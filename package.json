@@ -3,6 +3,8 @@
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
+  "packageManager": "pnpm@9.15.5",
+
   "scripts": {
      "dev": "turbo run dev --filter=web-amino",
     "build": "turbo run build --filter=web-amino",

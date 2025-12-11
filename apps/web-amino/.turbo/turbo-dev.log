@@ -1,0 +1,56 @@
+
+> web-amino@0.1.0 dev /Users/davidvalentine/Documents/Digital-Garden/apps/web-amino
+> next dev --webpack
+
+ [33m[1m⚠[22m[39m Invalid next.config.ts options detected: 
+ [33m[1m⚠[22m[39m     Unrecognized key(s) in object: 'reactCompiler' at "experimental"
+ [33m[1m⚠[22m[39m See more info here: https://nextjs.org/docs/messages/invalid-next-config
+ [33m[1m⚠[22m[39m `experimental.reactCompiler` has been moved to `reactCompiler`. Please update your next.config.ts file accordingly.
+ [33m[1m⚠[22m[39m Warning: Next.js inferred your workspace root, but it may not be correct.
+ We detected multiple lockfiles and selected the directory of /Users/davidvalentine/package-lock.json as the root directory.
+ To silence this warning, set `outputFileTracingRoot` in your Next.js config, or consider removing one of the lockfiles if it's not needed.
+   See https://nextjs.org/docs/app/api-reference/config/next-config-js/output#caveats for more information.
+ Detected additional lockfiles: 
+   * /Users/davidvalentine/Documents/Digital-Garden/pnpm-lock.yaml
+
+   [1m[38;2;173;127;168m▲ Next.js 16.0.1[39m[22m (webpack)
+   - Local:        http://localhost:3000
+   - Network:      http://192.168.0.94:3000
+   - Experiments (use with caution):
+     [1m✓[22m mdxRs
+     ? [9mreactCompiler[29m (invalid experimental key)
+
+ [32m[1m✓[22m[39m Starting...
+ [32m[1m✓[22m[39m Ready in 1431ms
+ GET / [32m200[39m in 3.4s[2m (compile: 3.4s, render: 68ms)[22m
+ GET / [32m200[39m in 109ms[2m (compile: 85ms, render: 24ms)[22m
+ GET / [32m200[39m in 51ms[2m (compile: 38ms, render: 13ms)[22m
+ GET / [32m200[39m in 41ms[2m (compile: 28ms, render: 14ms)[22m
+ GET / [32m200[39m in 37ms[2m (compile: 22ms, render: 15ms)[22m
+ GET / [32m200[39m in 74ms[2m (compile: 58ms, render: 16ms)[22m
+ GET / [32m200[39m in 44ms[2m (compile: 31ms, render: 13ms)[22m
+ GET / [32m200[39m in 37ms[2m (compile: 21ms, render: 16ms)[22m
+ GET / [32m200[39m in 47ms[2m (compile: 27ms, render: 20ms)[22m
+ GET / [32m200[39m in 42ms[2m (compile: 27ms, render: 15ms)[22m
+ GET / [32m200[39m in 32ms[2m (compile: 22ms, render: 10ms)[22m
+ GET / [32m200[39m in 34ms[2m (compile: 22ms, render: 12ms)[22m
+ GET / [32m200[39m in 83ms[2m (compile: 6ms, render: 77ms)[22m
+ GET / [32m200[39m in 41ms[2m (compile: 30ms, render: 12ms)[22m
+ GET / [32m200[39m in 31ms[2m (compile: 23ms, render: 8ms)[22m
+ GET / [32m200[39m in 41ms[2m (compile: 31ms, render: 10ms)[22m
+ GET / [32m200[39m in 31ms[2m (compile: 20ms, render: 12ms)[22m
+ GET / [32m200[39m in 41ms[2m (compile: 27ms, render: 14ms)[22m
+ GET / [32m200[39m in 38ms[2m (compile: 28ms, render: 10ms)[22m
+ GET / [32m200[39m in 33ms[2m (compile: 24ms, render: 10ms)[22m
+ GET / [32m200[39m in 40ms[2m (compile: 26ms, render: 15ms)[22m
+ GET / [32m200[39m in 32ms[2m (compile: 23ms, render: 9ms)[22m
+ GET / [32m200[39m in 30ms[2m (compile: 21ms, render: 9ms)[22m
+ GET / [32m200[39m in 33ms[2m (compile: 21ms, render: 13ms)[22m
+ GET / [32m200[39m in 31ms[2m (compile: 21ms, render: 10ms)[22m
+ GET / [32m200[39m in 35ms[2m (compile: 23ms, render: 12ms)[22m
+ GET / [32m200[39m in 30ms[2m (compile: 21ms, render: 9ms)[22m
+ GET / [32m200[39m in 39ms[2m (compile: 27ms, render: 12ms)[22m
+ GET / [32m200[39m in 43ms[2m (compile: 27ms, render: 17ms)[22m
+ GET / [32m200[39m in 33ms[2m (compile: 22ms, render: 10ms)[22m
+ GET / [32m200[39m in 316ms[2m (compile: 63ms, render: 253ms)[22m
+ GET / [32m200[39m in 304ms[2m (compile: 112ms, render: 192ms)[22m
