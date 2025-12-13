@@ -1,0 +1,11 @@
+{
+  "color": {
+    "brand": {
+      "primary": {
+        "value": "{color.blue.500}"
+      }
+    }
+  },
+  "spacing": {},
+  "font": {}
+}

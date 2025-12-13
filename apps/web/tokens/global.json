@@ -1,0 +1,29 @@
+{
+  "color": {
+    "blue": {
+      "500": {
+        "value": "#3B82F6"
+      }
+    }
+  },
+  "spacing": {
+    "size": {
+      "xs": { "value": ".25rem" },
+      "sm": { "value": ".5rem" },
+      "md": { "value": "1rem" },
+      "lg": { "value": "2rem" }
+    }
+  },
+  "font": {
+    "weight": {
+      "regular": {
+        "value": 400
+      },
+      "bold": {
+        "value": 700
+      }
+    },
+    "line-height": {},
+    "letter-spacing": {}
+  }
+}
