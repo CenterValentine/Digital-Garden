@@ -1,0 +1,117 @@
+
+
+// Docs: https://pris.ly/d/prisma-schema
+// Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client"
+  output   = "../lib/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// --- 1. CORE USER ---
+model User {
+  id              String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  username        String       @unique @db.VarChar(50)
+  passwordHash    String       @db.Char(60)
+  email           String       @unique @db.VarChar(255)
+
+  // Relationships
+  structuredDocuments StructuredDocument[]
+  documentHistory     DocumentHistory[]
+}
+
+// --- 2. UNIVERSAL DOCUMENT STORE (CONTENT) ---
+model StructuredDocument {
+  id             String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ownerId        String         @db.Uuid
+  docType        String         @db.VarChar(50) // e.g., 'Note', 'Project', 'Folder', 'Resume'
+  title          String         @db.VarChar(255)
+  slug           String         @unique @db.VarChar(255)
+  contentData    Json           @db.JsonB // Stores the content (Markdown or structured JSON)
+  isPublished    Boolean        @default(false)
+  updatedAt      DateTime       @updatedAt @db.Timestamptz()
+
+  // Hierarchy
+  parentId       String?        @db.Uuid
+  parent         StructuredDocument? @relation("Hierarchy", fields: [parentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  children       StructuredDocument[] @relation("Hierarchy")
+
+  // Relationships
+  owner          User             @relation(fields: [ownerId], references: [id])
+  history        DocumentHistory[]
+  documentPaths  DocumentPath?
+  sourceLinks    DocumentLink[]   @relation("SourceDocument")
+  targetLinks    DocumentLink[]   @relation("TargetDocument")
+  documentTags   DocumentTag[]
+
+  // Indexes (Crucial for performance)
+  @@index([ownerId, docType, isPublished])
+  @@index([parentId])
+}
+
+// --- 3. DOCUMENT HISTORY ---
+model DocumentHistory {
+  id             BigInt         @id @default(autoincrement())
+  documentId     String         @db.Uuid
+  revisionData   Json           @db.JsonB // Snapshot of the contentData
+  editedById     String         @db.Uuid
+  editedAt       DateTime       @default(now()) @db.Timestamptz()
+
+  document       StructuredDocument @relation(fields: [documentId], references: [id])
+  editor         User               @relation(fields: [editedById], references: [id])
+
+  @@index([documentId])
+  @@index([editedAt])
+}
+
+// --- 4. DOCUMENT PATHS (MATERIALIZED PATH) ---
+model DocumentPath {
+  documentId     String         @id @db.Uuid
+  pathSlug       String         @unique @db.VarChar(1024) // e.g., 'tech/databases/rcte-guide'
+  pathText       String         @unique @db.VarChar(1024) // e.g., 'tech.databases.rcte-guide'
+  depth          Int            @db.SmallInt
+
+  document       StructuredDocument @relation(fields: [documentId], references: [id])
+}
+
+// --- 5. DOCUMENT LINKS (WIKILINKS, SECTION REFS) ---
+model DocumentLink {
+  sourceId        String        @db.Uuid
+  targetId        String        @db.Uuid
+  linkType        String        @db.VarChar(50)
+  targetFragment  String?       @db.VarChar(255) // The anchor name (e.g., '#overview')
+  displayOrder    Int           @default(0)
+  updatedAt       DateTime      @default(now()) @db.Timestamptz()
+
+  source          StructuredDocument @relation("SourceDocument", fields: [sourceId], references: [id])
+  target          StructuredDocument @relation("TargetDocument", fields: [targetId], references: [id])
+
+  @@id([sourceId, targetId]) // Composite Primary Key
+  @@index([targetId, sourceId]) // For Backlinks
+  @@index([targetFragment])
+  @@index([displayOrder])
+}
+
+// --- 6. TAGGING SYSTEM ---
+model Tag {
+  id              BigInt         @id @default(autoincrement())
+  name            String         @unique @db.VarChar(100) // Standardized tag name
+  slug            String         @unique @db.VarChar(100)
+
+  documentTags    DocumentTag[]
+}
+
+model DocumentTag {
+  documentId      String         @db.Uuid
+  tagId           BigInt
+
+  document        StructuredDocument @relation(fields: [documentId], references: [id])
+  tag             Tag                @relation(fields: [tagId], references: [id])
+
+  @@id([documentId, tagId]) // Composite Primary Key
+  @@index([tagId, documentId]) // For searching documents by tag
+}
