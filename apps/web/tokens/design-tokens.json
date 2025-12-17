@@ -1,0 +1,120 @@
+{
+  "color": {
+    "intent": {
+      "primary": {
+        "value": "#10b981",
+        "description": "Primary intent color - Green from branch nodes"
+      },
+      "secondary": {
+        "value": "#3b82f6",
+        "description": "Secondary intent color - Blue from branch nodes"
+      },
+      "accent": {
+        "value": "#f59e0b",
+        "description": "Accent intent color - Amber from branch nodes"
+      },
+      "warning": {
+        "value": "#fb923c",
+        "description": "Warning intent color - Orange from branch nodes"
+      },
+      "danger": {
+        "value": "#ef4444",
+        "description": "Danger intent color - Red for destructive actions"
+      },
+      "neutral": {
+        "value": "#6b7280",
+        "description": "Neutral intent color - Gray"
+      }
+    },
+    "surface": {
+      "default": {
+        "value": "var(--background)",
+        "description": "Default surface color"
+      },
+      "elevated": {
+        "value": "#ffffff",
+        "description": "Elevated surface color"
+      },
+      "overlay": {
+        "value": "rgba(0, 0, 0, 0.5)",
+        "description": "Overlay surface color"
+      }
+    },
+    "state": {
+      "hover": {
+        "value": "rgba(16, 185, 129, 0.1)",
+        "description": "Hover state color"
+      },
+      "focus": {
+        "value": "rgba(59, 130, 246, 0.2)",
+        "description": "Focus state color"
+      },
+      "active": {
+        "value": "rgba(16, 185, 129, 0.2)",
+        "description": "Active state color"
+      },
+      "disabled": {
+        "value": "rgba(107, 114, 128, 0.3)",
+        "description": "Disabled state color"
+      }
+    }
+  },
+  "spacing": {
+    "xs": {
+      "value": "var(--spacing-size-xs)",
+      "description": "Extra small spacing"
+    },
+    "sm": {
+      "value": "var(--spacing-size-sm)",
+      "description": "Small spacing"
+    },
+    "md": {
+      "value": "var(--spacing-size-md)",
+      "description": "Medium spacing"
+    },
+    "lg": {
+      "value": "var(--spacing-size-lg)",
+      "description": "Large spacing"
+    }
+  },
+  "typography": {
+    "fontSize": {
+      "xs": {
+        "value": "0.75rem",
+        "lineHeight": "1rem"
+      },
+      "sm": {
+        "value": "0.875rem",
+        "lineHeight": "1.25rem"
+      },
+      "base": {
+        "value": "1rem",
+        "lineHeight": "1.5rem"
+      },
+      "lg": {
+        "value": "1.125rem",
+        "lineHeight": "1.75rem"
+      },
+      "xl": {
+        "value": "1.25rem",
+        "lineHeight": "1.875rem"
+      }
+    }
+  },
+  "effect": {
+    "glow": {
+      "sm": {
+        "value": "drop-shadow(0 0 2px currentColor) drop-shadow(0 0 4px currentColor)",
+        "description": "Small neon glow effect"
+      },
+      "md": {
+        "value": "drop-shadow(0 0 4px currentColor) drop-shadow(0 0 8px currentColor) drop-shadow(0 0 12px currentColor)",
+        "description": "Medium neon glow effect"
+      },
+      "lg": {
+        "value": "drop-shadow(0 0 8px currentColor) drop-shadow(0 0 16px currentColor) drop-shadow(0 0 24px currentColor)",
+        "description": "Large neon glow effect"
+      }
+    }
+  }
+}

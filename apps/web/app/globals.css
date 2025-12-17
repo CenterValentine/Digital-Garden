@@ -54,3 +54,22 @@ nav[class*="fixed"] {
   left: 0 !important;
   right: 0 !important;
 }
+
+
+/* Neon glow filters matching branch node aesthetic */
+.neon-glow-sm {
+  filter: drop-shadow(0 0 2px currentColor) 
+          drop-shadow(0 0 4px currentColor);
+}
+
+.neon-glow-md {
+  filter: drop-shadow(0 0 4px currentColor) 
+          drop-shadow(0 0 8px currentColor)
+          drop-shadow(0 0 12px currentColor);
+}
+
+.neon-glow-lg {
+  filter: drop-shadow(0 0 8px currentColor) 
+          drop-shadow(0 0 16px currentColor)
+          drop-shadow(0 0 24px currentColor);
+}
