@@ -1,9 +1,42 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import CompactLogo from "../logo/CompactLogo";
+import type { SessionData } from "@/lib/auth/types";
 
 export default function NavBar() {
+  const router = useRouter();
+  const [session, setSession] = useState<SessionData | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    // Fetch session on mount
+    fetch("/api/auth/session")
+      .then((res) => res.json())
+      .then((data: { success: boolean; data: SessionData | null }) => {
+        if (data.success && data.data) {
+          setSession(data.data);
+        }
+        setIsLoading(false);
+      })
+      .catch(() => {
+        setIsLoading(false);
+      });
+  }, []);
+
+  const handleSignOut = async () => {
+    try {
+      await fetch("/api/auth/sign-out", { method: "POST" });
+      setSession(null);
+      router.push("/");
+      router.refresh();
+    } catch (error) {
+      console.error("Sign out error:", error);
+    }
+  };
+
   return (
     <nav
       className="fixed top-0 left-0 right-0 z-[100] bg-white border-b border-gray-200 shadow-sm"
@@ -70,6 +103,35 @@ export default function NavBar() {
             >
               Contact
             </Link>
+          </div>
+
+          {/* Auth section */}
+          <div className="flex flex-row items-center gap-4">
+            {isLoading ? (
+              <div className="px-4 py-2 text-sm text-gray-500">Loading...</div>
+            ) : session ? (
+              <>
+                <span className="px-4 py-2 text-sm text-gray-700">
+                  {session.user.username}
+                </span>
+                <button
+                  onClick={handleSignOut}
+                  className="px-4 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-100 transition-colors"
+                >
+                  Sign Out
+                </button>
+              </>
+            ) : (
+              <Link
+                href="/sign-in"
+                className="px-4 py-2 rounded-md text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 transition-colors no-underline"
+                style={{
+                  textDecoration: "none",
+                }}
+              >
+                Sign In
+              </Link>
+            )}
           </div>
         </div>
       </div>
