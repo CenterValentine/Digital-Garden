@@ -2,23 +2,118 @@
 @import "../dist/variables.css";
 @import "../dist/theme-a.css";
 
+@custom-variant dark (&:is(.dark *));
+
 :root {
+  --font-size: 16px;
+  
+  /* David's Digital Garden Color Palette */
+  --teal-dark: #3D5A5B;
+  --teal-mid: #5A7A7A;
+  --teal-light: #7A9A9A;
+  
+  --gold-primary: #C9A86C;
+  --gold-dark: #8B7355;
+  --gold-light: #E5D4B0;
+  
+  --leaf-primary: #4CAF50;
+  --leaf-light: #81C784;
+  --leaf-bright: #A5D6A7;
+  
+  --intent-primary: #4CAF50;
+  --intent-secondary: #C9A86C;
+  --intent-accent: #5A7A7A;
+  --intent-danger: #E57373;
+  --intent-neutral: #7A9A9A;
+
+  /* Default Tailwind Tokens */
   --background: #ffffff;
   --foreground: #171717;
+  --card: #ffffff;
+  --card-foreground: #171717;
+  --popover: #ffffff;
+  --popover-foreground: #171717;
+  --primary: #3D5A5B;
+  --primary-foreground: #E5D4B0;
+  --secondary: #5A7A7A;
+  --secondary-foreground: #E5D4B0;
+  --muted: #ececf0;
+  --muted-foreground: #717182;
+  --accent: #C9A86C;
+  --accent-foreground: #3D5A5B;
+  --destructive: #E57373;
+  --destructive-foreground: #ffffff;
+  --border: rgba(61, 90, 91, 0.2);
+  --input: transparent;
+  --input-background: #f3f3f5;
+  --ring: #4CAF50;
+  --radius: 0.625rem;
+  --font-weight-medium: 500;
+  --font-weight-normal: 400;
+}
+
+.dark {
+  --background: #3D5A5B;
+  --foreground: #E5D4B0;
+  --card: #2D4A4B;
+  --card-foreground: #E5D4B0;
+  --popover: #2D4A4B;
+  --popover-foreground: #E5D4B0;
+  --primary: #4CAF50;
+  --primary-foreground: #ffffff;
+  --secondary: #C9A86C;
+  --secondary-foreground: #3D5A5B;
+  --muted: #5A7A7A;
+  --muted-foreground: #7A9A9A;
+  --accent: #C9A86C;
+  --accent-foreground: #3D5A5B;
+  --destructive: #E57373;
+  --destructive-foreground: #ffffff;
+  --border: rgba(229, 212, 176, 0.2);
+  --input: transparent;
+  --ring: #81C784;
 }
 
 @theme inline {
+  /* Standard Tailwind semantic colors */
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  /* David's Digital Garden Palette */
+  --color-teal-dark: var(--teal-dark);
+  --color-teal-mid: var(--teal-mid);
+  --color-teal-light: var(--teal-light);
+  --color-gold-primary: var(--gold-primary);
+  --color-gold-dark: var(--gold-dark);
+  --color-gold-light: var(--gold-light);
+  --color-leaf-primary: var(--leaf-primary);
+  --color-leaf-light: var(--leaf-light);
+  --color-leaf-bright: var(--leaf-bright);
+
+  /* Fonts and radius */
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
 }
 
 html,

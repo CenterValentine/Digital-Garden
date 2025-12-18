@@ -3,33 +3,50 @@ module.exports = {
     extend: {
       fontWeight: {
         regular: "var(--font-weight-regular)",
+        medium: "var(--font-weight-medium)",
         bold: "var(--font-weight-bold)",
       },
       colors: {
         brand: {
           primary: "var(--color-brand-primary)",
         },
-        // Intent-based semantic tokens (from branch node colors)
+        // David's Digital Garden Color Palette (using CSS variables)
+        teal: {
+          dark: "var(--teal-dark)",
+          mid: "var(--teal-mid)",
+          light: "var(--teal-light)",
+        },
+        gold: {
+          primary: "var(--gold-primary)",
+          dark: "var(--gold-dark)",
+          light: "var(--gold-light)",
+        },
+        leaf: {
+          primary: "var(--leaf-primary)",
+          light: "var(--leaf-light)",
+          bright: "var(--leaf-bright)",
+        },
+        // Intent-based semantic tokens (from Digital Garden palette)
         intent: {
-          primary: "#10b981", // Green (from branch nodes)
-          secondary: "#3b82f6", // Blue
-          accent: "#f59e0b", // Amber
-          warning: "#fb923c", // Orange
-          danger: "#ef4444", // Red (for destructive actions)
-          neutral: "#6b7280", // Gray
+          primary: "var(--intent-primary)",
+          secondary: "var(--intent-secondary)",
+          accent: "var(--intent-accent)",
+          warning: "var(--gold-dark)",
+          danger: "var(--intent-danger)",
+          neutral: "var(--intent-neutral)",
         },
         // Role-based tokens (surfaces, borders, etc.)
         surface: {
           default: "var(--background)",
-          elevated: "#ffffff",
-          overlay: "rgba(0, 0, 0, 0.5)",
+          elevated: "var(--card)",
+          overlay: "rgba(61, 90, 91, 0.8)",
         },
         // State-based tokens
         state: {
-          hover: "rgba(16, 185, 129, 0.1)",
-          focus: "rgba(59, 130, 246, 0.2)",
-          active: "rgba(16, 185, 129, 0.2)",
-          disabled: "rgba(107, 114, 128, 0.3)",
+          hover: "rgba(201, 168, 108, 0.15)", // Gold hover
+          focus: "rgba(76, 175, 80, 0.2)", // Leaf focus
+          active: "rgba(76, 175, 80, 0.3)", // Leaf active
+          disabled: "rgba(122, 154, 154, 0.3)", // Teal disabled
         },
       },
       spacing: {
@@ -50,10 +67,24 @@ module.exports = {
         "5xl": ["3rem", { lineHeight: "1" }],
       },
       boxShadow: {
+        // Neon glow effects for tree nodes
+        "glow-leaf": "0 0 20px rgba(76, 175, 80, 0.6)",
+        "glow-gold": "0 0 15px rgba(201, 168, 108, 0.4)",
+        "glow-success": "0 0 25px rgba(129, 199, 132, 0.5)",
+        "glow-warning": "0 0 12px rgba(139, 115, 85, 0.4)",
+        // Generic glow utilities
         glow: "0 0 4px currentColor, 0 0 8px currentColor, 0 0 12px currentColor",
         "glow-sm": "0 0 2px currentColor, 0 0 4px currentColor",
-        "glow-md": "0 0 4px currentColor, 0 0 8px currentColor, 0 0 12px currentColor",
-        "glow-lg": "0 0 8px currentColor, 0 0 16px currentColor, 0 0 24px currentColor",
+        "glow-md":
+          "0 0 4px currentColor, 0 0 8px currentColor, 0 0 12px currentColor",
+        "glow-lg":
+          "0 0 8px currentColor, 0 0 16px currentColor, 0 0 24px currentColor",
+      },
+      borderRadius: {
+        sm: "calc(var(--radius) - 4px)",
+        md: "calc(var(--radius) - 2px)",
+        lg: "var(--radius)",
+        xl: "calc(var(--radius) + 4px)",
       },
     },
   },
