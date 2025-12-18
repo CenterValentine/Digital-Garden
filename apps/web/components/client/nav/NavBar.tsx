@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import CompactLogo from "../logo/CompactLogo";
+import { Button } from "@/components/ui/button";
 import type { SessionData } from "@/lib/auth/types";
 
 export default function NavBar() {
@@ -38,99 +39,133 @@ export default function NavBar() {
   };
 
   return (
-    <nav
-      className="fixed top-0 left-0 right-0 z-[100] bg-white border-b border-gray-200 shadow-sm"
-      style={{
-        position: "fixed",
-        top: 0,
-        left: 0,
-        right: 0,
-        zIndex: 100,
-      }}
-    >
-      <div className="w-full px-4 sm:px-6 lg:px-8">
-        <div className="flex flex-row items-center h-16 w-full">
-          {/* Logo inline with navigation */}
-          <Link
-            href="/"
-            className="flex items-center hover:opacity-80 transition-opacity flex-shrink-0 mr-8 no-underline"
-            style={{ textDecoration: "none" }}
-          >
-            <div className="h-10 w-10 flex items-center justify-center">
-              <CompactLogo />
-            </div>
-          </Link>
+    <nav className="fixed top-0 left-0 right-0 z-[100] bg-card border-b border-border shadow-sm h-20">
+      <div className="w-full h-full">
+        <div className="flex flex-row items-stretch justify-center h-full w-full">
+          {/* Left navigation buttons */}
+          <div className="flex flex-row items-stretch flex-1 justify-end">
+            <Button variant="nav-item" size="full" asChild>
+              <Link href="/">Home</Link>
+            </Button>
+            <Button variant="nav-item" size="full" asChild>
+              <Link href="/about">About</Link>
+            </Button>
+          </div>
 
-          {/* Navigation buttons - inline and spread across screen */}
-          <div className="flex flex-row items-center gap-8 flex-1">
+          {/* Spacing container - displaces buttons to make room for medallion */}
+          <div className="w-36 shrink-0" aria-hidden="true" />
+
+          {/* Center logo with medallion - overflows navbar, absolutely positioned */}
+          <div className="absolute left-1/2 -translate-x-1/2 top-0 flex items-center justify-center mt-1">
             <Link
               href="/"
-              className="px-4 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-100 transition-colors no-underline"
-              style={{
-                textDecoration: "none",
-                color: "inherit",
-              }}
+              className="absolute top-0 flex items-start justify-center no-underline group z-[101] "
             >
-              Home
-            </Link>
-            <Link
-              href="/about"
-              className="px-4 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-100 transition-colors no-underline"
-              style={{
-                textDecoration: "none",
-                color: "inherit",
-              }}
-            >
-              About
-            </Link>
-            <Link
-              href="/content"
-              className="px-4 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-100 transition-colors no-underline"
-              style={{
-                textDecoration: "none",
-                color: "inherit",
-              }}
-            >
-              Content
-            </Link>
-            <Link
-              href="/contact"
-              className="px-4 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-100 transition-colors no-underline"
-              style={{
-                textDecoration: "none",
-                color: "inherit",
-              }}
-            >
-              Contact
+              {/* White background circle - sized to just contain text with minimal gap */}
+              <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-32 h-32 rounded-full bg-background" />
+
+              {/* SVG with curved text - sized to match background */}
+              <svg viewBox="0 0 100 100" className="w-32 h-32 relative z-10">
+                <defs>
+                  {/* 
+                    Arc positioning guide:
+                    - The "50" is the Y position (vertical center of viewBox)
+                    - INCREASE to move text DOWN, DECREASE to move UP
+                    - The "35 35" is the arc radius - smaller = tighter curve
+                    - "15" and "85" are left/right X endpoints
+                  */}
+                  {/* Arc for "David's" - shifted down to sit just above medallion */}
+                  <path
+                    id="textArcTop"
+                    d="M 15 40 A 25 25 0 0 1 85 50"
+                    fill="none"
+                  />
+                  {/* Arc for "Digital Garden" - shifted down to sit just below medallion */}
+                  <path
+                    id="textArcBottom"
+                    d="M 9 73 A 45 45 0 0 0 89 73"
+                    fill="none"
+                  />
+                </defs>
+
+                {/* "David's" curved on top - 3x size */}
+                <text
+                  fontSize="12.75"
+                  fontWeight="1000"
+                  letterSpacing="1.5"
+                  style={{ fill: "var(--gold-primary)" }}
+                >
+                  <textPath
+                    href="#textArcTop"
+                    startOffset="50%"
+                    textAnchor="middle"
+                  >
+                    David&apos;s
+                  </textPath>
+                </text>
+
+                {/* "Digital Garden" curved on bottom */}
+                <text
+                  fontSize="11"
+                  fontWeight="600"
+                  letterSpacing="1"
+                  style={{ fill: "var(--gold-primary)" }}
+                >
+                  <textPath
+                    href="#textArcBottom"
+                    startOffset="50%"
+                    textAnchor="middle"
+                  >
+                    Digital Garden
+                  </textPath>
+                </text>
+              </svg>
+
+              {/* Medallion centered - fills most of center, minimal gap to text */}
+              <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-20">
+                <div className="relative h-24 w-24 flex items-center justify-center">
+                  {/* Medallion ring */}
+                  <div className="absolute inset-0 rounded-full border-2 border-gold-primary bg-gradient-to-br from-gold-light/30 to-teal-dark/40 shadow-glow-gold group-hover:shadow-glow-leaf transition-shadow duration-300" />
+                  {/* Inner ring */}
+                  <div className="absolute inset-0.5 rounded-full border border-gold-dark/50 bg-background" />
+                  {/* Logo container */}
+                  <div className="relative h-20 w-20 flex items-center justify-center z-10">
+                    <CompactLogo />
+                  </div>
+                </div>
+              </div>
             </Link>
           </div>
 
-          {/* Auth section */}
-          <div className="flex flex-row items-center gap-4">
+          {/* Right navigation buttons */}
+          <div className="flex flex-row items-stretch flex-1 justify-start">
+            <Button variant="nav-item" size="full" asChild>
+              <Link href="/content">Content</Link>
+            </Button>
+            <Button variant="nav-item" size="full" asChild>
+              <Link href="/contact">Contact</Link>
+            </Button>
+          </div>
+
+          {/* Auth section - absolute positioned to the right, vertically centered */}
+          <div className="absolute right-4 top-1/2 -translate-y-1/2 flex flex-row items-center gap-4">
             {isLoading ? (
-              <div className="px-4 py-2 text-sm text-gray-500">Loading...</div>
+              <span className="px-4 py-2 text-sm text-muted-foreground">
+                Loading...
+              </span>
             ) : session ? (
               <>
-                <span className="px-4 py-2 text-sm text-gray-700">
+                <span className="px-4 py-2 text-sm text-foreground">
                   {session.user.username}
                 </span>
-                <button
-                  onClick={handleSignOut}
-                  className="px-4 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-100 transition-colors"
-                >
+                <Button variant="ghost" onClick={handleSignOut}>
                   Sign Out
-                </button>
+                </Button>
               </>
             ) : (
-              <Link
-                href="/sign-in"
-                className="px-4 py-2 rounded-md text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 transition-colors no-underline"
-                style={{
-                  textDecoration: "none",
-                }}
-              >
-                Sign In
-              </Link>
+              <Button variant="gradient-gold-soft" asChild>
+                <Link href="/sign-in">Sign In</Link>
+              </Button>
             )}
           </div>
         </div>

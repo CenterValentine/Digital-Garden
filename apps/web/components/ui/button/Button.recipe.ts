@@ -31,6 +31,9 @@ export const buttonVariants = cva(
         // NavBar variant - white background, gold gradient on hover, max height for 2:1 aspect
         "nav-item":
           "rounded-none bg-background text-foreground hover:bg-gradient-to-b hover:from-gold-light hover:via-gold-primary hover:to-gold-dark hover:text-white transition-all duration-300 max-h-12 my-auto",
+        // Soft gold gradient - muted, elegant
+        "gradient-gold-soft":
+          "bg-gradient-to-b from-gold-light/80 via-gold-primary/70 to-gold-dark/60 text-teal-dark hover:from-gold-light hover:via-gold-primary hover:to-gold-dark transition-all duration-300",
       },
       size: {
         default: "h-9 px-4 py-2 has-[>svg]:px-3",

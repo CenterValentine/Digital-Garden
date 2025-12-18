@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import React from "react";
 import { Geist, Geist_Mono } from "next/font/google";
+import "./globals.css";
 
 import Head from "./layout/head";
 import NavBar from "@/components/client/nav/NavBar";
@@ -29,9 +30,9 @@ export default function RootLayout({
   return (
     <html lang="en" className="theme-a">
       <Head></Head>
-      <body className="min-h-screen w-full overflow-hidden relative">
+      <body className="min-h-screen w-full relative">
         <NavBar />
-        {children}
+        <main className="pt-20">{children}</main>
       </body>
     </html>
   );
