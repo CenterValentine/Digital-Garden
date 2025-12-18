@@ -3,6 +3,7 @@ export {
   CardHeader,
   CardFooter,
   CardTitle,
+  CardAction,
   CardDescription,
   CardContent,
   type CardProps,
@@ -12,6 +13,7 @@ export {
   cardHeaderVariants,
   cardTitleVariants,
   cardDescriptionVariants,
+  cardActionVariants,
   cardContentVariants,
   cardFooterVariants,
 } from "./Card.recipe";

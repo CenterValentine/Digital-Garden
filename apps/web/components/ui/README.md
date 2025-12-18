@@ -1,6 +1,6 @@
-# Design System Component Library
+# David's Digital Garden Design System
 
-This directory contains reusable UI components built with Tailwind CSS following the **Intent-Role-State** pattern from our design system theory.
+This directory contains reusable UI components built with Tailwind CSS following the **Intent-Role-State** pattern, styled with the Digital Garden color palette.
 
 ## Design Principles
 
@@ -9,29 +9,29 @@ This directory contains reusable UI components built with Tailwind CSS following
 Our components follow a three-dimensional variant system:
 
 1. **Intent**: Semantic meaning (primary, secondary, danger, success, etc.)
-
    - Maps to semantic tokens
    - Communicates purpose, not appearance
-   - Example: `intent="primary"` instead of `color="green"`
+   - Example: `variant="leaf"` for growth/success actions
 
 2. **Role**: Component type (button, card, input, etc.)
-
    - Defines base styling and layout rules
    - Encodes accessibility and affordances
-   - Example: `<Button>` vs `<Card>`
+   - Example: `<Button>` vs `<Card>` vs `<TreeNode>`
 
 3. **State**: Transient modifications (hover, focus, disabled, etc.)
    - Modifies intent or role
    - Non-optional for accessibility
-   - Example: `state="disabled"` or `state="loading"`
+   - Example: `state="active"` or `state="disabled"`
 
 ### Visual Language
 
-Inspired by our branch node navigation system:
+Inspired by the Digital Garden logo - organic growth meets technology:
 
-- **Colors**: Green (#10b981), Blue (#3b82f6), Amber (#f59e0b), Orange (#fb923c)
-- **Effects**: Neon glows, subtle shadows, gradient backgrounds
-- **Aesthetics**: Circuit/tech aesthetic, modern and clean
+- **Teal Palette**: #3D5A5B (dark), #5A7A7A (mid), #7A9A9A (light) - Depth/connection
+- **Gold Palette**: #C9A86C (primary), #8B7355 (dark), #E5D4B0 (light) - Knowledge/foundation
+- **Leaf Palette**: #4CAF50 (primary), #81C784 (light), #A5D6A7 (bright) - Growth/success
+- **Effects**: Neon glows, circuit patterns, organic branching
+- **Aesthetics**: Circuit board roots + organic tree branches
 
 ## Components
 
@@ -178,39 +178,102 @@ import { Prose } from "@/components/ui/prose";
 
 ## Design Tokens
 
-### Semantic Color Tokens
+### David's Digital Garden Color Palette
 
-Colors are named by purpose, not appearance:
+#### Teal (Depth/Connection)
 
-- `intent-primary`: #10b981 (Green)
-- `intent-secondary`: #3b82f6 (Blue)
-- `intent-accent`: #f59e0b (Amber)
-- `intent-warning`: #fb923c (Orange)
-- `intent-danger`: #ef4444 (Red)
-- `intent-neutral`: #6b7280 (Gray)
+- `teal-dark`: #3D5A5B - Primary backgrounds, deep surfaces
+- `teal-mid`: #5A7A7A - Secondary backgrounds, overlays
+- `teal-light`: #7A9A9A - Muted text, borders
 
-### Surface Tokens
+#### Gold (Knowledge/Foundation)
 
-- `surface-default`: Background color
-- `surface-elevated`: Elevated surfaces
-- `surface-overlay`: Overlay backgrounds
+- `gold-primary`: #C9A86C - Headlines, CTAs, primary actions
+- `gold-dark`: #8B7355 - Hover states, secondary gold
+- `gold-light`: #E5D4B0 - Highlights, selected states
+
+#### Leaf (Growth/Success)
+
+- `leaf-primary`: #4CAF50 - Success states, growth indicators
+- `leaf-light`: #81C784 - Hover on success, light accents
+- `leaf-bright`: #A5D6A7 - Highlights, new content badges
+
+### Semantic Intent Tokens
+
+- `intent-primary`: #4CAF50 (Leaf green - growth/success)
+- `intent-secondary`: #C9A86C (Gold - knowledge/foundation)
+- `intent-accent`: #5A7A7A (Teal - connection)
+- `intent-danger`: #E57373 (Muted red)
+- `intent-neutral`: #7A9A9A (Teal light)
 
 ### State Tokens
 
-- `state-hover`: Hover state background
-- `state-focus`: Focus ring color
-- `state-active`: Active state background
-- `state-disabled`: Disabled state opacity
+- `state-hover`: rgba(201, 168, 108, 0.15) - Gold hover
+- `state-focus`: rgba(76, 175, 80, 0.2) - Leaf focus
+- `state-active`: rgba(76, 175, 80, 0.3) - Leaf active
+- `state-disabled`: rgba(122, 154, 154, 0.3) - Teal disabled
 
 ## Neon Glow Effects
 
-Inspired by branch node aesthetics, we provide utility classes for neon glow effects:
+Inspired by the circuit board aesthetic, we provide utility classes for neon glow effects:
 
 ```tsx
-<div className="neon-glow-sm text-intent-primary">Small glow</div>
-<div className="neon-glow-md text-intent-secondary">Medium glow</div>
-<div className="neon-glow-lg text-intent-accent">Large glow</div>
+<div className="neon-glow-sm text-leaf-primary">Small glow (growth)</div>
+<div className="neon-glow-md text-gold-primary">Medium glow (knowledge)</div>
+<div className="neon-glow-lg text-teal-light">Large glow (connection)</div>
 ```
+
+### Semantic Glow Shadows
+
+```tsx
+// Available as Tailwind shadow utilities
+shadow - glow - leaf; // Green glow for growth/success states
+shadow - glow - gold; // Gold glow for knowledge/hover states
+shadow - glow - success; // Light green glow for success feedback
+shadow - glow - warning; // Brown glow for warning states
+```
+
+---
+
+## TreeNode Component
+
+A specialized component for tree/branch navigation nodes.
+
+### Usage
+
+```tsx
+import { TreeNode, BranchLine } from "@/components/ui/tree-node";
+
+// Basic node
+<TreeNode type="default" state="active" />
+
+// Leaf node with glow
+<TreeNode type="leaf" state="success" showGlow label="Ideas" />
+
+// Branch lines
+<BranchLine type="circuit" color="gold" withJunctions />
+```
+
+### Node Types
+
+| Type       | Description                 |
+| ---------- | --------------------------- |
+| `default`  | Circular node               |
+| `leaf`     | Diamond-shaped leaf node    |
+| `junction` | Circular junction point     |
+| `root`     | Rounded rectangle root node |
+| `endpoint` | Small diamond endpoint      |
+
+### Node States
+
+| State      | Background   | Border       | Glow Color  |
+| ---------- | ------------ | ------------ | ----------- |
+| `default`  | teal-mid     | teal-light   | None        |
+| `active`   | leaf-primary | leaf-light   | Green       |
+| `hover`    | gold-primary | gold-light   | Gold        |
+| `success`  | leaf-light   | leaf-bright  | Light green |
+| `warning`  | gold-dark    | gold-primary | Brown       |
+| `disabled` | teal-light   | teal-mid     | None        |
 
 ## Accessibility
 

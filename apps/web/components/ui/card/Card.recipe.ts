@@ -1,62 +1,41 @@
 import { cva } from "class-variance-authority";
 
+// Card variants matching Figma Make output with Digital Garden palette
 export const cardVariants = cva(
-  "rounded-lg border bg-surface-default shadow-sm transition-all",
+  "bg-card text-card-foreground flex flex-col gap-6 rounded-xl border transition-all",
   {
     variants: {
       intent: {
-        default: "border-gray-200 dark:border-gray-800",
+        default: "border-border",
         highlight:
-          "border-intent-primary bg-intent-primary/5 dark:bg-intent-primary/10",
+          "border-leaf-primary bg-leaf-primary/5",
         warning:
-          "border-intent-warning bg-intent-warning/5 dark:bg-intent-warning/10",
-        error: "border-intent-danger bg-intent-danger/5 dark:bg-intent-danger/10",
-      },
-      size: {
-        compact: "p-4",
-        standard: "p-6",
-        jumbo: "p-8",
+          "border-gold-dark bg-gold-dark/10",
+        error: "border-destructive bg-destructive/5",
+        teal: "border-teal-mid bg-teal-dark/50 text-gold-light",
+        gold: "border-gold-primary bg-gold-dark/20 text-gold-light",
       },
     },
     defaultVariants: {
       intent: "default",
-      size: "standard",
     },
   }
 );
 
-export const cardHeaderVariants = cva("flex flex-col space-y-1.5", {
-  variants: {
-    size: {
-      compact: "mb-3",
-      standard: "mb-4",
-      jumbo: "mb-6",
-    },
-  },
-  defaultVariants: {
-    size: "standard",
-  },
-});
-
-export const cardTitleVariants = cva(
-  "text-2xl font-semibold leading-none tracking-tight"
+export const cardHeaderVariants = cva(
+  "@container/card-header grid auto-rows-min grid-rows-[auto_auto] items-start gap-1.5 px-6 pt-6 has-data-[slot=card-action]:grid-cols-[1fr_auto] [.border-b]:pb-6"
 );
 
-export const cardDescriptionVariants = cva(
-  "text-sm text-intent-neutral"
+export const cardTitleVariants = cva("leading-none font-medium");
+
+export const cardDescriptionVariants = cva("text-muted-foreground");
+
+export const cardActionVariants = cva(
+  "col-start-2 row-span-2 row-start-1 self-start justify-self-end"
 );
 
-export const cardContentVariants = cva("");
+export const cardContentVariants = cva("px-6 [&:last-child]:pb-6");
 
-export const cardFooterVariants = cva("flex items-center", {
-  variants: {
-    size: {
-      compact: "mt-3 pt-3",
-      standard: "mt-4 pt-4",
-      jumbo: "mt-6 pt-6",
-    },
-  },
-  defaultVariants: {
-    size: "standard",
-  },
-});
+export const cardFooterVariants = cva(
+  "flex items-center px-6 pb-6 [.border-t]:pt-6"
+);
