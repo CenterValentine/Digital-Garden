@@ -189,7 +189,7 @@ function setDebugActive(el: Element, active: boolean) {
  */
 
 export function useLogoAnimation(
-  svgRef: React.RefObject<SVGSVGElement>,
+  svgRef: React.RefObject<SVGSVGElement | null>,
   options?: LogoAnimationOptions
 ) {
   useEffect(() => {
