@@ -5,8 +5,13 @@ import React from "react";
 
 import { IntegratedCircuitNav } from "@/components/client/app-nav/IntegratedCircuitNav";
 import { BranchPresetName } from "@/lib/app-nav/branch-builder";
+import type { NavigationTree } from "@/lib/db/navigation";
 
-export default function AppNav() {
+interface AppNavProps {
+  navigationData?: NavigationTree;
+}
+
+export default function AppNav({ navigationData }: AppNavProps) {
   const [mounted, setMounted] = React.useState(false);
   const [progress, setProgress] = React.useState(0);
   const [scrollRotation, setScrollRotation] = React.useState<
@@ -59,12 +64,15 @@ export default function AppNav() {
     return () => window.removeEventListener("wheel", handleScroll);
   }, [mounted]);
 
-  const branchDepthConfigs = [
-    { branchId: 5, config: "binary" as BranchPresetName }, // Branch 5 has binary split
-    { branchId: 12, config: "trident" as BranchPresetName }, // Branch 12 has trident split
-    { branchId: 18, config: "deepBinary" as BranchPresetName }, // Branch 18 has deep binary split
-    { branchId: 23, config: "organic" as BranchPresetName }, // Branch 23 has organic branching
-  ];
+  // Convert navigation data to branch configs
+  const branchDepthConfigs = React.useMemo(() => {
+    if (!navigationData?.categories) return [];
+
+    return navigationData.categories.map((category, index) => ({
+      branchId: index,
+      config: category.preset as BranchPresetName,
+    }));
+  }, [navigationData]);
 
   // Don't render until mounted to avoid hydration mismatches
   if (!mounted) {
@@ -80,6 +88,7 @@ export default function AppNav() {
         containerWidth={dimensions.width}
         containerHeight={dimensions.height}
         branchDepthConfigs={branchDepthConfigs}
+        navigationData={navigationData}
         scrollRotation={scrollRotation}
         onNodeClick={(data) =>
           console.log(

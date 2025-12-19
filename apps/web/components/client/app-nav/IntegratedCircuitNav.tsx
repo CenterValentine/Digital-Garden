@@ -12,6 +12,7 @@ import {
   BuiltBranch,
 } from "@/lib/app-nav/branch-builder";
 import { getBranchColor, TEAL } from "@/lib/design-system/colors";
+import type { NavigationTree } from "@/lib/db/navigation";
 
 // Get all preset names as an array for cycling
 const PRESET_NAMES: BranchPresetName[] = Object.keys(
@@ -26,6 +27,8 @@ interface Branch {
   color: string;
   radialDistance: number;
   branchConfig?: Partial<BranchBuilderConfig> | BranchPresetName; // Branch builder config or preset name
+  categoryId?: string; // Database category ID
+  categoryName?: string; // Category name for display
 }
 
 // Configuration for which branches get custom depth/splits
@@ -51,6 +54,7 @@ interface IntegratedCircuitNavProps {
   branchDepthConfigs?: BranchDepthConfig[]; // Configure custom branch depths
   defaultBranchConfig?: Partial<BranchBuilderConfig> | BranchPresetName; // Default config for all branches
   scrollRotation?: number; // Scroll-driven rotation override (in degrees)
+  navigationData?: NavigationTree; // Database-driven navigation data
 }
 
 // Helper to resolve preset name to config
@@ -73,8 +77,8 @@ export function IntegratedCircuitNav({
   branchDepthConfigs = [], // Can override with specific configs if needed
   defaultBranchConfig, // If not set, all branches will cycle through presets
   scrollRotation, // Scroll-driven rotation override
+  navigationData, // Database-driven navigation data
 }: IntegratedCircuitNavProps) {
-  // Base rotation is much slower now (10 degrees per full progress instead of 360)
   // Scroll rotation override takes precedence if provided
   const baseRotation = progress * 10; // Much slower base rotation
   const rotation = scrollRotation !== undefined ? scrollRotation : baseRotation;
@@ -105,8 +109,58 @@ export function IntegratedCircuitNav({
     return map;
   }, [branchDepthConfigs]);
 
-  // Generate stable branches
+  // Generate stable branches from navigation data or fallback to hardcoded
   const branches = useMemo(() => {
+    // If navigation data provided, use it
+    if (navigationData?.categories && navigationData.categories.length > 0) {
+      const categories = navigationData.categories;
+      const totalCategories = categories.length;
+      const newBranches: Branch[] = [];
+
+      categories.forEach((category, index) => {
+        // Calculate yPercent from displayOrder (normalize to 0-100)
+        // If displayOrder is already in 0-100 range, use it directly
+        // Otherwise, distribute evenly based on index
+        const yPercent =
+          category.displayOrder <= 100
+            ? category.displayOrder
+            : (index / totalCategories) * 100;
+
+        // Use design system colors based on vertical position
+        const color = getBranchColor(yPercent);
+
+        // Distribute angles evenly around the trunk
+        const baseAngle = (index / totalCategories) * 360;
+
+        // Get branch config from category preset or override
+        let branchConfig =
+          branchConfigMap.get(index) ||
+          resolveConfig(category.preset as BranchPresetName) ||
+          resolveConfig(defaultBranchConfig);
+
+        // Fallback to cycling presets if still no config
+        if (!branchConfig) {
+          const presetIndex = index % PRESET_NAMES.length;
+          branchConfig = resolveConfig(PRESET_NAMES[presetIndex]);
+        }
+
+        newBranches.push({
+          id: index,
+          yPercent,
+          baseAngle,
+          length: branchLength,
+          color,
+          radialDistance: branchBaseRadius,
+          branchConfig,
+          categoryId: category.id, // Store for click handling
+          categoryName: category.name,
+        });
+      });
+
+      return newBranches;
+    }
+
+    // Fallback: Generate hardcoded branches (backward compatibility)
     const branchCount = 28;
     const newBranches: Branch[] = [];
 
@@ -140,7 +194,13 @@ export function IntegratedCircuitNav({
     }
 
     return newBranches;
-  }, [branchConfigMap, defaultBranchConfig, branchLength, branchBaseRadius]);
+  }, [
+    navigationData,
+    branchConfigMap,
+    defaultBranchConfig,
+    branchLength,
+    branchBaseRadius,
+  ]);
 
   // Calculate 3D positions for branches and build sub-branch trees
   const branchesWithDepth = useMemo(() => {
