@@ -12,16 +12,26 @@ datasource db {
   provider = "postgresql"
 }
 
+enum UserRole {
+  owner
+  admin
+  member
+  guest
+}
+
 // --- 1. CORE USER ---
 model User {
   id              String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   username        String       @unique @db.VarChar(50)
-  passwordHash    String       @db.Char(60)
+  passwordHash    String?      @db.Char(60) // Optional for OAuth users
   email           String       @unique @db.VarChar(255)
+  role            UserRole     @default(guest)
 
   // Relationships
   structuredDocuments StructuredDocument[]
   documentHistory     DocumentHistory[]
+  sessions            Session[]
+  accounts            Account[]
 }
 
 // --- 2. UNIVERSAL DOCUMENT STORE (CONTENT) ---
@@ -114,4 +124,37 @@ model DocumentTag {
 
   @@id([documentId, tagId]) // Composite Primary Key
   @@index([tagId, documentId]) // For searching documents by tag
+}
+
+// --- 7. SESSION MANAGEMENT ---
+model Session {
+  id              String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId          String       @db.Uuid
+  token           String       @unique @db.VarChar(255)
+  expiresAt       DateTime     @db.Timestamptz()
+  createdAt       DateTime     @default(now()) @db.Timestamptz()
+
+  user            User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([token])
+}
+
+// --- 8. OAUTH ACCOUNTS ---
+model Account {
+  id                String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId            String       @db.Uuid
+  provider          String       @db.VarChar(50)
+  providerAccountId String       @db.VarChar(255)
+  accessToken       String?      @db.Text
+  refreshToken      String?      @db.Text
+  expiresAt         BigInt?
+  createdAt         DateTime     @default(now()) @db.Timestamptz()
+  updatedAt         DateTime     @updatedAt @db.Timestamptz()
+
+  user              User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+  @@index([provider])
 }

@@ -13,7 +13,7 @@ export default function CompactLogo() {
   useLogoAnimation(svgRef, {
     speed: 4,
     runOnce: true,
-    gapsMs: 0,
+    gapMs: 1,
     drawJitterMs: 10,
     drawOverlap: 1,
     onComplete: () => setShowCrown(true),
@@ -1493,4 +1493,3 @@ export default function CompactLogo() {
     </svg>
   );
 }
-

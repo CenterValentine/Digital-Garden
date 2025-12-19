@@ -11,6 +11,7 @@ import {
   BRANCH_PRESETS,
   BuiltBranch,
 } from "@/lib/app-nav/branch-builder";
+import { getBranchColor, TEAL } from "@/lib/design-system/colors";
 
 // Get all preset names as an array for cycling
 const PRESET_NAMES: BranchPresetName[] = Object.keys(
@@ -112,12 +113,8 @@ export function IntegratedCircuitNav({
     for (let i = 0; i < branchCount; i++) {
       const yPercent = (i / branchCount) * 100;
 
-      let color = "#10b981";
-      if (yPercent > 60) {
-        color = yPercent > 70 ? "#fb923c" : "#f59e0b";
-      } else if (yPercent > 40) {
-        color = "#3b82f6";
-      }
+      // Use design system colors based on vertical position
+      const color = getBranchColor(yPercent);
 
       const baseAngle = (i / branchCount) * 360;
 
@@ -210,7 +207,7 @@ export function IntegratedCircuitNav({
   }, [branches, rotation, height, svgCenterX, treeStart, treeEnd]);
 
   return (
-    <div className="fixed inset-0 w-screen h-screen bg-slate-900 overflow-hidden">
+    <div className="fixed inset-0 w-screen h-screen bg-teal-dark overflow-hidden">
       {/* Circuit Tree SVG - centered */}
       <div
         className="absolute z-10 flex items-center justify-center"

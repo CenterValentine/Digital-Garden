@@ -13,7 +13,7 @@ export default function Tree() {
   useLogoAnimation(svgRef, {
     speed: 4,
     runOnce: true,
-    gapsMs: 0,
+    gapMs: 0,
     drawJitterMs: 10,
     drawOverlap: 1,
     onComplete: () => setShowCrown(true),

@@ -1,0 +1,172 @@
+{
+  "color": {
+    "teal": {
+      "dark": {
+        "value": "#3D5A5B",
+        "description": "Primary background, deep surfaces"
+      },
+      "mid": {
+        "value": "#5A7A7A",
+        "description": "Secondary backgrounds, overlays"
+      },
+      "light": {
+        "value": "#7A9A9A",
+        "description": "Muted text, borders"
+      }
+    },
+    "gold": {
+      "primary": {
+        "value": "#C9A86C",
+        "description": "Headlines, CTAs, primary actions"
+      },
+      "dark": {
+        "value": "#8B7355",
+        "description": "Hover states, secondary gold"
+      },
+      "light": {
+        "value": "#E5D4B0",
+        "description": "Highlights, selected states"
+      }
+    },
+    "leaf": {
+      "primary": {
+        "value": "#4CAF50",
+        "description": "Success states, growth indicators"
+      },
+      "light": {
+        "value": "#81C784",
+        "description": "Hover on success, light accents"
+      },
+      "bright": {
+        "value": "#A5D6A7",
+        "description": "Highlights, new content badges"
+      }
+    },
+    "intent": {
+      "primary": {
+        "value": "#4CAF50",
+        "description": "Primary intent - Leaf green (growth/success)"
+      },
+      "secondary": {
+        "value": "#C9A86C",
+        "description": "Secondary intent - Gold (knowledge/foundation)"
+      },
+      "accent": {
+        "value": "#5A7A7A",
+        "description": "Accent intent - Teal (connection)"
+      },
+      "danger": {
+        "value": "#E57373",
+        "description": "Danger intent - Muted red"
+      },
+      "neutral": {
+        "value": "#7A9A9A",
+        "description": "Neutral intent - Teal light"
+      }
+    },
+    "surface": {
+      "default": {
+        "value": "var(--background)",
+        "description": "Default surface color"
+      },
+      "elevated": {
+        "value": "var(--card)",
+        "description": "Elevated surface color"
+      },
+      "overlay": {
+        "value": "rgba(61, 90, 91, 0.8)",
+        "description": "Overlay surface color"
+      }
+    },
+    "state": {
+      "hover": {
+        "value": "rgba(201, 168, 108, 0.15)",
+        "description": "Gold hover state"
+      },
+      "focus": {
+        "value": "rgba(76, 175, 80, 0.2)",
+        "description": "Leaf focus state"
+      },
+      "active": {
+        "value": "rgba(76, 175, 80, 0.3)",
+        "description": "Leaf active state"
+      },
+      "disabled": {
+        "value": "rgba(122, 154, 154, 0.3)",
+        "description": "Teal disabled state"
+      }
+    }
+  },
+  "spacing": {
+    "xs": {
+      "value": "var(--spacing-size-xs)",
+      "description": "Extra small spacing"
+    },
+    "sm": {
+      "value": "var(--spacing-size-sm)",
+      "description": "Small spacing"
+    },
+    "md": {
+      "value": "var(--spacing-size-md)",
+      "description": "Medium spacing"
+    },
+    "lg": {
+      "value": "var(--spacing-size-lg)",
+      "description": "Large spacing"
+    }
+  },
+  "typography": {
+    "fontWeight": {
+      "normal": "400",
+      "medium": "500"
+    },
+    "fontSize": {
+      "xs": {
+        "value": "0.75rem",
+        "lineHeight": "1rem"
+      },
+      "sm": {
+        "value": "0.875rem",
+        "lineHeight": "1.25rem"
+      },
+      "base": {
+        "value": "1rem",
+        "lineHeight": "1.5rem"
+      },
+      "lg": {
+        "value": "1.125rem",
+        "lineHeight": "1.75rem"
+      },
+      "xl": {
+        "value": "1.25rem",
+        "lineHeight": "1.875rem"
+      }
+    }
+  },
+  "effect": {
+    "glow": {
+      "leaf": {
+        "value": "0 0 20px rgba(76, 175, 80, 0.6)",
+        "description": "Leaf/success glow effect"
+      },
+      "gold": {
+        "value": "0 0 15px rgba(201, 168, 108, 0.4)",
+        "description": "Gold hover glow effect"
+      },
+      "success": {
+        "value": "0 0 25px rgba(129, 199, 132, 0.5)",
+        "description": "Success state glow"
+      },
+      "warning": {
+        "value": "0 0 12px rgba(139, 115, 85, 0.4)",
+        "description": "Warning state glow"
+      }
+    }
+  },
+  "radius": {
+    "sm": "calc(var(--radius) - 4px)",
+    "md": "calc(var(--radius) - 2px)",
+    "lg": "var(--radius)",
+    "xl": "calc(var(--radius) + 4px)"
+  }
+}
