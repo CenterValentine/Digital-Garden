@@ -62,9 +62,24 @@ export type AuthError = {
   message: string;
 };
 
+export type ApiError = {
+  code:
+    | "INVALID_CREDENTIALS"
+    | "USER_EXISTS"
+    | "WEAK_PASSWORD"
+    | "INVALID_EMAIL"
+    | "OAUTH_ERROR"
+    | "SESSION_EXPIRED"
+    | "UNAUTHORIZED"
+    | "INVALID_REQUEST"
+    | "NOT_FOUND"
+    | "INTERNAL_ERROR";
+  message: string;
+};
+
 export type ApiResponse<T> =
   | { success: true; data: T }
-  | { success: false; error: AuthError };
+  | { success: false; error: ApiError };
 
 export type OAuthProvider = "google";
 
