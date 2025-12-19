@@ -32,6 +32,8 @@ model User {
   documentHistory     DocumentHistory[]
   sessions            Session[]
   accounts            Account[]
+  categories          Category[]
+  viewGrants           ViewGrant[]
 }
 
 // --- 2. UNIVERSAL DOCUMENT STORE (CONTENT) ---
@@ -50,17 +52,25 @@ model StructuredDocument {
   parent         StructuredDocument? @relation("Hierarchy", fields: [parentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   children       StructuredDocument[] @relation("Hierarchy")
 
+  // Navigation integration
+  categoryId     String?        @db.Uuid // Link to Category
+  displayOrder   Int            @default(0) // Order within category/parent
+
   // Relationships
   owner          User             @relation(fields: [ownerId], references: [id])
+  category       Category?        @relation(fields: [categoryId], references: [id])
   history        DocumentHistory[]
   documentPaths  DocumentPath?
   sourceLinks    DocumentLink[]   @relation("SourceDocument")
   targetLinks    DocumentLink[]   @relation("TargetDocument")
   documentTags   DocumentTag[]
+  viewGrants      ViewGrant[]
 
   // Indexes (Crucial for performance)
   @@index([ownerId, docType, isPublished])
   @@index([parentId])
+  @@index([categoryId, displayOrder])
+  @@index([parentId, displayOrder]) // For hierarchical ordering
 }
 
 // --- 3. DOCUMENT HISTORY ---
@@ -157,4 +167,49 @@ model Account {
   @@unique([provider, providerAccountId])
   @@index([userId])
   @@index([provider])
+}
+
+// --- 9. NAVIGATION CATEGORIES ---
+model Category {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name            String   @unique @db.VarChar(255)
+  slug            String   @unique @db.VarChar(255)
+  description     String?  @db.Text
+  displayOrder    Int      @default(0) // Vertical position on trunk (0-100)
+  branchPreset    String?  @db.VarChar(50) // Optional preset override (e.g., "binary", "trident")
+  isPublished     Boolean  @default(true)
+  ownerId         String   @db.Uuid
+  
+  owner           User     @relation(fields: [ownerId], references: [id])
+  documents       StructuredDocument[] // Documents belonging to this category
+  viewGrants      ViewGrant[]
+  
+  @@index([ownerId, isPublished, displayOrder])
+  @@index([displayOrder])
+}
+
+// --- 10. VIEW GRANTS (FILTERED NAVIGATION) ---
+model ViewGrant {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  viewKey         String   @db.VarChar(100) // e.g., "portfolio", "family", "tech"
+  
+  // Grantee (one of these must be set)
+  userId          String?  @db.Uuid // Specific user grant
+  role            UserRole? // Role-based grant (e.g., all "member" users)
+  
+  // Target (one of these must be set)
+  categoryId      String?  @db.Uuid
+  documentId      String?  @db.Uuid
+  
+  createdAt       DateTime @default(now()) @db.Timestamptz()
+  
+  user            User?    @relation(fields: [userId], references: [id])
+  category        Category? @relation(fields: [categoryId], references: [id])
+  document        StructuredDocument? @relation(fields: [documentId], references: [id])
+  
+  @@index([viewKey])
+  @@index([userId, viewKey])
+  @@index([role, viewKey])
+  @@index([categoryId])
+  @@index([documentId])
 }
