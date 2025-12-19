@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "prisma generate && pnpm build:tokens && next build",
     "start": "next start",
     "lint": "eslint",
     "build:tokens": "style-dictionary build --config style-dictionary.config.js"
