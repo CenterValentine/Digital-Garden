@@ -3,12 +3,16 @@
 // 3. Define the platform configuration to generate CSS variables for Tailwind.
 
 module.exports = {
-  source: ["tokens/global.json", "tokens/theme-a.json", "tokens/theme-b.json"],
+  source: [
+    "lib/design-system/tokens/global.json",
+    "lib/design-system/tokens/theme-a.json",
+    "lib/design-system/tokens/theme-b.json",
+  ],
   platforms: {
     globalcss: {
       transformGroup: "css",
       buildPath: "dist/",
-      include: ["tokens/global.json"],
+      include: ["lib/design-system/tokens/global.json"],
       files: [
         {
           destination: "variables.css",
@@ -25,7 +29,7 @@ module.exports = {
     themeA: {
       transformGroup: "css",
       buildPath: "dist/",
-      include: ["tokens/theme-a.json"],
+      include: ["lib/design-system/tokens/theme-a.json"],
       files: [
         {
           destination: "theme-a.css",
@@ -40,7 +44,7 @@ module.exports = {
     themeB: {
       transformGroup: "css",
       buildPath: "dist/",
-      include: ["tokens/theme-b.json"],
+      include: ["lib/design-system/tokens/theme-b.json"],
       files: [
         {
           destination: "theme-b.css",
