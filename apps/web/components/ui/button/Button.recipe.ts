@@ -17,23 +17,23 @@ export const buttonVariants = cva(
         link: "text-primary underline-offset-4 hover:underline",
         // Digital Garden specific variants
         leaf: "bg-leaf-primary text-white hover:bg-leaf-light shadow-glow-leaf",
-        gold: "bg-gold-primary text-teal-dark hover:bg-gold-light shadow-glow-gold",
-        teal: "bg-teal-mid text-gold-light hover:bg-teal-light",
+        gold: "bg-gold-primary text-shale-dark hover:bg-gold-light shadow-glow-gold",
+        shale: "bg-shale-mid text-gold-light hover:bg-shale-light",
         // Gradient variants - full height, no rounded corners
-        "gradient-teal":
-          "rounded-none bg-gradient-to-b from-teal-light via-teal-mid to-teal-dark text-gold-light hover:from-teal-mid hover:via-teal-dark hover:to-teal-dark",
+        "gradient-shale":
+          "rounded-none bg-gradient-to-b from-shale-light via-shale-mid to-shale-dark text-gold-light hover:from-shale-mid hover:via-shale-dark hover:to-shale-dark",
         "gradient-gold":
-          "rounded-none bg-gradient-to-b from-gold-light via-gold-primary to-gold-dark text-teal-dark hover:from-gold-primary hover:via-gold-dark hover:to-gold-dark",
+          "rounded-none bg-gradient-to-b from-gold-light via-gold-primary to-gold-dark text-shale-dark hover:from-gold-primary hover:via-gold-dark hover:to-gold-dark",
         "gradient-leaf":
           "rounded-none bg-gradient-to-b from-leaf-bright via-leaf-light to-leaf-primary text-white hover:from-leaf-light hover:via-leaf-primary hover:to-leaf-primary shadow-glow-leaf",
         "gradient-mixed":
-          "rounded-none bg-gradient-to-b from-gold-light via-teal-mid to-teal-dark text-gold-light hover:from-gold-primary hover:via-teal-dark hover:to-teal-dark",
+          "rounded-none bg-gradient-to-b from-gold-light via-shale-mid to-shale-dark text-gold-light hover:from-gold-primary hover:via-shale-dark hover:to-shale-dark",
         // NavBar variant - white background, gold gradient on hover, max height for 2:1 aspect
         "nav-item":
           "rounded-none bg-background text-foreground hover:bg-gradient-to-b hover:from-gold-light hover:via-gold-primary hover:to-gold-dark hover:text-white transition-all duration-300 max-h-12 my-auto",
         // Soft gold gradient - muted, elegant
         "gradient-gold-soft":
-          "bg-gradient-to-b from-gold-light/80 via-gold-primary/70 to-gold-dark/60 text-teal-dark hover:from-gold-light hover:via-gold-primary hover:to-gold-dark transition-all duration-300",
+          "bg-gradient-to-b from-gold-light/80 via-gold-primary/70 to-gold-dark/60 text-shale-dark hover:from-gold-light hover:via-gold-primary hover:to-gold-dark transition-all duration-300",
       },
       size: {
         default: "h-9 px-4 py-2 has-[>svg]:px-3",

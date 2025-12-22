@@ -11,10 +11,10 @@ module.exports = {
           primary: "var(--color-brand-primary)",
         },
         // David's Digital Garden Color Palette (using CSS variables)
-        teal: {
-          dark: "var(--teal-dark)",
-          mid: "var(--teal-mid)",
-          light: "var(--teal-light)",
+        shale: {
+          dark: "var(--shale-dark)",
+          mid: "var(--shale-mid)",
+          light: "var(--shale-light)",
         },
         gold: {
           primary: "var(--gold-primary)",
@@ -44,9 +44,31 @@ module.exports = {
         // State-based tokens
         state: {
           hover: "rgba(201, 168, 108, 0.15)", // Gold hover
-          focus: "rgba(76, 175, 80, 0.2)", // Leaf focus
-          active: "rgba(76, 175, 80, 0.3)", // Leaf active
-          disabled: "rgba(122, 154, 154, 0.3)", // Teal disabled
+          focus: "rgba(73, 166, 87, 0.2)", // Leaf focus
+          active: "rgba(73, 166, 87, 0.3)", // Leaf active
+          disabled: "rgba(110, 134, 157, 0.3)", // Slate disabled
+        },
+        // Neon Palettes
+        neonBlue: {
+          primary: "var(--neon-blue-primary)",
+          secondary: "var(--neon-blue-secondary)",
+          accent: "var(--neon-blue-accent)",
+          dark: "var(--neon-blue-dark)",
+          light: "var(--neon-blue-light)",
+        },
+        neonGold: {
+          primary: "var(--neon-gold-primary)",
+          secondary: "var(--neon-gold-secondary)",
+          accent: "var(--neon-gold-accent)",
+          dark: "var(--neon-gold-dark)",
+          light: "var(--neon-gold-light)",
+        },
+        neonGreen: {
+          primary: "var(--neon-green-primary)",
+          secondary: "var(--neon-green-secondary)",
+          accent: "var(--neon-green-accent)",
+          dark: "var(--neon-green-dark)",
+          light: "var(--neon-green-light)",
         },
       },
       spacing: {

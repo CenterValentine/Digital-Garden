@@ -8,23 +8,42 @@
   --font-size: 16px;
   
   /* David's Digital Garden Color Palette */
-  --teal-dark: #3D5A5B;
-  --teal-mid: #5A7A7A;
-  --teal-light: #7A9A9A;
+  --shale-dark: #465E73;
+  --shale-mid: #5A7288;
+  --shale-light: #6E869D;
   
   --gold-primary: #C9A86C;
-  --gold-dark: #8B7355;
-  --gold-light: #E5D4B0;
+  --gold-dark: #B8965A;
+  --gold-light: #D9B87E;
   
-  --leaf-primary: #4CAF50;
-  --leaf-light: #81C784;
-  --leaf-bright: #A5D6A7;
+  --leaf-primary: #49A657;
+  --leaf-light: #6BC578;
+  --leaf-bright: #8FE39A;
   
-  --intent-primary: #4CAF50;
+  /* Neon Palettes */
+  --neon-blue-primary: #00D4FF;
+  --neon-blue-secondary: #FF6B35;
+  --neon-blue-accent: #7FFF00;
+  --neon-blue-dark: #0099CC;
+  --neon-blue-light: #33E0FF;
+  
+  --neon-gold-primary: #FFD700;
+  --neon-gold-secondary: #00BFFF;
+  --neon-gold-accent: #FF1493;
+  --neon-gold-dark: #FFA500;
+  --neon-gold-light: #FFE44D;
+  
+  --neon-green-primary: #00FF7F;
+  --neon-green-secondary: #FF8C00;
+  --neon-green-accent: #9370DB;
+  --neon-green-dark: #00CC66;
+  --neon-green-light: #33FF99;
+  
+  --intent-primary: #49A657;
   --intent-secondary: #C9A86C;
-  --intent-accent: #5A7A7A;
+  --intent-accent: #5A7288;
   --intent-danger: #E57373;
-  --intent-neutral: #7A9A9A;
+  --intent-neutral: #6E869D;
 
   /* Default Tailwind Tokens */
   --background: #ffffff;
@@ -33,9 +52,9 @@
   --card-foreground: #171717;
   --popover: #ffffff;
   --popover-foreground: #171717;
-  --primary: #3D5A5B;
+  --primary: #465E73;
   --primary-foreground: #E5D4B0;
-  --secondary: #5A7A7A;
+  --secondary: #5A7288;
   --secondary-foreground: #E5D4B0;
   --muted: #ececf0;
   --muted-foreground: #717182;
@@ -43,23 +62,23 @@
   --accent-foreground: #3D5A5B;
   --destructive: #E57373;
   --destructive-foreground: #ffffff;
-  --border: rgba(61, 90, 91, 0.2);
+  --border: rgba(70, 94, 115, 0.2);
   --input: transparent;
   --input-background: #f3f3f5;
-  --ring: #4CAF50;
+  --ring: #49A657;
   --radius: 0.625rem;
   --font-weight-medium: 500;
   --font-weight-normal: 400;
 }
 
 .dark {
-  --background: #3D5A5B;
+  --background: #465E73;
   --foreground: #E5D4B0;
   --card: #2D4A4B;
   --card-foreground: #E5D4B0;
   --popover: #2D4A4B;
   --popover-foreground: #E5D4B0;
-  --primary: #4CAF50;
+  --primary: #49A657;
   --primary-foreground: #ffffff;
   --secondary: #C9A86C;
   --secondary-foreground: #3D5A5B;
@@ -97,15 +116,34 @@
   --color-ring: var(--ring);
 
   /* David's Digital Garden Palette */
-  --color-teal-dark: var(--teal-dark);
-  --color-teal-mid: var(--teal-mid);
-  --color-teal-light: var(--teal-light);
+  --color-shale-dark: var(--shale-dark);
+  --color-shale-mid: var(--shale-mid);
+  --color-shale-light: var(--shale-light);
   --color-gold-primary: var(--gold-primary);
   --color-gold-dark: var(--gold-dark);
   --color-gold-light: var(--gold-light);
   --color-leaf-primary: var(--leaf-primary);
   --color-leaf-light: var(--leaf-light);
   --color-leaf-bright: var(--leaf-bright);
+  
+  /* Neon Palettes */
+  --color-neon-blue-primary: var(--neon-blue-primary);
+  --color-neon-blue-secondary: var(--neon-blue-secondary);
+  --color-neon-blue-accent: var(--neon-blue-accent);
+  --color-neon-blue-dark: var(--neon-blue-dark);
+  --color-neon-blue-light: var(--neon-blue-light);
+  
+  --color-neon-gold-primary: var(--neon-gold-primary);
+  --color-neon-gold-secondary: var(--neon-gold-secondary);
+  --color-neon-gold-accent: var(--neon-gold-accent);
+  --color-neon-gold-dark: var(--neon-gold-dark);
+  --color-neon-gold-light: var(--neon-gold-light);
+  
+  --color-neon-green-primary: var(--neon-green-primary);
+  --color-neon-green-secondary: var(--neon-green-secondary);
+  --color-neon-green-accent: var(--neon-green-accent);
+  --color-neon-green-dark: var(--neon-green-dark);
+  --color-neon-green-light: var(--neon-green-light);
 
   /* Fonts and radius */
   --font-sans: var(--font-geist-sans);

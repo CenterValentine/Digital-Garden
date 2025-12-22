@@ -11,7 +11,7 @@ import {
 import { cn } from "@/lib/utils";
 
 export interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
-  intent?: "default" | "highlight" | "warning" | "error" | "teal" | "gold";
+  intent?: "default" | "highlight" | "warning" | "error" | "shale" | "gold";
 }
 
 function Card({ intent, className, ...props }: CardProps) {

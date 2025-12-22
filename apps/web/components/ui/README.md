@@ -27,7 +27,7 @@ Our components follow a three-dimensional variant system:
 
 Inspired by the Digital Garden logo - organic growth meets technology:
 
-- **Teal Palette**: #3D5A5B (dark), #5A7A7A (mid), #7A9A9A (light) - Depth/connection
+- **Shale Palette**: #3D5A5B (dark), #5A7A7A (mid), #7A9A9A (light) - Depth/connection
 - **Gold Palette**: #C9A86C (primary), #8B7355 (dark), #E5D4B0 (light) - Knowledge/foundation
 - **Leaf Palette**: #4CAF50 (primary), #81C784 (light), #A5D6A7 (bright) - Growth/success
 - **Effects**: Neon glows, circuit patterns, organic branching
@@ -180,11 +180,11 @@ import { Prose } from "@/components/ui/prose";
 
 ### David's Digital Garden Color Palette
 
-#### Teal (Depth/Connection)
+#### Shale (Depth/Connection)
 
-- `teal-dark`: #3D5A5B - Primary backgrounds, deep surfaces
-- `teal-mid`: #5A7A7A - Secondary backgrounds, overlays
-- `teal-light`: #7A9A9A - Muted text, borders
+- `shale-dark`: #3D5A5B - Primary backgrounds, deep surfaces
+- `shale-mid`: #5A7A7A - Secondary backgrounds, overlays
+- `shale-light`: #7A9A9A - Muted text, borders
 
 #### Gold (Knowledge/Foundation)
 
@@ -202,16 +202,16 @@ import { Prose } from "@/components/ui/prose";
 
 - `intent-primary`: #4CAF50 (Leaf green - growth/success)
 - `intent-secondary`: #C9A86C (Gold - knowledge/foundation)
-- `intent-accent`: #5A7A7A (Teal - connection)
+- `intent-accent`: #5A7A7A (Shale - connection)
 - `intent-danger`: #E57373 (Muted red)
-- `intent-neutral`: #7A9A9A (Teal light)
+- `intent-neutral`: #7A9A9A (Shale light)
 
 ### State Tokens
 
 - `state-hover`: rgba(201, 168, 108, 0.15) - Gold hover
 - `state-focus`: rgba(76, 175, 80, 0.2) - Leaf focus
 - `state-active`: rgba(76, 175, 80, 0.3) - Leaf active
-- `state-disabled`: rgba(122, 154, 154, 0.3) - Teal disabled
+- `state-disabled`: rgba(122, 154, 154, 0.3) - Shale disabled
 
 ## Neon Glow Effects
 
@@ -220,7 +220,7 @@ Inspired by the circuit board aesthetic, we provide utility classes for neon glo
 ```tsx
 <div className="neon-glow-sm text-leaf-primary">Small glow (growth)</div>
 <div className="neon-glow-md text-gold-primary">Medium glow (knowledge)</div>
-<div className="neon-glow-lg text-teal-light">Large glow (connection)</div>
+<div className="neon-glow-lg text-shale-light">Large glow (connection)</div>
 ```
 
 ### Semantic Glow Shadows
@@ -268,12 +268,12 @@ import { TreeNode, BranchLine } from "@/components/ui/tree-node";
 
 | State      | Background   | Border       | Glow Color  |
 | ---------- | ------------ | ------------ | ----------- |
-| `default`  | teal-mid     | teal-light   | None        |
+| `default`  | shale-mid     | shale-light   | None        |
 | `active`   | leaf-primary | leaf-light   | Green       |
 | `hover`    | gold-primary | gold-light   | Gold        |
 | `success`  | leaf-light   | leaf-bright  | Light green |
 | `warning`  | gold-dark    | gold-primary | Brown       |
-| `disabled` | teal-light   | teal-mid     | None        |
+| `disabled` | shale-light   | shale-mid     | None        |
 
 ## Accessibility
 

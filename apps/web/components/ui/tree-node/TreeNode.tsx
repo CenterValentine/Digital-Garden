@@ -1,6 +1,6 @@
 import * as React from "react";
 import { cn } from "@/lib/utils";
-import { GOLD, TEAL, LEAF } from "@/lib/design-system/colors";
+import { GOLD, SLATE, LEAF } from "@/lib/design-system/colors";
 
 export type NodeType = "default" | "leaf" | "junction" | "root" | "endpoint";
 export type NodeState =
@@ -88,15 +88,15 @@ const getStateStyles = (state: NodeState, showGlow: boolean) => {
       };
     case "disabled":
       return {
-        bg: "bg-teal-light",
-        border: "border-teal-mid border",
+        bg: "bg-shale-light",
+        border: "border-shale-mid border",
         glow: "",
-        text: "text-teal-dark",
+        text: "text-shale-dark",
       };
     default:
       return {
-        bg: "bg-teal-mid",
-        border: "border-teal-light border-2",
+        bg: "bg-shale-mid",
+        border: "border-shale-light border-2",
         glow: "",
         text: "text-gold-light",
       };
@@ -151,20 +151,20 @@ interface BranchLineProps {
   type?: "straight" | "curved" | "angular" | "circuit";
   direction?: "vertical" | "horizontal" | "diagonal-right" | "diagonal-left";
   length?: number;
-  color?: "gold" | "teal" | "green";
+  color?: "gold" | "shale" | "green";
   animated?: boolean;
   withJunctions?: boolean;
 }
 
 const colorClasses = {
   gold: "stroke-gold-primary",
-  teal: "stroke-teal-mid",
+  shale: "stroke-shale-mid",
   green: "stroke-leaf-primary",
 };
 
 const fillColors = {
   gold: GOLD.primary,
-  teal: TEAL.mid,
+  shale: SLATE.mid,
   green: LEAF.primary,
 };
 
@@ -172,7 +172,7 @@ export function BranchLine({
   type = "straight",
   direction = "vertical",
   length = 100,
-  color = "teal",
+  color = "shale",
   animated = false,
   withJunctions = false,
 }: BranchLineProps) {

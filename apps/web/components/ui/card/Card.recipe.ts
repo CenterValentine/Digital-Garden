@@ -12,7 +12,7 @@ export const cardVariants = cva(
         warning:
           "border-gold-dark bg-gold-dark/10",
         error: "border-destructive bg-destructive/5",
-        teal: "border-teal-mid bg-teal-dark/50 text-gold-light",
+        shale: "border-shale-mid bg-shale-dark/50 text-gold-light",
         gold: "border-gold-primary bg-gold-dark/20 text-gold-light",
       },
     },
