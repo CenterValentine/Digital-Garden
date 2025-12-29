@@ -1,6 +1,19 @@
 import * as React from "react";
-import { proseVariants } from "./Prose.recipe";
+import { cva } from "class-variance-authority";
 import { cn } from "@/lib/utils";
+
+const proseVariants = cva("prose", {
+  variants: {
+    intent: {
+      default: "prose-lg",
+      blog: "prose-xl max-w-none",
+      compact: "prose-sm",
+    },
+  },
+  defaultVariants: {
+    intent: "default",
+  },
+});
 
 export interface ProseProps extends React.HTMLAttributes<HTMLDivElement> {
   intent?: "default" | "blog" | "compact";

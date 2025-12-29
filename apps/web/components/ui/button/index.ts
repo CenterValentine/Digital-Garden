@@ -1,3 +1,2 @@
-export { Button, type ButtonProps } from "./Button";
-export { buttonVariants } from "./Button.recipe";
+export { Button, buttonVariants, type ButtonProps } from "./Button";
 export type { VariantProps } from "class-variance-authority";

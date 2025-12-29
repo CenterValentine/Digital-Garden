@@ -268,12 +268,12 @@ import { TreeNode, BranchLine } from "@/components/ui/tree-node";
 
 | State      | Background   | Border       | Glow Color  |
 | ---------- | ------------ | ------------ | ----------- |
-| `default`  | shale-mid     | shale-light   | None        |
+| `default`  | shale-mid    | shale-light  | None        |
 | `active`   | leaf-primary | leaf-light   | Green       |
 | `hover`    | gold-primary | gold-light   | Gold        |
 | `success`  | leaf-light   | leaf-bright  | Light green |
 | `warning`  | gold-dark    | gold-primary | Brown       |
-| `disabled` | shale-light   | shale-mid     | None        |
+| `disabled` | shale-light  | shale-mid    | None        |
 
 ## Accessibility
 
@@ -287,16 +287,102 @@ All components follow WCAG guidelines:
 
 ## Component Architecture
 
-### Recipe Pattern
+### Component Structure
 
-Each component follows the recipe architecture:
+Components follow two patterns:
+
+**Custom Components (with intent system):**
 
 ```
 /component-name
-├── Component.tsx      # React component
-├── Component.recipe.ts # CVA variant definitions
+├── Component.tsx      # React component with inline CVA variants + intent system
 └── index.ts           # Exports
 ```
+
+**shadcn/ui Components:**
+
+```
+/components/ui
+├── component-name.tsx  # shadcn component (installed via CLI)
+```
+
+### shadcn/ui Integration
+
+This design system integrates with shadcn/ui components:
+
+- **Custom components** (Button, Card, Prose) are in subdirectories with intent system
+- **shadcn components** are installed at root level of `components/ui/`
+- Both can be used together - custom components for Digital Garden-specific variants, shadcn for standard UI patterns
+- All components use CVA inline (shadcn pattern)
+- All components use the same design system CSS variables
+
+**Available shadcn Components:**
+
+- `accordion`, `alert`, `alert-dialog`, `breadcrumb`, `calendar`, `checkbox`, `collapsible`, `command`, `dialog`, `drawer`, `dropdown-menu`, `empty`, `form`, `input`, `kbd`, `label`, `menubar`, `pagination`, `popover`, `scroll-area`, `select`, `separator`, `skeleton`, `sonner` (toast), `switch`, `table`, `tabs`, `textarea`, `toggle`, `toggle-group`, `tooltip`, `chart`
+
+**Note on Form Component:**
+The `form` component requires `react-hook-form` and `@hookform/resolvers` (with `zod` for validation). Install these dependencies when using the form component:
+
+```bash
+pnpm add react-hook-form @hookform/resolvers zod
+```
+
+**Note on Data Table:**
+`data-table` is not a single component but a pattern built using the `table` component with TanStack Table. See shadcn documentation for implementation examples.
+
+**Component Import Resolution:**
+
+- Custom components (Button, Card, Prose) are in subdirectories: `@/components/ui/button`, `@/components/ui/card`
+- shadcn components are at root level: `@/components/ui/accordion`, `@/components/ui/alert`, etc.
+- When shadcn components import from `@/components/ui/button`, they resolve to our custom Button (via `button/index.ts`)
+- Our custom Button includes all standard shadcn variants plus Digital Garden-specific variants (leaf, gold, shale, gradients, nav-item)
+- The shadcn `button.tsx` at root level exists but is not used by default (our subdirectory takes precedence)
+
+### Third-Party Component Libraries
+
+This design system also integrates third-party component libraries from various sources, organized in `/components/third-party/`:
+
+- **Aceternity UI** - Animated components, backgrounds, effects (35+ components)
+- **Animate UI** - Radix-based animated components (23+ components)
+- **Cult UI** - Unique aesthetic components (14+ components)
+- **Glass UI** - Glass morphism effects (8+ components)
+- **Dice UI** - Form and input components (8+ components)
+- **Ali Imam** - Background effects and patterns (7+ components)
+- **Creative Tim** - Admin/account components
+- **Hexta UI** - Clerk integration components
+- **ABUI** - Radio tabs, scroll progress
+- **8Labs** - System banner, timeline
+- **Ein Dev** - Stats widgets, glass timeline
+- **Blocks.so** - Form layouts, tables, stats
+- **FormCN** - Form templates
+- **AI SDK** - AI/chatbot components
+- **Billing SDK** - Pricing tables
+- **Coss UI** - Toast, toolbar
+
+All third-party components have been adapted to use Digital Garden design tokens (colors, spacing, typography) while preserving their original functionality and animations.
+
+**Usage:**
+
+```tsx
+import { BackgroundRipple } from '@/components/third-party/aceternity/BackgroundRipple';
+import { Card3D } from '@/components/third-party/aceternity/Card3D';
+
+<BackgroundRipple color="shale" />
+<Card3D intent="primary" />
+```
+
+See `/components/third-party/README.md` for comprehensive documentation.
+
+### Variant System
+
+Variants are defined using Class Variance Authority (CVA) inline within component files, which provides:
+
+- Type-safe variant definitions
+- Automatic class merging
+- Default variant support
+- Compound variant support
+
+This matches the shadcn/ui pattern, making it easy to integrate shadcn components.
 
 ### Base Styles
 
@@ -306,15 +392,6 @@ Base styles are applied before any variants are considered. They define:
 - Typography defaults
 - Accessibility features
 - Common transitions
-
-### Variant System
-
-Variants are defined using Class Variance Authority (CVA), which provides:
-
-- Type-safe variant definitions
-- Automatic class merging
-- Default variant support
-- Compound variant support
 
 ## Best Practices
 
@@ -328,7 +405,7 @@ Variants are defined using Class Variance Authority (CVA), which provides:
 
 To extend a component:
 
-1. Add new variant values to the recipe file
+1. Add new variant values to the CVA definition in the component file
 2. Update TypeScript types in the component file
 3. Document new variants in this README
 4. Test accessibility and contrast ratios
