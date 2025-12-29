@@ -28,7 +28,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="theme-a">
+    <html lang="en">
       <Head></Head>
       <body className="min-h-screen w-full relative">
         <NavBar />
