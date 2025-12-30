@@ -3,12 +3,12 @@
 // 3. Define the platform configuration to generate CSS variables for Tailwind.
 
 module.exports = {
-  source: ["tokens/global.json", "tokens/theme-a.json", "tokens/theme-b.json"],
+  source: ["lib/design-system/tokens/global.json"],
   platforms: {
     globalcss: {
       transformGroup: "css",
       buildPath: "dist/",
-      include: ["tokens/global.json"],
+      include: ["lib/design-system/tokens/global.json"],
       files: [
         {
           destination: "variables.css",
@@ -17,37 +17,6 @@ module.exports = {
             outputReferences: true,
             // Important: Define a selector for the CSS variables. The root selector makes them globally available.
             selector: ":root",
-          },
-        },
-      ],
-    },
-
-    themeA: {
-      transformGroup: "css",
-      buildPath: "dist/",
-      include: ["tokens/theme-a.json"],
-      files: [
-        {
-          destination: "theme-a.css",
-          format: "css/variables",
-          options: {
-            outputReferences: true,
-            selector: ".theme-a",
-          },
-        },
-      ],
-    },
-    themeB: {
-      transformGroup: "css",
-      buildPath: "dist/",
-      include: ["tokens/theme-b.json"],
-      files: [
-        {
-          destination: "theme-b.css",
-          format: "css/variables",
-          options: {
-            outputReferences: true,
-            selector: ".theme-b",
           },
         },
       ],

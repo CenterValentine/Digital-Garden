@@ -1,6 +1,6 @@
 import Link from "next/link";
 import Logo from "@/components/client/logo/Logo";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/ui/button/Button";
 
 export default function Navigation() {
   return (
@@ -10,13 +10,13 @@ export default function Navigation() {
       </div>
       <div className="flex justify-center gap-2 pb-4">
         <Button variant="ghost" asChild>
-      <Link href="/">Home</Link>
+          <Link href="/">Home</Link>
         </Button>
         <Button variant="ghost" asChild>
-      <Link href="/about">About</Link>
+          <Link href="/about">About</Link>
         </Button>
         <Button variant="ghost" asChild>
-      <Link href="/contact">Contact</Link>
+          <Link href="/contact">Contact</Link>
         </Button>
       </div>
     </nav>

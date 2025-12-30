@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/ui/button/Button";
 import {
   Card,
   CardHeader,
@@ -9,14 +9,14 @@ import {
   CardDescription,
   CardContent,
   CardFooter,
-} from "@/components/ui/card";
+} from "@/components/ui/card/Card";
 import { Prose } from "@/components/ui/prose";
 import { TreeNode, BranchLine } from "@/components/ui/tree-node";
 
 export default function DesignSystemPage() {
   const [activeHoverDemo, setActiveHoverDemo] = useState<string | null>(null);
   return (
-    <div className="min-h-screen bg-gradient-to-br from-teal-dark via-teal-mid to-teal-dark p-8 space-y-8">
+    <div className="min-h-screen bg-gradient-to-br from-shale-dark via-shale-mid to-shale-dark p-8 space-y-8">
       <div className="max-w-5xl mx-auto space-y-12">
         <header className="text-center">
           <h1 className="text-4xl font-bold mb-2 text-gold-primary">
@@ -33,18 +33,18 @@ export default function DesignSystemPage() {
             Fonts
           </h2>
 
-          <div className="bg-teal-dark/50 p-6 rounded-xl border border-teal-light/20 space-y-6">
+          <div className="bg-shale-dark/50 p-6 rounded-xl border border-shale-light/20 space-y-6">
             {/* Primary Fonts */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-3">
                 <h3 className="text-lg font-medium text-gold-light">
                   Geist Sans (Primary)
                 </h3>
-                <p className="text-teal-light text-sm mb-2">
+                <p className="text-shale-light text-sm mb-2">
                   CSS Variable:{" "}
                   <code className="text-gold-light">--font-geist-sans</code>
                 </p>
-                <div className="space-y-2 bg-teal-dark p-4 rounded-lg">
+                <div className="space-y-2 bg-shale-dark p-4 rounded-lg">
                   <p className="font-sans text-gold-light text-2xl">
                     The quick brown fox jumps over the lazy dog
                   </p>
@@ -58,7 +58,7 @@ export default function DesignSystemPage() {
                     0123456789 !@#$%^&amp;*()
                   </p>
                 </div>
-                <p className="text-teal-light text-xs">
+                <p className="text-shale-light text-xs">
                   Used for: Body text, headings, UI elements
                 </p>
               </div>
@@ -67,11 +67,11 @@ export default function DesignSystemPage() {
                 <h3 className="text-lg font-medium text-gold-light">
                   Geist Mono (Code)
                 </h3>
-                <p className="text-teal-light text-sm mb-2">
+                <p className="text-shale-light text-sm mb-2">
                   CSS Variable:{" "}
                   <code className="text-gold-light">--font-geist-mono</code>
                 </p>
-                <div className="space-y-2 bg-teal-dark p-4 rounded-lg">
+                <div className="space-y-2 bg-shale-dark p-4 rounded-lg">
                   <p className="font-mono text-gold-light text-lg">
                     const garden = &quot;digital&quot;;
                   </p>
@@ -85,7 +85,7 @@ export default function DesignSystemPage() {
                     0123456789 {`{} [] () => ===`}
                   </p>
                 </div>
-                <p className="text-teal-light text-xs">
+                <p className="text-shale-light text-xs">
                   Used for: Code snippets, technical content, monospace text
                 </p>
               </div>
@@ -96,7 +96,7 @@ export default function DesignSystemPage() {
               <h3 className="text-lg font-medium text-gold-light">
                 Fallback Stack
               </h3>
-              <div className="bg-teal-dark p-4 rounded-lg">
+              <div className="bg-shale-dark p-4 rounded-lg">
                 <code className="text-gold-light/80 text-sm font-mono">
                   font-family: var(--font-geist-sans), Arial, Helvetica,
                   sans-serif;
@@ -110,13 +110,13 @@ export default function DesignSystemPage() {
                 Tailwind Classes
               </h3>
               <div className="grid grid-cols-2 gap-4 text-sm">
-                <div className="bg-teal-dark p-3 rounded-lg">
+                <div className="bg-shale-dark p-3 rounded-lg">
                   <code className="text-gold-light font-mono">font-sans</code>
-                  <p className="text-teal-light mt-1">Primary font (Geist)</p>
+                  <p className="text-shale-light mt-1">Primary font (Geist)</p>
                 </div>
-                <div className="bg-teal-dark p-3 rounded-lg">
+                <div className="bg-shale-dark p-3 rounded-lg">
                   <code className="text-gold-light font-mono">font-mono</code>
-                  <p className="text-teal-light mt-1">
+                  <p className="text-shale-light mt-1">
                     Monospace font (Geist Mono)
                   </p>
                 </div>
@@ -132,38 +132,38 @@ export default function DesignSystemPage() {
           </h2>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {/* Teal */}
-            <div className="space-y-3 bg-teal-dark/50 p-4 rounded-xl border border-teal-light/20">
+            {/* Slate (formerly Shale) */}
+            <div className="space-y-3 bg-shale-dark/50 p-4 rounded-xl border border-shale-light/20">
               <h3 className="text-lg font-medium text-gold-light">
-                Teal (Depth/Connection)
+                Slate (Depth/Connection)
               </h3>
               <div className="space-y-2">
                 <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-lg border-2 border-teal-light bg-teal-dark" />
+                  <div className="w-12 h-12 rounded-lg border-2 border-shale-light bg-shale-dark" />
                   <div>
-                    <p className="text-gold-light font-medium">teal-dark</p>
-                    <p className="text-teal-light text-sm">#3D5A5B</p>
+                    <p className="text-gold-light font-medium">shale-dark</p>
+                    <p className="text-shale-light text-sm">#465E73</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-lg bg-teal-mid" />
+                  <div className="w-12 h-12 rounded-lg bg-shale-mid" />
                   <div>
-                    <p className="text-gold-light font-medium">teal-mid</p>
-                    <p className="text-teal-light text-sm">#5A7A7A</p>
+                    <p className="text-gold-light font-medium">shale-mid</p>
+                    <p className="text-shale-light text-sm">#5A7288</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-lg bg-teal-light" />
+                  <div className="w-12 h-12 rounded-lg bg-shale-light" />
                   <div>
-                    <p className="text-gold-light font-medium">teal-light</p>
-                    <p className="text-teal-light text-sm">#7A9A9A</p>
+                    <p className="text-gold-light font-medium">shale-light</p>
+                    <p className="text-shale-light text-sm">#6E869D</p>
                   </div>
                 </div>
               </div>
             </div>
 
             {/* Gold */}
-            <div className="space-y-3 bg-teal-dark/50 p-4 rounded-xl border border-teal-light/20">
+            <div className="space-y-3 bg-shale-dark/50 p-4 rounded-xl border border-shale-light/20">
               <h3 className="text-lg font-medium text-gold-light">
                 Gold (Knowledge/Foundation)
               </h3>
@@ -172,28 +172,28 @@ export default function DesignSystemPage() {
                   <div className="w-12 h-12 rounded-lg bg-gold-dark" />
                   <div>
                     <p className="text-gold-light font-medium">gold-dark</p>
-                    <p className="text-teal-light text-sm">#8B7355</p>
+                    <p className="text-shale-light text-sm">#B8965A</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
                   <div className="w-12 h-12 rounded-lg bg-gold-primary" />
                   <div>
                     <p className="text-gold-light font-medium">gold-primary</p>
-                    <p className="text-teal-light text-sm">#C9A86C</p>
+                    <p className="text-shale-light text-sm">#C9A86C</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
                   <div className="w-12 h-12 rounded-lg bg-gold-light" />
                   <div>
                     <p className="text-gold-light font-medium">gold-light</p>
-                    <p className="text-teal-light text-sm">#E5D4B0</p>
+                    <p className="text-shale-light text-sm">#D9B87E</p>
                   </div>
                 </div>
               </div>
             </div>
 
             {/* Leaf */}
-            <div className="space-y-3 bg-teal-dark/50 p-4 rounded-xl border border-teal-light/20">
+            <div className="space-y-3 bg-shale-dark/50 p-4 rounded-xl border border-shale-light/20">
               <h3 className="text-lg font-medium text-gold-light">
                 Leaf (Growth/Success)
               </h3>
@@ -202,21 +202,164 @@ export default function DesignSystemPage() {
                   <div className="w-12 h-12 rounded-lg bg-leaf-primary" />
                   <div>
                     <p className="text-gold-light font-medium">leaf-primary</p>
-                    <p className="text-teal-light text-sm">#4CAF50</p>
+                    <p className="text-shale-light text-sm">#49A657</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
                   <div className="w-12 h-12 rounded-lg bg-leaf-light" />
                   <div>
                     <p className="text-gold-light font-medium">leaf-light</p>
-                    <p className="text-teal-light text-sm">#81C784</p>
+                    <p className="text-shale-light text-sm">#6BC578</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
                   <div className="w-12 h-12 rounded-lg bg-leaf-bright" />
                   <div>
                     <p className="text-gold-light font-medium">leaf-bright</p>
-                    <p className="text-teal-light text-sm">#A5D6A7</p>
+                    <p className="text-shale-light text-sm">#8FE39A</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Neon Palettes */}
+          <div className="space-y-6">
+            <h3 className="text-xl font-semibold text-gold-primary border-b border-gold-primary/30 pb-2">
+              Neon Palettes (Triadic Harmony)
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {/* Neon Blue */}
+              <div className="space-y-3 bg-shale-dark/50 p-4 rounded-xl border border-shale-light/20">
+                <h4 className="text-lg font-medium text-gold-light">
+                  Neon Blue (Triadic from Slate)
+                </h4>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-3">
+                    <div
+                      className="w-12 h-12 rounded-lg border-2 border-neon-blue-light bg-neon-blue-primary shadow-glow-lg"
+                      style={{ boxShadow: "0 0 20px rgba(0, 212, 255, 0.6)" }}
+                    />
+                    <div>
+                      <p className="text-gold-light font-medium">
+                        neon-blue-primary
+                      </p>
+                      <p className="text-shale-light text-sm">#00D4FF</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div
+                      className="w-12 h-12 rounded-lg bg-neon-blue-secondary"
+                      style={{ boxShadow: "0 0 15px rgba(255, 107, 53, 0.5)" }}
+                    />
+                    <div>
+                      <p className="text-gold-light font-medium">
+                        neon-blue-secondary
+                      </p>
+                      <p className="text-shale-light text-sm">#FF6B35</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div
+                      className="w-12 h-12 rounded-lg bg-neon-blue-accent"
+                      style={{ boxShadow: "0 0 15px rgba(127, 255, 0, 0.5)" }}
+                    />
+                    <div>
+                      <p className="text-gold-light font-medium">
+                        neon-blue-accent
+                      </p>
+                      <p className="text-shale-light text-sm">#7FFF00</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Neon Gold */}
+              <div className="space-y-3 bg-shale-dark/50 p-4 rounded-xl border border-shale-light/20">
+                <h4 className="text-lg font-medium text-gold-light">
+                  Neon Gold (Triadic from Gold)
+                </h4>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-3">
+                    <div
+                      className="w-12 h-12 rounded-lg border-2 border-neon-gold-light bg-neon-gold-primary shadow-glow-lg"
+                      style={{ boxShadow: "0 0 20px rgba(255, 215, 0, 0.6)" }}
+                    />
+                    <div>
+                      <p className="text-gold-light font-medium">
+                        neon-gold-primary
+                      </p>
+                      <p className="text-shale-light text-sm">#FFD700</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div
+                      className="w-12 h-12 rounded-lg bg-neon-gold-secondary"
+                      style={{ boxShadow: "0 0 15px rgba(0, 191, 255, 0.5)" }}
+                    />
+                    <div>
+                      <p className="text-gold-light font-medium">
+                        neon-gold-secondary
+                      </p>
+                      <p className="text-shale-light text-sm">#00BFFF</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div
+                      className="w-12 h-12 rounded-lg bg-neon-gold-accent"
+                      style={{ boxShadow: "0 0 15px rgba(255, 20, 147, 0.5)" }}
+                    />
+                    <div>
+                      <p className="text-gold-light font-medium">
+                        neon-gold-accent
+                      </p>
+                      <p className="text-shale-light text-sm">#FF1493</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Neon Green */}
+              <div className="space-y-3 bg-shale-dark/50 p-4 rounded-xl border border-shale-light/20">
+                <h4 className="text-lg font-medium text-gold-light">
+                  Neon Green (Triadic from Leaf)
+                </h4>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-3">
+                    <div
+                      className="w-12 h-12 rounded-lg border-2 border-neon-green-light bg-neon-green-primary shadow-glow-lg"
+                      style={{ boxShadow: "0 0 20px rgba(0, 255, 127, 0.6)" }}
+                    />
+                    <div>
+                      <p className="text-gold-light font-medium">
+                        neon-green-primary
+                      </p>
+                      <p className="text-shale-light text-sm">#00FF7F</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div
+                      className="w-12 h-12 rounded-lg bg-neon-green-secondary"
+                      style={{ boxShadow: "0 0 15px rgba(255, 140, 0, 0.5)" }}
+                    />
+                    <div>
+                      <p className="text-gold-light font-medium">
+                        neon-green-secondary
+                      </p>
+                      <p className="text-shale-light text-sm">#FF8C00</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div
+                      className="w-12 h-12 rounded-lg bg-neon-green-accent"
+                      style={{ boxShadow: "0 0 15px rgba(147, 112, 219, 0.5)" }}
+                    />
+                    <div>
+                      <p className="text-gold-light font-medium">
+                        neon-green-accent
+                      </p>
+                      <p className="text-shale-light text-sm">#9370DB</p>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -224,7 +367,7 @@ export default function DesignSystemPage() {
           </div>
 
           {/* Semantic Colors */}
-          <div className="space-y-3 bg-teal-dark/50 p-4 rounded-xl border border-teal-light/20">
+          <div className="space-y-3 bg-shale-dark/50 p-4 rounded-xl border border-shale-light/20">
             <h3 className="text-lg font-medium text-gold-light">
               Semantic Colors (for UI Components)
             </h3>
@@ -265,15 +408,15 @@ export default function DesignSystemPage() {
           </div>
 
           {/* Gradients */}
-          <div className="space-y-3 bg-teal-dark/50 p-4 rounded-xl border border-teal-light/20">
+          <div className="space-y-3 bg-shale-dark/50 p-4 rounded-xl border border-shale-light/20">
             <h3 className="text-lg font-medium text-gold-light">
               Gradient Backgrounds
             </h3>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               <div className="flex flex-col items-center gap-2">
-                <div className="w-full h-16 rounded-lg bg-gradient-to-b from-teal-light via-teal-mid to-teal-dark" />
+                <div className="w-full h-16 rounded-lg bg-gradient-to-b from-shale-light via-shale-mid to-shale-dark" />
                 <p className="text-gold-light text-xs text-center">
-                  Teal Gradient
+                  Shale Gradient
                 </p>
               </div>
               <div className="flex flex-col items-center gap-2">
@@ -289,7 +432,7 @@ export default function DesignSystemPage() {
                 </p>
               </div>
               <div className="flex flex-col items-center gap-2">
-                <div className="w-full h-16 rounded-lg bg-gradient-to-b from-gold-light via-teal-mid to-teal-dark" />
+                <div className="w-full h-16 rounded-lg bg-gradient-to-b from-gold-light via-shale-mid to-shale-dark" />
                 <p className="text-gold-light text-xs text-center">
                   Mixed Gradient
                 </p>
@@ -298,7 +441,7 @@ export default function DesignSystemPage() {
           </div>
 
           {/* State Colors */}
-          <div className="space-y-3 bg-teal-dark/50 p-4 rounded-xl border border-teal-light/20">
+          <div className="space-y-3 bg-shale-dark/50 p-4 rounded-xl border border-shale-light/20">
             <h3 className="text-lg font-medium text-gold-light">
               State Colors (Interactive Feedback)
             </h3>
@@ -306,22 +449,22 @@ export default function DesignSystemPage() {
               <div className="flex flex-col items-center gap-2">
                 <div className="w-16 h-16 rounded-lg bg-state-hover border-2 border-gold-primary/50" />
                 <p className="text-gold-light text-xs">hover</p>
-                <p className="text-teal-light text-[10px]">Gold 15%</p>
+                <p className="text-shale-light text-[10px]">Gold 15%</p>
               </div>
               <div className="flex flex-col items-center gap-2">
                 <div className="w-16 h-16 rounded-lg bg-state-focus border-2 border-leaf-primary/50" />
                 <p className="text-gold-light text-xs">focus</p>
-                <p className="text-teal-light text-[10px]">Leaf 20%</p>
+                <p className="text-shale-light text-[10px]">Leaf 20%</p>
               </div>
               <div className="flex flex-col items-center gap-2">
                 <div className="w-16 h-16 rounded-lg bg-state-active border-2 border-leaf-primary/50" />
                 <p className="text-gold-light text-xs">active</p>
-                <p className="text-teal-light text-[10px]">Leaf 30%</p>
+                <p className="text-shale-light text-[10px]">Leaf 30%</p>
               </div>
               <div className="flex flex-col items-center gap-2">
-                <div className="w-16 h-16 rounded-lg bg-state-disabled border-2 border-teal-light/50" />
+                <div className="w-16 h-16 rounded-lg bg-state-disabled border-2 border-shale-light/50" />
                 <p className="text-gold-light text-xs">disabled</p>
-                <p className="text-teal-light text-[10px]">Teal 30%</p>
+                <p className="text-shale-light text-[10px]">Shale 30%</p>
               </div>
             </div>
           </div>
@@ -333,7 +476,7 @@ export default function DesignSystemPage() {
             Interactive States &amp; Hover Effects
           </h2>
 
-          <div className="bg-teal-dark/50 p-6 rounded-xl border border-teal-light/20 space-y-6">
+          <div className="bg-shale-dark/50 p-6 rounded-xl border border-shale-light/20 space-y-6">
             <p className="text-gold-light/80 text-sm">
               Hover over the elements below to see the interactive state
               transitions.
@@ -342,12 +485,14 @@ export default function DesignSystemPage() {
             {/* Hover Demo Cards */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div
-                className="p-4 rounded-lg bg-teal-mid transition-all duration-300 hover:bg-gold-primary hover:shadow-glow-gold cursor-pointer"
+                className="p-4 rounded-lg bg-shale-mid transition-all duration-300 hover:bg-gold-primary hover:shadow-glow-gold cursor-pointer"
                 onMouseEnter={() => setActiveHoverDemo("card1")}
                 onMouseLeave={() => setActiveHoverDemo(null)}
               >
-                <p className="text-gold-light font-medium">Teal → Gold Hover</p>
-                <p className="text-teal-light text-xs mt-1">
+                <p className="text-gold-light font-medium">
+                  Shale → Gold Hover
+                </p>
+                <p className="text-shale-light text-xs mt-1">
                   {activeHoverDemo === "card1" ? "Hovered!" : "Hover me"}
                 </p>
               </div>
@@ -356,13 +501,13 @@ export default function DesignSystemPage() {
                 onMouseEnter={() => setActiveHoverDemo("card2")}
                 onMouseLeave={() => setActiveHoverDemo(null)}
               >
-                <p className="text-teal-dark font-medium">Gold → Leaf Hover</p>
+                <p className="text-shale-dark font-medium">Gold → Leaf Hover</p>
                 <p className="text-gold-dark text-xs mt-1">
                   {activeHoverDemo === "card2" ? "Hovered!" : "Hover me"}
                 </p>
               </div>
               <div
-                className="p-4 rounded-lg bg-leaf-primary transition-all duration-300 hover:bg-gold-light hover:text-teal-dark cursor-pointer"
+                className="p-4 rounded-lg bg-leaf-primary transition-all duration-300 hover:bg-gold-light hover:text-shale-dark cursor-pointer"
                 onMouseEnter={() => setActiveHoverDemo("card3")}
                 onMouseLeave={() => setActiveHoverDemo(null)}
               >
@@ -381,17 +526,17 @@ export default function DesignSystemPage() {
                 Scale &amp; Transform Effects
               </h3>
               <div className="flex flex-wrap gap-4">
-                <div className="w-16 h-16 rounded-lg bg-teal-mid transition-transform duration-300 hover:scale-110 cursor-pointer flex items-center justify-center">
+                <div className="w-16 h-16 rounded-lg bg-shale-mid transition-transform duration-300 hover:scale-110 cursor-pointer flex items-center justify-center">
                   <span className="text-gold-light text-xs">Scale</span>
                 </div>
                 <div className="w-16 h-16 rounded-lg bg-gold-primary transition-transform duration-300 hover:-translate-y-2 cursor-pointer flex items-center justify-center">
-                  <span className="text-teal-dark text-xs">Lift</span>
+                  <span className="text-shale-dark text-xs">Lift</span>
                 </div>
                 <div className="w-16 h-16 rounded-lg bg-leaf-primary transition-all duration-300 hover:rotate-12 cursor-pointer flex items-center justify-center">
                   <span className="text-white text-xs">Rotate</span>
                 </div>
-                <div className="w-16 h-16 rounded-lg bg-teal-light transition-all duration-300 hover:scale-110 hover:shadow-glow-gold cursor-pointer flex items-center justify-center">
-                  <span className="text-teal-dark text-xs">Combined</span>
+                <div className="w-16 h-16 rounded-lg bg-shale-light transition-all duration-300 hover:scale-110 hover:shadow-glow-gold cursor-pointer flex items-center justify-center">
+                  <span className="text-shale-dark text-xs">Combined</span>
                 </div>
               </div>
             </div>
@@ -405,10 +550,10 @@ export default function DesignSystemPage() {
                 <div className="w-20 h-16 rounded-lg bg-gold-primary/50 transition-all duration-300 hover:bg-gold-primary cursor-pointer flex items-center justify-center">
                   <span className="text-gold-light text-xs">Opacity</span>
                 </div>
-                <div className="w-20 h-16 rounded-lg border-2 border-teal-light transition-all duration-300 hover:border-gold-primary hover:border-4 cursor-pointer flex items-center justify-center">
+                <div className="w-20 h-16 rounded-lg border-2 border-shale-light transition-all duration-300 hover:border-gold-primary hover:border-4 cursor-pointer flex items-center justify-center">
                   <span className="text-gold-light text-xs">Border</span>
                 </div>
-                <div className="w-20 h-16 rounded-lg bg-teal-mid border-2 border-transparent transition-all duration-300 hover:border-leaf-primary cursor-pointer flex items-center justify-center">
+                <div className="w-20 h-16 rounded-lg bg-shale-mid border-2 border-transparent transition-all duration-300 hover:border-leaf-primary cursor-pointer flex items-center justify-center">
                   <span className="text-gold-light text-xs">Reveal</span>
                 </div>
               </div>
@@ -420,19 +565,19 @@ export default function DesignSystemPage() {
                 Common Hover Class Patterns
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm font-mono text-gold-light/80">
-                <div className="bg-teal-dark p-3 rounded-lg">
+                <div className="bg-shale-dark p-3 rounded-lg">
                   <p className="text-gold-primary mb-1">Color Transition</p>
                   <code>hover:bg-gold-primary transition-colors</code>
                 </div>
-                <div className="bg-teal-dark p-3 rounded-lg">
+                <div className="bg-shale-dark p-3 rounded-lg">
                   <p className="text-gold-primary mb-1">Scale Effect</p>
                   <code>hover:scale-105 transition-transform</code>
                 </div>
-                <div className="bg-teal-dark p-3 rounded-lg">
+                <div className="bg-shale-dark p-3 rounded-lg">
                   <p className="text-gold-primary mb-1">Glow on Hover</p>
                   <code>hover:shadow-glow-leaf transition-shadow</code>
                 </div>
-                <div className="bg-teal-dark p-3 rounded-lg">
+                <div className="bg-shale-dark p-3 rounded-lg">
                   <p className="text-gold-primary mb-1">Lift Effect</p>
                   <code>hover:-translate-y-1 transition-transform</code>
                 </div>
@@ -447,7 +592,7 @@ export default function DesignSystemPage() {
             Typography
           </h2>
 
-          <div className="bg-teal-dark/50 p-6 rounded-xl border border-teal-light/20 space-y-6">
+          <div className="bg-shale-dark/50 p-6 rounded-xl border border-shale-light/20 space-y-6">
             {/* Font Sizes */}
             <div className="space-y-4">
               <h3 className="text-lg font-medium text-gold-light">
@@ -456,45 +601,47 @@ export default function DesignSystemPage() {
               <div className="space-y-3">
                 <div className="flex items-baseline gap-4">
                   <span className="text-xs text-gold-light">text-xs</span>
-                  <span className="text-teal-light text-xs">
+                  <span className="text-shale-light text-xs">
                     0.75rem / 12px
                   </span>
                 </div>
                 <div className="flex items-baseline gap-4">
                   <span className="text-sm text-gold-light">text-sm</span>
-                  <span className="text-teal-light text-xs">
+                  <span className="text-shale-light text-xs">
                     0.875rem / 14px
                   </span>
                 </div>
                 <div className="flex items-baseline gap-4">
                   <span className="text-base text-gold-light">text-base</span>
-                  <span className="text-teal-light text-xs">1rem / 16px</span>
+                  <span className="text-shale-light text-xs">1rem / 16px</span>
                 </div>
                 <div className="flex items-baseline gap-4">
                   <span className="text-lg text-gold-light">text-lg</span>
-                  <span className="text-teal-light text-xs">
+                  <span className="text-shale-light text-xs">
                     1.125rem / 18px
                   </span>
                 </div>
                 <div className="flex items-baseline gap-4">
                   <span className="text-xl text-gold-light">text-xl</span>
-                  <span className="text-teal-light text-xs">
+                  <span className="text-shale-light text-xs">
                     1.25rem / 20px
                   </span>
                 </div>
                 <div className="flex items-baseline gap-4">
                   <span className="text-2xl text-gold-light">text-2xl</span>
-                  <span className="text-teal-light text-xs">1.5rem / 24px</span>
+                  <span className="text-shale-light text-xs">
+                    1.5rem / 24px
+                  </span>
                 </div>
                 <div className="flex items-baseline gap-4">
                   <span className="text-3xl text-gold-light">text-3xl</span>
-                  <span className="text-teal-light text-xs">
+                  <span className="text-shale-light text-xs">
                     1.875rem / 30px
                   </span>
                 </div>
                 <div className="flex items-baseline gap-4">
                   <span className="text-4xl text-gold-light">text-4xl</span>
-                  <span className="text-teal-light text-xs">
+                  <span className="text-shale-light text-xs">
                     2.25rem / 36px
                   </span>
                 </div>
@@ -524,7 +671,7 @@ export default function DesignSystemPage() {
             Spacing &amp; Border Radius
           </h2>
 
-          <div className="bg-teal-dark/50 p-6 rounded-xl border border-teal-light/20 space-y-6">
+          <div className="bg-shale-dark/50 p-6 rounded-xl border border-shale-light/20 space-y-6">
             {/* Border Radius */}
             <div className="space-y-4">
               <h3 className="text-lg font-medium text-gold-light">
@@ -614,7 +761,7 @@ export default function DesignSystemPage() {
           </h2>
 
           <div className="space-y-6">
-            <div className="bg-teal-dark/50 p-4 rounded-xl border border-teal-light/20">
+            <div className="bg-shale-dark/50 p-4 rounded-xl border border-shale-light/20">
               <h3 className="text-lg font-medium mb-3 text-gold-light">
                 Standard Variants
               </h3>
@@ -628,24 +775,24 @@ export default function DesignSystemPage() {
               </div>
             </div>
 
-            <div className="bg-teal-dark/50 p-4 rounded-xl border border-teal-light/20">
+            <div className="bg-shale-dark/50 p-4 rounded-xl border border-shale-light/20">
               <h3 className="text-lg font-medium mb-3 text-gold-light">
                 Digital Garden Variants
               </h3>
               <div className="flex flex-wrap gap-3">
                 <Button variant="leaf">Leaf (Growth)</Button>
                 <Button variant="gold">Gold (Knowledge)</Button>
-                <Button variant="teal">Teal (Connection)</Button>
+                <Button variant="shale">Shale (Connection)</Button>
               </div>
             </div>
 
-            <div className="bg-teal-dark/50 p-4 rounded-xl border border-teal-light/20">
+            <div className="bg-shale-dark/50 p-4 rounded-xl border border-shale-light/20">
               <h3 className="text-lg font-medium mb-3 text-gold-light">
                 Gradient Variants (Full Height for NavBar)
               </h3>
-              <div className="flex h-12 border border-teal-light/30 rounded-lg overflow-hidden">
-                <Button variant="gradient-teal" size="full">
-                  Teal Gradient
+              <div className="flex h-12 border border-shale-light/30 rounded-lg overflow-hidden">
+                <Button variant="gradient-shale" size="full">
+                  Shale Gradient
                 </Button>
                 <Button variant="gradient-gold" size="full">
                   Gold Gradient
@@ -659,7 +806,7 @@ export default function DesignSystemPage() {
               </div>
             </div>
 
-            <div className="bg-teal-dark/50 p-4 rounded-xl border border-teal-light/20">
+            <div className="bg-shale-dark/50 p-4 rounded-xl border border-shale-light/20">
               <h3 className="text-lg font-medium mb-3 text-gold-light">
                 Sizes
               </h3>
@@ -680,7 +827,7 @@ export default function DesignSystemPage() {
           </h2>
 
           <div className="space-y-6">
-            <div className="bg-teal-dark/50 p-4 rounded-xl border border-teal-light/20">
+            <div className="bg-shale-dark/50 p-4 rounded-xl border border-shale-light/20">
               <h3 className="text-lg font-medium mb-4 text-gold-light">
                 Node Types
               </h3>
@@ -693,7 +840,7 @@ export default function DesignSystemPage() {
               </div>
             </div>
 
-            <div className="bg-teal-dark/50 p-4 rounded-xl border border-teal-light/20">
+            <div className="bg-shale-dark/50 p-4 rounded-xl border border-shale-light/20">
               <h3 className="text-lg font-medium mb-4 text-gold-light">
                 Node States (with Glow)
               </h3>
@@ -707,7 +854,7 @@ export default function DesignSystemPage() {
               </div>
             </div>
 
-            <div className="bg-teal-dark/50 p-4 rounded-xl border border-teal-light/20">
+            <div className="bg-shale-dark/50 p-4 rounded-xl border border-shale-light/20">
               <h3 className="text-lg font-medium mb-4 text-gold-light">
                 Node Sizes
               </h3>
@@ -719,7 +866,7 @@ export default function DesignSystemPage() {
               </div>
             </div>
 
-            <div className="bg-teal-dark/50 p-4 rounded-xl border border-teal-light/20">
+            <div className="bg-shale-dark/50 p-4 rounded-xl border border-shale-light/20">
               <h3 className="text-lg font-medium mb-4 text-gold-light">
                 Branch Lines
               </h3>
@@ -738,10 +885,10 @@ export default function DesignSystemPage() {
                     type="straight"
                     direction="horizontal"
                     length={80}
-                    color="teal"
+                    color="shale"
                   />
                   <span className="text-xs text-gold-light">
-                    Teal Horizontal
+                    Shale Horizontal
                   </span>
                 </div>
                 <div className="flex flex-col items-center gap-2">
@@ -801,15 +948,15 @@ export default function DesignSystemPage() {
               </CardFooter>
             </Card>
 
-            <Card intent="teal">
+            <Card intent="shale">
               <CardHeader>
-                <CardTitle className="text-gold-light">Teal Card</CardTitle>
-                <CardDescription className="text-teal-light">
+                <CardTitle className="text-gold-light">Shale Card</CardTitle>
+                <CardDescription className="text-shale-light">
                   Connection/depth variant
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <p className="text-gold-light/80">Deep teal background</p>
+                <p className="text-gold-light/80">Deep shale background</p>
               </CardContent>
               <CardFooter>
                 <Button variant="gold" size="sm">
@@ -829,7 +976,7 @@ export default function DesignSystemPage() {
                 <p className="text-gold-light/80">Gold-accented content</p>
               </CardContent>
               <CardFooter>
-                <Button variant="teal" size="sm">
+                <Button variant="shale" size="sm">
                   Learn
                 </Button>
               </CardFooter>
@@ -865,7 +1012,7 @@ export default function DesignSystemPage() {
             Glow Effects
           </h2>
 
-          <div className="bg-teal-dark/50 p-6 rounded-xl border border-teal-light/20 space-y-6">
+          <div className="bg-shale-dark/50 p-6 rounded-xl border border-shale-light/20 space-y-6">
             <div className="space-y-4">
               <h3 className="text-lg font-medium text-gold-light">
                 Neon Text Glow (CSS Filter)
@@ -877,8 +1024,8 @@ export default function DesignSystemPage() {
                 <div className="neon-glow-md text-lg text-gold-primary">
                   Medium glow with gold color (knowledge)
                 </div>
-                <div className="neon-glow-lg text-lg text-teal-light">
-                  Large glow with teal color (connection)
+                <div className="neon-glow-lg text-lg text-shale-light">
+                  Large glow with shale color (connection)
                 </div>
               </div>
             </div>
@@ -892,7 +1039,7 @@ export default function DesignSystemPage() {
                   <span className="text-white text-xs">Leaf</span>
                 </div>
                 <div className="w-16 h-16 rounded-full shadow-glow-gold bg-gold-primary flex items-center justify-center">
-                  <span className="text-teal-dark text-xs">Gold</span>
+                  <span className="text-shale-dark text-xs">Gold</span>
                 </div>
                 <div className="w-16 h-16 rounded-full shadow-glow-success bg-leaf-light flex items-center justify-center">
                   <span className="text-white text-xs">Success</span>
@@ -911,16 +1058,16 @@ export default function DesignSystemPage() {
             Quick Reference
           </h2>
 
-          <div className="bg-teal-dark/50 p-6 rounded-xl border border-teal-light/20">
+          <div className="bg-shale-dark/50 p-6 rounded-xl border border-shale-light/20">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm">
               <div>
                 <h3 className="text-lg font-medium text-gold-light mb-3">
                   Tailwind Color Classes
                 </h3>
                 <ul className="space-y-1 text-gold-light/80 font-mono">
-                  <li>bg-teal-dark / text-teal-dark</li>
-                  <li>bg-teal-mid / text-teal-mid</li>
-                  <li>bg-teal-light / text-teal-light</li>
+                  <li>bg-shale-dark / text-shale-dark</li>
+                  <li>bg-shale-mid / text-shale-mid</li>
+                  <li>bg-shale-light / text-shale-light</li>
                   <li>bg-gold-primary / text-gold-primary</li>
                   <li>bg-gold-dark / text-gold-dark</li>
                   <li>bg-gold-light / text-gold-light</li>
@@ -936,9 +1083,9 @@ export default function DesignSystemPage() {
                 <ul className="space-y-1 text-gold-light/80 font-mono">
                   <li>
                     variant=&quot;leaf&quot; | &quot;gold&quot; |
-                    &quot;teal&quot;
+                    &quot;shale&quot;
                   </li>
-                  <li>variant=&quot;gradient-teal&quot;</li>
+                  <li>variant=&quot;gradient-shale&quot;</li>
                   <li>variant=&quot;gradient-gold&quot;</li>
                   <li>variant=&quot;gradient-leaf&quot;</li>
                   <li>variant=&quot;gradient-mixed&quot;</li>
@@ -976,7 +1123,7 @@ export default function DesignSystemPage() {
                 <ul className="space-y-1 text-gold-light/80 font-mono">
                   <li>intent=&quot;default&quot;</li>
                   <li>intent=&quot;highlight&quot;</li>
-                  <li>intent=&quot;teal&quot;</li>
+                  <li>intent=&quot;shale&quot;</li>
                   <li>intent=&quot;gold&quot;</li>
                   <li>intent=&quot;warning&quot;</li>
                   <li>intent=&quot;error&quot;</li>
@@ -1002,14 +1149,16 @@ export default function DesignSystemPage() {
                 </h3>
                 <ul className="space-y-1 text-gold-light/80 font-mono">
                   <li>
-                    bg-gradient-to-b from-teal-light via-teal-mid to-teal-dark
+                    bg-gradient-to-b from-shale-light via-shale-mid
+                    to-shale-dark
                   </li>
                   <li>
                     bg-gradient-to-b from-gold-light via-gold-primary
                     to-gold-dark
                   </li>
                   <li>
-                    bg-gradient-to-br from-teal-dark via-teal-mid to-teal-dark
+                    bg-gradient-to-br from-shale-dark via-shale-mid
+                    to-shale-dark
                   </li>
                 </ul>
               </div>
@@ -1021,7 +1170,7 @@ export default function DesignSystemPage() {
                   <li>bg-state-hover (gold 15%)</li>
                   <li>bg-state-focus (leaf 20%)</li>
                   <li>bg-state-active (leaf 30%)</li>
-                  <li>bg-state-disabled (teal 30%)</li>
+                  <li>bg-state-disabled (shale 30%)</li>
                 </ul>
               </div>
               <div>
@@ -1039,7 +1188,7 @@ export default function DesignSystemPage() {
           </div>
         </section>
 
-        <footer className="text-center py-8 text-teal-light text-sm">
+        <footer className="text-center py-8 text-shale-light text-sm">
           <p>David&apos;s Digital Garden Design System v1.0</p>
         </footer>
       </div>

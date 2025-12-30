@@ -11,7 +11,7 @@ import {
   BRANCH_PRESETS,
   BuiltBranch,
 } from "@/lib/app-nav/branch-builder";
-import { getBranchColor, TEAL } from "@/lib/design-system/colors";
+import { getBranchColor, SLATE } from "@/lib/design-system/colors";
 import type { NavigationTree } from "@/lib/db/navigation";
 
 // Get all preset names as an array for cycling
@@ -267,7 +267,7 @@ export function IntegratedCircuitNav({
   }, [branches, rotation, height, svgCenterX, treeStart, treeEnd]);
 
   return (
-    <div className="fixed inset-0 w-screen h-screen bg-teal-dark overflow-hidden">
+    <div className="fixed inset-0 w-screen h-screen bg-shale-dark overflow-hidden">
       {/* Circuit Tree SVG - centered */}
       <div
         className="absolute z-10 flex items-center justify-center"

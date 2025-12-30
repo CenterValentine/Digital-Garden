@@ -11,7 +11,7 @@ export default async function Home({ searchParams }: HomeProps) {
   const navigationData = await getNavigationTreeData(searchParams.view);
 
   return (
-    <div className="w-full h-[calc(100vh-80px)] fixed top-20 left-0 right-0 bg-gradient-to-br from-teal-dark via-teal-mid to-teal-dark overflow-hidden">
+    <div className="w-full h-[calc(100vh-80px)] fixed top-20 left-0 right-0 bg-gradient-to-br from-shale-dark via-shale-mid to-shale-dark overflow-hidden">
       {/* <Tree /> */}
       <AppNav navigationData={navigationData} />
       {user && (

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import CompactLogo from "../logo/CompactLogo";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/ui/button/Button";
 import type { SessionData } from "@/lib/auth/types";
 
 export default function NavBar() {
@@ -125,7 +125,7 @@ export default function NavBar() {
               <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-20">
                 <div className="relative h-24 w-24 flex items-center justify-center">
                   {/* Medallion ring */}
-                  <div className="absolute inset-0 rounded-full border-2 border-gold-primary bg-gradient-to-br from-gold-light/30 to-teal-dark/40 shadow-glow-gold group-hover:shadow-glow-leaf transition-shadow duration-300" />
+                  <div className="absolute inset-0 rounded-full border-2 border-gold-primary bg-gradient-to-br from-gold-light/30 to-shale-dark/40 shadow-glow-gold group-hover:shadow-glow-leaf transition-shadow duration-300" />
                   {/* Inner ring */}
                   <div className="absolute inset-0.5 rounded-full border border-gold-dark/50 bg-background" />
                   {/* Logo container */}

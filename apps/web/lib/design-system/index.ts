@@ -6,11 +6,13 @@
 
 export {
   COLORS,
-  TEAL,
+  SLATE,
   GOLD,
   LEAF,
   INTENT,
   BRANCH_COLORS,
-  GRADIENTS,
+  NEON_BLUE,
+  NEON_GOLD,
+  NEON_GREEN,
   getBranchColor,
 } from "./colors";
