@@ -35,7 +35,8 @@ export const mapSpacing = (value: string | number): string => {
   };
 
   const key = typeof value === "number" ? `${value}px` : value;
-  return spacingMap[key] || value;
+  const mapped = spacingMap[key];
+  return mapped || (typeof value === "string" ? value : `${value}px`);
 };
 
 /**

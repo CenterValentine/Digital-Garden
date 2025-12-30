@@ -6,4 +6,4 @@
 // Note: Individual component files should be created following the same pattern
 // as Aceternity components, adapted for Digital Garden design tokens
 
-export * from "./README";
+// Components will be exported here as they are implemented

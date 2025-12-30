@@ -2,4 +2,4 @@
  * Blocks.so Components
  */
 
-export * from "./README";
+// Components will be exported here as they are implemented

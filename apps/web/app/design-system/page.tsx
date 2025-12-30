@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/ui/button/Button";
 import {
   Card,
   CardHeader,
@@ -9,7 +9,7 @@ import {
   CardDescription,
   CardContent,
   CardFooter,
-} from "@/components/ui/card";
+} from "@/components/ui/card/Card";
 import { Prose } from "@/components/ui/prose";
 import { TreeNode, BranchLine } from "@/components/ui/tree-node";
 
@@ -489,7 +489,9 @@ export default function DesignSystemPage() {
                 onMouseEnter={() => setActiveHoverDemo("card1")}
                 onMouseLeave={() => setActiveHoverDemo(null)}
               >
-                <p className="text-gold-light font-medium">Shale → Gold Hover</p>
+                <p className="text-gold-light font-medium">
+                  Shale → Gold Hover
+                </p>
                 <p className="text-shale-light text-xs mt-1">
                   {activeHoverDemo === "card1" ? "Hovered!" : "Hover me"}
                 </p>
@@ -627,7 +629,9 @@ export default function DesignSystemPage() {
                 </div>
                 <div className="flex items-baseline gap-4">
                   <span className="text-2xl text-gold-light">text-2xl</span>
-                  <span className="text-shale-light text-xs">1.5rem / 24px</span>
+                  <span className="text-shale-light text-xs">
+                    1.5rem / 24px
+                  </span>
                 </div>
                 <div className="flex items-baseline gap-4">
                   <span className="text-3xl text-gold-light">text-3xl</span>
@@ -1145,14 +1149,16 @@ export default function DesignSystemPage() {
                 </h3>
                 <ul className="space-y-1 text-gold-light/80 font-mono">
                   <li>
-                    bg-gradient-to-b from-shale-light via-shale-mid to-shale-dark
+                    bg-gradient-to-b from-shale-light via-shale-mid
+                    to-shale-dark
                   </li>
                   <li>
                     bg-gradient-to-b from-gold-light via-gold-primary
                     to-gold-dark
                   </li>
                   <li>
-                    bg-gradient-to-br from-shale-dark via-shale-mid to-shale-dark
+                    bg-gradient-to-br from-shale-dark via-shale-mid
+                    to-shale-dark
                   </li>
                 </ul>
               </div>
