@@ -122,3 +122,89 @@ export const getStateColor = (
   };
   return stateMap[state] || stateMap.hover;
 };
+
+/**
+ * Convert CSS variable to hex string
+ * Used for Canvas API components that need hex colors
+ */
+export const cssVarToHex = (
+  cssVar: string,
+  fallback: string = "#737373"
+): string => {
+  if (typeof window === "undefined" || !document.body) return fallback;
+
+  try {
+    const tempEl = document.createElement("div");
+    tempEl.style.color = cssVar;
+    tempEl.style.position = "absolute";
+    tempEl.style.visibility = "hidden";
+    document.body.appendChild(tempEl);
+    const computed = window.getComputedStyle(tempEl).color;
+    document.body.removeChild(tempEl);
+
+    const match = computed.match(/\d+/g);
+    if (Array.isArray(match) && match.length >= 3) {
+      const [r, g, b] = match.slice(0, 3).map(Number);
+      return `#${[r, g, b].map((x) => x.toString(16).padStart(2, "0")).join("")}`;
+    }
+  } catch {
+    console.warn("Failed to convert CSS variable to hex:", cssVar);
+    return fallback;
+  }
+
+  return fallback;
+};
+
+/**
+ * Convert CSS variable to RGB array
+ * Used for Canvas API components that need RGB arrays
+ */
+export const cssVarToRgb = (
+  cssVar: string,
+  fallback: [number, number, number] = [115, 115, 115]
+): [number, number, number] => {
+  if (typeof window === "undefined" || !document.body) return fallback;
+
+  try {
+    const tempEl = document.createElement("div");
+    tempEl.style.color = cssVar;
+    tempEl.style.position = "absolute";
+    tempEl.style.visibility = "hidden";
+    document.body.appendChild(tempEl);
+    const computed = window.getComputedStyle(tempEl).color;
+    document.body.removeChild(tempEl);
+
+    const match = computed.match(/\d+/g);
+    if (Array.isArray(match) && match.length >= 3) {
+      const [r, g, b] = match.slice(0, 3).map(Number);
+      return [r, g, b] as [number, number, number];
+    }
+  } catch {
+    console.warn("Failed to convert CSS variable to RGB:", cssVar);
+    return fallback;
+  }
+
+  return fallback;
+};
+
+/**
+ * Get Digital Garden color as hex string
+ * Convenience function for Canvas components
+ */
+export const getColorAsHex = (
+  color: DigitalGardenColor,
+  variant: ColorVariant = "primary"
+): string => {
+  return cssVarToHex(getColorVariable(color, variant));
+};
+
+/**
+ * Get Digital Garden color as RGB array
+ * Convenience function for Canvas components
+ */
+export const getColorAsRgb = (
+  color: DigitalGardenColor,
+  variant: ColorVariant = "primary"
+): [number, number, number] => {
+  return cssVarToRgb(getColorVariable(color, variant));
+};
