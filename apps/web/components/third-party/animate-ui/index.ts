@@ -3,7 +3,9 @@
  * Export all components from this library
  */
 
-// Note: Individual component files should be created following the same pattern
-// as Aceternity components, adapted for Digital Garden design tokens
+// Backgrounds
+export { GradientBackground } from "./components/backgrounds/gradient";
+export type { GradientBackgroundProps } from "./components/backgrounds/gradient";
 
-// Components will be exported here as they are implemented
+export { GradientBackgroundDemo } from "./GradientBackgroundDemo";
+export type { GradientBackgroundDemoProps } from "./GradientBackgroundDemo";
