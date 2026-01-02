@@ -11,7 +11,6 @@ export { GradientBackgroundDemo } from "./GradientBackgroundDemo";
 export type { GradientBackgroundDemoProps } from "./GradientBackgroundDemo";
 
 export { GravityStarsBackground } from "./components/backgrounds/gravity-stars";
-export type { GravityStarsBackgroundProps } from "./components/backgrounds/gravity-stars";
 
 export { GravityStarsBackgroundDemo } from "./GravityStarsBackgroundDemo";
 export type { GravityStarsBackgroundDemoProps } from "./GravityStarsBackgroundDemo";
