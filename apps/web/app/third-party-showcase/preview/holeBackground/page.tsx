@@ -1,11 +1,11 @@
 "use client";
 
-import { HoleBackgroundDemo } from "@/components/third-party/animate-ui/HoleBackgroundDemo";
-import type { HoleBackgroundRef } from "@/components/third-party/animate-ui/components/backgrounds/hole";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
+import { HoleBackgroundDemo } from "@/components/client/third-party/animate-ui/HoleBackgroundDemo";
+import type { HoleBackgroundRef } from "@/components/client/third-party/animate-ui/components/backgrounds/hole";
+import { Button } from "@/components/client/ui/button";
+import { Card, CardContent } from "@/components/client/ui/card";
+import { Label } from "@/components/client/ui/label";
+import { Switch } from "@/components/client/ui/switch";
 import { useRef, useState } from "react";
 import { getColorAsHex } from "@/lib/third-party/colors";
 

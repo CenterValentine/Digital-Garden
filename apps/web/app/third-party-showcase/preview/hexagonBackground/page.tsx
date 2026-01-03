@@ -1,4 +1,4 @@
-import { HexagonBackgroundDemo } from "@/components/third-party/animate-ui/HexagonBackgroundDemo";
+import { HexagonBackgroundDemo } from "@/components/client/third-party/animate-ui/HexagonBackgroundDemo";
 
 export default function HexagonBackgroundPreview() {
   return (

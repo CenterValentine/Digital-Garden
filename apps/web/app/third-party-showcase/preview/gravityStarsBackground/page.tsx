@@ -1,40 +1,40 @@
 "use client";
 
-import { GravityStarsBackgroundDemo } from "@/components/third-party/animate-ui/GravityStarsBackgroundDemo";
+import { GravityStarsBackgroundDemo } from "@/components/client/third-party/animate-ui/GravityStarsBackgroundDemo";
 import {
   Card,
   CardContent,
   CardHeader,
   CardTitle,
   CardDescription,
-} from "@/components/ui/card";
+} from "@/components/client/ui/card";
 import type {
   DigitalGardenColor,
   ColorVariant,
 } from "@/lib/third-party/colors";
-import { ColorSelector } from "@/components/ui/utility/color-selector";
+import { ColorSelector } from "@/components/client/ui/utility/color-selector";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
+} from "@/components/client/ui/select";
 
 import {
   Collapsible,
   CollapsibleTrigger,
   CollapsibleContent,
-} from "@/components/ui/collapsible";
+} from "@/components/client/ui/collapsible";
 
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/client/ui/button";
 
 import { Settings2, ChevronLeft } from "lucide-react";
 
-import { Label } from "@/components/ui/label";
+import { Label } from "@/components/client/ui/label";
 
-import { Switch } from "@/components/ui/switch";
-import { Slider } from "@/components/ui/slider";
+import { Switch } from "@/components/client/ui/switch";
+import { Slider } from "@/components/client/ui/slider";
 import { useState } from "react";
 
 import { cn } from "@/lib/utils";

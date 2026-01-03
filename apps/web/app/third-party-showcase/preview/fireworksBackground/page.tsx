@@ -1,23 +1,23 @@
 "use client";
 
 import { useState } from "react";
-import { FireworksBackgroundDemo } from "@/components/third-party/animate-ui/FireworksBackgroundDemo";
+import { FireworksBackgroundDemo } from "@/components/client/third-party/animate-ui/FireworksBackgroundDemo";
 import {
   Card,
   CardContent,
   CardHeader,
   CardTitle,
   CardDescription,
-} from "@/components/ui/card";
-import { ColorSelector } from "@/components/ui/utility/color-selector";
+} from "@/components/client/ui/card";
+import { ColorSelector } from "@/components/client/ui/utility/color-selector";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
-import { Label } from "@/components/ui/label";
+} from "@/components/client/ui/select";
+import { Label } from "@/components/client/ui/label";
 import type {
   DigitalGardenColor,
   ColorVariant,

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Button } from "@/components/ui/button/Button";
+import { Button } from "@/components/client/ui/button/Button";
 import {
   Card,
   CardHeader,
@@ -9,9 +9,9 @@ import {
   CardDescription,
   CardContent,
   CardFooter,
-} from "@/components/ui/card/Card";
-import { Prose } from "@/components/ui/prose";
-import { TreeNode, BranchLine } from "@/components/ui/tree-node";
+} from "@/components/client/ui/card/Card";
+import { Prose } from "@/components/client/ui/prose";
+import { TreeNode, BranchLine } from "@/components/client/ui/tree-node";
 
 export default function DesignSystemPage() {
   const [activeHoverDemo, setActiveHoverDemo] = useState<string | null>(null);

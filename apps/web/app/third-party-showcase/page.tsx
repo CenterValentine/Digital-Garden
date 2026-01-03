@@ -51,16 +51,21 @@ import {
   AnimatedHeader,
   HeroSections,
   FeatureSections,
-} from "@/components/third-party/aceternity";
+} from "@/components/client/third-party/aceternity";
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Badge } from "@/components/ui/badge";
+} from "@/components/client/ui/card";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/client/ui/tabs";
+import { Badge } from "@/components/client/ui/badge";
 import { ExternalLink } from "lucide-react";
 
 // Component metadata types
@@ -290,20 +295,20 @@ export default function ThirdPartyShowcasePage() {
 
           {/* Backgrounds & Effects */}
           <TabsContent value="backgrounds" className="space-y-8">
-          <div>
+            <div>
               <h3 className="text-xl font-medium mb-4">
                 Backgrounds & Effects
               </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 <ComponentPreviewCard
                   name="BackgroundRipple"
                   description="Ripple effect background"
                   sourceUrl="https://www.aceternity.com/components/background-ripple-effect"
                   category="Background"
                 >
-              <BackgroundRipple color="shale" className="h-32 rounded-lg">
+                  <BackgroundRipple color="shale" className="h-32 rounded-lg">
                     <div className="p-4 text-white">Background Ripple</div>
-              </BackgroundRipple>
+                  </BackgroundRipple>
                 </ComponentPreviewCard>
 
                 <ComponentPreviewCard
@@ -385,25 +390,25 @@ export default function ThirdPartyShowcasePage() {
                     <div className="p-4 text-white">Noise Background</div>
                   </NoiseBackground>
                 </ComponentPreviewCard>
+              </div>
             </div>
-          </div>
           </TabsContent>
 
           {/* Cards */}
           <TabsContent value="cards" className="space-y-8">
-          <div>
-            <h3 className="text-xl font-medium mb-4">Cards</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div>
+              <h3 className="text-xl font-medium mb-4">Cards</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 <ComponentPreviewCard
                   name="Card3D"
                   description="3D card effect with tilt"
                   sourceUrl="https://ui.aceternity.com/components/3d-card-effect"
                   category="Card"
                 >
-              <Card3D color="gold" className="p-6">
-                <h4 className="text-lg font-semibold">3D Card</h4>
-                <p>Example 3D card effect</p>
-              </Card3D>
+                  <Card3D color="gold" className="p-6">
+                    <h4 className="text-lg font-semibold">3D Card</h4>
+                    <p>Example 3D card effect</p>
+                  </Card3D>
                 </ComponentPreviewCard>
 
                 <ComponentPreviewCard
@@ -460,14 +465,14 @@ export default function ThirdPartyShowcasePage() {
                     <div className="p-4">Cards Sections</div>
                   </CardsSections>
                 </ComponentPreviewCard>
+              </div>
             </div>
-          </div>
           </TabsContent>
 
           {/* Buttons */}
           <TabsContent value="buttons" className="space-y-8">
-          <div>
-            <h3 className="text-xl font-medium mb-4">Buttons</h3>
+            <div>
+              <h3 className="text-xl font-medium mb-4">Buttons</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 <ComponentPreviewCard
                   name="StatefulButtons"
@@ -475,11 +480,11 @@ export default function ThirdPartyShowcasePage() {
                   sourceUrl="https://ui.aceternity.com/components/stateful-buttons"
                   category="Button"
                 >
-            <div className="flex gap-4">
-              <StatefulButtons color="leaf" intent="primary">
-                Stateful Button
-              </StatefulButtons>
-            </div>
+                  <div className="flex gap-4">
+                    <StatefulButtons color="leaf" intent="primary">
+                      Stateful Button
+                    </StatefulButtons>
+                  </div>
                 </ComponentPreviewCard>
 
                 <ComponentPreviewCard
@@ -503,14 +508,14 @@ export default function ThirdPartyShowcasePage() {
                     <div className="p-4">Tailwind Buttons</div>
                   </TailwindCSSButtons>
                 </ComponentPreviewCard>
-          </div>
+              </div>
             </div>
           </TabsContent>
 
           {/* Navigation */}
           <TabsContent value="navigation" className="space-y-8">
-          <div>
-            <h3 className="text-xl font-medium mb-4">Navigation</h3>
+            <div>
+              <h3 className="text-xl font-medium mb-4">Navigation</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 <ComponentPreviewCard
                   name="Sidebar"
@@ -540,11 +545,11 @@ export default function ThirdPartyShowcasePage() {
                   sourceUrl="https://ui.aceternity.com/components/tabs"
                   category="Navigation"
                 >
-            <AnimatedTabs
-              color="shale"
-              tabs={["Tab 1", "Tab 2", "Tab 3"]}
-              activeTab="Tab 1"
-            />
+                  <AnimatedTabs
+                    color="shale"
+                    tabs={["Tab 1", "Tab 2", "Tab 3"]}
+                    activeTab="Tab 1"
+                  />
                 </ComponentPreviewCard>
 
                 <ComponentPreviewCard
@@ -557,8 +562,8 @@ export default function ThirdPartyShowcasePage() {
                     <div className="p-4">Sticky Banner</div>
                   </StickyBanner>
                 </ComponentPreviewCard>
-          </div>
-        </div>
+              </div>
+            </div>
           </TabsContent>
 
           {/* Forms */}
@@ -574,7 +579,7 @@ export default function ThirdPartyShowcasePage() {
                 >
                   <div className="h-32 rounded-lg flex items-center justify-center">
                     <PlaceholdersAndVanishInput className="w-full max-w-xs" />
-          </div>
+                  </div>
                 </ComponentPreviewCard>
 
                 <ComponentPreviewCard
@@ -585,10 +590,10 @@ export default function ThirdPartyShowcasePage() {
                 >
                   <div className="h-32 rounded-lg flex items-center justify-center">
                     <SignupForm className="w-full max-w-xs" />
-          </div>
+                  </div>
                 </ComponentPreviewCard>
-          </div>
-          </div>
+              </div>
+            </div>
           </TabsContent>
 
           {/* Modals */}
@@ -606,8 +611,8 @@ export default function ThirdPartyShowcasePage() {
                     <div className="p-4">Animated Modal</div>
                   </AnimatedModal>
                 </ComponentPreviewCard>
-          </div>
-        </div>
+              </div>
+            </div>
           </TabsContent>
 
           {/* Data Display */}

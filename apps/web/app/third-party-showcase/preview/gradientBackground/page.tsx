@@ -1,10 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import { GradientBackgroundDemo } from "@/components/third-party/animate-ui";
+import { GradientBackgroundDemo } from "@/components/client/third-party/animate-ui";
 import { AnimatePresence, motion } from "framer-motion";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ColorSelector } from "@/components/ui/utility/color-selector";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/components/client/ui/card";
+import { ColorSelector } from "@/components/client/ui/utility/color-selector";
 import type { DigitalGardenColor } from "@/lib/third-party/colors";
 
 export default function GradientBackgroundPreview() {
