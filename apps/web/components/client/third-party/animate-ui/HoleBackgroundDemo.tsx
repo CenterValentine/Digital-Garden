@@ -9,7 +9,7 @@
 import {
   HoleBackground,
   type HoleBackgroundRef,
-} from "@/components/third-party/animate-ui/components/backgrounds/hole";
+} from "@/components/client/third-party/animate-ui/components/backgrounds/hole";
 import { cn } from "@/lib/utils";
 import {
   getColorAsHex,

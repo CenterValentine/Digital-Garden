@@ -8,8 +8,8 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
-import { Label } from "@/components/ui/label";
+} from "@/components/client/ui/select";
+import { Label } from "@/components/client/ui/label";
 
 const availableColors: DigitalGardenColor[] = [
   "shale",
