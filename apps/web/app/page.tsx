@@ -1,4 +1,4 @@
-import AppNav from "@/components/client/app-nav/app-nav";
+import AppNav from "@/components/client/tree-nav/tree-nav";
 import { getCurrentUser } from "@/lib/auth/middleware";
 import { getNavigationTreeData } from "@/components/server/nav/NavigationData.server";
 

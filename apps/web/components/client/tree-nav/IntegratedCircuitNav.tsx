@@ -10,7 +10,7 @@ import {
   BranchPresetName,
   BRANCH_PRESETS,
   BuiltBranch,
-} from "@/lib/app-nav/branch-builder";
+} from "@/lib/tree-nav/branch-builder";
 import { getBranchColor, SLATE } from "@/lib/design-system/colors";
 import type { NavigationTree } from "@/lib/db/navigation";
 
