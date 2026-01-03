@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import CompactLogo from "../logo/CompactLogo";
-import { Button } from "@/components/ui/button/Button";
+import { Button } from "@/components/client/ui/button/Button";
 import type { SessionData } from "@/lib/auth/types";
 
 export default function NavBar() {
@@ -56,10 +56,10 @@ export default function NavBar() {
           <div className="w-36 shrink-0" aria-hidden="true" />
 
           {/* Center logo with medallion - overflows navbar, absolutely positioned */}
-          <div className="absolute left-1/2 -translate-x-1/2 top-0 flex items-center justify-center mt-1">
+          <div className="absolute left-1/2 -translate-x-1/2 top-0 flex items-center justify-center mt-1 before:content-[''] before:absolute before:left-1/2 before:-translate-x-1/2 before:top-1/2 before:-translate-y-1/2 before:w-32 before:h-32 before:rounded-full before:shadow-[0_4px_6px_-1px_rgba(0,0,0,0.1),0_2px_4px_-1px_rgba(0,0,0,0.06)] before:pointer-events-none before:z-[90]">
             <Link
               href="/"
-              className="absolute top-0 flex items-start justify-center no-underline group z-[101] "
+              className="absolute top-0 flex items-start justify-center no-underline group z-[101]"
             >
               {/* White background circle - sized to just contain text with minimal gap */}
               <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-32 h-32 rounded-full bg-background" />
