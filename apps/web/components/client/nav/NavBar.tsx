@@ -5,9 +5,26 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import CompactLogo from "../logo/CompactLogo";
 import { Button } from "@/components/client/ui/button/Button";
-import type { SessionData } from "@/lib/auth/types";
+import type { SessionData, UserRole } from "@/lib/auth/types";
 
-export default function NavBar() {
+export interface NavItem {
+  href: string;
+  label: string;
+  position: "left" | "right";
+  allowedRoles?: Array<UserRole | "all">;
+}
+
+export interface AuthConfig {
+  signInUrl?: string;
+  signOutUrl?: string;
+}
+
+export interface NavBarProps {
+  navItems: NavItem[];
+  authConfig?: AuthConfig;
+}
+
+export default function NavBar({ navItems, authConfig }: NavBarProps) {
   const router = useRouter();
   const [session, setSession] = useState<SessionData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -29,7 +46,8 @@ export default function NavBar() {
 
   const handleSignOut = async () => {
     try {
-      await fetch("/api/auth/sign-out", { method: "POST" });
+      const signOutUrl = authConfig?.signOutUrl || "/api/auth/sign-out";
+      await fetch(signOutUrl, { method: "POST" });
       setSession(null);
       router.push("/");
       router.refresh();
@@ -38,18 +56,48 @@ export default function NavBar() {
     }
   };
 
+  // Role-based filtering function
+  const filterNavItemsByRole = (items: NavItem[]): NavItem[] => {
+    return items.filter((item) => {
+      // If allowedRoles is undefined or includes "all", item is visible to everyone
+      if (!item.allowedRoles || item.allowedRoles.includes("all")) {
+        return true;
+      }
+
+      // For unauthenticated users, only show items with "all" or undefined
+      if (!session?.user) {
+        return false;
+      }
+
+      // For authenticated users, check if their role is in allowedRoles
+      return item.allowedRoles.includes(session.user.role);
+    });
+  };
+
+  // Filter nav items based on current session
+  const filteredNavItems = filterNavItemsByRole(navItems);
+
+  // Separate items by position
+  const leftNavItems = filteredNavItems.filter(
+    (item) => item.position === "left"
+  );
+  const rightNavItems = filteredNavItems.filter(
+    (item) => item.position === "right"
+  );
+
+  const signInUrl = authConfig?.signInUrl || "/sign-in";
+
   return (
     <nav className="fixed top-0 left-0 right-0 z-[100] bg-card border-b border-border shadow-sm h-20">
       <div className="w-full h-full">
         <div className="flex flex-row items-stretch justify-center h-full w-full">
           {/* Left navigation buttons */}
-          <div className="flex flex-row items-stretch flex-1 justify-end">
-            <Button variant="nav-item" size="full" asChild>
-              <Link href="/">Home</Link>
-            </Button>
-            <Button variant="nav-item" size="full" asChild>
-              <Link href="/about">About</Link>
-            </Button>
+          <div className="flex flex-row items-stretch flex-1 justify-end overflow-x-auto">
+            {leftNavItems.map((item) => (
+              <Button key={item.href} variant="nav-item" size="full" asChild>
+                <Link href={item.href}>{item.label}</Link>
+              </Button>
+            ))}
           </div>
 
           {/* Spacing container - displaces buttons to make room for medallion */}
@@ -138,13 +186,12 @@ export default function NavBar() {
           </div>
 
           {/* Right navigation buttons */}
-          <div className="flex flex-row items-stretch flex-1 justify-start">
-            <Button variant="nav-item" size="full" asChild>
-              <Link href="/content">Content</Link>
-            </Button>
-            <Button variant="nav-item" size="full" asChild>
-              <Link href="/contact">Contact</Link>
-            </Button>
+          <div className="flex flex-row items-stretch flex-1 justify-start overflow-x-auto">
+            {rightNavItems.map((item) => (
+              <Button key={item.href} variant="nav-item" size="full" asChild>
+                <Link href={item.href}>{item.label}</Link>
+              </Button>
+            ))}
           </div>
 
           {/* Auth section - absolute positioned to the right, vertically centered */}
@@ -155,16 +202,16 @@ export default function NavBar() {
               </span>
             ) : session ? (
               <>
-                <span className="px-4 py-2 text-sm text-foreground">
+                {/* <span className="px-4 py-2 text-sm text-foreground">
                   {session.user.username}
-                </span>
+                </span> */}
                 <Button variant="ghost" onClick={handleSignOut}>
                   Sign Out
                 </Button>
               </>
             ) : (
               <Button variant="gradient-gold-soft" asChild>
-                <Link href="/sign-in">Sign In</Link>
+                <Link href={signInUrl}>Sign In</Link>
               </Button>
             )}
           </div>

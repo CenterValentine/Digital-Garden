@@ -222,5 +222,3 @@ apps/web/
 - Ensure all components use design system tokens
 - Make it look polished and professional
 - Consider the organic + technology aesthetic in styling choices
-
-
