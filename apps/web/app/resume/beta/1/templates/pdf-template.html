@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Resume</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: Arial, "Times New Roman", Calibri, sans-serif;
+      font-size: 11pt;
+      line-height: 1.4;
+      color: #000;
+      background: #fff;
+      padding: 0.5in;
+    }
+
+    h1 {
+      font-size: 20pt;
+      font-weight: bold;
+      margin-bottom: 4pt;
+      color: #000;
+    }
+
+    h2 {
+      font-size: 14pt;
+      font-weight: bold;
+      margin-top: 12pt;
+      margin-bottom: 6pt;
+      color: #000;
+      border-bottom: 1pt solid #000;
+      padding-bottom: 2pt;
+    }
+
+    h3 {
+      font-size: 12pt;
+      font-weight: bold;
+      margin-top: 8pt;
+      margin-bottom: 4pt;
+      color: #000;
+    }
+
+    p {
+      margin-bottom: 6pt;
+      color: #000;
+    }
+
+    ul {
+      margin-left: 20pt;
+      margin-bottom: 6pt;
+    }
+
+    li {
+      margin-bottom: 3pt;
+      color: #000;
+    }
+
+    .header {
+      margin-bottom: 12pt;
+    }
+
+    .header h1 {
+      margin-bottom: 2pt;
+    }
+
+    .header p {
+      margin-bottom: 2pt;
+      font-size: 10pt;
+    }
+
+    .contact-info {
+      font-size: 9pt;
+      margin-top: 4pt;
+    }
+
+    .contact-info span {
+      margin-right: 8pt;
+    }
+
+    .section {
+      margin-bottom: 12pt;
+      page-break-inside: avoid;
+    }
+
+    .experience-item,
+    .project-item,
+    .education-item {
+      margin-bottom: 10pt;
+      page-break-inside: avoid;
+    }
+
+    .experience-header,
+    .project-header,
+    .education-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: start;
+      margin-bottom: 4pt;
+    }
+
+    .experience-title,
+    .project-title,
+    .education-title {
+      font-weight: bold;
+      font-size: 11pt;
+    }
+
+    .experience-company,
+    .project-role,
+    .education-institution {
+      font-size: 10pt;
+      color: #333;
+    }
+
+    .experience-date,
+    .project-date,
+    .education-date {
+      font-size: 9pt;
+      color: #666;
+      white-space: nowrap;
+    }
+
+    .experience-meta,
+    .project-meta {
+      font-size: 9pt;
+      color: #666;
+      margin-bottom: 4pt;
+    }
+
+    .skills-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4pt;
+    }
+
+    .skill-item {
+      font-size: 10pt;
+      margin-right: 8pt;
+    }
+
+    .certification-item,
+    .award-item {
+      margin-bottom: 6pt;
+    }
+
+    .certification-name,
+    .award-title {
+      font-weight: bold;
+      font-size: 10pt;
+    }
+
+    .certification-meta,
+    .award-meta {
+      font-size: 9pt;
+      color: #666;
+    }
+
+    .language-item {
+      display: inline-block;
+      margin-right: 8pt;
+      font-size: 10pt;
+    }
+
+    @media print {
+      body {
+        padding: 0.5in;
+      }
+
+      .section {
+        page-break-inside: avoid;
+      }
+
+      h2 {
+        page-break-after: avoid;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- Content will be injected here by the API route -->
+  <div id="resume-content"></div>
+</body>
+</html>
+
