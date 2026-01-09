@@ -1,3 +1,33 @@
+David's digital garden is a launch pad for representing myself and all that I am and what I do. It incorpoates the following:
+
+A web-based knowledge management system (inspired by Obsidian) that is optimized to extend and enhance my capabilities using the following features:
+
+- Resizable sidebars
+- Tab-based document interface
+- Command pallet / keyboard shortcuts
+- Right sidebar for backlinks, outline and metadata.
+
+A graph/network of document relationships
+Full-text search across notes and files
+
+A hybrid content management system powered by Cloudflare R2 that allows upload of any document file type:
+
+- Markdown notes.
+- Code files.
+- Office documents.
+- Media files.
+- Diagrams
+- Archives
+- and more...
+- set to public/private
+
+A simple postgres database powered by Neon/Vercel Prisma:
+
+- 'StructuredDocument' A universal container for all content:
+- FileMetadata: metadata for uploaded files (modeled seperately for type safety)
+- A tagging system for categorizing content.
+- Access control system.
+
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
 ## Getting Started
