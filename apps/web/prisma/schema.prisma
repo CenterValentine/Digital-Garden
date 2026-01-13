@@ -1,16 +1,19 @@
-
-
 // Docs: https://pris.ly/d/prisma-schema
 // Prisma Accelerate: https://pris.ly/cli/accelerate-init
 
 generator client {
-  provider = "prisma-client"
+  provider = "prisma-client-js"
   output   = "../lib/generated/prisma"
 }
 
 datasource db {
   provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
+
+// ============================================================
+// ENUMS
+// ============================================================
 
 enum UserRole {
   owner
@@ -19,197 +22,357 @@ enum UserRole {
   guest
 }
 
-// --- 1. CORE USER ---
-model User {
-  id              String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  username        String       @unique @db.VarChar(50)
-  passwordHash    String?      @db.Char(60) // Optional for OAuth users
-  email           String       @unique @db.VarChar(255)
-  role            UserRole     @default(guest)
+enum UploadStatus {
+  uploading
+  ready
+  failed
+}
+
+enum StorageProvider {
+  r2
+  s3
+  vercel
+}
+
+// ============================================================
+// CORE CONTENT MODEL (v2.0)
+// ============================================================
+
+model ContentNode {
+  id            String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ownerId       String         @db.Uuid
+  title         String         @db.VarChar(255)
+  slug          String         @unique @db.VarChar(255)
+
+  // Hierarchy
+  parentId      String?        @db.Uuid
+  displayOrder  Int            @default(0)
+
+  // Categorization
+  categoryId    String?        @db.Uuid
+
+  // Publication
+  isPublished   Boolean        @default(false)
+  createdAt     DateTime       @default(now()) @db.Timestamptz()
+  updatedAt     DateTime       @updatedAt @db.Timestamptz()
+
+  // Soft delete
+  deletedAt     DateTime?      @db.Timestamptz()
+  deletedBy     String?        @db.Uuid
+
+  // Visual customization
+  customIcon    String?        @db.VarChar(100)
+  iconColor     String?        @db.VarChar(20)
 
   // Relationships
-  structuredDocuments StructuredDocument[]
-  documentHistory     DocumentHistory[]
+  owner         User           @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  parent        ContentNode?   @relation("Hierarchy", fields: [parentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  children      ContentNode[]  @relation("Hierarchy")
+  category      Category?      @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+
+  // Typed payloads (exactly one should exist for leaf nodes, none for folders)
+  notePayload   NotePayload?
+  filePayload   FilePayload?
+  htmlPayload   HtmlPayload?
+  codePayload   CodePayload?
+
+  // Related entities
+  history       ContentHistory[]
+  contentPath   ContentPath?
+  sourceLinks   ContentLink[]    @relation("SourceContent")
+  targetLinks   ContentLink[]    @relation("TargetContent")
+  contentTags   ContentTag[]
+  viewGrants    ViewGrant[]
+  trashBinEntry TrashBin?
+
+  @@index([ownerId, deletedAt])
+  @@index([parentId, displayOrder])
+  @@index([categoryId, displayOrder])
+  @@index([deletedAt])
+}
+
+// ============================================================
+// TYPED PAYLOADS
+// ============================================================
+
+model NotePayload {
+  contentId   String   @id @db.Uuid
+  tiptapJson  Json     @db.JsonB
+  searchText  String   @default("") @db.Text
+  metadata    Json     @default("{}") @db.JsonB
+  createdAt   DateTime @default(now()) @db.Timestamptz()
+  updatedAt   DateTime @updatedAt @db.Timestamptz()
+
+  content     ContentNode @relation(fields: [contentId], references: [id], onDelete: Cascade)
+
+  @@index([searchText(ops: raw("gin_trgm_ops"))], type: Gin)
+}
+
+model FilePayload {
+  contentId         String          @id @db.Uuid
+  fileName          String          @db.VarChar(255)
+  fileExtension     String?         @db.VarChar(10)
+  mimeType          String          @db.VarChar(127)
+  fileSize          BigInt
+  checksum          String          @db.VarChar(64)
+
+  storageProvider   StorageProvider @default(r2)
+  storageKey        String          @db.VarChar(512)
+  storageUrl        String?         @db.Text
+  storageMetadata   Json            @default("{}") @db.JsonB
+
+  uploadStatus      UploadStatus    @default(uploading)
+  uploadedAt        DateTime?       @db.Timestamptz()
+  uploadError       String?         @db.Text
+
+  processingStatus  String          @default("pending") @db.VarChar(20)
+  isProcessed       Boolean         @default(false)
+
+  thumbnailUrl      String?         @db.Text
+  width             Int?
+  height            Int?
+  duration          Int?
+
+  lastAccessedAt    DateTime?       @db.Timestamptz()
+  createdAt         DateTime        @default(now()) @db.Timestamptz()
+  updatedAt         DateTime        @updatedAt @db.Timestamptz()
+
+  content           ContentNode     @relation(fields: [contentId], references: [id], onDelete: Cascade)
+
+  @@index([uploadStatus])
+  @@index([storageProvider, uploadedAt(sort: Desc)])
+  @@index([checksum, fileSize])
+  @@index([mimeType])
+  @@index([processingStatus, isProcessed])
+}
+
+model HtmlPayload {
+  contentId        String   @id @db.Uuid
+  html             String   @db.Text
+  searchText       String   @default("") @db.Text
+  isTemplate       Boolean  @default(false)
+  templateSchema   Json?    @db.JsonB
+  templateMetadata Json     @default("{}") @db.JsonB
+  renderMode       String   @default("static") @db.VarChar(20)
+  templateEngine   String?  @db.VarChar(20)
+  createdAt        DateTime @default(now()) @db.Timestamptz()
+  updatedAt        DateTime @updatedAt @db.Timestamptz()
+
+  content          ContentNode @relation(fields: [contentId], references: [id], onDelete: Cascade)
+
+  @@index([searchText(ops: raw("gin_trgm_ops"))], type: Gin)
+  @@index([isTemplate])
+}
+
+model CodePayload {
+  contentId   String   @id @db.Uuid
+  code        String   @db.Text
+  language    String   @db.VarChar(50)
+  searchText  String   @default("") @db.Text
+  metadata    Json     @default("{}") @db.JsonB
+  createdAt   DateTime @default(now()) @db.Timestamptz()
+  updatedAt   DateTime @updatedAt @db.Timestamptz()
+
+  content     ContentNode @relation(fields: [contentId], references: [id], onDelete: Cascade)
+
+  @@index([searchText(ops: raw("gin_trgm_ops"))], type: Gin)
+  @@index([language])
+}
+
+// ============================================================
+// RELATED ENTITIES (renamed from Document* to Content*)
+// ============================================================
+
+model ContentHistory {
+  id          String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  contentId   String      @db.Uuid
+  version     Int
+  snapshot    Json        @db.JsonB
+  changedBy   String      @db.Uuid
+  changedAt   DateTime    @default(now()) @db.Timestamptz()
+
+  content     ContentNode @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  user        User        @relation(fields: [changedBy], references: [id])
+
+  @@unique([contentId, version])
+  @@index([contentId, version(sort: Desc)])
+}
+
+model ContentPath {
+  contentId         String      @id @db.Uuid
+  path              String      @db.VarChar(2048)
+  pathSegments      String[]
+  depth             Int
+  lastUpdated       DateTime    @updatedAt @db.Timestamptz()
+
+  content           ContentNode @relation(fields: [contentId], references: [id], onDelete: Cascade)
+
+  @@index([path])
+  @@index([depth])
+}
+
+model ContentLink {
+  id              String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  sourceId        String      @db.Uuid
+  targetId        String      @db.Uuid
+  linkType        String      @db.VarChar(20)
+  targetFragment  String?     @db.VarChar(255)
+  context         String?     @db.Text
+  createdAt       DateTime    @default(now()) @db.Timestamptz()
+
+  source          ContentNode @relation("SourceContent", fields: [sourceId], references: [id], onDelete: Cascade)
+  target          ContentNode @relation("TargetContent", fields: [targetId], references: [id], onDelete: Cascade)
+
+  @@unique([sourceId, targetId, linkType])
+  @@index([targetId])
+}
+
+model ContentTag {
+  id          String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  contentId   String      @db.Uuid
+  tagId       String      @db.Uuid
+  createdAt   DateTime    @default(now()) @db.Timestamptz()
+
+  content     ContentNode @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  tag         Tag         @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@unique([contentId, tagId])
+  @@index([tagId])
+}
+
+// ============================================================
+// TRASH & STORAGE CONFIG
+// ============================================================
+
+model TrashBin {
+  id                  String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  contentId           String      @unique @db.Uuid
+  originalPath        String?     @db.Text
+  deletedBy           String      @db.Uuid
+  deletedAt           DateTime    @default(now()) @db.Timestamptz()
+  scheduledDeletion   DateTime    @db.Timestamptz()
+  deletionReason      String?     @db.VarChar(255)
+  contentSnapshot     Json        @db.JsonB
+
+  content             ContentNode @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  deletedByUser       User        @relation(fields: [deletedBy], references: [id])
+
+  @@index([deletedBy])
+  @@index([scheduledDeletion])
+  @@index([deletedAt(sort: Desc)])
+}
+
+model StorageProviderConfig {
+  id            String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId        String          @db.Uuid
+  provider      StorageProvider
+  isDefault     Boolean         @default(false)
+  displayName   String?         @db.VarChar(100)
+  config        Json            @db.JsonB
+  isActive      Boolean         @default(true)
+  createdAt     DateTime        @default(now()) @db.Timestamptz()
+  updatedAt     DateTime        @updatedAt @db.Timestamptz()
+
+  user          User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, provider])
+  @@index([userId, isDefault])
+}
+
+// ============================================================
+// EXISTING MODELS (User, Category, Tag, ViewGrant, Session)
+// ============================================================
+
+model User {
+  id                  String                    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  username            String                    @unique @db.VarChar(50)
+  passwordHash        String?                   @db.Char(60)
+  email               String                    @unique @db.VarChar(255)
+  role                UserRole                  @default(guest)
+  createdAt           DateTime                  @default(now()) @db.Timestamptz()
+  updatedAt           DateTime                  @updatedAt @db.Timestamptz()
+
+  // Relationships
+  contentNodes        ContentNode[]
+  contentHistory      ContentHistory[]
+  storageConfigs      StorageProviderConfig[]
   sessions            Session[]
   accounts            Account[]
   categories          Category[]
-  viewGrants           ViewGrant[]
+  viewGrants          ViewGrant[]
+  trashedContent      TrashBin[]
+
+  @@index([email])
 }
 
-// --- 2. UNIVERSAL DOCUMENT STORE (CONTENT) ---
-model StructuredDocument {
-  id             String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  ownerId        String         @db.Uuid
-  docType        String         @db.VarChar(50) // e.g., 'Note', 'Project', 'Folder', 'Resume'
-  title          String         @db.VarChar(255)
-  slug           String         @unique @db.VarChar(255)
-  contentData    Json           @db.JsonB // Stores the content (Markdown or structured JSON)
-  isPublished    Boolean        @default(false)
-  updatedAt      DateTime       @updatedAt @db.Timestamptz()
-
-  // Hierarchy
-  parentId       String?        @db.Uuid
-  parent         StructuredDocument? @relation("Hierarchy", fields: [parentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  children       StructuredDocument[] @relation("Hierarchy")
-
-  // Navigation integration
-  categoryId     String?        @db.Uuid // Link to Category
-  displayOrder   Int            @default(0) // Order within category/parent
-
-  // Relationships
-  owner          User             @relation(fields: [ownerId], references: [id])
-  category       Category?        @relation(fields: [categoryId], references: [id])
-  history        DocumentHistory[]
-  documentPaths  DocumentPath?
-  sourceLinks    DocumentLink[]   @relation("SourceDocument")
-  targetLinks    DocumentLink[]   @relation("TargetDocument")
-  documentTags   DocumentTag[]
-  viewGrants      ViewGrant[]
-
-  // Indexes (Crucial for performance)
-  @@index([ownerId, docType, isPublished])
-  @@index([parentId])
-  @@index([categoryId, displayOrder])
-  @@index([parentId, displayOrder]) // For hierarchical ordering
-}
-
-// --- 3. DOCUMENT HISTORY ---
-model DocumentHistory {
-  id             BigInt         @id @default(autoincrement())
-  documentId     String         @db.Uuid
-  revisionData   Json           @db.JsonB // Snapshot of the contentData
-  editedById     String         @db.Uuid
-  editedAt       DateTime       @default(now()) @db.Timestamptz()
-
-  document       StructuredDocument @relation(fields: [documentId], references: [id])
-  editor         User               @relation(fields: [editedById], references: [id])
-
-  @@index([documentId])
-  @@index([editedAt])
-}
-
-// --- 4. DOCUMENT PATHS (MATERIALIZED PATH) ---
-model DocumentPath {
-  documentId     String         @id @db.Uuid
-  pathSlug       String         @unique @db.VarChar(1024) // e.g., 'tech/databases/rcte-guide'
-  pathText       String         @unique @db.VarChar(1024) // e.g., 'tech.databases.rcte-guide'
-  depth          Int            @db.SmallInt
-
-  document       StructuredDocument @relation(fields: [documentId], references: [id])
-}
-
-// --- 5. DOCUMENT LINKS (WIKILINKS, SECTION REFS) ---
-model DocumentLink {
-  sourceId        String        @db.Uuid
-  targetId        String        @db.Uuid
-  linkType        String        @db.VarChar(50)
-  targetFragment  String?       @db.VarChar(255) // The anchor name (e.g., '#overview')
-  displayOrder    Int           @default(0)
-  updatedAt       DateTime      @default(now()) @db.Timestamptz()
-
-  source          StructuredDocument @relation("SourceDocument", fields: [sourceId], references: [id])
-  target          StructuredDocument @relation("TargetDocument", fields: [targetId], references: [id])
-
-  @@id([sourceId, targetId]) // Composite Primary Key
-  @@index([targetId, sourceId]) // For Backlinks
-  @@index([targetFragment])
-  @@index([displayOrder])
-}
-
-// --- 6. TAGGING SYSTEM ---
-model Tag {
-  id              BigInt         @id @default(autoincrement())
-  name            String         @unique @db.VarChar(100) // Standardized tag name
-  slug            String         @unique @db.VarChar(100)
-
-  documentTags    DocumentTag[]
-}
-
-model DocumentTag {
-  documentId      String         @db.Uuid
-  tagId           BigInt
-
-  document        StructuredDocument @relation(fields: [documentId], references: [id])
-  tag             Tag                @relation(fields: [tagId], references: [id])
-
-  @@id([documentId, tagId]) // Composite Primary Key
-  @@index([tagId, documentId]) // For searching documents by tag
-}
-
-// --- 7. SESSION MANAGEMENT ---
-model Session {
-  id              String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  userId          String       @db.Uuid
-  token           String       @unique @db.VarChar(255)
-  expiresAt       DateTime     @db.Timestamptz()
-  createdAt       DateTime     @default(now()) @db.Timestamptz()
-
-  user            User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
-  @@index([token])
-}
-
-// --- 8. OAUTH ACCOUNTS ---
-model Account {
-  id                String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  userId            String       @db.Uuid
-  provider          String       @db.VarChar(50)
-  providerAccountId String       @db.VarChar(255)
-  accessToken       String?      @db.Text
-  refreshToken      String?      @db.Text
-  expiresAt         BigInt?
-  createdAt         DateTime     @default(now()) @db.Timestamptz()
-  updatedAt         DateTime     @updatedAt @db.Timestamptz()
-
-  user              User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([provider, providerAccountId])
-  @@index([userId])
-  @@index([provider])
-}
-
-// --- 9. NAVIGATION CATEGORIES ---
 model Category {
-  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  name            String   @unique @db.VarChar(255)
-  slug            String   @unique @db.VarChar(255)
-  description     String?  @db.Text
-  displayOrder    Int      @default(0) // Vertical position on trunk (0-100)
-  branchPreset    String?  @db.VarChar(50) // Optional preset override (e.g., "binary", "trident")
-  isPublished     Boolean  @default(true)
-  ownerId         String   @db.Uuid
-  
-  owner           User     @relation(fields: [ownerId], references: [id])
-  documents       StructuredDocument[] // Documents belonging to this category
-  viewGrants      ViewGrant[]
-  
-  @@index([ownerId, isPublished, displayOrder])
-  @@index([displayOrder])
+  id            String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name          String        @db.VarChar(100)
+  slug          String        @unique @db.VarChar(100)
+  description   String?       @db.Text
+  ownerId       String        @db.Uuid
+  displayOrder  Int           @default(0)
+  isPublished   Boolean       @default(false)
+  createdAt     DateTime      @default(now()) @db.Timestamptz()
+  updatedAt     DateTime      @updatedAt @db.Timestamptz()
+
+  owner         User          @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  contentNodes  ContentNode[]
+
+  @@index([ownerId, displayOrder])
 }
 
-// --- 10. VIEW GRANTS (FILTERED NAVIGATION) ---
+model Tag {
+  id            String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name          String       @unique @db.VarChar(50)
+  slug          String       @unique @db.VarChar(50)
+  createdAt     DateTime     @default(now()) @db.Timestamptz()
+
+  contentTags   ContentTag[]
+
+  @@index([name])
+}
+
 model ViewGrant {
-  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  viewKey         String   @db.VarChar(100) // e.g., "portfolio", "family", "tech"
-  
-  // Grantee (one of these must be set)
-  userId          String?  @db.Uuid // Specific user grant
-  role            UserRole? // Role-based grant (e.g., all "member" users)
-  
-  // Target (one of these must be set)
-  categoryId      String?  @db.Uuid
-  documentId      String?  @db.Uuid
-  
-  createdAt       DateTime @default(now()) @db.Timestamptz()
-  
-  user            User?    @relation(fields: [userId], references: [id])
-  category        Category? @relation(fields: [categoryId], references: [id])
-  document        StructuredDocument? @relation(fields: [documentId], references: [id])
-  
-  @@index([viewKey])
-  @@index([userId, viewKey])
-  @@index([role, viewKey])
-  @@index([categoryId])
-  @@index([documentId])
+  id          String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  contentId   String      @db.Uuid
+  userId      String      @db.Uuid
+  accessLevel String      @db.VarChar(20)
+  grantedAt   DateTime    @default(now()) @db.Timestamptz()
+  expiresAt   DateTime?   @db.Timestamptz()
+
+  content     ContentNode @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([contentId, userId])
+  @@index([userId])
+}
+
+model Session {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId      String    @db.Uuid
+  token       String    @unique @db.VarChar(255)
+  expiresAt   DateTime  @db.Timestamptz()
+  createdAt   DateTime  @default(now()) @db.Timestamptz()
+
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model Account {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId        String   @db.Uuid
+  provider      String   @db.VarChar(50)
+  providerAccId String   @db.VarChar(255)
+  refreshToken  String?  @db.Text
+  accessToken   String?  @db.Text
+  expiresAt     DateTime? @db.Timestamptz()
+  createdAt     DateTime @default(now()) @db.Timestamptz()
+
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccId])
+  @@index([userId])
 }
