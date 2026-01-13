@@ -6,8 +6,8 @@
  */
 
 import { generateJSON, generateHTML } from "@tiptap/core";
-import { Node } from "@tiptap/pm/model";
 import type { JSONContent, Extensions } from "@tiptap/core";
+import { extractSearchTextFromTipTap } from "./search-text";
 
 // Import TipTap extensions (these would be defined in editor config)
 // For now, we'll define the signature; implementation happens in M5
@@ -137,7 +137,7 @@ function htmlToMarkdown(html: string): string {
   // Code
   markdown = markdown.replace(/<code>(.*?)<\/code>/gi, "`$1`");
   markdown = markdown.replace(
-    /<pre><code>(.*?)<\/code><\/pre>/gis,
+    /<pre><code>([\s\S]*?)<\/code><\/pre>/gi,
     "```\n$1\n```\n"
   );
 
@@ -152,7 +152,10 @@ function htmlToMarkdown(html: string): string {
   markdown = markdown.replace(/<p>(.*?)<\/p>/gi, "$1\n\n");
 
   // Blockquotes
-  markdown = markdown.replace(/<blockquote>(.*?)<\/blockquote>/gis, "> $1\n\n");
+  markdown = markdown.replace(
+    /<blockquote>([\s\S]*?)<\/blockquote>/gi,
+    "> $1\n\n"
+  );
 
   // Line breaks
   markdown = markdown.replace(/<br\s*\/?>/gi, "\n");
@@ -221,7 +224,6 @@ export function importMarkdownFile(
   const tiptapJson = markdownToTiptap(markdown);
 
   // Extract search text from JSON
-  const { extractSearchTextFromTipTap } = require("./search-text");
   const searchText = extractSearchTextFromTipTap(tiptapJson);
 
   // Calculate metadata

@@ -1,0 +1,410 @@
+// Digital Garden Database Schema v2.0 (ContentNode Architecture)
+// Format: DBML (Database Markup Language)
+// View at: https://dbdiagram.io/
+
+Project digital_garden {
+  database_type: 'PostgreSQL'
+  Note: 'Digital Garden v2.0 - ContentNode + Typed Payloads Architecture'
+}
+
+// ============================================================
+// ENUMS
+// ============================================================
+
+Enum UserRole {
+  owner
+  admin
+  member
+  guest
+}
+
+Enum UploadStatus {
+  uploading
+  ready
+  failed
+}
+
+Enum StorageProvider {
+  r2
+  s3
+  vercel
+}
+
+// ============================================================
+// CORE CONTENT MODEL
+// ============================================================
+
+Table ContentNode {
+  id uuid [pk, default: `gen_random_uuid()`]
+  ownerId uuid [not null, ref: > User.id]
+  title varchar(255) [not null]
+  slug varchar(255) [unique, not null]
+  
+  // Hierarchy
+  parentId uuid [ref: > ContentNode.id]
+  displayOrder int [default: 0]
+  
+  // Categorization
+  categoryId uuid [ref: > Category.id]
+  
+  // Publication
+  isPublished boolean [default: false]
+  createdAt timestamptz [default: `now()`]
+  updatedAt timestamptz [default: `now()`]
+  
+  // Soft delete
+  deletedAt timestamptz
+  deletedBy uuid
+  
+  // Visual customization
+  customIcon varchar(100)
+  iconColor varchar(20)
+  
+  indexes {
+    (ownerId, deletedAt)
+    (parentId, displayOrder)
+    (categoryId, displayOrder)
+    deletedAt
+  }
+  
+  Note: 'Central content node. Type derived from payload presence (NotePayload, FilePayload, HtmlPayload, CodePayload, or none for folder)'
+}
+
+// ============================================================
+// TYPED PAYLOADS (1:1 with ContentNode)
+// ============================================================
+
+Table NotePayload {
+  contentId uuid [pk, ref: - ContentNode.id]
+  tiptapJson jsonb [not null]
+  searchText text [default: '']
+  metadata jsonb [default: '{}']
+  createdAt timestamptz [default: `now()`]
+  updatedAt timestamptz [default: `now()`]
+  
+  indexes {
+    searchText [type: gin, note: 'Trigram GIN index for full-text search']
+  }
+  
+  Note: 'Rich text notes using TipTap JSON format. Search text materialized for performance.'
+}
+
+Table FilePayload {
+  contentId uuid [pk, ref: - ContentNode.id]
+  fileName varchar(255) [not null]
+  fileExtension varchar(10)
+  mimeType varchar(127) [not null]
+  fileSize bigint [not null]
+  checksum varchar(64) [not null, note: 'SHA-256 hash for integrity']
+  
+  // Storage
+  storageProvider StorageProvider [default: 'r2']
+  storageKey varchar(512) [not null]
+  storageUrl text
+  storageMetadata jsonb [default: '{}']
+  
+  // Upload state machine
+  uploadStatus UploadStatus [default: 'uploading']
+  uploadedAt timestamptz
+  uploadError text
+  
+  // Processing
+  processingStatus varchar(20) [default: 'pending']
+  isProcessed boolean [default: false]
+  
+  // Media metadata
+  thumbnailUrl text
+  width int
+  height int
+  duration int
+  
+  lastAccessedAt timestamptz
+  createdAt timestamptz [default: `now()`]
+  updatedAt timestamptz [default: `now()`]
+  
+  indexes {
+    uploadStatus
+    (storageProvider, uploadedAt)
+    (checksum, fileSize) [note: 'For deduplication']
+    mimeType
+    (processingStatus, isProcessed)
+  }
+  
+  Note: 'File uploads with two-phase workflow: uploading → ready/failed. Checksums for integrity and deduplication.'
+}
+
+Table HtmlPayload {
+  contentId uuid [pk, ref: - ContentNode.id]
+  html text [not null]
+  searchText text [default: '']
+  isTemplate boolean [default: false]
+  templateSchema jsonb
+  templateMetadata jsonb [default: '{}']
+  renderMode varchar(20) [default: 'static']
+  templateEngine varchar(20)
+  createdAt timestamptz [default: `now()`]
+  updatedAt timestamptz [default: `now()`]
+  
+  indexes {
+    searchText [type: gin, note: 'Trigram GIN index']
+    isTemplate
+  }
+  
+  Note: 'Static HTML or dynamic templates (Nunjucks, etc.). Templates have schema definitions for parameters.'
+}
+
+Table CodePayload {
+  contentId uuid [pk, ref: - ContentNode.id]
+  code text [not null]
+  language varchar(50) [not null]
+  searchText text [default: '']
+  metadata jsonb [default: '{}']
+  createdAt timestamptz [default: `now()`]
+  updatedAt timestamptz [default: `now()`]
+  
+  indexes {
+    searchText [type: gin]
+    language
+  }
+  
+  Note: 'Code snippets with syntax highlighting. Language field for context.'
+}
+
+// ============================================================
+// RELATED ENTITIES
+// ============================================================
+
+Table ContentHistory {
+  id uuid [pk, default: `gen_random_uuid()`]
+  contentId uuid [not null, ref: > ContentNode.id]
+  version int [not null]
+  snapshot jsonb [not null]
+  changedBy uuid [not null, ref: > User.id]
+  changedAt timestamptz [default: `now()`]
+  
+  indexes {
+    (contentId, version) [unique]
+    (contentId, version)
+  }
+  
+  Note: 'Version history with full content snapshots. Version number increments per content.'
+}
+
+Table ContentPath {
+  contentId uuid [pk, ref: - ContentNode.id]
+  path varchar(2048) [not null]
+  pathSegments text[] [not null]
+  depth int [not null]
+  lastUpdated timestamptz [default: `now()`]
+  
+  indexes {
+    path
+    depth
+  }
+  
+  Note: 'Materialized paths for efficient breadcrumb queries (e.g., "projects/web/notes")'
+}
+
+Table ContentLink {
+  id uuid [pk, default: `gen_random_uuid()`]
+  sourceId uuid [not null, ref: > ContentNode.id]
+  targetId uuid [not null, ref: > ContentNode.id]
+  linkType varchar(20) [not null]
+  targetFragment varchar(255) [note: 'Anchor within target (e.g., #section)']
+  context text
+  createdAt timestamptz [default: `now()`]
+  
+  indexes {
+    (sourceId, targetId, linkType) [unique]
+    targetId [note: 'For backlinks query']
+  }
+  
+  Note: 'Bidirectional links between content (wikilinks, references, etc.)'
+}
+
+Table ContentTag {
+  id uuid [pk, default: `gen_random_uuid()`]
+  contentId uuid [not null, ref: > ContentNode.id]
+  tagId uuid [not null, ref: > Tag.id]
+  createdAt timestamptz [default: `now()`]
+  
+  indexes {
+    (contentId, tagId) [unique]
+    tagId
+  }
+}
+
+// ============================================================
+// TRASH & STORAGE
+// ============================================================
+
+Table TrashBin {
+  id uuid [pk, default: `gen_random_uuid()`]
+  contentId uuid [unique, not null, ref: - ContentNode.id]
+  originalPath text
+  deletedBy uuid [not null, ref: > User.id]
+  deletedAt timestamptz [default: `now()`]
+  scheduledDeletion timestamptz [not null]
+  deletionReason varchar(255)
+  contentSnapshot jsonb [not null]
+  
+  indexes {
+    deletedBy
+    scheduledDeletion
+    deletedAt
+  }
+  
+  Note: 'Soft delete with 30-day retention. Cron job purges after scheduledDeletion.'
+}
+
+Table StorageProviderConfig {
+  id uuid [pk, default: `gen_random_uuid()`]
+  userId uuid [not null, ref: > User.id]
+  provider StorageProvider [not null]
+  isDefault boolean [default: false]
+  displayName varchar(100)
+  config jsonb [not null]
+  isActive boolean [default: true]
+  createdAt timestamptz [default: `now()`]
+  updatedAt timestamptz [default: `now()`]
+  
+  indexes {
+    (userId, provider) [unique]
+    (userId, isDefault)
+  }
+  
+  Note: 'Multi-cloud storage configuration. Users can have multiple providers.'
+}
+
+// ============================================================
+// USER & AUTH
+// ============================================================
+
+Table User {
+  id uuid [pk, default: `gen_random_uuid()`]
+  username varchar(50) [unique, not null]
+  passwordHash char(60)
+  email varchar(255) [unique, not null]
+  role UserRole [default: 'guest']
+  createdAt timestamptz [default: `now()`]
+  updatedAt timestamptz [default: `now()`]
+  
+  indexes {
+    email
+  }
+}
+
+Table Session {
+  id uuid [pk, default: `gen_random_uuid()`]
+  userId uuid [not null, ref: > User.id]
+  token varchar(255) [unique, not null]
+  expiresAt timestamptz [not null]
+  createdAt timestamptz [default: `now()`]
+  
+  indexes {
+    userId
+    expiresAt
+  }
+}
+
+Table Account {
+  id uuid [pk, default: `gen_random_uuid()`]
+  userId uuid [not null, ref: > User.id]
+  provider varchar(50) [not null]
+  providerAccId varchar(255) [not null]
+  refreshToken text
+  accessToken text
+  expiresAt timestamptz
+  createdAt timestamptz [default: `now()`]
+  
+  indexes {
+    (provider, providerAccId) [unique]
+    userId
+  }
+  
+  Note: 'OAuth provider accounts (Google, GitHub, etc.)'
+}
+
+// ============================================================
+// ORGANIZATION
+// ============================================================
+
+Table Category {
+  id uuid [pk, default: `gen_random_uuid()`]
+  name varchar(100) [not null]
+  slug varchar(100) [unique, not null]
+  description text
+  ownerId uuid [not null, ref: > User.id]
+  displayOrder int [default: 0]
+  isPublished boolean [default: false]
+  createdAt timestamptz [default: `now()`]
+  updatedAt timestamptz [default: `now()`]
+  
+  indexes {
+    (ownerId, displayOrder)
+  }
+}
+
+Table Tag {
+  id uuid [pk, default: `gen_random_uuid()`]
+  name varchar(50) [unique, not null]
+  slug varchar(50) [unique, not null]
+  createdAt timestamptz [default: `now()`]
+  
+  indexes {
+    name
+  }
+}
+
+Table ViewGrant {
+  id uuid [pk, default: `gen_random_uuid()`]
+  contentId uuid [not null, ref: > ContentNode.id]
+  userId uuid [not null, ref: > User.id]
+  accessLevel varchar(20) [not null]
+  grantedAt timestamptz [default: `now()`]
+  expiresAt timestamptz
+  
+  indexes {
+    (contentId, userId) [unique]
+    userId
+  }
+  
+  Note: 'Fine-grained access control for sharing content'
+}
+
+// ============================================================
+// RELATIONSHIP NOTES
+// ============================================================
+
+/*
+KEY ARCHITECTURAL INVARIANTS:
+
+1. ContentType Derivation:
+   - ContentType is NEVER stored as a field
+   - Derived from payload presence: note, file, html, code, or folder (no payload)
+   - Exactly 0 or 1 payload per ContentNode (enforced at application layer)
+
+2. File Upload State Machine:
+   - uploading: Client initiated, not yet uploaded to storage
+   - ready: Upload complete, file accessible
+   - failed: Upload failed, see uploadError
+
+3. Soft Delete:
+   - ContentNode.deletedAt marks as deleted
+   - TrashBin entry created with snapshot
+   - Cron job purges after 30 days (scheduledDeletion)
+
+4. Materialized Paths:
+   - ContentPath updated via trigger or application code on move/rename
+   - Used for efficient breadcrumb and ancestor queries
+
+5. Full-Text Search:
+   - searchText materialized in NotePayload, HtmlPayload, CodePayload
+   - Trigram GIN indexes for fuzzy search (requires pg_trgm extension)
+
+6. Checksums:
+   - SHA-256 stored in FilePayload.checksum
+   - Used for integrity validation and deduplication
+   - Index on (checksum, fileSize) for duplicate detection
+*/
+
