@@ -1,0 +1,285 @@
+# Notes Feature Documentation Index
+
+**Version:** 2.0  
+**Last Updated:** January 12, 2026  
+**Status:** Draft
+
+## Overview
+
+This documentation suite provides comprehensive specifications for implementing an Obsidian-inspired notes IDE feature within the Digital Garden application. The feature combines document management, real-time editing, multi-cloud storage, and a hybrid file system supporting markdown notes, code files, office documents, media, AI chat and more.
+
+## Purpose
+
+The notes feature transforms the application into a powerful knowledge management system with:
+
+- **Resizable panel-based layout** inspired by modern IDEs
+- **Tab-based document interface** with unsaved changes tracking
+- **Command palette** with keyboard shortcuts (Cmd/Ctrl+K)
+- **Drag-and-drop file organization** with react-arborist
+- **Custom icon system** for folders and files with color personalization
+- **Hybrid file system** supporting multiple content types
+- **Multi-cloud storage** (Cloudflare R2, AWS S3, Vercel Blob)
+- **Rich markdown editing** using Novel/TipTap
+- **Export/Import** in multiple formats (Markdown, PDF, HTML, ZIP)
+- **Real-time collaboration** foundations (future enhancement)
+
+## Documentation Structure
+
+### Core Architecture & Design
+
+**[V2 Architecture Overview](./V2-ARCHITECTURE-OVERVIEW.md)** - Start here for v2.0 architecture understanding
+
+1. **[Architecture](./01-architecture.md)**
+   - System architecture overview
+   - Component hierarchy
+   - Data flow diagrams
+   - State management patterns
+   - Integration with existing application
+
+2. **[Technology Stack](./02-technology-stack.md)**
+   - Library evaluations and comparisons
+   - Technology decisions (straightforward and options-based)
+   - Bundle size analysis
+   - License compatibility
+   - Integration complexity assessments
+
+3. **[Database Design](./03-database-design.md)**
+   - ContentNode + Typed Payloads architecture
+   - Complete Prisma schema
+   - Migrations and constraints
+   - Indexing strategy
+   - Query optimization
+
+### Implementation Specifications
+
+4. **[API Specification](./04-api-specification.md)**
+   - ContentNode + Typed Payloads architecture
+   - Complete REST API routes
+   - Request/response payloads
+   - Two-phase upload workflow
+   - Type derivation rules
+   - Error handling patterns
+   - Rate limiting
+   - Webhook integrations
+
+5. **[Security Model](./05-security-model.md)**
+   - Authentication flows
+   - Authorization and role-based access control
+   - Row-level security
+   - File upload validation
+   - XSS and CSRF prevention
+   - Audit logging
+
+6. **[UI Components](./06-ui-components.md)**
+   - Component specifications
+   - Props and interfaces
+   - Styling with design system
+   - Accessibility requirements
+   - Interaction patterns
+
+7. **[File Storage](./07-file-storage.md)**
+   - Multi-cloud storage architecture
+   - Cloudflare R2 configuration
+   - AWS S3 configuration
+   - Vercel Blob configuration
+   - Presigned URL generation
+   - Storage provider switching
+
+8. **[Content Types](./08-content-types.md)**
+   - Supported MIME types
+   - CRUD capability matrix
+   - Viewer components per type
+   - Editor components per type
+   - Fallback strategies
+
+9. **[Settings System](./09-settings-system.md)**
+   - Settings data model
+   - User preferences storage
+   - Admin/owner settings
+   - Command palette integration
+   - Default configurations
+
+### Integration & Extensions
+
+10. **[Resume Integration](./10-resume-integration.md)**
+    - Leveraging existing PDF generation
+    - PDF viewer implementation
+    - Shared utilities and patterns
+    - Admin editing workflow
+    - Future collaboration features
+
+11. **[Implementation Guide](./11-implementation-guide.md)**
+    - Step-by-step roadmap
+    - Phase 1: Foundation (panels, tabs, file tree)
+    - Phase 2: Content handling (viewers, editors)
+    - Phase 3: Storage integration
+    - Phase 4: Advanced features (search, backlinks)
+    - Migration from MVP
+
+### Quality Assurance
+
+12. **[Testing Strategy](./12-testing-strategy.md)**
+    - Unit testing approach
+    - Integration testing
+    - End-to-end testing scenarios
+    - Accessibility testing
+    - Performance testing
+    - Browser compatibility
+
+13. **[Performance](./13-performance.md)**
+    - Optimization strategies
+    - Code splitting and lazy loading
+    - Virtualization for large trees
+    - Caching strategies
+    - Monitoring and metrics
+    - Bundle size management
+    - Memory monitoring and leak detection
+
+14. **[Settings Architecture Planning](./14-settings-architecture-planning.md)**
+    - Unified settings system
+    - Command palette integration
+    - Account system integration
+    - Settings API design
+
+15. **[Runtime and Caching](./15-runtime-and-caching.md)**
+    - Edge vs Node runtime selection
+    - Streaming responses and SSE
+    - Next.js caching strategy
+    - ISR and CDN caching
+    - Cache invalidation
+
+16. **[Advanced Security](./16-advanced-security.md)**
+    - Virus and malware scanning
+    - SVG/iframe/code sandboxing
+    - Abuse controls and rate limiting
+    - ZIP bomb detection
+    - Account suspension system
+
+17. **[Export and Import](./17-export-import.md)**
+    - Export formats (Markdown, HTML, PDF, JSON, ZIP)
+    - Single note, folder, and workspace export
+    - Import markdown files and ZIP archives
+    - Metadata export for migration
+    - Security validation
+
+## Quick Start
+
+For developers new to this feature:
+
+1. Start with **[Architecture](./01-architecture.md)** to understand the system design
+2. Review **[Technology Stack](./02-technology-stack.md)** for library decisions
+3. Study **[Database Design](./03-database-design.md)** for data model changes
+4. Follow **[Implementation Guide](./11-implementation-guide.md)** for step-by-step development
+
+## Key Principles
+
+### 1. Hybrid Document System
+
+The feature extends the existing `StructuredDocument` model to support both text-based content (markdown, code) and binary files (images, PDFs, videos) through a new `FileMetadata` table.
+
+### 2. Multi-Cloud First
+
+Users can choose their preferred storage provider (R2, S3, Vercel Blob) with seamless switching and per-document storage selection.
+
+### 3. Progressive Enhancement
+
+Core functionality works without JavaScript, with enhanced features for modern browsers. File viewing degrades gracefully for unsupported types.
+
+### 4. Accessibility by Default
+
+All components meet WCAG 2.1 AA standards with keyboard navigation, screen reader support, and proper ARIA attributes.
+
+### 5. Security First
+
+Row-level security, role-based permissions, file validation, and XSS prevention are built into every layer.
+
+## Integration Points
+
+### Existing Features
+
+- **Authentication:** Leverages existing `lib/auth/middleware.ts` patterns
+- **Database:** Extends current Prisma schema without breaking changes
+- **Design System:** Uses existing `lib/design-system` tokens and components
+- **Navigation:** Integrates with existing category/document tree structure
+
+### New Dependencies
+
+**Chosen Libraries:**
+
+- `novel` + `@tiptap/react` - Rich text editing
+- `shiki` - Code syntax highlighting
+- `@react-pdf-viewer/core` - PDF viewing with plugins
+- `allotment` - Panel layout (3.2KB gzipped)
+- `react-arborist` - File tree with virtualization + drag-and-drop
+- `zustand` - State management (3KB gzipped)
+  - _Note: Jotai considered as future alternative for Suspense support_
+- `cmdk` - Command palette (already integrated)
+- `lucide-react` - Icon system (already integrated)
+- `file-saver` - Single file exports (2KB)
+- `jszip` - ZIP archive creation (55KB)
+- `puppeteer` - PDF generation (already in resume feature)
+- `@tiptap/extension-markdown` - Markdown conversion for TipTap
+- `@uiw/react-codemirror` (Phase 2) - Markdown editor for toggle mode
+- `@codemirror/lang-markdown` (Phase 2) - Markdown syntax highlighting
+- `@tanstack/react-query` - Data fetching and caching
+
+## Addressed Requirements
+
+This documentation resolves all 32 identified gaps from the original scope document:
+
+1. ✅ Library evaluation with criteria and recommendations
+2. ✅ Panel layout implementation details
+3. ✅ File type handling matrix
+4. ✅ Settings architecture with data model
+5. ✅ Storage solution configuration
+6. ✅ Novel/TipTap integration with schema changes
+7. ✅ Icon system (Lucide with file type mapping + custom icon/color per document)
+8. ✅ Database philosophy evolution
+9. ✅ Complete API routes specification
+10. ✅ Security implementation details
+11. ✅ Command palette functionality
+12. ✅ Tab management specifications
+13. ✅ Right sidebar features (backlinks, outline, metadata)
+14. ✅ SideChatBar specifications
+15. ✅ Status bar details
+16. ✅ File tree navigation
+17. ✅ Archive file handling
+18. ✅ Media player features
+19. ✅ Performance optimization
+20. ✅ Testing strategy
+21. ✅ Accessibility (a11y)
+22. ✅ Error handling & user feedback
+23. ✅ Migration path from MVP
+24. ✅ Open source reference integration
+25. ✅ Extensibility & plugin system
+26. ✅ Drag-and-drop file reorganization (tree-level)
+27. ✅ Custom icons and colors for documents/folders
+28. ✅ Export system (Markdown, PDF, HTML, ZIP)
+29. ✅ Import system (Markdown files, ZIP archives)
+30. ✅ Soft delete and trash management
+31. ✅ Markdown file upload with conversion to editable notes
+32. ✅ Markdown/WYSIWYG toggle mode (Phase 2 enhancement)
+
+## Contributing to This Documentation
+
+When updating these documents:
+
+1. Maintain the established structure and formatting
+2. Include mermaid diagrams for complex flows
+3. Provide code examples for implementations
+4. Update the version and last updated date
+5. Cross-reference related documents
+6. Add migration notes for breaking changes
+
+## Version History
+
+| Version | Date       | Author | Changes                                                                                                                  |
+| ------- | ---------- | ------ | ------------------------------------------------------------------------------------------------------------------------ |
+| 1.0     | 2026-01-10 | System | Initial comprehensive documentation suite                                                                                |
+| 1.1     | 2026-01-12 | System | Added drag-and-drop, custom icons, export/import features                                                                |
+| 2.0     | 2026-01-12 | System | Database v2.0 refactor (ContentNode + Typed Payloads), API v2.0, complete terminology migration from docType/contentData |
+| 2.1     | 2026-01-13 | System | Documentation cleanup: consolidated summaries into V2-ARCHITECTURE-OVERVIEW.md, removed deprecated files                 |
+
+## Next Steps
+
+Begin implementation by following the **[Implementation Guide](./11-implementation-guide.md)** which provides a phased approach to building this feature.
