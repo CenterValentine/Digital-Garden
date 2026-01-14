@@ -10,7 +10,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { requireAuth } from "@/lib/auth/middleware";
-import { generateUniqueSlug, calculateChecksumFromBuffer } from "@/lib/content";
+import { generateUniqueSlug } from "@/lib/content";
+import type { InitiateUploadRequest } from "@/lib/content/api-types";
 import crypto from "crypto";
 
 // ============================================================
@@ -20,7 +21,7 @@ import crypto from "crypto";
 export async function POST(request: NextRequest) {
   try {
     const session = await requireAuth();
-    const body = await request.json();
+    const body = (await request.json()) as InitiateUploadRequest;
 
     const {
       fileName,

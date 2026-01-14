@@ -10,6 +10,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { requireAuth } from "@/lib/auth/middleware";
+import type { FinalizeUploadRequest } from "@/lib/content/api-types";
 
 // ============================================================
 // POST /api/notes/content/upload/finalize
@@ -18,7 +19,7 @@ import { requireAuth } from "@/lib/auth/middleware";
 export async function POST(request: NextRequest) {
   try {
     const session = await requireAuth();
-    const body = await request.json();
+    const body = (await request.json()) as FinalizeUploadRequest;
 
     const { contentId, uploadSuccess, uploadError, fileMetadata } = body;
 
@@ -259,4 +260,3 @@ async function extractFileMetadata(
 
   return metadata;
 }
-

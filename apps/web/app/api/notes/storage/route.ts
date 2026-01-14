@@ -8,6 +8,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { requireAuth } from "@/lib/auth/middleware";
+import type {
+  CreateStorageConfigRequest,
+  R2Config,
+  S3Config,
+  VercelConfig,
+  StorageConfig,
+} from "@/lib/content/api-types";
 
 // ============================================================
 // GET /api/notes/storage - List Storage Configurations
@@ -63,7 +70,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const session = await requireAuth();
-    const body = await request.json();
+    const body = (await request.json()) as CreateStorageConfigRequest;
 
     const { provider, displayName, config, isDefault } = body;
 
@@ -193,23 +200,45 @@ export async function POST(request: NextRequest) {
 // ============================================================
 
 function validateProviderConfig(
-  provider: string,
-  config: any
+  provider: "r2" | "s3" | "vercel",
+  config: StorageConfig
 ): string | null {
   if (provider === "r2") {
-    if (!config.accountId || !config.accessKeyId || !config.secretAccessKey || !config.bucket) {
+    const r2Config = config as R2Config;
+    if (
+      !r2Config.accountId ||
+      !r2Config.accessKeyId ||
+      !r2Config.secretAccessKey ||
+      !r2Config.bucket
+    ) {
       return "R2 requires: accountId, accessKeyId, secretAccessKey, bucket";
     }
+
+    // Access config values like this:
+    // const { accountId, accessKeyId, secretAccessKey, bucket } = r2Config;
+    // Or: r2Config.accountId, r2Config.accessKeyId, etc.
   } else if (provider === "s3") {
-    if (!config.region || !config.accessKeyId || !config.secretAccessKey || !config.bucket) {
+    const s3Config = config as S3Config;
+    if (
+      !s3Config.region ||
+      !s3Config.accessKeyId ||
+      !s3Config.secretAccessKey ||
+      !s3Config.bucket
+    ) {
       return "S3 requires: region, accessKeyId, secretAccessKey, bucket";
     }
+
+    // Access config values like this:
+    // const { region, accessKeyId, secretAccessKey, bucket } = s3Config;
   } else if (provider === "vercel") {
-    if (!config.token) {
+    const vercelConfig = config as VercelConfig;
+    if (!vercelConfig.token) {
       return "Vercel Blob requires: token";
     }
+
+    // Access config values like this:
+    // const { token } = vercelConfig;
   }
 
   return null;
 }
-

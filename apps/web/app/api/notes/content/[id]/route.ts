@@ -19,6 +19,10 @@ import {
   CONTENT_WITH_PAYLOADS,
 } from "@/lib/content";
 import type { JSONContent } from "@tiptap/core";
+import type {
+  ContentDetailResponse,
+  UpdateContentRequest,
+} from "@/lib/content/api-types";
 
 type Params = Promise<{ id: string }>;
 
@@ -68,7 +72,7 @@ export async function GET(
 
     // Format response
     const contentType = deriveContentType(content as any);
-    const response: any = {
+    const response: ContentDetailResponse = {
       id: content.id,
       ownerId: content.ownerId,
       title: content.title,
@@ -160,7 +164,7 @@ export async function PATCH(
   try {
     const session = await requireAuth();
     const { id } = await params;
-    const body = await request.json();
+    const body = (await request.json()) as UpdateContentRequest;
 
     // Fetch existing content
     const existing = await prisma.contentNode.findUnique({
@@ -211,7 +215,7 @@ export async function PATCH(
     } = body;
 
     // Prepare update data
-    const updateData: any = {};
+    const updateData: Record<string, unknown> = {};
 
     if (title !== undefined) {
       if (!title || title.trim().length === 0) {
@@ -242,11 +246,7 @@ export async function PATCH(
 
       // Regenerate slug if title changed
       if (title !== existing.title) {
-        updateData.slug = await generateUniqueSlug(
-          title,
-          session.user.id,
-          id
-        );
+        updateData.slug = await generateUniqueSlug(title, session.user.id, id);
       }
     }
 
@@ -328,7 +328,7 @@ export async function PATCH(
 
     // Format response
     const contentType = deriveContentType(updated as any);
-    const response: any = {
+    const response: ContentDetailResponse = {
       id: updated.id,
       ownerId: updated.ownerId,
       title: updated.title,
@@ -342,6 +342,7 @@ export async function PATCH(
       contentType,
       createdAt: updated.createdAt,
       updatedAt: updated.updatedAt,
+      deletedAt: updated.deletedAt,
     };
 
     // Include payload data
@@ -471,7 +472,8 @@ export async function DELETE(
         id,
         deletedAt: now,
         scheduledDeletion,
-        message: "Content moved to trash. Will be permanently deleted in 30 days.",
+        message:
+          "Content moved to trash. Will be permanently deleted in 30 days.",
       },
     });
   } catch (error) {
@@ -488,4 +490,3 @@ export async function DELETE(
     );
   }
 }
-

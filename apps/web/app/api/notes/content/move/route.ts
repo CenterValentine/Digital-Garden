@@ -10,6 +10,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { requireAuth } from "@/lib/auth/middleware";
 import { updateMaterializedPath } from "@/lib/content";
+import type { MoveContentRequest } from "@/lib/content/api-types";
 
 // ============================================================
 // POST /api/notes/content/move - Move Content
@@ -18,7 +19,7 @@ import { updateMaterializedPath } from "@/lib/content";
 export async function POST(request: NextRequest) {
   try {
     const session = await requireAuth();
-    const body = await request.json();
+    const body = (await request.json()) as MoveContentRequest;
 
     const { contentId, targetParentId, newDisplayOrder } = body;
 
@@ -122,10 +123,7 @@ export async function POST(request: NextRequest) {
       }
 
       // Check if target is a descendant (would create cycle)
-      const isDescendant = await checkIsDescendant(
-        targetParentId,
-        contentId
-      );
+      const isDescendant = await checkIsDescendant(targetParentId, contentId);
       if (isDescendant) {
         return NextResponse.json(
           {
@@ -144,7 +142,8 @@ export async function POST(request: NextRequest) {
     const updated = await prisma.contentNode.update({
       where: { id: contentId },
       data: {
-        parentId: targetParentId === undefined ? content.parentId : targetParentId,
+        parentId:
+          targetParentId === undefined ? content.parentId : targetParentId,
         displayOrder: newDisplayOrder ?? 0,
       },
     });
@@ -237,4 +236,3 @@ async function updateChildrenPaths(parentId: string) {
     await updateChildrenPaths(child.id);
   }
 }
-

@@ -18,6 +18,13 @@ import {
   CONTENT_WITH_PAYLOADS,
 } from "@/lib/content";
 import type { JSONContent } from "@tiptap/core";
+import type {
+  ContentWhereInput,
+  ContentListItem,
+  CreatePayloadData,
+  CreateContentRequest,
+  ContentDetailResponse,
+} from "@/lib/content/api-types";
 
 // ============================================================
 // GET /api/notes/content - List Content
@@ -42,7 +49,7 @@ export async function GET(request: NextRequest) {
     const sortOrder = searchParams.get("sortOrder") || "asc";
 
     // Build where clause
-    const whereClause: any = {
+    const whereClause: ContentWhereInput = {
       ownerId: session.user.id,
     };
 
@@ -142,10 +149,10 @@ export async function GET(request: NextRequest) {
     ]);
 
     // Format response
-    const formattedItems = items.map((item) => {
+    const formattedItems: ContentListItem[] = items.map((item) => {
       const contentType = deriveContentType(item as any);
 
-      const formatted: any = {
+      const formatted: ContentListItem = {
         id: item.id,
         ownerId: item.ownerId,
         title: item.title,
@@ -225,7 +232,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const session = await requireAuth();
-    const body = await request.json();
+    const body = (await request.json()) as CreateContentRequest;
 
     const {
       title,
@@ -308,7 +315,7 @@ export async function POST(request: NextRequest) {
     const slug = await generateUniqueSlug(title, session.user.id);
 
     // Determine content type and prepare payload data
-    let payloadData: any = {};
+    let payloadData: CreatePayloadData = {};
 
     if (isFolder) {
       // Folder: no payload
@@ -398,7 +405,7 @@ export async function POST(request: NextRequest) {
 
     // Format response
     const contentType = deriveContentType(content as any);
-    const response: any = {
+    const response: ContentDetailResponse = {
       id: content.id,
       ownerId: content.ownerId,
       title: content.title,
@@ -412,6 +419,7 @@ export async function POST(request: NextRequest) {
       contentType,
       createdAt: content.createdAt,
       updatedAt: content.updatedAt,
+      deletedAt: content.deletedAt,
     };
 
     // Add full payload data in response

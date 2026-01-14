@@ -9,6 +9,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { requireAuth } from "@/lib/auth/middleware";
+import type { UpdateStorageConfigRequest } from "@/lib/content/api-types";
 
 type Params = Promise<{ id: string }>;
 
@@ -102,7 +103,7 @@ export async function PATCH(
   try {
     const session = await requireAuth();
     const { id } = await params;
-    const body = await request.json();
+    const body = (await request.json()) as UpdateStorageConfigRequest;
 
     const { displayName, config, isDefault, isActive } = body;
 
@@ -299,4 +300,3 @@ export async function DELETE(
     );
   }
 }
-
