@@ -78,11 +78,12 @@ The notes feature transforms the application into a powerful knowledge managemen
    - Interaction patterns
 
 **[Liquid Glass Design System](./LIQUID-GLASS-DESIGN-SYSTEM.md)** - Design system strategy for `/notes/**`
-   - Dual-library approach (Glass-UI + DiceUI vs shadcn/Radix)
-   - Unified design tokens (surfaces, intents, motion)
-   - DS facade for consistent API
-   - Metaphor budget and conservative constraints
-   - Component priority rules
+
+- Dual-library approach (Glass-UI + DiceUI vs shadcn/Radix)
+- Unified design tokens (surfaces, intents, motion)
+- DS facade for consistent API
+- Metaphor budget and conservative constraints
+- Component priority rules
 
 7. **[File Storage](./07-file-storage.md)**
    - Multi-cloud storage architecture
@@ -124,14 +125,19 @@ The notes feature transforms the application into a powerful knowledge managemen
     - Migration from MVP
 
 **Milestone Implementation Guides:**
+
 - **[M1: Foundation README](./M1-FOUNDATION-README.md)** - Database schema, seed script, core utilities
 - **[M2: Core API README](./M2-CORE-API-README.md)** - REST API routes, file upload, storage management
 - **[M3: UI Foundation with Liquid Glass](./M3-UI-FOUNDATION-LIQUID-GLASS.md)** - Panel layout, design system, Glass-UI integration
+- **[M3: Setup Guide](./M3-SETUP-GUIDE.md)** - Step-by-step setup and testing for M3
+- **[M4: File Tree Implementation](./M4-FILE-TREE-IMPLEMENTATION.md)** - Server/client architecture, Suspense, react-arborist
 
 **Supporting Documentation:**
+
 - **[Type Safety Improvements](./TYPE-SAFETY-IMPROVEMENTS.md)** - TypeScript types for API routes
 - **[Tree Update Flow](./TREE-UPDATE-FLOW.md)** - Drag-and-drop tree updates explained
 - **[Storage Config Examples](./STORAGE-CONFIG-EXAMPLES.md)** - How to use storage provider configs
+- **[Component Registry Notes](./COMPONENT-REGISTRY-NOTES.md)** - Glass-UI/DiceUI investigation and alternatives
 
 ### Quality Assurance
 

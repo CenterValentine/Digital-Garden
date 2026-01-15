@@ -6,13 +6,15 @@
 
 ## Executive Summary
 
-The Notes Feature adopts a **dual-library strategy** with **unified design tokens**:
+The Notes Feature adopts a **dual-component-registry strategy** with **unified design tokens**:
 
-- **`/notes/**`\*\*: Uses Glass-UI + DiceUI (fallback) for modern, fluid IDE experience
-- **Rest of app**: Uses shadcn/Radix with matching surface tokens
+- **`/notes/**`: Uses Glass-UI + DiceUI (shadcn-compatible registries) for modern, fluid IDE experience
+- **Rest of app**: Uses standard shadcn/ui components with matching surface tokens
 - **Both**: Share same semantic intents, surfaces, motion rules, and typography
 
 **Key Principle:** Different component sources, identical visual language.
+
+**Important:** Glass-UI and DiceUI are **shadcn-compatible component registries**, not separate npm packages. Components are added using `shadcn` CLI and copied into your project.
 
 ---
 
@@ -20,11 +22,33 @@ The Notes Feature adopts a **dual-library strategy** with **unified design token
 
 ### A) `/notes/**` Routes (Greenfield Territory)
 
-**Component Libraries:**
+**Component Registries:**
 
-- ✅ **Primary**: Glass-UI components (liquid glass aesthetic)
-- ✅ **Fallback**: DiceUI components (when Glass-UI lacks primitive)
-- ⚠️ **Last Resort**: shadcn/Radix (only if both above missing)
+- ✅ **Primary**: Glass-UI components (liquid glass aesthetic, shadcn-compatible)
+- ✅ **Fallback**: DiceUI components (when Glass-UI lacks primitive, shadcn-compatible)
+- ⚠️ **Last Resort**: Standard shadcn/ui (only if both above missing)
+
+**Installation Pattern:**
+
+```bash
+# Glass-UI components (verify availability in M4+)
+pnpm dlx shadcn@latest add @glass-ui/button
+pnpm dlx shadcn@latest add @glass-ui/card
+
+# DiceUI components (registry verification needed)
+# Known issue: Returns 404 error as of Jan 2026
+# npx shadcn@latest add "@diceui/command"
+
+# Standard shadcn (reliable fallback)
+npx shadcn@latest add button
+npx shadcn@latest add card
+```
+
+**Current Status:**
+
+- Glass-UI: To be verified in M4 when components are needed
+- DiceUI: Registry URL returns 404 (investigating alternative installation)
+- Standard shadcn: Always available as fallback
 
 **Design Constraints:**
 
@@ -44,11 +68,19 @@ The Notes Feature adopts a **dual-library strategy** with **unified design token
 
 ### B) Outside `/notes/**` (Existing App)
 
-**Component Libraries:**
+**Component Registry:**
 
-- ✅ **Primary**: shadcn/Radix components (existing implementation)
-- ✅ Apply same Glass-0/1/2 surface tokens via styling
-- ❌ **Do NOT** introduce Glass-UI components outside `/notes/**`
+- ✅ **Primary**: Standard shadcn/ui components (existing implementation)
+- ✅ Apply same Glass-0/1/2 surface tokens via styling/variants
+- ❌ **Do NOT** introduce Glass-UI or DiceUI components outside `/notes/**`
+
+**Installation Pattern:**
+
+```bash
+# Standard shadcn/ui
+npx shadcn@latest add button
+npx shadcn@latest add card
+```
 
 **Design Constraints:**
 

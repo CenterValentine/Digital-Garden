@@ -10,6 +10,7 @@
 M3 builds the foundational UI layer for the Notes Feature using the **Liquid Glass design system**. This includes panel layout, state management, design tokens, and core components styled with Glass-UI.
 
 **Key Difference from Standard Implementation:**
+
 - Uses **Glass-UI** (primary) + **DiceUI** (fallback) instead of shadcn/Radix
 - Implements **DS facade** for consistent API across `/notes/**` and rest of app
 - Applies **Liquid Glass aesthetic** with conservative motion rules
@@ -20,10 +21,12 @@ M3 builds the foundational UI layer for the Notes Feature using the **Liquid Gla
 ## Prerequisites
 
 **Completed:**
+
 - ✅ M1: Foundation & Database (ContentNode v2.0, seed script, core utilities)
 - ✅ M2: Core API Routes (CRUD, file upload, storage providers, tree navigation)
 
 **Required:**
+
 - Next.js 16+ running
 - PostgreSQL configured
 - Prisma client generated (`npx prisma generate`)
@@ -33,13 +36,10 @@ M3 builds the foundational UI layer for the Notes Feature using the **Liquid Gla
 
 ## Phase 1: Design System Foundation
 
-### Step 1.1: Install Design System Dependencies
+### Step 1.1: Install Core Dependencies
 
 ```bash
 cd apps/web
-
-# Glass-UI and DiceUI
-pnpm add @glass-ui/react @dice-ui/react
 
 # Panel layout and virtualization
 pnpm add allotment @tanstack/react-virtual
@@ -47,9 +47,11 @@ pnpm add allotment @tanstack/react-virtual
 # State management
 pnpm add zustand
 
-# Icons (if not already installed)
-pnpm add lucide-react
+# Icons (already installed)
+# lucide-react is already in dependencies
 ```
+
+**Note:** Glass-UI and DiceUI are **shadcn-compatible component registries**, not npm packages. Components are added individually using the `shadcn` CLI (see Step 1.4).
 
 ### Step 1.2: Create Design Token System
 
@@ -58,7 +60,7 @@ pnpm add lucide-react
 ```typescript
 /**
  * Surface Tokens - Liquid Glass
- * 
+ *
  * Three-tier glass surface system for depth and hierarchy.
  * Used across ALL routes (not just /notes/**).
  */
@@ -111,18 +113,18 @@ export const surfacesDark = {
 ```typescript
 /**
  * Semantic Intent Colors
- * 
+ *
  * Unified color intent system across all routes.
  */
 
 export const intents = {
-  primary: "hsl(222, 47%, 51%)",     // Blue
-  secondary: "hsl(222, 13%, 45%)",   // Gray-blue
-  neutral: "hsl(215, 14%, 34%)",     // Neutral gray
-  danger: "hsl(0, 72%, 51%)",        // Red
-  success: "hsl(142, 71%, 45%)",     // Green
-  warning: "hsl(38, 92%, 50%)",      // Orange
-  info: "hsl(199, 89%, 48%)",        // Cyan
+  primary: "hsl(222, 47%, 51%)", // Blue
+  secondary: "hsl(222, 13%, 45%)", // Gray-blue
+  neutral: "hsl(215, 14%, 34%)", // Neutral gray
+  danger: "hsl(0, 72%, 51%)", // Red
+  success: "hsl(142, 71%, 45%)", // Green
+  warning: "hsl(38, 92%, 50%)", // Orange
+  info: "hsl(199, 89%, 48%)", // Cyan
 } as const;
 
 export type Intent = keyof typeof intents;
@@ -133,22 +135,22 @@ export type Intent = keyof typeof intents;
 ```typescript
 /**
  * Motion Rules - Conservative
- * 
+ *
  * Restrained animations for professional IDE experience.
  */
 
 export const motion = {
   durations: {
-    fast: 150,    // ms
+    fast: 150, // ms
     base: 200,
     slow: 300,
   },
-  
+
   easings: {
-    smooth: "cubic-bezier(0.4, 0, 0.2, 1)",  // ease-out
-    snappy: "cubic-bezier(0.4, 0, 0.6, 1)",  // custom snap
+    smooth: "cubic-bezier(0.4, 0, 0.2, 1)", // ease-out
+    snappy: "cubic-bezier(0.4, 0, 0.6, 1)", // custom snap
   },
-  
+
   // Allowed transforms
   allowed: {
     opacity: true,
@@ -156,12 +158,12 @@ export const motion = {
     translateY: true,
     scale: { min: 0.95, max: 1.05 }, // Subtle only
   },
-  
+
   // Banned transforms
   banned: {
-    rotate: true,        // Except icon spin
+    rotate: true, // Except icon spin
     skew: true,
-    dropShadow: true,    // Except icons
+    dropShadow: true, // Except icons
     glow: true,
   },
 } as const;
@@ -185,14 +187,38 @@ export * from "./intents";
 export * from "./motion";
 ```
 
-### Step 1.3: Create DS Facade Structure
+### Step 1.3: Add Glass-UI Components
+
+Glass-UI and DiceUI are shadcn-compatible registries. Add components using the shadcn CLI:
+
+```bash
+# Add Glass-UI button component
+pnpm dlx shadcn@latest add @glass-ui/button
+
+# Add Glass-UI card component
+pnpm dlx shadcn@latest add @glass-ui/card
+
+# Add Glass-UI dialog component
+pnpm dlx shadcn@latest add @glass-ui/dialog
+
+# This copies components to components/ui/ with Glass-UI styling
+```
+
+**What This Does:**
+
+- Downloads component code from Glass-UI registry
+- Copies it to `components/ui/` (standard shadcn location)
+- Components have built-in glass surface styling
+- You own the code (can customize)
+
+### Step 1.4: Create DS Facade Structure
 
 **File:** `components/ds/types.ts`
 
 ```typescript
 /**
  * Unified Design System Types
- * 
+ *
  * These types are used by both Glass-UI and shadcn implementations.
  */
 
@@ -249,11 +275,13 @@ export interface TabsProps {
 ```typescript
 /**
  * Button - Glass-UI Implementation (for /notes/**)
+ *
+ * Uses Glass-UI button component (added via shadcn CLI)
  */
 
 "use client";
 
-import { Button as GlassButton } from "@glass-ui/react";
+import { Button as GlassButton } from "@/components/ui/button"; // Glass-UI button
 import { cn } from "@/lib/utils";
 import { surfaces, intents } from "@/lib/design-system";
 import type { ButtonProps } from "../types";
@@ -273,7 +301,7 @@ export function ButtonNotes({
 }: ButtonProps) {
   const surfaceStyles = surfaces[surface];
   const intentColor = intents[intent];
-  
+
   return (
     <GlassButton
       type={type}
@@ -284,12 +312,12 @@ export function ButtonNotes({
         "relative inline-flex items-center justify-center",
         "font-medium transition-all duration-200",
         "focus:outline-none focus:ring-2 focus:ring-offset-2",
-        
+
         // Size variants
         size === "sm" && "text-sm px-3 py-1.5 rounded",
         size === "md" && "text-base px-4 py-2 rounded-md",
         size === "lg" && "text-lg px-6 py-3 rounded-lg",
-        
+
         // Surface + variant styles
         variant === "solid" && [
           "text-white",
@@ -305,21 +333,21 @@ export function ButtonNotes({
           `color: ${intentColor}`,
           "hover:bg-opacity-5",
         ],
-        
+
         // Glass surface
         surface && surfaceStyles.backdropBlur && [
           `backdrop-blur-[${surfaceStyles.backdropBlur}]`,
         ],
-        
+
         // Full width
         fullWidth && "w-full",
-        
+
         // Disabled state
         disabled && "opacity-50 cursor-not-allowed",
-        
+
         // Loading state
         loading && "cursor-wait",
-        
+
         // Custom classes
         className
       )}
@@ -348,12 +376,12 @@ import { ButtonNotes } from "./button-notes";
 
 export function Button(props: React.ComponentProps<typeof ButtonNotes>) {
   const pathname = usePathname();
-  
+
   // Route-based selection
   if (pathname.startsWith("/notes")) {
     return <ButtonNotes {...props} />;
   }
-  
+
   // TODO: Implement ButtonApp for rest of application
   return <ButtonNotes {...props} />;
 }
@@ -373,7 +401,7 @@ export type { ButtonProps } from "../types";
 ```typescript
 /**
  * Panel Layout State
- * 
+ *
  * Manages panel widths, visibility, and layout persistence.
  */
 
@@ -384,28 +412,31 @@ export interface PanelState {
   // Left sidebar
   leftSidebarVisible: boolean;
   leftSidebarWidth: number;
-  
+
   // Right sidebar
   rightSidebarVisible: boolean;
   rightSidebarWidth: number;
-  
+
   // Status bar
   statusBarVisible: boolean;
-  
+
   // Actions
   toggleLeftSidebar: () => void;
   toggleRightSidebar: () => void;
   setLeftSidebarWidth: (width: number) => void;
   setRightSidebarWidth: (width: number) => void;
   toggleStatusBar: () => void;
-  
+
   // Reset
   resetLayout: () => void;
 }
 
+const CURRENT_VERSION = 2;
+
 const DEFAULT_STATE = {
+  version: CURRENT_VERSION,
   leftSidebarVisible: true,
-  leftSidebarWidth: 280,
+  leftSidebarWidth: 200, // Narrower default for better space usage
   rightSidebarVisible: true,
   rightSidebarWidth: 300,
   statusBarVisible: true,
@@ -415,26 +446,37 @@ export const usePanelStore = create<PanelState>()(
   persist(
     (set) => ({
       ...DEFAULT_STATE,
-      
+
       toggleLeftSidebar: () =>
         set((state) => ({ leftSidebarVisible: !state.leftSidebarVisible })),
-      
+
       toggleRightSidebar: () =>
         set((state) => ({ rightSidebarVisible: !state.rightSidebarVisible })),
-      
+
       setLeftSidebarWidth: (width) =>
         set({ leftSidebarWidth: Math.max(200, Math.min(600, width)) }),
-      
+
       setRightSidebarWidth: (width) =>
         set({ rightSidebarWidth: Math.max(200, Math.min(600, width)) }),
-      
+
       toggleStatusBar: () =>
         set((state) => ({ statusBarVisible: !state.statusBarVisible })),
-      
+
       resetLayout: () => set(DEFAULT_STATE),
     }),
     {
       name: "notes-panel-layout",
+      version: CURRENT_VERSION,
+      migrate: (persistedState: any, version: number) => {
+        // If stored version doesn't match current version, reset to defaults
+        if (version !== CURRENT_VERSION) {
+          console.log(
+            `[Panel Store] Migrating from version ${version} to ${CURRENT_VERSION}`
+          );
+          return DEFAULT_STATE;
+        }
+        return persistedState;
+      },
     }
   )
 );
@@ -447,7 +489,7 @@ export const usePanelStore = create<PanelState>()(
 ```typescript
 /**
  * Panel Layout - Obsidian-inspired IDE layout
- * 
+ *
  * Uses Allotment for resizable panels with Glass-UI styling.
  */
 
@@ -481,7 +523,7 @@ export function PanelLayout({
     setLeftSidebarWidth,
     setRightSidebarWidth,
   } = usePanelStore();
-  
+
   return (
     <div className="flex h-screen flex-col overflow-hidden">
       {/* Main panel area */}
@@ -499,20 +541,20 @@ export function PanelLayout({
               minSize={200}
               maxSize={600}
               preferredSize={leftSidebarWidth}
-              className={cn(
-                "overflow-hidden",
-                "border-r",
-                surfaces["glass-0"].border
-              )}
-              style={{
-                background: surfaces["glass-0"].background,
-                backdropFilter: `blur(${surfaces["glass-0"].backdropBlur})`,
-              }}
             >
-              {leftSidebar}
+              <div
+                className={cn("h-full overflow-hidden border-r")}
+                style={{
+                  background: surfaces["glass-0"].background,
+                  backdropFilter: `blur(${surfaces["glass-0"].backdropBlur})`,
+                  borderColor: "rgba(255, 255, 255, 0.08)",
+                }}
+              >
+                {leftSidebar}
+              </div>
             </Allotment.Pane>
           )}
-          
+
           {/* Main content area */}
           <Allotment.Pane>
             <Allotment
@@ -525,31 +567,31 @@ export function PanelLayout({
               }}
             >
               <Allotment.Pane>{mainContent}</Allotment.Pane>
-              
+
               {/* Right sidebar */}
               {rightSidebarVisible && (
                 <Allotment.Pane
                   minSize={200}
                   maxSize={600}
                   preferredSize={rightSidebarWidth}
-                  className={cn(
-                    "overflow-hidden",
-                    "border-l",
-                    surfaces["glass-0"].border
-                  )}
-                  style={{
-                    background: surfaces["glass-0"].background,
-                    backdropFilter: `blur(${surfaces["glass-0"].backdropBlur})`,
-                  }}
                 >
-                  {rightSidebar}
+                  <div
+                    className={cn("h-full overflow-hidden border-l")}
+                    style={{
+                      background: surfaces["glass-0"].background,
+                      backdropFilter: `blur(${surfaces["glass-0"].backdropBlur})`,
+                      borderColor: "rgba(255, 255, 255, 0.08)",
+                    }}
+                  >
+                    {rightSidebar}
+                  </div>
                 </Allotment.Pane>
               )}
             </Allotment>
           </Allotment.Pane>
         </Allotment>
       </div>
-      
+
       {/* Status bar */}
       {statusBarVisible && (
         <div
@@ -594,24 +636,24 @@ export function CardNotes({
   className,
 }: CardProps) {
   const surfaceStyles = surfaces[surface];
-  
+
   return (
     <div
       className={cn(
         "rounded-lg transition-all duration-200",
-        
+
         // Padding variants
         padding === "none" && "p-0",
         padding === "sm" && "p-3",
         padding === "md" && "p-4",
         padding === "lg" && "p-6",
-        
+
         // Border
         border && surfaceStyles.border,
-        
+
         // Hover effect
         hover && "hover:scale-[1.01] hover:shadow-lg",
-        
+
         className
       )}
       style={{
@@ -649,13 +691,13 @@ export function DialogNotes({
   footer,
 }: DialogProps) {
   const surfaceStyles = surfaces[surface];
-  
+
   return (
     <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
       <DialogPrimitive.Portal>
         {/* Backdrop */}
         <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
-        
+
         {/* Content */}
         <DialogPrimitive.Content
           className={cn(
@@ -687,13 +729,13 @@ export function DialogNotes({
               )}
             </div>
           )}
-          
+
           {/* Body */}
           <div className="mb-4">{children}</div>
-          
+
           {/* Footer */}
           {footer && <div className="flex justify-end gap-2">{footer}</div>}
-          
+
           {/* Close button */}
           <DialogPrimitive.Close className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none">
             <X className="h-4 w-4" />
@@ -722,21 +764,21 @@ test.describe("Panel Layout", () => {
     await page.goto("/notes");
     await expect(page).toHaveScreenshot("panel-layout-default.png");
   });
-  
+
   test("hides left sidebar", async ({ page }) => {
     await page.goto("/notes");
     await page.click("[data-testid=toggle-left-sidebar]");
     await expect(page).toHaveScreenshot("panel-layout-no-left.png");
   });
-  
+
   test("applies glass surfaces correctly", async ({ page }) => {
     await page.goto("/notes");
-    
+
     const leftSidebar = page.locator("[data-testid=left-sidebar]");
-    const backdropFilter = await leftSidebar.evaluate((el) =>
-      window.getComputedStyle(el).backdropFilter
+    const backdropFilter = await leftSidebar.evaluate(
+      (el) => window.getComputedStyle(el).backdropFilter
     );
-    
+
     expect(backdropFilter).toContain("blur");
   });
 });
@@ -757,12 +799,14 @@ test.describe("Panel Layout", () => {
 ## Next Steps
 
 **M4: File Tree**
+
 - Virtualized tree with react-arborist
 - Glass-UI styled tree nodes
 - Drag-and-drop with optimistic updates
 - Custom icon picker dialog
 
 **M5: Content Editors & Viewers**
+
 - TipTap editor with glass chrome
 - Markdown mode toggle
 - File viewers (PDF, images, etc.)
@@ -786,7 +830,6 @@ test.describe("Panel Layout", () => {
 ✅ Panel layout with Allotment + Glass surfaces  
 ✅ Core components (Button, Card, Dialog) with Glass-UI  
 ✅ Zustand state management with persistence  
-✅ Testing strategy with visual regression  
+✅ Testing strategy with visual regression
 
 **Result:** Solid foundation for building `/notes/**` UI with Liquid Glass aesthetic.
-

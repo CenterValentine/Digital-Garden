@@ -68,3 +68,22 @@ export {
 // Constants
 export { CONTENT_WITH_PAYLOADS, CONTENT_TREE_SELECT } from "./types";
 export { UploadStatus } from "./types";
+
+// API Types
+export type {
+  ContentListItem,
+  ContentDetailResponse,
+  CreateContentRequest,
+  UpdateContentRequest,
+  MoveContentRequest,
+  InitiateUploadRequest,
+  FinalizeUploadRequest,
+  CreateStorageConfigRequest,
+  UpdateStorageConfigRequest,
+  R2Config,
+  S3Config,
+  VercelConfig,
+  StorageConfig,
+  ContentWhereInput,
+  CreatePayloadData,
+} from "./api-types";
