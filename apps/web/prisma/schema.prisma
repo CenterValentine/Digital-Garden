@@ -8,7 +8,6 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
 // ============================================================
@@ -362,17 +361,18 @@ model Session {
 }
 
 model Account {
-  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  userId        String   @db.Uuid
-  provider      String   @db.VarChar(50)
-  providerAccId String   @db.VarChar(255)
-  refreshToken  String?  @db.Text
-  accessToken   String?  @db.Text
-  expiresAt     DateTime? @db.Timestamptz()
-  createdAt     DateTime @default(now()) @db.Timestamptz()
+  id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId             String    @db.Uuid
+  provider           String    @db.VarChar(50)
+  providerAccountId  String    @db.VarChar(255)
+  refreshToken       String?   @db.Text
+  accessToken        String?   @db.Text
+  expiresAt          DateTime? @db.Timestamptz()
+  createdAt          DateTime  @default(now()) @db.Timestamptz()
 
-  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user               User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@unique([provider, providerAccId])
+  @@unique([provider, providerAccountId])
   @@index([userId])
+  @@index([provider])
 }

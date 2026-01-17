@@ -5,3 +5,6 @@ out
 dist
 .DS_Store
 .env*
+
+# Claude tracking files (DO NOT COMMIT)
+.claude-commit-schedule.md
