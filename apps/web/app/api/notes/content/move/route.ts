@@ -80,6 +80,12 @@ export async function POST(request: NextRequest) {
     if (targetParentId !== null && targetParentId !== undefined) {
       const targetParent = await prisma.contentNode.findUnique({
         where: { id: targetParentId },
+        include: {
+          notePayload: true,
+          filePayload: true,
+          htmlPayload: true,
+          codePayload: true,
+        },
       });
 
       if (!targetParent) {
@@ -105,6 +111,26 @@ export async function POST(request: NextRequest) {
             },
           },
           { status: 403 }
+        );
+      }
+
+      // Validate target is a folder (has no payload)
+      const hasPayload =
+        targetParent.notePayload ||
+        targetParent.filePayload ||
+        targetParent.htmlPayload ||
+        targetParent.codePayload;
+
+      if (hasPayload) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: {
+              code: "VALIDATION_ERROR",
+              message: "Cannot move content into a non-folder item",
+            },
+          },
+          { status: 400 }
         );
       }
 
@@ -138,15 +164,20 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Determine the final parent (either new parent or keep current)
+    const finalParentId = targetParentId === undefined ? content.parentId : targetParentId;
+
     // Move content
     const updated = await prisma.contentNode.update({
       where: { id: contentId },
       data: {
-        parentId:
-          targetParentId === undefined ? content.parentId : targetParentId,
+        parentId: finalParentId,
         displayOrder: newDisplayOrder ?? 0,
       },
     });
+
+    // Recalculate displayOrder for all siblings to maintain consistent ordering
+    await reorderSiblings(finalParentId);
 
     // Update materialized path
     await updateMaterializedPath(contentId);
@@ -235,4 +266,54 @@ async function updateChildrenPaths(parentId: string) {
     await updateMaterializedPath(child.id);
     await updateChildrenPaths(child.id);
   }
+}
+
+/**
+ * Reorder siblings to maintain consistent displayOrder values
+ *
+ * After a move operation, siblings may have duplicate or inconsistent displayOrder values.
+ * This function recalculates displayOrder for all siblings to ensure proper ordering.
+ *
+ * @param parentId - The parent whose children should be reordered (null for root items)
+ */
+async function reorderSiblings(parentId: string | null) {
+  // Fetch all siblings with the same parentId, including payload relations
+  const siblings = await prisma.contentNode.findMany({
+    where: { parentId },
+    include: {
+      notePayload: true,
+      filePayload: true,
+      htmlPayload: true,
+      codePayload: true,
+    },
+  });
+
+  // Sort siblings using the same logic as tree API
+  siblings.sort((a, b) => {
+    const aIsFolder = !a.notePayload && !a.filePayload && !a.htmlPayload && !a.codePayload;
+    const bIsFolder = !b.notePayload && !b.filePayload && !b.htmlPayload && !b.codePayload;
+
+    // Rule 1: Folders first
+    if (aIsFolder && !bIsFolder) return -1;
+    if (!aIsFolder && bIsFolder) return 1;
+
+    // Rule 2: Then by displayOrder
+    if (a.displayOrder !== b.displayOrder) {
+      return a.displayOrder - b.displayOrder;
+    }
+
+    // Rule 3: Then alphabetically
+    return a.title.localeCompare(b.title);
+  });
+
+  // Assign sequential displayOrder values (0, 1, 2, 3...)
+  const updates = siblings.map((sibling, index) => {
+    return prisma.contentNode.update({
+      where: { id: sibling.id },
+      data: { displayOrder: index },
+    });
+  });
+
+  // Execute all updates in a transaction for atomicity
+  await prisma.$transaction(updates);
 }
