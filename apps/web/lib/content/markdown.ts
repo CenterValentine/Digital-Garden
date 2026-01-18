@@ -9,9 +9,9 @@ import { generateJSON, generateHTML } from "@tiptap/core";
 import type { JSONContent, Extensions } from "@tiptap/core";
 import { extractSearchTextFromTipTap } from "./search-text";
 
-// Import TipTap extensions (these would be defined in editor config)
-// For now, we'll define the signature; implementation happens in M5
-import { getEditorExtensions } from "@/lib/editor/extensions";
+// Import TipTap extensions
+// Use server-only file to avoid loading React components
+import { getServerExtensions } from "@/lib/editor/extensions-server";
 
 // ============================================================
 // MARKDOWN → TIPTAP JSON
@@ -32,7 +32,7 @@ export function markdownToTiptap(markdown: string): JSONContent {
   }
 
   try {
-    const extensions = getEditorExtensions();
+    const extensions = getServerExtensions();
     const json = generateJSON(markdown, extensions);
     return json;
   } catch (error) {
@@ -72,7 +72,7 @@ export function tiptapToMarkdown(json: JSONContent): string {
   }
 
   try {
-    const extensions = getEditorExtensions();
+    const extensions = getServerExtensions();
 
     // Use TipTap's markdown serializer
     // Note: This requires @tiptap/extension-markdown to be configured

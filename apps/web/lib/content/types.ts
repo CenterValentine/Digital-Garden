@@ -22,6 +22,50 @@ export type ContentType =
 export type PayloadType = Exclude<ContentType, "folder" | "template">;
 
 // ============================================================
+// TREE NODE TYPE (for react-arborist)
+// ============================================================
+
+/**
+ * TreeNode interface for file tree rendering
+ * Matches the structure returned by GET /api/notes/content/tree
+ */
+export interface TreeNode {
+  id: string;
+  title: string;
+  slug: string;
+  parentId: string | null;
+  displayOrder: number;
+  customIcon: string | null;
+  iconColor: string | null;
+  isPublished: boolean;
+  contentType: ContentType;
+  children: TreeNode[];
+  createdAt: Date;
+  updatedAt: Date;
+  deletedAt: Date | null;
+
+  // Optional payload summaries
+  note?: {
+    wordCount?: number;
+    characterCount?: number;
+    readingTime?: number;
+  };
+  file?: {
+    fileName: string;
+    mimeType: string;
+    fileSize: string;
+    uploadStatus: "uploading" | "ready" | "failed";
+    thumbnailUrl?: string | null;
+  };
+  html?: {
+    isTemplate: boolean;
+  };
+  code?: {
+    language: string;
+  };
+}
+
+// ============================================================
 // PRISMA INCLUDE HELPERS
 // ============================================================
 
