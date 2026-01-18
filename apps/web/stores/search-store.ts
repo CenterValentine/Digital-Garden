@@ -13,6 +13,7 @@ import type { SearchFilter, SearchResult } from "@/lib/search/filters";
 import { DEFAULT_FILTER } from "@/lib/search/filters";
 
 const STORAGE_KEY = "search-settings";
+const RESULTS_STORAGE_KEY = "search-results";
 
 interface SearchSettings {
   caseSensitive: boolean;
@@ -22,6 +23,13 @@ interface SearchSettings {
   type: SearchFilter["type"];
 }
 
+interface SearchResultsCache {
+  query: string;
+  tags: string[];
+  results: SearchResult[];
+  timestamp: number;
+}
+
 const DEFAULT_SETTINGS: SearchSettings = {
   caseSensitive: false,
   useRegex: false,
@@ -29,6 +37,8 @@ const DEFAULT_SETTINGS: SearchSettings = {
   autoScrollToMatch: false,
   type: "all",
 };
+
+const CACHE_EXPIRY_MS = 30 * 60 * 1000; // 30 minutes
 
 // Load settings from localStorage
 function loadSettings(): SearchSettings {
@@ -59,6 +69,57 @@ function saveSettings(settings: Partial<SearchSettings>) {
   }
 }
 
+// Load search results from localStorage
+function loadCachedResults(): SearchResultsCache | null {
+  if (typeof window === "undefined") return null;
+
+  try {
+    const stored = localStorage.getItem(RESULTS_STORAGE_KEY);
+    if (stored) {
+      const cache: SearchResultsCache = JSON.parse(stored);
+      // Check if cache is still valid (within expiry time)
+      if (Date.now() - cache.timestamp < CACHE_EXPIRY_MS) {
+        return cache;
+      } else {
+        // Cache expired, remove it
+        localStorage.removeItem(RESULTS_STORAGE_KEY);
+      }
+    }
+  } catch (e) {
+    console.error("Failed to load cached search results:", e);
+  }
+
+  return null;
+}
+
+// Save search results to localStorage
+function saveCachedResults(query: string, tags: string[], results: SearchResult[]) {
+  if (typeof window === "undefined") return;
+
+  try {
+    const cache: SearchResultsCache = {
+      query,
+      tags,
+      results,
+      timestamp: Date.now(),
+    };
+    localStorage.setItem(RESULTS_STORAGE_KEY, JSON.stringify(cache));
+  } catch (e) {
+    console.error("Failed to save search results:", e);
+  }
+}
+
+// Clear cached results
+function clearCachedResults() {
+  if (typeof window === "undefined") return;
+
+  try {
+    localStorage.removeItem(RESULTS_STORAGE_KEY);
+  } catch (e) {
+    console.error("Failed to clear cached results:", e);
+  }
+}
+
 interface SearchState {
   // UI state
   isSearchOpen: boolean;
@@ -85,6 +146,8 @@ interface SearchState {
   selectNext: () => void;
   selectPrevious: () => void;
   reset: () => void;
+  loadCachedResults: () => void;
+  clearCache: () => void;
 }
 
 export const useSearchStore = create<SearchState>((set, get) => {
@@ -163,10 +226,16 @@ export const useSearchStore = create<SearchState>((set, get) => {
         filter: { ...state.filter, query },
       })),
 
-  setResults: (results) => set({
-    results,
-    selectedIndex: -1, // Don't auto-select, only on keyboard navigation
-  }),
+    setResults: (results) => {
+      set({
+        results,
+        selectedIndex: -1, // Don't auto-select, only on keyboard navigation
+      });
+
+      // Save results to cache
+      const { filter } = get();
+      saveCachedResults(filter.query, filter.tags || [], results);
+    },
 
   setLoading: (isLoading) => set({ isLoading }),
 
@@ -209,6 +278,20 @@ export const useSearchStore = create<SearchState>((set, get) => {
         error: null,
         selectedIndex: -1,
       });
+    },
+
+    loadCachedResults: () => {
+      const cached = loadCachedResults();
+      if (cached) {
+        set((state) => ({
+          filter: { ...state.filter, query: cached.query, tags: cached.tags },
+          results: cached.results,
+        }));
+      }
+    },
+
+    clearCache: () => {
+      clearCachedResults();
     },
   };
 });
