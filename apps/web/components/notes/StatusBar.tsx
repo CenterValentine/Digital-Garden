@@ -7,8 +7,29 @@
 "use client";
 
 import { CloudCheck, FileText, Clock } from "lucide-react";
+import { useEditorStatsStore } from "@/stores/editor-stats-store";
 
 export function StatusBar() {
+  const { wordCount, characterCount, lastSaved, isSaving } = useEditorStatsStore();
+
+  // Format last saved time
+  const getLastSavedText = () => {
+    if (isSaving) return "Saving...";
+    if (!lastSaved) return "Not saved";
+
+    const now = new Date();
+    const diffMs = now.getTime() - lastSaved.getTime();
+    const diffSecs = Math.floor(diffMs / 1000);
+    const diffMins = Math.floor(diffSecs / 60);
+    const diffHours = Math.floor(diffMins / 60);
+
+    if (diffSecs < 10) return "Saved just now";
+    if (diffSecs < 60) return `Saved ${diffSecs}s ago`;
+    if (diffMins < 60) return `Saved ${diffMins}m ago`;
+    if (diffHours < 24) return `Saved ${diffHours}h ago`;
+    return `Saved ${Math.floor(diffHours / 24)}d ago`;
+  };
+
   return (
     <div className="flex items-center justify-between text-gray-400">
       <div className="flex items-center gap-4">
@@ -18,15 +39,19 @@ export function StatusBar() {
         </div>
         <div className="flex items-center gap-1">
           <Clock className="h-3 w-3" />
-          <span>Saved 2m ago</span>
+          <span>{getLastSavedText()}</span>
         </div>
       </div>
 
       <div className="flex items-center gap-4">
-        <div>245 words</div>
+        <div className="flex items-center gap-2 text-xs">
+          <span>{wordCount} words</span>
+          <span className="text-gray-600">•</span>
+          <span>{characterCount} characters</span>
+        </div>
         <div className="flex items-center gap-1">
           <CloudCheck className="h-3 w-3" />
-          <span>Synced</span>
+          <span>{isSaving ? "Syncing..." : "Synced"}</span>
         </div>
       </div>
     </div>

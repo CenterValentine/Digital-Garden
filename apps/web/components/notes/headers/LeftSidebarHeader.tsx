@@ -13,12 +13,14 @@ import { LeftSidebarHeaderActions } from "./LeftSidebarHeaderActions";
 interface LeftSidebarHeaderProps {
   onCreateFolder: () => void;
   onCreateNote: () => void;
+  onCreateFile: () => void;
   isCreateDisabled?: boolean;
 }
 
 export function LeftSidebarHeader({
   onCreateFolder,
   onCreateNote,
+  onCreateFile,
   isCreateDisabled = false,
 }: LeftSidebarHeaderProps) {
   const { isSearchOpen, toggleSearch } = useSearchStore();
@@ -75,6 +77,7 @@ export function LeftSidebarHeader({
       <LeftSidebarHeaderActions
         onCreateFolder={onCreateFolder}
         onCreateNote={onCreateNote}
+        onCreateFile={onCreateFile}
         disabled={isCreateDisabled}
       />
     </div>

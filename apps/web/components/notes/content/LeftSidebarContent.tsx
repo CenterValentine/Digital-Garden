@@ -8,7 +8,8 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { FileTree } from "../FileTree";
+import { toast } from "sonner";
+import { FileTreeWithDropZone } from "../FileTreeWithDropZone";
 import { FileTreeSkeleton } from "../skeletons/FileTreeSkeleton";
 import { SearchPanel } from "../SearchPanel";
 import { ConfirmDialog } from "../ConfirmDialog";
@@ -39,12 +40,14 @@ interface LeftSidebarContentProps {
   refreshTrigger: number;
   createTrigger?: { type: "folder" | "note"; timestamp: number } | null;
   onSelectionChange?: (hasMultipleSelections: boolean) => void;
+  onFileDrop?: (files: File[]) => void;
 }
 
 export function LeftSidebarContent({
   refreshTrigger,
   createTrigger,
   onSelectionChange,
+  onFileDrop,
 }: LeftSidebarContentProps) {
   const [treeData, setTreeData] = useState<TreeNode[] | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -255,6 +258,9 @@ export function LeftSidebarContent({
         console.error("Move failed:", result.error);
         // Rollback to original tree state
         setTreeData(originalTree);
+        toast.error("Failed to move item", {
+          description: result.error?.message || "Could not move the item to the new location. Please try again.",
+        });
         throw new Error(result.error?.message || "Failed to move content");
       }
 
@@ -266,7 +272,16 @@ export function LeftSidebarContent({
       console.error("Failed to move node:", err);
       // Rollback to original tree state on any error
       setTreeData(originalTree);
-      // You could show a toast notification here
+
+      // Show user-friendly error notification
+      const errorMessage = err instanceof Error ? err.message : "An unexpected error occurred";
+      if (!errorMessage.includes("Failed to move content")) {
+        // Only show toast if we haven't already shown one above
+        toast.error("Failed to move item", {
+          description: errorMessage,
+        });
+      }
+
       throw err;
     }
   };
@@ -294,16 +309,17 @@ export function LeftSidebarContent({
       onSelectionChange(hasMultiple);
     }
 
-    // Only open notes (not folders) in the editor - use first selected
+    // Open content in main panel - use first selected
     const firstNode = nodes[0];
     if (firstNode) {
       console.log("Selected node:", firstNode);
 
-      if (firstNode.contentType === "note") {
+      // Open notes and files in the main panel
+      if (firstNode.contentType === "note" || firstNode.contentType === "file") {
         setSelectedContentId(firstNode.id);
       } else {
-        // For folders, clear the content selection (don't open in editor)
-        // This prevents folders from being loaded as notes
+        // For folders and other types, clear the content selection
+        // This prevents folders from being loaded in main panel
         setSelectedContentId(null);
         console.log("Selected folder:", firstNode.title);
       }
@@ -322,6 +338,11 @@ export function LeftSidebarContent({
     }
 
     const { type, parentId, tempId } = creatingItem;
+
+    // Optimistically navigate to new file (not folders) immediately
+    if (type !== "folder") {
+      setSelectedContentId(tempId);
+    }
 
     // Auto-add .md extension to note files if not present
 
@@ -392,11 +413,30 @@ export function LeftSidebarContent({
 
       if (!response.ok || !result.success) {
         console.error("Create failed:", result.error);
+
+        // Remove temp node on error
+        if (treeData) {
+          const removeTempNode = (nodes: TreeNode[]): TreeNode[] => {
+            return nodes
+              .filter((node) => node.id !== tempId)
+              .map((node) => ({
+                ...node,
+                children: node.children ? removeTempNode(node.children) : [],
+              }));
+          };
+          setTreeData(removeTempNode(treeData));
+        }
+        setCreatingItem(null);
+
+        // Clear optimistic navigation
+        if (type !== "folder") {
+          setSelectedContentId(null);
+        }
+
         setErrorDialog({
           title: "Failed to create",
           message: result.error?.message || "Unknown error occurred. Please try again.",
         });
-        // Keep the temporary node so user can retry
         return;
       }
 
@@ -455,6 +495,11 @@ export function LeftSidebarContent({
 
         setTreeData(replaceTempNode(treeData));
         setCreatingItem(null);
+
+        // Navigate to newly created file (but not folders)
+        if (type !== "folder") {
+          setSelectedContentId(apiResponse.id);
+        }
       } else {
         // Fallback: If API doesn't return expected data, refresh tree
         setCreatingItem(null);
@@ -462,11 +507,30 @@ export function LeftSidebarContent({
       }
     } catch (err) {
       console.error("Failed to create item:", err);
+
+      // Remove temp node on error
+      if (treeData) {
+        const removeTempNode = (nodes: TreeNode[]): TreeNode[] => {
+          return nodes
+            .filter((node) => node.id !== tempId)
+            .map((node) => ({
+              ...node,
+              children: node.children ? removeTempNode(node.children) : [],
+            }));
+        };
+        setTreeData(removeTempNode(treeData));
+      }
+      setCreatingItem(null);
+
+      // Clear optimistic navigation
+      if (type !== "folder") {
+        setSelectedContentId(null);
+      }
+
       setErrorDialog({
         title: "Failed to create",
         message: "An unexpected error occurred. Please try again.",
       });
-      // Keep the temporary node so user can retry
     }
   };
 
@@ -681,7 +745,29 @@ export function LeftSidebarContent({
   // Handler: Perform actual delete after confirmation (supports batch delete)
   const handleDeleteConfirmed = async (ids: string[]) => {
     try {
-      // Delete all items in parallel
+      // Get node titles before deleting (for better error messages)
+      const findNode = (nodes: TreeNode[], targetId: string): TreeNode | null => {
+        for (const node of nodes) {
+          if (node.id === targetId) return node;
+          if (node.children) {
+            const found = findNode(node.children, targetId);
+            if (found) return found;
+          }
+        }
+        return null;
+      };
+
+      const nodeMap = new Map<string, string>();
+      if (treeData) {
+        ids.forEach(id => {
+          const node = findNode(treeData, id);
+          if (node) {
+            nodeMap.set(id, node.title);
+          }
+        });
+      }
+
+      // Delete all items in parallel with enhanced error tracking
       const deletePromises = ids.map(id =>
         fetch(`/api/notes/content/${id}`, {
           method: "DELETE",
@@ -691,21 +777,44 @@ export function LeftSidebarContent({
           if (!response.ok || !result.success) {
             throw new Error(result.error?.message || "Failed to delete");
           }
-          return { id, success: true };
+          return { id, success: true, title: nodeMap.get(id) || id };
+        }).catch((error) => {
+          // Capture both ID and title for failed items
+          return { id, success: false, title: nodeMap.get(id) || id, error: error.message };
         })
       );
 
       // Wait for all deletes to complete
-      const results = await Promise.allSettled(deletePromises);
+      const results = await Promise.all(deletePromises);
 
-      // Check for any failures
-      const failures = results.filter(r => r.status === "rejected");
+      // Separate successes and failures
+      const failures = results.filter(r => !r.success);
+      const successes = results.filter(r => r.success);
 
       if (failures.length > 0) {
         console.error("Some deletes failed:", failures);
+
+        // Build detailed error message with item names
+        let errorMessage: string;
+        if (failures.length <= 3) {
+          // Show all failed item names if 3 or fewer
+          const failedNames = failures.map(f => `"${f.title}"`).join(", ");
+          errorMessage = `Failed to delete: ${failedNames}`;
+        } else {
+          // Show first 3 + count if more than 3
+          const firstThree = failures.slice(0, 3).map(f => `"${f.title}"`).join(", ");
+          const remaining = failures.length - 3;
+          errorMessage = `Failed to delete: ${firstThree}, and ${remaining} more item${remaining === 1 ? '' : 's'}`;
+        }
+
+        // If some succeeded, mention that too
+        if (successes.length > 0) {
+          errorMessage += `\n\n${successes.length} item${successes.length === 1 ? ' was' : 's were'} deleted successfully.`;
+        }
+
         setErrorDialog({
-          title: "Failed to delete some items",
-          message: `${failures.length} of ${ids.length} items could not be deleted. Please try again.`,
+          title: `Failed to delete ${failures.length} of ${ids.length} items`,
+          message: errorMessage,
         });
       }
 
@@ -716,6 +825,59 @@ export function LeftSidebarContent({
       setErrorDialog({
         title: "Failed to delete",
         message: "An unexpected error occurred. Please try again.",
+      });
+    }
+  };
+
+  // Handler: Download file(s) (single or batch)
+  const handleDownload = async (idsToDownload: string[]) => {
+    if (idsToDownload.length === 0) return;
+
+    try {
+      // Download each file
+      for (const id of idsToDownload) {
+        // Fetch download URL from API
+        const response = await fetch(`/api/notes/content/${id}/download`, {
+          credentials: "include",
+        });
+
+        if (!response.ok) {
+          const result = await response.json();
+          toast.error("Failed to download file", {
+            description: result.error?.message || "Could not generate download URL",
+          });
+          continue;
+        }
+
+        const result = await response.json();
+        const { url, fileName } = result.data;
+
+        // Trigger download by opening URL in new window
+        // This works for presigned S3/R2 URLs
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = fileName;
+        link.target = "_blank";
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        // Show success toast for single file
+        if (idsToDownload.length === 1) {
+          toast.success("Download started", {
+            description: fileName,
+          });
+        }
+      }
+
+      // Show success toast for batch downloads
+      if (idsToDownload.length > 1) {
+        toast.success(`Started downloading ${idsToDownload.length} files`);
+      }
+    } catch (err) {
+      console.error("Failed to download:", err);
+      toast.error("Download failed", {
+        description: "An unexpected error occurred. Please try again.",
       });
     }
   };
@@ -877,19 +1039,21 @@ export function LeftSidebarContent({
   return (
     <>
       <div className="flex-1 flex flex-col overflow-hidden">
-        {/* File tree */}
+        {/* File tree with drag-and-drop zone */}
         <div className="flex-1 min-h-0 overflow-hidden">
-          <FileTree
+          <FileTreeWithDropZone
             data={treeData}
             onMove={handleMove}
             onSelect={handleSelect}
             onRename={handleRename}
             onCreate={handleCreate}
             onDelete={handleDelete}
+            onDownload={handleDownload}
             height={800}
             editingNodeId={creatingItem?.tempId}
             expandNodeId={expandNodeId}
             onExpandComplete={() => setExpandNodeId(null)}
+            onFileDrop={onFileDrop}
           />
         </div>
 

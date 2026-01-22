@@ -7,17 +7,19 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, FolderPlus, FileText } from "lucide-react";
+import { Plus, FolderPlus, FileText, Upload } from "lucide-react";
 
 interface LeftSidebarHeaderActionsProps {
   onCreateFolder: () => void;
   onCreateNote: () => void;
+  onCreateFile: () => void;
   disabled?: boolean;
 }
 
 export function LeftSidebarHeaderActions({
   onCreateFolder,
   onCreateNote,
+  onCreateFile,
   disabled = false,
 }: LeftSidebarHeaderActionsProps) {
   const [showMenu, setShowMenu] = useState(false);
@@ -30,6 +32,11 @@ export function LeftSidebarHeaderActions({
   const handleCreateNote = () => {
     setShowMenu(false);
     onCreateNote();
+  };
+
+  const handleCreateFile = () => {
+    setShowMenu(false);
+    onCreateFile();
   };
 
   return (
@@ -62,10 +69,17 @@ export function LeftSidebarHeaderActions({
             </button>
             <button
               onClick={handleCreateNote}
-              className="flex w-full items-center gap-2 px-3 py-2 text-sm text-left text-white hover:bg-white/10 transition-colors border-t border-white/5 last:rounded-b-md"
+              className="flex w-full items-center gap-2 px-3 py-2 text-sm text-left text-white hover:bg-white/10 transition-colors border-t border-white/5"
             >
               <FileText className="h-4 w-4" />
               <span>New Note</span>
+            </button>
+            <button
+              onClick={handleCreateFile}
+              className="flex w-full items-center gap-2 px-3 py-2 text-sm text-left text-white hover:bg-white/10 transition-colors border-t border-white/5 last:rounded-b-md"
+            >
+              <Upload className="h-4 w-4" />
+              <span>New File</span>
             </button>
           </div>
         </>
