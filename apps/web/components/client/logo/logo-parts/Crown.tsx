@@ -24,7 +24,6 @@ export default function Crown() {
         rx={80}
         ry={80}
         fill="#ffffff"
-        filter="url(#soft-ios-shadow-light)"
       />
 
       <g id="uuid-37779736-3fb8-4a10-91fe-d97c2213c1b3" data-name="Layer 1">

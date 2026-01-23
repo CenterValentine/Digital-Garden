@@ -7,6 +7,7 @@ import type { GlassCustomization } from "@/lib/glass-utils"
 import { hoverEffects, type HoverEffect } from "@/lib/hover-effects"
 
 export interface CardProps extends React.ComponentProps<typeof BaseCard> {
+  variant?: string
   gradient?: boolean
   animated?: boolean
   hover?: HoverEffect
@@ -59,11 +60,10 @@ export interface CardProps extends React.ComponentProps<typeof BaseCard> {
  */
 export const Card = React.forwardRef<HTMLDivElement, CardProps>(
   ({ className, variant = "glass", gradient = false, animated = false, hover = "none", glass, children, ...props }, ref) => {
+    // Note: variant and glass props not used by BaseCard, kept for API compatibility
     return (
       <BaseCard
         ref={ref}
-        variant={variant}
-        glass={glass}
         className={cn(
           "relative overflow-hidden",
           gradient && "bg-gradient-to-br from-purple-500/10 via-blue-500/10 to-pink-500/10",

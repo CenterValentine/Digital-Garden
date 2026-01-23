@@ -41,11 +41,10 @@ export const DialogContent = React.forwardRef<
   React.ElementRef<typeof BaseDialogContent>,
   DialogContentProps
 >(({ className, variant = "glass", animated = true, hover = "none", glass, children, ...props }, ref) => {
+  // Note: variant and glass props not used by BaseDialogContent, kept for API compatibility
   return (
     <BaseDialogContent
       ref={ref}
-      variant={variant}
-      glass={glass}
       className={cn(
         "relative overflow-hidden",
         animated && "backdrop-blur-[var(--blur-lg)]",

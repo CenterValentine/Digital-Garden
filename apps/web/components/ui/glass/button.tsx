@@ -33,11 +33,11 @@ export const Button = React.forwardRef<
   HTMLButtonElement,
   ButtonProps
 >(({ className, effect = "glow", variant = "glass", glass, ...props }, ref) => {
+  // Note: glass prop is not used by BaseButton, kept for API compatibility
   return (
     <BaseButton
       ref={ref}
-      variant={variant}
-      glass={glass}
+      variant={variant as any}
       className={cn(
         "relative overflow-hidden",
         hoverEffects({ hover: effect }),
