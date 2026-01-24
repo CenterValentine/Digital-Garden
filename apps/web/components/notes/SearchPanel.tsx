@@ -132,6 +132,10 @@ export function SearchPanel() {
           params.append("type", filter.type);
         }
 
+        if (filter.caseSensitive) {
+          params.append("caseSensitive", "true");
+        }
+
         const response = await fetch(`/api/notes/search?${params.toString()}`);
 
         if (!response.ok) {
@@ -193,8 +197,10 @@ export function SearchPanel() {
         e.preventDefault();
         // Set the selected content ID - this will trigger the main panel to load the content
         setSelectedContentId(results[selectedIndex].id);
-        // Close search and return to file tree
-        closeSearch();
+        // Close search after a brief delay to allow state updates to propagate
+        setTimeout(() => {
+          closeSearch();
+        }, 50);
       }
     },
     [results, selectedIndex, selectNext, selectPrevious, setSelectedContentId, closeSearch]
@@ -223,8 +229,11 @@ export function SearchPanel() {
       }
     }
 
-    // Close search and return to file tree
-    closeSearch();
+    // Close search after a brief delay to allow state updates to propagate
+    // This prevents race conditions where the content panel unmounts before loading
+    setTimeout(() => {
+      closeSearch();
+    }, 50);
   };
 
   // Scroll selected result into view
@@ -265,7 +274,7 @@ export function SearchPanel() {
             onChange={(e) => setLocalQuery(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Search notes..."
-            className="w-full rounded-md border border-white/10 bg-white/90 px-3 py-2 pr-[110px] text-sm text-gray-900 placeholder-gray-500 transition-colors hover:border-white/20 hover:bg-white focus:border-gold-primary focus:bg-white focus:outline-none focus:ring-1 focus:ring-gold-primary/50"
+            className="w-full rounded-md border border-white/10 bg-white/5 backdrop-blur-md px-3 py-2 pr-[110px] text-sm text-foreground placeholder-gray-400 transition-colors hover:border-white/20 hover:bg-white/10 focus:border-gold-primary focus:bg-white/10 focus:outline-none focus:ring-1 focus:ring-gold-primary/50"
           />
 
           {/* Clear button */}
@@ -276,7 +285,7 @@ export function SearchPanel() {
                 setQuery("");
                 setResults([]);
               }}
-              className="absolute right-[90px] top-2.5 rounded p-0.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
+              className="absolute right-[90px] top-2.5 rounded p-0.5 text-gray-400 transition-colors hover:bg-white/10 hover:text-foreground"
               title="Clear search"
               type="button"
             >
@@ -292,7 +301,7 @@ export function SearchPanel() {
             className={`absolute right-[68px] top-2.5 rounded p-0.5 transition-colors ${
               filter.type !== "all" || showTypeFilter
                 ? "bg-gold-primary/20 text-gold-primary"
-                : "text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                : "text-gray-400 hover:bg-white/10 hover:text-foreground"
             }`}
             title={filter.type === "all" ? "Filter by type" : `Filtered by: ${filter.type}`}
             type="button"
@@ -308,7 +317,7 @@ export function SearchPanel() {
             className={`absolute right-[46px] top-2.5 rounded p-0.5 transition-colors ${
               selectedTags.length > 0 || showTagFilter
                 ? "bg-gold-primary/20 text-gold-primary"
-                : "text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                : "text-gray-400 hover:bg-white/10 hover:text-foreground"
             }`}
             title={selectedTags.length > 0 ? `${selectedTags.length} tag(s) selected` : "Filter by tags"}
             type="button"
@@ -324,7 +333,7 @@ export function SearchPanel() {
             className={`absolute right-[24px] top-2.5 rounded p-0.5 text-xs font-medium transition-colors ${
               filter.caseSensitive
                 ? "bg-gold-primary/20 text-gold-primary"
-                : "text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                : "text-gray-400 hover:bg-white/10 hover:text-foreground"
             }`}
             title="Match case"
             type="button"
@@ -338,7 +347,7 @@ export function SearchPanel() {
             className={`absolute right-2 top-2.5 rounded p-0.5 text-xs font-medium transition-colors ${
               filter.useRegex
                 ? "bg-gold-primary/20 text-gold-primary"
-                : "text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                : "text-gray-400 hover:bg-white/10 hover:text-foreground"
             }`}
             title="Use regular expression"
             type="button"
@@ -391,45 +400,45 @@ export function SearchPanel() {
         {/* Type filter dropdown */}
         {showTypeFilter && (
           <div className="relative mb-2">
-            <div className="rounded-md border border-white/20 bg-white shadow-lg">
+            <div className="rounded-md border border-white/20 bg-white/5 backdrop-blur-md shadow-lg">
               <button
                 onClick={() => setDocumentType("all")}
-                className="w-full px-3 py-2 text-left text-sm hover:bg-gray-100"
+                className="w-full px-3 py-2 text-left text-sm text-foreground hover:bg-white/10"
                 type="button"
               >
                 {filter.type === "all" && "✓ "}All types
               </button>
               <button
                 onClick={() => setDocumentType("note")}
-                className="w-full px-3 py-2 text-left text-sm hover:bg-gray-100"
+                className="w-full px-3 py-2 text-left text-sm text-foreground hover:bg-white/10"
                 type="button"
               >
                 {filter.type === "note" && "✓ "}Notes
               </button>
               <button
                 onClick={() => setDocumentType("folder")}
-                className="w-full px-3 py-2 text-left text-sm hover:bg-gray-100"
+                className="w-full px-3 py-2 text-left text-sm text-foreground hover:bg-white/10"
                 type="button"
               >
                 {filter.type === "folder" && "✓ "}Folders
               </button>
               <button
                 onClick={() => setDocumentType("html")}
-                className="w-full px-3 py-2 text-left text-sm hover:bg-gray-100"
+                className="w-full px-3 py-2 text-left text-sm text-foreground hover:bg-white/10"
                 type="button"
               >
                 {filter.type === "html" && "✓ "}HTML
               </button>
               <button
                 onClick={() => setDocumentType("code")}
-                className="w-full px-3 py-2 text-left text-sm hover:bg-gray-100"
+                className="w-full px-3 py-2 text-left text-sm text-foreground hover:bg-white/10"
                 type="button"
               >
                 {filter.type === "code" && "✓ "}Code
               </button>
               <button
                 onClick={() => setDocumentType("file")}
-                className="w-full px-3 py-2 text-left text-sm hover:bg-gray-100"
+                className="w-full px-3 py-2 text-left text-sm text-foreground hover:bg-white/10"
                 type="button"
               >
                 {filter.type === "file" && "✓ "}Files
@@ -471,15 +480,15 @@ export function SearchPanel() {
           )}
 
             {/* Tag selector dropdown */}
-            <div className="mb-2 max-h-40 overflow-y-auto rounded-md border border-white/10 bg-white/50">
+            <div className="mb-2 max-h-40 overflow-y-auto rounded-md border border-white/10 bg-white/5 backdrop-blur-md">
               {/* Tag search input */}
-              <div className="sticky top-0 border-b border-white/10 bg-white p-2">
+              <div className="sticky top-0 border-b border-white/10 bg-white/5 backdrop-blur-md p-2">
                 <input
                   type="text"
                   value={tagSearchQuery}
                   onChange={(e) => setTagSearchQuery(e.target.value)}
                   placeholder="Search tags..."
-                  className="w-full rounded border border-white/10 px-2 py-1 text-xs text-gray-900 placeholder-gray-500 focus:border-gold-primary focus:outline-none focus:ring-1 focus:ring-gold-primary/50"
+                  className="w-full rounded border border-white/10 bg-white/5 backdrop-blur-md px-2 py-1 text-xs text-foreground placeholder-gray-400 focus:border-gold-primary focus:outline-none focus:ring-1 focus:ring-gold-primary/50"
                 />
               </div>
 

@@ -10,6 +10,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
 import { useContentStore } from "@/stores/content-store";
 import { useEditorStatsStore } from "@/stores/editor-stats-store";
 
@@ -23,7 +24,7 @@ interface Tag {
 }
 
 export function TagsPanel() {
-  const { selectedContentId } = useContentStore();
+  const { selectedContentId, clearSelection } = useContentStore();
   const { lastSaved } = useEditorStatsStore();
   const [tags, setTags] = useState<Tag[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -59,6 +60,14 @@ export function TagsPanel() {
 
       try {
         const response = await fetch(`/api/notes/tags/content/${selectedContentId}`);
+
+        // Handle 404 - content no longer exists (stale localStorage/URL)
+        if (response.status === 404) {
+          console.warn(`Content ${selectedContentId} not found (404). Clearing stale selection.`);
+          toast.error("Note not found. It may have been deleted.");
+          clearSelection();
+          return;
+        }
 
         if (!response.ok) {
           throw new Error(`Failed to fetch tags: ${response.status}`);

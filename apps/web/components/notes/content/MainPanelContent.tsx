@@ -8,10 +8,12 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { toast } from "sonner";
 import { useContentStore } from "@/stores/content-store";
 import { useEditorStatsStore } from "@/stores/editor-stats-store";
 import { useOutlineStore } from "@/stores/outline-store";
 import { MarkdownEditor } from "../editor/MarkdownEditor";
+import { FileViewer } from "../viewer/FileViewer";
 import type { JSONContent } from "@tiptap/core";
 import type { EditorStats } from "../editor/MarkdownEditor";
 import type { OutlineHeading } from "@/lib/content/outline-extractor";
@@ -44,6 +46,7 @@ export function MainPanelContent() {
   const { setOutline, clearOutline } = useOutlineStore();
   const [noteContent, setNoteContent] = useState<JSONContent | null>(null);
   const [noteTitle, setNoteTitle] = useState<string>("");
+  const [contentType, setContentType] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -104,6 +107,7 @@ export function MainPanelContent() {
         // Handle 404 - content no longer exists (stale localStorage/URL)
         if (response.status === 404) {
           console.warn(`Content ${selectedContentId} not found (404). Clearing stale selection.`);
+          toast.error("Note not found. It may have been deleted.");
           clearSelection();
           return;
         }
@@ -120,6 +124,7 @@ export function MainPanelContent() {
         }
 
         setNoteTitle(result.data.title);
+        setContentType(result.data.contentType);
 
         // Load note content (or empty document if no payload)
         if (result.data.note?.tiptapJson) {
@@ -420,14 +425,19 @@ export function MainPanelContent() {
     return (
       <div className="flex-1 flex items-center justify-center">
         <div className="text-center">
-          <div className="text-sm text-red-400 mb-2">Failed to load note</div>
+          <div className="text-sm text-red-400 mb-2">Failed to load content</div>
           <div className="text-xs text-gray-500">{error}</div>
         </div>
       </div>
     );
   }
 
-  // Editor
+  // File viewer for uploaded files
+  if (contentType === "file" && selectedContentId) {
+    return <FileViewer contentId={selectedContentId} title={noteTitle} />;
+  }
+
+  // Editor for notes
   if (noteContent) {
     return (
       <div className="flex flex-col h-full">

@@ -31,10 +31,12 @@ interface FileTreeProps {
   onRename?: (id: string, name: string) => Promise<void>;
   onCreate?: (parentId: string | null, type: "folder" | "note" | "file" | "code" | "html") => Promise<void>;
   onDelete?: (ids: string | string[]) => Promise<void>; // Support both single ID and batch delete
+  onDownload?: (ids: string[]) => Promise<void>; // Download file(s)
   height?: number;
   editingNodeId?: string; // If set, automatically triggers edit mode on this node
   expandNodeId?: string | null; // If set, imperatively expands this node
   onExpandComplete?: () => void; // Called after expansion completes
+  dndManager?: any; // Optional: DndManager from parent DndProvider
 }
 
 export function FileTree({
@@ -44,10 +46,12 @@ export function FileTree({
   onRename,
   onCreate,
   onDelete,
+  onDownload,
   height = 600,
   editingNodeId,
   expandNodeId,
   onExpandComplete,
+  dndManager,
 }: FileTreeProps) {
   const treeRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -170,7 +174,7 @@ export function FileTree({
 
   // Create a wrapper component that has access to callbacks
   const NodeWithCallbacks = (props: any) => {
-    return <FileNode {...props} onRename={onRename} onCreate={onCreate} onDelete={onDelete} />;
+    return <FileNode {...props} onRename={onRename} onCreate={onCreate} onDelete={onDelete} onDownload={onDownload} />;
   };
 
   // Get initial open state from persisted IDs
@@ -438,6 +442,7 @@ export function FileTree({
         disableDrag={!onMove}
         disableDrop={!onMove}
         {...({ canDrop } as any)} // Type assertion: canDrop exists in runtime but not in v3.4.0 types
+        {...(dndManager && { dndManager })} // Pass dndManager if provided
       >
         {NodeWithCallbacks}
       </Tree>

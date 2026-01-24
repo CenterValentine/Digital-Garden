@@ -233,10 +233,62 @@ export function LeftSidebarContent({
 
     if (!originalTree) return;
 
+    // Find the dragged node's current position
+    let currentParentId: string | null = null;
+    let currentIndex = -1;
+
+    const findNode = (nodes: TreeNode[], parent: string | null = null): boolean => {
+      for (let i = 0; i < nodes.length; i++) {
+        if (nodes[i].id === dragIds[0]) {
+          currentParentId = parent;
+          currentIndex = i;
+          return true;
+        }
+        if (nodes[i].children && nodes[i].children.length > 0) {
+          if (findNode(nodes[i].children, nodes[i].id)) {
+            return true;
+          }
+        }
+      }
+      return false;
+    };
+
+    findNode(originalTree);
+
+    // Check if this is actually a position change
+    const isSameParent = currentParentId === parentId;
+    const isSamePosition = isSameParent && (currentIndex === index || currentIndex === index - 1);
+
+    // Debug logging
+    console.log('[handleMove] Drag analysis:', {
+      draggedItem: dragIds[0],
+      from: { parent: currentParentId || 'ROOT', index: currentIndex },
+      to: { parent: parentId || 'ROOT', index },
+      isSamePosition,
+    });
+
+    if (isSamePosition) {
+      console.log('[handleMove] No position change detected, skipping API call');
+      return; // Skip the move - item is being dropped in same position
+    }
+
     try {
       // OPTIMISTIC UPDATE: Apply the move immediately to the UI
       const optimisticTree = applyMoveToTree(originalTree, dragIds[0], parentId, index);
       setTreeData(optimisticTree);
+
+      // Calculate the API index: react-arborist gives us insertion point, but server expects final visual position
+      // If moving down within same parent, we need to subtract 1 because server removes item first
+      let apiIndex = index;
+      if (isSameParent && currentIndex < index) {
+        apiIndex = index - 1; // Adjust for removal shifting items left
+      }
+
+      console.log('[handleMove] Sending to API:', {
+        contentId: dragIds[0],
+        targetParentId: parentId || 'ROOT',
+        newDisplayOrder: apiIndex,
+      });
 
       // Make API call in background
       const response = await fetch("/api/notes/content/move", {
@@ -248,7 +300,7 @@ export function LeftSidebarContent({
         body: JSON.stringify({
           contentId: dragIds[0], // Only support single drag for now
           targetParentId: parentId,
-          newDisplayOrder: index,
+          newDisplayOrder: apiIndex,
         }),
       });
 
@@ -264,10 +316,12 @@ export function LeftSidebarContent({
         throw new Error(result.error?.message || "Failed to move content");
       }
 
-      // Success! Keep the optimistic update.
-      // No need to refetch - the server has updated displayOrder for siblings,
-      // but our optimistic update is sufficient for immediate UX.
-      // The tree will refresh automatically on next page load or manual refresh.
+      // Success! Refetch tree to get server's canonical ordering
+      // The server's reorderSiblings() recalculates ALL sibling displayOrder values,
+      // so we need to refetch to ensure UI matches server state
+      await fetchTree();
+
+      console.log("Move successful, tree refreshed");
     } catch (err) {
       console.error("Failed to move node:", err);
       // Rollback to original tree state on any error

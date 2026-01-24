@@ -10,6 +10,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
 import { useContentStore } from "@/stores/content-store";
 import { useTreeStateStore } from "@/stores/tree-state-store";
 import { ArrowLeft } from "lucide-react";
@@ -36,6 +37,7 @@ export function BacklinksPanel() {
   const selectedContentId = selectedIds.length === 1 ? selectedIds[0] : null;
 
   const setSelectedContentId = useContentStore((state) => state.setSelectedContentId);
+  const clearSelection = useContentStore((state) => state.clearSelection);
 
   const [backlinks, setBacklinks] = useState<BacklinksData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -60,6 +62,14 @@ export function BacklinksPanel() {
         console.log('[BacklinksPanel] Response status:', response.status);
 
         if (!response.ok) {
+          // Handle 404: Note not found (likely deleted)
+          if (response.status === 404) {
+            toast.error("Note not found. It may have been deleted.");
+            // Clear the selection to prevent further 404 errors
+            clearSelection();
+            return;
+          }
+
           const errorText = await response.text();
           console.error('[BacklinksPanel] Error response:', errorText);
           throw new Error(`HTTP ${response.status}: ${errorText}`);

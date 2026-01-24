@@ -32,10 +32,11 @@ import type { TreeNode } from "@/lib/content/types";
 interface FileNodeProps extends NodeRendererProps<TreeNode> {
   onRename?: (id: string, name: string) => Promise<void>;
   onCreate?: (parentId: string | null, type: "folder" | "note" | "file" | "code" | "html") => Promise<void>;
-  onDelete?: (id: string) => Promise<void>;
+  onDelete?: (id: string | string[]) => Promise<void>;
+  onDownload?: (ids: string[]) => Promise<void>;
 }
 
-export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete }: FileNodeProps) {
+export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete, onDownload }: FileNodeProps) {
   const { data } = node;
   const isFolder = data.contentType === "folder";
   const isOpen = node.isOpen;
@@ -186,6 +187,9 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
         onCreateHtml: onCreate ? async (parentId: string | null) => {
           console.log("[FileNode] onCreateHtml called with parentId:", parentId);
           await onCreate(parentId, "html");
+        } : undefined,
+        onDownload: onDownload ? async (ids: string[]) => {
+          await onDownload(ids);
         } : undefined,
       }
     );
