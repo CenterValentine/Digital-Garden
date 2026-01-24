@@ -132,12 +132,23 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Extract metadata (dimensions, duration, thumbnail)
-    const metadata = await extractFileMetadata(
-      content.filePayload.mimeType,
+    // Process media file (images, videos, PDFs)
+    const processingResult = await processUploadedMedia(
       content.filePayload.storageKey,
-      storageUrl
+      content.filePayload.mimeType
     );
+
+    // Extract searchable text from documents
+    const searchText = await extractDocumentText(
+      content.filePayload.storageKey,
+      content.filePayload.mimeType
+    );
+
+    // Prepare metadata for database update
+    const metadata: any = processingResult?.metadata || {};
+    const thumbnailUrl = processingResult
+      ? (metadata.thumbnails?.small || metadata.thumbnail || null)
+      : null;
 
     // Update file payload to "ready"
     const updated = await prisma.filePayload.update({
@@ -146,12 +157,14 @@ export async function POST(request: NextRequest) {
         uploadStatus: "ready",
         uploadedAt: new Date(),
         storageUrl,
-        thumbnailUrl: metadata.thumbnailUrl || null,
+        thumbnailUrl,
+        searchText,
         width: metadata.width || null,
         height: metadata.height || null,
         duration: metadata.duration || null,
-        isProcessed: true,
-        processingStatus: "complete",
+        isProcessed: processingResult !== null,
+        processingStatus: processingResult ? "complete" : "none",
+        storageMetadata: processingResult ? (metadata as any) : {},
       },
     });
 
@@ -188,75 +201,86 @@ export async function POST(request: NextRequest) {
 // ============================================================
 
 /**
- * Verify file exists in storage and get public URL
+ * Verify file exists in storage and get download URL
  *
- * Note: Placeholder implementation. Production requires actual SDK.
+ * Uses real storage SDK integration
  */
 async function verifyFileInStorage(
   provider: string,
   storageKey: string
 ): Promise<string | null> {
-  // Placeholder: In production, use actual storage SDK to check file exists
-  if (provider === "r2") {
-    // Check Cloudflare R2
-    // Example: Use @aws-sdk/client-s3 HeadObject
-    return `https://cdn.example.com/${storageKey}`;
-  } else if (provider === "s3") {
-    // Check AWS S3
-    return `https://s3.amazonaws.com/${storageKey}`;
-  } else if (provider === "vercel") {
-    // Check Vercel Blob
-    return `https://blob.vercel.com/${storageKey}`;
-  }
+  try {
+    // Import storage factory
+    const { getDefaultStorageProvider } = await import('@/lib/storage');
+    const storageProvider = getDefaultStorageProvider();
 
-  return null;
+    // Verify file exists
+    const verification = await storageProvider.verifyFileExists(storageKey);
+
+    if (!verification.exists) {
+      return null;
+    }
+
+    // Generate download URL (presigned, expires in 1 hour)
+    const downloadUrl = await storageProvider.generateDownloadUrl(storageKey, 3600);
+    return downloadUrl;
+  } catch (error) {
+    console.error('Failed to verify file in storage:', error);
+    return null;
+  }
 }
 
 /**
- * Extract file metadata (dimensions, duration, thumbnail)
+ * Process uploaded media file (images, videos, PDFs)
  *
- * Note: Placeholder implementation. Production requires image/video processing.
+ * Uses Sharp for images, FFmpeg for videos, PDF.js for PDFs
  */
-async function extractFileMetadata(
-  mimeType: string,
+async function processUploadedMedia(
   storageKey: string,
-  storageUrl: string
+  mimeType: string
 ): Promise<{
-  thumbnailUrl?: string;
-  width?: number;
-  height?: number;
-  duration?: number;
-}> {
-  const metadata: any = {};
+  metadata: any;
+  thumbnailKeys: string[];
+} | null> {
+  try {
+    const { createMediaProcessor } = await import('@/lib/media');
+    const mediaProcessor = await createMediaProcessor();
 
-  // Image metadata extraction
-  if (mimeType.startsWith("image/")) {
-    // Placeholder: Use sharp or similar to extract dimensions
-    // Example:
-    // const buffer = await fetchFileFromStorage(storageUrl);
-    // const image = sharp(buffer);
-    // const { width, height } = await image.metadata();
-    // metadata.width = width;
-    // metadata.height = height;
-    // metadata.thumbnailUrl = await generateThumbnail(buffer, storageKey);
+    // Process media (returns null for non-media files like documents)
+    const result = await mediaProcessor.processMedia(storageKey, mimeType, {
+      generateThumbnails: true,
+    });
+
+    return result;
+  } catch (error) {
+    console.error('Media processing failed:', error);
+    // Don't fail the upload if processing fails
+    // Just log the error and continue without metadata
+    return null;
   }
+}
 
-  // Video metadata extraction
-  if (mimeType.startsWith("video/")) {
-    // Placeholder: Use ffmpeg or similar to extract duration, dimensions
-    // Example:
-    // const videoInfo = await extractVideoMetadata(storageUrl);
-    // metadata.width = videoInfo.width;
-    // metadata.height = videoInfo.height;
-    // metadata.duration = videoInfo.duration;
-    // metadata.thumbnailUrl = await generateVideoThumbnail(storageUrl, storageKey);
+/**
+ * Extract searchable text from document files
+ *
+ * Supports: .txt, .md, .json, .pdf
+ */
+async function extractDocumentText(
+  storageKey: string,
+  mimeType: string
+): Promise<string> {
+  try {
+    const { createDocumentExtractor } = await import('@/lib/media/document-extractor');
+    const documentExtractor = await createDocumentExtractor();
+
+    // Extract text (returns empty string for non-document files)
+    const text = await documentExtractor.extractText(storageKey, mimeType);
+
+    return text;
+  } catch (error) {
+    console.error('Text extraction failed:', error);
+    // Don't fail the upload if extraction fails
+    // Just log the error and continue without searchable text
+    return '';
   }
-
-  // Audio metadata extraction
-  if (mimeType.startsWith("audio/")) {
-    // Placeholder: Extract audio duration
-    // metadata.duration = await extractAudioDuration(storageUrl);
-  }
-
-  return metadata;
 }

@@ -27,6 +27,7 @@ export async function GET(request: NextRequest) {
     const query = searchParams.get("query") || searchParams.get("search") || "";
     const tagsParam = searchParams.get("tags") || "";
     const typeParam = searchParams.get("type") || "";
+    const caseSensitive = searchParams.get("caseSensitive") === "true";
 
     // Parse tags (comma-separated slugs)
     const tagSlugs = tagsParam
@@ -34,7 +35,7 @@ export async function GET(request: NextRequest) {
       .map((t) => t.trim().toLowerCase())
       .filter(Boolean);
 
-    console.log("[Search API] Query:", query, "Tags:", tagSlugs, "Type:", typeParam);
+    console.log("[Search API] Query:", query, "Tags:", tagSlugs, "Type:", typeParam, "Case sensitive:", caseSensitive);
 
     // Start with base where clause
     let contentIds: string[] | undefined;
@@ -85,13 +86,16 @@ export async function GET(request: NextRequest) {
       where.id = { in: contentIds };
     }
 
+    // Determine Prisma search mode based on caseSensitive flag
+    const searchMode = caseSensitive ? "default" : "insensitive";
+
     // Text search filter (if query provided)
     if (query.trim()) {
       where.OR = [
         {
           title: {
             contains: query,
-            mode: "insensitive",
+            mode: searchMode,
           },
         },
         {
@@ -101,7 +105,7 @@ export async function GET(request: NextRequest) {
               notePayload: {
                 searchText: {
                   contains: query,
-                  mode: "insensitive",
+                  mode: searchMode,
                 },
               },
             },
@@ -114,7 +118,7 @@ export async function GET(request: NextRequest) {
               htmlPayload: {
                 searchText: {
                   contains: query,
-                  mode: "insensitive",
+                  mode: searchMode,
                 },
               },
             },
@@ -127,7 +131,20 @@ export async function GET(request: NextRequest) {
               codePayload: {
                 searchText: {
                   contains: query,
-                  mode: "insensitive",
+                  mode: searchMode,
+                },
+              },
+            },
+          ],
+        },
+        {
+          AND: [
+            { filePayload: { isNot: null } },
+            {
+              filePayload: {
+                searchText: {
+                  contains: query,
+                  mode: searchMode,
                 },
               },
             },

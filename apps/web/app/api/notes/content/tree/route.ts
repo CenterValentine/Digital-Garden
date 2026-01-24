@@ -24,6 +24,7 @@ export async function GET(request: NextRequest) {
     const maxDepth = Number.parseInt(searchParams.get("maxDepth") || "10");
 
     // Fetch all content for user (flat list)
+    // IMPORTANT: Don't apply orderBy here - we'll sort after building the tree
     const allContent = await prisma.contentNode.findMany({
       where: {
         ownerId: session.user.id,
@@ -68,8 +69,23 @@ export async function GET(request: NextRequest) {
           },
         },
       },
-      orderBy: [{ parentId: "asc" }, { displayOrder: "asc" }, { title: "asc" }],
     });
+
+    // Debug logging: Show displayOrder values from database
+    console.log('[Tree API] Raw database displayOrder values:');
+    const grouped = allContent.reduce((acc, item) => {
+      const key = item.parentId || 'ROOT';
+      if (!acc[key]) acc[key] = [];
+      acc[key].push({ id: item.id, title: item.title, displayOrder: item.displayOrder });
+      return acc;
+    }, {} as Record<string, any[]>);
+
+    for (const [parentId, items] of Object.entries(grouped)) {
+      console.log(`  Parent ${parentId}:`);
+      items.forEach(item => {
+        console.log(`    - ${item.title} (order: ${item.displayOrder})`);
+      });
+    }
 
     // Build tree structure (client-side can also flatten if needed)
     const nodeMap = new Map<string, any>();
@@ -137,20 +153,15 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Sort children recursively
+    // Sort children recursively by displayOrder (WYSIWYG)
     function sortChildren(nodes: any[]) {
       nodes.sort((a, b) => {
-        // Folders first
-        if (a.contentType === "folder" && b.contentType !== "folder")
-          return -1;
-        if (a.contentType !== "folder" && b.contentType === "folder") return 1;
-
-        // Then by displayOrder
+        // Primary: by displayOrder (visual order = database order)
         if (a.displayOrder !== b.displayOrder) {
           return a.displayOrder - b.displayOrder;
         }
 
-        // Then alphabetically
+        // Tiebreaker: alphabetically
         return a.title.localeCompare(b.title);
       });
 

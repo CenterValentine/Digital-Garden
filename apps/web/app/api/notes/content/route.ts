@@ -39,6 +39,7 @@ export async function GET(request: NextRequest) {
     const type = searchParams.get("type") || "all";
     const parentId = searchParams.get("parentId");
     const search = searchParams.get("search");
+    const tags = searchParams.get("tags"); // M6: Tag filter
     const includeDeleted = searchParams.get("includeDeleted") === "true";
     const limit = Math.min(
       Number.parseInt(searchParams.get("limit") || "100"),
@@ -104,6 +105,22 @@ export async function GET(request: NextRequest) {
       ];
     }
 
+    // M6: Tag filtering
+    if (tags) {
+      const tagSlugs = tags.split(",").map((t) => t.trim().toLowerCase());
+      if (tagSlugs.length > 0) {
+        whereClause.contentTags = {
+          some: {
+            tag: {
+              slug: {
+                in: tagSlugs,
+              },
+            },
+          },
+        };
+      }
+    }
+
     // Query content
     const [items, total] = await Promise.all([
       prisma.contentNode.findMany({
@@ -112,6 +129,7 @@ export async function GET(request: NextRequest) {
           notePayload: {
             select: {
               metadata: true,
+              searchText: true, // Include for search excerpts
             },
           },
           filePayload: {
@@ -128,11 +146,13 @@ export async function GET(request: NextRequest) {
           htmlPayload: {
             select: {
               isTemplate: true,
+              searchText: true, // Include for search excerpts
             },
           },
           codePayload: {
             select: {
               language: true,
+              searchText: true, // Include for search excerpts
             },
           },
           _count: {
@@ -171,7 +191,10 @@ export async function GET(request: NextRequest) {
 
       // Add payload summaries
       if (item.notePayload) {
-        formatted.note = item.notePayload.metadata;
+        formatted.note = {
+          ...(item.notePayload.metadata as any),
+          searchText: item.notePayload.searchText,
+        };
       }
       if (item.filePayload) {
         formatted.file = {
@@ -187,12 +210,14 @@ export async function GET(request: NextRequest) {
       if (item.htmlPayload) {
         formatted.html = {
           isTemplate: item.htmlPayload.isTemplate,
-        };
+          searchText: item.htmlPayload.searchText,
+        } as any;
       }
       if (item.codePayload) {
         formatted.code = {
           language: item.codePayload.language,
-        };
+          searchText: item.codePayload.searchText,
+        } as any;
       }
 
       if (contentType === "folder") {
@@ -324,7 +349,7 @@ export async function POST(request: NextRequest) {
       // Note payload
       const json: JSONContent = markdown
         ? markdownToTiptap(markdown)
-        : tiptapJson;
+        : (tiptapJson as JSONContent);
 
       const searchText = extractSearchTextFromTipTap(json);
       const wordCount = searchText.split(/\s+/).filter(Boolean).length;
@@ -353,8 +378,8 @@ export async function POST(request: NextRequest) {
             html,
             searchText,
             isTemplate: isTemplate || false,
-            templateSchema: templateSchema || null,
-            templateMetadata: templateMetadata || {},
+            templateSchema: (templateSchema || null) as any,
+            templateMetadata: (templateMetadata || {}) as any,
             renderMode: isTemplate ? "template" : "static",
             templateEngine: isTemplate ? "nunjucks" : null,
           },
@@ -425,23 +450,26 @@ export async function POST(request: NextRequest) {
     // Add full payload data in response
     if (content.notePayload) {
       response.note = {
-        tiptapJson: content.notePayload.tiptapJson,
+        tiptapJson: content.notePayload.tiptapJson as any,
         searchText: content.notePayload.searchText,
-        metadata: content.notePayload.metadata,
+        metadata: content.notePayload.metadata as any,
       };
     }
     if (content.htmlPayload) {
       response.html = {
         html: content.htmlPayload.html,
         isTemplate: content.htmlPayload.isTemplate,
-        templateSchema: content.htmlPayload.templateSchema,
-        templateMetadata: content.htmlPayload.templateMetadata,
+        templateSchema: content.htmlPayload.templateSchema as any,
+        templateMetadata: content.htmlPayload.templateMetadata as any,
+        renderMode: content.htmlPayload.renderMode,
+        templateEngine: content.htmlPayload.templateEngine,
       };
     }
     if (content.codePayload) {
       response.code = {
         code: content.codePayload.code,
         language: content.codePayload.language,
+        metadata: content.codePayload.metadata as any,
       };
     }
 

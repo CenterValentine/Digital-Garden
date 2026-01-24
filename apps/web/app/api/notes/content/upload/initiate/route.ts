@@ -209,8 +209,7 @@ export async function POST(request: NextRequest) {
 /**
  * Generate presigned upload URL for storage provider
  *
- * Note: This is a placeholder implementation.
- * Production requires actual SDK integration.
+ * Uses real storage SDK integration (R2, S3, Vercel Blob)
  */
 async function generatePresignedUploadUrl(
   provider: string,
@@ -218,20 +217,19 @@ async function generatePresignedUploadUrl(
   storageKey: string,
   mimeType: string
 ): Promise<string> {
-  // Placeholder: In production, use actual storage SDK
-  if (provider === "r2") {
-    // Cloudflare R2 (S3-compatible)
-    // Example: Use @aws-sdk/client-s3 with R2 endpoint
-    return `https://upload.example.com/${storageKey}?presigned=true`;
-  } else if (provider === "s3") {
-    // AWS S3
-    // Example: Use @aws-sdk/s3-request-presigner
-    return `https://s3.amazonaws.com/${storageKey}?presigned=true`;
-  } else if (provider === "vercel") {
-    // Vercel Blob
-    // Example: Use @vercel/blob
-    return `https://blob.vercel.com/upload/${storageKey}`;
-  }
+  // Import storage factory
+  const { getDefaultStorageProvider } = await import('@/lib/storage');
 
-  throw new Error(`Unsupported storage provider: ${provider}`);
+  // For now, use environment-based provider
+  // Later: use config parameter for user-specific providers
+  const storageProvider = getDefaultStorageProvider();
+
+  // Generate presigned URL
+  const presignedUrl = await storageProvider.generateUploadUrl(
+    storageKey,
+    mimeType,
+    3600 // 1 hour expiration
+  );
+
+  return presignedUrl.url;
 }

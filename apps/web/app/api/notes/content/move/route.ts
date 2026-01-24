@@ -167,17 +167,12 @@ export async function POST(request: NextRequest) {
     // Determine the final parent (either new parent or keep current)
     const finalParentId = targetParentId === undefined ? content.parentId : targetParentId;
 
-    // Move content
-    const updated = await prisma.contentNode.update({
-      where: { id: contentId },
-      data: {
-        parentId: finalParentId,
-        displayOrder: newDisplayOrder ?? 0,
-      },
-    });
+    // Move content with proper ordering
+    const updated = await moveContentToPosition(contentId, finalParentId, newDisplayOrder ?? 0);
 
-    // Recalculate displayOrder for all siblings to maintain consistent ordering
-    await reorderSiblings(finalParentId);
+    if (!updated) {
+      throw new Error('Failed to update content position');
+    }
 
     // Update materialized path
     await updateMaterializedPath(contentId);
@@ -236,7 +231,7 @@ async function checkIsDescendant(
       return true;
     }
 
-    const node = await prisma.contentNode.findUnique({
+    const node: { parentId: string | null } | null = await prisma.contentNode.findUnique({
       where: { id: currentId },
       select: { parentId: true },
     });
@@ -269,17 +264,30 @@ async function updateChildrenPaths(parentId: string) {
 }
 
 /**
- * Reorder siblings to maintain consistent displayOrder values
+ * Move content to a specific position within its parent
  *
- * After a move operation, siblings may have duplicate or inconsistent displayOrder values.
- * This function recalculates displayOrder for all siblings to ensure proper ordering.
+ * This function properly handles the visual position by:
+ * 1. Fetching all siblings and sorting them (folders-first, then by displayOrder)
+ * 2. Removing the item being moved from the list
+ * 3. Inserting it at the desired visual position
+ * 4. Renumbering all siblings sequentially
  *
- * @param parentId - The parent whose children should be reordered (null for root items)
+ * @param contentId - ID of the content to move
+ * @param parentId - Target parent ID
+ * @param visualIndex - Desired visual position (0-based)
+ * @returns The updated content node
  */
-async function reorderSiblings(parentId: string | null) {
-  // Fetch all siblings with the same parentId, including payload relations
+async function moveContentToPosition(
+  contentId: string,
+  parentId: string | null,
+  visualIndex: number
+) {
+  // Fetch all siblings in the target parent (including the moved item if same parent)
   const siblings = await prisma.contentNode.findMany({
-    where: { parentId },
+    where: {
+      parentId,
+      deletedAt: null  // CRITICAL: Exclude soft-deleted items
+    },
     include: {
       notePayload: true,
       filePayload: true,
@@ -288,32 +296,81 @@ async function reorderSiblings(parentId: string | null) {
     },
   });
 
-  // Sort siblings using the same logic as tree API
+  // Sort siblings by displayOrder only (WYSIWYG - visual order = database order)
   siblings.sort((a, b) => {
-    const aIsFolder = !a.notePayload && !a.filePayload && !a.htmlPayload && !a.codePayload;
-    const bIsFolder = !b.notePayload && !b.filePayload && !b.htmlPayload && !b.codePayload;
-
-    // Rule 1: Folders first
-    if (aIsFolder && !bIsFolder) return -1;
-    if (!aIsFolder && bIsFolder) return 1;
-
-    // Rule 2: Then by displayOrder
+    // Primary: displayOrder
     if (a.displayOrder !== b.displayOrder) {
       return a.displayOrder - b.displayOrder;
     }
 
-    // Rule 3: Then alphabetically
+    // Tiebreaker: alphabetically
     return a.title.localeCompare(b.title);
   });
 
-  // Assign sequential displayOrder values (0, 1, 2, 3...)
+  // Remove the item being moved from the list
+  const movedItemIndex = siblings.findIndex(s => s.id === contentId);
+  let movedItem;
+  if (movedItemIndex >= 0) {
+    [movedItem] = siblings.splice(movedItemIndex, 1);
+  }
+
+  // Insert at the desired visual position
+  const targetIndex = Math.max(0, Math.min(visualIndex, siblings.length));
+
+  // If we removed the item, we need to fetch it to insert it
+  if (!movedItem) {
+    movedItem = await prisma.contentNode.findUnique({
+      where: { id: contentId },
+      include: {
+        notePayload: true,
+        filePayload: true,
+        htmlPayload: true,
+        codePayload: true,
+      },
+    });
+    if (!movedItem) {
+      throw new Error('Content not found');
+    }
+  }
+
+  siblings.splice(targetIndex, 0, movedItem);
+
+  // Update all siblings with new displayOrder and parentId for the moved item
   const updates = siblings.map((sibling, index) => {
+    const updateData: any = { displayOrder: index };
+
+    // Only update parentId for the moved item
+    if (sibling.id === contentId) {
+      updateData.parentId = parentId;
+    }
+
     return prisma.contentNode.update({
       where: { id: sibling.id },
-      data: { displayOrder: index },
+      data: updateData,
     });
   });
 
-  // Execute all updates in a transaction for atomicity
+  // Debug logging: Show what we're about to save
+  console.log('[Move API] Saving new order for parent:', parentId);
+  siblings.forEach((sibling, index) => {
+    console.log(`  - ${sibling.title} → displayOrder: ${index} ${sibling.id === contentId ? '(MOVED ITEM)' : ''}`);
+  });
+
+  // Execute all updates in a transaction
   await prisma.$transaction(updates);
+
+  // Return the updated moved item
+  const result = await prisma.contentNode.findUnique({
+    where: { id: contentId },
+    select: {
+      id: true,
+      parentId: true,
+      displayOrder: true,
+    },
+  });
+
+  console.log('[Move API] Move completed. Moved item now has displayOrder:', result?.displayOrder);
+
+  return result;
 }
+

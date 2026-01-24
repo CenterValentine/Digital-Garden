@@ -158,7 +158,7 @@ export async function PATCH(
       where: { id },
       data: {
         displayName: displayName ?? existing.displayName,
-        config: config ?? existing.config,
+        config: (config ?? existing.config) as any,
         isDefault: isDefault ?? existing.isDefault,
         isActive: isActive ?? existing.isActive,
       },

@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
   try {
     const session = await requireAuth();
 
-    const configs = await prisma.storageProviderConfig.findMany({
+    const rawConfigs = await prisma.storageProviderConfig.findMany({
       where: {
         userId: session.user.id,
       },
@@ -34,11 +34,27 @@ export async function GET(request: NextRequest) {
         isDefault: true,
         displayName: true,
         isActive: true,
+        config: true,
         createdAt: true,
         updatedAt: true,
-        // Omit sensitive config data in list view
       },
       orderBy: [{ isDefault: "desc" }, { createdAt: "desc" }],
+    });
+
+    // Sanitize configs - remove sensitive credentials, keep display info
+    const configs = rawConfigs.map((config) => {
+      const sanitizedConfig = sanitizeConfig(config.provider, config.config as any);
+
+      return {
+        id: config.id,
+        provider: config.provider,
+        isDefault: config.isDefault,
+        displayName: config.displayName,
+        isActive: config.isActive,
+        config: sanitizedConfig,
+        createdAt: config.createdAt,
+        updatedAt: config.updatedAt,
+      };
     });
 
     return NextResponse.json({
@@ -158,7 +174,7 @@ export async function POST(request: NextRequest) {
         userId: session.user.id,
         provider,
         displayName: displayName || `${provider.toUpperCase()} Storage`,
-        config,
+        config: config as any,
         isDefault: isDefault || false,
         isActive: true,
       },
@@ -193,6 +209,39 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
+}
+
+// ============================================================
+// SANITIZATION HELPERS
+// ============================================================
+
+/**
+ * Sanitize config for safe display - remove credentials, keep display info
+ */
+function sanitizeConfig(
+  provider: "r2" | "s3" | "vercel",
+  config: any
+): Record<string, any> {
+  if (provider === "r2") {
+    return {
+      bucket: config.bucket || null,
+      endpoint: config.endpoint || null,
+      // Omit: accountId, accessKeyId, secretAccessKey
+    };
+  } else if (provider === "s3") {
+    return {
+      bucket: config.bucket || null,
+      region: config.region || null,
+      // Omit: accessKeyId, secretAccessKey
+    };
+  } else if (provider === "vercel") {
+    return {
+      // Vercel doesn't have non-sensitive config to show
+      // Omit: token
+    };
+  }
+
+  return {};
 }
 
 // ============================================================
