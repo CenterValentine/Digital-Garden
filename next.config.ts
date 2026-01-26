@@ -14,6 +14,8 @@ const nextConfig: NextConfig = {
     'canvas',
     // Sharp (image processing)
     'sharp',
+    // Bcrypt (password hashing)
+    'bcrypt',
   ],
   // Webpack configuration for production builds (Vercel uses --webpack flag)
   webpack: (config, { isServer }) => {
@@ -25,6 +27,7 @@ const nextConfig: NextConfig = {
         '@ffmpeg-installer/ffmpeg',
         'canvas',
         'sharp',
+        'bcrypt',
       ];
     }
     return config;
