@@ -112,7 +112,7 @@ export async function GET(request: NextRequest) {
       ownerId: item.ownerId,
       ownerUsername: item.owner.username,
       title: item.title,
-      contentType: deriveContentType(item),
+      contentType: deriveContentType(item) as AdminContentListItem['contentType'],
       isPublished: item.isPublished,
       createdAt: item.createdAt,
       updatedAt: item.updatedAt,

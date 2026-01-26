@@ -38,7 +38,7 @@ export async function logAuditAction(
         action,
         targetUserId: (details.targetUserId as string) || null,
         targetContentId: (details.targetContentId as string) || null,
-        details,
+        details: details as any,
         ipAddress,
         userAgent,
       },

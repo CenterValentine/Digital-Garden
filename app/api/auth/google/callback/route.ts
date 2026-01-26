@@ -4,9 +4,9 @@ import {
   exchangeCodeForTokens,
   verifyGoogleToken,
   findOrCreateOAuthUser,
-} from '@/lib/auth/oauth'
-import { createSession } from '@/lib/auth/session'
-import { extractUsername } from '@/lib/auth/types'
+} from '@/lib/infrastructure/auth/oauth'
+import { createSession } from '@/lib/infrastructure/auth/session'
+import { extractUsername } from '@/lib/infrastructure/auth/types'
 
 export async function GET(
   request: NextRequest

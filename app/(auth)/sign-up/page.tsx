@@ -7,7 +7,7 @@ import type {
   SignUpInput,
   ApiResponse,
   SessionData,
-} from '@/lib/auth/types'
+} from '@/lib/infrastructure/auth/types'
 
 export default function SignUpPage() {
   const router = useRouter()

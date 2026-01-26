@@ -5,7 +5,7 @@
  * Supports: Images, Videos, PDFs, Documents
  */
 
-import type { StorageProvider } from '@/lib/storage';
+import type { StorageProvider } from '@/lib/infrastructure/storage';
 import { ImageProcessor } from './image-processor';
 import { PDFProcessor } from './pdf-processor';
 import type { ProcessingOptions, ProcessingResult } from './types';
@@ -124,7 +124,7 @@ export class MediaProcessor {
  * Helper: Create media processor from default storage provider
  */
 export async function createMediaProcessor(): Promise<MediaProcessor> {
-  const { getDefaultStorageProvider } = await import('@/lib/storage');
+  const { getDefaultStorageProvider } = await import('@/lib/infrastructure/storage');
   const storageProvider = getDefaultStorageProvider();
   return new MediaProcessor(storageProvider);
 }

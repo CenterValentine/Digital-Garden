@@ -22,11 +22,11 @@ import { AUDIT_ACTIONS, type AdminContentDetail } from "@/lib/domain/admin/api-t
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await requireRole("owner");
-    const contentId = params.id;
+    const { id: contentId } = await params;
 
     // Fetch content with full details (but truncate payload for security)
     const content = await prisma.contentNode.findUnique({

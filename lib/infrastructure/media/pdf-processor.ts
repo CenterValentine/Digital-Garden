@@ -7,7 +7,7 @@
 
 import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs';
 import { Canvas, createCanvas } from 'canvas';
-import type { StorageProvider } from '@/lib/storage';
+import type { StorageProvider } from '@/lib/infrastructure/storage';
 import type { PDFMetadata, ProcessingOptions, ProcessingResult } from './types';
 
 // Note: PDF.js requires a worker, but in Node.js we don't need it
@@ -144,7 +144,7 @@ export class PDFProcessor {
  * Helper: Create PDF processor from default storage provider
  */
 export async function createPDFProcessor(): Promise<PDFProcessor> {
-  const { getDefaultStorageProvider } = await import('@/lib/storage');
+  const { getDefaultStorageProvider } = await import('@/lib/infrastructure/storage');
   const storageProvider = getDefaultStorageProvider();
   return new PDFProcessor(storageProvider);
 }

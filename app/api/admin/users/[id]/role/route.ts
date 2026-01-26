@@ -25,11 +25,11 @@ const VALID_ROLES = ["owner", "admin", "member", "guest"] as const;
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await requireRole("owner");
-    const userId = params.id;
+    const { id: userId } = await params;
 
     // Parse request body
     const body: ChangeRoleRequest = await request.json();

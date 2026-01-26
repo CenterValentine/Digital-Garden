@@ -9,7 +9,7 @@
  */
 
 import mammoth from 'mammoth';
-import type { StorageProvider } from '@/lib/storage';
+import type { StorageProvider } from '@/lib/infrastructure/storage';
 
 /**
  * Document Text Extractor
@@ -343,7 +343,7 @@ export class DocumentExtractor {
  * Helper: Create document extractor from default storage provider
  */
 export async function createDocumentExtractor(): Promise<DocumentExtractor> {
-  const { getDefaultStorageProvider } = await import('@/lib/storage');
+  const { getDefaultStorageProvider } = await import('@/lib/infrastructure/storage');
   const storageProvider = getDefaultStorageProvider();
   return new DocumentExtractor(storageProvider);
 }

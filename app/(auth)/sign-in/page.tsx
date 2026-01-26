@@ -3,7 +3,7 @@
 import { useState, FormEvent } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import type { SignInInput, ApiResponse, SessionData, AuthError } from '@/lib/auth/types'
+import type { SignInInput, ApiResponse, SessionData, AuthError } from '@/lib/infrastructure/auth/types'
 
 export default function SignInPage() {
   const router = useRouter()

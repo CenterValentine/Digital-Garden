@@ -8,7 +8,7 @@
 import fs from 'fs/promises';
 import path from 'path';
 import os from 'os';
-import type { StorageProvider } from '@/lib/storage';
+import type { StorageProvider } from '@/lib/infrastructure/storage';
 import type { VideoMetadata, ProcessingOptions, ProcessingResult } from './types';
 
 // Lazy load FFmpeg to avoid bundling issues with Next.js
@@ -193,7 +193,7 @@ export class VideoProcessor {
  * Helper: Create video processor from default storage provider
  */
 export async function createVideoProcessor(): Promise<VideoProcessor> {
-  const { getDefaultStorageProvider } = await import('@/lib/storage');
+  const { getDefaultStorageProvider } = await import('@/lib/infrastructure/storage');
   const storageProvider = getDefaultStorageProvider();
   return new VideoProcessor(storageProvider);
 }

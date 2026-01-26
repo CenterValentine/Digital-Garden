@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
 
     // Extract text for search (if document)
     // Use the same storage provider we just uploaded to
-    const { DocumentExtractor } = await import("@/lib/media/document-extractor");
+    const { DocumentExtractor } = await import("@/lib/infrastructure/media/document-extractor");
     const documentExtractor = new DocumentExtractor(storageProvider, enableOCR);
     const searchText = await documentExtractor.extractText(storageKey, file.type);
 

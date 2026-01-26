@@ -6,7 +6,7 @@
  */
 
 import sharp from 'sharp';
-import type { StorageProvider } from '@/lib/storage';
+import type { StorageProvider } from '@/lib/infrastructure/storage';
 import type { ImageMetadata, ProcessingOptions, ProcessingResult } from './types';
 
 /**
@@ -144,7 +144,7 @@ export class ImageProcessor {
  * Helper: Create image processor from default storage provider
  */
 export async function createImageProcessor(): Promise<ImageProcessor> {
-  const { getDefaultStorageProvider } = await import('@/lib/storage');
+  const { getDefaultStorageProvider } = await import('@/lib/infrastructure/storage');
   const storageProvider = getDefaultStorageProvider();
   return new ImageProcessor(storageProvider);
 }

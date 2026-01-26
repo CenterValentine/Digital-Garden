@@ -218,7 +218,7 @@ async function generatePresignedUploadUrl(
   mimeType: string
 ): Promise<string> {
   // Import storage factory
-  const { getDefaultStorageProvider } = await import('@/lib/storage');
+  const { getDefaultStorageProvider } = await import('@/lib/infrastructure/storage');
 
   // For now, use environment-based provider
   // Later: use config parameter for user-specific providers

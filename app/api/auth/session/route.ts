@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getSession } from '@/lib/auth/session'
-import type { ApiResponse, SessionData } from '@/lib/auth/types'
+import { getSession } from '@/lib/infrastructure/auth/session'
+import type { ApiResponse, SessionData } from '@/lib/infrastructure/auth/types'
 
 export async function GET(
   request: NextRequest
