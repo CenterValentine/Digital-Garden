@@ -7,7 +7,7 @@
 "use client";
 
 import { GravityStarsBackground } from "./components/backgrounds/gravity-stars";
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/core/utils";
 import {
   type DigitalGardenColor,
   type ColorVariant,

@@ -9,9 +9,9 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
-import { useContentStore } from "@/stores/content-store";
-import { useEditorStatsStore } from "@/stores/editor-stats-store";
-import { useOutlineStore } from "@/stores/outline-store";
+import { useContentStore } from "@/state/content-store";
+import { useEditorStatsStore } from "@/state/editor-stats-store";
+import { useOutlineStore } from "@/state/outline-store";
 import { MarkdownEditor } from "../editor/MarkdownEditor";
 import { FileViewer } from "../viewer/FileViewer";
 import type { JSONContent } from "@tiptap/core";
@@ -305,7 +305,7 @@ export function MainPanelContent() {
           if (matchedContent.contentType === 'folder') {
             // For folders: select in tree and expand (don't open in editor)
             // Import tree state store to handle folder navigation
-            const { setSelectedIds, setExpanded } = await import('@/stores/tree-state-store').then(m => m.useTreeStateStore.getState());
+            const { setSelectedIds, setExpanded } = await import('@/state/tree-state-store').then(m => m.useTreeStateStore.getState());
             setSelectedIds([matchedContent.id]);
             setExpanded(matchedContent.id, true);
             setSelectedContentId(null); // Clear editor selection

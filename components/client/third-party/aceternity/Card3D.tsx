@@ -10,7 +10,7 @@ import {
   type DigitalGardenColor,
   type DigitalGardenIntent,
 } from "@/lib/third-party";
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/core/utils";
 
 export interface Card3DProps {
   className?: string;

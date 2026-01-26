@@ -7,9 +7,9 @@
 
 "use client";
 
-import { useSearchStore } from "@/stores/search-store";
-import { useLeftPanelCollapseStore } from "@/stores/left-panel-collapse-store";
-import { useLeftPanelViewStore } from "@/stores/left-panel-view-store";
+import { useSearchStore } from "@/state/search-store";
+import { useLeftPanelCollapseStore } from "@/state/left-panel-collapse-store";
+import { useLeftPanelViewStore } from "@/state/left-panel-view-store";
 import { LeftSidebarHeaderActions } from "./LeftSidebarHeaderActions";
 import { PanelLeftClose, PanelLeft } from "lucide-react";
 

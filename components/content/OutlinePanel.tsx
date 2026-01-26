@@ -15,7 +15,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useContentStore } from "@/stores/content-store";
+import { useContentStore } from "@/state/content-store";
 import type { OutlineHeading } from "@/lib/content/outline-extractor";
 
 interface OutlinePanelProps {

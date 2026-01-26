@@ -16,7 +16,7 @@ import { Download, AlertCircle, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/glass/button";
 import { toast } from "sonner";
 import mammoth from "mammoth";
-import { useUploadSettingsStore } from "@/stores/upload-settings-store";
+import { useUploadSettingsStore } from "@/state/upload-settings-store";
 import { OnlyOfficeEditor } from "./OnlyOfficeEditor";
 import { GoogleDriveEditor } from "./GoogleDriveEditor";
 

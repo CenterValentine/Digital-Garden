@@ -19,9 +19,9 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
-import { useSearchStore } from "@/stores/search-store";
-import { useContentStore } from "@/stores/content-store";
-import { useTreeStateStore } from "@/stores/tree-state-store";
+import { useSearchStore } from "@/state/search-store";
+import { useContentStore } from "@/state/content-store";
+import { useTreeStateStore } from "@/state/tree-state-store";
 import { parseSearchResults } from "@/lib/search/filters";
 import type { SearchResult } from "@/lib/search/filters";
 import type { ContentType } from "@/lib/content/types";

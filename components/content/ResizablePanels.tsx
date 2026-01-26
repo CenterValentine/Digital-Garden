@@ -11,9 +11,9 @@
 import { useEffect, useState } from "react";
 import { Allotment } from "allotment";
 import "allotment/dist/style.css";
-import { usePanelStore } from "@/stores/panel-store";
-import { useSearchStore } from "@/stores/search-store";
-import { useLeftPanelCollapseStore } from "@/stores/left-panel-collapse-store";
+import { usePanelStore } from "@/state/panel-store";
+import { useSearchStore } from "@/state/search-store";
+import { useLeftPanelCollapseStore } from "@/state/left-panel-collapse-store";
 import { ContextMenu } from "./context-menu/ContextMenu";
 import { fileTreeActionProvider } from "./context-menu/file-tree-actions";
 

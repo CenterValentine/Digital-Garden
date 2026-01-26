@@ -6,7 +6,7 @@
 "use client";
 
 import { getColorVariable, type DigitalGardenColor } from "@/lib/third-party";
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/core/utils";
 
 export interface EvervaultCardProps {
   className?: string;

@@ -15,11 +15,10 @@ import { useState, useEffect, useRef } from "react";
 import { Download, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/glass/button";
 import { toast } from "sonner";
-import { useEditorStatsStore } from "@/stores/editor-stats-store";
+import { useEditorStatsStore } from "@/state/editor-stats-store";
 import { ToolBelt, getJSONToolBeltConfig } from "@/components/content/tool-belt";
 
 interface JSONViewerProps {
-  downloadUrl: string;
   fileName: string;
   title: string;
   onDownload: () => void;
@@ -27,7 +26,6 @@ interface JSONViewerProps {
 }
 
 export function JSONViewer({
-  downloadUrl,
   fileName,
   title,
   onDownload,
@@ -48,7 +46,9 @@ export function JSONViewer({
   useEffect(() => {
     const fetchJSON = async () => {
       try {
-        const response = await fetch(downloadUrl);
+        // Fetch through API route to avoid CORS issues with presigned URLs
+        // Using stream=true to proxy the file through Next.js
+        const response = await fetch(`/api/content/content/${contentId}/download?stream=true`);
         if (!response.ok) {
           throw new Error("Failed to fetch JSON file");
         }
@@ -75,7 +75,7 @@ export function JSONViewer({
     };
 
     fetchJSON();
-  }, [downloadUrl]);
+  }, [contentId]);
 
   // Update global stats whenever content changes
   useEffect(() => {

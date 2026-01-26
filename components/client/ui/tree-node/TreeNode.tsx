@@ -1,5 +1,5 @@
 import * as React from "react";
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/core/utils";
 import { GOLD, SLATE, LEAF } from "@/lib/design-system/colors";
 
 export type NodeType = "default" | "leaf" | "junction" | "root" | "endpoint";

@@ -17,7 +17,7 @@
 import { useRef, useEffect, useMemo } from "react";
 import { Tree, type NodeApi } from "react-arborist";
 import { FileNode } from "./FileNode";
-import { useTreeStateStore } from "@/stores/tree-state-store";
+import { useTreeStateStore } from "@/state/tree-state-store";
 import type { TreeNode } from "@/lib/content/types";
 
 interface FileTreeProps {

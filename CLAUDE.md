@@ -326,6 +326,52 @@ Sidebar Wrapper (Client Component)
 
 **See:** `docs/notes-feature/ARCHITECTURE-RIGHT-SIDEBAR-REFACTOR.md`
 
+### Menu Positioning Pattern (Portal + Boundary Detection)
+
+**Problem:** Context menus and dropdowns can clip at viewport edges.
+
+**Solution:** Use positioning engine with portal rendering in `lib/utils/menu-positioning.ts`:
+
+```typescript
+import { calculateMenuPosition } from "@/lib/utils/menu-positioning";
+
+// 1. Portal rendering (bypasses parent overflow)
+const menuContent = <div ref={menuRef}>...</div>;
+return createPortal(menuContent, document.body);
+
+// 2. Two-phase rendering (measure then position)
+const menuStyle = !menuPosition
+  ? { visibility: "hidden" as const } // Phase 1: Hidden to measure
+  : { left: `${menuPosition.x}px`, top: `${menuPosition.y}px` }; // Phase 2: Positioned
+
+// 3. Boundary-aware calculation
+useEffect(() => {
+  const menuRect = menuRef.current.getBoundingClientRect();
+  const calculatedPosition = calculateMenuPosition({
+    triggerPosition: { x: clickX, y: clickY },
+    menuDimensions: { width: menuRect.width, height: menuRect.height },
+    preferredPlacementX: "right", // Will flip to "left" if clipping
+    preferredPlacementY: "bottom", // Will flip to "top" if clipping
+  });
+  setMenuPosition(calculatedPosition);
+}, [isOpen]);
+```
+
+**Strategy:**
+- **Flip**: Automatically reverse direction when hitting viewport edge (bottom→top, right→left)
+- **Shift**: Micro-adjust position if flipping isn't enough
+- **Max-height**: Enable scrolling when menu exceeds available space
+
+**When to Use:**
+- Context menus (right-click)
+- Dropdown menus (button-triggered)
+- Tooltips, popovers, flyouts
+- Any menu that might appear near viewport edges
+
+**Examples:**
+- `components/content/context-menu/ContextMenu.tsx` - Right-click context menu
+- `components/content/headers/LeftSidebarHeaderActions.tsx` - "+" dropdown menu
+
 ### Type-Safe API Calls
 
 ```tsx

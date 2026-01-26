@@ -37,7 +37,7 @@ import { Switch } from "@/components/client/ui/switch";
 import { Slider } from "@/components/client/ui/slider";
 import { useState } from "react";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/core/utils";
 
 // https://animate-ui.com/docs/components/backgrounds/gravity-stars
 

@@ -10,9 +10,9 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
-import { cn } from "@/lib/utils"
-import type { GlassCustomization } from "@/lib/glass-utils"
-import { hoverEffects, type HoverEffect } from "@/lib/hover-effects"
+import { cn } from "@/lib/core/utils"
+import type { GlassCustomization } from "@/lib/core/glass-utils"
+import { hoverEffects, type HoverEffect } from "@/lib/core/hover-effects"
 
 export interface DialogContentProps extends Omit<React.ComponentProps<typeof BaseDialogContent>, "glass"> {
   variant?: "default" | "glass" | "glassSubtle" | "frosted" | "fluted" | "crystal"

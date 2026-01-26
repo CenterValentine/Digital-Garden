@@ -14,8 +14,8 @@ import { LeftSidebarContent } from "./content/LeftSidebarContent";
 import { LeftSidebarCollapsed } from "./LeftSidebarCollapsed";
 import { LeftSidebarExtensions } from "./content/LeftSidebarExtensions";
 import { FileUploadDialog } from "./dialogs/FileUploadDialog";
-import { useLeftPanelCollapseStore } from "@/stores/left-panel-collapse-store";
-import { useLeftPanelViewStore } from "@/stores/left-panel-view-store";
+import { useLeftPanelCollapseStore } from "@/state/left-panel-collapse-store";
+import { useLeftPanelViewStore } from "@/state/left-panel-view-store";
 
 export function LeftSidebar() {
   const { mode } = useLeftPanelCollapseStore();

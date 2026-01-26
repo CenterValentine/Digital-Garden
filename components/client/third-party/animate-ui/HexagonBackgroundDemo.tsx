@@ -7,7 +7,7 @@
 "use client";
 
 import { HexagonBackground } from "./components/backgrounds/hexagon";
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/core/utils";
 import {
   type DigitalGardenColor,
   type ColorVariant,

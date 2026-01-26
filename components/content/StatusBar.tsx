@@ -7,7 +7,7 @@
 "use client";
 
 import { CloudCheck, FileText, Clock } from "lucide-react";
-import { useEditorStatsStore } from "@/stores/editor-stats-store";
+import { useEditorStatsStore } from "@/state/editor-stats-store";
 
 export function StatusBar() {
   const {

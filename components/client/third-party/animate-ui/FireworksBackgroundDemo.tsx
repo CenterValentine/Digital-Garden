@@ -7,7 +7,7 @@
 "use client";
 
 import { FireworksBackground } from "./components/backgrounds/fireworks";
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/core/utils";
 import {
   getColorAsHsl,
   type DigitalGardenColor,

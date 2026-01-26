@@ -14,9 +14,9 @@ import { FileTreeSkeleton } from "../skeletons/FileTreeSkeleton";
 import { SearchPanel } from "../SearchPanel";
 import { ConfirmDialog } from "../ConfirmDialog";
 import { LeftSidebarStatusBar } from "../LeftSidebarStatusBar";
-import { useContentStore } from "@/stores/content-store";
-import { useSearchStore } from "@/stores/search-store";
-import { useTreeStateStore } from "@/stores/tree-state-store";
+import { useContentStore } from "@/state/content-store";
+import { useSearchStore } from "@/state/search-store";
+import { useTreeStateStore } from "@/state/tree-state-store";
 import type { TreeNode, ContentType } from "@/lib/content/types";
 
 interface TreeApiResponse {

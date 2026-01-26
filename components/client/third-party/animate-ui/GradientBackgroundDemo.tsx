@@ -8,7 +8,7 @@
 
 
 import { GradientBackground } from "./components/backgrounds/gradient";
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/core/utils";
 import {
   type DigitalGardenColor,
   type ColorVariant,
