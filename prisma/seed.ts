@@ -9,7 +9,7 @@
  */
 
 import { PrismaClient } from "../lib/generated/prisma";
-import { hash } from "bcrypt";
+import { hash } from "bcryptjs";
 import { Pool } from "pg";
 import { PrismaPg } from "@prisma/adapter-pg";
 
