@@ -11,8 +11,8 @@
 
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { useContentStore } from "@/stores/content-store";
-import { useEditorStatsStore } from "@/stores/editor-stats-store";
+import { useContentStore } from "@/state/content-store";
+import { useEditorStatsStore } from "@/state/editor-stats-store";
 
 interface Tag {
   id: string;

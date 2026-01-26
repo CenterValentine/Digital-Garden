@@ -3,7 +3,7 @@
 import { useState, FormEvent } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import type { SignInInput, ApiResponse, SessionData, AuthError } from '@/lib/auth/types'
+import type { SignInInput, ApiResponse, SessionData, AuthError } from '@/lib/infrastructure/auth/types'
 
 export default function SignInPage() {
   const router = useRouter()
@@ -36,8 +36,8 @@ export default function SignInPage() {
         return
       }
 
-      // Redirect to notes page
-      router.push('/notes')
+      // Redirect to content page
+      router.push('/content')
       router.refresh()
     } catch (err) {
       setError('An unexpected error occurred')

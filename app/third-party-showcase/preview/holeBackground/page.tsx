@@ -7,7 +7,7 @@ import { Card, CardContent } from "@/components/client/ui/card";
 import { Label } from "@/components/client/ui/label";
 import { Switch } from "@/components/client/ui/switch";
 import { useRef, useState } from "react";
-import { getColorAsHex } from "@/lib/third-party/colors";
+import { getColorAsHex } from "@/lib/design/integrations/colors";
 
 // https://animate-ui.com/docs/components/backgrounds/hole
 

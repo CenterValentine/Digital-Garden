@@ -25,9 +25,9 @@ import {
   ChevronRight,
   ChevronDown,
 } from "lucide-react";
-import { useContextMenuStore } from "@/stores/context-menu-store";
-import { useContentStore } from "@/stores/content-store";
-import type { TreeNode } from "@/lib/content/types";
+import { useContextMenuStore } from "@/state/context-menu-store";
+import { useContentStore } from "@/state/content-store";
+import type { TreeNode } from "@/lib/domain/content/types";
 
 interface FileNodeProps extends NodeRendererProps<TreeNode> {
   onRename?: (id: string, name: string) => Promise<void>;

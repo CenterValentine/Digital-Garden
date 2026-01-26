@@ -1,5 +1,5 @@
 import AppNav from "@/components/client/app-nav/app-nav";
-import { getCurrentUser } from "@/lib/auth/middleware";
+import { getCurrentUser } from "@/lib/infrastructure/auth/middleware";
 import { getNavigationTreeData } from "@/components/server/nav/NavigationData.server";
 
 interface HomeProps {

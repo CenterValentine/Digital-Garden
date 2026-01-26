@@ -7,10 +7,10 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/db/prisma";
-import { requireAuth } from "@/lib/auth/middleware";
-import { updateMaterializedPath } from "@/lib/content";
-import type { MoveContentRequest } from "@/lib/content/api-types";
+import { prisma } from "@/lib/database/client";
+import { requireAuth } from "@/lib/infrastructure/auth/middleware";
+import { updateMaterializedPath } from "@/lib/domain/content";
+import type { MoveContentRequest } from "@/lib/domain/content/api-types";
 
 // ============================================================
 // POST /api/content/content/move - Move Content

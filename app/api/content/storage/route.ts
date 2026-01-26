@@ -6,15 +6,15 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/db/prisma";
-import { requireAuth } from "@/lib/auth/middleware";
+import { prisma } from "@/lib/database/client";
+import { requireAuth } from "@/lib/infrastructure/auth/middleware";
 import type {
   CreateStorageConfigRequest,
   R2Config,
   S3Config,
   VercelConfig,
   StorageConfig,
-} from "@/lib/content/api-types";
+} from "@/lib/domain/content/api-types";
 
 // ============================================================
 // GET /api/content/storage - List Storage Configurations

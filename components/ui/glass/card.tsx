@@ -2,9 +2,9 @@
 
 import * as React from "react"
 import { Card as BaseCard, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { cn } from "@/lib/utils"
-import type { GlassCustomization } from "@/lib/glass-utils"
-import { hoverEffects, type HoverEffect } from "@/lib/hover-effects"
+import { cn } from "@/lib/core/utils"
+import type { GlassCustomization } from "@/lib/core/glass-utils"
+import { hoverEffects, type HoverEffect } from "@/lib/core/hover-effects"
 
 export interface CardProps extends React.ComponentProps<typeof BaseCard> {
   variant?: string

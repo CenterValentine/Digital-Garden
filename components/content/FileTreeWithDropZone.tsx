@@ -3,10 +3,10 @@
 import { DndProvider, useDrop, useDragDropManager } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
 import { NativeTypes } from "react-dnd-html5-backend";
-import { validateFileBatch } from "@/lib/media/file-validation";
+import { validateFileBatch } from "@/lib/infrastructure/media/file-validation";
 import { toast } from "sonner";
 import { FileTree } from "./FileTree";
-import type { TreeNode } from "@/lib/content/types";
+import type { TreeNode } from "@/lib/domain/content/types";
 
 interface FileTreeWithDropZoneProps {
   data: TreeNode[];

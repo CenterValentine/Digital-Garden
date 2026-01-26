@@ -9,9 +9,9 @@
 import { useEffect, useState } from "react";
 import { Allotment } from "allotment";
 import "allotment/dist/style.css";
-import { usePanelStore } from "@/stores/panel-store";
-import { cn } from "@/lib/utils";
-import { getSurfaceStyles } from "@/lib/design-system";
+import { usePanelStore } from "@/state/panel-store";
+import { cn } from "@/lib/core/utils";
+import { getSurfaceStyles } from "@/lib/design/system";
 
 interface PanelLayoutProps {
   leftSidebar: React.ReactNode;

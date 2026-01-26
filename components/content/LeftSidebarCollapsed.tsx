@@ -8,9 +8,9 @@
 "use client";
 
 import { Folder, Search, Puzzle } from "lucide-react";
-import { useSearchStore } from "@/stores/search-store";
-import { useLeftPanelCollapseStore } from "@/stores/left-panel-collapse-store";
-import { useLeftPanelViewStore } from "@/stores/left-panel-view-store";
+import { useSearchStore } from "@/state/search-store";
+import { useLeftPanelCollapseStore } from "@/state/left-panel-collapse-store";
+import { useLeftPanelViewStore } from "@/state/left-panel-view-store";
 
 export function LeftSidebarCollapsed() {
   const { isSearchOpen, toggleSearch } = useSearchStore();

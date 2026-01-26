@@ -5,8 +5,8 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/db/prisma";
-import { requireAuth } from "@/lib/auth/middleware";
+import { prisma } from "@/lib/database/client";
+import { requireAuth } from "@/lib/infrastructure/auth/middleware";
 import type { JSONContent } from "@tiptap/core";
 
 type Params = Promise<{ id: string }>;

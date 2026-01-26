@@ -21,7 +21,7 @@ import { Label } from "@/components/client/ui/label";
 import type {
   DigitalGardenColor,
   ColorVariant,
-} from "@/lib/third-party/colors";
+} from "@/lib/design/integrations/colors";
 
 // https://animate-ui.com/docs/components/backgrounds/fireworks
 

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { deleteSession } from '@/lib/auth/session'
-import type { ApiResponse } from '@/lib/auth/types'
+import { deleteSession } from '@/lib/infrastructure/auth/session'
+import type { ApiResponse } from '@/lib/infrastructure/auth/types'
 
 export async function POST(
   request: NextRequest

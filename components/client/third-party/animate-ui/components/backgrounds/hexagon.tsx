@@ -2,12 +2,12 @@
 
 import * as React from "react";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/core/utils";
 import {
   getColorVariable,
   type DigitalGardenColor,
   type ColorVariant,
-} from "@/lib/third-party/colors";
+} from "@/lib/design/integrations/colors";
 
 type HexagonBackgroundProps = React.ComponentProps<"div"> & {
   hexagonProps?: React.ComponentProps<"div">;

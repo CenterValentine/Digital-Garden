@@ -4,8 +4,8 @@ import React from "react";
 // flag for consolidation of layout and nav components
 
 import { IntegratedCircuitNav } from "@/components/client/app-nav/IntegratedCircuitNav";
-import { BranchPresetName } from "@/lib/app-nav/branch-builder";
-import type { NavigationTree } from "@/lib/db/navigation";
+import { BranchPresetName } from "@/lib/features/navigation/branch-builder";
+import type { NavigationTree } from "@/lib/features/navigation/navigation";
 
 interface AppNavProps {
   navigationData?: NavigationTree;

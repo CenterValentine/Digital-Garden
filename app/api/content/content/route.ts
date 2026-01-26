@@ -6,8 +6,8 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/db/prisma";
-import { requireAuth } from "@/lib/auth/middleware";
+import { prisma } from "@/lib/database/client";
+import { requireAuth } from "@/lib/infrastructure/auth/middleware";
 import {
   deriveContentType,
   generateUniqueSlug,
@@ -16,7 +16,7 @@ import {
   extractSearchTextFromCode,
   markdownToTiptap,
   CONTENT_WITH_PAYLOADS,
-} from "@/lib/content";
+} from "@/lib/domain/content";
 import type { JSONContent } from "@tiptap/core";
 import type {
   ContentWhereInput,
@@ -24,7 +24,7 @@ import type {
   CreatePayloadData,
   CreateContentRequest,
   ContentDetailResponse,
-} from "@/lib/content/api-types";
+} from "@/lib/domain/content/api-types";
 
 // ============================================================
 // GET /api/content/content - List Content

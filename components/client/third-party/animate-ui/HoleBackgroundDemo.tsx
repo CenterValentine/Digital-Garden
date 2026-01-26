@@ -10,13 +10,13 @@ import {
   HoleBackground,
   type HoleBackgroundRef,
 } from "@/components/client/third-party/animate-ui/components/backgrounds/hole";
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/core/utils";
 import {
   getColorAsHex,
   getColorAsRgb,
   type DigitalGardenColor,
   type ColorVariant,
-} from "@/lib/third-party/colors";
+} from "@/lib/design/integrations/colors";
 import { useEffect, useState } from "react";
 import React from "react";
 

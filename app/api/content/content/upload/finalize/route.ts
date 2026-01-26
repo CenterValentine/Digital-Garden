@@ -8,9 +8,9 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/db/prisma";
-import { requireAuth } from "@/lib/auth/middleware";
-import type { FinalizeUploadRequest } from "@/lib/content/api-types";
+import { prisma } from "@/lib/database/client";
+import { requireAuth } from "@/lib/infrastructure/auth/middleware";
+import type { FinalizeUploadRequest } from "@/lib/domain/content/api-types";
 
 // ============================================================
 // POST /api/content/content/upload/finalize
@@ -211,7 +211,7 @@ async function verifyFileInStorage(
 ): Promise<string | null> {
   try {
     // Import storage factory
-    const { getDefaultStorageProvider } = await import('@/lib/storage');
+    const { getDefaultStorageProvider } = await import('@/lib/infrastructure/storage');
     const storageProvider = getDefaultStorageProvider();
 
     // Verify file exists
@@ -243,7 +243,7 @@ async function processUploadedMedia(
   thumbnailKeys: string[];
 } | null> {
   try {
-    const { createMediaProcessor } = await import('@/lib/media');
+    const { createMediaProcessor } = await import('@/lib/infrastructure/media');
     const mediaProcessor = await createMediaProcessor();
 
     // Process media (returns null for non-media files like documents)
@@ -270,7 +270,7 @@ async function extractDocumentText(
   mimeType: string
 ): Promise<string> {
   try {
-    const { createDocumentExtractor } = await import('@/lib/media/document-extractor');
+    const { createDocumentExtractor } = await import('@/lib/infrastructure/media/document-extractor');
     const documentExtractor = await createDocumentExtractor();
 
     // Extract text (returns empty string for non-document files)

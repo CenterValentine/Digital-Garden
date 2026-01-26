@@ -6,7 +6,7 @@
  */
 
 // app/(authenticated)/content/layout.tsx
-import { getSurfaceStyles } from "@/lib/design-system";
+import { getSurfaceStyles } from "@/lib/design/system";
 import { ResizablePanels } from "@/components/content/ResizablePanels";
 import { LeftSidebar } from "@/components/content/LeftSidebar";
 import { RightSidebar } from "@/components/content/RightSidebar";

@@ -10,7 +10,7 @@ import {
   CardTitle,
 } from "@/components/client/ui/card";
 import { ColorSelector } from "@/components/client/ui/utility/color-selector";
-import type { DigitalGardenColor } from "@/lib/third-party/colors";
+import type { DigitalGardenColor } from "@/lib/design/integrations/colors";
 
 export default function GradientBackgroundPreview() {
   const [selectedColor, setColor] = useState<DigitalGardenColor>("gold");

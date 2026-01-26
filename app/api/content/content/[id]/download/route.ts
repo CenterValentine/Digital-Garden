@@ -8,9 +8,9 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/db/prisma";
-import { requireAuth } from "@/lib/auth/middleware";
-import { getUserStorageProvider } from "@/lib/storage";
+import { prisma } from "@/lib/database/client";
+import { requireAuth } from "@/lib/infrastructure/auth/middleware";
+import { getUserStorageProvider } from "@/lib/infrastructure/storage";
 
 type Params = Promise<{ id: string }>;
 

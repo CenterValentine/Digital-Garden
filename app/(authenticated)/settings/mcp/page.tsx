@@ -7,7 +7,7 @@
 
 "use client";
 
-import { getSurfaceStyles } from "@/lib/design-system";
+import { getSurfaceStyles } from "@/lib/design/system";
 
 export default function MCPSettingsPage() {
   const glass0 = getSurfaceStyles("glass-0");

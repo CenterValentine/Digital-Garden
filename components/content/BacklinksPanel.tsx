@@ -11,8 +11,8 @@
 
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { useContentStore } from "@/stores/content-store";
-import { useTreeStateStore } from "@/stores/tree-state-store";
+import { useContentStore } from "@/state/content-store";
+import { useTreeStateStore } from "@/state/tree-state-store";
 import { ArrowLeft } from "lucide-react";
 
 interface Backlink {

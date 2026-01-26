@@ -4,7 +4,7 @@
 
 "use client";
 
-import { getSurfaceStyles } from "@/lib/design-system";
+import { getSurfaceStyles } from "@/lib/design/system";
 
 export default function GeneralSettingsPage() {
   const glass0 = getSurfaceStyles("glass-0");

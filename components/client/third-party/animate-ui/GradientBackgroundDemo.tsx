@@ -8,11 +8,11 @@
 
 
 import { GradientBackground } from "./components/backgrounds/gradient";
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/core/utils";
 import {
   type DigitalGardenColor,
   type ColorVariant,
-} from "@/lib/third-party/colors";
+} from "@/lib/design/integrations/colors";
 import React from "react";
 
 export interface GradientBackgroundDemoProps extends React.ComponentProps<"div"> {

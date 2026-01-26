@@ -267,6 +267,7 @@ export function FileViewer({ contentId, title }: FileViewerProps) {
     if (mimeType.startsWith("audio/")) {
       return (
         <AudioPlayer
+          contentId={contentId}
           downloadUrl={downloadUrl}
           fileName={fileData.fileName}
           mimeType={mimeType}
@@ -281,7 +282,6 @@ export function FileViewer({ contentId, title }: FileViewerProps) {
       return (
         <JSONViewer
           contentId={contentId}
-          downloadUrl={downloadUrl}
           fileName={fileData.fileName}
           title={title}
           onDownload={handleDownload}

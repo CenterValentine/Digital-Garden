@@ -19,7 +19,7 @@
  * ```
  */
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/core/utils";
 import { Button } from "@/components/ui/glass/button";
 import type { ToolBeltProps, ToolAction } from "./types";
 

@@ -1,7 +1,7 @@
 "use client";
 
-import type { DigitalGardenColor } from "@/lib/third-party/colors";
-import { getColorVariable } from "@/lib/third-party/colors";
+import type { DigitalGardenColor } from "@/lib/design/integrations/colors";
+import { getColorVariable } from "@/lib/design/integrations/colors";
 import {
   Select,
   SelectContent,

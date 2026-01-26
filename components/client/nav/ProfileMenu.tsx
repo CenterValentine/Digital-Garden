@@ -3,8 +3,8 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronDown, Shield, LogOut, MessageSquare, Bug, Settings } from "lucide-react";
-import type { SessionData } from "@/lib/auth/types";
-import { getSurfaceStyles } from "@/lib/design-system";
+import type { SessionData } from "@/lib/infrastructure/auth/types";
+import { getSurfaceStyles } from "@/lib/design/system";
 
 export default function ProfileMenu() {
   const router = useRouter();
@@ -173,6 +173,22 @@ export default function ProfileMenu() {
               <Settings className="h-4 w-4 text-gold-primary" />
               <span>Settings</span>
             </button>
+
+            {/* Admin Panel (Owner Only) */}
+            {session.user.role === "owner" && (
+              <button
+                type="button"
+                onClick={() => {
+                  console.log("[ProfileMenu] Admin Panel clicked");
+                  setIsOpen(false);
+                  router.push("/admin");
+                }}
+                className="w-full px-4 py-2 flex items-center gap-3 text-sm text-foreground hover:bg-white/5 transition-colors text-left"
+              >
+                <Shield className="h-4 w-4 text-purple-400" />
+                <span>Admin Panel</span>
+              </button>
+            )}
 
             {/* Divider */}
             <div className="h-px bg-white/10 my-1" />

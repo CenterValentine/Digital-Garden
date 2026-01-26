@@ -13,12 +13,12 @@
 
 import { useEditor, EditorContent } from "@tiptap/react";
 import { useEffect, useRef, useState } from "react";
-import { getEditorExtensions } from "@/lib/editor/extensions";
+import { getEditorExtensions } from "@/lib/domain/editor/extensions-client";
 import type { JSONContent } from "@tiptap/core";
 import { LinkDialog } from "./LinkDialog";
 import { BubbleMenu } from "./BubbleMenu";
 import { TableBubbleMenu } from "./TableBubbleMenu";
-import { extractOutline, type OutlineHeading } from "@/lib/content/outline-extractor";
+import { extractOutline, type OutlineHeading } from "@/lib/domain/content/outline-extractor";
 
 export interface EditorStats {
   /** Word count */

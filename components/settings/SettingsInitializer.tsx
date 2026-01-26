@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { useSettingsStore } from "@/stores/settings-store";
+import { useSettingsStore } from "@/state/settings-store";
 
 /**
  * Settings Initializer

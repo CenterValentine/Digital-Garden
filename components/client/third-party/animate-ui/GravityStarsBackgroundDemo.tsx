@@ -7,11 +7,11 @@
 "use client";
 
 import { GravityStarsBackground } from "./components/backgrounds/gravity-stars";
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/core/utils";
 import {
   type DigitalGardenColor,
   type ColorVariant,
-} from "@/lib/third-party/colors";
+} from "@/lib/design/integrations/colors";
 import React from "react";
 
 export interface GravityStarsBackgroundDemoProps extends React.ComponentProps<"div"> {

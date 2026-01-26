@@ -10,7 +10,7 @@
 import { BacklinksPanel } from "../BacklinksPanel";
 import { OutlinePanel } from "../OutlinePanel";
 import { TagsPanel } from "../TagsPanel";
-import { useOutlineStore } from "@/stores/outline-store";
+import { useOutlineStore } from "@/state/outline-store";
 import type { RightSidebarTab } from "../RightSidebar";
 
 interface RightSidebarContentProps {

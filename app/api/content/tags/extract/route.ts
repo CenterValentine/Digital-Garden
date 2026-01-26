@@ -17,8 +17,8 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/db/prisma";
-import { extractTags } from "@/lib/content/tag-extractor";
+import { prisma } from "@/lib/database/client";
+import { extractTags } from "@/lib/domain/content/tag-extractor";
 import type { JSONContent } from "@tiptap/core";
 
 interface ExtractTagsRequest {

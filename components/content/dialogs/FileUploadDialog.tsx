@@ -11,9 +11,9 @@
 
 import { useState, useRef, useEffect } from "react";
 import { toast } from "sonner";
-import { getSurfaceStyles } from "@/lib/design-system";
+import { getSurfaceStyles } from "@/lib/design/system";
 import { Upload, Link, Cloud, Folder } from "lucide-react";
-import { useUploadSettingsStore } from "@/stores/upload-settings-store";
+import { useUploadSettingsStore } from "@/state/upload-settings-store";
 
 interface Folder {
   id: string;

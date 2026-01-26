@@ -8,10 +8,10 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/db/prisma";
-import { requireAuth } from "@/lib/auth/middleware";
-import { generateUniqueSlug } from "@/lib/content";
-import { getUserStorageProvider } from "@/lib/storage";
+import { prisma } from "@/lib/database/client";
+import { requireAuth } from "@/lib/infrastructure/auth/middleware";
+import { generateUniqueSlug } from "@/lib/domain/content";
+import { getUserStorageProvider } from "@/lib/infrastructure/storage";
 import crypto from "crypto";
 
 export async function POST(request: NextRequest) {
@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
 
     // Extract text for search (if document)
     // Use the same storage provider we just uploaded to
-    const { DocumentExtractor } = await import("@/lib/media/document-extractor");
+    const { DocumentExtractor } = await import("@/lib/infrastructure/media/document-extractor");
     const documentExtractor = new DocumentExtractor(storageProvider, enableOCR);
     const searchText = await documentExtractor.extractText(storageKey, file.type);
 

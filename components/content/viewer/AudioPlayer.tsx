@@ -35,9 +35,10 @@ interface AudioPlayerProps {
   mimeType: string;
   title: string;
   onDownload: () => void;
+  contentId: string;
 }
 
-export function AudioPlayer({ downloadUrl, fileName, mimeType, title, onDownload }: AudioPlayerProps) {
+export function AudioPlayer({ downloadUrl, fileName, mimeType, title, onDownload, contentId }: AudioPlayerProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -312,9 +313,10 @@ export function AudioPlayer({ downloadUrl, fileName, mimeType, title, onDownload
       </div>
 
       {/* Audio element (hidden) */}
+      {/* Use streaming URL to avoid CORS issues with Web Audio API */}
       <audio
         ref={audioRef}
-        src={downloadUrl}
+        src={`/api/content/content/${contentId}/download?stream=true`}
         preload="metadata"
         crossOrigin="anonymous"
       />

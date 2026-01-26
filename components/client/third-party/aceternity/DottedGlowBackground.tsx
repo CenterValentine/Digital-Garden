@@ -12,8 +12,8 @@
 
 "use client";
 
-import { getColorVariable, type DigitalGardenColor } from "@/lib/third-party";
-import { cn } from "@/lib/utils";
+import { getColorVariable, type DigitalGardenColor } from "@/lib/design/integrations";
+import { cn } from "@/lib/core/utils";
 
 export interface DottedGlowBackgroundProps {
   className?: string;

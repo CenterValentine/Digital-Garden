@@ -11,7 +11,7 @@ import {
 import type {
   DigitalGardenColor,
   ColorVariant,
-} from "@/lib/third-party/colors";
+} from "@/lib/design/integrations/colors";
 import { ColorSelector } from "@/components/client/ui/utility/color-selector";
 import {
   Select,
@@ -37,7 +37,7 @@ import { Switch } from "@/components/client/ui/switch";
 import { Slider } from "@/components/client/ui/slider";
 import { useState } from "react";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/core/utils";
 
 // https://animate-ui.com/docs/components/backgrounds/gravity-stars
 

@@ -5,7 +5,7 @@
  */
 
 import { FileText, X } from "lucide-react";
-import { getSurfaceStyles } from "@/lib/design-system";
+import { getSurfaceStyles } from "@/lib/design/system";
 
 export function MainPanelHeader() {
   const glass1 = getSurfaceStyles("glass-1");

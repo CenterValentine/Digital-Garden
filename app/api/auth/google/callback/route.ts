@@ -4,9 +4,9 @@ import {
   exchangeCodeForTokens,
   verifyGoogleToken,
   findOrCreateOAuthUser,
-} from '@/lib/auth/oauth'
-import { createSession } from '@/lib/auth/session'
-import { extractUsername } from '@/lib/auth/types'
+} from '@/lib/infrastructure/auth/oauth'
+import { createSession } from '@/lib/infrastructure/auth/session'
+import { extractUsername } from '@/lib/infrastructure/auth/types'
 
 export async function GET(
   request: NextRequest
@@ -78,8 +78,8 @@ export async function GET(
     // Create session
     await createSession(user.id)
 
-    // Get redirect URL (default to notes page)
-    const redirectTo = searchParams.get('redirect') || '/notes'
+    // Get redirect URL (default to content page)
+    const redirectTo = searchParams.get('redirect') || '/content'
 
     return NextResponse.redirect(new URL(redirectTo, request.url))
   } catch (error) {

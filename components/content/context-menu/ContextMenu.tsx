@@ -21,8 +21,9 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { ChevronRight } from "lucide-react";
-import { useContextMenuStore } from "@/stores/context-menu-store";
+import { useContextMenuStore } from "@/state/context-menu-store";
 import type { ContextMenuActionProvider, ContextMenuAction } from "./types";
+import { calculateMenuPosition, calculateSubmenuPosition } from "@/lib/core/menu-positioning";
 
 interface ContextMenuProps {
   /** Action providers for each panel type */
@@ -116,7 +117,7 @@ function SubMenu({
   submenuRef,
 }: {
   actions: ContextMenuAction[];
-  position: { x: number; y: number };
+  position: { x: number; y: number; maxHeight?: number };
   onClose: () => void;
   onMouseEnter: () => void;
   onMouseLeave: () => void;
@@ -134,10 +135,11 @@ function SubMenu({
   const submenuContent = (
     <div
       ref={refToUse}
-      className="fixed z-[60] min-w-[180px] rounded-md border border-white/20 bg-white/95 shadow-lg backdrop-blur-sm dark:bg-gray-900/95"
+      className="fixed z-[60] min-w-[180px] rounded-md border border-white/20 bg-white/95 shadow-lg backdrop-blur-sm dark:bg-gray-900/95 overflow-y-auto"
       style={{
         left: `${position.x}px`,
         top: `${position.y}px`,
+        maxHeight: `${position.maxHeight || 400}px`,
       }}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
@@ -193,8 +195,10 @@ export function ContextMenu({ actionProviders }: ContextMenuProps) {
   const { isOpen, position, panel, context, closeMenu } = useContextMenuStore();
   const menuRef = useRef<HTMLDivElement>(null);
   const submenuRef = useRef<HTMLDivElement>(null);
-  const [openSubmenu, setOpenSubmenu] = useState<{ id: string; position: { x: number; y: number } } | null>(null);
+  const [openSubmenu, setOpenSubmenu] = useState<{ id: string; position: { x: number; y: number }; maxHeight: number } | null>(null);
   const submenuCloseTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [menuPosition, setMenuPosition] = useState<{ x: number; y: number; maxHeight: number } | null>(null);
+  const [mounted, setMounted] = useState(false);
 
   // Close on click outside
   useEffect(() => {
@@ -240,6 +244,7 @@ export function ContextMenu({ actionProviders }: ContextMenuProps) {
   useEffect(() => {
     if (!isOpen) {
       setOpenSubmenu(null);
+      setMenuPosition(null);
       // Clear any pending submenu close timeout
       if (submenuCloseTimeoutRef.current) {
         clearTimeout(submenuCloseTimeoutRef.current);
@@ -247,6 +252,37 @@ export function ContextMenu({ actionProviders }: ContextMenuProps) {
       }
     }
   }, [isOpen]);
+
+  // Calculate menu position when menu opens or when dimensions change
+  useEffect(() => {
+    if (!isOpen || !position || !menuRef.current) return;
+
+    // Wait for menu to render and get dimensions
+    const timeoutId = setTimeout(() => {
+      if (!menuRef.current) return;
+
+      const menuRect = menuRef.current.getBoundingClientRect();
+      const calculatedPosition = calculateMenuPosition({
+        triggerPosition: position,
+        menuDimensions: {
+          width: menuRect.width,
+          height: menuRect.height,
+        },
+        viewportPadding: 8,
+        preferredPlacementX: "right",
+        preferredPlacementY: "bottom",
+      });
+
+      setMenuPosition(calculatedPosition);
+    }, 0);
+
+    return () => clearTimeout(timeoutId);
+  }, [isOpen, position]);
+
+  // Set mounted state for portal rendering
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Don't render if closed or no position
   if (!isOpen || !position || !panel) return null;
@@ -264,17 +300,44 @@ export function ContextMenu({ actionProviders }: ContextMenuProps) {
     const menuRect = menuRef.current?.getBoundingClientRect();
     if (!menuRect) return;
 
-    // Position submenu directly to the right of parent menu container
-    // Use parent menu's right edge (not button's right edge)
-    const submenuX = menuRect.right + 4; // 4px gap
-    const submenuY = buttonRect.top;     // Align with button vertically
+    // Find the submenu actions to get dimensions
+    const provider = actionProviders[panel || ""];
+    if (!provider) return;
+    const sections = provider(context || {});
+
+    // Find the action with submenu
+    let submenuActions: ContextMenuAction[] = [];
+    for (const section of sections) {
+      const action = section.actions.find(a => a.id === actionId);
+      if (action && action.submenu) {
+        submenuActions = action.submenu;
+        break;
+      }
+    }
+
+    if (submenuActions.length === 0) return;
+
+    // Estimate submenu dimensions (will be refined after render)
+    const estimatedHeight = Math.min(submenuActions.length * 32 + 8, 400);
+    const estimatedWidth = 180;
+
+    const calculatedPosition = calculateSubmenuPosition({
+      parentMenuRect: menuRect,
+      parentItemRect: buttonRect,
+      submenuDimensions: {
+        width: estimatedWidth,
+        height: estimatedHeight,
+      },
+      viewportPadding: 8,
+    });
 
     setOpenSubmenu({
       id: actionId,
       position: {
-        x: submenuX,
-        y: submenuY,
+        x: calculatedPosition.x,
+        y: calculatedPosition.y,
       },
+      maxHeight: calculatedPosition.maxHeight,
     });
   };
 
@@ -293,14 +356,24 @@ export function ContextMenu({ actionProviders }: ContextMenuProps) {
     }
   };
 
-  return (
-    <div
-      ref={menuRef}
-      className="fixed z-50 min-w-[180px] rounded-md border border-white/20 bg-white/95 shadow-lg backdrop-blur-sm dark:bg-gray-900/95"
-      style={{
+  // Initial render without positioning (to measure dimensions)
+  const initialMenuStyle = !menuPosition
+    ? {
         left: `${position.x}px`,
         top: `${position.y}px`,
-      }}
+        visibility: "hidden" as const,
+      }
+    : {
+        left: `${menuPosition.x}px`,
+        top: `${menuPosition.y}px`,
+        maxHeight: `${menuPosition.maxHeight}px`,
+      };
+
+  const menuContent = (
+    <div
+      ref={menuRef}
+      className="fixed z-50 min-w-[180px] rounded-md border border-white/20 bg-white/95 shadow-lg backdrop-blur-sm dark:bg-gray-900/95 overflow-y-auto"
+      style={initialMenuStyle}
       onMouseLeave={handleSubmenuClose}
     >
       {sections.map((section, sectionIndex) => (
@@ -349,4 +422,8 @@ export function ContextMenu({ actionProviders }: ContextMenuProps) {
       ))}
     </div>
   );
+
+  // Render in portal to avoid clipping by parent containers
+  if (!mounted) return null;
+  return createPortal(menuContent, document.body);
 }

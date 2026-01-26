@@ -18,7 +18,7 @@ import { DocumentEditor } from "@onlyoffice/document-editor-react";
 import { AlertCircle, Download, Settings } from "lucide-react";
 import { Button } from "@/components/ui/glass/button";
 import { toast } from "sonner";
-import { useUploadSettingsStore } from "@/stores/upload-settings-store";
+import { useUploadSettingsStore } from "@/state/upload-settings-store";
 
 interface OnlyOfficeEditorProps {
   contentId: string;
