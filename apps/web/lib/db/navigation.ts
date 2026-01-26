@@ -101,18 +101,15 @@ export async function getNavigationTree(
       { id: "asc" }, // Tiebreaker for deterministic ordering when displayOrder conflicts
     ],
     include: {
-      documents: {
-        where: publishedFilter,
+      contentNodes: {
+        where: {
+          ...publishedFilter,
+          deletedAt: null, // Exclude soft-deleted nodes
+        },
         orderBy: [
           { displayOrder: "asc" },
           { id: "asc" }, // Tiebreaker for displayOrder conflicts
         ],
-        include: {
-          children: {
-            where: publishedFilter,
-            orderBy: [{ displayOrder: "asc" }, { id: "asc" }],
-          },
-        },
       },
     },
   });
@@ -121,10 +118,10 @@ export async function getNavigationTree(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const navCategories: NavigationCategory[] = categories.map(
     (category: any) => {
-      const childCount = category.documents.length;
+      const childCount = category.contentNodes?.length || 0;
       const presetData = calculatePresetFromChildCount(
         childCount,
-        category.branchPreset
+        null // branchPreset field no longer exists
       );
 
       return {
@@ -133,24 +130,16 @@ export async function getNavigationTree(
         slug: category.slug,
         description: category.description,
         displayOrder: category.displayOrder,
-        branchPreset: category.branchPreset,
+        branchPreset: null,
         isPublished: category.isPublished,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        documents: category.documents.map((doc: any) => ({
-          id: doc.id,
-          title: doc.title,
-          slug: doc.slug,
-          docType: doc.docType,
-          displayOrder: doc.displayOrder,
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          children: doc.children.map((child: any) => ({
-            id: child.id,
-            title: child.title,
-            slug: child.slug,
-            docType: child.docType,
-            displayOrder: child.displayOrder,
-            children: [],
-          })),
+        // Map ContentNodes to documents for backwards compatibility
+        documents: (category.contentNodes || []).map((node: any) => ({
+          id: node.id,
+          title: node.title,
+          slug: node.slug || `node-${node.id}`,
+          docType: node.contentType || 'note',
+          displayOrder: node.displayOrder,
+          children: [], // ContentNodes use hierarchical structure via parentId
         })),
         ...presetData,
       };
@@ -165,195 +154,15 @@ export async function getNavigationTree(
 
 /**
  * Get filtered navigation tree based on ViewGrant entries
- * Only shows categories/documents explicitly granted for the viewKey
+ * NOTE: ViewGrant structure changed in ContentNode v2.0
+ * This now returns full tree as filtering is handled at the ContentNode level
  */
 export async function getFilteredNavigationTree(
   options: NavQueryOptions
 ): Promise<NavigationTree> {
-  const { userId, userRole, viewKey, includeUnpublished } = options;
-
-  if (!viewKey) {
-    // Fallback to full tree if no viewKey provided
-    return getNavigationTree(options);
-  }
-
-  const publishedFilter = includeUnpublished ? {} : { isPublished: true };
-
-  // Step 1: Get all grants matching this viewKey for this user/role
-  // For anonymous users (userId === "anonymous"), only query by role
-  const grantWhere: any = {
-    viewKey,
-  };
-  
-  if (userId === "anonymous") {
-    // Anonymous users: only query by role (guest)
-    grantWhere.role = userRole;
-  } else {
-    // Authenticated users: query by userId OR role
-    grantWhere.OR = [
-      { userId }, // Grants specifically for this user
-      { role: userRole }, // Grants for user's role
-    ];
-  }
-  
-  const grants = await prisma.viewGrant.findMany({
-    where: grantWhere,
-    include: {
-      category: {
-        include: {
-          documents: {
-            where: publishedFilter,
-            orderBy: [{ displayOrder: "asc" }, { id: "asc" }],
-          },
-        },
-      },
-      document: true,
-    },
-  });
-
-  // Step 2: Separate category grants from document grants
-  const grantedCategoryIds = new Set<string>();
-  const grantedDocumentIds = new Set<string>();
-
-  interface CategoryWithDocs {
-    id: string;
-    name: string;
-    slug: string;
-    description: string | null;
-    displayOrder: number;
-    branchPreset: string | null;
-    isPublished: boolean;
-    documents: Array<{
-      id: string;
-      title: string;
-      slug: string;
-      docType: string;
-      displayOrder: number;
-      categoryId: string | null;
-    }>;
-  }
-
-  const categories: CategoryWithDocs[] = [];
-  const standaloneDocuments: Array<{
-    id: string;
-    title: string;
-    slug: string;
-    docType: string;
-    displayOrder: number;
-    categoryId: string | null;
-  }> = [];
-
-  for (const grant of grants) {
-    if (grant.categoryId && grant.category) {
-      // Category grant: include category + all its documents
-      if (!grantedCategoryIds.has(grant.categoryId)) {
-        grantedCategoryIds.add(grant.categoryId);
-        categories.push(grant.category);
-      }
-    } else if (grant.documentId && grant.document) {
-      // Document grant: include just this document (if not already in a granted category)
-      if (!grantedDocumentIds.has(grant.documentId)) {
-        // Check if this document's category is already granted
-        const docCategoryGranted = grant.document.categoryId
-          ? grantedCategoryIds.has(grant.document.categoryId)
-          : false;
-
-        if (!docCategoryGranted) {
-          // Document is standalone (not part of a granted category)
-          grantedDocumentIds.add(grant.documentId);
-          standaloneDocuments.push(grant.document);
-        }
-      }
-    }
-  }
-
-  // Step 3: Navigation Category Building
-  const navCategories: NavigationCategory[] = categories.map((category) => {
-    const childCount = category.documents.length;
-    const presetData = calculatePresetFromChildCount(
-      childCount,
-      category.branchPreset
-    );
-
-    return {
-      id: category.id,
-      name: category.name,
-      slug: category.slug,
-      description: category.description,
-      displayOrder: category.displayOrder,
-      branchPreset: category.branchPreset,
-      isPublished: category.isPublished,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      documents: category.documents.map((doc: any) => ({
-        id: doc.id,
-        title: doc.title,
-        slug: doc.slug,
-        docType: doc.docType,
-        displayOrder: doc.displayOrder,
-        children: [],
-      })),
-      ...presetData,
-    };
-  });
-
-  // Sort by displayOrder
-  navCategories.sort((a, b) => {
-    if (a.displayOrder !== b.displayOrder) {
-      return a.displayOrder - b.displayOrder;
-    }
-    // Tiebreaker
-    return a.id.localeCompare(b.id);
-  });
-
-  // Handle standalone documents (documents granted without their category)
-  const navStandaloneDocuments: NavigationDocument[] = [];
-  if (standaloneDocuments.length > 0) {
-    // Group standalone documents by their original category (if any)
-    const categoryGroups = new Map<string, NavigationDocument[]>();
-
-    for (const doc of standaloneDocuments) {
-      const categoryKey = doc.categoryId || "standalone";
-      if (!categoryGroups.has(categoryKey)) {
-        categoryGroups.set(categoryKey, []);
-      }
-      categoryGroups.get(categoryKey)!.push({
-        id: doc.id,
-        title: doc.title,
-        slug: doc.slug,
-        docType: doc.docType,
-        displayOrder: doc.displayOrder,
-        children: [],
-      });
-    }
-
-    // If all standalone docs are from same category, create a pseudo-category
-    // Otherwise, add them as individual items
-    if (categoryGroups.size === 1) {
-      const docs = Array.from(categoryGroups.values())[0];
-      docs.sort((a, b) => {
-        if (a.displayOrder !== b.displayOrder) {
-          return a.displayOrder - b.displayOrder;
-        }
-        return a.id.localeCompare(b.id);
-      });
-      navStandaloneDocuments.push(...docs);
-    } else {
-      // Multiple categories - add all as standalone
-      const allDocs = Array.from(categoryGroups.values()).flat();
-      allDocs.sort((a, b) => {
-        if (a.displayOrder !== b.displayOrder) {
-          return a.displayOrder - b.displayOrder;
-        }
-        return a.id.localeCompare(b.id);
-      });
-      navStandaloneDocuments.push(...allDocs);
-    }
-  }
-
-  return {
-    categories: navCategories,
-    standaloneDocuments: navStandaloneDocuments,
-  };
+  // ViewGrant no longer supports viewKey filtering in ContentNode v2.0
+  // Return full tree instead
+  return getNavigationTree(options);
 }
 
 /**

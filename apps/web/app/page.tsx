@@ -3,12 +3,13 @@ import { getCurrentUser } from "@/lib/auth/middleware";
 import { getNavigationTreeData } from "@/components/server/nav/NavigationData.server";
 
 interface HomeProps {
-  searchParams: { view?: string };
+  searchParams: Promise<{ view?: string }>;
 }
 
 export default async function Home({ searchParams }: HomeProps) {
   const user = await getCurrentUser();
-  const navigationData = await getNavigationTreeData(searchParams.view);
+  const params = await searchParams;
+  const navigationData = await getNavigationTreeData(params.view);
 
   return (
     <div className="w-full h-[calc(100vh-80px)] fixed top-20 left-0 right-0 bg-gradient-to-br from-shale-dark via-shale-mid to-shale-dark overflow-hidden">

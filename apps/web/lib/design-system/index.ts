@@ -1,18 +1,10 @@
 /**
- * David's Digital Garden Design System
+ * Design System - Liquid Glass
  *
- * Re-exports all design system utilities and tokens
+ * Unified design tokens for Digital Garden Notes Feature.
+ * Used across all routes with different component sources.
  */
 
-export {
-  COLORS,
-  SLATE,
-  GOLD,
-  LEAF,
-  INTENT,
-  BRANCH_COLORS,
-  NEON_BLUE,
-  NEON_GOLD,
-  NEON_GREEN,
-  getBranchColor,
-} from "./colors";
+export * from "./surfaces";
+export * from "./intents";
+export * from "./motion";

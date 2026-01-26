@@ -1,0 +1,17 @@
+{
+  "name": "David's Digital Garden",
+  "short_name": "Digital Garden",
+  "description": "David's Digital Garden is an applied learning space with thoughts, ideas, applications, and projects.",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "any",
+      "type": "image/x-icon"
+    }
+  ],
+  "theme_color": "#4f46e5",
+  "background_color": "#ffffff",
+  "display": "standalone",
+  "start_url": "/",
+  "scope": "/"
+}

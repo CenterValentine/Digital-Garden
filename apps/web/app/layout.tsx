@@ -5,6 +5,8 @@ import "./globals.css";
 
 import Head from "./layout/head";
 import NavBar from "@/components/client/nav/NavBar";
+import { Toaster } from "@/components/client/ui/sonner";
+import { SettingsInitializer } from "@/components/settings/SettingsInitializer";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -30,9 +32,25 @@ export default function RootLayout({
   return (
     <html lang="en">
       <Head></Head>
-      <body className="min-h-screen w-full relative">
-        <NavBar />
-        <main className="pt-20">{children}</main>
+      <body className={`min-h-screen w-full relative ${geistSans.variable} ${geistMono.variable}`}>
+        {/* Initialize user settings on mount */}
+        <SettingsInitializer />
+        {/* Note: /notes route has its own NotesNavBar */}
+        {/* The navbar is hidden via CSS when notes layout renders */}
+        <div className="notes-route-hides-default-nav">
+          <NavBar />
+        </div>
+        <main className="pt-20 notes-route-no-padding">{children}</main>
+        {/* Toast notifications - positioned in top-right corner */}
+        {/* Notes route has navbar at 56px, so toasts appear below it via CSS */}
+        <Toaster
+          position="top-right"
+          expand={false}
+          richColors
+          visibleToasts={3}
+          duration={5000}
+          closeButton
+        />
       </body>
     </html>
   );
