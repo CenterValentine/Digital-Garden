@@ -13,10 +13,10 @@ Successfully extracted the file action system from JSONViewer into a reusable, e
 ### 1. Core Architecture Created
 
 **New Components:**
-- `components/notes/tool-belt/ToolBelt.tsx` - Main action rendering component
-- `components/notes/tool-belt/types.ts` - Complete type system
-- `components/notes/tool-belt/providers/json-provider.tsx` - JSON-specific actions
-- `components/notes/tool-belt/index.ts` - Public exports
+- `components/content/tool-belt/ToolBelt.tsx` - Main action rendering component
+- `components/content/tool-belt/types.ts` - Complete type system
+- `components/content/tool-belt/providers/json-provider.tsx` - JSON-specific actions
+- `components/content/tool-belt/index.ts` - Public exports
 
 **Type System:**
 - `ToolAction` - Individual action definition
@@ -124,14 +124,14 @@ Foundation for AI chat integration (M8+):
 ## Files Changed
 
 ### Created (5 files)
-- `components/notes/tool-belt/ToolBelt.tsx` (180 lines)
-- `components/notes/tool-belt/types.ts` (120 lines)
-- `components/notes/tool-belt/providers/json-provider.tsx` (90 lines)
-- `components/notes/tool-belt/index.ts` (35 lines)
+- `components/content/tool-belt/ToolBelt.tsx` (180 lines)
+- `components/content/tool-belt/types.ts` (120 lines)
+- `components/content/tool-belt/providers/json-provider.tsx` (90 lines)
+- `components/content/tool-belt/index.ts` (35 lines)
 - `docs/notes-feature/TOOL-BELT-ARCHITECTURE.md` (650 lines)
 
 ### Modified (2 files)
-- `components/notes/viewer/JSONViewer.tsx` - Refactored to use ToolBelt
+- `components/content/viewer/JSONViewer.tsx` - Refactored to use ToolBelt
 - `docs/notes-feature/00-index.md` - Added tool belt docs to index
 
 ### Total Impact

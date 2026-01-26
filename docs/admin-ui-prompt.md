@@ -179,7 +179,7 @@ Create TypeScript interfaces matching the Prisma schema and use mock data arrays
 ## File Structure to Create
 
 ```
-apps/web/
+
 ├── app/
 │   └── admin/
 │       ├── layout.tsx              # Admin layout with sidebar

@@ -388,7 +388,7 @@ export function PDFViewer({ url }: { url: string }) {
 
 ### MarkdownEditor (Phase 2)
 
-**File:** `components/notes/MarkdownEditor.tsx`
+**File:** `components/content/MarkdownEditor.tsx`
 
 **Purpose:** Toggle between WYSIWYG and raw markdown editing modes.
 

@@ -582,7 +582,7 @@ export function getEditorExtensions(options: EditorExtensionsOptions) {
   Suggestion.configure({
     ...createTagSuggestion(async (query) => {
       // Fetch tag suggestions from API
-      const response = await fetch(`/api/notes/tags/search?q=${encodeURIComponent(query)}`);
+      const response = await fetch(`/api/content/tags/search?q=${encodeURIComponent(query)}`);
       if (!response.ok) return [];
       const data = await response.json();
       return data.tags || [];
@@ -597,9 +597,9 @@ export function getEditorExtensions(options: EditorExtensionsOptions) {
 
 ### 1. Tag Search/Autocomplete
 
-**Endpoint:** `GET /api/notes/tags/search`
+**Endpoint:** `GET /api/content/tags/search`
 
-**File:** `app/api/notes/tags/search/route.ts`
+**File:** `app/api/content/tags/search/route.ts`
 
 **Query Parameters:**
 - `q` (string): Search query (prefix match)
@@ -671,9 +671,9 @@ export async function GET(request: NextRequest) {
 
 ### 2. Get All Tags
 
-**Endpoint:** `GET /api/notes/tags`
+**Endpoint:** `GET /api/content/tags`
 
-**File:** `app/api/notes/tags/route.ts`
+**File:** `app/api/content/tags/route.ts`
 
 **Query Parameters:**
 - `sortBy` (string, optional): `name`, `count`, `recent` (default: `count`)
@@ -751,9 +751,9 @@ export async function GET(request: NextRequest) {
 
 ### 3. Get Tags for Content
 
-**Endpoint:** `GET /api/notes/content/[id]/tags`
+**Endpoint:** `GET /api/content/content/[id]/tags`
 
-**File:** `app/api/notes/content/[id]/tags/route.ts`
+**File:** `app/api/content/content/[id]/tags/route.ts`
 
 **Response:**
 ```typescript
@@ -811,9 +811,9 @@ export async function GET(
 
 ### 4. Add Tag to Content
 
-**Endpoint:** `POST /api/notes/content/[id]/tags`
+**Endpoint:** `POST /api/content/content/[id]/tags`
 
-**File:** `app/api/notes/content/[id]/tags/route.ts`
+**File:** `app/api/content/content/[id]/tags/route.ts`
 
 **Request Body:**
 ```typescript
@@ -911,9 +911,9 @@ export async function POST(
 
 ### 5. Remove Tag from Content
 
-**Endpoint:** `DELETE /api/notes/content/[id]/tags/[tagId]`
+**Endpoint:** `DELETE /api/content/content/[id]/tags/[tagId]`
 
-**File:** `app/api/notes/content/[id]/tags/[tagId]/route.ts`
+**File:** `app/api/content/content/[id]/tags/[tagId]/route.ts`
 
 **Response:**
 ```typescript
@@ -959,9 +959,9 @@ export async function DELETE(
 
 ### 6. Delete Tag (Admin)
 
-**Endpoint:** `DELETE /api/notes/tags/[id]`
+**Endpoint:** `DELETE /api/content/tags/[id]`
 
-**File:** `app/api/notes/tags/[id]/route.ts`
+**File:** `app/api/content/tags/[id]/route.ts`
 
 **Response:**
 ```typescript
@@ -1010,7 +1010,7 @@ export async function DELETE(
 
 ### 7. Update Content Save Logic
 
-**File:** `app/api/notes/content/[id]/route.ts` (PATCH handler)
+**File:** `app/api/content/content/[id]/route.ts` (PATCH handler)
 
 **Add Tag Extraction:**
 
@@ -1073,7 +1073,7 @@ if (tiptapJson) {
 
 ### 1. Tags Panel (Right Sidebar)
 
-**File:** `components/notes/TagsPanel.tsx`
+**File:** `components/content/TagsPanel.tsx`
 
 ```typescript
 /**
@@ -1132,7 +1132,7 @@ export function TagsPanel() {
     setError(null);
 
     try {
-      const response = await fetch(`/api/notes/content/${selectedContentId}/tags`);
+      const response = await fetch(`/api/content/content/${selectedContentId}/tags`);
       if (!response.ok) throw new Error("Failed to fetch tags");
 
       const data = await response.json();
@@ -1149,7 +1149,7 @@ export function TagsPanel() {
     if (!selectedContentId) return;
 
     try {
-      const response = await fetch(`/api/notes/content/${selectedContentId}/tags/${tagId}`, {
+      const response = await fetch(`/api/content/content/${selectedContentId}/tags/${tagId}`, {
         method: "DELETE",
       });
 
@@ -1270,7 +1270,7 @@ export function TagsPanel() {
 
 ### 2. Update Right Sidebar
 
-**File:** `components/notes/RightSidebar.tsx`
+**File:** `components/content/RightSidebar.tsx`
 
 Add "tags" tab type:
 
@@ -1292,7 +1292,7 @@ export function RightSidebar() {
 }
 ```
 
-**File:** `components/notes/headers/RightSidebarHeader.tsx`
+**File:** `components/content/headers/RightSidebarHeader.tsx`
 
 Add tags button:
 
@@ -1324,7 +1324,7 @@ Add tags button:
 </button>
 ```
 
-**File:** `components/notes/content/RightSidebarContent.tsx`
+**File:** `components/content/content/RightSidebarContent.tsx`
 
 Add tags case:
 
@@ -1356,7 +1356,7 @@ export function RightSidebarContent({ activeTab }: RightSidebarContentProps) {
 
 ### 3. Search Panel Tag Filter
 
-**File:** Update `components/notes/SearchPanel.tsx`
+**File:** Update `components/content/SearchPanel.tsx`
 
 Add tag filter toggle button:
 
@@ -1431,24 +1431,24 @@ Add tag creation command:
    - `validateTag()`
    - **Test:** Unit tests for extraction logic
 
-2. Create API route `app/api/notes/tags/search/route.ts`
+2. Create API route `app/api/content/tags/search/route.ts`
    - GET handler for tag autocomplete
    - **Test:** Query existing tags by prefix
 
-3. Create API route `app/api/notes/tags/route.ts`
+3. Create API route `app/api/content/tags/route.ts`
    - GET handler for listing all tags
    - **Test:** Fetch all tags with counts
 
-4. Create API route `app/api/notes/content/[id]/tags/route.ts`
+4. Create API route `app/api/content/content/[id]/tags/route.ts`
    - GET handler for content tags
    - POST handler for adding tags
    - **Test:** Add/fetch tags for content
 
-5. Create API route `app/api/notes/content/[id]/tags/[tagId]/route.ts`
+5. Create API route `app/api/content/content/[id]/tags/[tagId]/route.ts`
    - DELETE handler for removing tags
    - **Test:** Remove tag association
 
-6. Create API route `app/api/notes/tags/[id]/route.ts`
+6. Create API route `app/api/content/tags/[id]/route.ts`
    - DELETE handler for deleting tags
    - **Test:** Delete tag and verify cascade
 
@@ -1471,7 +1471,7 @@ Add tag creation command:
 ### Phase 3: Auto-Extraction on Save
 **Depends on:** Phase 1 (tag-extractor)
 
-10. Update `app/api/notes/content/[id]/route.ts`
+10. Update `app/api/content/content/[id]/route.ts`
     - Add tag extraction in PATCH handler
     - Auto-create/associate tags from content
     - Remove tags no longer in content
@@ -1480,29 +1480,29 @@ Add tag creation command:
 ### Phase 4: UI Components
 **Depends on:** Phase 1-3 (APIs, extraction)
 
-11. Create `components/notes/TagsPanel.tsx`
+11. Create `components/content/TagsPanel.tsx`
     - Display tags for current content
     - Pill-style tag display
     - Remove tag functionality
     - Click to filter
     - **Test:** View tags, click to filter, remove tag
 
-12. Update `components/notes/RightSidebar.tsx`
+12. Update `components/content/RightSidebar.tsx`
     - Add "tags" tab type
     - **Test:** Tab persistence
 
-13. Update `components/notes/headers/RightSidebarHeader.tsx`
+13. Update `components/content/headers/RightSidebarHeader.tsx`
     - Add tags icon/button
     - **Test:** Click tags tab
 
-14. Update `components/notes/content/RightSidebarContent.tsx`
+14. Update `components/content/content/RightSidebarContent.tsx`
     - Add tags case
     - **Test:** Tags panel renders when tab selected
 
 ### Phase 5: Search Integration
 **Depends on:** Phase 4 (UI components)
 
-15. Update `components/notes/SearchPanel.tsx`
+15. Update `components/content/SearchPanel.tsx`
     - Add tag filter toggle
     - Tag filter UI
     - **Test:** Filter search by tags
@@ -1531,19 +1531,19 @@ Add tag creation command:
 
 ### API Tests
 
-**GET /api/notes/tags/search:**
+**GET /api/content/tags/search:**
 - [ ] Search returns matching tags
 - [ ] Search is case-insensitive
 - [ ] Returns tags with counts
 - [ ] Limit parameter works
 
-**POST /api/notes/content/[id]/tags:**
+**POST /api/content/content/[id]/tags:**
 - [ ] Add new tag creates Tag record
 - [ ] Add existing tag reuses Tag record
 - [ ] Duplicate add is idempotent
 - [ ] Invalid tag name returns error
 
-**DELETE /api/notes/content/[id]/tags/[tagId]:**
+**DELETE /api/content/content/[id]/tags/[tagId]:**
 - [ ] Removes association
 - [ ] Does not delete Tag record
 - [ ] Returns success
@@ -1693,12 +1693,12 @@ Add tag creation command:
 - [ ] `/tag` command inserts `#`
 
 **API Routes:**
-- [ ] GET /api/notes/tags/search
-- [ ] GET /api/notes/tags
-- [ ] GET /api/notes/content/[id]/tags
-- [ ] POST /api/notes/content/[id]/tags
-- [ ] DELETE /api/notes/content/[id]/tags/[tagId]
-- [ ] DELETE /api/notes/tags/[id]
+- [ ] GET /api/content/tags/search
+- [ ] GET /api/content/tags
+- [ ] GET /api/content/content/[id]/tags
+- [ ] POST /api/content/content/[id]/tags
+- [ ] DELETE /api/content/content/[id]/tags/[tagId]
+- [ ] DELETE /api/content/tags/[id]
 
 **Right Sidebar:**
 - [ ] Tags tab added
@@ -1747,18 +1747,18 @@ Add tag creation command:
 1. `lib/content/tag-extractor.ts`
 
 **API Routes (6):**
-2. `app/api/notes/tags/search/route.ts`
-3. `app/api/notes/tags/route.ts`
-4. `app/api/notes/content/[id]/tags/route.ts`
-5. `app/api/notes/content/[id]/tags/[tagId]/route.ts`
-6. `app/api/notes/tags/[id]/route.ts`
+2. `app/api/content/tags/search/route.ts`
+3. `app/api/content/tags/route.ts`
+4. `app/api/content/content/[id]/tags/route.ts`
+5. `app/api/content/content/[id]/tags/[tagId]/route.ts`
+6. `app/api/content/tags/[id]/route.ts`
 
 **Editor (1):**
 7. `lib/editor/tag-suggestion.tsx`
 
 **Components (2):**
-8. `components/notes/TagsPanel.tsx`
-9. `components/notes/TagFilterDropdown.tsx` (optional)
+8. `components/content/TagsPanel.tsx`
+9. `components/content/TagFilterDropdown.tsx` (optional)
 
 **Documentation (1):**
 10. This file: `docs/notes-feature/M6-TAGS-IMPLEMENTATION.md`
@@ -1767,11 +1767,11 @@ Add tag creation command:
 
 1. `lib/editor/extensions.ts` - Add tag suggestion
 2. `lib/editor/slash-commands.tsx` - Add `/tag` command
-3. `app/api/notes/content/[id]/route.ts` - Add tag extraction on save
-4. `components/notes/RightSidebar.tsx` - Add "tags" tab
-5. `components/notes/headers/RightSidebarHeader.tsx` - Add tags icon
-6. `components/notes/content/RightSidebarContent.tsx` - Add tags case
-7. `components/notes/SearchPanel.tsx` - Add tag filter
+3. `app/api/content/content/[id]/route.ts` - Add tag extraction on save
+4. `components/content/RightSidebar.tsx` - Add "tags" tab
+5. `components/content/headers/RightSidebarHeader.tsx` - Add tags icon
+6. `components/content/content/RightSidebarContent.tsx` - Add tags case
+7. `components/content/SearchPanel.tsx` - Add tag filter
 
 **Total:** 17 files (10 new, 7 modified)
 

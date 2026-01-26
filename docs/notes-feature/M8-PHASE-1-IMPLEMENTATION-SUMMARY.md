@@ -163,7 +163,7 @@ model User {
 ## File Tree
 
 ```
-apps/web/
+
 ├── prisma/
 │   └── schema.prisma                          # ✅ Updated User model
 │

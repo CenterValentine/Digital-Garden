@@ -50,7 +50,7 @@ pnpm add allotment @tanstack/react-virtual zustand \
 
 ```typescript
 // app/notes/layout.tsx
-import { NotesLayout } from '@/components/notes/NotesLayout';
+import { NotesLayout } from '@/components/content/NotesLayout';
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   return <NotesLayout>{children}</NotesLayout>;
@@ -59,11 +59,11 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
 **Components to create:**
 
-- `components/notes/NotesLayout.tsx`
-- `components/notes/LeftSidebar.tsx`
-- `components/notes/MainPanel.tsx`
-- `components/notes/RightSidebar.tsx`
-- `components/notes/StatusBar.tsx`
+- `components/content/NotesLayout.tsx`
+- `components/content/LeftSidebar.tsx`
+- `components/content/MainPanel.tsx`
+- `components/content/RightSidebar.tsx`
+- `components/content/StatusBar.tsx`
 
 ### 1.4 State Management Setup
 
@@ -96,7 +96,7 @@ export const usePanelStore = create(
 ### 2.1 File Tree Component
 
 ```typescript
-// components/notes/FileTree.tsx
+// components/content/FileTree.tsx
 import { useVirtualizer } from '@tanstack/react-virtual';
 
 export function FileTree() {
@@ -115,14 +115,14 @@ export function FileTree() {
 
 **Components to create:**
 
-- `components/notes/FileTree.tsx`
-- `components/notes/FileTreeNode.tsx`
-- `components/notes/FolderNode.tsx`
+- `components/content/FileTree.tsx`
+- `components/content/FileTreeNode.tsx`
+- `components/content/FolderNode.tsx`
 
 ### 2.2 API Routes - Files
 
 ```typescript
-// app/api/notes/files/route.ts
+// app/api/content/files/route.ts
 export async function GET(req: Request) {
   const session = await requireAuth();
   const documents = await prisma.structuredDocument.findMany({
@@ -183,16 +183,16 @@ export async function POST(req: Request) {
 
 **API routes to create:**
 
-- `app/api/notes/files/route.ts`
-- `app/api/notes/files/[id]/route.ts`
-- `app/api/notes/tree/route.ts`
+- `app/api/content/files/route.ts`
+- `app/api/content/files/[id]/route.ts`
+- `app/api/content/tree/route.ts`
 
 ## Phase 3: Content Editors (Week 5-6)
 
 ### 3.1 Markdown Editor (Novel/TipTap)
 
 ```typescript
-// components/notes/MarkdownEditor.tsx
+// components/content/MarkdownEditor.tsx
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 
@@ -211,16 +211,16 @@ export function MarkdownEditor({ content, onChange }: EditorProps) {
 
 **Components to create:**
 
-- `components/notes/MarkdownEditor.tsx`
-- `components/notes/CodeEditor.tsx`
-- `components/notes/PDFViewer.tsx`
-- `components/notes/ImageViewer.tsx`
-- `components/notes/VideoPlayer.tsx`
+- `components/content/MarkdownEditor.tsx`
+- `components/content/CodeEditor.tsx`
+- `components/content/PDFViewer.tsx`
+- `components/content/ImageViewer.tsx`
+- `components/content/VideoPlayer.tsx`
 
 ### 3.2 Tab Management
 
 ```typescript
-// components/notes/TabBar.tsx
+// components/content/TabBar.tsx
 export function TabBar() {
   const { tabs, activeTabId, openTab, closeTab } = useTabStore();
 
@@ -242,13 +242,13 @@ export function TabBar() {
 
 **Components to create:**
 
-- `components/notes/TabBar.tsx`
-- `components/notes/Tab.tsx`
+- `components/content/TabBar.tsx`
+- `components/content/Tab.tsx`
 
 ### 3.3 Content API
 
 ```typescript
-// app/api/notes/content/[id]/route.ts
+// app/api/content/content/[id]/route.ts
 export async function GET(
   req: Request,
   { params }: { params: { id: string } }
@@ -326,7 +326,7 @@ export async function PATCH(
 
 **API routes to create:**
 
-- `app/api/notes/content/[id]/route.ts`
+- `app/api/content/content/[id]/route.ts`
 
 ## Phase 3.5: Markdown File Upload (Week 6)
 
@@ -374,7 +374,7 @@ export function tiptapToMarkdown(tiptapJson: object): string {
 ### 3.5.2 Update Upload Handler
 
 ```typescript
-// app/api/notes/content/route.ts
+// app/api/content/content/route.ts
 import { markdownToTiptap } from "@/lib/converters/markdown";
 
 export async function POST(req: Request) {
@@ -418,7 +418,7 @@ export async function POST(req: Request) {
 ### 3.5.3 Client-Side Upload Detection
 
 ```typescript
-// components/notes/FileUploader.tsx
+// components/content/FileUploader.tsx
 async function handleFileUpload(file: File) {
   const mimeType = file.type;
   const extension = file.name.split(".").pop()?.toLowerCase();
@@ -428,7 +428,7 @@ async function handleFileUpload(file: File) {
     const markdownContent = await file.text();
 
     // Upload as note
-    await fetch("/api/notes/content", {
+    await fetch("/api/content/content", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -445,11 +445,11 @@ async function handleFileUpload(file: File) {
 
 **API routes to update:**
 
-- `app/api/notes/content/route.ts`
+- `app/api/content/content/route.ts`
 
 **Components to create:**
 
-- Update `components/notes/FileUploader.tsx`
+- Update `components/content/FileUploader.tsx`
 
 ## Phase 4: File Storage (Week 7-8)
 
@@ -481,7 +481,7 @@ export async function getR2PresignedUrl(key: string, mimeType: string) {
 ### 4.2 Upload API
 
 ```typescript
-// app/api/notes/content/upload/route.ts
+// app/api/content/content/upload/route.ts
 // Phase 1: Initiate upload
 export async function POST(req: Request) {
   const session = await requireAuth();
@@ -537,7 +537,7 @@ export async function POST(req: Request) {
 ```
 
 ```typescript
-// app/api/notes/content/[id]/finalize/route.ts
+// app/api/content/content/[id]/finalize/route.ts
 // Phase 3: Finalize upload
 export async function POST(
   req: Request,
@@ -588,15 +588,15 @@ export async function POST(
 
 **API routes to create:**
 
-- `app/api/notes/files/upload/route.ts`
-- `app/api/notes/files/upload/confirm/route.ts`
+- `app/api/content/files/upload/route.ts`
+- `app/api/content/files/upload/confirm/route.ts`
 
 ## Phase 5: Advanced Features (Week 9-10)
 
 ### 5.1 Command Palette
 
 ```typescript
-// components/notes/CommandPalette.tsx
+// components/content/CommandPalette.tsx
 import { Command, CommandInput, CommandList } from '@/components/ui/command';
 
 export function CommandPalette() {
@@ -627,7 +627,7 @@ export function CommandPalette() {
 ### 5.2 Search Functionality
 
 ```typescript
-// app/api/notes/search/route.ts
+// app/api/content/search/route.ts
 export async function GET(req: Request) {
   const session = await requireAuth();
   const { searchParams } = new URL(req.url);
@@ -661,7 +661,7 @@ export async function GET(req: Request) {
 ### 5.3 Backlinks
 
 ```typescript
-// app/api/notes/backlinks/[id]/route.ts
+// app/api/content/backlinks/[id]/route.ts
 export async function GET(
   req: Request,
   { params }: { params: { id: string } }
@@ -690,7 +690,7 @@ export async function GET(
 ### 6.1 Error Boundaries
 
 ```typescript
-// components/notes/ErrorBoundary.tsx
+// components/content/ErrorBoundary.tsx
 export class NotesErrorBoundary extends React.Component {
   componentDidCatch(error: Error) {
     logError(error);
@@ -708,7 +708,7 @@ export class NotesErrorBoundary extends React.Component {
 ### 6.2 Loading States
 
 ```typescript
-// components/notes/EditorSkeleton.tsx
+// components/content/EditorSkeleton.tsx
 export function EditorSkeleton() {
   return (
     <div className="animate-pulse">

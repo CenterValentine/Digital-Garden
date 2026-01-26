@@ -5,8 +5,8 @@
 ### Files Created
 
 #### API Routes
-- `/app/api/notes/route.ts` - GET (list notes) and POST (create note)
-- `/app/api/notes/[id]/route.ts` - GET (single note), PATCH (update), DELETE (delete)
+- `/app/api/content/route.ts` - GET (list notes) and POST (create note)
+- `/app/api/content/[id]/route.ts` - GET (single note), PATCH (update), DELETE (delete)
 
 #### Components
 - `/app/notes/components/NotesList.tsx` - Sidebar with notes list and "New Note" button
@@ -25,9 +25,9 @@
 
 #### ✅ CRUD Operations
 - **Create**: POST `/api/notes` with title and optional content
-- **Read**: GET `/api/notes` (list all user notes) and GET `/api/notes/[id]` (single note)
-- **Update**: PATCH `/api/notes/[id]` with title and/or content
-- **Delete**: DELETE `/api/notes/[id]` with confirmation dialog
+- **Read**: GET `/api/notes` (list all user notes) and GET `/api/content/[id]` (single note)
+- **Update**: PATCH `/api/content/[id]` with title and/or content
+- **Delete**: DELETE `/api/content/[id]` with confirmation dialog
 
 #### ✅ Data Model
 - Uses existing `StructuredDocument` table with `docType='Note'`

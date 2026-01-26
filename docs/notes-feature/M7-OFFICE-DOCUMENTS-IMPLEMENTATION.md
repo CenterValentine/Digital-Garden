@@ -41,7 +41,7 @@ Implemented a comprehensive multi-tier fallback strategy for Office document vie
 
 **Key Files:**
 ```
-components/notes/viewer/GoogleDocsEditor.tsx
+components/content/viewer/GoogleDocsEditor.tsx
 app/api/google-drive/upload/route.ts
 app/api/auth/provider/route.ts
 ```
@@ -72,7 +72,7 @@ app/api/auth/provider/route.ts
 
 **Key Files:**
 ```
-components/notes/viewer/OnlyOfficeEditor.tsx
+components/content/viewer/OnlyOfficeEditor.tsx
 app/api/onlyoffice/callback/route.ts
 stores/upload-settings-store.ts
 ```
@@ -482,13 +482,13 @@ const config = {
 ### Medium Priority
 
 3. **Navigate to Settings from Error**
-   - File: `components/notes/viewer/OnlyOfficeEditor.tsx`
+   - File: `components/content/viewer/OnlyOfficeEditor.tsx`
    - Status: TODO marked (line 83-84)
    - Need: Implement navigation to settings page
    - Impact: Users must manually navigate to configure ONLYOFFICE
 
 4. **User Context in ONLYOFFICE**
-   - File: `components/notes/viewer/OnlyOfficeEditor.tsx`
+   - File: `components/content/viewer/OnlyOfficeEditor.tsx`
    - Status: TODO marked (line 130-131)
    - Need: Get user ID and name from session
    - Impact: Shows generic "User" instead of actual name

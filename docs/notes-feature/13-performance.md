@@ -9,9 +9,9 @@
 
 ```typescript
 // app/notes/layout.tsx
-const MarkdownEditor = lazy(() => import('@/components/notes/MarkdownEditor'));
-const PDFViewer = lazy(() => import('@/components/notes/PDFViewer'));
-const VideoPlayer = lazy(() => import('@/components/notes/VideoPlayer'));
+const MarkdownEditor = lazy(() => import('@/components/content/MarkdownEditor'));
+const PDFViewer = lazy(() => import('@/components/content/PDFViewer'));
+const VideoPlayer = lazy(() => import('@/components/content/VideoPlayer'));
 
 export default function NotesLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -103,7 +103,7 @@ export function useFileTree() {
 import useSWR from "swr";
 
 export function useDocument(id: string) {
-  return useSWR(`/api/notes/content/${id}`, fetcher, {
+  return useSWR(`/api/content/content/${id}`, fetcher, {
     refreshInterval: 30000, // Refresh every 30s
     revalidateOnFocus: true,
     dedupingInterval: 2000,
@@ -471,7 +471,7 @@ export function useDocumentFetch(id: string) {
   useEffect(() => {
     const abortController = new AbortController();
 
-    fetch(`/api/notes/files/${id}`, {
+    fetch(`/api/content/files/${id}`, {
       signal: abortController.signal,
     });
 

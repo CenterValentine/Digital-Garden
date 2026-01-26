@@ -96,7 +96,7 @@
 - [ ] Create FileUploadDropzone component
 - [ ] Implement drag-and-drop file upload
 - [ ] Add upload progress indicator
-- [ ] Integrate with `/api/notes/content/upload/initiate`
+- [ ] Integrate with `/api/content/content/upload/initiate`
 - [ ] Handle upload finalization
 - **Reference:** M2-CORE-API-README.md (two-phase upload)
 
@@ -212,10 +212,10 @@
 - [ARCHITECTURE-RIGHT-SIDEBAR-REFACTOR.md](ARCHITECTURE-RIGHT-SIDEBAR-REFACTOR.md) - Component patterns
 
 ### Related Code
-- **Tag Schema:** `apps/web/prisma/schema.prisma` (lines ~180-210)
-- **Editor Extensions:** `apps/web/lib/editor/extensions.ts`
-- **Right Sidebar:** `apps/web/components/notes/RightSidebar.tsx`
-- **Search Panel:** `apps/web/components/notes/SearchPanel.tsx`
+- **Tag Schema:** `prisma/schema.prisma` (lines ~180-210)
+- **Editor Extensions:** `lib/editor/extensions.ts`
+- **Right Sidebar:** `components/content/RightSidebar.tsx`
+- **Search Panel:** `components/content/SearchPanel.tsx`
 
 ---
 

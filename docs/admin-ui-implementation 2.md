@@ -288,7 +288,7 @@ This document outlines the implementation plan for building the admin/owner UI t
 ## File Structure
 
 ```
-apps/web/
+
 ├── app/
 │   └── admin/
 │       ├── page.tsx                    # Dashboard

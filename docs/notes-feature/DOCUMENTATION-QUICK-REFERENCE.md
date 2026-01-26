@@ -24,7 +24,7 @@ This is a quick reference guide to navigating the Digital Garden Notes IDE docum
 ## 📁 Documentation Structure at a Glance
 
 ```
-apps/web/docs/notes-feature/
+docs/notes-feature/
 │
 ├── 🎯 START HERE
 │   ├── CURRENT-STATE.md              # Active work (updated weekly)
@@ -130,24 +130,24 @@ apps/web/docs/notes-feature/
 
 **Find implementation patterns:**
 ```bash
-grep -r "pattern-name" apps/web/docs/notes-feature/M*-*.md
+grep -r "pattern-name" docs/notes-feature/M*-*.md
 ```
 
 **Find architectural decisions:**
 ```bash
-grep -r "decision" apps/web/docs/notes-feature/*ARCHITECTURE*.md
+grep -r "decision" docs/notes-feature/*ARCHITECTURE*.md
 ```
 
 **Find why something was done a certain way:**
 ```bash
 # Check session logs in archive
-grep -r "why" apps/web/docs/notes-feature/archive/sessions/
+grep -r "why" docs/notes-feature/archive/sessions/
 ```
 
 **Find what's blocking current work:**
 ```bash
 # Check CURRENT-STATE.md "Blockers" section
-grep -A 10 "Blockers" apps/web/docs/notes-feature/CURRENT-STATE.md
+grep -A 10 "Blockers" docs/notes-feature/CURRENT-STATE.md
 ```
 
 ---
@@ -247,10 +247,10 @@ grep -A 10 "Blockers" apps/web/docs/notes-feature/CURRENT-STATE.md
 
 ```bash
 # What am I working on?
-cat apps/web/docs/notes-feature/CURRENT-STATE.md
+cat docs/notes-feature/CURRENT-STATE.md
 
 # What's the overall status?
-cat apps/web/docs/notes-feature/IMPLEMENTATION-STATUS.md
+cat docs/notes-feature/IMPLEMENTATION-STATUS.md
 
 # How do I run the dev server?
 cd apps/web && pnpm dev
@@ -259,7 +259,7 @@ cd apps/web && pnpm dev
 cd apps/web && npx prisma migrate reset --force
 
 # Where's the master index?
-cat apps/web/docs/notes-feature/00-index.md
+cat docs/notes-feature/00-index.md
 
 # What commands are available?
 cat CLAUDE.md  # From repo root

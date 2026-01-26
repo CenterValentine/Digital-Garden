@@ -30,7 +30,7 @@ Let's walk through adding support for PDF documents as a new content type.
 
 ### Step 1: Update Type Definitions
 
-**File:** `components/notes/FileNode.tsx` (and propagate through chain)
+**File:** `components/content/FileNode.tsx` (and propagate through chain)
 
 **Before:**
 ```typescript
@@ -49,9 +49,9 @@ onCreate?: (
 ```
 
 **Files to Update:**
-1. `components/notes/FileNode.tsx` - Interface definition
-2. `components/notes/FileTree.tsx` - Props interface
-3. `components/notes/content/LeftSidebarContent.tsx` - Handler signature
+1. `components/content/FileNode.tsx` - Interface definition
+2. `components/content/FileTree.tsx` - Props interface
+3. `components/content/content/LeftSidebarContent.tsx` - Handler signature
 
 **Time:** ~2 minutes (3 one-line changes)
 
@@ -59,7 +59,7 @@ onCreate?: (
 
 ### Step 2: Add Menu Item to Sub-Menu
 
-**File:** `components/notes/context-menu/file-tree-actions.tsx`
+**File:** `components/content/context-menu/file-tree-actions.tsx`
 
 **Location:** Inside the `submenu` array of the "Create" action (lines 112-148)
 
@@ -123,7 +123,7 @@ interface FileTreeContext extends BaseContextMenuContext {
 
 ### Step 3: Add Payload Configuration to Handler
 
-**File:** `components/notes/content/LeftSidebarContent.tsx`
+**File:** `components/content/content/LeftSidebarContent.tsx`
 
 **Location:** Inside `handleCreate` function (lines 374-466)
 
@@ -182,7 +182,7 @@ if (type === "folder") {
 
 **Wire callback in FileNode:**
 
-**File:** `components/notes/FileNode.tsx`
+**File:** `components/content/FileNode.tsx`
 
 ```typescript
 // In handleContextMenu
@@ -209,10 +209,10 @@ openMenu("file-tree", { x: e.clientX, y: e.clientY }, {
 **~10 minutes** for a developer familiar with the codebase.
 
 **Files Modified:**
-1. `components/notes/FileNode.tsx` - 2 changes (type union + callback wire)
-2. `components/notes/FileTree.tsx` - 1 change (type union)
-3. `components/notes/content/LeftSidebarContent.tsx` - 2 changes (type union + defaults object)
-4. `components/notes/context-menu/file-tree-actions.tsx` - 2 changes (interface + menu item)
+1. `components/content/FileNode.tsx` - 2 changes (type union + callback wire)
+2. `components/content/FileTree.tsx` - 1 change (type union)
+3. `components/content/content/LeftSidebarContent.tsx` - 2 changes (type union + defaults object)
+4. `components/content/context-menu/file-tree-actions.tsx` - 2 changes (interface + menu item)
 
 **Total:** 5 files, 7 small changes
 
@@ -319,7 +319,7 @@ export function getCreateMenuItems(): Array<{
     onClick: async (parentId: string | null) => {
       const payload = type.createPayload(parentId);
       // Make API call with payload
-      await fetch("/api/notes/content", {
+      await fetch("/api/content/content", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -511,9 +511,9 @@ If you grow to 10+ types or need dynamic type management, consider migrating to 
 - [ ] Test: Menu appears, API call correct, tree refreshes
 
 **Files:**
-1. `components/notes/FileNode.tsx`
-2. `components/notes/FileTree.tsx`
-3. `components/notes/content/LeftSidebarContent.tsx`
-4. `components/notes/context-menu/file-tree-actions.tsx`
+1. `components/content/FileNode.tsx`
+2. `components/content/FileTree.tsx`
+3. `components/content/content/LeftSidebarContent.tsx`
+4. `components/content/context-menu/file-tree-actions.tsx`
 
 **Time:** ~10 minutes

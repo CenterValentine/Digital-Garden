@@ -41,7 +41,7 @@ RightSidebar (Client Component - State Manager)
 
 ## Files Modified
 
-### 1. `components/notes/RightSidebar.tsx`
+### 1. `components/content/RightSidebar.tsx`
 **Changed:** Server Component → Client Component
 
 **Responsibilities:**
@@ -71,7 +71,7 @@ export function RightSidebar() {
 }
 ```
 
-### 2. `components/notes/headers/RightSidebarHeader.tsx`
+### 2. `components/content/headers/RightSidebarHeader.tsx`
 **Changed:** Server Component → Client Component with props
 
 **Responsibilities:**
@@ -107,7 +107,7 @@ export function RightSidebarHeader({ activeTab, onTabChange }: RightSidebarHeade
 }
 ```
 
-### 3. `components/notes/content/RightSidebarContent.tsx`
+### 3. `components/content/content/RightSidebarContent.tsx`
 **Changed:** Removed internal tab state, now receives via props
 
 **Responsibilities:**

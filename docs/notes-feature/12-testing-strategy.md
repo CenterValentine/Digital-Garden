@@ -21,7 +21,7 @@
 ```typescript
 // __tests__/components/FileTree.test.tsx
 import { render, screen, fireEvent } from '@testing-library/react';
-import { FileTree } from '@/components/notes/FileTree';
+import { FileTree } from '@/components/content/FileTree';
 
 describe('FileTree', () => {
   it('renders file tree nodes', () => {
@@ -49,12 +49,12 @@ describe('FileTree', () => {
 ### API Route Tests (Jest)
 
 ```typescript
-// __tests__/api/notes/files.test.ts
-import { POST } from "@/app/api/notes/files/route";
+// __tests__/api/content/files.test.ts
+import { POST } from "@/app/api/content/files/route";
 
-describe("POST /api/notes/files", () => {
+describe("POST /api/content/files", () => {
   it("creates a new document", async () => {
-    const request = new Request("http://localhost/api/notes/files", {
+    const request = new Request("http://localhost/api/content/files", {
       method: "POST",
       body: JSON.stringify({
         docType: "Note",
@@ -72,7 +72,7 @@ describe("POST /api/notes/files", () => {
 
   it("requires authentication", async () => {
     // Test without auth session
-    const request = new Request("http://localhost/api/notes/files", {
+    const request = new Request("http://localhost/api/content/files", {
       method: "POST",
     });
 
@@ -95,7 +95,7 @@ describe("File Upload Flow", () => {
 
   it("completes full upload flow", async () => {
     // 1. Get presigned URL
-    const presignedResponse = await fetch("/api/notes/files/upload", {
+    const presignedResponse = await fetch("/api/content/files/upload", {
       method: "POST",
       body: JSON.stringify({
         fileName: "test.pdf",
@@ -110,7 +110,7 @@ describe("File Upload Flow", () => {
     await mockStorageUpload(uploadUrl, testFile);
 
     // 3. Confirm upload
-    const confirmResponse = await fetch("/api/notes/files/upload/confirm", {
+    const confirmResponse = await fetch("/api/content/files/upload/confirm", {
       method: "POST",
       body: JSON.stringify({ contentId }),
     });

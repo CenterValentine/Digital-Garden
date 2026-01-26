@@ -183,7 +183,7 @@ interface AdminSettings {
 
 ## Settings API
 
-### GET /api/notes/settings
+### GET /api/content/settings
 ```typescript
 export async function GET(req: Request) {
   const session = await requireAuth();
@@ -198,7 +198,7 @@ export async function GET(req: Request) {
 }
 ```
 
-### PATCH /api/notes/settings
+### PATCH /api/content/settings
 ```typescript
 export async function PATCH(req: Request) {
   const session = await requireAuth();

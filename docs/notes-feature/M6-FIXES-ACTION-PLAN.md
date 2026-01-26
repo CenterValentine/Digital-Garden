@@ -142,7 +142,7 @@ User types: [ ]
 **Status:** COMPLETED ✅
 
 **Files Modified:**
-- `components/notes/editor/LinkDialog.tsx` (lines 53-101)
+- `components/content/editor/LinkDialog.tsx` (lines 53-101)
   - Added `const isInLink = editor.isActive("link");`
   - Reordered conditional logic to check `isInLink` first
   - All three use cases now work correctly
@@ -213,7 +213,7 @@ useEffect(() => {
 **Status:** COMPLETED ✅
 
 **Files Modified:**
-- `components/notes/editor/BubbleMenu.tsx` (lines 13, 37-55)
+- `components/content/editor/BubbleMenu.tsx` (lines 13, 37-55)
   - Added `useState` and `useEffect` imports
   - Added selection update listener
   - Forces re-render on every selection/transaction change
@@ -242,8 +242,8 @@ useEffect(() => {
 **Priority:** LOW - Menus work without conflicts, may be unnecessary
 
 **Files to Review:**
-- `components/notes/editor/BubbleMenu.tsx` (lines 15, 28, 43)
-- `components/notes/editor/TableBubbleMenu.tsx` (lines 15, 27, 41)
+- `components/content/editor/BubbleMenu.tsx` (lines 15, 28, 43)
+- `components/content/editor/TableBubbleMenu.tsx` (lines 15, 27, 41)
 
 **Investigation:**
 ```javascript
@@ -283,8 +283,8 @@ window.__tiptapEditor.view.state.plugins.forEach(p => {
 **Status:** COMPLETED ✅ (Already implemented)
 
 **Files Verified:**
-- `components/notes/editor/BubbleMenu.tsx` (line 79)
-- `components/notes/editor/TableBubbleMenu.tsx` (line 47)
+- `components/content/editor/BubbleMenu.tsx` (line 79)
+- `components/content/editor/TableBubbleMenu.tsx` (line 47)
 
 **Note:** If styles don't appear correct in browser, check:
 1. Tailwind CSS is building correctly (`pnpm build:tokens`)

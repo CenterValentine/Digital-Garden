@@ -109,7 +109,7 @@ Comprehensive guide with:
 
 **1. Upload API saves file ID to metadata:**
 ```typescript
-// apps/web/app/api/google-drive/upload/route.ts
+// app/api/google-drive/upload/route.ts
 const updatedMetadata = setGoogleDriveMetadata(filePayload.storageMetadata, {
   fileId: uploadResult.id,
   lastSynced: new Date().toISOString(),
@@ -284,9 +284,9 @@ If you need breaking changes:
 
 ### Modified
 - `app/api/google-drive/upload/route.ts` - Save file ID to metadata after upload
-- `components/notes/viewer/GoogleDocsEditor.tsx` - Check metadata before upload, reuse existing files
+- `components/content/viewer/GoogleDocsEditor.tsx` - Check metadata before upload, reuse existing files
 - `lib/content/api-types.ts` - Add `storageMetadata` to API response type
-- `app/api/notes/content/[id]/route.ts` - Include `storageMetadata` in GET response
+- `app/api/content/content/[id]/route.ts` - Include `storageMetadata` in GET response
 
 ### No Changes Required
 - `prisma/schema.prisma` - Existing `storageMetadata Json @default("{}")` field reused (no migration needed)

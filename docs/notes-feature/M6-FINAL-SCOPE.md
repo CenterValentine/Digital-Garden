@@ -171,8 +171,8 @@ Rendering bug in `@tiptap/extension-table` v3.15.3. Attempted 6+ different fixes
 - Slash commands still available as alternative
 
 **Related Files:**
-- `components/notes/editor/TableBubbleMenu.tsx` - Table-specific bubble menu
-- `components/notes/editor/MarkdownEditor.tsx` - Integrated table menu
+- `components/content/editor/TableBubbleMenu.tsx` - Table-specific bubble menu
+- `components/content/editor/MarkdownEditor.tsx` - Integrated table menu
 - `lib/editor/extensions.ts` - Table configuration
 
 ### M8: Settings & Preferences
@@ -314,9 +314,9 @@ Rendering bug in `@tiptap/extension-table` v3.15.3. Attempted 6+ different fixes
 ## Files to Create
 
 ### API Routes (3)
-1. `app/api/notes/search/route.ts`
-2. `app/api/notes/backlinks/[id]/route.ts`
-3. `app/api/notes/outline/[id]/route.ts`
+1. `app/api/content/search/route.ts`
+2. `app/api/content/backlinks/[id]/route.ts`
+3. `app/api/content/outline/[id]/route.ts`
 
 ### Utilities (4)
 1. `lib/content/link-extractor.ts`
@@ -325,23 +325,23 @@ Rendering bug in `@tiptap/extension-table` v3.15.3. Attempted 6+ different fixes
 4. `lib/editor/extensions/wiki-link.ts`
 
 ### Components (10)
-1. `components/notes/search/SearchPanel.tsx`
-2. `components/notes/search/SearchResult.tsx`
-3. `components/notes/backlinks/BacklinksPanel.tsx`
-4. `components/notes/backlinks/BacklinkItem.tsx`
-5. `components/notes/outline/OutlinePanel.tsx`
-6. `components/notes/outline/OutlineItem.tsx`
-7. `components/notes/tags/TagsPanel.tsx`
-8. `components/notes/tags/TagInput.tsx`
-9. `components/notes/editor/SlashCommandMenu.tsx`
-10. `components/notes/editor/LinkDialog.tsx`
+1. `components/content/search/SearchPanel.tsx`
+2. `components/content/search/SearchResult.tsx`
+3. `components/content/backlinks/BacklinksPanel.tsx`
+4. `components/content/backlinks/BacklinkItem.tsx`
+5. `components/content/outline/OutlinePanel.tsx`
+6. `components/content/outline/OutlineItem.tsx`
+7. `components/content/tags/TagsPanel.tsx`
+8. `components/content/tags/TagInput.tsx`
+9. `components/content/editor/SlashCommandMenu.tsx`
+10. `components/content/editor/LinkDialog.tsx`
 
 ### Modified Files (6)
 1. `stores/content-store.ts` - Add URL/localStorage persistence
-2. `components/notes/RightSidebar.tsx` - Tab navigation
-3. `components/notes/StatusBar.tsx` - Word count display
+2. `components/content/RightSidebar.tsx` - Tab navigation
+3. `components/content/StatusBar.tsx` - Word count display
 4. `lib/editor/extensions.ts` - Add all new extensions
-5. `app/api/notes/content/[id]/route.ts` - Extract links/tags on save
+5. `app/api/content/content/[id]/route.ts` - Extract links/tags on save
 6. `prisma/schema.prisma` - Add Tag table
 
 ### Database Migration (1)

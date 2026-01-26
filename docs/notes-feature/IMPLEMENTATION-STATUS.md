@@ -55,32 +55,32 @@
 
 Content Management:
 
-- `GET /api/notes/content` - List with filtering
-- `POST /api/notes/content` - Create notes/folders/HTML/code
-- `GET /api/notes/content/[id]` - Get with full payload
-- `PATCH /api/notes/content/[id]` - Update
-- `DELETE /api/notes/content/[id]` - Soft delete
+- `GET /api/content/content` - List with filtering
+- `POST /api/content/content` - Create notes/folders/HTML/code
+- `GET /api/content/content/[id]` - Get with full payload
+- `PATCH /api/content/content/[id]` - Update
+- `DELETE /api/content/content/[id]` - Soft delete
 
 File Tree:
 
-- `GET /api/notes/content/tree` - Hierarchical tree
+- `GET /api/content/content/tree` - Hierarchical tree
 
 Operations:
 
-- `POST /api/notes/content/move` - Drag-and-drop
+- `POST /api/content/content/move` - Drag-and-drop
 
 File Upload:
 
-- `POST /api/notes/content/upload/initiate` - Phase 1
-- `POST /api/notes/content/upload/finalize` - Phase 2
+- `POST /api/content/content/upload/initiate` - Phase 1
+- `POST /api/content/content/upload/finalize` - Phase 2
 
 Storage Config:
 
-- `GET /api/notes/storage` - List configs
-- `POST /api/notes/storage` - Create config
-- `GET /api/notes/storage/[id]` - Get config
-- `PATCH /api/notes/storage/[id]` - Update config
-- `DELETE /api/notes/storage/[id]` - Delete config
+- `GET /api/content/storage` - List configs
+- `POST /api/content/storage` - Create config
+- `GET /api/content/storage/[id]` - Get config
+- `PATCH /api/content/storage/[id]` - Update config
+- `DELETE /api/content/storage/[id]` - Delete config
 
 **Type Safety:**
 
@@ -149,8 +149,8 @@ Phase 3: Route Structure
 
 - `lib/design-system/` - Design tokens (4 files)
 - `stores/panel-store.ts` - State management
-- `components/notes/` - Layout components (5 files)
-- `app/(authenticated)/notes/` - Route structure
+- `components/content/` - Layout components (5 files)
+- `app/(authenticated)/content/` - Route structure
 - `docs/notes-feature/M3-SETUP-GUIDE.md` - Setup instructions
 
 **Design Principles:**
@@ -178,8 +178,8 @@ Phase 3: Route Structure
 
 - ✅ React Arborist integration (virtualized tree)
 - ✅ Drag-and-drop support with optimistic UI
-- ✅ File tree API integration (`GET /api/notes/content/tree`)
-- ✅ Move API integration (`POST /api/notes/content/move`)
+- ✅ File tree API integration (`GET /api/content/content/tree`)
+- ✅ Move API integration (`POST /api/content/content/move`)
 - ✅ Content selection state management (Zustand)
 - ✅ Custom file/folder icons
 - ✅ Tree node styling with glassmorphism
@@ -188,10 +188,10 @@ Phase 3: Route Structure
 
 **Key Components:**
 
-- `components/notes/FileTree.tsx` - React Arborist wrapper
-- `components/notes/FileNode.tsx` - Individual tree node
-- `components/notes/content/LeftSidebarContent.tsx` - Tree integration
-- `components/notes/context-menu/` - Context menu system
+- `components/content/FileTree.tsx` - React Arborist wrapper
+- `components/content/FileNode.tsx` - Individual tree node
+- `components/content/content/LeftSidebarContent.tsx` - Tree integration
+- `components/content/context-menu/` - Context menu system
 - `stores/content-store.ts` - Selection state
 - `stores/tree-state-store.ts` - Tree expansion and selection persistence
 - `stores/context-menu-store.ts` - Context menu state
@@ -214,7 +214,7 @@ Phase 3: Route Structure
 
 - ❌ **Cascade Soft Delete:** Delete operations only soft-delete parent nodes (no recursive cascade to children)
   - Children become inaccessible when parent is deleted but remain in database with `deletedAt: null`
-  - **Recommendation:** Implement recursive soft delete in `DELETE /api/notes/content/[id]` API endpoint
+  - **Recommendation:** Implement recursive soft delete in `DELETE /api/content/content/[id]` API endpoint
   - Should traverse children and set `deletedAt` + `deletedBy` for all descendants
   - Would match user expectation: "delete folder = delete contents"
 
@@ -249,9 +249,9 @@ Phase 3: Route Structure
 
 **Key Components:**
 
-- `components/notes/editor/MarkdownEditor.tsx` - TipTap wrapper
+- `components/content/editor/MarkdownEditor.tsx` - TipTap wrapper
 - `lib/editor/extensions.ts` - Editor configuration
-- `components/notes/content/MainPanelContent.tsx` - Editor integration
+- `components/content/content/MainPanelContent.tsx` - Editor integration
 - `app/globals.css` - TipTap styling (headings, lists, code, etc.)
 
 **Editor Features:**
@@ -322,19 +322,19 @@ Phase 3: Route Structure
 **Key Components:**
 
 Search System:
-- `components/notes/SearchPanel.tsx` - Search UI with filters
+- `components/content/SearchPanel.tsx` - Search UI with filters
 - `stores/search-store.ts` - Search state management
 - `lib/search/filters.ts` - Advanced filtering logic
 
 Wiki-Links & Backlinks:
 - `lib/editor/wiki-link-node.ts` - TipTap wiki-link extension
 - `lib/editor/wiki-link-suggestion.tsx` - Autocomplete UI
-- `components/notes/BacklinksPanel.tsx` - Backlinks display
-- `app/api/notes/backlinks/route.ts` - Backlinks API
+- `components/content/BacklinksPanel.tsx` - Backlinks display
+- `app/api/content/backlinks/route.ts` - Backlinks API
 
 Outline System:
 - `lib/content/outline-extractor.ts` - Heading extraction from TipTap JSON
-- `components/notes/OutlinePanel.tsx` - Hierarchical outline display
+- `components/content/OutlinePanel.tsx` - Hierarchical outline display
 - `stores/outline-store.ts` - Outline state management
 
 Editor Extensions:
@@ -344,9 +344,9 @@ Editor Extensions:
 - `lib/editor/bullet-list-backspace.ts` - Improved list navigation
 
 Right Sidebar:
-- `components/notes/RightSidebar.tsx` - Client wrapper with tab state
-- `components/notes/headers/RightSidebarHeader.tsx` - Tab navigation
-- `components/notes/content/RightSidebarContent.tsx` - Panel routing
+- `components/content/RightSidebar.tsx` - Client wrapper with tab state
+- `components/content/headers/RightSidebarHeader.tsx` - Tab navigation
+- `components/content/content/RightSidebarContent.tsx` - Panel routing
 
 **Features Breakdown:**
 
@@ -438,11 +438,11 @@ Error Handling Pattern:
 
 Key Files Modified:
 - `app/layout.tsx` - Added Toaster component
-- `app/(authenticated)/notes/layout.tsx` - Added Toaster with offset
+- `app/(authenticated)/content/layout.tsx` - Added Toaster with offset
 - `components/client/ui/sonner.tsx` - Custom styling for full-width banners
-- `components/notes/content/LeftSidebarContent.tsx` - Toast notifications for all operations
-- `components/notes/TagsPanel.tsx` - Temp ID detection
-- `components/notes/content/MainPanelContent.tsx` - Temp ID detection
+- `components/content/content/LeftSidebarContent.tsx` - Toast notifications for all operations
+- `components/content/TagsPanel.tsx` - Temp ID detection
+- `components/content/content/MainPanelContent.tsx` - Temp ID detection
 
 **Known Limitations:**
 
@@ -476,18 +476,18 @@ Tag Features Implemented:
 - Inline rendering: Tags appear as colored pills in editor
 
 API Routes Implemented:
-1. ✅ `GET /api/notes/tags` - List all tags with counts and colors
-2. ✅ `GET /api/notes/tags/content/[id]` - Get tags for specific content with positions
-3. ✅ `POST /api/notes/tags` - Create new tag (auto-called by editor)
-4. ✅ `GET /api/notes/search` - Enhanced with tag filtering support
+1. ✅ `GET /api/content/tags` - List all tags with counts and colors
+2. ✅ `GET /api/content/tags/content/[id]` - Get tags for specific content with positions
+3. ✅ `POST /api/content/tags` - Create new tag (auto-called by editor)
+4. ✅ `GET /api/content/search` - Enhanced with tag filtering support
 5. ✅ Tag autocomplete integrated into editor extension
 
 Components Implemented:
-- ✅ `components/notes/TagsPanel.tsx` - Main tags UI with pills and occurrence tracking
+- ✅ `components/content/TagsPanel.tsx` - Main tags UI with pills and occurrence tracking
 - ✅ `lib/editor/tag-extension.ts` - TipTap node extension with double-click editing
 - ✅ `lib/editor/tag-suggestion.tsx` - Autocomplete suggestion popup
-- ✅ `components/notes/RightSidebar.tsx` - Updated with Tags tab
-- ✅ `components/notes/SearchPanel.tsx` - Multi-select tag filter
+- ✅ `components/content/RightSidebar.tsx` - Updated with Tags tab
+- ✅ `components/content/SearchPanel.tsx` - Multi-select tag filter
 
 **Supporting Documentation:**
 
@@ -527,9 +527,9 @@ Office Document Viewing (January 23, 2026):
 **Key Components:**
 
 Office Document Viewers:
-- `components/notes/viewer/GoogleDocsEditor.tsx` - Google Docs integration (edit + view)
-- `components/notes/viewer/OnlyOfficeEditor.tsx` - ONLYOFFICE integration
-- `components/notes/viewer/OfficeDocumentViewer.tsx` - Multi-tier fallback logic
+- `components/content/viewer/GoogleDocsEditor.tsx` - Google Docs integration (edit + view)
+- `components/content/viewer/OnlyOfficeEditor.tsx` - ONLYOFFICE integration
+- `components/content/viewer/OfficeDocumentViewer.tsx` - Multi-tier fallback logic
 - `app/api/google-drive/upload/route.ts` - Google Drive upload API
 - `app/api/auth/provider/route.ts` - OAuth provider detection
 - `app/api/onlyoffice/callback/route.ts` - ONLYOFFICE auto-save callback
@@ -577,11 +577,11 @@ Media Viewers (January 23, 2026):
   - ✅ Keyboard shortcuts (Space, arrows, M, L)
 
 **Key Components (Media Viewers):**
-- `components/notes/viewer/ImageViewer.tsx` - Enhanced image viewer
-- `components/notes/viewer/PDFViewer.tsx` - Enhanced PDF viewer
-- `components/notes/viewer/VideoPlayer.tsx` - Custom video player
-- `components/notes/viewer/AudioPlayer.tsx` - Waveform audio player
-- `components/notes/viewer/FileViewer.tsx` - Router to appropriate viewer
+- `components/content/viewer/ImageViewer.tsx` - Enhanced image viewer
+- `components/content/viewer/PDFViewer.tsx` - Enhanced PDF viewer
+- `components/content/viewer/VideoPlayer.tsx` - Custom video player
+- `components/content/viewer/AudioPlayer.tsx` - Waveform audio player
+- `components/content/viewer/FileViewer.tsx` - Router to appropriate viewer
 
 **Completed M7 Deliverables (January 23, 2026):**
 - ✅ Drag-and-drop file upload to tree (working with multiple files)
@@ -735,7 +735,7 @@ Add "D" and "G" text on either side of the medallion logo in the notes navbar fo
 - Location: `components/client/logo/NotesLogo.tsx`
 - NotesNavBar height: 56px (compact, down from 72px standard navbar)
 - Profile menu with z-index 200 to appear above all panels
-- CSS hides default navbar on `/notes` route (see `globals.css`)
+- CSS hides default navbar on `/content` route (see `globals.css`)
 
 **Proposed Design:**
 ```
@@ -827,17 +827,17 @@ pnpm tsc --watch --noEmit
 
 ```bash
 # List content
-curl http://localhost:3000/api/notes/content \
+curl http://localhost:3000/api/content/content \
   -H "Cookie: session=..."
 
 # Create note
-curl -X POST http://localhost:3000/api/notes/content \
+curl -X POST http://localhost:3000/api/content/content \
   -H "Cookie: session=..." \
   -H "Content-Type: application/json" \
   -d '{"title":"Test Note","tiptapJson":{"type":"doc","content":[]}}'
 
 # Get tree
-curl http://localhost:3000/api/notes/content/tree \
+curl http://localhost:3000/api/content/content/tree \
   -H "Cookie: session=..."
 ```
 
@@ -866,9 +866,9 @@ curl http://localhost:3000/api/notes/content/tree \
 
 4. **Implement panel layout:**
    - `stores/panel-store.ts`
-   - `components/notes/PanelLayout.tsx`
-   - `components/notes/LeftSidebar.tsx`
-   - `components/notes/RightSidebar.tsx`
+   - `components/content/PanelLayout.tsx`
+   - `components/content/LeftSidebar.tsx`
+   - `components/content/RightSidebar.tsx`
 
 ### Upcoming Milestones
 

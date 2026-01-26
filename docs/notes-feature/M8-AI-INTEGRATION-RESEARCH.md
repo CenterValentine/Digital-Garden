@@ -932,7 +932,7 @@ async function migrateConversation(oldFormat: any) {
            ↓
 ┌─────────────────────┐
 │  Notes API          │
-│  /api/notes/...     │
+│  /api/content/...     │
 └─────────────────────┘
 ```
 

@@ -32,7 +32,7 @@ FILE_SIZE_LIMITS = {
 - Images: .jpg, .png, .gif, .webp, .svg, .avif
 - Videos: .mp4, .webm, .mov, .avi, .mkv
 
-### 2. Drag-and-Drop UI (`components/notes/content/LeftSidebarContent.tsx`)
+### 2. Drag-and-Drop UI (`components/content/content/LeftSidebarContent.tsx`)
 
 **Event Handling:**
 Uses react-dnd's `useDrop` hook to integrate with react-arborist's existing DndProvider:
@@ -65,7 +65,7 @@ const [{ isOver, canDrop }, dropRef] = useDrop(
 - Valid files are passed to `LeftSidebar` via callback
 - `LeftSidebar` opens `FileUploadDialog` with validated files
 
-### 3. Dialog Integration (`components/notes/dialogs/FileUploadDialog.tsx`)
+### 3. Dialog Integration (`components/content/dialogs/FileUploadDialog.tsx`)
 
 **New Props:**
 - `initialFiles?: File[]` - Pre-populate dialog with dropped files
@@ -272,10 +272,10 @@ if (validFiles.length > 0) {
 ## Code Locations
 
 ```
-apps/web/
+
 ├── lib/media/
 │   └── file-validation.ts                    # NEW: Validation utilities
-├── components/notes/
+├── components/content/
 │   ├── LeftSidebar.tsx                       # MODIFIED: File drop state management
 │   ├── content/
 │   │   └── LeftSidebarContent.tsx            # MODIFIED: useDrop hook + overlay
@@ -330,7 +330,7 @@ This causes:
 
 **Implementation:** (2026-01-22)
 
-**Step 1: Add useDrop to LeftSidebarContent** (`components/notes/content/LeftSidebarContent.tsx`)
+**Step 1: Add useDrop to LeftSidebarContent** (`components/content/content/LeftSidebarContent.tsx`)
 ```tsx
 import { useDrop } from "react-dnd";
 import { NativeTypes } from "react-dnd-html5-backend";
@@ -383,7 +383,7 @@ export function LeftSidebarContent({ onFileDrop, ... }) {
 }
 ```
 
-**Step 2: Pass Handler from LeftSidebar** (`components/notes/LeftSidebar.tsx`)
+**Step 2: Pass Handler from LeftSidebar** (`components/content/LeftSidebar.tsx`)
 ```tsx
 export function LeftSidebar() {
   const [draggedFiles, setDraggedFiles] = useState<File[] | null>(null);

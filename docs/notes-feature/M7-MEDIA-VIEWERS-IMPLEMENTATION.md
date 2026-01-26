@@ -22,7 +22,7 @@ Implemented comprehensive media viewers that replace basic browser defaults with
 
 ## Image Viewer
 
-**Component:** `components/notes/viewer/ImageViewer.tsx`
+**Component:** `components/content/viewer/ImageViewer.tsx`
 **Lines of Code:** ~280
 
 ### Features
@@ -88,7 +88,7 @@ style={{
 
 ## PDF Viewer
 
-**Component:** `components/notes/viewer/PDFViewer.tsx`
+**Component:** `components/content/viewer/PDFViewer.tsx`
 **Lines of Code:** ~320
 
 ### Features
@@ -165,7 +165,7 @@ const pdfViewerUrl = `${downloadUrl}#page=${currentPage}&zoom=${zoom}${
 
 ## Video Player
 
-**Component:** `components/notes/viewer/VideoPlayer.tsx`
+**Component:** `components/content/viewer/VideoPlayer.tsx`
 **Lines of Code:** ~380
 
 ### Features
@@ -255,7 +255,7 @@ try {
 
 ## Audio Player
 
-**Component:** `components/notes/viewer/AudioPlayer.tsx`
+**Component:** `components/content/viewer/AudioPlayer.tsx`
 **Lines of Code:** ~420
 
 ### Features
@@ -382,7 +382,7 @@ useEffect(() => {
 
 ## File Viewer Router
 
-**Component:** `components/notes/viewer/FileViewer.tsx`
+**Component:** `components/content/viewer/FileViewer.tsx`
 **Updated:** January 23, 2026
 
 ### Routing Logic

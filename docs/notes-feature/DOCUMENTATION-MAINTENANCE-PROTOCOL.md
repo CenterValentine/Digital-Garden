@@ -126,7 +126,7 @@ When making changes, follow this order:
 ### API Architecture (15 Endpoints)
 
 **New Route:**
-GET /api/notes/tags/search       # Autocomplete for tag suggestions
+GET /api/content/tags/search       # Autocomplete for tag suggestions
 ```
 
 **Time Required:** 3-4 minutes
@@ -168,8 +168,8 @@ GET /api/notes/tags/search       # Autocomplete for tag suggestions
    ```markdown
    ### 2026-01-20
    - ✅ Ad-hoc: CSV export button added (user request)
-   - Location: components/notes/ExportButton.tsx
-   - API: GET /api/notes/export/csv
+   - Location: components/content/ExportButton.tsx
+   - API: GET /api/content/export/csv
    ```
 
 3. **Create ad-hoc session log**
@@ -264,19 +264,19 @@ GET /api/notes/tags/search       # Autocomplete for tag suggestions
 
 ```bash
 # 1. Check milestone status consistency
-grep -n "M6.*complete\|M6.*progress" apps/web/docs/notes-feature/*.md
+grep -n "M6.*complete\|M6.*progress" docs/notes-feature/*.md
 
 # 2. Check API endpoint counts
-grep -n "Endpoints\|API Routes" apps/web/docs/notes-feature/CLAUDE.md apps/web/docs/notes-feature/IMPLEMENTATION-STATUS.md
+grep -n "Endpoints\|API Routes" docs/notes-feature/CLAUDE.md docs/notes-feature/IMPLEMENTATION-STATUS.md
 
 # 3. Check status emoji consistency
-grep -n "✅ M6\|🚧 M6\|⏳ M6\|📋 M6" apps/web/docs/notes-feature/*.md
+grep -n "✅ M6\|🚧 M6\|⏳ M6\|📋 M6" docs/notes-feature/*.md
 
 # 4. Check "Current Status" lines
-grep -n "Current Status\|Active Milestone\|Current Phase" apps/web/docs/notes-feature/*.md
+grep -n "Current Status\|Active Milestone\|Current Phase" docs/notes-feature/*.md
 
 # 5. Verify no duplicate information
-grep -n "Tags system" apps/web/docs/notes-feature/CLAUDE.md apps/web/docs/notes-feature/CURRENT-STATE.md
+grep -n "Tags system" docs/notes-feature/CLAUDE.md docs/notes-feature/CURRENT-STATE.md
 ```
 
 **Expected Results:**
@@ -300,13 +300,13 @@ grep -n "Tags system" apps/web/docs/notes-feature/CLAUDE.md apps/web/docs/notes-
 echo "🔍 Validating documentation consistency..."
 
 # Extract milestone status from IMPLEMENTATION-STATUS.md
-M6_STATUS=$(grep "^### ✅ M6:" apps/web/docs/notes-feature/IMPLEMENTATION-STATUS.md)
+M6_STATUS=$(grep "^### ✅ M6:" docs/notes-feature/IMPLEMENTATION-STATUS.md)
 
 # Check CLAUDE.md references it correctly
-CLAUDE_M6=$(grep "M6.*complete" apps/web/docs/notes-feature/CLAUDE.md)
+CLAUDE_M6=$(grep "M6.*complete" docs/notes-feature/CLAUDE.md)
 
 # Check for contradictions
-CONTRADICTIONS=$(grep -n "M6" apps/web/docs/notes-feature/*.md | grep -E "🚧.*complete|✅.*progress")
+CONTRADICTIONS=$(grep -n "M6" docs/notes-feature/*.md | grep -E "🚧.*complete|✅.*progress")
 
 if [ -n "$CONTRADICTIONS" ]; then
   echo "❌ CONTRADICTIONS FOUND:"
@@ -317,8 +317,8 @@ else
 fi
 
 # Check API endpoint counts
-CLAUDE_API_COUNT=$(grep -oP '\d+(?=\+? Endpoints)' apps/web/docs/notes-feature/CLAUDE.md)
-STATUS_API_COUNT=$(grep -oP 'API Routes: \K\d+' apps/web/docs/notes-feature/IMPLEMENTATION-STATUS.md)
+CLAUDE_API_COUNT=$(grep -oP '\d+(?=\+? Endpoints)' docs/notes-feature/CLAUDE.md)
+STATUS_API_COUNT=$(grep -oP 'API Routes: \K\d+' docs/notes-feature/IMPLEMENTATION-STATUS.md)
 
 echo "API Endpoints: CLAUDE=$CLAUDE_API_COUNT, STATUS=$STATUS_API_COUNT"
 
@@ -352,8 +352,8 @@ Add to pre-commit hook in `.git/hooks/pre-commit`
 git checkout -b feature/m7-file-upload
 
 # Work on code + docs together
-git add apps/web/components/FileUpload.tsx
-git add apps/web/docs/notes-feature/CURRENT-STATE.md
+git add components/FileUpload.tsx
+git add docs/notes-feature/CURRENT-STATE.md
 git commit -m "feat(m7): add file upload component
 
 - Implement drag-and-drop file upload
@@ -367,8 +367,8 @@ git commit -m "feat(m7): add file upload component
 git checkout -b docs/update-m6-completion
 
 # Update multiple doc files
-git add apps/web/docs/notes-feature/IMPLEMENTATION-STATUS.md
-git add apps/web/docs/notes-feature/CURRENT-STATE.md
+git add docs/notes-feature/IMPLEMENTATION-STATUS.md
+git add docs/notes-feature/CURRENT-STATE.md
 git add CLAUDE.md
 git commit -m "docs: mark M6 as 100% complete
 
@@ -476,12 +476,12 @@ docs: archive M6 session logs
 ### ✅ Adding API Route Checklist
 
 ```markdown
-- [ ] Implement route in `app/api/notes/...`
+- [ ] Implement route in `app/api/content/...`
 - [ ] Update CLAUDE.md API count and list
 - [ ] Update IMPLEMENTATION-STATUS.md API Routes count
 - [ ] Add types to `lib/content/api-types.ts`
 - [ ] Update milestone guide if pattern-worthy
-- [ ] Commit: `git commit -m "feat(api): add /api/notes/... endpoint"`
+- [ ] Commit: `git commit -m "feat(api): add /api/content/... endpoint"`
 ```
 
 ### ✅ Weekly Cleanup Checklist

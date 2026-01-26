@@ -20,7 +20,7 @@ sequenceDiagram
     participant R2
     participant Database
     
-    Client->>API: POST /api/notes/files/upload
+    Client->>API: POST /api/content/files/upload
     API->>R2: Generate presigned URL
     R2-->>API: Return presigned URL
     API-->>Client: Return upload URL

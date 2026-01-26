@@ -111,7 +111,7 @@
 
 **API Routes:**
 
-1. **Storage config API** ✅ `/api/notes/storage/*`
+1. **Storage config API** ✅ `/api/content/storage/*`
    - GET, POST, PATCH, DELETE all implemented
    - Pattern: ✅ **GOOD** - Full CRUD
 

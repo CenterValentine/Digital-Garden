@@ -24,7 +24,7 @@ Server-rendered headers with icons not showing during initial page load. Root ca
 ## Project Structure
 
 ### Documentation Location
-All documentation is in: `apps/web/docs/notes-feature/`
+All documentation is in: `docs/notes-feature/`
 
 **Start Here:**
 1. **[00-index.md](./00-index.md)** - Master documentation index
@@ -75,14 +75,14 @@ All documentation is in: `apps/web/docs/notes-feature/`
 
 #### M2: Core API ✅
 **Files:**
-- `app/api/notes/content/route.ts` - Content CRUD
-- `app/api/notes/content/[id]/route.ts` - Individual content
-- `app/api/notes/content/tree/route.ts` - Tree structure
-- `app/api/notes/content/move/route.ts` - Drag-and-drop
-- `app/api/notes/content/upload/initiate/route.ts` - Upload phase 1
-- `app/api/notes/content/upload/finalize/route.ts` - Upload phase 2
-- `app/api/notes/storage/route.ts` - Storage configs
-- `app/api/notes/storage/[id]/route.ts` - Individual configs
+- `app/api/content/content/route.ts` - Content CRUD
+- `app/api/content/content/[id]/route.ts` - Individual content
+- `app/api/content/content/tree/route.ts` - Tree structure
+- `app/api/content/content/move/route.ts` - Drag-and-drop
+- `app/api/content/content/upload/initiate/route.ts` - Upload phase 1
+- `app/api/content/content/upload/finalize/route.ts` - Upload phase 2
+- `app/api/content/storage/route.ts` - Storage configs
+- `app/api/content/storage/[id]/route.ts` - Individual configs
 - `lib/content/api-types.ts` - Type definitions
 
 **Status:** All 14 endpoints functional, type-safe, documented
@@ -93,10 +93,10 @@ All documentation is in: `apps/web/docs/notes-feature/`
 - `lib/design-system/intents.ts` - Semantic colors
 - `lib/design-system/motion.ts` - Animation rules
 - `stores/panel-store.ts` - Zustand state management
-- `components/notes/ResizablePanels.tsx` - Allotment wrapper
-- `app/(authenticated)/notes/layout.tsx` - Server layout
-- `app/(authenticated)/notes/page.tsx` - Main page
-- `app/(authenticated)/notes/loading.tsx` - Loading state
+- `components/content/ResizablePanels.tsx` - Allotment wrapper
+- `app/(authenticated)/content/layout.tsx` - Server layout
+- `app/(authenticated)/content/page.tsx` - Main page
+- `app/(authenticated)/content/loading.tsx` - Loading state
 
 **Status:** Panel layout working, borders visible, state persists
 
@@ -116,15 +116,15 @@ All documentation is in: `apps/web/docs/notes-feature/`
 - 🔄 Drag-and-drop implementation
 
 **Files Created:**
-- `components/notes/headers/LeftSidebarHeader.tsx` - ⚠️ Needs inline SVG
-- `components/notes/headers/RightSidebarHeader.tsx` - ⚠️ Needs inline SVG
-- `components/notes/headers/MainPanelHeader.tsx` - ⚠️ Needs inline SVG
-- `components/notes/skeletons/FileTreeSkeleton.tsx` - ✅ Complete
-- `components/notes/skeletons/OutlineSkeleton.tsx` - ✅ Complete
-- `components/notes/skeletons/EditorSkeleton.tsx` - ✅ Complete
-- `components/notes/content/LeftSidebarContent.tsx` - Placeholder
-- `components/notes/content/RightSidebarContent.tsx` - Placeholder
-- `components/notes/content/MainPanelContent.tsx` - Placeholder
+- `components/content/headers/LeftSidebarHeader.tsx` - ⚠️ Needs inline SVG
+- `components/content/headers/RightSidebarHeader.tsx` - ⚠️ Needs inline SVG
+- `components/content/headers/MainPanelHeader.tsx` - ⚠️ Needs inline SVG
+- `components/content/skeletons/FileTreeSkeleton.tsx` - ✅ Complete
+- `components/content/skeletons/OutlineSkeleton.tsx` - ✅ Complete
+- `components/content/skeletons/EditorSkeleton.tsx` - ✅ Complete
+- `components/content/content/LeftSidebarContent.tsx` - Placeholder
+- `components/content/content/RightSidebarContent.tsx` - Placeholder
+- `components/content/content/MainPanelContent.tsx` - Placeholder
 
 ---
 
@@ -212,10 +212,10 @@ Server component headers using `lucide-react` icons don't render until JavaScrip
 Replace all `lucide-react` imports in server component headers with **inline SVG**.
 
 **Files to Update:**
-1. `components/notes/headers/LeftSidebarHeader.tsx`
-2. `components/notes/headers/RightSidebarHeader.tsx`
-3. `components/notes/headers/MainPanelHeader.tsx`
-4. `app/(authenticated)/notes/loading.tsx` (already has inline SVG)
+1. `components/content/headers/LeftSidebarHeader.tsx`
+2. `components/content/headers/RightSidebarHeader.tsx`
+3. `components/content/headers/MainPanelHeader.tsx`
+4. `app/(authenticated)/content/loading.tsx` (already has inline SVG)
 
 **Example Fix:**
 ```tsx
@@ -254,8 +254,8 @@ Left sidebar was jumping to 600px on load.
 
 **2. Implement FileTree Component**
 - Install `react-arborist` (already in package.json)
-- Create `components/notes/FileTree.tsx`
-- Connect to `GET /api/notes/content/tree`
+- Create `components/content/FileTree.tsx`
+- Connect to `GET /api/content/content/tree`
 - Implement virtualization
 - Add drag-and-drop handlers
 
@@ -297,15 +297,15 @@ See `IMPLEMENTATION-STATUS.md` for full roadmap.
 ### Core Implementation
 
 **Layout & Routing:**
-- `app/(authenticated)/notes/layout.tsx` - Server layout wrapper
-- `app/(authenticated)/notes/page.tsx` - Main page
-- `app/(authenticated)/notes/loading.tsx` - Loading state
+- `app/(authenticated)/content/layout.tsx` - Server layout wrapper
+- `app/(authenticated)/content/page.tsx` - Main page
+- `app/(authenticated)/content/loading.tsx` - Loading state
 
 **Components:**
-- `components/notes/ResizablePanels.tsx` - Client component (Allotment)
-- `components/notes/headers/*.tsx` - Server headers (need SVG fix)
-- `components/notes/content/*.tsx` - Client content (placeholders)
-- `components/notes/skeletons/*.tsx` - Loading skeletons
+- `components/content/ResizablePanels.tsx` - Client component (Allotment)
+- `components/content/headers/*.tsx` - Server headers (need SVG fix)
+- `components/content/content/*.tsx` - Client content (placeholders)
+- `components/content/skeletons/*.tsx` - Loading skeletons
 
 **State:**
 - `stores/panel-store.ts` - Zustand with persistence
@@ -316,8 +316,8 @@ See `IMPLEMENTATION-STATUS.md` for full roadmap.
 - `lib/design-system/motion.ts`
 
 **API:**
-- `app/api/notes/content/*` - Content endpoints
-- `app/api/notes/storage/*` - Storage config endpoints
+- `app/api/content/content/*` - Content endpoints
+- `app/api/content/storage/*` - Storage config endpoints
 - `lib/content/api-types.ts` - Type definitions
 
 **Database:**

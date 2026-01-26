@@ -50,7 +50,7 @@ createBlankOfficeDocument(fileName: string): Promise<Buffer>
 
 ### API Route
 
-**Endpoint:** `POST /api/notes/content/create-document`
+**Endpoint:** `POST /api/content/content/create-document`
 
 **Request Body:**
 ```json
@@ -91,7 +91,7 @@ createBlankOfficeDocument(fileName: string): Promise<Buffer>
 
 #### 1. Header Menu (+ Button)
 
-**Location:** `components/notes/headers/LeftSidebarHeaderActions.tsx`
+**Location:** `components/content/headers/LeftSidebarHeaderActions.tsx`
 
 **New Options:**
 - "New Document" (.docx) - FileType icon
@@ -104,7 +104,7 @@ createBlankOfficeDocument(fileName: string): Promise<Buffer>
 
 #### 2. Context Menu (Right-Click)
 
-**Location:** `components/notes/context-menu/file-tree-actions.tsx`
+**Location:** `components/content/context-menu/file-tree-actions.tsx`
 
 **New Options in "New" Submenu:**
 - "Word Document (.docx)"
@@ -117,11 +117,11 @@ createBlankOfficeDocument(fileName: string): Promise<Buffer>
 
 #### 3. Handler Implementation
 
-**Location:** `components/notes/LeftSidebar.tsx`
+**Location:** `components/content/LeftSidebar.tsx`
 
 ```typescript
 const handleCreateDocument = async () => {
-  const response = await fetch("/api/notes/content/create-document", {
+  const response = await fetch("/api/content/content/create-document", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -137,7 +137,7 @@ const handleCreateDocument = async () => {
 };
 ```
 
-**Location:** `components/notes/content/LeftSidebarContent.tsx`
+**Location:** `components/content/content/LeftSidebarContent.tsx`
 
 Updated `handleCreate` to support "docx" and "xlsx" types:
 - Skips inline naming flow (no temporary placeholder node)
@@ -269,15 +269,15 @@ Follows same logic as file uploads:
 
 ### New Files
 - `lib/office/blank-document-generator.ts` - Document generation utilities
-- `app/api/notes/content/create-document/route.ts` - API endpoint
+- `app/api/content/content/create-document/route.ts` - API endpoint
 
 ### Modified Files
-- `components/notes/headers/LeftSidebarHeaderActions.tsx` - Added menu options
-- `components/notes/headers/LeftSidebarHeader.tsx` - Pass handlers through
-- `components/notes/LeftSidebar.tsx` - Implement creation handlers
-- `components/notes/FileNode.tsx` - Add docx/xlsx types to onCreate
-- `components/notes/context-menu/file-tree-actions.tsx` - Add submenu options
-- `components/notes/content/LeftSidebarContent.tsx` - Handle docx/xlsx creation
+- `components/content/headers/LeftSidebarHeaderActions.tsx` - Added menu options
+- `components/content/headers/LeftSidebarHeader.tsx` - Pass handlers through
+- `components/content/LeftSidebar.tsx` - Implement creation handlers
+- `components/content/FileNode.tsx` - Add docx/xlsx types to onCreate
+- `components/content/context-menu/file-tree-actions.tsx` - Add submenu options
+- `components/content/content/LeftSidebarContent.tsx` - Handle docx/xlsx creation
 - `package.json` - Added `docx` and `xlsx` dependencies
 
 ---
@@ -312,7 +312,7 @@ npx tsx lib/office/__test-generator.ts
 **API Endpoint:**
 ```bash
 # Test create-document endpoint (requires auth)
-curl -X POST http://localhost:3000/api/notes/content/create-document \
+curl -X POST http://localhost:3000/api/content/content/create-document \
   -H "Content-Type: application/json" \
   -d '{"fileName": "Test Document", "fileType": "docx"}'
 ```

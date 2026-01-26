@@ -72,7 +72,7 @@ When a user renames an Office document (.docx, .xlsx, .pptx) in the file tree, t
 
 ### Integration: Content PATCH Endpoint
 
-**Location:** `app/api/notes/content/[id]/route.ts`
+**Location:** `app/api/content/content/[id]/route.ts`
 
 **Added Logic** (after database update, before response):
 
@@ -410,7 +410,7 @@ curl -X POST http://localhost:3000/api/google-drive/rename \
 **Integration Test:**
 ```bash
 # Test full rename flow
-curl -X PATCH http://localhost:3000/api/notes/content/{id} \
+curl -X PATCH http://localhost:3000/api/content/content/{id} \
   -H "Content-Type: application/json" \
   -d '{"title": "New Document Name.docx"}'
 ```
@@ -423,7 +423,7 @@ curl -X PATCH http://localhost:3000/api/notes/content/{id} \
 - `app/api/google-drive/rename/route.ts` - Google Drive rename API endpoint
 
 ### Modified Files
-- `app/api/notes/content/[id]/route.ts` - Added Google Drive sync logic to PATCH handler
+- `app/api/content/content/[id]/route.ts` - Added Google Drive sync logic to PATCH handler
 
 ---
 

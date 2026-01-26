@@ -15,7 +15,7 @@ The **Tool Belt** is a context-aware action system for file viewers in the Digit
 ### Core Components
 
 ```
-apps/web/components/notes/tool-belt/
+components/content/tool-belt/
 ├── ToolBelt.tsx              # Main component (renders actions)
 ├── types.ts                  # Type definitions
 ├── index.ts                  # Exports
@@ -94,7 +94,7 @@ The JSON provider currently offers:
 ### Usage Example
 
 ```tsx
-import { ToolBelt, getJSONToolBeltConfig } from "@/components/notes/tool-belt";
+import { ToolBelt, getJSONToolBeltConfig } from "@/components/content/tool-belt";
 
 function JSONViewer({ fileName, contentId, ... }) {
   const [editorContent, setEditorContent] = useState("");
@@ -399,7 +399,7 @@ To migrate an existing file viewer to use the tool belt:
 4. **Replace old UI** with `<ToolBelt config={...} />`
 5. **Position the tool belt** using absolute/relative positioning
 
-**Example:** See [JSONViewer.tsx](../../components/notes/viewer/JSONViewer.tsx) for reference implementation.
+**Example:** See [JSONViewer.tsx](../../components/content/viewer/JSONViewer.tsx) for reference implementation.
 
 ## Future Considerations
 
@@ -432,9 +432,9 @@ To migrate an existing file viewer to use the tool belt:
 - [IMPLEMENTATION-STATUS.md](./IMPLEMENTATION-STATUS.md) - Current milestone status
 
 **Implementation:**
-- [ToolBelt.tsx](../../components/notes/tool-belt/ToolBelt.tsx) - Main component
-- [types.ts](../../components/notes/tool-belt/types.ts) - Type definitions
-- [json-provider.tsx](../../components/notes/tool-belt/providers/json-provider.tsx) - JSON file actions
+- [ToolBelt.tsx](../../components/content/tool-belt/ToolBelt.tsx) - Main component
+- [types.ts](../../components/content/tool-belt/types.ts) - Type definitions
+- [json-provider.tsx](../../components/content/tool-belt/providers/json-provider.tsx) - JSON file actions
 
 **Inspiration:**
 - VS Code Editor Actions

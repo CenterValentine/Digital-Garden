@@ -12,7 +12,7 @@ This document provides a comprehensive test plan to verify the TipTap editor fun
 
 ## Test Environment Setup
 
-1. Navigate to `/notes` in your browser
+1. Navigate to `/content` in your browser
 2. Open browser DevTools (F12)
 3. Select a note from the file tree (e.g., "newmdfile.md")
 4. The editor should load in the main panel

@@ -67,7 +67,7 @@ The correct approach is to create **one DndProvider** and share it with react-ar
 #### Step 1: Create a Wrapper Component with DndProvider
 
 ```tsx
-// components/notes/FileTreeWithDropZone.tsx
+// components/content/FileTreeWithDropZone.tsx
 "use client";
 
 import { DndProvider, useDrop, useDragDropManager } from "react-dnd";
@@ -130,7 +130,7 @@ export function FileTreeWithDropZone(props) {
 #### Step 2: Update FileTree to Accept dndManager
 
 ```tsx
-// components/notes/FileTree.tsx
+// components/content/FileTree.tsx
 interface FileTreeProps {
   // ... other props
   dndManager?: any; // Optional: DndManager from parent DndProvider
@@ -153,7 +153,7 @@ export function FileTree({ dndManager, ...props }: FileTreeProps) {
 #### Step 3: Use FileTreeWithDropZone in Your Component
 
 ```tsx
-// components/notes/content/LeftSidebarContent.tsx
+// components/content/content/LeftSidebarContent.tsx
 export function LeftSidebarContent({ onFileDrop, ...props }) {
   return (
     <FileTreeWithDropZone
@@ -244,7 +244,7 @@ If you encounter drag-and-drop errors:
 
 Search your codebase:
 ```bash
-grep -r "DndProvider" apps/web/components --include="*.tsx"
+grep -r "DndProvider" components --include="*.tsx"
 ```
 
 You should only see ONE `DndProvider` that wraps both your `useDrop` and the `FileTree`.
@@ -384,8 +384,8 @@ react-arborist handles virtualization, but monitor performance with:
 When modifying drag-and-drop functionality, these files are involved:
 
 ```
-apps/web/
-├── components/notes/
+
+├── components/content/
 │   ├── FileTreeWithDropZone.tsx      # DndProvider wrapper (main integration point)
 │   ├── FileTree.tsx                  # Accepts dndManager prop
 │   ├── content/
@@ -469,7 +469,7 @@ import { TouchBackend } from 'react-dnd-touch-backend';
 - [react-arborist GitHub](https://github.com/brimdata/react-arborist)
 - [HTML5Backend API](https://react-dnd.github.io/react-dnd/docs/backends/html5)
 - [M7-DRAG-DROP-UPLOAD.md](./M7-DRAG-DROP-UPLOAD.md) - Implementation details
-- [FileTreeWithDropZone.tsx](../../components/notes/FileTreeWithDropZone.tsx) - Source code
+- [FileTreeWithDropZone.tsx](../../components/content/FileTreeWithDropZone.tsx) - Source code
 
 ---
 

@@ -7,33 +7,33 @@
 ### API Routes Created
 
 #### Content Management
-- **GET /api/notes/content** - List content items with filtering, search, pagination
-- **POST /api/notes/content** - Create notes, folders, HTML pages, code files
-- **GET /api/notes/content/[id]** - Get full content with payload data
-- **PATCH /api/notes/content/[id]** - Update content (title, payload, metadata)
-- **DELETE /api/notes/content/[id]** - Soft delete (move to trash with 30-day retention)
+- **GET /api/content/content** - List content items with filtering, search, pagination
+- **POST /api/content/content** - Create notes, folders, HTML pages, code files
+- **GET /api/content/content/[id]** - Get full content with payload data
+- **PATCH /api/content/content/[id]** - Update content (title, payload, metadata)
+- **DELETE /api/content/content/[id]** - Soft delete (move to trash with 30-day retention)
 
 #### File Tree
-- **GET /api/notes/content/tree** - Get hierarchical tree structure with metadata
+- **GET /api/content/content/tree** - Get hierarchical tree structure with metadata
 
 #### Content Operations
-- **POST /api/notes/content/move** - Move/reorder content (drag-and-drop support)
+- **POST /api/content/content/move** - Move/reorder content (drag-and-drop support)
 
 #### File Upload (Two-Phase)
-- **POST /api/notes/content/upload/initiate** - Phase 1: Create ContentNode, get presigned URL
-- **POST /api/notes/content/upload/finalize** - Phase 2: Verify upload, extract metadata
+- **POST /api/content/content/upload/initiate** - Phase 1: Create ContentNode, get presigned URL
+- **POST /api/content/content/upload/finalize** - Phase 2: Verify upload, extract metadata
 
 #### Storage Configuration
-- **GET /api/notes/storage** - List storage provider configurations
-- **POST /api/notes/storage** - Create storage configuration (R2, S3, Vercel)
-- **GET /api/notes/storage/[id]** - Get storage configuration details
-- **PATCH /api/notes/storage/[id]** - Update storage configuration
-- **DELETE /api/notes/storage/[id]** - Delete storage configuration (with validation)
+- **GET /api/content/storage** - List storage provider configurations
+- **POST /api/content/storage** - Create storage configuration (R2, S3, Vercel)
+- **GET /api/content/storage/[id]** - Get storage configuration details
+- **PATCH /api/content/storage/[id]** - Update storage configuration
+- **DELETE /api/content/storage/[id]** - Delete storage configuration (with validation)
 
 ## File Structure
 
 ```
-apps/web/app/api/notes/
+app/api/content/
 ├── content/
 │   ├── route.ts                      # List & Create
 │   ├── [id]/
@@ -217,15 +217,15 @@ pnpm dev
 Test endpoints:
 ```bash
 # List content
-curl http://localhost:3000/api/notes/content \
+curl http://localhost:3000/api/content/content \
   -H "Cookie: session=..."
 
 # Get tree
-curl http://localhost:3000/api/notes/content/tree \
+curl http://localhost:3000/api/content/content/tree \
   -H "Cookie: session=..."
 
 # Create note
-curl -X POST http://localhost:3000/api/notes/content \
+curl -X POST http://localhost:3000/api/content/content \
   -H "Cookie: session=..." \
   -H "Content-Type: application/json" \
   -d '{"title":"My Note","tiptapJson":{"type":"doc","content":[]}}'
@@ -252,7 +252,7 @@ The following are **placeholder implementations** requiring production integrati
 
 #### Storage Presigned URLs
 ```typescript
-// apps/web/app/api/notes/content/upload/initiate/route.ts
+// app/api/content/content/upload/initiate/route.ts
 async function generatePresignedUploadUrl() {
   // TODO: Integrate @aws-sdk/client-s3 for R2/S3
   // TODO: Integrate @vercel/blob for Vercel Blob
@@ -267,7 +267,7 @@ async function generatePresignedUploadUrl() {
 
 #### Storage Verification
 ```typescript
-// apps/web/app/api/notes/content/upload/finalize/route.ts
+// app/api/content/content/upload/finalize/route.ts
 async function verifyFileInStorage() {
   // TODO: Use HeadObject to verify file exists
   return "https://cdn.example.com/...";
@@ -276,7 +276,7 @@ async function verifyFileInStorage() {
 
 #### Metadata Extraction
 ```typescript
-// apps/web/app/api/notes/content/upload/finalize/route.ts
+// app/api/content/content/upload/finalize/route.ts
 async function extractFileMetadata() {
   // TODO: Use sharp for image dimensions
   // TODO: Use ffmpeg for video metadata
@@ -297,12 +297,12 @@ Full API specification: `docs/notes-feature/04-api-specification.md`
 
 #### List Content
 ```http
-GET /api/notes/content?type=note&search=hello&limit=50
+GET /api/content/content?type=note&search=hello&limit=50
 ```
 
 #### Create Note
 ```http
-POST /api/notes/content
+POST /api/content/content
 Content-Type: application/json
 
 {
@@ -314,7 +314,7 @@ Content-Type: application/json
 
 #### Create Folder
 ```http
-POST /api/notes/content
+POST /api/content/content
 Content-Type: application/json
 
 {
@@ -325,7 +325,7 @@ Content-Type: application/json
 
 #### Update Note
 ```http
-PATCH /api/notes/content/{id}
+PATCH /api/content/content/{id}
 Content-Type: application/json
 
 {
@@ -336,17 +336,17 @@ Content-Type: application/json
 
 #### Soft Delete
 ```http
-DELETE /api/notes/content/{id}
+DELETE /api/content/content/{id}
 ```
 
 #### Get Tree
 ```http
-GET /api/notes/content/tree
+GET /api/content/content/tree
 ```
 
 #### Move Content
 ```http
-POST /api/notes/content/move
+POST /api/content/content/move
 Content-Type: application/json
 
 {
@@ -359,7 +359,7 @@ Content-Type: application/json
 #### Two-Phase Upload
 ```http
 # Phase 1: Initiate
-POST /api/notes/content/upload/initiate
+POST /api/content/content/upload/initiate
 {
   "fileName": "photo.jpg",
   "fileSize": 1024000,
@@ -377,7 +377,7 @@ POST /api/notes/content/upload/initiate
 # Client uploads to uploadUrl
 
 # Phase 2: Finalize
-POST /api/notes/content/upload/finalize
+POST /api/content/content/upload/finalize
 {
   "contentId": "uuid",
   "uploadSuccess": true

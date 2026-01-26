@@ -29,13 +29,13 @@ From M1, we already have:
 
 ```
 Search:
-  GET /api/notes/search?q=query&type=note&limit=20
+  GET /api/content/search?q=query&type=note&limit=20
 
 Backlinks:
-  GET /api/notes/backlinks/[id]  # Notes linking to this ID
+  GET /api/content/backlinks/[id]  # Notes linking to this ID
 
 Outline:
-  GET /api/notes/outline/[id]    # Extract headings from TipTap JSON
+  GET /api/content/outline/[id]    # Extract headings from TipTap JSON
 ```
 
 ### Component Architecture
@@ -90,7 +90,7 @@ export const useContentStore = create<ContentState>((set) => ({
 }));
 ```
 
-**File:** `components/notes/content/MainPanelContent.tsx`
+**File:** `components/content/content/MainPanelContent.tsx`
 
 Restore selection on mount:
 ```typescript
@@ -123,7 +123,7 @@ useEffect(() => {
 
 ### 1.1 Search API Route
 
-**File:** `app/api/notes/search/route.ts`
+**File:** `app/api/content/search/route.ts`
 
 **Request Query Parameters:**
 ```typescript
@@ -194,7 +194,7 @@ interface SearchResponse {
 
 ### 1.2 Search Panel Component
 
-**File:** `components/notes/search/SearchPanel.tsx`
+**File:** `components/content/search/SearchPanel.tsx`
 
 **Features:**
 - Search input with debouncing (300ms)
@@ -264,7 +264,7 @@ export function extractLinks(tiptapJson: JSONContent): ExtractedLink[];
 
 **Update Save Logic:**
 
-Modify `app/api/notes/content/[id]/route.ts` PATCH handler:
+Modify `app/api/content/content/[id]/route.ts` PATCH handler:
 
 ```typescript
 // Extract links from TipTap JSON
@@ -285,7 +285,7 @@ await prisma.notePayload.update({
 
 ### 2.2 Backlinks API Route
 
-**File:** `app/api/notes/backlinks/[id]/route.ts`
+**File:** `app/api/content/backlinks/[id]/route.ts`
 
 **Logic:**
 1. Find all notes where `metadata.links` contains `targetId: [id]`
@@ -314,7 +314,7 @@ interface BacklinksResponse {
 
 ### 2.3 Backlinks Panel Component
 
-**File:** `components/notes/backlinks/BacklinksPanel.tsx`
+**File:** `components/content/backlinks/BacklinksPanel.tsx`
 
 **UI Design:**
 ```
@@ -369,7 +369,7 @@ export function extractOutline(tiptapJson: JSONContent): OutlineHeading[];
 
 ### 3.2 Outline API Route
 
-**File:** `app/api/notes/outline/[id]/route.ts`
+**File:** `app/api/content/outline/[id]/route.ts`
 
 **Simple Implementation:**
 1. Fetch note's `tiptapJson`
@@ -388,7 +388,7 @@ interface OutlineResponse {
 
 ### 3.3 Outline Panel Component
 
-**File:** `components/notes/outline/OutlinePanel.tsx`
+**File:** `components/content/outline/OutlinePanel.tsx`
 
 **UI Design:**
 ```
@@ -467,7 +467,7 @@ model ContentNode {
 
 ### 4.3 Tag Panel Component
 
-**File:** `components/notes/tags/TagsPanel.tsx`
+**File:** `components/content/tags/TagsPanel.tsx`
 
 **UI Design:**
 ```
@@ -495,7 +495,7 @@ model ContentNode {
 
 ### 5.1 Tab Navigation
 
-**File:** `components/notes/RightSidebar.tsx`
+**File:** `components/content/RightSidebar.tsx`
 
 Add tab state to switch between panels:
 
@@ -650,9 +650,9 @@ const [activeTab, setActiveTab] = useState<RightSidebarTab>("outline");
 ## Files to Create
 
 **API Routes (3):**
-1. `app/api/notes/search/route.ts`
-2. `app/api/notes/backlinks/[id]/route.ts`
-3. `app/api/notes/outline/[id]/route.ts`
+1. `app/api/content/search/route.ts`
+2. `app/api/content/backlinks/[id]/route.ts`
+3. `app/api/content/outline/[id]/route.ts`
 
 **Utilities (3):**
 1. `lib/content/link-extractor.ts`
@@ -660,15 +660,15 @@ const [activeTab, setActiveTab] = useState<RightSidebarTab>("outline");
 3. `lib/content/tag-extractor.ts`
 
 **Components (5):**
-1. `components/notes/search/SearchPanel.tsx`
-2. `components/notes/search/SearchResult.tsx`
-3. `components/notes/backlinks/BacklinksPanel.tsx`
-4. `components/notes/outline/OutlinePanel.tsx`
-5. `components/notes/tags/TagsPanel.tsx`
+1. `components/content/search/SearchPanel.tsx`
+2. `components/content/search/SearchResult.tsx`
+3. `components/content/backlinks/BacklinksPanel.tsx`
+4. `components/content/outline/OutlinePanel.tsx`
+5. `components/content/tags/TagsPanel.tsx`
 
 **Modified Files (2):**
-1. `components/notes/RightSidebar.tsx` - Add tab navigation
-2. `app/api/notes/content/[id]/route.ts` - Extract links/tags on save
+1. `components/content/RightSidebar.tsx` - Add tab navigation
+2. `app/api/content/content/[id]/route.ts` - Extract links/tags on save
 
 **Total:** 8 new files, 2 modified files
 

@@ -18,16 +18,16 @@
 
 ✅ **Panel Layout System**
 
-- `components/notes/PanelLayout.tsx` - Allotment-based resizable panels
-- `components/notes/LeftSidebar.tsx` - File tree placeholder
-- `components/notes/RightSidebar.tsx` - Outline/backlinks placeholder
-- `components/notes/MainPanel.tsx` - Editor placeholder
-- `components/notes/StatusBar.tsx` - Status information
+- `components/content/PanelLayout.tsx` - Allotment-based resizable panels
+- `components/content/LeftSidebar.tsx` - File tree placeholder
+- `components/content/RightSidebar.tsx` - Outline/backlinks placeholder
+- `components/content/MainPanel.tsx` - Editor placeholder
+- `components/content/StatusBar.tsx` - Status information
 
 ✅ **Route Structure**
 
-- `app/(authenticated)/notes/layout.tsx` - Notes layout wrapper
-- `app/(authenticated)/notes/page.tsx` - Main notes page
+- `app/(authenticated)/content/layout.tsx` - Notes layout wrapper
+- `app/(authenticated)/content/page.tsx` - Main notes page
 
 ✅ **Dependencies Added**
 
@@ -110,11 +110,11 @@ You should see:
 ## File Structure
 
 ```
-apps/web/
-├── app/(authenticated)/notes/
+
+├── app/(authenticated)/content/
 │   ├── layout.tsx                 # Notes layout wrapper
 │   └── page.tsx                   # Main notes page
-├── components/notes/
+├── components/content/
 │   ├── PanelLayout.tsx            # Resizable panel system
 │   ├── LeftSidebar.tsx            # File tree (placeholder)
 │   ├── RightSidebar.tsx           # Outline/backlinks (placeholder)
@@ -155,9 +155,9 @@ These will be implemented in M7 (Command Palette):
 
 **API Integration:**
 
-- Connect to `GET /api/notes/content/tree`
+- Connect to `GET /api/content/content/tree`
 - Implement optimistic updates
-- Handle drag-and-drop with `POST /api/notes/content/move`
+- Handle drag-and-drop with `POST /api/content/content/move`
 
 ### M5: Content Editors & Viewers (Week 5-6)
 

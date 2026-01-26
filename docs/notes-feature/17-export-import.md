@@ -439,7 +439,7 @@ export async function importMarkdownFiles(
       const tiptapJson = markdownToTiptap(body);
 
       // Create document
-      const response = await fetch("/api/notes/content", {
+      const response = await fetch("/api/content/content", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -596,7 +596,7 @@ export const EXPORT_COMMANDS: Command[] = [
 ### Export Button Component
 
 ```typescript
-// components/notes/ExportButton.tsx
+// components/content/ExportButton.tsx
 import { Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -637,7 +637,7 @@ export function ExportButton({ contentId }: { contentId: string }) {
 ### Import Dialog Component
 
 ```typescript
-// components/notes/ImportDialog.tsx
+// components/content/ImportDialog.tsx
 import { useState } from 'react';
 import { Upload } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';

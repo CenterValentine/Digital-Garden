@@ -18,7 +18,7 @@ This document provides a comprehensive testing checklist for all M6 editor exten
 - [x] Development server running (`pnpm dev` in `apps/web`)
 - [x] PostgreSQL database seeded with test data (`pnpm db:seed`)
 - [x] User authenticated and logged in
-- [x] Navigate to `/notes` route
+- [x] Navigate to `/content` route
 - [x] Select any note from the file tree (left sidebar)
 
 ### Browser Requirements
@@ -145,8 +145,8 @@ This works as expected even when just placing the cursor inside the link without
 Right clicking does not show "Open link in new tab" option. This issue must be resolved before M6 can be completed. It is worth noting that holding command and clicking the link does open it in a new tab as expected.
 
 **Related Files:**
-- `components/notes/editor/LinkDialog.tsx`
-- `components/notes/editor/MarkdownEditor.tsx` (lines 111-153)
+- `components/content/editor/LinkDialog.tsx`
+- `components/content/editor/MarkdownEditor.tsx` (lines 111-153)
 - `lib/editor/extensions.ts` (lines 92-100)
 
 ---
@@ -191,8 +191,8 @@ Right clicking does not show "Open link in new tab" option. This issue must be r
 
 **Related Files:**
 - `lib/editor/extensions.ts` (line 114)
-- `components/notes/editor/MarkdownEditor.tsx` (lines 66-74, 100-109)
-- `components/notes/StatusBar.tsx` (lines 59-62)
+- `components/content/editor/MarkdownEditor.tsx` (lines 66-74, 100-109)
+- `components/content/StatusBar.tsx` (lines 59-62)
 - `stores/editor-stats-store.ts`
 
 ---
@@ -328,8 +328,8 @@ See note in Test Case 6.2 regarding table creation issue.
 Liquid glass styles do no appear to be applied anywhere. Generic styles are applied instead. 
 
 **Related Files:**
-- `components/notes/editor/TableBubbleMenu.tsx`
-- `components/notes/editor/MarkdownEditor.tsx` (lines 176-177)
+- `components/content/editor/TableBubbleMenu.tsx`
+- `components/content/editor/MarkdownEditor.tsx` (lines 176-177)
 
 ---
 
@@ -500,8 +500,8 @@ Deselecting and reselecting this same text does not show active state!  Explore 
 
 
 **Related Files:**
-- `components/notes/editor/BubbleMenu.tsx`
-- `components/notes/editor/MarkdownEditor.tsx` (lines 170-174)
+- `components/content/editor/BubbleMenu.tsx`
+- `components/content/editor/MarkdownEditor.tsx` (lines 170-174)
 
 ---
 
@@ -542,8 +542,8 @@ pluginKey does not show in html search for any of the bubble objects.  Conflicts
 - [x ] **Expected:** No memory leaks or excessive re-renders
 
 **Related Files:**
-- `components/notes/editor/BubbleMenu.tsx` (lines 15, 28, 43)
-- `components/notes/editor/TableBubbleMenu.tsx` (lines 15, 27, 41)
+- `components/content/editor/BubbleMenu.tsx` (lines 15, 28, 43)
+- `components/content/editor/TableBubbleMenu.tsx` (lines 15, 27, 41)
 
 ---
 

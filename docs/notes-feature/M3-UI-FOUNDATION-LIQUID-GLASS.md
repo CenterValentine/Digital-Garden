@@ -484,7 +484,7 @@ export const usePanelStore = create<PanelState>()(
 
 ### Step 2.2: Create Panel Layout Component
 
-**File:** `components/notes/PanelLayout.tsx`
+**File:** `components/content/PanelLayout.tsx`
 
 ```typescript
 /**

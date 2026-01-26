@@ -149,7 +149,7 @@ model FilePayload {
 
 | Change | v1.0 | v2.0 | Migration |
 |--------|------|------|-----------|
-| **Endpoints** | `/api/notes/files` | `/api/notes/content` | Update all API calls |
+| **Endpoints** | `/api/content/files` | `/api/content/content` | Update all API calls |
 | **Type Field** | `docType: "Note"` | `contentType: "note"` (derived) | Remove from requests |
 | **Content Storage** | `contentData: {...}` | Payload-specific fields | Restructure payloads |
 | **File Upload** | Single-phase POST | Two-phase (initiate→upload→finalize) | Rewrite upload handlers |
@@ -161,11 +161,11 @@ model FilePayload {
 
 ```typescript
 // v1.0
-POST /api/notes/files
+POST /api/content/files
 { "docType": "Note", "contentData": { "format": "tiptap", "content": {...} } }
 
 // v2.0
-POST /api/notes/content
+POST /api/content/content
 { "tiptapJson": {...} }
 ```
 
@@ -464,7 +464,7 @@ GENERATED ALWAYS AS (
 ## File Locations
 
 ```
-apps/web/docs/notes-feature/
+docs/notes-feature/
 ├── V2-ARCHITECTURE-OVERVIEW.md          ✅ THIS FILE (master reference)
 ├── 03-database-design.md                ✅ Complete schema specification
 ├── 04-api-specification-v2.md           ✅ Complete API documentation

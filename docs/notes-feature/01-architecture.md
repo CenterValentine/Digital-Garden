@@ -28,12 +28,12 @@ graph TB
     end
 
     subgraph APILayer [API Layer - Next.js Routes]
-        FilesAPI[/api/notes/files]
-        ContentAPI[/api/notes/content]
-        TreeAPI[/api/notes/tree]
-        SearchAPI[/api/notes/search]
-        UploadAPI[/api/notes/files/upload]
-        BacklinksAPI[/api/notes/backlinks]
+        FilesAPI[/api/content/files]
+        ContentAPI[/api/content/content]
+        TreeAPI[/api/content/tree]
+        SearchAPI[/api/content/search]
+        UploadAPI[/api/content/files/upload]
+        BacklinksAPI[/api/content/backlinks]
     end
 
     subgraph DatabaseLayer [Database Layer]
@@ -174,7 +174,7 @@ sequenceDiagram
 
     User->>FileTree: Click file
     FileTree->>TabBar: Open in new tab
-    TabBar->>API: GET /api/notes/content/[id]
+    TabBar->>API: GET /api/content/content/[id]
     API->>Database: Query StructuredDocument
 
     alt Is Binary File
@@ -207,7 +207,7 @@ sequenceDiagram
 
     Note over Editor: Auto-save after 2s debounce
 
-    Editor->>API: PATCH /api/notes/content/[id]
+    Editor->>API: PATCH /api/content/content/[id]
     API->>Database: Update StructuredDocument
     API->>Database: Create DocumentHistory entry
     Database-->>API: Confirm save
@@ -227,7 +227,7 @@ sequenceDiagram
     participant Database
 
     User->>FileTree: Drop file or click upload
-    FileTree->>API: POST /api/notes/files/upload
+    FileTree->>API: POST /api/content/files/upload
     Note over API: Validate MIME type & size
     API->>Storage: Generate presigned URL
     Storage-->>API: Return presigned URL
@@ -236,7 +236,7 @@ sequenceDiagram
     FileTree->>Storage: Upload file directly
     Storage-->>FileTree: Upload complete
 
-    FileTree->>API: POST /api/notes/files (create metadata)
+    FileTree->>API: POST /api/content/files (create metadata)
     API->>Database: Create StructuredDocument
     API->>Database: Create FileMetadata
     Database-->>API: Return document ID
@@ -264,7 +264,7 @@ sequenceDiagram
     Note over IconPicker: Lucide icons, Emoji, Colors
 
     User->>IconPicker: Select icon & color
-    IconPicker->>API: PATCH /api/notes/files/[id]/icon
+    IconPicker->>API: PATCH /api/content/files/[id]/icon
     Note over API: { icon: "Rocket", color: "#FF5733" }
 
     API->>Database: Update StructuredDocument
@@ -292,7 +292,7 @@ sequenceDiagram
     FileTree->>FileTree: Highlight valid drop targets
 
     User->>FileTree: Drop on target folder
-    FileTree->>API: POST /api/notes/content/move
+    FileTree->>API: POST /api/content/content/move
     Note over API: { contentIds: ["uuid"], newParentId: "uuid", position: 2 }
 
     API->>Database: Update parentId & displayOrder
@@ -442,9 +442,9 @@ const virtualizer = useVirtualizer({
 
 ```typescript
 // Lazy load heavy editors
-const MarkdownEditor = lazy(() => import('@/components/notes/MarkdownEditor'));
-const CodeEditor = lazy(() => import('@/components/notes/CodeEditor'));
-const PDFViewer = lazy(() => import('@/components/notes/PDFViewer'));
+const MarkdownEditor = lazy(() => import('@/components/content/MarkdownEditor'));
+const CodeEditor = lazy(() => import('@/components/content/CodeEditor'));
+const PDFViewer = lazy(() => import('@/components/content/PDFViewer'));
 
 // Use with Suspense
 <Suspense fallback={<EditorSkeleton />}>
@@ -537,7 +537,7 @@ useFocusTrap(modalRef, isOpen);
 
 ```typescript
 try {
-  const response = await fetch("/api/notes/content/123");
+  const response = await fetch("/api/content/content/123");
   if (!response.ok) {
     throw new APIError(response.status, await response.json());
   }

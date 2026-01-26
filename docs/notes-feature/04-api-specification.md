@@ -105,7 +105,7 @@ export const middleware = requireAuth();
 
 ## Content API
 
-### GET /api/notes/content
+### GET /api/content/content
 
 List content items for authenticated user.
 
@@ -214,7 +214,7 @@ if (type === "note") {
 }
 ```
 
-### POST /api/notes/content
+### POST /api/content/content
 
 Create a new content item (note, folder, HTML page, or code file). **Files use separate upload flow.**
 
@@ -335,7 +335,7 @@ Create a new content item (note, folder, HTML page, or code file). **Files use s
 - `parentId`: Must exist and not be deleted
 - Exactly one payload type must be specified (tiptapJson XOR html XOR code XOR isFolder)
 
-### GET /api/notes/content/[id]
+### GET /api/content/content/[id]
 
 Get full content including payload data.
 
@@ -479,7 +479,7 @@ Get full content including payload data.
 }
 ```
 
-### PATCH /api/notes/content/[id]
+### PATCH /api/content/content/[id]
 
 Update content item.
 
@@ -531,7 +531,7 @@ Update content item.
 }
 ```
 
-**Response:** Same as GET /api/notes/content/[id]
+**Response:** Same as GET /api/content/content/[id]
 
 **Invariants:**
 
@@ -540,7 +540,7 @@ Update content item.
 - searchText auto-updated for note/html changes
 - updatedAt auto-set
 
-### DELETE /api/notes/content/[id]
+### DELETE /api/content/content/[id]
 
 Soft delete (move to trash) or permanently delete.
 
@@ -589,7 +589,7 @@ Soft delete (move to trash) or permanently delete.
 
 **Two-Phase Upload Workflow** (enforces upload state machine)
 
-### POST /api/notes/content/upload
+### POST /api/content/content/upload
 
 **Phase 1:** Initiate file upload.
 
@@ -644,7 +644,7 @@ Creates ContentNode + FilePayload with `uploadStatus=uploading`. Returns presign
 ```typescript
 // 1. Initiate
 const { contentId, presignedUrl, method, headers } = await fetch(
-  "/api/notes/content/upload",
+  "/api/content/content/upload",
   {
     method: "POST",
     body: JSON.stringify({
@@ -666,7 +666,7 @@ const uploadResponse = await fetch(presignedUrl, {
 });
 
 // 3. Finalize
-await fetch(`/api/notes/content/${contentId}/finalize`, {
+await fetch(`/api/content/content/${contentId}/finalize`, {
   method: "POST",
   body: JSON.stringify({
     success: uploadResponse.ok,
@@ -675,7 +675,7 @@ await fetch(`/api/notes/content/${contentId}/finalize`, {
 });
 ```
 
-### POST /api/notes/content/[id]/finalize
+### POST /api/content/content/[id]/finalize
 
 **Phase 3:** Finalize file upload (mark as ready or failed).
 
@@ -702,7 +702,7 @@ await fetch(`/api/notes/content/${contentId}/finalize`, {
       "mimeType": "application/pdf",
       "fileSize": 1048576,
       "storageUrl": "https://cdn.../document.pdf",
-      "downloadUrl": "https://yourdomain.com/api/notes/content/uuid/download"
+      "downloadUrl": "https://yourdomain.com/api/content/content/uuid/download"
     }
   }
 }
@@ -728,7 +728,7 @@ await fetch(`/api/notes/content/${contentId}/finalize`, {
 - Once `ready`, cannot change to `uploading` (must delete + re-upload)
 - UI must check `uploadStatus === 'ready'` before download/preview
 
-### GET /api/notes/content/[id]/download
+### GET /api/content/content/[id]/download
 
 Download file binary.
 
@@ -775,7 +775,7 @@ Content-Length: {fileSize}
 
 ## Tree Navigation API
 
-### GET /api/notes/content/tree
+### GET /api/content/content/tree
 
 Get hierarchical tree structure.
 
@@ -875,7 +875,7 @@ function buildTreeNode(node: ContentNode): TreeNode {
 }
 ```
 
-### POST /api/notes/content/move
+### POST /api/content/content/move
 
 Move content to new parent or reorder.
 
@@ -920,7 +920,7 @@ Move content to new parent or reorder.
 
 ## Search API
 
-### GET /api/notes/search
+### GET /api/content/search
 
 Full-text search across all content types.
 
@@ -1030,7 +1030,7 @@ LIMIT $3 OFFSET $4;
 
 ## Backlinks API
 
-### GET /api/notes/content/[id]/backlinks
+### GET /api/content/content/[id]/backlinks
 
 Get all content linking to this item.
 
@@ -1059,7 +1059,7 @@ Get all content linking to this item.
 
 **Database Mapping:** Uses `ContentLink` table (renamed from DocumentLink)
 
-### POST /api/notes/content/[id]/backlinks/update
+### POST /api/content/content/[id]/backlinks/update
 
 Update backlinks for a content item (incremental indexing).
 
@@ -1093,7 +1093,7 @@ Update backlinks for a content item (incremental indexing).
 
 ## HTML Template API
 
-### POST /api/notes/content/template
+### POST /api/content/content/template
 
 Create reusable HTML template.
 
@@ -1141,7 +1141,7 @@ Create reusable HTML template.
 }
 ```
 
-### POST /api/notes/content/template/[id]/instantiate
+### POST /api/content/content/template/[id]/instantiate
 
 Create new HTML page from template.
 
@@ -1182,7 +1182,7 @@ Create new HTML page from template.
 }
 ```
 
-### GET /api/notes/content/templates
+### GET /api/content/content/templates
 
 List all available templates.
 
@@ -1215,7 +1215,7 @@ List all available templates.
 
 ## Icon Customization API
 
-### PATCH /api/notes/content/[id]/icon
+### PATCH /api/content/content/[id]/icon
 
 Update icon and color.
 
@@ -1241,7 +1241,7 @@ Update icon and color.
 }
 ```
 
-### POST /api/notes/content/icons/batch
+### POST /api/content/content/icons/batch
 
 Bulk update icons.
 
@@ -1270,7 +1270,7 @@ Bulk update icons.
 
 ## Trash API
 
-### GET /api/notes/trash
+### GET /api/content/trash
 
 List deleted items (soft delete).
 
@@ -1299,7 +1299,7 @@ List deleted items (soft delete).
 }
 ```
 
-### POST /api/notes/trash/[contentId]/restore
+### POST /api/content/trash/[contentId]/restore
 
 Restore from trash.
 
@@ -1316,7 +1316,7 @@ Restore from trash.
 }
 ```
 
-### DELETE /api/notes/trash/empty
+### DELETE /api/content/trash/empty
 
 Permanently delete all trash items.
 
@@ -1334,7 +1334,7 @@ Permanently delete all trash items.
 
 ## Webhooks
 
-### POST /api/notes/webhooks/subscribe
+### POST /api/content/webhooks/subscribe
 
 Subscribe to content change events.
 
@@ -1452,7 +1452,7 @@ function showProgress(file: FilePayload): boolean {
 **API Enforcement:**
 
 ```typescript
-// GET /api/notes/content/[id]/download
+// GET /api/content/content/[id]/download
 export async function GET(
   req: Request,
   { params }: { params: { id: string } }
@@ -1495,7 +1495,7 @@ export async function GET(
 **API Enforcement:**
 
 ```typescript
-// DELETE /api/notes/content/[id]
+// DELETE /api/content/content/[id]
 export async function DELETE(
   req: Request,
   { params }: { params: { id: string } }
@@ -1686,7 +1686,7 @@ if (actualChecksum !== file.checksum) {
 
 ```typescript
 // 1. Create note
-const response = await fetch("/api/notes/content", {
+const response = await fetch("/api/content/content", {
   method: "POST",
   body: JSON.stringify({
     title: "My Note",
@@ -1698,7 +1698,7 @@ const { data: note } = await response.json();
 console.log(note.contentType); // 'note'
 
 // 2. Edit note
-await fetch(`/api/notes/content/${note.id}`, {
+await fetch(`/api/content/content/${note.id}`, {
   method: "PATCH",
   body: JSON.stringify({
     tiptapJson: {
@@ -1717,7 +1717,7 @@ await fetch(`/api/notes/content/${note.id}`, {
 
 ```typescript
 // 1. Initiate
-const { data } = await fetch("/api/notes/content/upload", {
+const { data } = await fetch("/api/content/content/upload", {
   method: "POST",
   body: JSON.stringify({
     fileName: file.name,
@@ -1737,20 +1737,20 @@ await fetch(data.presignedUrl, {
 });
 
 // 3. Finalize
-await fetch(`/api/notes/content/${data.contentId}/finalize`, {
+await fetch(`/api/content/content/${data.contentId}/finalize`, {
   method: "POST",
   body: JSON.stringify({ success: true }),
 });
 
 // 4. Download (now allowed)
-window.open(`/api/notes/content/${data.contentId}/download`);
+window.open(`/api/content/content/${data.contentId}/download`);
 ```
 
 ### Create Template and Instantiate Flow
 
 ```typescript
 // 1. Create template
-const { data: template } = await fetch("/api/notes/content/template", {
+const { data: template } = await fetch("/api/content/content/template", {
   method: "POST",
   body: JSON.stringify({
     title: "Newsletter Template",
@@ -1766,7 +1766,7 @@ const { data: template } = await fetch("/api/notes/content/template", {
 
 // 2. Instantiate
 const { data: page } = await fetch(
-  `/api/notes/content/template/${template.id}/instantiate`,
+  `/api/content/content/template/${template.id}/instantiate`,
   {
     method: "POST",
     body: JSON.stringify({

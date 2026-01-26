@@ -152,7 +152,7 @@ for (let attempt = 1; attempt <= 3; attempt++) {
 
 #### Current Protection
 
-In `/app/api/notes/content/upload/initiate/route.ts`:
+In `/app/api/content/content/upload/initiate/route.ts`:
 
 ```typescript
 // Check for duplicate file (by checksum + size)
@@ -256,7 +256,7 @@ model FilePayload {
 
 #### Current Protection
 
-When creating a note/folder via `/api/notes/content` POST:
+When creating a note/folder via `/api/content/content` POST:
 
 ```typescript
 // In the create handler
@@ -301,7 +301,7 @@ model Tag {
 
 #### API Protection
 
-In `/app/api/notes/tags/route.ts`:
+In `/app/api/content/tags/route.ts`:
 
 ```typescript
 // Check if tag already exists
@@ -494,7 +494,7 @@ const uploadWithDebounce = useMemo(
 ```bash
 # Test script
 for i in {1..5}; do
-  curl -X POST /api/notes/content/upload/initiate \
+  curl -X POST /api/content/content/upload/initiate \
     -H "Content-Type: application/json" \
     -d '{"fileName":"test.pdf","fileSize":1024,"mimeType":"application/pdf"}' &
 done

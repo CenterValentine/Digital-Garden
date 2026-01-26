@@ -149,9 +149,9 @@ npx prisma migrate resolve --applied baseline
 ## Our Current Setup (as of M8)
 
 **Database:** Neon PostgreSQL (production database)
-**Schema Location:** `apps/web/prisma/schema.prisma`
-**Client Output:** `apps/web/lib/generated/prisma`
-**Config:** `apps/web/prisma.config.ts`
+**Schema Location:** `prisma/schema.prisma`
+**Client Output:** `lib/generated/prisma`
+**Config:** `prisma.config.ts`
 
 **Recent Changes:**
 - Added `settings` (Json @db.JsonB) to User model

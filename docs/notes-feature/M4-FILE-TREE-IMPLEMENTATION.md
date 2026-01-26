@@ -46,7 +46,7 @@ PanelLayout (Server)
 
 ### Step 1: Create Server Component Headers
 
-**File:** `components/notes/headers/LeftSidebarHeader.tsx`
+**File:** `components/content/headers/LeftSidebarHeader.tsx`
 
 ```typescript
 /**
@@ -83,7 +83,7 @@ export function LeftSidebarHeader() {
 }
 ```
 
-**File:** `components/notes/headers/RightSidebarHeader.tsx`
+**File:** `components/content/headers/RightSidebarHeader.tsx`
 
 ```typescript
 /**
@@ -128,7 +128,7 @@ export function RightSidebarHeader() {
 
 ### Step 2: Create Skeleton Components
 
-**File:** `components/notes/skeletons/FileTreeSkeleton.tsx`
+**File:** `components/content/skeletons/FileTreeSkeleton.tsx`
 
 ```typescript
 /**
@@ -166,10 +166,10 @@ export function FileTreeSkeleton() {
 
 ### Step 3: Update Panel Components
 
-**File:** `components/notes/LeftSidebar.tsx` → Split into:
+**File:** `components/content/LeftSidebar.tsx` → Split into:
 
 ```typescript
-// components/notes/LeftSidebar.tsx (Server Component Wrapper)
+// components/content/LeftSidebar.tsx (Server Component Wrapper)
 import { Suspense } from "react";
 import { LeftSidebarHeader } from "./headers/LeftSidebarHeader";
 import { LeftSidebarContent } from "./content/LeftSidebarContent";
@@ -191,7 +191,7 @@ export function LeftSidebar() {
 ```
 
 ```typescript
-// components/notes/content/LeftSidebarContent.tsx (Client Component)
+// components/content/content/LeftSidebarContent.tsx (Client Component)
 "use client";
 
 import { useEffect, useState } from "react";
@@ -202,7 +202,7 @@ export function LeftSidebarContent() {
   
   useEffect(() => {
     // Fetch tree data
-    fetch('/api/notes/content/tree')
+    fetch('/api/content/content/tree')
       .then(res => res.json())
       .then(data => setTreeData(data));
   }, []);
@@ -217,13 +217,13 @@ export function LeftSidebarContent() {
 
 ### Step 4: Update Layout to Use New Structure
 
-**File:** `app/(authenticated)/notes/layout.tsx`
+**File:** `app/(authenticated)/content/layout.tsx`
 
 ```typescript
-import { PanelLayout } from "@/components/notes/PanelLayout";
-import { LeftSidebar } from "@/components/notes/LeftSidebar";
-import { RightSidebar } from "@/components/notes/RightSidebar";
-import { StatusBar } from "@/components/notes/StatusBar";
+import { PanelLayout } from "@/components/content/PanelLayout";
+import { LeftSidebar } from "@/components/content/LeftSidebar";
+import { RightSidebar } from "@/components/content/RightSidebar";
+import { StatusBar } from "@/components/content/StatusBar";
 
 export default function NotesLayout({
   children,
@@ -254,7 +254,7 @@ pnpm add react-arborist
 
 ### Create FileTree Component
 
-**File:** `components/notes/FileTree.tsx`
+**File:** `components/content/FileTree.tsx`
 
 ```typescript
 "use client";
@@ -312,7 +312,7 @@ export function FileTree({ data }: { data: any }) {
 ## File Structure
 
 ```
-components/notes/
+components/content/
 ├── PanelLayout.tsx              # Client (needs Allotment)
 ├── LeftSidebar.tsx              # Server wrapper
 ├── RightSidebar.tsx             # Server wrapper

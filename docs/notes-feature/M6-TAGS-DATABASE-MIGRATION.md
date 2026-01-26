@@ -94,7 +94,7 @@ model ContentTag {
 
 ### Step 1: Update Prisma Schema
 
-**File:** `apps/web/prisma/schema.prisma`
+**File:** `prisma/schema.prisma`
 
 Update the `Tag` model:
 
@@ -174,7 +174,7 @@ npx prisma migrate dev --name add_user_tags_and_positions
 
 ### Step 3: Update Seed Script
 
-**File:** `apps/web/prisma/seed.ts`
+**File:** `prisma/seed.ts`
 
 Add sample tags for test user:
 
@@ -249,7 +249,7 @@ if (welcomeNote) {
 ```bash
 npx prisma generate
 
-# Outputs to: apps/web/lib/generated/prisma
+# Outputs to: lib/generated/prisma
 ```
 
 ### Step 5: Verify Migration
@@ -490,7 +490,7 @@ export interface ContentTagResponse {
 
 ### 1. Tag Search (Autocomplete)
 
-**File:** `app/api/notes/tags/search/route.ts`
+**File:** `app/api/content/tags/search/route.ts`
 
 ```typescript
 export async function GET(request: NextRequest) {
@@ -526,7 +526,7 @@ export async function GET(request: NextRequest) {
 
 ### 2. Create Tag
 
-**File:** `app/api/notes/content/[id]/tags/route.ts`
+**File:** `app/api/content/content/[id]/tags/route.ts`
 
 ```typescript
 export async function POST(request: NextRequest, { params }) {
@@ -600,7 +600,7 @@ export async function POST(request: NextRequest, { params }) {
 
 ### 3. Delete Tag (With Confirmation)
 
-**File:** `app/api/notes/tags/[id]/route.ts`
+**File:** `app/api/content/tags/[id]/route.ts`
 
 ```typescript
 export async function DELETE(request: NextRequest, { params }) {

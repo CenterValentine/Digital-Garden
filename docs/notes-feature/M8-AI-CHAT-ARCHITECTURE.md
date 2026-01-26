@@ -729,7 +729,7 @@ export const useAIChatStore = create<AIChatStore>()((set, get) => ({
 
 ### 1. AIChatPanel
 
-**`components/notes/chat/AIChatPanel.tsx`**
+**`components/content/chat/AIChatPanel.tsx`**
 
 ```typescript
 "use client";
@@ -784,7 +784,7 @@ export function AIChatPanel() {
 
 ### 2. MessageList
 
-**`components/notes/chat/MessageList.tsx`**
+**`components/content/chat/MessageList.tsx`**
 
 ```typescript
 export function MessageList({
@@ -825,7 +825,7 @@ export function MessageList({
 
 ### 3. AI Message Bubble
 
-**`components/notes/chat/AIMessage.tsx`**
+**`components/content/chat/AIMessage.tsx`**
 
 ```typescript
 export function AIMessage({ message, isStreaming }: AIMessageProps) {
@@ -869,7 +869,7 @@ export function AIMessage({ message, isStreaming }: AIMessageProps) {
 
 ### 4. Chat Input
 
-**`components/notes/chat/ChatInput.tsx`**
+**`components/content/chat/ChatInput.tsx`**
 
 ```typescript
 export function ChatInput({ onSend, disabled }: ChatInputProps) {
@@ -919,7 +919,7 @@ export function ChatInput({ onSend, disabled }: ChatInputProps) {
 
 ### Markdown Provider with AI
 
-**`components/notes/tool-belt/providers/markdown-ai-provider.tsx`**
+**`components/content/tool-belt/providers/markdown-ai-provider.tsx`**
 
 ```typescript
 export function getMarkdownToolBeltConfig(

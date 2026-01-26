@@ -9,7 +9,7 @@ The `validateProviderConfig` function receives a typed `config` parameter. Acces
 ## Updated validateProviderConfig (with usage examples)
 
 ```typescript
-// apps/web/app/api/notes/storage/route.ts
+// app/api/content/storage/route.ts
 
 import type { R2Config, S3Config, VercelConfig, StorageConfig } from "@/lib/content/api-types";
 
@@ -87,7 +87,7 @@ function validateProviderConfig(
 ## Complete Example: Using Config in Upload
 
 ```typescript
-// apps/web/app/api/notes/content/upload/initiate/route.ts
+// app/api/content/content/upload/initiate/route.ts
 
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
@@ -216,7 +216,7 @@ export type StorageConfig = R2Config | S3Config | VercelConfig;
 ### Create Storage Config
 
 ```http
-POST /api/notes/storage
+POST /api/content/storage
 Content-Type: application/json
 
 {
@@ -254,7 +254,7 @@ Note: `config` is omitted in response (sensitive data).
 ### Get Storage Config (includes sensitive config)
 
 ```http
-GET /api/notes/storage/{id}
+GET /api/content/storage/{id}
 ```
 
 ```json

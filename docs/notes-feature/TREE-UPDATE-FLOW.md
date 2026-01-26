@@ -8,7 +8,7 @@ The content tree follows a **client-optimistic + server-authoritative** pattern:
 
 1. **User drags** item in tree UI
 2. **Client optimistically updates** UI immediately (feels instant)
-3. **API call** sent to server (POST /api/notes/content/move)
+3. **API call** sent to server (POST /api/content/content/move)
 4. **Server validates** and persists change
 5. **Client reconciles** on success or reverts on error
 
@@ -28,7 +28,7 @@ User Drags File
       ↓
 ┌─────────────────────────────────────┐
 │ 2. API Call                          │
-│    POST /api/notes/content/move      │
+│    POST /api/content/content/move      │
 │    {                                 │
 │      contentId,                      │
 │      targetParentId,                 │
@@ -97,7 +97,7 @@ export const useTreeStore = create<TreeState>((set, get) => ({
     set({ tree: updated, isMoving: true });
     
     // Make API call
-    fetch("/api/notes/content/move", {
+    fetch("/api/content/content/move", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ contentId, targetParentId, newDisplayOrder }),
@@ -127,7 +127,7 @@ export const useTreeStore = create<TreeState>((set, get) => ({
   },
   
   refetchTree: async () => {
-    const res = await fetch("/api/notes/content/tree");
+    const res = await fetch("/api/content/content/tree");
     const data = await res.json();
     set({ tree: data.data.tree });
   },
@@ -189,10 +189,10 @@ export function FileTree() {
 
 ## Server Implementation (Already Done)
 
-### POST /api/notes/content/move
+### POST /api/content/content/move
 
 ```typescript
-// apps/web/app/api/notes/content/move/route.ts
+// app/api/content/content/move/route.ts
 
 export async function POST(request: NextRequest) {
   const { contentId, targetParentId, newDisplayOrder } = await request.json();

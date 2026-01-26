@@ -88,7 +88,7 @@ When a user deletes an Office document (.docx, .xlsx, .pptx) or other file that 
 
 ### Integration: Delete Confirmation Dialog
 
-**Location:** `components/notes/ConfirmDialog.tsx`
+**Location:** `components/content/ConfirmDialog.tsx`
 
 **Enhanced Props:**
 ```typescript
@@ -112,7 +112,7 @@ interface ConfirmDialogProps {
 
 ### Integration: LeftSidebarContent Delete Handler
 
-**Location:** `components/notes/content/LeftSidebarContent.tsx`
+**Location:** `components/content/content/LeftSidebarContent.tsx`
 
 **State Management:**
 ```typescript
@@ -156,7 +156,7 @@ if (hasGoogleAuth) {
   try {
     const metadataChecks = ids.map(async (id) => {
       try {
-        const response = await fetch(`/api/notes/content/${id}`, {
+        const response = await fetch(`/api/content/content/${id}`, {
           credentials: "include",
         });
         if (response.ok) {
@@ -191,7 +191,7 @@ setDeleteConfirm({
 
 // STEP 3: On confirm, fetch metadata and delete from Google Drive
 if (hasGoogleAuth && deleteFromGoogleDrive) {
-  const response = await fetch(`/api/notes/content/${id}`);
+  const response = await fetch(`/api/content/content/${id}`);
   const data = await response.json();
   const metadata = data.data?.file?.storageMetadata;
   // CRITICAL: Use correct metadata path
@@ -275,7 +275,7 @@ for (const { fileId, contentId } of googleDriveFiles) {
 
 ### Document Creation Gating
 
-**Location:** `components/notes/LeftSidebar.tsx`
+**Location:** `components/content/LeftSidebar.tsx`
 
 **Implementation:**
 ```typescript
@@ -307,8 +307,8 @@ useEffect(() => {
 - **Without Google Auth**: Options hidden (callbacks are undefined)
 
 **Applies To:**
-- Left sidebar header + menu ([LeftSidebarHeaderActions.tsx:91-108](apps/web/components/notes/headers/LeftSidebarHeaderActions.tsx#L91-L108))
-- Right-click context menu ([file-tree-actions.tsx:181-193](apps/web/components/notes/context-menu/file-tree-actions.tsx#L181-L193))
+- Left sidebar header + menu ([LeftSidebarHeaderActions.tsx:91-108](components/content/headers/LeftSidebarHeaderActions.tsx#L91-L108))
+- Right-click context menu ([file-tree-actions.tsx:181-193](components/content/context-menu/file-tree-actions.tsx#L181-L193))
 
 ---
 
@@ -351,11 +351,11 @@ export interface ExternalProviders {
 ```
 
 **Where This Path Is Used:**
-1. **Delete Detection** - [LeftSidebarContent.tsx:903](../../components/notes/content/LeftSidebarContent.tsx#L903)
+1. **Delete Detection** - [LeftSidebarContent.tsx:903](../../components/content/content/LeftSidebarContent.tsx#L903)
    - Checks if files have Google Drive metadata before showing checkbox
-2. **Delete Execution** - [LeftSidebarContent.tsx:970](../../components/notes/content/LeftSidebarContent.tsx#L970)
+2. **Delete Execution** - [LeftSidebarContent.tsx:970](../../components/content/content/LeftSidebarContent.tsx#L970)
    - Extracts fileId to call Google Drive delete API
-3. **Rename Logic** - [route.ts:337](../../app/api/notes/content/[id]/route.ts#L337)
+3. **Rename Logic** - [route.ts:337](../../app/api/content/content/[id]/route.ts#L337)
    - Checks if file needs to be renamed in Google Drive
 
 **Testing Verification:**
@@ -684,7 +684,7 @@ curl -X POST http://localhost:3000/api/google-drive/delete \
 **Integration Test:**
 ```bash
 # Test full delete flow with Google Drive sync
-curl -X DELETE http://localhost:3000/api/notes/content/{id}
+curl -X DELETE http://localhost:3000/api/content/content/{id}
 # Then verify Google Drive file is deleted
 ```
 
@@ -697,12 +697,12 @@ curl -X DELETE http://localhost:3000/api/notes/content/{id}
 - `docs/notes-feature/M7-GOOGLE-DRIVE-DELETE-SYNC.md` - This documentation
 
 ### Modified Files
-- `components/notes/ConfirmDialog.tsx` - Added optional checkbox support
-- `components/notes/content/LeftSidebarContent.tsx` - Added Google Drive delete logic, intelligent detection, SSR-safe localStorage
-- `components/notes/LeftSidebar.tsx` - Added Google auth check and conditional document creation
-- `app/api/notes/content/[id]/route.ts` - Fixed metadata path in rename logic (line 337)
-- `components/notes/headers/LeftSidebarHeader.tsx` - Conditional document creation props
-- `components/notes/headers/LeftSidebarHeaderActions.tsx` - Conditional rendering for document/spreadsheet options
+- `components/content/ConfirmDialog.tsx` - Added optional checkbox support
+- `components/content/content/LeftSidebarContent.tsx` - Added Google Drive delete logic, intelligent detection, SSR-safe localStorage
+- `components/content/LeftSidebar.tsx` - Added Google auth check and conditional document creation
+- `app/api/content/content/[id]/route.ts` - Fixed metadata path in rename logic (line 337)
+- `components/content/headers/LeftSidebarHeader.tsx` - Conditional document creation props
+- `components/content/headers/LeftSidebarHeaderActions.tsx` - Conditional rendering for document/spreadsheet options
 
 ---
 
@@ -726,9 +726,9 @@ curl -X DELETE http://localhost:3000/api/notes/content/{id}
 **Status:** ✅ Fixed and verified working (see Critical Implementation Details above)
 
 **Files Changed:**
-- `components/notes/content/LeftSidebarContent.tsx:903` - Delete detection
-- `components/notes/content/LeftSidebarContent.tsx:970` - Delete execution
-- `app/api/notes/content/[id]/route.ts:337` - Rename logic
+- `components/content/content/LeftSidebarContent.tsx:903` - Delete detection
+- `components/content/content/LeftSidebarContent.tsx:970` - Delete execution
+- `app/api/content/content/[id]/route.ts:337` - Rename logic
 
 ---
 

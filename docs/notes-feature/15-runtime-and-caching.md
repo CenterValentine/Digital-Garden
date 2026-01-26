@@ -13,18 +13,18 @@ This document outlines the runtime selection strategy for API routes, streaming 
 
 | Route Type                  | Runtime  | Rationale                             |
 | --------------------------- | -------- | ------------------------------------- |
-| `/api/notes/files` (GET)    | **Edge** | Fast JSON responses, no DB writes     |
-| `/api/notes/files` (POST)   | **Node** | Database writes, complex logic        |
-| `/api/notes/files/upload`   | **Node** | Presigned URL generation, crypto      |
-| `/api/notes/content/[id]`   | **Edge** | Read-heavy, fast delivery             |
-| `/api/notes/tree`           | **Edge** | Cached tree data, global distribution |
-| `/api/notes/search`         | **Node** | Database queries, full-text search    |
-| `/api/notes/backlinks/[id]` | **Edge** | Read-only, cacheable                  |
+| `/api/content/files` (GET)    | **Edge** | Fast JSON responses, no DB writes     |
+| `/api/content/files` (POST)   | **Node** | Database writes, complex logic        |
+| `/api/content/files/upload`   | **Node** | Presigned URL generation, crypto      |
+| `/api/content/content/[id]`   | **Edge** | Read-heavy, fast delivery             |
+| `/api/content/tree`           | **Edge** | Cached tree data, global distribution |
+| `/api/content/search`         | **Node** | Database queries, full-text search    |
+| `/api/content/backlinks/[id]` | **Edge** | Read-only, cacheable                  |
 
 ### Edge Runtime Configuration
 
 ```typescript
-// app/api/notes/files/route.ts
+// app/api/content/files/route.ts
 export const runtime = "edge";
 export const preferredRegion = "auto"; // Deploy to all regions
 
@@ -52,7 +52,7 @@ export async function GET(request: Request) {
 ### Node Runtime Configuration
 
 ```typescript
-// app/api/notes/files/upload/route.ts
+// app/api/content/files/upload/route.ts
 export const runtime = "nodejs";
 export const maxDuration = 60; // 60 seconds max
 
@@ -80,7 +80,7 @@ export async function POST(request: Request) {
 ### Streaming Implementation
 
 ```typescript
-// app/api/notes/export/route.ts
+// app/api/content/export/route.ts
 export const runtime = "nodejs";
 
 export async function GET(request: Request) {
@@ -123,7 +123,7 @@ export async function GET(request: Request) {
 ### Server-Sent Events for Real-Time Updates
 
 ```typescript
-// app/api/notes/live-updates/route.ts
+// app/api/content/live-updates/route.ts
 export const runtime = "nodejs";
 
 export async function GET(request: Request) {
@@ -180,7 +180,7 @@ export default {
 ### Custom Body Size Limits
 
 ```typescript
-// app/api/notes/files/upload/route.ts
+// app/api/content/files/upload/route.ts
 export const config = {
   api: {
     bodyParser: {
@@ -247,10 +247,10 @@ export async function updateDocumentTitle(formData: FormData) {
 
 | Operation        | Approach                  | Example                   |
 | ---------------- | ------------------------- | ------------------------- |
-| CRUD operations  | API Routes                | `/api/notes/files`        |
-| Search/filtering | API Routes                | `/api/notes/search`       |
+| CRUD operations  | API Routes                | `/api/content/files`        |
+| Search/filtering | API Routes                | `/api/content/search`       |
 | Form submissions | API Routes (preferred)    | POST to API               |
-| File uploads     | API Routes                | `/api/notes/files/upload` |
+| File uploads     | API Routes                | `/api/content/files/upload` |
 | Simple mutations | Server Actions (optional) | updateDocumentTitle       |
 
 ## Next.js Caching Strategy
@@ -392,7 +392,7 @@ export async function POST(request: Request) {
 ### Cache Tags Strategy
 
 ```typescript
-// app/api/notes/files/[id]/route.ts
+// app/api/content/files/[id]/route.ts
 export async function GET(
   request: Request,
   { params }: { params: { id: string } }
@@ -462,7 +462,7 @@ export async function warmCache() {
   // Pre-fetch and cache
   await Promise.all(
     topDocuments.map(async (doc) => {
-      await fetch(`${process.env.APP_URL}/api/notes/files/${doc.id}`);
+      await fetch(`${process.env.APP_URL}/api/content/files/${doc.id}`);
     })
   );
 }

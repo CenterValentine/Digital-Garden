@@ -24,7 +24,7 @@
 2. **URL updates** → `/notes?content=<uuid>` via `window.history.replaceState()`
 3. **localStorage backup** → `lastSelectedContentId` stored
 4. **Page refresh** → Reads `?content=` first, falls back to localStorage
-5. **API request** → `GET /api/notes/content/<uuid>`
+5. **API request** → `GET /api/content/content/<uuid>`
 6. **Auth check** → Validates `content.ownerId === session.user.id`
 
 **Security:** ✅ Ownership validated on every API request (see `route.ts:59`)
@@ -108,7 +108,7 @@ generateSlug("My Awesome Note!")
 ### Resolution Logic
 
 ```typescript
-// In: GET /api/notes/content/[id]
+// In: GET /api/content/content/[id]
 async function getContentNode(identifier: string, userId: string) {
   // Try UUID first (most common, fastest)
   if (isUUID(identifier)) {

@@ -116,7 +116,7 @@ Password: changeme123
 ## File Structure
 
 ```
-apps/web/
+
 ├── prisma/
 │   ├── schema.prisma          # ✅ v2.0 Schema
 │   └── seed.ts                # ✅ Seed script

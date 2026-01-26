@@ -8,7 +8,7 @@
 
 ## Overview
 
-Phase 0 focused on building the complete settings UI with all sections designed, using the Liquid Glass design system to match the `/notes` route aesthetic. All interactions are wired to console alerts for testing, with real API integration planned for later phases.
+Phase 0 focused on building the complete settings UI with all sections designed, using the Liquid Glass design system to match the `/content` route aesthetic. All interactions are wired to console alerts for testing, with real API integration planned for later phases.
 
 ---
 
@@ -310,7 +310,7 @@ All interactions log to console for testing. Examples:
 ## File Structure
 
 ```
-apps/web/
+
 ├── app/(authenticated)/settings/
 │   ├── layout.tsx                  # Settings layout with sidebar
 │   ├── page.tsx                    # Redirect to /storage

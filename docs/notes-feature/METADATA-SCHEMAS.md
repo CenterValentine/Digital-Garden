@@ -16,7 +16,7 @@ The `FilePayload.storageMetadata` JSON field stores structured metadata about up
 
 ## Schema Location
 
-**TypeScript Types:** `apps/web/lib/content/metadata-schemas.ts`
+**TypeScript Types:** `lib/content/metadata-schemas.ts`
 **Documentation:** This file
 
 ## Core Metadata Structure

@@ -25,11 +25,11 @@ The Notes IDE now supports **full Office document editing** with auto-save using
 ### Component Hierarchy
 
 ```
-FileViewer (apps/web/components/notes/viewer/FileViewer.tsx)
+FileViewer (components/content/viewer/FileViewer.tsx)
   ↓
-OfficeDocumentViewer (apps/web/components/notes/viewer/OfficeDocumentViewer.tsx)
+OfficeDocumentViewer (components/content/viewer/OfficeDocumentViewer.tsx)
   ↓ (if officeViewerMode === "onlyoffice" && onlyofficeServerUrl)
-OnlyOfficeEditor (apps/web/components/notes/viewer/OnlyOfficeEditor.tsx)
+OnlyOfficeEditor (components/content/viewer/OnlyOfficeEditor.tsx)
   ↓ (uses)
 @onlyoffice/document-editor-react
 ```
@@ -164,7 +164,7 @@ docker-compose up -d
 
 ### Settings Store
 
-**File:** `apps/web/stores/upload-settings-store.ts`
+**File:** `stores/upload-settings-store.ts`
 
 **State:**
 ```typescript
@@ -184,7 +184,7 @@ interface UploadSettingsStore {
 
 ### Callback Endpoint
 
-**Path:** `apps/web/app/api/onlyoffice/callback/route.ts`
+**Path:** `app/api/onlyoffice/callback/route.ts`
 
 **Method:** `POST`
 
@@ -415,20 +415,20 @@ The callback endpoint should verify:
 ## Related Files
 
 **Components:**
-- `apps/web/components/notes/viewer/OnlyOfficeEditor.tsx` - Main editor component
-- `apps/web/components/notes/viewer/OfficeDocumentViewer.tsx` - Wrapper with mode switching
-- `apps/web/components/notes/viewer/FileViewer.tsx` - Parent viewer component
+- `components/content/viewer/OnlyOfficeEditor.tsx` - Main editor component
+- `components/content/viewer/OfficeDocumentViewer.tsx` - Wrapper with mode switching
+- `components/content/viewer/FileViewer.tsx` - Parent viewer component
 
 **API:**
-- `apps/web/app/api/onlyoffice/callback/route.ts` - Callback endpoint for saves
+- `app/api/onlyoffice/callback/route.ts` - Callback endpoint for saves
 
 **Settings:**
-- `apps/web/app/(authenticated)/settings/preferences/page.tsx` - Settings UI
-- `apps/web/stores/upload-settings-store.ts` - Settings state management
+- `app/(authenticated)/settings/preferences/page.tsx` - Settings UI
+- `stores/upload-settings-store.ts` - Settings state management
 
 **Documentation:**
-- `apps/web/docs/notes-feature/M7-STORAGE-ARCHITECTURE-V2.md` - Storage architecture
-- `apps/web/docs/notes-feature/IMPLEMENTATION-STATUS.md` - Feature status
+- `docs/notes-feature/M7-STORAGE-ARCHITECTURE-V2.md` - Storage architecture
+- `docs/notes-feature/IMPLEMENTATION-STATUS.md` - Feature status
 
 ---
 

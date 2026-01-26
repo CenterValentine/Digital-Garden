@@ -63,14 +63,14 @@ WHERE cn.id = rn.id
 ```
 
 **Scripts created:**
-- `apps/web/scripts/remove-duplicates.sql` - Soft-delete duplicate records
-- `apps/web/scripts/fix-display-order-v2.sql` - Renumber all siblings sequentially
+- `scripts/remove-duplicates.sql` - Soft-delete duplicate records
+- `scripts/fix-display-order-v2.sql` - Renumber all siblings sequentially
 
 ### 2. Move API Including Soft-Deleted Items
 
 **Issue:** The `moveContentToPosition()` function in the move API was fetching siblings WITHOUT filtering out soft-deleted records.
 
-**Location:** `apps/web/app/api/notes/content/move/route.ts` line 286-294
+**Location:** `app/api/content/content/move/route.ts` line 286-294
 
 **Fix:**
 ```typescript
@@ -102,7 +102,7 @@ When moving an item from position 4 to position 5:
 
 **Fix:** Adjust the index when moving DOWN within the same parent before sending to API.
 
-**Location:** `apps/web/components/notes/content/LeftSidebarContent.tsx` line 275-292
+**Location:** `components/content/content/LeftSidebarContent.tsx` line 275-292
 
 ```typescript
 // Calculate the API index: react-arborist gives us insertion point, but server expects final visual position
@@ -123,7 +123,7 @@ Both should keep the item in its current position if dropped, but only the "abov
 
 **Fix:** Detect when the drop would result in no position change and skip the API call entirely.
 
-**Location:** `apps/web/components/notes/content/LeftSidebarContent.tsx` line 258-273
+**Location:** `components/content/content/LeftSidebarContent.tsx` line 258-273
 
 ```typescript
 // Find the dragged node's current position
@@ -273,10 +273,10 @@ When modifying drag-and-drop functionality, test:
 
 ## Files Modified
 
-- `apps/web/app/api/notes/content/move/route.ts` - Added `deletedAt: null` filter, adjusted index calculation
-- `apps/web/components/notes/content/LeftSidebarContent.tsx` - Added position change detection, API index adjustment
-- `apps/web/scripts/remove-duplicates.sql` - Script to clean up duplicate records
-- `apps/web/scripts/fix-display-order-v2.sql` - Script to renumber displayOrder sequentially
+- `app/api/content/content/move/route.ts` - Added `deletedAt: null` filter, adjusted index calculation
+- `components/content/content/LeftSidebarContent.tsx` - Added position change detection, API index adjustment
+- `scripts/remove-duplicates.sql` - Script to clean up duplicate records
+- `scripts/fix-display-order-v2.sql` - Script to renumber displayOrder sequentially
 
 ## Related Documentation
 

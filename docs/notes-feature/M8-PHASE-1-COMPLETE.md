@@ -151,7 +151,7 @@ model User {
 ## File Structure
 
 ```
-apps/web/
+
 ├── prisma/
 │   └── schema.prisma                          # ✅ Updated User model
 │
@@ -409,9 +409,9 @@ curl -X POST http://localhost:3000/api/user/settings/reset \
 
 **Files to Update:**
 - `app/(authenticated)/settings/preferences/page.tsx`
-- `components/notes/LeftPanel.tsx`
-- `components/notes/RightPanel.tsx`
-- `components/notes/RightSidebar.tsx`
+- `components/content/LeftPanel.tsx`
+- `components/content/RightPanel.tsx`
+- `components/content/RightSidebar.tsx`
 
 ### Phase 1C: Migration Utility (Days 4-5)
 

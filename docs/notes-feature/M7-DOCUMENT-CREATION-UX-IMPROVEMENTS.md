@@ -108,7 +108,7 @@ const defaults = {
 };
 
 // Call dedicated endpoint
-const response = await fetch("/api/notes/content/create-document", {
+const response = await fetch("/api/content/content/create-document", {
   method: "POST",
   body: JSON.stringify({
     fileName: config.title,
@@ -125,7 +125,7 @@ Simplified handlers to trigger inline creation instead of immediate API call:
 ```typescript
 // Before: Immediate API call
 const handleCreateDocument = async () => {
-  const response = await fetch("/api/notes/content/create-document", ...);
+  const response = await fetch("/api/content/content/create-document", ...);
   // ... complex logic
 };
 
@@ -143,7 +143,7 @@ const handleCreateDocument = () => {
 
 When a file is renamed in the file tree:
 1. File tree updates immediately (optimistic UI)
-2. Database updated via PATCH /api/notes/content/[id]
+2. Database updated via PATCH /api/content/content/[id]
 3. **MainPanel doesn't know about the change**
 4. MainPanel shows stale title until page refresh
 
@@ -224,10 +224,10 @@ Documents use `contentType: "file"` in the tree, but different creation handlers
 
 | User Action | Type Param | ContentType | Endpoint |
 |------------|-----------|-------------|----------|
-| New Folder | "folder" | "folder" | /api/notes/content (isFolder: true) |
-| New Note | "note" | "note" | /api/notes/content (tiptapJson) |
-| New Document | "docx" | "file" | /api/notes/content/create-document |
-| New Spreadsheet | "xlsx" | "file" | /api/notes/content/create-document |
+| New Folder | "folder" | "folder" | /api/content/content (isFolder: true) |
+| New Note | "note" | "note" | /api/content/content (tiptapJson) |
+| New Document | "docx" | "file" | /api/content/content/create-document |
+| New Spreadsheet | "xlsx" | "file" | /api/content/content/create-document |
 | New File (upload) | "file" | "file" | Upload dialog |
 
 ### Event Flow
@@ -238,7 +238,7 @@ User renames "Report.docx" → "Q4 Report.docx"
          ↓
 [LeftSidebarContent] Optimistic UI update (tree shows new name)
          ↓
-PATCH /api/notes/content/{id} { title: "Q4 Report.docx" }
+PATCH /api/content/content/{id} { title: "Q4 Report.docx" }
          ↓
 Database updated (ContentNode.title + Google Drive if needed)
          ↓
@@ -265,7 +265,7 @@ User presses Enter
          ↓
 Auto-add extension → "Q4 Report.docx"
          ↓
-POST /api/notes/content/create-document
+POST /api/content/content/create-document
   { fileName: "Q4 Report.docx", fileType: "docx" }
          ↓
 Server creates blank .docx, uploads to storage, creates ContentNode
@@ -322,11 +322,11 @@ Title updates are instant across all panels:
 ### Modified Files
 
 **Type Definitions:**
-- `components/notes/LeftSidebar.tsx`
+- `components/content/LeftSidebar.tsx`
   - Updated `createTrigger` type to include "docx" | "xlsx"
   - Simplified handlers to trigger inline creation
 
-- `components/notes/content/LeftSidebarContent.tsx`
+- `components/content/content/LeftSidebarContent.tsx`
   - Updated `LeftSidebarContentProps.createTrigger` type
   - Updated `creatingItem` state type
   - Added "docx" and "xlsx" to `defaults` config
@@ -335,7 +335,7 @@ Title updates are instant across all panels:
   - Imported `ContentType` from types
 
 **Event System:**
-- `components/notes/content/MainPanelContent.tsx`
+- `components/content/content/MainPanelContent.tsx`
   - Added `refreshTrigger` state
   - Added `useEffect` to listen for 'content-updated' events
   - Added `refreshTrigger` to fetch dependency array

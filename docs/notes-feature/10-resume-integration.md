@@ -12,7 +12,7 @@ The existing resume feature provides valuable infrastructure that the notes feat
 ### PDF Generation Pipeline (Puppeteer)
 
 **Current Implementation:**
-- **Location:** `apps/web/app/api/resume/export-pdf/route.ts`
+- **Location:** `app/api/resume/export-pdf/route.ts`
 - **Method:** HTML template → Puppeteer → PDF
 - **Features:** Server-side rendering, custom page sizes, ATS-friendly output
 
@@ -32,7 +32,7 @@ await browser.close();
 ### State Persistence Pattern
 
 **Current Implementation:**
-- **Location:** `apps/web/app/resume/page.tsx`
+- **Location:** `app/resume/page.tsx`
 - **Method:** useState + useEffect + localStorage
 - **Features:** Filter state, section visibility, variant selection
 

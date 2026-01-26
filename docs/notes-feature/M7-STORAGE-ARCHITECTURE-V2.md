@@ -372,7 +372,7 @@ async function forceDelete(contentId: string) {
 **Design Theme:**
 - Use Notes design system (Liquid Glass + DiceUI)
 - Same `getSurfaceStyles("glass-0")` surfaces
-- Consistent with `/notes` layout
+- Consistent with `/content` layout
 - Sticky sidebar navigation (same pattern as notes left sidebar)
 
 ### Storage Settings UI
@@ -747,7 +747,7 @@ export function MetadataPanel() {
   useEffect(() => {
     if (!selectedContentId) return;
 
-    fetch(`/api/notes/content/${selectedContentId}/metadata`)
+    fetch(`/api/content/content/${selectedContentId}/metadata`)
       .then(res => res.json())
       .then(data => setMetadata(data));
   }, [selectedContentId]);
@@ -1122,7 +1122,7 @@ All questions from the initial document have been resolved:
 
 - [Original M7 Plan](./M7-FILE-MANAGEMENT-MEDIA.md)
 - [Prisma Schema](../../prisma/schema.prisma)
-- [Upload Initiate API](../../app/api/notes/content/upload/initiate/route.ts)
-- [Upload Finalize API](../../app/api/notes/content/upload/finalize/route.ts)
-- [Storage Config API](../../app/api/notes/storage/route.ts)
+- [Upload Initiate API](../../app/api/content/content/upload/initiate/route.ts)
+- [Upload Finalize API](../../app/api/content/content/upload/finalize/route.ts)
+- [Storage Config API](../../app/api/content/storage/route.ts)
 - [IMPLEMENTATION-STATUS.md](./IMPLEMENTATION-STATUS.md)

@@ -27,9 +27,9 @@
 
 - **Database:** PostgreSQL (recommended version: 14+)
 - **ORM:** Prisma 7.2.0
-- **Generated Client Location:** `apps/web/lib/generated/prisma`
-- **Schema Location:** `apps/web/prisma/schema.prisma`
-- **Migrations:** `apps/web/prisma/migrations/`
+- **Generated Client Location:** `lib/generated/prisma`
+- **Schema Location:** `prisma/schema.prisma`
+- **Migrations:** `prisma/migrations/`
 
 ### Key Principles
 
@@ -679,7 +679,7 @@ npx prisma validate                             # Validate schema syntax
 ### File Locations
 
 ```
-apps/web/
+
 ├── prisma/
 │   ├── schema.prisma           # Database schema
 │   ├── seed.ts                 # Seed script

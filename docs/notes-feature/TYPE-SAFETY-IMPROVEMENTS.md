@@ -40,13 +40,13 @@ const body = (await request.json()) as CreateContentRequest;
 ### 3. Updated All Route Files
 
 **Files Updated:**
-- `app/api/notes/content/route.ts`
-- `app/api/notes/content/[id]/route.ts`
-- `app/api/notes/content/move/route.ts`
-- `app/api/notes/content/upload/initiate/route.ts`
-- `app/api/notes/content/upload/finalize/route.ts`
-- `app/api/notes/storage/route.ts`
-- `app/api/notes/storage/[id]/route.ts`
+- `app/api/content/content/route.ts`
+- `app/api/content/content/[id]/route.ts`
+- `app/api/content/content/move/route.ts`
+- `app/api/content/content/upload/initiate/route.ts`
+- `app/api/content/content/upload/finalize/route.ts`
+- `app/api/content/storage/route.ts`
+- `app/api/content/storage/[id]/route.ts`
 
 **Changes:**
 - Import proper types from `@/lib/content/api-types`
@@ -158,7 +158,7 @@ const body: CreateContentRequest = {
   parentId: "folder-uuid",
 };
 
-const response = await fetch("/api/notes/content", {
+const response = await fetch("/api/content/content", {
   method: "POST",
   headers: { "Content-Type": "application/json" },
   body: JSON.stringify(body),
@@ -170,7 +170,7 @@ const data: { success: true; data: ContentDetailResponse } = await response.json
 ### Listing Content
 
 ```typescript
-const response = await fetch("/api/notes/content?type=note&limit=50");
+const response = await fetch("/api/content/content?type=note&limit=50");
 const data: {
   success: true;
   data: {
@@ -195,7 +195,7 @@ const body: CreateStorageConfigRequest = {
   isDefault: true,
 };
 
-const response = await fetch("/api/notes/storage", {
+const response = await fetch("/api/content/storage", {
   method: "POST",
   headers: { "Content-Type": "application/json" },
   body: JSON.stringify(body),

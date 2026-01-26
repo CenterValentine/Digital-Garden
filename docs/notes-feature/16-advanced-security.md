@@ -137,7 +137,7 @@ export async function uploadWithMalwareScan(
 ### Integration in Upload Flow
 
 ```typescript
-// app/api/notes/files/upload/confirm/route.ts
+// app/api/content/files/upload/confirm/route.ts
 export async function POST(request: Request) {
   const { contentId } = await request.json();
   const session = await requireAuth();
@@ -245,7 +245,7 @@ if (mimeType.includes("officedocument")) {
 ### Iframe Sandboxing for User Content
 
 ```typescript
-// components/notes/PDFViewer.tsx
+// components/content/PDFViewer.tsx
 export function PDFViewer({ url }: { url: string }) {
   return (
     <iframe
@@ -316,7 +316,7 @@ export function SVGImage({ src }: { src: string }) {
 ### Code Block XSS Prevention
 
 ```typescript
-// components/notes/CodeBlock.tsx
+// components/content/CodeBlock.tsx
 import { codeToHtml } from 'shiki';
 
 export async function CodeBlock({ code, language }: CodeBlockProps) {

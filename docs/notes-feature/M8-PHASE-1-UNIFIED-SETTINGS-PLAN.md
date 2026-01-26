@@ -265,7 +265,7 @@ npx prisma generate
 
 ### Step 2: Update Prisma Schema
 
-**File:** `apps/web/prisma/schema.prisma`
+**File:** `prisma/schema.prisma`
 
 ```prisma
 model User {
@@ -299,7 +299,7 @@ model User {
 
 ### Step 3: Create Validation Schema
 
-**File:** `apps/web/lib/settings/validation.ts`
+**File:** `lib/settings/validation.ts`
 
 ```typescript
 import { z } from "zod";
@@ -410,7 +410,7 @@ export const DEFAULT_SETTINGS: UserSettings = {
 
 ### Step 4: Create Settings Utilities
 
-**File:** `apps/web/lib/settings/utils.ts`
+**File:** `lib/settings/utils.ts`
 
 ```typescript
 import { prisma } from "@/lib/db";
@@ -496,7 +496,7 @@ function mergeWithDefaults(settings: UserSettings): UserSettings {
 
 ### Step 5: Create API Routes
 
-**File:** `apps/web/app/api/user/settings/route.ts`
+**File:** `app/api/user/settings/route.ts`
 
 ```typescript
 import { NextRequest, NextResponse } from "next/server";
@@ -577,7 +577,7 @@ export async function PATCH(request: NextRequest) {
 }
 ```
 
-**File:** `apps/web/app/api/user/settings/reset/route.ts`
+**File:** `app/api/user/settings/reset/route.ts`
 
 ```typescript
 import { NextRequest, NextResponse } from "next/server";
@@ -621,7 +621,7 @@ export async function POST(request: NextRequest) {
 
 ### Step 6: Create Unified Zustand Store
 
-**File:** `apps/web/stores/settings-store.ts`
+**File:** `stores/settings-store.ts`
 
 ```typescript
 import { create } from "zustand";

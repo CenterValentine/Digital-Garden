@@ -202,7 +202,7 @@ Create a facade that exports the same prop interface regardless of underlying im
 **File structure:**
 
 ```
-apps/web/components/ds/
+components/ds/
 ├── button/
 │   ├── index.tsx              # Route-aware export
 │   ├── button-notes.tsx       # Glass-UI implementation
@@ -560,7 +560,7 @@ BANNED_PATTERNS=(
 
 for pattern in "${BANNED_PATTERNS[@]}"; do
   echo "Checking for banned pattern: $pattern"
-  rg "$pattern" apps/web/app/notes/ && exit 1 || true
+  rg "$pattern" app/notes/ && exit 1 || true
 done
 
 echo "✅ No banned patterns found"

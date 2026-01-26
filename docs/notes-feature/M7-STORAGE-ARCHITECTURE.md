@@ -28,16 +28,16 @@ model StorageProviderConfig {
 ```
 
 **API Endpoints** (Already Implemented):
-- ✅ `GET /api/notes/storage` - List user's storage configurations
-- ✅ `POST /api/notes/storage` - Create new storage configuration
-- ✅ `GET /api/notes/storage/[id]` - Get specific configuration
-- ✅ `PATCH /api/notes/storage/[id]` - Update configuration
-- ✅ `DELETE /api/notes/storage/[id]` - Delete configuration (with safety checks)
+- ✅ `GET /api/content/storage` - List user's storage configurations
+- ✅ `POST /api/content/storage` - Create new storage configuration
+- ✅ `GET /api/content/storage/[id]` - Get specific configuration
+- ✅ `PATCH /api/content/storage/[id]` - Update configuration
+- ✅ `DELETE /api/content/storage/[id]` - Delete configuration (with safety checks)
 
 **Upload Flow** (Skeleton Implemented):
 - ✅ Two-phase upload pattern designed
-- ✅ `POST /api/notes/content/upload/initiate` - Creates ContentNode + FilePayload, returns presigned URL
-- ✅ `POST /api/notes/content/upload/finalize` - Verifies upload, extracts metadata, marks ready
+- ✅ `POST /api/content/content/upload/initiate` - Creates ContentNode + FilePayload, returns presigned URL
+- ✅ `POST /api/content/content/upload/finalize` - Verifies upload, extracts metadata, marks ready
 - ⚠️ Storage SDK integration is placeholder (lines 215-237, 195-213)
 
 ### ❌ What We Need to Build
@@ -150,7 +150,7 @@ ENABLE_S3=false
 
 ### 3. File Upload Flow (Detailed)
 
-**Phase 1: Initiate Upload** (`POST /api/notes/content/upload/initiate`)
+**Phase 1: Initiate Upload** (`POST /api/content/content/upload/initiate`)
 ```
 Client                        API Route                    Database              Storage Provider
   │                             │                            │                         │
@@ -179,7 +179,7 @@ Client                                                      Storage Provider (R2
   │<── 200 OK ──────────────────────────────────────────────────────│
 ```
 
-**Phase 3: Finalize Upload** (`POST /api/notes/content/upload/finalize`)
+**Phase 3: Finalize Upload** (`POST /api/content/content/upload/finalize`)
 ```
 Client                        API Route                    Database              Storage Provider
   │                             │                            │                         │
@@ -353,7 +353,7 @@ export class MediaProcessor {
 
 ### Phase 4: Upload UI (Week 2, Days 1-2)
 20. ✅ Install react-dropzone
-21. ✅ Create FileUpload component (`/components/notes/FileUpload.tsx`)
+21. ✅ Create FileUpload component (`/components/content/FileUpload.tsx`)
 22. ✅ Add drag-and-drop zone
 23. ✅ Add progress bar during upload
 24. ✅ Handle upload errors with retry
@@ -367,7 +367,7 @@ export class MediaProcessor {
 30. ✅ Update MainPanel to route by content type
 
 ### Phase 6: File Operations (Week 2, Day 5)
-31. ✅ Implement download API route (`GET /api/notes/content/[id]/download`)
+31. ✅ Implement download API route (`GET /api/content/content/[id]/download`)
 32. ✅ Add "Download" to context menu
 33. ✅ Update delete operation to remove from storage
 34. ✅ Add file size display in tree
@@ -404,7 +404,7 @@ export class MediaProcessor {
 - ❌ Requires new layout component
 - ❌ Additional navigation item
 
-**Option B: Within `/notes` layout (Quick Access)**
+**Option B: Within `/content` layout (Quick Access)**
 ```
 /notes
   ├─ File tree
@@ -512,7 +512,7 @@ Bucket: my-uploads-processed    (thumbnails)
 ## References
 
 - [Prisma Schema](../../prisma/schema.prisma) - StorageProviderConfig model
-- [Upload Initiate API](../../app/api/notes/content/upload/initiate/route.ts) - Phase 1 upload
-- [Upload Finalize API](../../app/api/notes/content/upload/finalize/route.ts) - Phase 2 upload
-- [Storage Config API](../../app/api/notes/storage/route.ts) - CRUD for storage settings
+- [Upload Initiate API](../../app/api/content/content/upload/initiate/route.ts) - Phase 1 upload
+- [Upload Finalize API](../../app/api/content/content/upload/finalize/route.ts) - Phase 2 upload
+- [Storage Config API](../../app/api/content/storage/route.ts) - CRUD for storage settings
 - [M7 Implementation Plan](./M7-FILE-MANAGEMENT-MEDIA.md) - Original M7 scope

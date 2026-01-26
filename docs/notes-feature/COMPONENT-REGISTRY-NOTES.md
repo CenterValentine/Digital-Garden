@@ -233,4 +233,4 @@ Already installed in package.json. Can use this for command palette in M7.
 - **DiceUI Docs:** https://www.diceui.com/docs/introduction
 - **shadcn/ui:** https://ui.shadcn.com
 - **cmdk:** https://cmdk.paco.me
-- **Our Design Tokens:** `apps/web/lib/design-system/`
+- **Our Design Tokens:** `lib/design-system/`

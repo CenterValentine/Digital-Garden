@@ -13,7 +13,7 @@ The Outline Panel has been fully implemented with the following components:
    - Generates unique anchor IDs for navigation
    - Returns array of `OutlineHeading` with id, level, text, position
 
-2. **`components/notes/OutlinePanel.tsx`** (Created)
+2. **`components/content/OutlinePanel.tsx`** (Created)
    - Displays hierarchical outline with indentation
    - Click-to-scroll functionality (pending scroll implementation)
    - Active heading highlighting
@@ -23,17 +23,17 @@ The Outline Panel has been fully implemented with the following components:
    - Zustand store for outline state
    - Shared between MainPanelContent (writer) and RightSidebarContent (reader)
 
-4. **`components/notes/editor/MarkdownEditor.tsx`** (Modified)
+4. **`components/content/editor/MarkdownEditor.tsx`** (Modified)
    - Added `onOutlineChange` callback prop
    - Extracts outline on every editor update
    - Real-time outline updates as user types
 
-5. **`components/notes/content/MainPanelContent.tsx`** (Modified)
+5. **`components/content/content/MainPanelContent.tsx`** (Modified)
    - Wires `onOutlineChange` handler to editor
    - Updates outline store when content changes
    - Clears outline when no note selected
 
-6. **`components/notes/content/RightSidebarContent.tsx`** (Modified)
+6. **`components/content/content/RightSidebarContent.tsx`** (Modified)
    - Added tab navigation (Backlinks | Outline)
    - Conditionally renders BacklinksPanel or OutlinePanel
    - Reads outline from outline store

@@ -28,7 +28,7 @@ All libraries are assessed against these criteria:
 
 **Rationale:**
 
-- Already integrated in codebase (`apps/web/components/client/ui/command.tsx`)
+- Already integrated in codebase (`components/client/ui/command.tsx`)
 - Lightweight: 14KB gzipped
 - Excellent keyboard navigation
 - Accessible by default (ARIA compliant)
@@ -217,7 +217,7 @@ const html = await codeToHtml(code, {
 **Current Implementation:**
 
 ```typescript
-// apps/web/app/api/resume/export-pdf/route.ts
+// app/api/resume/export-pdf/route.ts
 const browser = await puppeteer.launch({ headless: true });
 const page = await browser.newPage();
 await page.setContent(htmlTemplate);
@@ -553,7 +553,7 @@ export const openTabsAtom = atomWithStorage<Tab[]>('openTabs', []);
 export const documentAtom = atom(async (get) => {
   const id = get(activeTabIdAtom);
   if (!id) return null;
-  const response = await fetch(`/api/notes/files/${id}`);
+  const response = await fetch(`/api/content/files/${id}`);
   return response.json(); // Suspends automatically
 });
 

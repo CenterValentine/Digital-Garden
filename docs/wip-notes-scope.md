@@ -1,4 +1,4 @@
-I want to build out a new feature below on @apps/web/app/notes/
+I want to build out a new feature below on @app/notes/
 This new feature will be an multi-content Obsidian-inspired IDE UI with panel-based layout including:
 
 - Resizable sidebars (file tree navigation)
@@ -141,7 +141,7 @@ Do not use emojis. State of the art icon libraries only.
 
 This feature naturally requires an update to the existing database and its core philosophy. Lets recycle the existing database structure without breaking the home page tree node philosophy and design. We'll have to update that design possibly if we make significant changes. Identify all dependencies in this regard and then reimagine the database to work with a content documenting the original design philosophy of the database and provide the updated philosophy based on this feature.
 
-The database adapts , possibly as outlined in @apps/web/prisma/prismaExample.md
+The database adapts , possibly as outlined in @prisma/prismaExample.md
 
 - Documents can be private (visible by the user only) but all are public by default.
 - File management using cloudflare R2.
