@@ -15,7 +15,21 @@ const nextConfig: NextConfig = {
     // Sharp (image processing)
     'sharp',
   ],
-  // Empty turbopack config to silence warning about webpack config
+  // Webpack configuration for production builds (Vercel uses --webpack flag)
+  webpack: (config, { isServer }) => {
+    if (isServer) {
+      // Externalize native modules to prevent bundling
+      config.externals = [
+        ...(Array.isArray(config.externals) ? config.externals : [config.externals || {}]),
+        'fluent-ffmpeg',
+        '@ffmpeg-installer/ffmpeg',
+        'canvas',
+        'sharp',
+      ];
+    }
+    return config;
+  },
+  // Empty turbopack config for local dev (uses Turbopack by default)
   turbopack: {},
 };
 

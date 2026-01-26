@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "prisma generate && pnpm build:tokens && next build",
-    "vercel-build": "prisma migrate deploy && prisma generate && pnpm build:tokens && next build",
+    "vercel-build": "prisma migrate deploy && prisma generate && pnpm build:tokens && next build --webpack",
     "start": "next start",
     "lint": "eslint",
     "build:tokens": "style-dictionary build --config style-dictionary.config.js",

@@ -108,7 +108,7 @@ export async function PATCH(
  * Calculate new displayOrder from before/after positions
  * Used by drag-and-drop UI to calculate midpoint
  */
-export function calculateNewOrder(
+function calculateNewOrder(
   beforeOrder: number | null,
   afterOrder: number | null
 ): number {
