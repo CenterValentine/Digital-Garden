@@ -179,6 +179,26 @@ POST /api/content/tags                         # Create new tag
 
 **Type Definitions:** `lib/domain/content/api-types.ts`
 
+### Admin Panel
+
+**Location:** `app/api/admin/` with utilities in `lib/domain/admin/`
+
+**Features:**
+- User management (list, role changes, deletion)
+- Content moderation (view all content, delete)
+- Audit logging (track all admin actions with IP/user agent)
+- System statistics (user counts, content metrics)
+
+**Access Control:**
+- Owner role required for all admin endpoints
+- Role hierarchy: owner > admin > member > guest
+- Verified via `requireRole("owner")` middleware
+
+**Audit Logging:**
+- All admin actions automatically logged to `AuditLog` table
+- Tracks: action type, target user/content, IP address, user agent
+- Utility: `logAuditAction()` in `lib/domain/admin/audit.ts`
+
 ### UI Architecture: Server/Client Split
 
 **Critical Pattern:** Maximize server-side rendering for instant visual feedback, progressively enhance with client interactivity.
@@ -247,7 +267,7 @@ const glass0 = getSurfaceStyles("glass-0");
 
 ### State Management
 
-**Zustand Stores:** All in `stores/`
+**Zustand Stores:** All in `state/` (renamed from `stores/`)
 
 **Panel State** (`panel-store.ts`):
 - Panel widths (left: 200px, right: 300px defaults)
@@ -281,8 +301,8 @@ const glass0 = getSurfaceStyles("glass-0");
 
 **Pattern:**
 ```tsx
-import { usePanelStore } from "@/stores/panel-store";
-import { useContentStore } from "@/stores/content-store";
+import { usePanelStore } from "@/state/panel-store";
+import { useContentStore } from "@/state/content-store";
 
 const { leftWidth, setLeftWidth, isLeftVisible } = usePanelStore();
 const { selectedContentId, setSelectedContentId } = useContentStore();
