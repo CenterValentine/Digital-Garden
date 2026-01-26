@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 This is a **pnpm monorepo** using **Turbo** for task orchestration. It contains three applications:
 
-- **`apps/web`** - Digital Garden Notes IDE (primary focus, active development)
+- **`apps/web`** - Digital Garden Content IDE (primary focus, active development)
 - **`apps/web-amino`** - Amino acid learning platform
 - **`apps/open-notes`** - Documentation and research repository
 
@@ -56,11 +56,11 @@ pnpm typecheck    # Run TypeScript type checking
 pnpm lint         # Run ESLint
 
 # Target specific apps with --filter flag
-turbo run dev --filter=web        # Run Notes IDE only
-turbo run build --filter=web      # Build Notes IDE only
+turbo run dev --filter=web        # Run Content IDE only
+turbo run build --filter=web      # Build Content IDE only
 ```
 
-**Important:** Root-level scripts default to `web-amino`. To work on the Notes IDE (`apps/web`), either:
+**Important:** Root-level scripts default to `web-amino`. To work on the Content IDE (`apps/web`), either:
 1. Use `--filter=web` flag with turbo commands
 2. Navigate to `cd apps/web` and run commands directly
 
@@ -68,7 +68,7 @@ turbo run build --filter=web      # Build Notes IDE only
 - `apps/web` - Uses **turbopack** (Next.js 16 default, faster dev builds)
 - `apps/web-amino` - Uses **webpack** (`--webpack` flag, for compatibility)
 
-### Notes IDE (apps/web)
+### Content IDE (apps/web)
 
 ```bash
 # Navigate to the web app
@@ -95,9 +95,9 @@ pnpm build:tokens # Generate CSS variables from design tokens (style-dictionary)
 2. `pnpm build:tokens` - Generates CSS variables in `app/globals.css`
 3. `next build` - Builds the Next.js application
 
-## Notes IDE Architecture (apps/web)
+## Content IDE Architecture (apps/web)
 
-The Notes IDE is an Obsidian-inspired knowledge management system with a panel-based layout, file tree navigation, rich text editing, and multi-cloud storage support.
+The Content IDE is an Obsidian-inspired knowledge management system with a panel-based layout, file tree navigation, rich text editing, and multi-cloud storage support.
 
 **Current Status:** See [IMPLEMENTATION-STATUS.md](apps/web/docs/notes-feature/IMPLEMENTATION-STATUS.md) for detailed progress.
 - ✅ M1-M6: Database, API, UI foundation, file tree, editor, search, tags (complete)
