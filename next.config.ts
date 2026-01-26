@@ -1,5 +1,4 @@
 import type { NextConfig } from "next";
-import path from "path";
 
 const nextConfig: NextConfig = {
   /* config options here */
@@ -11,11 +10,6 @@ const nextConfig: NextConfig = {
     '@ffmpeg-installer/linux-x64',
     '@ffmpeg-installer/win32-x64',
   ],
-  // Fix Turbopack workspace root detection in monorepo
-  // Point to monorepo root (two levels up from apps/web)
-  turbopack: {
-    root: path.resolve(__dirname, '../..'),
-  },
 };
 
 export default nextConfig;
