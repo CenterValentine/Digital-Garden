@@ -7,7 +7,7 @@
  *
  * Usage:
  * ```typescript
- * import { FileMetadata, getMetadata, setMetadata } from '@/lib/content/metadata-schemas';
+ * import { FileMetadata, getMetadata, setMetadata } from '@/lib/content/metadata-types';
  *
  * // Get typed metadata
  * const metadata = getMetadata(filePayload.storageMetadata);

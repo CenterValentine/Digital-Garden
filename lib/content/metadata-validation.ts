@@ -6,7 +6,7 @@
  *
  * Usage:
  * ```typescript
- * import { validateMetadata, GoogleDriveMetadataSchema } from '@/lib/content/metadata-validators';
+ * import { validateMetadata, GoogleDriveMetadataSchema } from '@/lib/content/metadata-validation';
  *
  * // Validate metadata from database
  * const result = validateMetadata(filePayload.storageMetadata);

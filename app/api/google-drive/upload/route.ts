@@ -12,7 +12,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/db/prisma";
-import { setGoogleDriveMetadata } from "@/lib/content/metadata-schemas";
+import { setGoogleDriveMetadata } from "@/lib/content/metadata-types";
 
 interface UploadRequest {
   contentId: string;
