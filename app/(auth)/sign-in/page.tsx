@@ -36,8 +36,8 @@ export default function SignInPage() {
         return
       }
 
-      // Redirect to notes page
-      router.push('/notes')
+      // Redirect to content page
+      router.push('/content')
       router.refresh()
     } catch (err) {
       setError('An unexpected error occurred')

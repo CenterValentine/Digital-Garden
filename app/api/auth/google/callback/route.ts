@@ -78,8 +78,8 @@ export async function GET(
     // Create session
     await createSession(user.id)
 
-    // Get redirect URL (default to notes page)
-    const redirectTo = searchParams.get('redirect') || '/notes'
+    // Get redirect URL (default to content page)
+    const redirectTo = searchParams.get('redirect') || '/content'
 
     return NextResponse.redirect(new URL(redirectTo, request.url))
   } catch (error) {
