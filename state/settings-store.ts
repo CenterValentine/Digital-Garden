@@ -7,8 +7,8 @@
 
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import type { UserSettings } from "@/lib/settings/validation";
-import { DEFAULT_SETTINGS } from "@/lib/settings/validation";
+import type { UserSettings } from "@/lib/features/settings/validation";
+import { DEFAULT_SETTINGS } from "@/lib/features/settings/validation";
 
 interface SettingsStore extends UserSettings {
   // Sync state

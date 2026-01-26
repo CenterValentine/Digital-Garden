@@ -1,7 +1,7 @@
 // Server component to fetch navigation data
 
 // This server component enables dynamic navigation based on the user's role or viewKey
-import { getNavigationData } from "@/lib/db/navigation";
+import { getNavigationData } from "@/lib/features/navigation/navigation";
 import { getSession } from "@/lib/infrastructure/auth/session";
 
 export async function getNavigationTreeData(viewKey?: string) {

@@ -10,9 +10,9 @@ import {
   BranchPresetName,
   BRANCH_PRESETS,
   BuiltBranch,
-} from "@/lib/app-nav/branch-builder";
+} from "@/lib/features/navigation/branch-builder";
 import { getBranchColor, SLATE } from "@/lib/design-system/colors";
-import type { NavigationTree } from "@/lib/db/navigation";
+import type { NavigationTree } from "@/lib/features/navigation/navigation";
 
 // Get all preset names as an array for cycling
 const PRESET_NAMES: BranchPresetName[] = Object.keys(

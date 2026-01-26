@@ -1,7 +1,7 @@
 // Navigation query functions for dynamic branch-based navigation
 // Handles both full navigation tree and filtered views via ViewGrant
 
-import { prisma } from "./client";
+import { prisma } from "@/lib/database/client";
 import type { UserRole } from "@/lib/infrastructure/auth/types";
 
 export interface NavigationCategory {

@@ -12,7 +12,7 @@ import { prisma } from "@/lib/database/client";
 import { requireAuth } from "@/lib/infrastructure/auth/middleware";
 import { generateUniqueSlug } from "@/lib/domain/content";
 import { getUserStorageProvider } from "@/lib/infrastructure/storage";
-import { createBlankOfficeDocument } from "@/lib/office/blank-document-generator";
+import { createBlankOfficeDocument } from "@/lib/features/office/blank-document-generator";
 import crypto from "crypto";
 
 export async function POST(request: NextRequest) {

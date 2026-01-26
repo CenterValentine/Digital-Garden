@@ -6,7 +6,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/infrastructure/auth/middleware";
-import { resetUserSettings } from "@/lib/settings/utils";
+import { resetUserSettings } from "@/lib/features/settings/utils";
 
 /**
  * POST /api/user/settings/reset

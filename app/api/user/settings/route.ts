@@ -10,8 +10,8 @@ import { requireAuth } from "@/lib/infrastructure/auth/middleware";
 import {
   getUserSettings,
   updateUserSettings,
-} from "@/lib/settings/utils";
-import { userSettingsSchema } from "@/lib/settings/validation";
+} from "@/lib/features/settings/utils";
+import { userSettingsSchema } from "@/lib/features/settings/validation";
 
 /**
  * GET /api/user/settings
