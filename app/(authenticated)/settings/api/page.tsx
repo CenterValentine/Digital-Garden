@@ -8,7 +8,7 @@
 "use client";
 
 import { useState } from "react";
-import { getSurfaceStyles } from "@/lib/design-system";
+import { getSurfaceStyles } from "@/lib/design/system";
 import { toast } from "sonner";
 
 // Dummy data

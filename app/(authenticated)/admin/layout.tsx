@@ -6,7 +6,7 @@
  */
 
 import { redirect } from "next/navigation";
-import { getSurfaceStyles } from "@/lib/design-system";
+import { getSurfaceStyles } from "@/lib/design/system";
 import NotesNavBar from "@/components/client/nav/NotesNavBar";
 import { NotesLayoutMarker } from "@/components/content/NotesLayoutMarker";
 import { Toaster } from "@/components/client/ui/sonner";

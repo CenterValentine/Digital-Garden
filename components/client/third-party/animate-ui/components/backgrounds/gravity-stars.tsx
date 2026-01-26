@@ -4,7 +4,7 @@ import {
   getColorVariable,
   type DigitalGardenColor,
   type ColorVariant,
-} from "@/lib/third-party/colors";
+} from "@/lib/design/integrations/colors";
 
 interface Star {
   x: number;

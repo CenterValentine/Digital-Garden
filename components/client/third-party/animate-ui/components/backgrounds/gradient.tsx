@@ -13,7 +13,7 @@ import {
   getColorVariable,
   type DigitalGardenColor,
   type ColorVariant,
-} from "@/lib/third-party/colors";
+} from "@/lib/design/integrations/colors";
 
 export interface GradientBackgroundProps {
   className?: string;

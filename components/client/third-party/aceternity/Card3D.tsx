@@ -9,7 +9,7 @@ import {
   getColorVariable,
   type DigitalGardenColor,
   type DigitalGardenIntent,
-} from "@/lib/third-party";
+} from "@/lib/design/integrations";
 import { cn } from "@/lib/core/utils";
 
 export interface Card3DProps {

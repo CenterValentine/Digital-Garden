@@ -11,7 +11,7 @@ import {
 import type {
   DigitalGardenColor,
   ColorVariant,
-} from "@/lib/third-party/colors";
+} from "@/lib/design/integrations/colors";
 import { ColorSelector } from "@/components/client/ui/utility/color-selector";
 import {
   Select,

@@ -8,7 +8,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { getSurfaceStyles } from "@/lib/design-system";
+import { getSurfaceStyles } from "@/lib/design/system";
 import type { SystemStats, AuditLogEntry } from "@/lib/domain/admin/api-types";
 import { Skeleton } from "@/components/client/ui/skeleton";
 

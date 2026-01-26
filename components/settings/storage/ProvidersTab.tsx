@@ -8,7 +8,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { getSurfaceStyles } from "@/lib/design-system";
+import { getSurfaceStyles } from "@/lib/design/system";
 import { toast } from "sonner";
 import { maskSensitiveValue } from "@/lib/infrastructure/crypto/encryption";
 import { ProviderConfigForm } from "./ProviderConfigForm";

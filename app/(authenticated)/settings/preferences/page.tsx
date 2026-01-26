@@ -5,7 +5,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { getSurfaceStyles } from "@/lib/design-system";
+import { getSurfaceStyles } from "@/lib/design/system";
 import { useUploadSettingsStore } from "@/state/upload-settings-store";
 import { Button } from "@/components/ui/glass/button";
 import { AlertCircle, Check } from "lucide-react";

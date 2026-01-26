@@ -5,7 +5,7 @@
  * Reads panel widths from localStorage to maintain layout consistency.
  */
 
-import { getSurfaceStyles } from "@/lib/design-system";
+import { getSurfaceStyles } from "@/lib/design/system";
 import { FileTreeSkeleton } from "@/components/content/skeletons/FileTreeSkeleton";
 import { OutlineSkeleton } from "@/components/content/skeletons/OutlineSkeleton";
 import { EditorSkeleton } from "@/components/content/skeletons/EditorSkeleton";

@@ -2,7 +2,7 @@
 
 import NotesLogo from "../logo/NotesLogo";
 import ProfileMenu from "./ProfileMenu";
-import { getSurfaceStyles } from "@/lib/design-system";
+import { getSurfaceStyles } from "@/lib/design/system";
 
 /**
  * NotesNavBar - Minimal navbar for the notes application

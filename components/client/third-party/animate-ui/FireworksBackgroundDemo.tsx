@@ -12,7 +12,7 @@ import {
   getColorAsHsl,
   type DigitalGardenColor,
   type ColorVariant,
-} from "@/lib/third-party/colors";
+} from "@/lib/design/integrations/colors";
 import { useMemo } from "react";
 
 export interface FireworksBackgroundDemoProps extends React.ComponentProps<"div"> {

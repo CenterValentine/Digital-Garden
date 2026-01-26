@@ -9,7 +9,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { getSurfaceStyles } from "@/lib/design-system";
+import { getSurfaceStyles } from "@/lib/design/system";
 
 // Inline SVG icons (server-compatible)
 const SettingsIcon = () => (

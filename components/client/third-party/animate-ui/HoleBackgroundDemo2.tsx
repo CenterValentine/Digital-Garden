@@ -16,7 +16,7 @@ import {
   getColorAsRgb,
   type DigitalGardenColor,
   type ColorVariant,
-} from "@/lib/third-party/colors";
+} from "@/lib/design/integrations/colors";
 import { useEffect, useState } from "react";
 import React from "react";
 
