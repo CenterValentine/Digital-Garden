@@ -7,7 +7,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/db/prisma";
+import { prisma } from "@/lib/database/client";
 import { requireRole } from "@/lib/auth/middleware";
 import { logAuditAction, formatBytes, handleApiError } from "@/lib/admin/audit";
 import { AUDIT_ACTIONS, type SystemStats } from "@/lib/admin/api-types";

@@ -1,7 +1,7 @@
 import { OAuth2Client } from "google-auth-library";
 import type { User, Account, OAuthProvider } from "./types";
 
-import { prisma } from "@/lib/db/prisma";
+import { prisma } from "@/lib/database/client";
 
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;

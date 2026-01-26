@@ -7,7 +7,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
-import { prisma } from "@/lib/db/prisma";
+import { prisma } from "@/lib/database/client";
 
 interface ClearMetadataRequest {
   contentId: string;

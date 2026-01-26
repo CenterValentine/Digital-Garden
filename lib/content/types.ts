@@ -5,7 +5,7 @@
  * ContentType is DERIVED from payload presence, not stored.
  */
 
-import type { Prisma } from "@/lib/generated/prisma";
+import type { Prisma } from "@/lib/database/generated/prisma";
 
 // ============================================================
 // CONTENT TYPES (Derived from payload presence)

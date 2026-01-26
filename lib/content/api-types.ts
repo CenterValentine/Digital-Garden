@@ -4,7 +4,7 @@
  * TypeScript types for API request/response bodies and internal processing.
  */
 
-import type { Prisma } from "@/lib/generated/prisma";
+import type { Prisma } from "@/lib/database/generated/prisma";
 import type { JSONContent } from "@tiptap/core";
 
 // ============================================================

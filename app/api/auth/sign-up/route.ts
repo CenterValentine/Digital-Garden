@@ -11,7 +11,7 @@ import {
   type AuthError,
 } from "@/lib/auth/types";
 
-import { prisma } from "@/lib/db/prisma";
+import { prisma } from "@/lib/database/client";
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {

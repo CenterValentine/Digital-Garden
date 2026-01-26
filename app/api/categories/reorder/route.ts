@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/auth/middleware";
-import { prisma } from "@/lib/db/prisma";
+import { prisma } from "@/lib/database/client";
 import type { ApiResponse, ApiError } from "@/lib/auth/types";
 
 interface ReorderRequest {

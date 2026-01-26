@@ -8,7 +8,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/db/prisma";
+import { prisma } from "@/lib/database/client";
 import { requireAuth } from "@/lib/auth/middleware";
 
 export async function GET(

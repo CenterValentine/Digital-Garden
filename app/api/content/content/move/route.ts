@@ -7,7 +7,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/db/prisma";
+import { prisma } from "@/lib/database/client";
 import { requireAuth } from "@/lib/auth/middleware";
 import { updateMaterializedPath } from "@/lib/content";
 import type { MoveContentRequest } from "@/lib/content/api-types";

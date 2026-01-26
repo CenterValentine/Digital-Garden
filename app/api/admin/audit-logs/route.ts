@@ -7,11 +7,11 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/db/prisma";
+import { prisma } from "@/lib/database/client";
 import { requireRole } from "@/lib/auth/middleware";
 import { logAuditAction, handleApiError } from "@/lib/admin/audit";
 import { AUDIT_ACTIONS, type AuditLogEntry } from "@/lib/admin/api-types";
-import type { Prisma } from "@/lib/generated/prisma";
+import type { Prisma } from "@/lib/database/generated/prisma";
 
 // ============================================================
 // GET /api/admin/audit-logs - List Logs

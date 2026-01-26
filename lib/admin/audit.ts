@@ -4,7 +4,7 @@
  * Helper functions for tracking admin actions and managing audit logs.
  */
 
-import { prisma } from "@/lib/db/prisma";
+import { prisma } from "@/lib/database/client";
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import type { AuditAction } from "./api-types";

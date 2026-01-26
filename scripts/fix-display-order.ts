@@ -5,7 +5,7 @@
  * displayOrder values (0, 1, 2, 3...) with no duplicates or gaps.
  */
 
-import { prisma } from '../lib/db/prisma';
+import { prisma } from '../lib/database/client';
 
 async function fixDisplayOrder() {
   console.log('🔍 Analyzing ContentNode displayOrder values...\n');

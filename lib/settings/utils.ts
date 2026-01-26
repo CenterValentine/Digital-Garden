@@ -4,7 +4,7 @@
  * Helper functions for reading, writing, and managing user settings in the database.
  */
 
-import { prisma } from "@/lib/db/prisma";
+import { prisma } from "@/lib/database/client";
 import {
   userSettingsSchema,
   DEFAULT_SETTINGS,

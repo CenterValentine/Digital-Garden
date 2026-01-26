@@ -5,7 +5,7 @@
  * Ensures uniqueness at database level.
  */
 
-import { prisma } from "@/lib/db/prisma";
+import { prisma } from "@/lib/database/client";
 
 // ============================================================
 // SLUG GENERATION

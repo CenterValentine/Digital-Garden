@@ -1,7 +1,7 @@
 // Prisma Client singleton
 // This ensures we only create one instance of Prisma Client
 
-import { PrismaClient, Prisma } from "@/lib/generated/prisma";
+import { PrismaClient, Prisma } from "@/lib/database/generated/prisma";
 import { Pool } from "pg";
 import { PrismaPg } from "@prisma/adapter-pg";
 

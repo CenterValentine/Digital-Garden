@@ -96,7 +96,7 @@ export async function getUserStorageProvider(
   providerType?: 'r2' | 's3' | 'vercel'
 ): Promise<StorageProvider> {
   // Import prisma here to avoid circular dependencies
-  const { prisma } = await import('@/lib/db/prisma');
+  const { prisma } = await import('@/lib/database/client');
 
   // If specific provider requested, look for that config first
   if (providerType) {

@@ -102,7 +102,7 @@ export async function findDuplicateFile(
   fileSize: bigint,
   ownerId: string
 ) {
-  const { prisma } = await import("@/lib/db/prisma");
+  const { prisma } = await import("@/lib/database/client");
 
   return prisma.filePayload.findFirst({
     where: {
@@ -130,7 +130,7 @@ export async function isDuplicateUpload(
   checksum: string,
   ownerId: string
 ): Promise<boolean> {
-  const { prisma } = await import("@/lib/db/prisma");
+  const { prisma } = await import("@/lib/database/client");
 
   const count = await prisma.filePayload.count({
     where: {
@@ -172,7 +172,7 @@ export async function verifyFileIntegrity(
   contentId: string,
   getFileBuffer: () => Promise<Buffer>
 ): Promise<IntegrityCheckResult> {
-  const { prisma } = await import("@/lib/db/prisma");
+  const { prisma } = await import("@/lib/database/client");
 
   const filePayload = await prisma.filePayload.findUnique({
     where: { contentId },
@@ -226,7 +226,7 @@ export async function batchIntegrityCheck(
   ownerId?: string,
   limit: number = 100
 ): Promise<IntegrityCheckResult[]> {
-  const { prisma } = await import("@/lib/db/prisma");
+  const { prisma } = await import("@/lib/database/client");
 
   const files = await prisma.filePayload.findMany({
     where: {
