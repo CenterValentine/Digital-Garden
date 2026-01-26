@@ -20,13 +20,13 @@ import TableHeader from "@tiptap/extension-table-header";
 import TableCell from "@tiptap/extension-table-cell";
 import CharacterCount from "@tiptap/extension-character-count";
 import { common, createLowlight } from "lowlight";
-import { SlashCommands } from "./slash-commands";
-import { TaskListInputRule } from "./task-list-input-rule";
-import { BulletListBackspace } from "./bullet-list-backspace";
-import { Callout } from "./callout-extension";
-import { WikiLink } from "./wiki-link-node";
-import { createWikiLinkSuggestion } from "./wiki-link-suggestion";
-import { Tag } from "./tag-extension";
+import { SlashCommands } from "./commands/slash-commands";
+import { TaskListInputRule } from "./extensions/task-list";
+import { BulletListBackspace } from "./extensions/bullet-list";
+import { Callout } from "./extensions/callout";
+import { WikiLink } from "./extensions/wiki-link";
+import { createWikiLinkSuggestion } from "./extensions/wiki-link-suggestion";
+import { Tag } from "./extensions/tag";
 
 // Create lowlight instance with common languages
 const lowlight = createLowlight(common);
