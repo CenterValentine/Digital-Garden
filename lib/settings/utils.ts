@@ -10,6 +10,7 @@ import {
   DEFAULT_SETTINGS,
   type UserSettings,
 } from "./validation";
+import { deepMerge } from "@/lib/core/deep-merge";
 
 /**
  * Get user settings from database
@@ -89,34 +90,6 @@ export async function resetUserSettings(
     console.error("[Settings Utils] Reset settings error:", error);
     throw new Error("Failed to reset settings");
   }
-}
-
-/**
- * Deep merge helper
- * Recursively merges source into target
- */
-function deepMerge(target: any, source: any): any {
-  if (!source) return target;
-  if (!target) return source;
-
-  const result = { ...target };
-
-  for (const key in source) {
-    if (source[key] !== undefined && source[key] !== null) {
-      if (
-        typeof source[key] === "object" &&
-        !Array.isArray(source[key]) &&
-        typeof target[key] === "object" &&
-        !Array.isArray(target[key])
-      ) {
-        result[key] = deepMerge(target[key], source[key]);
-      } else {
-        result[key] = source[key];
-      }
-    }
-  }
-
-  return result;
 }
 
 /**
