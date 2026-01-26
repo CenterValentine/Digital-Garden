@@ -53,7 +53,7 @@ pnpm lint         # Run ESLint
 
 # Database operations
 pnpm db:seed      # Seed database with ContentNode v2.0 test data
-npx prisma generate   # Generate Prisma client (outputs to lib/generated/prisma)
+npx prisma generate   # Generate Prisma client (outputs to lib/database/generated/prisma)
 npx prisma migrate dev --name migration_name  # Create and apply migration
 npx prisma studio     # Open Prisma Studio GUI (http://localhost:5555)
 
@@ -62,7 +62,7 @@ pnpm build:tokens # Generate CSS variables from design tokens (style-dictionary)
 ```
 
 **Important:** The build script runs three operations in sequence:
-1. `prisma generate` - Generates client in `lib/generated/prisma`
+1. `prisma generate` - Generates client in `lib/database/generated/prisma`
 2. `pnpm build:tokens` - Generates CSS variables in `app/globals.css`
 3. `next build` - Builds the Next.js application
 
@@ -104,8 +104,8 @@ A single `ContentNode` table acts as a universal container for all content types
 - **Vercel Blob** - Vercel-native storage
 
 **Provider Implementation:**
-- Factory pattern in `lib/storage/factory.ts`
-- Individual providers in `lib/storage/r2-provider.ts`, `s3-provider.ts`, `vercel-provider.ts`
+- Factory pattern in `lib/infrastructure/storage/factory.ts`
+- Individual providers in `lib/infrastructure/storage/r2-provider.ts`, `s3-provider.ts`, `vercel-provider.ts`
 - Unified interface for upload, download, delete operations
 - Presigned URLs for secure file access
 - Credential encryption with `STORAGE_ENCRYPTION_KEY`
@@ -126,8 +126,9 @@ bucket/
 **Provider:** Custom OAuth implementation with Google Sign-In
 
 **Core Components:**
-- `lib/auth/oauth.ts` - Google OAuth token verification
-- `lib/auth/types.ts` - User, Account, Session types
+- `lib/infrastructure/auth/oauth.ts` - Google OAuth token verification
+- `lib/infrastructure/auth/types.ts` - User, Account, Session types
+- `lib/infrastructure/auth/index.ts` - Barrel export with organized API
 - Database models: `User`, `Account`, `Session`
 
 **Authentication Flow:**
@@ -176,7 +177,7 @@ GET /api/content/tags/content/[id]             # Get tags for specific content
 POST /api/content/tags                         # Create new tag
 ```
 
-**Type Definitions:** `lib/content/api-types.ts`
+**Type Definitions:** `lib/domain/content/api-types.ts`
 
 ### UI Architecture: Server/Client Split
 
@@ -215,7 +216,7 @@ export function Panel() {
 
 ### Design System: Liquid Glass
 
-**Location:** `lib/design-system/`
+**Location:** `lib/design/system/`
 
 **Three Token Categories:**
 - **`surfaces.ts`** - Glass-0/1/2 blur levels for glassmorphism effects
@@ -226,7 +227,7 @@ export function Panel() {
 
 **Usage Pattern:**
 ```tsx
-import { getSurfaceStyles } from "@/lib/design-system";
+import { getSurfaceStyles } from "@/lib/design/system";
 
 const glass0 = getSurfaceStyles("glass-0");
 
@@ -330,10 +331,10 @@ Sidebar Wrapper (Client Component)
 
 **Problem:** Context menus and dropdowns can clip at viewport edges.
 
-**Solution:** Use positioning engine with portal rendering in `lib/utils/menu-positioning.ts`:
+**Solution:** Use positioning engine with portal rendering in `lib/core/menu-positioning.ts`:
 
 ```typescript
-import { calculateMenuPosition } from "@/lib/utils/menu-positioning";
+import { calculateMenuPosition } from "@/lib/core/menu-positioning";
 
 // 1. Portal rendering (bypasses parent overflow)
 const menuContent = <div ref={menuRef}>...</div>;
@@ -375,7 +376,7 @@ useEffect(() => {
 ### Type-Safe API Calls
 
 ```tsx
-import type { ContentTreeItem } from "@/lib/content/api-types";
+import type { ContentTreeItem } from "@/lib/domain/content/api-types";
 
 const response = await fetch("/api/content/content/tree");
 if (!response.ok) {
@@ -451,7 +452,7 @@ npx prisma studio  # Open database GUI to debug
 
 ### Design Token Changes
 
-1. Modify token files in `lib/design-system/`
+1. Modify token files in `lib/design/system/`
 2. Run `pnpm build:tokens` to regenerate CSS variables
 3. Restart dev server to see changes
 
@@ -503,28 +504,28 @@ export const useMyStore = create<MyStore>()(
 
 ### TipTap Editor Extensions
 
-**Location:** `lib/editor/`
+**Location:** `lib/domain/editor/`
 
-**Core Extensions** (`extensions.ts`):
+**Core Extensions** (`extensions-client.ts`):
 - `getEditorExtensions()` - Full client-side extensions (includes React components)
 - `getServerExtensions()` - Server-safe extensions (API routes, markdown conversion)
 - `getViewerExtensions()` - Read-only display mode
 
-**Custom Extensions:**
-- **WikiLink** (`wiki-link-node.ts`) - `[[Note Title]]` or `[[slug|Display]]` syntax
+**Custom Extensions** (in `extensions/` subdirectory):
+- **WikiLink** (`wiki-link.ts`) - `[[Note Title]]` or `[[slug|Display]]` syntax
   - Autocomplete with `wiki-link-suggestion.tsx`
   - Click navigation to linked notes
   - Renders as blue underlined link
-- **Callout** (`callout-extension.ts`) - Obsidian-style callouts `> [!note]`, `> [!warning]`, etc.
+- **Callout** (`callout.ts`) - Obsidian-style callouts `> [!note]`, `> [!warning]`, etc.
   - 6 types: note, tip, warning, danger, info, success
   - Colored borders and icons
   - Collapsible with `> [!note]-` syntax
-- **SlashCommands** (`slash-commands.tsx`) - `/` menu for quick insertion
+- **SlashCommands** (in `commands/slash-commands.tsx`) - `/` menu for quick insertion
   - Headings, code blocks, tables, callouts, task lists, etc.
   - Keyboard navigation
   - Custom command menu UI
-- **TaskListInputRule** (`task-list-input-rule.ts`) - Auto-format `- [ ]` to task list
-- **BulletListBackspace** (`bullet-list-backspace.ts`) - Obsidian-style behavior
+- **TaskListInputRule** (`task-list.ts`) - Auto-format `- [ ]` to task list
+- **BulletListBackspace** (`bullet-list.ts`) - Obsidian-style behavior
   - Backspace in empty bullet item → plain text "-"
 
 **Editor Features:**
@@ -537,7 +538,7 @@ export const useMyStore = create<MyStore>()(
 
 **Usage Pattern:**
 ```tsx
-import { getEditorExtensions } from "@/lib/editor/extensions";
+import { getEditorExtensions } from "@/lib/domain/editor";
 
 const editor = useEditor({
   extensions: getEditorExtensions({
@@ -557,7 +558,7 @@ const editor = useEditor({
 
 **Database:**
 - PostgreSQL with Prisma 7.2.0
-- Client output: `lib/generated/prisma`
+- Client output: `lib/database/generated/prisma`
 
 **UI & State:**
 - Tailwind CSS 4.1.16 with custom design tokens
@@ -611,10 +612,10 @@ const editor = useEditor({
 - **Database:** `prisma/schema.prisma` - ContentNode v2.0 schema
 - **API Routes:** `app/api/content/` - 14+ REST endpoints
 - **Components:** `components/content/` - UI components (tree, editor, panels)
-- **State Stores:** `stores/` - Zustand stores (8+ stores)
-- **Design System:** `lib/design-system/` - Liquid Glass tokens
-- **Editor Extensions:** `lib/editor/` - TipTap custom extensions
-- **Type Definitions:** `lib/content/api-types.ts` - API interfaces
+- **State Stores:** `state/` - Zustand stores (renamed from `stores/`)
+- **Design System:** `lib/design/system/` - Liquid Glass tokens
+- **Editor Extensions:** `lib/domain/editor/` - TipTap custom extensions
+- **Type Definitions:** `lib/domain/content/api-types.ts` - API interfaces
 
 **Key Directories:**
 ```
@@ -623,12 +624,48 @@ Digital-Garden/
 ├── app/api/content/             # API routes
 ├── app/(authenticated)/content/ # Content UI routes
 ├── components/content/          # UI components
-├── lib/content/                 # Content utilities
-├── lib/design-system/           # Design tokens
-├── lib/editor/                  # TipTap extensions
-├── stores/                      # State management
+├── lib/                         # Organized by conceptual layer (see below)
+├── state/                       # State management (renamed from stores/)
 ├── prisma/                      # Database schema + seed
 └── archive/                     # Archived apps (not in build)
+```
+
+**lib/ Directory Structure (Conceptual Layers):**
+```
+lib/
+├── core/                        # Foundational utilities
+│   ├── utils.ts                 # Tailwind cn(), 91+ imports
+│   ├── deep-merge.ts            # Recursive object merging
+│   ├── glass-utils.ts           # Glassmorphism utilities
+│   ├── hover-effects.ts         # CVA hover variants
+│   └── menu-positioning.ts      # Viewport-aware positioning
+├── database/                    # Database client and generated code
+│   ├── client.ts                # Prisma singleton (renamed from prisma.ts)
+│   └── generated/prisma/        # Generated Prisma client (output path)
+├── domain/                      # Business logic modules
+│   ├── admin/                   # Admin panel utilities
+│   ├── content/                 # ContentNode v2.0 utilities (31 imports)
+│   ├── editor/                  # TipTap extensions (2 imports)
+│   │   ├── index.ts             # Barrel export
+│   │   ├── extensions-client.ts # Client-side extensions
+│   │   ├── extensions-server.ts # Server-side extensions
+│   │   ├── extensions/          # Individual extension files
+│   │   └── commands/            # Slash commands
+│   └── search/                  # Search filters (4 imports)
+├── infrastructure/              # External service integrations
+│   ├── auth/                    # OAuth, sessions, middleware (55 imports)
+│   │   └── index.ts             # Barrel export
+│   ├── crypto/                  # Encryption utilities
+│   ├── media/                   # File processing (2 imports)
+│   └── storage/                 # Multi-cloud abstraction (8 imports)
+├── features/                    # Feature-specific modules
+│   ├── navigation/              # Branch builder + navigation
+│   ├── office/                  # Blank document generator
+│   └── settings/                # User settings CRUD
+│       └── index.ts             # Barrel export
+└── design/                      # Design system
+    ├── system/                  # Liquid Glass design tokens (23 imports)
+    └── integrations/            # Third-party UI utilities (48 imports)
 ```
 
 ## Development Workflow
@@ -644,9 +681,10 @@ Digital-Garden/
 - TypeScript strict mode, no `any` types
 - Use inline SVG for server component icons (not `lucide-react`)
 - `lucide-react` is okay in client components only
-- Use `lib/design-system/` tokens for styling
+- Use `lib/design/system/` tokens for styling
 - Follow server/client component split strictly
 - Test that server components render without JavaScript
+- Import from barrel exports when available (`lib/domain/editor`, `lib/infrastructure/auth`, `lib/features/settings`)
 - Update documentation as you implement
 
 **Editor Extension Guidelines:**
