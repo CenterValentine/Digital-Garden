@@ -16,7 +16,7 @@ import {
   extractSearchTextFromCode,
   markdownToTiptap,
   CONTENT_WITH_PAYLOADS,
-} from "@/lib/content";
+} from "@/lib/domain/content";
 import type { JSONContent } from "@tiptap/core";
 import type {
   ContentWhereInput,
@@ -24,7 +24,7 @@ import type {
   CreatePayloadData,
   CreateContentRequest,
   ContentDetailResponse,
-} from "@/lib/content/api-types";
+} from "@/lib/domain/content/api-types";
 
 // ============================================================
 // GET /api/content/content - List Content

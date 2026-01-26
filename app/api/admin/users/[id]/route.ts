@@ -16,8 +16,8 @@ import {
   formatBytes,
   handleApiError,
   deriveContentType,
-} from "@/lib/admin/audit";
-import { AUDIT_ACTIONS, type AdminUserDetail } from "@/lib/admin/api-types";
+} from "@/lib/domain/admin/audit";
+import { AUDIT_ACTIONS, type AdminUserDetail } from "@/lib/domain/admin/api-types";
 
 // ============================================================
 // GET /api/admin/users/[id] - User Detail

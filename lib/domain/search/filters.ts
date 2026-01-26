@@ -11,7 +11,7 @@
  * The API already supports searching across all content types via the searchText field.
  */
 
-import type { ContentType } from "@/lib/content/types";
+import type { ContentType } from "@/lib/domain/content/types";
 
 /**
  * Search filter configuration

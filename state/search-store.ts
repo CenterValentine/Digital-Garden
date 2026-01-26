@@ -9,8 +9,8 @@
  */
 
 import { create } from "zustand";
-import type { SearchFilter, SearchResult } from "@/lib/search/filters";
-import { DEFAULT_FILTER } from "@/lib/search/filters";
+import type { SearchFilter, SearchResult } from "@/lib/domain/search/filters";
+import { DEFAULT_FILTER } from "@/lib/domain/search/filters";
 
 const STORAGE_KEY = "search-settings";
 const RESULTS_STORAGE_KEY = "search-results";

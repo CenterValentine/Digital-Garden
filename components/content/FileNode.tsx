@@ -27,7 +27,7 @@ import {
 } from "lucide-react";
 import { useContextMenuStore } from "@/state/context-menu-store";
 import { useContentStore } from "@/state/content-store";
-import type { TreeNode } from "@/lib/content/types";
+import type { TreeNode } from "@/lib/domain/content/types";
 
 interface FileNodeProps extends NodeRendererProps<TreeNode> {
   onRename?: (id: string, name: string) => Promise<void>;

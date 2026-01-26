@@ -10,8 +10,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/database/client";
 import { requireAuth } from "@/lib/auth/middleware";
-import { generateUniqueSlug } from "@/lib/content";
-import type { InitiateUploadRequest } from "@/lib/content/api-types";
+import { generateUniqueSlug } from "@/lib/domain/content";
+import type { InitiateUploadRequest } from "@/lib/domain/content/api-types";
 import crypto from "crypto";
 
 // ============================================================

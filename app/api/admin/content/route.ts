@@ -15,8 +15,8 @@ import {
   handleApiError,
   deriveContentType,
   shouldLogAction,
-} from "@/lib/admin/audit";
-import { AUDIT_ACTIONS, type AdminContentListItem } from "@/lib/admin/api-types";
+} from "@/lib/domain/admin/audit";
+import { AUDIT_ACTIONS, type AdminContentListItem } from "@/lib/domain/admin/api-types";
 import type { Prisma } from "@/lib/database/generated/prisma";
 
 // ============================================================

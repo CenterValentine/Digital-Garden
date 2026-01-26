@@ -10,7 +10,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/database/client";
 import { requireAuth } from "@/lib/auth/middleware";
-import type { FinalizeUploadRequest } from "@/lib/content/api-types";
+import type { FinalizeUploadRequest } from "@/lib/domain/content/api-types";
 
 // ============================================================
 // POST /api/content/content/upload/finalize

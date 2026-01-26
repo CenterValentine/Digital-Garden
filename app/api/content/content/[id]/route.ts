@@ -17,13 +17,13 @@ import {
   extractSearchTextFromCode,
   markdownToTiptap,
   CONTENT_WITH_PAYLOADS,
-} from "@/lib/content";
-import { extractTags } from "@/lib/content/tag-extractor";
+} from "@/lib/domain/content";
+import { extractTags } from "@/lib/domain/content/tag-extractor";
 import type { JSONContent } from "@tiptap/core";
 import type {
   ContentDetailResponse,
   UpdateContentRequest,
-} from "@/lib/content/api-types";
+} from "@/lib/domain/content/api-types";
 
 type Params = Promise<{ id: string }>;
 

@@ -7,7 +7,7 @@
  */
 
 import { create } from "zustand";
-import type { OutlineHeading } from "@/lib/content/outline-extractor";
+import type { OutlineHeading } from "@/lib/domain/content/outline-extractor";
 
 interface OutlineStore {
   /** Current outline headings */

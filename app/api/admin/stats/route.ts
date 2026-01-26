@@ -9,8 +9,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/database/client";
 import { requireRole } from "@/lib/auth/middleware";
-import { logAuditAction, formatBytes, handleApiError } from "@/lib/admin/audit";
-import { AUDIT_ACTIONS, type SystemStats } from "@/lib/admin/api-types";
+import { logAuditAction, formatBytes, handleApiError } from "@/lib/domain/admin/audit";
+import { AUDIT_ACTIONS, type SystemStats } from "@/lib/domain/admin/api-types";
 
 // ============================================================
 // GET /api/admin/stats - System Statistics

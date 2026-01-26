@@ -16,8 +16,8 @@ import { MarkdownEditor } from "../editor/MarkdownEditor";
 import { FileViewer } from "../viewer/FileViewer";
 import type { JSONContent } from "@tiptap/core";
 import type { EditorStats } from "../editor/MarkdownEditor";
-import type { OutlineHeading } from "@/lib/content/outline-extractor";
-import { extractOutline } from "@/lib/content/outline-extractor";
+import type { OutlineHeading } from "@/lib/domain/content/outline-extractor";
+import { extractOutline } from "@/lib/domain/content/outline-extractor";
 
 interface NoteResponse {
   success: boolean;

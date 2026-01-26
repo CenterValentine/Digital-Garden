@@ -9,12 +9,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/database/client";
 import { requireRole } from "@/lib/auth/middleware";
-import { logAuditAction, handleApiError } from "@/lib/admin/audit";
+import { logAuditAction, handleApiError } from "@/lib/domain/admin/audit";
 import {
   AUDIT_ACTIONS,
   type ChangeRoleRequest,
   type ChangeRoleResponse,
-} from "@/lib/admin/api-types";
+} from "@/lib/domain/admin/api-types";
 
 // Valid roles
 const VALID_ROLES = ["owner", "admin", "member", "guest"] as const;

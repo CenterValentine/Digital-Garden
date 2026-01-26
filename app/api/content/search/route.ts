@@ -10,7 +10,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/database/client";
 import { requireAuth } from "@/lib/auth/middleware";
-import type { ContentType } from "@/lib/content/types";
+import type { ContentType } from "@/lib/domain/content/types";
 
 export async function GET(request: NextRequest) {
   try {

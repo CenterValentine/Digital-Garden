@@ -14,7 +14,7 @@ import type {
   S3Config,
   VercelConfig,
   StorageConfig,
-} from "@/lib/content/api-types";
+} from "@/lib/domain/content/api-types";
 
 // ============================================================
 // GET /api/content/storage - List Storage Configurations

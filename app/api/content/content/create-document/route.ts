@@ -10,7 +10,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/database/client";
 import { requireAuth } from "@/lib/auth/middleware";
-import { generateUniqueSlug } from "@/lib/content";
+import { generateUniqueSlug } from "@/lib/domain/content";
 import { getUserStorageProvider } from "@/lib/storage";
 import { createBlankOfficeDocument } from "@/lib/office/blank-document-generator";
 import crypto from "crypto";

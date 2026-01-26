@@ -15,8 +15,8 @@ import {
   formatBytes,
   handleApiError,
   shouldLogAction,
-} from "@/lib/admin/audit";
-import { AUDIT_ACTIONS, type AdminUserListItem } from "@/lib/admin/api-types";
+} from "@/lib/domain/admin/audit";
+import { AUDIT_ACTIONS, type AdminUserListItem } from "@/lib/domain/admin/api-types";
 import type { Prisma } from "@/lib/database/generated/prisma";
 
 // ============================================================

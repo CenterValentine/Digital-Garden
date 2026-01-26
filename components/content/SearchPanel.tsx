@@ -22,9 +22,9 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { useSearchStore } from "@/state/search-store";
 import { useContentStore } from "@/state/content-store";
 import { useTreeStateStore } from "@/state/tree-state-store";
-import { parseSearchResults } from "@/lib/search/filters";
-import type { SearchResult } from "@/lib/search/filters";
-import type { ContentType } from "@/lib/content/types";
+import { parseSearchResults } from "@/lib/domain/search/filters";
+import type { SearchResult } from "@/lib/domain/search/filters";
+import type { ContentType } from "@/lib/domain/content/types";
 
 export function SearchPanel() {
   const {

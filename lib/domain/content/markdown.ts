@@ -11,7 +11,7 @@ import { extractSearchTextFromTipTap } from "./search-text";
 
 // Import TipTap extensions
 // Use server-only file to avoid loading React components
-import { getServerExtensions } from "@/lib/editor/extensions-server";
+import { getServerExtensions } from "@/lib/domain/editor/extensions-server";
 
 // ============================================================
 // MARKDOWN → TIPTAP JSON

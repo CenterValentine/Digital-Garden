@@ -17,7 +17,7 @@ import { LeftSidebarStatusBar } from "../LeftSidebarStatusBar";
 import { useContentStore } from "@/state/content-store";
 import { useSearchStore } from "@/state/search-store";
 import { useTreeStateStore } from "@/state/tree-state-store";
-import type { TreeNode, ContentType } from "@/lib/content/types";
+import type { TreeNode, ContentType } from "@/lib/domain/content/types";
 
 interface TreeApiResponse {
   success: boolean;

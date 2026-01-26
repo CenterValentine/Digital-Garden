@@ -9,8 +9,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/database/client";
 import { requireRole } from "@/lib/auth/middleware";
-import { logAuditAction, handleApiError } from "@/lib/admin/audit";
-import { AUDIT_ACTIONS, type AuditLogEntry } from "@/lib/admin/api-types";
+import { logAuditAction, handleApiError } from "@/lib/domain/admin/audit";
+import { AUDIT_ACTIONS, type AuditLogEntry } from "@/lib/domain/admin/api-types";
 import type { Prisma } from "@/lib/database/generated/prisma";
 
 // ============================================================
