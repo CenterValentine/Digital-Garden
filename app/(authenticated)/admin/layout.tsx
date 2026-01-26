@@ -11,7 +11,7 @@ import NotesNavBar from "@/components/client/nav/NotesNavBar";
 import { NotesLayoutMarker } from "@/components/content/NotesLayoutMarker";
 import { Toaster } from "@/components/client/ui/sonner";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
-import { requireRole } from "@/lib/auth/middleware";
+import { requireRole } from "@/lib/infrastructure/auth/middleware";
 
 export default async function AdminLayout({
   children,

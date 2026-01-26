@@ -9,9 +9,9 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/database/client";
-import { requireAuth } from "@/lib/auth/middleware";
+import { requireAuth } from "@/lib/infrastructure/auth/middleware";
 import { generateUniqueSlug } from "@/lib/domain/content";
-import { getUserStorageProvider } from "@/lib/storage";
+import { getUserStorageProvider } from "@/lib/infrastructure/storage";
 import { createBlankOfficeDocument } from "@/lib/office/blank-document-generator";
 import crypto from "crypto";
 

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { hashPassword } from "@/lib/auth/password";
-import { createSession } from "@/lib/auth/session";
+import { hashPassword } from "@/lib/infrastructure/auth/password";
+import { createSession } from "@/lib/infrastructure/auth/session";
 import {
   extractUsername,
   isValidEmail,
@@ -9,7 +9,7 @@ import {
   type SignUpInput,
   type SessionData,
   type AuthError,
-} from "@/lib/auth/types";
+} from "@/lib/infrastructure/auth/types";
 
 import { prisma } from "@/lib/database/client";
 

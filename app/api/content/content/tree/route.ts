@@ -8,7 +8,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/database/client";
-import { requireAuth } from "@/lib/auth/middleware";
+import { requireAuth } from "@/lib/infrastructure/auth/middleware";
 import { deriveContentType } from "@/lib/domain/content";
 
 // ============================================================

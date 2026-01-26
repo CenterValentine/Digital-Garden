@@ -8,7 +8,7 @@
 
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/database/client";
-import { requireRole } from "@/lib/auth/middleware";
+import { requireRole } from "@/lib/infrastructure/auth/middleware";
 import { logAuditAction, generateCSV, handleApiError } from "@/lib/domain/admin/audit";
 import { AUDIT_ACTIONS } from "@/lib/domain/admin/api-types";
 

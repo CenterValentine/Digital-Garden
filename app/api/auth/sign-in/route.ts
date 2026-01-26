@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { verifyPassword } from "@/lib/auth/password";
-import { createSession } from "@/lib/auth/session";
+import { verifyPassword } from "@/lib/infrastructure/auth/password";
+import { createSession } from "@/lib/infrastructure/auth/session";
 import {
   isValidEmail,
   type ApiResponse,
   type SignInInput,
   type SessionData,
-} from "@/lib/auth/types";
+} from "@/lib/infrastructure/auth/types";
 
 import { prisma } from "@/lib/database/client";
 

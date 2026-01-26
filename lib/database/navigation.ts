@@ -2,7 +2,7 @@
 // Handles both full navigation tree and filtered views via ViewGrant
 
 import { prisma } from "./client";
-import type { UserRole } from "@/lib/auth/types";
+import type { UserRole } from "@/lib/infrastructure/auth/types";
 
 export interface NavigationCategory {
   id: string;

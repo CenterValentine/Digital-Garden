@@ -2,7 +2,7 @@
 
 // This server component enables dynamic navigation based on the user's role or viewKey
 import { getNavigationData } from "@/lib/db/navigation";
-import { getSession } from "@/lib/auth/session";
+import { getSession } from "@/lib/infrastructure/auth/session";
 
 export async function getNavigationTreeData(viewKey?: string) {
   const session = await getSession();

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import NavBarLogo from "../logo/NavBarLogo";
 import { Button } from "@/components/client/ui/button/Button";
-import type { SessionData } from "@/lib/auth/types";
+import type { SessionData } from "@/lib/infrastructure/auth/types";
 
 export default function NavBar() {
   const router = useRouter();

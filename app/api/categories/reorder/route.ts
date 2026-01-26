@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireRole } from "@/lib/auth/middleware";
+import { requireRole } from "@/lib/infrastructure/auth/middleware";
 import { prisma } from "@/lib/database/client";
-import type { ApiResponse, ApiError } from "@/lib/auth/types";
+import type { ApiResponse, ApiError } from "@/lib/infrastructure/auth/types";
 
 interface ReorderRequest {
   categoryId: string;

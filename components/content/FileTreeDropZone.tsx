@@ -2,7 +2,7 @@
 
 import { useDrop } from "react-dnd";
 import { NativeTypes } from "react-dnd-html5-backend";
-import { validateFileBatch } from "@/lib/media/file-validation";
+import { validateFileBatch } from "@/lib/infrastructure/media/file-validation";
 import { toast } from "sonner";
 
 interface FileTreeDropZoneProps {

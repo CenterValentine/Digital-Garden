@@ -6,7 +6,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuth } from "@/lib/auth/middleware";
+import { requireAuth } from "@/lib/infrastructure/auth/middleware";
 import {
   getUserSettings,
   updateUserSettings,

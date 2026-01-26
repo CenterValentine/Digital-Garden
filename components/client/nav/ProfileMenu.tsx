@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronDown, Shield, LogOut, MessageSquare, Bug, Settings } from "lucide-react";
-import type { SessionData } from "@/lib/auth/types";
+import type { SessionData } from "@/lib/infrastructure/auth/types";
 import { getSurfaceStyles } from "@/lib/design-system";
 
 export default function ProfileMenu() {

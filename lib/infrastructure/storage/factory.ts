@@ -8,7 +8,7 @@
 import { R2StorageProvider, createR2ProviderFromEnv } from './r2-provider';
 import { S3StorageProvider, createS3ProviderFromEnv } from './s3-provider';
 import { VercelBlobProvider, createVercelBlobProviderFromEnv } from './vercel-provider';
-import { decrypt } from '@/lib/crypto/encrypt';
+import { decrypt } from '@/lib/infrastructure/crypto/encryption';
 import type { StorageProvider, StorageConfig } from './types';
 
 /**
