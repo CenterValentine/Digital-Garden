@@ -82,6 +82,7 @@ export interface ContentDetailResponse {
     storageProvider: "r2" | "s3" | "vercel";
     storageKey: string;
     storageUrl: string | null;
+    storageMetadata: Record<string, unknown>;
     uploadStatus: "uploading" | "ready" | "failed";
     uploadedAt: Date | null;
     uploadError: string | null;

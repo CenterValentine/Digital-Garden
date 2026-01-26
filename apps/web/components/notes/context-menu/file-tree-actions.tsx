@@ -22,6 +22,8 @@ import {
   FileCode,
   Code,
   Plus,
+  FileType,
+  FileSpreadsheet,
 } from "lucide-react";
 import type { ContextMenuActionProvider, ContextMenuSection } from "./types";
 
@@ -58,6 +60,8 @@ export interface FileTreeContext {
   onCreateFile?: (parentId: string | null) => Promise<void>;
   onCreateCode?: (parentId: string | null) => Promise<void>;
   onCreateHtml?: (parentId: string | null) => Promise<void>;
+  onCreateDocument?: (parentId: string | null) => Promise<void>;
+  onCreateSpreadsheet?: (parentId: string | null) => Promise<void>;
   /** Clipboard state */
   hasClipboard?: boolean;
 }
@@ -92,6 +96,8 @@ export const fileTreeActionProvider: ContextMenuActionProvider = (ctx) => {
     onCreateFile,
     onCreateCode,
     onCreateHtml,
+    onCreateDocument,
+    onCreateSpreadsheet,
     hasClipboard = false,
   } = context;
 
@@ -170,6 +176,20 @@ export const fileTreeActionProvider: ContextMenuActionProvider = (ctx) => {
               icon: <FileCode className="h-4 w-4" />,
               onClick: () => onCreateHtml?.(targetId || null),
               disabled: !onCreateHtml,
+            },
+            {
+              id: "new-document",
+              label: "Word Document (.docx)",
+              icon: <FileType className="h-4 w-4" />,
+              onClick: () => onCreateDocument?.(targetId || null),
+              disabled: !onCreateDocument,
+            },
+            {
+              id: "new-spreadsheet",
+              label: "Excel Spreadsheet (.xlsx)",
+              icon: <FileSpreadsheet className="h-4 w-4" />,
+              onClick: () => onCreateSpreadsheet?.(targetId || null),
+              disabled: !onCreateSpreadsheet,
             },
           ],
           divider: true,

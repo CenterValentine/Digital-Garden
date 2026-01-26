@@ -7,22 +7,44 @@
 
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { LeftSidebarHeader } from "./headers/LeftSidebarHeader";
 import { LeftSidebarContent } from "./content/LeftSidebarContent";
+import { LeftSidebarCollapsed } from "./LeftSidebarCollapsed";
+import { LeftSidebarExtensions } from "./content/LeftSidebarExtensions";
 import { FileUploadDialog } from "./dialogs/FileUploadDialog";
+import { useLeftPanelCollapseStore } from "@/stores/left-panel-collapse-store";
+import { useLeftPanelViewStore } from "@/stores/left-panel-view-store";
 
 export function LeftSidebar() {
+  const { mode } = useLeftPanelCollapseStore();
+  const { activeView } = useLeftPanelViewStore();
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [createTrigger, setCreateTrigger] = useState<{
-    type: "folder" | "note";
+    type: "folder" | "note" | "docx" | "xlsx";
     timestamp: number;
   } | null>(null);
   const [isCreateDisabled, setIsCreateDisabled] = useState(false);
   const [showFileUpload, setShowFileUpload] = useState(false);
   const [fileUploadParentId, setFileUploadParentId] = useState<string | null>(null);
   const [draggedFiles, setDraggedFiles] = useState<File[] | null>(null);
+  const [hasGoogleAuth, setHasGoogleAuth] = useState(false);
+
+  // Check if user has Google authentication
+  useEffect(() => {
+    async function checkGoogleAuth() {
+      try {
+        const response = await fetch("/api/auth/provider");
+        const data = await response.json();
+        setHasGoogleAuth(data.success && data.data.hasGoogleAuth);
+      } catch (err) {
+        console.error("[LeftSidebar] Failed to check Google auth:", err);
+        setHasGoogleAuth(false);
+      }
+    }
+    checkGoogleAuth();
+  }, []);
 
   // Trigger content refresh
   const handleRefresh = useCallback(() => {
@@ -43,15 +65,18 @@ export function LeftSidebar() {
     setCreateTrigger({ type: "note", timestamp: Date.now() });
   }, []);
 
-  // TODO: Implement handleCreateFile callback
-  // This should open the file upload dialog
-  // Consider: Should we get the current selected folder as parentId?
-  // Or always upload to root (null)?
   const handleCreateFile = useCallback(() => {
-    // Your implementation here (5-10 lines)
-    // Hint: Set showFileUpload to true and determine fileUploadParentId
     setFileUploadParentId(null); // TODO: Get from current selection?
     setShowFileUpload(true);
+  }, []);
+
+  // Trigger inline document creation (same pattern as folders/notes)
+  const handleCreateDocument = useCallback(() => {
+    setCreateTrigger({ type: "docx", timestamp: Date.now() });
+  }, []);
+
+  const handleCreateSpreadsheet = useCallback(() => {
+    setCreateTrigger({ type: "xlsx", timestamp: Date.now() });
   }, []);
 
   const handleFileUploadSuccess = useCallback((fileId: string) => {
@@ -76,6 +101,12 @@ export function LeftSidebar() {
     setShowFileUpload(true);
   }, []);
 
+  // If panel is in hidden mode, show only the collapsed icon bar
+  if (mode === "hidden") {
+    return <LeftSidebarCollapsed />;
+  }
+
+  // Full mode: show complete sidebar with header and content
   return (
     <>
       <div className="flex h-full flex-col">
@@ -84,16 +115,32 @@ export function LeftSidebar() {
           onCreateFolder={handleCreateFolder}
           onCreateNote={handleCreateNote}
           onCreateFile={handleCreateFile}
+          onCreateDocument={hasGoogleAuth ? handleCreateDocument : undefined}
+          onCreateSpreadsheet={hasGoogleAuth ? handleCreateSpreadsheet : undefined}
           isCreateDisabled={isCreateDisabled}
         />
 
-        {/* Content with file tree and drag-drop handling */}
-        <LeftSidebarContent
-          refreshTrigger={refreshTrigger}
-          createTrigger={createTrigger}
-          onSelectionChange={handleSelectionChange}
-          onFileDrop={handleFileDrop}
-        />
+        {/* Content area - conditionally render based on active view */}
+        {activeView === "files" && (
+          <LeftSidebarContent
+            refreshTrigger={refreshTrigger}
+            createTrigger={createTrigger}
+            onSelectionChange={handleSelectionChange}
+            onFileDrop={handleFileDrop}
+          />
+        )}
+
+        {activeView === "extensions" && <LeftSidebarExtensions />}
+
+        {/* Search view is handled by LeftSidebarContent with isSearchOpen state */}
+        {activeView === "search" && (
+          <LeftSidebarContent
+            refreshTrigger={refreshTrigger}
+            createTrigger={createTrigger}
+            onSelectionChange={handleSelectionChange}
+            onFileDrop={handleFileDrop}
+          />
+        )}
       </div>
 
       {/* File Upload Dialog - Rendered via Portal to escape panel constraints */}

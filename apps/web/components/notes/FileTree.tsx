@@ -31,6 +31,7 @@ interface FileTreeProps {
   onRename?: (id: string, name: string) => Promise<void>;
   onCreate?: (parentId: string | null, type: "folder" | "note" | "file" | "code" | "html") => Promise<void>;
   onDelete?: (ids: string | string[]) => Promise<void>; // Support both single ID and batch delete
+  onDuplicate?: (ids: string[]) => Promise<void>; // Duplicate content node(s)
   onDownload?: (ids: string[]) => Promise<void>; // Download file(s)
   height?: number;
   editingNodeId?: string; // If set, automatically triggers edit mode on this node
@@ -46,6 +47,7 @@ export function FileTree({
   onRename,
   onCreate,
   onDelete,
+  onDuplicate,
   onDownload,
   height = 600,
   editingNodeId,
@@ -174,7 +176,7 @@ export function FileTree({
 
   // Create a wrapper component that has access to callbacks
   const NodeWithCallbacks = (props: any) => {
-    return <FileNode {...props} onRename={onRename} onCreate={onCreate} onDelete={onDelete} onDownload={onDownload} />;
+    return <FileNode {...props} onRename={onRename} onCreate={onCreate} onDelete={onDelete} onDuplicate={onDuplicate} onDownload={onDownload} />;
   };
 
   // Get initial open state from persisted IDs
@@ -407,6 +409,7 @@ export function FileTree({
 
     return () => clearTimeout(timeoutId);
   }, [editingNodeId]);
+
 
   return (
     <div

@@ -149,7 +149,10 @@ export async function POST(request: NextRequest) {
       }
 
       // Check if target is a descendant (would create cycle)
-      const isDescendant = await checkIsDescendant(targetParentId, contentId);
+      // The function checks if potentialAncestor is an ancestor of nodeId
+      // We want to check if targetParent is a descendant of content
+      // So we check: is content an ancestor of targetParent?
+      const isDescendant = await checkIsDescendant(contentId, targetParentId);
       if (isDescendant) {
         return NextResponse.json(
           {

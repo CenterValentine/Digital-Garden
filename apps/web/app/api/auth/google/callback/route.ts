@@ -47,7 +47,7 @@ export async function GET(
     const redirectUri = new URL('/api/auth/google/callback', request.url).toString()
 
     // Exchange code for tokens
-    const { idToken, accessToken, refreshToken } = await exchangeCodeForTokens(
+    const { idToken, accessToken, refreshToken, expiresIn } = await exchangeCodeForTokens(
       code,
       redirectUri
     )
@@ -64,19 +64,22 @@ export async function GET(
     // Extract username from email
     const username = extractUsername(googleUser.email)
 
-    // Find or create user
+    // Find or create user with OAuth tokens
     const { user } = await findOrCreateOAuthUser(
       'google',
       googleUser.sub,
       googleUser.email,
-      username
+      username,
+      accessToken,
+      refreshToken,
+      expiresIn
     )
 
     // Create session
     await createSession(user.id)
 
-    // Get redirect URL (default to home)
-    const redirectTo = searchParams.get('redirect') || '/'
+    // Get redirect URL (default to notes page)
+    const redirectTo = searchParams.get('redirect') || '/notes'
 
     return NextResponse.redirect(new URL(redirectTo, request.url))
   } catch (error) {

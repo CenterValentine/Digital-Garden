@@ -50,7 +50,7 @@ export const TaskListInputRule = Extension.create({
 
                 tr.replaceWith(deleteFrom, deleteFrom, taskListNode);
                 tr.setSelection(
-                  state.selection.constructor.near(tr.doc.resolve(deleteFrom + 2))
+                  (state.selection.constructor as any).near(tr.doc.resolve(deleteFrom + 2))
                 );
 
                 if (dispatch) {
@@ -86,36 +86,68 @@ export const TaskListInputRule = Extension.create({
               const listItemPos = $from.before(-1);
               const listItemNode = $from.node(-1);
 
-              // Delete the checkbox text
+              // Delete the checkbox text first
               const matchLength = (uncheckedMatch || checkedMatch)![0].length;
               const deleteFrom = from - matchLength;
               tr.delete(deleteFrom, from);
 
-              // Convert listItem to taskItem
+              // Now work with the updated document after deletion
+              const $fromAfterDelete = tr.doc.resolve(deleteFrom);
+              const listItemAfterDelete = $fromAfterDelete.node(-1);
+
+              // Convert listItem to taskItem with the cleaned content
               const taskItemNode = schema.nodes.taskItem.create(
                 { checked: !!checkedMatch },
-                listItemNode.content
+                listItemAfterDelete.content
               );
 
               // Replace the listItem with taskItem
-              tr.replaceWith(listItemPos, listItemPos + listItemNode.nodeSize, taskItemNode);
+              const listItemPosAfterDelete = $fromAfterDelete.before(-1);
+              tr.replaceWith(listItemPosAfterDelete, listItemPosAfterDelete + listItemAfterDelete.nodeSize, taskItemNode);
 
               // Convert bulletList parent to taskList if it isn't already
-              const bulletListPos = $from.before(-2);
               const bulletListNode = $from.node(-2);
 
               // Only convert if it's actually a bulletList
-              if (bulletListNode.type.name === "bulletList") {
-                const taskListNode = schema.nodes.taskList.create(
-                  bulletListNode.attrs,
-                  bulletListNode.content
-                );
-                tr.replaceWith(bulletListPos, bulletListPos + bulletListNode.nodeSize, taskListNode);
-              }
+              if (bulletListNode && bulletListNode.type.name === "bulletList") {
+                // After replacing the listItem with taskItem, we need to find the bulletList in the updated doc
+                // Resolve to a position inside the paragraph within the taskItem
+                const $insideTaskItem = tr.doc.resolve(listItemPosAfterDelete + 2);
 
-              // Set cursor position inside the new task item
-              const newPos = tr.doc.resolve(listItemPos + 2);
-              tr.setSelection(state.selection.constructor.near(newPos));
+                // Navigate up: paragraph -> taskItem -> bulletList
+                // So bulletList is at depth -2 from the paragraph
+                if ($insideTaskItem.depth >= 2) {
+                  const parentAtDepthMinus1 = $insideTaskItem.node(-1); // Should be taskItem
+                  const parentAtDepthMinus2 = $insideTaskItem.node(-2); // Should be bulletList
+
+                  if (parentAtDepthMinus2?.type.name === "bulletList") {
+                    const updatedBulletListPos = $insideTaskItem.before(-2);
+                    const updatedBulletList = parentAtDepthMinus2;
+
+                    const taskListNode = schema.nodes.taskList.create(
+                      updatedBulletList.attrs,
+                      updatedBulletList.content
+                    );
+                    tr.replaceWith(updatedBulletListPos, updatedBulletListPos + updatedBulletList.nodeSize, taskListNode);
+
+                    // Set cursor position inside the new task item's paragraph
+                    const newPos = tr.doc.resolve(updatedBulletListPos + 4); // taskList + taskItem + paragraph
+                    tr.setSelection((state.selection.constructor as any).near(newPos));
+                  } else {
+                    // Fallback: just position cursor in the taskItem
+                    const newPos = tr.doc.resolve(listItemPosAfterDelete + 2);
+                    tr.setSelection((state.selection.constructor as any).near(newPos));
+                  }
+                } else {
+                  // Fallback: just position cursor in the taskItem
+                  const newPos = tr.doc.resolve(listItemPosAfterDelete + 2);
+                  tr.setSelection((state.selection.constructor as any).near(newPos));
+                }
+              } else {
+                // No bulletList conversion needed, just position cursor
+                const newPos = tr.doc.resolve(listItemPosAfterDelete + 2);
+                tr.setSelection((state.selection.constructor as any).near(newPos));
+              }
 
               if (dispatch) {
                 dispatch(tr);

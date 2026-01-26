@@ -116,7 +116,7 @@ export const WikiLink = Node.create<WikiLinkOptions>({
       // Triggers when user types the closing ]]
       new InputRule({
         find: /\[\[([^\|\]]+)(?:\|([^\]]+))?\]\]$/,
-        handler: ({ state, range, match }) => {
+        handler: ({ state, range, match }: any) => {
           const targetTitle = match[1]?.trim();
           const displayText = match[2]?.trim() || null;
 
@@ -255,7 +255,7 @@ export const WikiLink = Node.create<WikiLinkOptions>({
             // Single-click to navigate
             if (wikiLinkNode && options.onClickLink) {
               event.preventDefault();
-              options.onClickLink(wikiLinkNode.attrs.targetTitle);
+              options.onClickLink((wikiLinkNode as any).attrs.targetTitle);
               return true;
             }
 

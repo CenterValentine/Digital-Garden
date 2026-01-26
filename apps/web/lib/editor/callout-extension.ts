@@ -172,13 +172,13 @@ export const Callout = Node.create<CalloutOptions>({
     };
   },
 
-  addInputRules() {
+  addInputRules(): any {
     return [
       // Match: > [!type] Optional Title
       // At start of line or after whitespace
       {
         find: /^>\s*\[!(note|tip|warning|danger|info)\](?:\s+(.+))?$/,
-        handler: ({ state, range, match }) => {
+        handler: ({ state, range, match }: any) => {
           const type = match[1];
           const title = match[2] || null;
 
@@ -200,7 +200,7 @@ export const Callout = Node.create<CalloutOptions>({
 
           // Move cursor into the callout content
           tr.setSelection(
-            state.selection.constructor.near(tr.doc.resolve(range.from + 2))
+            (state.selection.constructor as any).near(tr.doc.resolve(range.from + 2))
           );
         },
       },

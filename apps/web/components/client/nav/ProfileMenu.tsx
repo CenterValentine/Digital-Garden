@@ -48,13 +48,35 @@ export default function ProfileMenu() {
   }, [isOpen]);
 
   const handleSignOut = async () => {
+    console.log("[ProfileMenu] Sign out clicked"); // Debug log
+
     try {
-      await fetch("/api/auth/sign-out", { method: "POST" });
+      console.log("[ProfileMenu] Calling sign-out API..."); // Debug log
+
+      // Call sign-out API
+      const response = await fetch("/api/auth/sign-out", { method: "POST" });
+
+      console.log("[ProfileMenu] Sign-out API response:", response.status); // Debug log
+
+      if (!response.ok) {
+        throw new Error("Sign out failed");
+      }
+
+      // Clear local session state
       setSession(null);
-      router.push("/");
-      router.refresh();
+
+      // Close the menu
+      setIsOpen(false);
+
+      console.log("[ProfileMenu] Navigating to home page..."); // Debug log
+
+      // Use full page navigation to ensure clean session clear
+      // This prevents any stale client state from persisting
+      window.location.href = "/";
     } catch (error) {
-      console.error("Sign out error:", error);
+      console.error("[ProfileMenu] Sign out error:", error);
+      // Even on error, try to navigate home
+      window.location.href = "/";
     }
   };
 
@@ -140,11 +162,13 @@ export default function ProfileMenu() {
 
             {/* Settings */}
             <button
+              type="button"
               onClick={() => {
+                console.log("[ProfileMenu] Settings clicked");
                 setIsOpen(false);
                 router.push("/settings");
               }}
-              className="w-full px-4 py-2 flex items-center gap-3 text-sm text-foreground hover:bg-white/5 transition-colors"
+              className="w-full px-4 py-2 flex items-center gap-3 text-sm text-foreground hover:bg-white/5 transition-colors text-left"
             >
               <Settings className="h-4 w-4 text-gold-primary" />
               <span>Settings</span>
@@ -180,8 +204,10 @@ export default function ProfileMenu() {
 
             {/* Sign Out */}
             <button
+              type="button"
               onClick={handleSignOut}
-              className="w-full px-4 py-2 flex items-center gap-3 text-sm text-foreground hover:bg-white/5 transition-colors"
+              onMouseEnter={() => console.log("[ProfileMenu] Mouse entered Sign Out button")}
+              className="w-full px-4 py-2 flex items-center gap-3 text-sm text-foreground hover:bg-white/5 transition-colors text-left cursor-pointer"
             >
               <LogOut className="h-4 w-4 text-gold-primary" />
               <span>Sign Out</span>

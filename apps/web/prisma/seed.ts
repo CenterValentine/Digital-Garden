@@ -10,8 +10,19 @@
 
 import { PrismaClient } from "../lib/generated/prisma";
 import { hash } from "bcrypt";
+import { Pool } from "pg";
+import { PrismaPg } from "@prisma/adapter-pg";
 
-const prisma = new PrismaClient();
+// Load environment variables
+import { config } from "dotenv";
+config({ path: ".env.local" });
+config(); // Fallback to .env
+
+// Initialize Prisma client with pg adapter (Prisma 7 requirement)
+const databaseUrl = process.env.DATABASE_URL || "";
+const pool = new Pool({ connectionString: databaseUrl });
+const adapter = new PrismaPg(pool);
+const prisma = new PrismaClient({ adapter });
 
 // ============================================================
 // SEED DATA
@@ -332,6 +343,7 @@ async function seedStorageConfig(userId: string) {
         accessKeyId: process.env.R2_ACCESS_KEY_ID || "placeholder",
         secretAccessKey: process.env.R2_SECRET_ACCESS_KEY || "placeholder",
         bucket: process.env.R2_BUCKET || "digital-garden",
+        endpoint: process.env.R2_ENDPOINT || "https://placeholder.r2.cloudflarestorage.com",
       },
     },
   });
@@ -426,6 +438,43 @@ async function seedStarterContent(userId: string) {
   return welcomeNote;
 }
 
+async function seedTags(userId: string) {
+  // Sample tags with colors
+  const sampleTags = [
+    { name: "tutorial", slug: "tutorial", color: "#3b82f6" }, // blue
+    { name: "reference", slug: "reference", color: "#8b5cf6" }, // purple
+    { name: "project", slug: "project", color: "#10b981" }, // green
+    { name: "idea", slug: "idea", color: "#f59e0b" }, // amber
+    { name: "todo", slug: "todo", color: "#ef4444" }, // red
+    { name: "archive", slug: "archive", color: "#6b7280" }, // gray
+  ];
+
+  const tags = [];
+
+  for (const tagData of sampleTags) {
+    const tag = await prisma.tag.upsert({
+      where: {
+        userId_slug: {
+          userId,
+          slug: tagData.slug,
+        },
+      },
+      update: {},
+      create: {
+        userId,
+        name: tagData.name,
+        slug: tagData.slug,
+        color: tagData.color,
+      },
+    });
+
+    tags.push(tag);
+  }
+
+  console.log(`✅ Created ${tags.length} sample tags`);
+  return tags;
+}
+
 // ============================================================
 // MAIN SEED FUNCTION
 // ============================================================
@@ -445,7 +494,10 @@ async function main() {
     
     // 4. Create starter content
     await seedStarterContent(user.id);
-    
+
+    // 5. Create sample tags
+    await seedTags(user.id);
+
     console.log("\n✨ Seed complete!");
     console.log("\n📋 Login credentials:");
     console.log("   Email: admin@example.com");

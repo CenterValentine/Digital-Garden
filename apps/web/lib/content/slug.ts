@@ -133,10 +133,10 @@ export async function generateContentPath(contentId: string): Promise<string> {
   const segments: string[] = [];
   
   let currentId: string | null = contentId;
-  
+
   // Walk up the tree to root
   while (currentId) {
-    const node = await prisma.contentNode.findUnique({
+    const node: { slug: string; parentId: string | null } | null = await prisma.contentNode.findUnique({
       where: { id: currentId },
       select: {
         slug: true,

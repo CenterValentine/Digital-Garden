@@ -17,7 +17,7 @@ import { LeftSidebarStatusBar } from "../LeftSidebarStatusBar";
 import { useContentStore } from "@/stores/content-store";
 import { useSearchStore } from "@/stores/search-store";
 import { useTreeStateStore } from "@/stores/tree-state-store";
-import type { TreeNode } from "@/lib/content/types";
+import type { TreeNode, ContentType } from "@/lib/content/types";
 
 interface TreeApiResponse {
   success: boolean;
@@ -38,7 +38,7 @@ interface TreeApiResponse {
 
 interface LeftSidebarContentProps {
   refreshTrigger: number;
-  createTrigger?: { type: "folder" | "note"; timestamp: number } | null;
+  createTrigger?: { type: "folder" | "note" | "docx" | "xlsx"; timestamp: number } | null;
   onSelectionChange?: (hasMultipleSelections: boolean) => void;
   onFileDrop?: (files: File[]) => void;
 }
@@ -54,7 +54,7 @@ export function LeftSidebarContent({
   const [error, setError] = useState<string | null>(null);
   const [selectedCount, setSelectedCount] = useState(0);
   const [creatingItem, setCreatingItem] = useState<{
-    type: "folder" | "note" | "file" | "code" | "html";
+    type: "folder" | "note" | "file" | "code" | "html" | "docx" | "xlsx";
     parentId: string | null;
     tempId: string; // Temporary ID for the placeholder node
   } | null>(null);
@@ -64,11 +64,14 @@ export function LeftSidebarContent({
     title: string;
     message: string;
     hasChildren: boolean;
+    hasGoogleDriveFiles: boolean;
   } | null>(null);
   const [errorDialog, setErrorDialog] = useState<{
     title: string;
     message: string;
   } | null>(null);
+  const [hasGoogleAuth, setHasGoogleAuth] = useState(false);
+  const [deleteFromGoogleDrive, setDeleteFromGoogleDrive] = useState(true); // Default to true
 
   // Content selection store
   const selectedContentId = useContentStore((state) => state.selectedContentId);
@@ -116,17 +119,52 @@ export function LeftSidebarContent({
     }
   }, []);
 
+
   // Initial load and refresh when trigger changes
   useEffect(() => {
     fetchTree();
   }, [fetchTree, refreshTrigger]);
 
+  // Check if user has Google authentication
+  useEffect(() => {
+    async function checkGoogleAuth() {
+      try {
+        const response = await fetch("/api/auth/provider");
+        const data = await response.json();
+        setHasGoogleAuth(data.success && data.data.hasGoogleAuth);
+      } catch (err) {
+        console.error("[LeftSidebar] Failed to check Google auth:", err);
+        setHasGoogleAuth(false);
+      }
+    }
+    checkGoogleAuth();
+  }, []);
+
+  // Load and save checkbox preference to/from localStorage
+  useEffect(() => {
+    // Load from localStorage on mount
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("deleteFromGoogleDrive");
+      if (saved !== null) {
+        setDeleteFromGoogleDrive(saved === "true");
+      }
+    }
+  }, []); // Run once on mount
+
+  // Save to localStorage when value changes
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("deleteFromGoogleDrive", String(deleteFromGoogleDrive));
+    }
+  }, [deleteFromGoogleDrive]);
+
+
   // Watch for create trigger from + button
   useEffect(() => {
     if (createTrigger) {
-      const type = createTrigger.type === "folder" ? "folder" : "note";
+      // Pass the actual type from createTrigger (folder, note, docx, or xlsx)
       // parentId will be determined in handleCreate based on current selection
-      handleCreate(null, type); // Pass null, we'll determine parent inside handleCreate
+      handleCreate(null, createTrigger.type); // Pass null, we'll determine parent inside handleCreate
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [createTrigger]);
@@ -316,12 +354,8 @@ export function LeftSidebarContent({
         throw new Error(result.error?.message || "Failed to move content");
       }
 
-      // Success! Refetch tree to get server's canonical ordering
-      // The server's reorderSiblings() recalculates ALL sibling displayOrder values,
-      // so we need to refetch to ensure UI matches server state
-      await fetchTree();
-
-      console.log("Move successful, tree refreshed");
+      // Success! Optimistic update is complete, no refetch needed
+      console.log("Move successful, optimistic update complete");
     } catch (err) {
       console.error("Failed to move node:", err);
       // Rollback to original tree state on any error
@@ -402,7 +436,7 @@ export function LeftSidebarContent({
 
     try {
       // Prepare payload based on content type
-      const defaults: Record<string, { title: string; payload?: any }> = {
+      const defaults: Record<string, { title: string; payload?: any; fileType?: "docx" | "xlsx" }> = {
         folder: { title: title.trim() },
         note: {
           title: title.trim(),
@@ -430,6 +464,14 @@ export function LeftSidebarContent({
           title: title.trim(),
           // File type requires upload flow - should not reach here
         },
+        docx: {
+          title: title.trim().endsWith(".docx") ? title.trim() : `${title.trim()}.docx`,
+          fileType: "docx",
+        },
+        xlsx: {
+          title: title.trim().endsWith(".xlsx") ? title.trim() : `${title.trim()}.xlsx`,
+          fileType: "xlsx",
+        },
       };
 
       const config = defaults[type];
@@ -443,7 +485,55 @@ export function LeftSidebarContent({
         parentId,
       };
 
-      // Add type-specific payloads
+      // Add type-specific payloads or use special endpoints
+      if (type === "docx" || type === "xlsx") {
+        // Office documents use dedicated creation endpoint
+        const response = await fetch("/api/notes/content/create-document", {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            fileName: config.title,
+            fileType: config.fileType,
+            parentId,
+          }),
+        });
+
+        const result = await response.json();
+
+        if (!response.ok || !result.success) {
+          console.error("Create document failed:", result.error);
+
+          // Remove temp node on error
+          if (treeData) {
+            const removeTempNode = (nodes: TreeNode[]): TreeNode[] => {
+              return nodes
+                .filter((node) => node.id !== tempId)
+                .map((node) => ({
+                  ...node,
+                  children: node.children ? removeTempNode(node.children) : [],
+                }));
+            };
+            setTreeData(removeTempNode(treeData));
+          }
+          setCreatingItem(null);
+          setSelectedContentId(null);
+
+          setErrorDialog({
+            title: "Failed to create document",
+            message: result.error?.message || "Unknown error occurred. Please try again.",
+          });
+          return;
+        }
+
+        // Success! Refresh tree to show new document
+        fetchTree();
+        setCreatingItem(null);
+        setSelectedContentId(result.data.id);
+        console.log(`[LeftSidebarContent] ${type.toUpperCase()} created:`, result.data.id);
+        return;
+      }
+
       if (type === "folder") {
         requestBody.isFolder = true;
       } else if (type === "note") {
@@ -681,6 +771,13 @@ export function LeftSidebarContent({
       }
 
       // Success! The optimistic update is already visible.
+      // Notify other components (e.g., MainPanel) that content was updated
+      window.dispatchEvent(new CustomEvent('content-updated', {
+        detail: {
+          contentId: id,
+          updates: { title: newName.trim() }
+        }
+      }));
       // Optionally refresh to sync with server (slug, updatedAt, etc.)
       // For now, skip refresh to keep it snappy
     } catch (err) {
@@ -787,19 +884,50 @@ export function LeftSidebarContent({
       node.children && node.children.length > 0
     );
 
+    // Check if any files have Google Drive metadata (async check)
+    let hasGoogleDriveFiles = false;
+    if (hasGoogleAuth) {
+      try {
+        // Check metadata for all items in parallel
+        const metadataChecks = ids.map(async (id) => {
+          try {
+            const response = await fetch(`/api/notes/content/${id}`, {
+              credentials: "include",
+            });
+            if (response.ok) {
+              const data = await response.json();
+              const metadata = data.data?.file?.storageMetadata;
+              const googleDriveFileId = metadata?.externalProviders?.googleDrive?.fileId;
+              return !!googleDriveFileId;
+            }
+          } catch {
+            return false;
+          }
+          return false;
+        });
+
+        const results = await Promise.all(metadataChecks);
+        hasGoogleDriveFiles = results.some(hasGoogleDrive => hasGoogleDrive);
+      } catch (err) {
+        console.error("[Delete] Failed to check Google Drive metadata:", err);
+        hasGoogleDriveFiles = false;
+      }
+    }
+
     // Show confirmation dialog with appropriate message
     setDeleteConfirm({
       ids,
       title: confirmTitle,
       message: confirmMessage,
       hasChildren,
+      hasGoogleDriveFiles,
     });
   };
 
   // Handler: Perform actual delete after confirmation (supports batch delete)
   const handleDeleteConfirmed = async (ids: string[]) => {
     try {
-      // Get node titles before deleting (for better error messages)
+      // Get node titles and Google Drive metadata before deleting
       const findNode = (nodes: TreeNode[], targetId: string): TreeNode | null => {
         for (const node of nodes) {
           if (node.id === targetId) return node;
@@ -812,13 +940,63 @@ export function LeftSidebarContent({
       };
 
       const nodeMap = new Map<string, string>();
+      const googleDriveFiles: Array<{ contentId: string; fileId: string }> = [];
+
       if (treeData) {
-        ids.forEach(id => {
+        // First, fetch metadata for all items to check for Google Drive files
+        const metadataPromises = ids.map(async (id) => {
           const node = findNode(treeData, id);
           if (node) {
             nodeMap.set(id, node.title);
+
+            // Only check for Google Drive metadata if user wants to delete from Drive
+            if (hasGoogleAuth && deleteFromGoogleDrive) {
+              try {
+                const response = await fetch(`/api/notes/content/${id}`, {
+                  credentials: "include",
+                });
+                if (response.ok) {
+                  const data = await response.json();
+                  const metadata = data.data?.file?.storageMetadata;
+                  const googleDriveFileId = metadata?.externalProviders?.googleDrive?.fileId;
+                  if (googleDriveFileId) {
+                    googleDriveFiles.push({ contentId: id, fileId: googleDriveFileId });
+                  }
+                }
+              } catch (err) {
+                console.error(`[Delete] Failed to fetch metadata for ${id}:`, err);
+              }
+            }
           }
         });
+
+        await Promise.all(metadataPromises);
+      }
+
+      // Delete from Google Drive first (if applicable)
+      if (googleDriveFiles.length > 0) {
+        console.log(`[Delete] Deleting ${googleDriveFiles.length} files from Google Drive...`);
+        const googleDeletePromises = googleDriveFiles.map(async ({ contentId, fileId }) => {
+          try {
+            const response = await fetch("/api/google-drive/delete", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              credentials: "include",
+              body: JSON.stringify({ fileId, contentId }),
+            });
+
+            if (!response.ok) {
+              console.error(`[Delete] Failed to delete Google Drive file ${fileId}`);
+            } else {
+              console.log(`[Delete] Successfully deleted Google Drive file ${fileId}`);
+            }
+          } catch (err) {
+            console.error(`[Delete] Error deleting Google Drive file ${fileId}:`, err);
+          }
+        });
+
+        // Wait for Google Drive deletes (but don't fail if they error)
+        await Promise.all(googleDeletePromises);
       }
 
       // Delete all items in parallel with enhanced error tracking
@@ -890,27 +1068,13 @@ export function LeftSidebarContent({
     try {
       // Download each file
       for (const id of idsToDownload) {
-        // Fetch download URL from API
-        const response = await fetch(`/api/notes/content/${id}/download`, {
-          credentials: "include",
-        });
+        // Use direct download endpoint with download=true to force download
+        // This prevents text files from opening in browser
+        const downloadUrl = `/api/notes/content/${id}/download?download=true`;
 
-        if (!response.ok) {
-          const result = await response.json();
-          toast.error("Failed to download file", {
-            description: result.error?.message || "Could not generate download URL",
-          });
-          continue;
-        }
-
-        const result = await response.json();
-        const { url, fileName } = result.data;
-
-        // Trigger download by opening URL in new window
-        // This works for presigned S3/R2 URLs
+        // Trigger download
         const link = document.createElement("a");
-        link.href = url;
-        link.download = fileName;
+        link.href = downloadUrl;
         link.target = "_blank";
         document.body.appendChild(link);
         link.click();
@@ -918,9 +1082,7 @@ export function LeftSidebarContent({
 
         // Show success toast for single file
         if (idsToDownload.length === 1) {
-          toast.success("Download started", {
-            description: fileName,
-          });
+          toast.success("Download started");
         }
       }
 
@@ -936,9 +1098,46 @@ export function LeftSidebarContent({
     }
   };
 
-  // Handler: Create new content node (all 5 types)
+  // Handler: Duplicate content node(s) (supports batch duplicate)
+  const handleDuplicate = async (idsToDuplicate: string[]) => {
+    if (idsToDuplicate.length === 0) return;
+
+    try {
+      const response = await fetch("/api/notes/content/duplicate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ ids: idsToDuplicate }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        throw new Error(result.error?.message || "Failed to duplicate content");
+      }
+
+      const duplicatedCount = result.data.duplicated.length;
+
+      // Show success toast
+      if (duplicatedCount === 1) {
+        toast.success(`Duplicated "${result.data.duplicated[0].title}"`);
+      } else {
+        toast.success(`Duplicated ${duplicatedCount} items`);
+      }
+
+      // Refresh tree to show duplicated items
+      fetchTree();
+    } catch (err) {
+      console.error("Failed to duplicate:", err);
+      toast.error("Failed to duplicate", {
+        description: err instanceof Error ? err.message : "An unexpected error occurred. Please try again.",
+      });
+    }
+  };
+
+  // Handler: Create new content node (all types)
   // This creates a temporary placeholder node in the tree for inline naming
-  const handleCreate = async (requestedParentId: string | null, type: "folder" | "note" | "file" | "code" | "html") => {
+  const handleCreate = async (requestedParentId: string | null, type: "folder" | "note" | "file" | "code" | "html" | "docx" | "xlsx") => {
     // File upload requires special two-phase flow - show dialog instead
     if (type === "file") {
       setErrorDialog({
@@ -947,6 +1146,8 @@ export function LeftSidebarContent({
       });
       return;
     }
+
+    // Office documents (docx, xlsx) now support inline naming (changed from immediate creation)
 
     if (!treeData) return;
 
@@ -989,11 +1190,14 @@ export function LeftSidebarContent({
     const tempId = `temp-${Date.now()}-${Math.random()}`;
 
     // Create temporary placeholder node
+    // Note: docx/xlsx types use contentType="file" since they're FilePayload
+    const contentType: ContentType = (type === "docx" || type === "xlsx") ? "file" : type as ContentType;
+
     const tempNode: TreeNode = {
       id: tempId,
       title: "", // Empty - user will type the name
       slug: "",
-      contentType: type,
+      contentType,
       parentId: parentId,
       displayOrder: 0,
       customIcon: null,
@@ -1102,6 +1306,7 @@ export function LeftSidebarContent({
             onRename={handleRename}
             onCreate={handleCreate}
             onDelete={handleDelete}
+            onDuplicate={handleDuplicate}
             onDownload={handleDownload}
             height={800}
             editingNodeId={creatingItem?.tempId}
@@ -1137,6 +1342,11 @@ export function LeftSidebarContent({
         confirmLabel="Delete"
         confirmVariant="danger"
         onConfirm={() => deleteConfirm && handleDeleteConfirmed(deleteConfirm.ids)}
+        checkbox={hasGoogleAuth && deleteConfirm?.hasGoogleDriveFiles ? {
+          label: "Also delete from Google Drive",
+          checked: deleteFromGoogleDrive,
+          onChange: setDeleteFromGoogleDrive,
+        } : undefined}
       />
 
       {/* Error dialog */}

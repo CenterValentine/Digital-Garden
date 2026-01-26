@@ -28,6 +28,17 @@ main:has(.notes-layout-page) {
   padding-top: 0 !important;
 }
 
+/* Position toaster below navbar on notes routes (top-right corner) */
+/* Sonner uses [data-sonner-toaster] as the main container */
+body:has(.notes-layout-page) [data-sonner-toaster][data-y-position="top"] {
+  top: 64px !important; /* 56px navbar + 8px spacing */
+}
+
+/* Fallback for class-based selector */
+body:has(.notes-layout-page) .toaster {
+  top: 64px !important; /* 56px navbar + 8px spacing */
+}
+
 :root {
   --font-size: 16px;
   

@@ -7,11 +7,19 @@
 
 import { create } from "zustand";
 
+export type FileType = "markdown" | "json" | "file";
+
 export interface EditorStatsState {
-  /** Word count */
+  /** Current file type being edited */
+  fileType: FileType;
+  /** Word count (for markdown) */
   wordCount: number;
   /** Character count (including spaces) */
   characterCount: number;
+  /** Line count (for JSON/code files) */
+  lineCount: number;
+  /** Object count (for JSON files) */
+  objectCount: number;
   /** Last save timestamp */
   lastSaved: Date | null;
   /** Is currently saving */
@@ -19,8 +27,12 @@ export interface EditorStatsState {
   /** Has unsaved changes */
   hasUnsavedChanges: boolean;
 
-  /** Update stats */
+  /** Update stats for markdown files */
   setStats: (stats: { wordCount: number; characterCount: number }) => void;
+  /** Update stats for JSON files */
+  setJsonStats: (stats: { lineCount: number; characterCount: number; objectCount: number }) => void;
+  /** Set file type */
+  setFileType: (fileType: FileType) => void;
   /** Set last saved timestamp */
   setLastSaved: (date: Date) => void;
   /** Set saving status */
@@ -32,17 +44,32 @@ export interface EditorStatsState {
 }
 
 export const useEditorStatsStore = create<EditorStatsState>((set) => ({
+  fileType: "markdown",
   wordCount: 0,
   characterCount: 0,
+  lineCount: 0,
+  objectCount: 0,
   lastSaved: null,
   isSaving: false,
   hasUnsavedChanges: false,
 
   setStats: (stats) =>
     set({
+      fileType: "markdown",
       wordCount: stats.wordCount,
       characterCount: stats.characterCount,
     }),
+
+  setJsonStats: (stats) =>
+    set({
+      fileType: "json",
+      lineCount: stats.lineCount,
+      characterCount: stats.characterCount,
+      objectCount: stats.objectCount,
+      wordCount: 0, // Reset word count for JSON
+    }),
+
+  setFileType: (fileType) => set({ fileType }),
 
   setLastSaved: (date) =>
     set({
@@ -57,8 +84,11 @@ export const useEditorStatsStore = create<EditorStatsState>((set) => ({
 
   reset: () =>
     set({
+      fileType: "markdown",
       wordCount: 0,
       characterCount: 0,
+      lineCount: 0,
+      objectCount: 0,
       lastSaved: null,
       isSaving: false,
       hasUnsavedChanges: false,

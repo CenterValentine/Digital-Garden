@@ -22,7 +22,11 @@ interface WikiLinkListProps {
   command: (item: WikiLinkSuggestionItem) => void;
 }
 
-export const WikiLinkList = forwardRef((props: WikiLinkListProps, ref) => {
+interface WikiLinkListRef {
+  onKeyDown: (props: { event: KeyboardEvent }) => boolean;
+}
+
+export const WikiLinkList = forwardRef<WikiLinkListRef, WikiLinkListProps>((props, ref) => {
   const [selectedIndex, setSelectedIndex] = useState(0);
 
   const selectItem = (index: number) => {
@@ -112,7 +116,7 @@ export function createWikiLinkSuggestion(
     },
 
     render: () => {
-      let component: ReactRenderer;
+      let component: ReactRenderer<WikiLinkListRef>;
       let popup: TippyInstance[];
 
       return {

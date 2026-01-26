@@ -11,14 +11,8 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { PrismaClient } from "@/lib/generated/prisma";
-import { Pool } from "pg";
-import { PrismaPg } from "@prisma/adapter-pg";
+import { prisma } from "@/lib/db/prisma";
 import { requireAuth } from "@/lib/auth/middleware";
-
-const pool = new Pool({ connectionString: process.env.DATABASE_URL });
-const adapter = new PrismaPg(pool);
-const prisma = new PrismaClient({ adapter });
 
 export async function GET(request: NextRequest) {
   try {
@@ -72,6 +66,15 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(results);
   } catch (error) {
     console.error("List tags error:", error);
+
+    // Handle authentication errors
+    if (error instanceof Error && error.message === "Authentication required") {
+      return NextResponse.json(
+        { error: "Authentication required" },
+        { status: 401 }
+      );
+    }
+
     return NextResponse.json(
       { error: "Failed to list tags", details: error instanceof Error ? error.message : "Unknown error" },
       { status: 500 }
@@ -136,6 +139,15 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error("Create tag error:", error);
+
+    // Handle authentication errors
+    if (error instanceof Error && error.message === "Authentication required") {
+      return NextResponse.json(
+        { error: "Authentication required" },
+        { status: 401 }
+      );
+    }
+
     return NextResponse.json(
       { error: "Failed to create tag", details: error instanceof Error ? error.message : "Unknown error" },
       { status: 500 }

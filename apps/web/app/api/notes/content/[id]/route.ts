@@ -108,6 +108,7 @@ export async function GET(
         storageProvider: content.filePayload.storageProvider,
         storageKey: content.filePayload.storageKey,
         storageUrl: content.filePayload.storageUrl,
+        storageMetadata: content.filePayload.storageMetadata as any,
         uploadStatus: content.filePayload.uploadStatus,
         uploadedAt: content.filePayload.uploadedAt,
         uploadError: content.filePayload.uploadError,
@@ -329,6 +330,47 @@ export async function PATCH(
       data: updateData,
       include: CONTENT_WITH_PAYLOADS,
     });
+
+    // If this is a file with Google Drive integration, rename the Google Drive file
+    if (title && title !== existing.title && existing.filePayload) {
+      const metadata = existing.filePayload.storageMetadata as any;
+      const googleDriveFileId = metadata?.externalProviders?.googleDrive?.fileId;
+
+      if (googleDriveFileId) {
+        console.log(`[PATCH Content] File renamed, syncing to Google Drive...`);
+        try {
+          // Call Google Drive rename API
+          const renameResponse = await fetch(
+            `${request.nextUrl.origin}/api/google-drive/rename`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                // Forward cookies for authentication
+                cookie: request.headers.get("cookie") || "",
+              },
+              body: JSON.stringify({
+                fileId: googleDriveFileId,
+                newFileName: title,
+                contentId: id,
+              }),
+            }
+          );
+
+          if (!renameResponse.ok) {
+            const errorData = await renameResponse.json();
+            console.error("[PATCH Content] Google Drive rename failed:", errorData.error);
+            // Don't fail the entire request if Google Drive rename fails
+            // The local file is already renamed successfully
+          } else {
+            console.log("[PATCH Content] Google Drive file renamed successfully");
+          }
+        } catch (error) {
+          console.error("[PATCH Content] Google Drive rename error:", error);
+          // Don't fail the entire request
+        }
+      }
+    }
 
     // Format response
     const contentType = deriveContentType(updated as any);

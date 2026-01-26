@@ -13,6 +13,7 @@ import { Allotment } from "allotment";
 import "allotment/dist/style.css";
 import { usePanelStore } from "@/stores/panel-store";
 import { useSearchStore } from "@/stores/search-store";
+import { useLeftPanelCollapseStore } from "@/stores/left-panel-collapse-store";
 import { ContextMenu } from "./context-menu/ContextMenu";
 import { fileTreeActionProvider } from "./context-menu/file-tree-actions";
 
@@ -35,6 +36,8 @@ export function ResizablePanels({ children }: ResizablePanelsProps) {
   } = usePanelStore();
 
   const toggleSearch = useSearchStore((state) => state.toggleSearch);
+  const { mode: panelMode, setMode: setPanelMode } = useLeftPanelCollapseStore();
+  const togglePanelCollapse = useLeftPanelCollapseStore((state) => state.toggleMode);
 
   const [isMounted, setIsMounted] = useState(false);
 
@@ -46,37 +49,62 @@ export function ResizablePanels({ children }: ResizablePanelsProps) {
     return () => clearTimeout(timer);
   }, []);
 
-  // Global keyboard shortcut: Cmd+/ to toggle search
+  // Global keyboard shortcut: Cmd+/ to toggle search and expand panel
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Check for Cmd+/ (Mac) or Ctrl+/ (Windows/Linux)
       if ((e.metaKey || e.ctrlKey) && e.key === "/") {
         e.preventDefault();
+        // Ensure panel is expanded when toggling search
+        if (panelMode === "hidden") {
+          setPanelMode("full");
+        }
         toggleSearch();
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [toggleSearch]);
+  }, [toggleSearch, panelMode, setPanelMode]);
+
+  // Global keyboard shortcut: Cmd+B to toggle left panel collapse
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Check for Cmd+B (Mac) or Ctrl+B (Windows/Linux)
+      if ((e.metaKey || e.ctrlKey) && e.key === "b") {
+        e.preventDefault();
+        togglePanelCollapse();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [togglePanelCollapse]);
 
   const [leftPanel, mainPanel, rightPanel] = children;
+
+  // Calculate left panel size based on collapse mode
+  // Hidden mode: 48px (w-12), Full mode: saved width
+  const effectiveLeftWidth = panelMode === "hidden" ? 48 : leftSidebarWidth;
+  const leftPanelMinSize = panelMode === "hidden" ? 48 : 200;
+  const leftPanelMaxSize = panelMode === "hidden" ? 48 : 600;
 
   return (
     <>
     <Allotment
       onDragEnd={(sizes) => {
         if (!isMounted) return;
-        if (leftSidebarVisible && sizes[0] !== leftSidebarWidth) {
+        // Only save width changes when in full mode
+        if (leftSidebarVisible && panelMode === "full" && sizes[0] !== leftSidebarWidth) {
           setLeftSidebarWidth(sizes[0]);
         }
       }}
     >
       {leftSidebarVisible && (
         <Allotment.Pane
-          minSize={200}
-          maxSize={600}
-          preferredSize={leftSidebarWidth}
+          minSize={leftPanelMinSize}
+          maxSize={leftPanelMaxSize}
+          preferredSize={effectiveLeftWidth}
         >
           {leftPanel}
         </Allotment.Pane>

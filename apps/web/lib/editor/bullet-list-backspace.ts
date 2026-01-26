@@ -64,7 +64,7 @@ export const BulletListBackspace = Extension.create({
 
           // Set cursor after the "-" character
           const newPos = listItemPos + 2; // +1 for paragraph, +1 for "-" char
-          tr.setSelection(state.selection.constructor.near(tr.doc.resolve(newPos)));
+          tr.setSelection((state.selection.constructor as any).near(tr.doc.resolve(newPos)));
 
           dispatch(tr);
         }

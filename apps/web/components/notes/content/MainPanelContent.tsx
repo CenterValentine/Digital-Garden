@@ -49,6 +49,7 @@ export function MainPanelContent() {
   const [contentType, setContentType] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [refreshTrigger, setRefreshTrigger] = useState(0); // Used to force refetch
 
   // Restore selection from URL or localStorage on mount
   useEffect(() => {
@@ -74,6 +75,7 @@ export function MainPanelContent() {
   }, []); // Empty dependency array - only run on mount
 
   // Fetch note content when selection changes
+  // Also re-fetch when content is updated (e.g., renamed in file tree)
   useEffect(() => {
     if (!selectedContentId) {
       setNoteContent(null);
@@ -190,7 +192,32 @@ export function MainPanelContent() {
     };
 
     fetchNote();
-  }, [selectedContentId, clearSelection, resetStats, clearOutline, setOutline]);
+  }, [selectedContentId, refreshTrigger, clearSelection, resetStats, clearOutline, setOutline]);
+
+  // Listen for content updates (e.g., when renamed in file tree)
+  useEffect(() => {
+    const handleContentUpdate = (event: CustomEvent) => {
+      const { contentId, updates } = event.detail;
+
+      // If the updated content is the currently selected one, refresh it
+      if (contentId === selectedContentId) {
+        console.log('[MainPanelContent] Content updated, refreshing:', contentId, updates);
+
+        // If only title changed, update it directly (faster than refetch)
+        if (updates.title && Object.keys(updates).length === 1) {
+          setNoteTitle(updates.title);
+        } else {
+          // Other changes, trigger full refetch
+          setRefreshTrigger(prev => prev + 1);
+        }
+      }
+    };
+
+    window.addEventListener('content-updated' as any, handleContentUpdate as any);
+    return () => {
+      window.removeEventListener('content-updated' as any, handleContentUpdate as any);
+    };
+  }, [selectedContentId]);
 
   // Stats change handler
   const handleStatsChange = useCallback(

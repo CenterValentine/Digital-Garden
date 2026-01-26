@@ -50,6 +50,13 @@ export function BacklinksPanel() {
       return;
     }
 
+    // Skip if this is a temporary document being created
+    if (selectedContentId.startsWith("temp-")) {
+      setBacklinks(null);
+      setIsLoading(false);
+      return;
+    }
+
     const fetchBacklinks = async () => {
       setIsLoading(true);
       setError(null);

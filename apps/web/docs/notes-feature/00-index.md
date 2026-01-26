@@ -1,8 +1,8 @@
 # Notes Feature Documentation Index
 
-**Version:** 2.0  
-**Last Updated:** January 12, 2026  
-**Status:** Draft
+**Version:** 2.3
+**Last Updated:** January 23, 2026
+**Status:** Active Development (M7 Office Documents Complete)
 
 ## Overview
 
@@ -124,20 +124,49 @@ The notes feature transforms the application into a powerful knowledge managemen
     - Phase 4: Advanced features (search, backlinks)
     - Migration from MVP
 
-**Milestone Implementation Guides:**
+### Current Development
+
+- **[CURRENT-STATE.md](./CURRENT-STATE.md)** - Active work tracking (M7 file management starting)
+- **[IMPLEMENTATION-STATUS.md](./IMPLEMENTATION-STATUS.md)** - Milestone progress tracking (M1-M6 complete)
+- **[DOCUMENTATION-QUICK-REFERENCE.md](./DOCUMENTATION-QUICK-REFERENCE.md)** - Quick navigation guide
+- **[DOCUMENTATION-CONTRADICTIONS-REPORT.md](./DOCUMENTATION-CONTRADICTIONS-REPORT.md)** - Quality assurance report
+
+**Milestone Implementation Guides (Reference):**
 
 - **[M1: Foundation README](./M1-FOUNDATION-README.md)** - Database schema, seed script, core utilities
 - **[M2: Core API README](./M2-CORE-API-README.md)** - REST API routes, file upload, storage management
 - **[M3: UI Foundation with Liquid Glass](./M3-UI-FOUNDATION-LIQUID-GLASS.md)** - Panel layout, design system, Glass-UI integration
 - **[M3: Setup Guide](./M3-SETUP-GUIDE.md)** - Step-by-step setup and testing for M3
 - **[M4: File Tree Implementation](./M4-FILE-TREE-IMPLEMENTATION.md)** - Server/client architecture, Suspense, react-arborist
+- **[M5: Editor Test Plan](./M5-EDITOR-TEST-PLAN.md)** - TipTap editor integration testing
+- **[M6: Final Scope](./M6-FINAL-SCOPE.md)** - Search, backlinks, editor extensions scope
+- **[M6: Extension Recommendations](./M6-EXTENSION-RECOMMENDATIONS.md)** - Custom TipTap extensions guide
+- **[M6: Tags Implementation](./M6-TAGS-IMPLEMENTATION.md)** - Complete tags system specification (7,000+ lines)
+- **[M6: Outline Panel Test Plan](./M6-OUTLINE-PANEL-TEST-PLAN.md)** - Outline feature testing
+- **[M6: Editor Extensions Test Plan](./M6-EDITOR-EXTENSIONS-TEST-PLAN.md)** - Extension testing guide
+- **[M7: Drag-Drop Upload](./M7-DRAG-DROP-UPLOAD.md)** - File upload with drag-and-drop implementation
+- **[M7: Storage Architecture](./M7-STORAGE-ARCHITECTURE-V2.md)** - Storage provider abstraction design
+- **[M7: Office Documents Implementation](./M7-OFFICE-DOCUMENTS-IMPLEMENTATION.md)** - Multi-tier Office document viewing (Google Docs, ONLYOFFICE, Microsoft Viewer) ✅ Complete
+- **[M7: Media Viewers Implementation](./M7-MEDIA-VIEWERS-IMPLEMENTATION.md)** - Enhanced image, PDF, video, and audio viewers with keyboard shortcuts ✅ Complete
 
-**Supporting Documentation:**
+**Architecture & Patterns:**
 
+- **[Architecture: Right Sidebar Refactor](./ARCHITECTURE-RIGHT-SIDEBAR-REFACTOR.md)** - Component architecture patterns
+- **[Tool Belt Architecture](./TOOL-BELT-ARCHITECTURE.md)** - Context-aware action system for file viewers (M7+)
+- **[React DND Integration Guide](./REACT-DND-INTEGRATION-GUIDE.md)** - ⭐ Critical reference for drag-and-drop with react-arborist
 - **[Type Safety Improvements](./TYPE-SAFETY-IMPROVEMENTS.md)** - TypeScript types for API routes
 - **[Tree Update Flow](./TREE-UPDATE-FLOW.md)** - Drag-and-drop tree updates explained
 - **[Storage Config Examples](./STORAGE-CONFIG-EXAMPLES.md)** - How to use storage provider configs
 - **[Component Registry Notes](./COMPONENT-REGISTRY-NOTES.md)** - Glass-UI/DiceUI investigation and alternatives
+- **[Adding New Content Types](./ADDING-NEW-CONTENT-TYPES.md)** - Content type extension guide
+- **[URL Identifier Strategy](./URL-IDENTIFIER-STRATEGY.md)** - URL vs slug routing decisions
+
+**Session Logs (Archived):**
+
+Completed milestone session logs moved to `archive/sessions/`:
+- M4 session logs (13 files: bugfixes, completion summaries, test plans)
+- M6 session logs (completion summaries, session notes)
+- See `archive/sessions/` for historical implementation details
 
 ### Quality Assurance
 
@@ -187,12 +216,30 @@ The notes feature transforms the application into a powerful knowledge managemen
 
 ## Quick Start
 
-For developers new to this feature:
+### For Active Development (AI & Human Developers)
 
-1. Start with **[Architecture](./01-architecture.md)** to understand the system design
-2. Review **[Technology Stack](./02-technology-stack.md)** for library decisions
-3. Study **[Database Design](./03-database-design.md)** for data model changes
-4. Follow **[Implementation Guide](./11-implementation-guide.md)** for step-by-step development
+**Start here for current work:**
+1. **[CURRENT-STATE.md](./CURRENT-STATE.md)** - What's being worked on right now, next tasks, recent changes
+2. **[IMPLEMENTATION-STATUS.md](./IMPLEMENTATION-STATUS.md)** - Overall milestone progress (M1-M6 complete, M7 active)
+3. **[CLAUDE.md](../../CLAUDE.md)** - Development commands, patterns, architecture overview
+4. **[DOCUMENTATION-QUICK-REFERENCE.md](./DOCUMENTATION-QUICK-REFERENCE.md)** - Fast navigation guide
+
+### For New Contributors
+
+**Start here to understand the system:**
+1. **[Architecture](./01-architecture.md)** - System design and component hierarchy
+2. **[Technology Stack](./02-technology-stack.md)** - Library decisions and rationale
+3. **[Database Design](./03-database-design.md)** - ContentNode v2.0 schema
+4. **[Implementation Guide](./11-implementation-guide.md)** - Step-by-step development roadmap
+
+### Troubleshooting & Maintenance
+
+**[DRAG-AND-DROP-TROUBLESHOOTING.md](./DRAG-AND-DROP-TROUBLESHOOTING.md)** - Comprehensive guide to debugging file tree drag-and-drop issues
+   - Database corruption detection and cleanup
+   - React-arborist index mismatch resolution
+   - Soft-delete filtering patterns
+   - Drop zone positioning logic
+   - Testing checklist and prevention strategies
 
 ## Key Principles
 
@@ -302,6 +349,7 @@ When updating these documents:
 | 1.1     | 2026-01-12 | System | Added drag-and-drop, custom icons, export/import features                                                                |
 | 2.0     | 2026-01-12 | System | Database v2.0 refactor (ContentNode + Typed Payloads), API v2.0, complete terminology migration from docType/contentData |
 | 2.1     | 2026-01-13 | System | Documentation cleanup: consolidated summaries into V2-ARCHITECTURE-OVERVIEW.md, removed deprecated files                 |
+| 2.2     | 2026-01-20 | System | Added CURRENT-STATE.md for active work tracking, archived M4/M6 session logs to archive/sessions/, updated index structure |
 
 ## Next Steps
 

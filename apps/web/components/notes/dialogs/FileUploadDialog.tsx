@@ -57,6 +57,7 @@ export function FileUploadDialog({ parentId, onSuccess, onCancel, initialFiles }
   const editInputRef = useRef<HTMLInputElement>(null);
   // Track rename map during upload (persists through upload phase)
   const [uploadRenameMap, setUploadRenameMap] = useState<Map<string, string>>(new Map());
+  const [isDraggingOver, setIsDraggingOver] = useState(false);
 
   // Load folder tree on mount
   useEffect(() => {
@@ -527,24 +528,61 @@ export function FileUploadDialog({ parentId, onSuccess, onCancel, initialFiles }
         {uploadMethod === "file" && (
           <div className="space-y-4">
             <div
-              onClick={() => !isUploading && fileInputRef.current?.click()}
-              className="border-2 border-dashed border-white/20 rounded-lg p-8 text-center cursor-pointer hover:border-primary/50 transition-colors"
+              onDragOver={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setIsDraggingOver(true);
+              }}
+              onDragEnter={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setIsDraggingOver(true);
+              }}
+              onDragLeave={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                // Only reset if we're actually leaving the div (not just entering a child)
+                if (e.currentTarget === e.target || !e.currentTarget.contains(e.relatedTarget as Node)) {
+                  setIsDraggingOver(false);
+                }
+              }}
+              onDrop={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setIsDraggingOver(false);
+                if (isUploading) return;
+
+                const files = Array.from(e.dataTransfer.files || []);
+                if (files.length > 0) {
+                  if (uploadMode === 'automatic') {
+                    handleMultiFileUpload(files);
+                  } else {
+                    // Manual mode: populate selected files for review
+                    setSelectedFiles(files);
+                  }
+                }
+              }}
+              className={`relative border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
+                isDraggingOver
+                  ? 'border-primary bg-primary/10'
+                  : 'border-white/20 hover:border-primary/50'
+              }`}
             >
-              <Upload className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-              <p className="text-sm text-gray-300 mb-2">
-                {isUploading ? "Uploading..." : "Click to select files"}
-              </p>
-              <p className="text-xs text-gray-500">
-                Select one or multiple files (PDF, TXT, MD, JSON, Images, etc.)
-              </p>
               <input
                 ref={fileInputRef}
                 type="file"
                 multiple
                 onChange={handleFileChange}
-                className="hidden"
+                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                 disabled={isUploading}
               />
+              <Upload className="h-12 w-12 mx-auto mb-4 text-gray-400 pointer-events-none" />
+              <p className="text-sm text-gray-300 mb-2 pointer-events-none">
+                {isUploading ? "Uploading..." : "Click to select files"}
+              </p>
+              <p className="text-xs text-gray-500 pointer-events-none">
+                Select one or multiple files (PDF, TXT, MD, JSON, Images, etc.)
+              </p>
             </div>
 
             {/* Manual Mode: Selected Files with Rename (Before Upload) */}

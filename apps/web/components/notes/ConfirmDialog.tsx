@@ -37,6 +37,12 @@ interface ConfirmDialogProps {
   confirmVariant?: "danger" | "warning" | "primary";
   onConfirm: () => void;
   onCancel?: () => void;
+  /** Optional checkbox configuration */
+  checkbox?: {
+    label: string;
+    checked: boolean;
+    onChange: (checked: boolean) => void;
+  };
 }
 
 export function ConfirmDialog({
@@ -49,6 +55,7 @@ export function ConfirmDialog({
   confirmVariant = "primary",
   onConfirm,
   onCancel,
+  checkbox,
 }: ConfirmDialogProps) {
   const handleConfirm = () => {
     onConfirm();
@@ -123,6 +130,23 @@ export function ConfirmDialog({
           <Dialog.Description className="text-sm text-gray-400 mb-6 ml-10 whitespace-pre-line">
             {description}
           </Dialog.Description>
+
+          {/* Optional Checkbox */}
+          {checkbox && (
+            <div className="ml-10 mb-6">
+              <label className="flex items-center gap-2 cursor-pointer group">
+                <input
+                  type="checkbox"
+                  checked={checkbox.checked}
+                  onChange={(e) => checkbox.onChange(e.target.checked)}
+                  className="h-4 w-4 rounded border border-white/20 bg-white/5 text-primary focus:ring-2 focus:ring-primary/50 cursor-pointer"
+                />
+                <span className="text-sm text-gray-300 group-hover:text-gray-200 transition-colors">
+                  {checkbox.label}
+                </span>
+              </label>
+            </div>
+          )}
 
           {/* Actions */}
           <div className="flex justify-end gap-3">

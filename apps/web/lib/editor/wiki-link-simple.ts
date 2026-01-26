@@ -123,12 +123,15 @@ export const WikiLinkMark = Mark.create<WikiLinkOptions>({
                   tr.delete(start, end);
 
                   // Insert new text with wiki link mark
-                  tr.insertText(replacementText, start, start, [
+                  tr.insertText(replacementText, start);
+                  tr.addMark(
+                    start,
+                    start + replacementText.length,
                     newState.schema.marks.wikiLink.create({
                       targetTitle,
                       displayText,
-                    }),
-                  ]);
+                    })
+                  );
 
                   modified = true;
                 }

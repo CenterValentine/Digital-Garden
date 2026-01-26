@@ -31,12 +31,13 @@ import type { TreeNode } from "@/lib/content/types";
 
 interface FileNodeProps extends NodeRendererProps<TreeNode> {
   onRename?: (id: string, name: string) => Promise<void>;
-  onCreate?: (parentId: string | null, type: "folder" | "note" | "file" | "code" | "html") => Promise<void>;
+  onCreate?: (parentId: string | null, type: "folder" | "note" | "file" | "code" | "html" | "docx" | "xlsx") => Promise<void>;
   onDelete?: (id: string | string[]) => Promise<void>;
+  onDuplicate?: (ids: string[]) => Promise<void>;
   onDownload?: (ids: string[]) => Promise<void>;
 }
 
-export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete, onDownload }: FileNodeProps) {
+export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete, onDuplicate, onDownload }: FileNodeProps) {
   const { data } = node;
   const isFolder = data.contentType === "folder";
   const isOpen = node.isOpen;
@@ -168,6 +169,9 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
           // Pass all IDs at once for batch delete with single confirmation
           await onDelete(ids);
         } : undefined,
+        onDuplicate: onDuplicate ? async (ids: string[]) => {
+          await onDuplicate(ids);
+        } : undefined,
         onCreateNote: onCreate ? async (parentId: string | null) => {
           console.log("[FileNode] onCreateNote called with parentId:", parentId);
           await onCreate(parentId, "note");
@@ -187,6 +191,14 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
         onCreateHtml: onCreate ? async (parentId: string | null) => {
           console.log("[FileNode] onCreateHtml called with parentId:", parentId);
           await onCreate(parentId, "html");
+        } : undefined,
+        onCreateDocument: onCreate ? async (parentId: string | null) => {
+          console.log("[FileNode] onCreateDocument called with parentId:", parentId);
+          await onCreate(parentId, "docx");
+        } : undefined,
+        onCreateSpreadsheet: onCreate ? async (parentId: string | null) => {
+          console.log("[FileNode] onCreateSpreadsheet called with parentId:", parentId);
+          await onCreate(parentId, "xlsx");
         } : undefined,
         onDownload: onDownload ? async (ids: string[]) => {
           await onDownload(ids);

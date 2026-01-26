@@ -10,7 +10,15 @@ import { CloudCheck, FileText, Clock } from "lucide-react";
 import { useEditorStatsStore } from "@/stores/editor-stats-store";
 
 export function StatusBar() {
-  const { wordCount, characterCount, lastSaved, isSaving } = useEditorStatsStore();
+  const {
+    fileType,
+    wordCount,
+    characterCount,
+    lineCount,
+    objectCount,
+    lastSaved,
+    isSaving
+  } = useEditorStatsStore();
 
   // Format last saved time
   const getLastSavedText = () => {
@@ -30,12 +38,24 @@ export function StatusBar() {
     return `Saved ${Math.floor(diffHours / 24)}d ago`;
   };
 
+  // Get file type label
+  const getFileTypeLabel = () => {
+    switch (fileType) {
+      case "json":
+        return "JSON";
+      case "markdown":
+        return "Markdown";
+      default:
+        return "File";
+    }
+  };
+
   return (
     <div className="flex items-center justify-between text-gray-400">
       <div className="flex items-center gap-4">
         <div className="flex items-center gap-1">
           <FileText className="h-3 w-3" />
-          <span>Markdown</span>
+          <span>{getFileTypeLabel()}</span>
         </div>
         <div className="flex items-center gap-1">
           <Clock className="h-3 w-3" />
@@ -45,9 +65,21 @@ export function StatusBar() {
 
       <div className="flex items-center gap-4">
         <div className="flex items-center gap-2 text-xs">
-          <span>{wordCount} words</span>
-          <span className="text-gray-600">•</span>
-          <span>{characterCount} characters</span>
+          {fileType === "json" ? (
+            <>
+              <span>Ln {lineCount}</span>
+              <span className="text-gray-600">•</span>
+              <span>{characterCount.toLocaleString()} characters</span>
+              <span className="text-gray-600">•</span>
+              <span>{objectCount} {objectCount === 1 ? "object" : "objects"}</span>
+            </>
+          ) : (
+            <>
+              <span>{wordCount} words</span>
+              <span className="text-gray-600">•</span>
+              <span>{characterCount} characters</span>
+            </>
+          )}
         </div>
         <div className="flex items-center gap-1">
           <CloudCheck className="h-3 w-3" />

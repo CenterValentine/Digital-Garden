@@ -7,12 +7,14 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, FolderPlus, FileText, Upload } from "lucide-react";
+import { Plus, FolderPlus, FileText, Upload, FileSpreadsheet, FileType } from "lucide-react";
 
 interface LeftSidebarHeaderActionsProps {
   onCreateFolder: () => void;
   onCreateNote: () => void;
   onCreateFile: () => void;
+  onCreateDocument?: () => void;
+  onCreateSpreadsheet?: () => void;
   disabled?: boolean;
 }
 
@@ -20,6 +22,8 @@ export function LeftSidebarHeaderActions({
   onCreateFolder,
   onCreateNote,
   onCreateFile,
+  onCreateDocument,
+  onCreateSpreadsheet,
   disabled = false,
 }: LeftSidebarHeaderActionsProps) {
   const [showMenu, setShowMenu] = useState(false);
@@ -39,6 +43,16 @@ export function LeftSidebarHeaderActions({
     onCreateFile();
   };
 
+  const handleCreateDocument = () => {
+    setShowMenu(false);
+    onCreateDocument?.();
+  };
+
+  const handleCreateSpreadsheet = () => {
+    setShowMenu(false);
+    onCreateSpreadsheet?.();
+  };
+
   return (
     <div className="relative">
       <button
@@ -52,14 +66,14 @@ export function LeftSidebarHeaderActions({
 
       {showMenu && !disabled && (
         <>
-          {/* Backdrop */}
+          {/* Backdrop - higher z-index to cover all panels */}
           <div
-            className="fixed inset-0 z-10"
+            className="fixed inset-0 z-[100]"
             onClick={() => setShowMenu(false)}
           />
 
-          {/* Menu */}
-          <div className="absolute right-0 top-full mt-1 z-20 min-w-[160px] rounded-md border border-white/10 bg-[#1a1a1a] shadow-lg">
+          {/* Menu - even higher z-index to appear above backdrop */}
+          <div className="absolute right-0 top-full mt-1 z-[110] min-w-[180px] rounded-md border border-white/10 bg-[#1a1a1a] shadow-lg">
             <button
               onClick={handleCreateFolder}
               className="flex w-full items-center gap-2 px-3 py-2 text-sm text-left text-white hover:bg-white/10 transition-colors first:rounded-t-md"
@@ -74,6 +88,24 @@ export function LeftSidebarHeaderActions({
               <FileText className="h-4 w-4" />
               <span>New Note</span>
             </button>
+            {onCreateDocument && (
+              <button
+                onClick={handleCreateDocument}
+                className="flex w-full items-center gap-2 px-3 py-2 text-sm text-left text-white hover:bg-white/10 transition-colors border-t border-white/5"
+              >
+                <FileType className="h-4 w-4" />
+                <span>New Document</span>
+              </button>
+            )}
+            {onCreateSpreadsheet && (
+              <button
+                onClick={handleCreateSpreadsheet}
+                className="flex w-full items-center gap-2 px-3 py-2 text-sm text-left text-white hover:bg-white/10 transition-colors border-t border-white/5"
+              >
+                <FileSpreadsheet className="h-4 w-4" />
+                <span>New Spreadsheet</span>
+              </button>
+            )}
             <button
               onClick={handleCreateFile}
               className="flex w-full items-center gap-2 px-3 py-2 text-sm text-left text-white hover:bg-white/10 transition-colors border-t border-white/5 last:rounded-b-md"

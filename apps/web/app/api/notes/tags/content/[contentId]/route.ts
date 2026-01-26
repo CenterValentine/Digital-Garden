@@ -8,19 +8,17 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { PrismaClient } from "@/lib/generated/prisma";
-import { Pool } from "pg";
-import { PrismaPg } from "@prisma/adapter-pg";
-
-const pool = new Pool({ connectionString: process.env.DATABASE_URL });
-const adapter = new PrismaPg(pool);
-const prisma = new PrismaClient({ adapter });
+import { prisma } from "@/lib/db/prisma";
+import { requireAuth } from "@/lib/auth/middleware";
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ contentId: string }> }
 ) {
   try {
+    // Require authentication
+    await requireAuth();
+
     const { contentId } = await params;
 
     // Get all tags for this content node
@@ -61,6 +59,15 @@ export async function GET(
     return NextResponse.json(results);
   } catch (error) {
     console.error("Get content tags error:", error);
+
+    // Handle authentication errors
+    if (error instanceof Error && error.message === "Authentication required") {
+      return NextResponse.json(
+        { error: "Authentication required" },
+        { status: 401 }
+      );
+    }
+
     return NextResponse.json(
       {
         error: "Failed to get content tags",

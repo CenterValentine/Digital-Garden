@@ -30,11 +30,14 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   const redirectUri = new URL('/api/auth/google/callback', request.url).toString()
 
   // Build OAuth URL
+  // Request Google Drive scope for document editing
+  // Note: Using 'drive' instead of 'drive.file' to allow full Drive access
+  // This is needed so files can be accessed via iframe and opened in Google Docs/Sheets
   const params = new URLSearchParams({
     client_id: GOOGLE_CLIENT_ID,
     redirect_uri: redirectUri,
     response_type: 'code',
-    scope: 'openid email profile',
+    scope: 'openid email profile https://www.googleapis.com/auth/drive',
     state,
     access_type: 'offline',
     prompt: 'consent',

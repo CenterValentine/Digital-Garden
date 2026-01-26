@@ -1,6 +1,3 @@
-// Docs: https://pris.ly/d/prisma-schema
-// Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client-js"
   output   = "../lib/generated/prisma"
@@ -10,9 +7,303 @@ datasource db {
   provider = "postgresql"
 }
 
-// ============================================================
-// ENUMS
-// ============================================================
+model ContentNode {
+  id            String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ownerId       String           @db.Uuid
+  title         String           @db.VarChar(255)
+  slug          String           @db.VarChar(255)
+  parentId      String?          @db.Uuid
+  displayOrder  Int              @default(0)
+  categoryId    String?          @db.Uuid
+  isPublished   Boolean          @default(false)
+  createdAt     DateTime         @default(now()) @db.Timestamptz(6)
+  updatedAt     DateTime         @updatedAt @db.Timestamptz(6)
+  deletedAt     DateTime?        @db.Timestamptz(6)
+  deletedBy     String?          @db.Uuid
+  customIcon    String?          @db.VarChar(100)
+  iconColor     String?          @db.VarChar(20)
+  codePayload   CodePayload?
+  history       ContentHistory[]
+  sourceLinks   ContentLink[]    @relation("SourceContent")
+  targetLinks   ContentLink[]    @relation("TargetContent")
+  category      Category?        @relation(fields: [categoryId], references: [id])
+  owner         User             @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  parent        ContentNode?     @relation("Hierarchy", fields: [parentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  children      ContentNode[]    @relation("Hierarchy")
+  contentPath   ContentPath?
+  contentTags   ContentTag[]
+  filePayload   FilePayload?
+  htmlPayload   HtmlPayload?
+  notePayload   NotePayload?
+  trashBinEntry TrashBin?
+  viewGrants    ViewGrant[]
+
+  @@unique([ownerId, slug])
+  @@index([ownerId, deletedAt])
+  @@index([parentId, displayOrder])
+  @@index([categoryId, displayOrder])
+  @@index([deletedAt])
+}
+
+model NotePayload {
+  contentId  String      @id @db.Uuid
+  tiptapJson Json
+  searchText String      @default("")
+  metadata   Json        @default("{}")
+  createdAt  DateTime    @default(now()) @db.Timestamptz(6)
+  updatedAt  DateTime    @updatedAt @db.Timestamptz(6)
+  content    ContentNode @relation(fields: [contentId], references: [id], onDelete: Cascade)
+
+  @@index([searchText(ops: raw("gin_trgm_ops"))], type: Gin)
+}
+
+model FilePayload {
+  contentId        String          @id @db.Uuid
+  fileName         String          @db.VarChar(255)
+  fileExtension    String?         @db.VarChar(10)
+  mimeType         String          @db.VarChar(127)
+  fileSize         BigInt
+  checksum         String          @db.VarChar(64)
+  storageProvider  StorageProvider @default(r2)
+  storageKey       String          @db.VarChar(512)
+  storageUrl       String?
+  storageMetadata  Json            @default("{}")
+  uploadStatus     UploadStatus    @default(uploading)
+  uploadedAt       DateTime?       @db.Timestamptz(6)
+  uploadError      String?
+  processingStatus String          @default("pending") @db.VarChar(20)
+  isProcessed      Boolean         @default(false)
+  thumbnailUrl     String?
+  width            Int?
+  height           Int?
+  duration         Int?
+  lastAccessedAt   DateTime?       @db.Timestamptz(6)
+  createdAt        DateTime        @default(now()) @db.Timestamptz(6)
+  updatedAt        DateTime        @updatedAt @db.Timestamptz(6)
+  searchText       String          @default("")
+  content          ContentNode     @relation(fields: [contentId], references: [id], onDelete: Cascade)
+
+  @@index([uploadStatus])
+  @@index([storageProvider, uploadedAt(sort: Desc)])
+  @@index([checksum, fileSize])
+  @@index([mimeType])
+  @@index([processingStatus, isProcessed])
+  @@index([searchText(ops: raw("gin_trgm_ops"))], type: Gin)
+}
+
+model HtmlPayload {
+  contentId        String      @id @db.Uuid
+  html             String
+  searchText       String      @default("")
+  isTemplate       Boolean     @default(false)
+  templateSchema   Json?
+  templateMetadata Json        @default("{}")
+  renderMode       String      @default("static") @db.VarChar(20)
+  templateEngine   String?     @db.VarChar(20)
+  createdAt        DateTime    @default(now()) @db.Timestamptz(6)
+  updatedAt        DateTime    @updatedAt @db.Timestamptz(6)
+  content          ContentNode @relation(fields: [contentId], references: [id], onDelete: Cascade)
+
+  @@index([searchText(ops: raw("gin_trgm_ops"))], type: Gin)
+  @@index([isTemplate])
+}
+
+model CodePayload {
+  contentId  String      @id @db.Uuid
+  code       String
+  language   String      @db.VarChar(50)
+  searchText String      @default("")
+  metadata   Json        @default("{}")
+  createdAt  DateTime    @default(now()) @db.Timestamptz(6)
+  updatedAt  DateTime    @updatedAt @db.Timestamptz(6)
+  content    ContentNode @relation(fields: [contentId], references: [id], onDelete: Cascade)
+
+  @@index([searchText(ops: raw("gin_trgm_ops"))], type: Gin)
+  @@index([language])
+}
+
+model ContentHistory {
+  id        String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  contentId String      @db.Uuid
+  version   Int
+  snapshot  Json
+  changedBy String      @db.Uuid
+  changedAt DateTime    @default(now()) @db.Timestamptz(6)
+  user      User        @relation(fields: [changedBy], references: [id])
+  content   ContentNode @relation(fields: [contentId], references: [id], onDelete: Cascade)
+
+  @@unique([contentId, version])
+  @@index([contentId, version(sort: Desc)])
+}
+
+model ContentPath {
+  contentId    String      @id @db.Uuid
+  path         String      @db.VarChar(2048)
+  pathSegments String[]
+  depth        Int
+  lastUpdated  DateTime    @updatedAt @db.Timestamptz(6)
+  content      ContentNode @relation(fields: [contentId], references: [id], onDelete: Cascade)
+
+  @@index([path])
+  @@index([depth])
+}
+
+model ContentLink {
+  id             String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  sourceId       String      @db.Uuid
+  targetId       String      @db.Uuid
+  linkType       String      @db.VarChar(20)
+  targetFragment String?     @db.VarChar(255)
+  context        String?
+  createdAt      DateTime    @default(now()) @db.Timestamptz(6)
+  source         ContentNode @relation("SourceContent", fields: [sourceId], references: [id], onDelete: Cascade)
+  target         ContentNode @relation("TargetContent", fields: [targetId], references: [id], onDelete: Cascade)
+
+  @@unique([sourceId, targetId, linkType])
+  @@index([targetId])
+}
+
+model ContentTag {
+  id        String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  contentId String      @db.Uuid
+  tagId     String      @db.Uuid
+  createdAt DateTime    @default(now()) @db.Timestamptz(6)
+  positions Json        @default("[]")
+  content   ContentNode @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  tag       Tag         @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@unique([contentId, tagId])
+  @@index([tagId])
+}
+
+model TrashBin {
+  id                String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  contentId         String      @unique @db.Uuid
+  originalPath      String?
+  deletedBy         String      @db.Uuid
+  deletedAt         DateTime    @default(now()) @db.Timestamptz(6)
+  scheduledDeletion DateTime    @db.Timestamptz(6)
+  deletionReason    String?     @db.VarChar(255)
+  contentSnapshot   Json
+  content           ContentNode @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  deletedByUser     User        @relation(fields: [deletedBy], references: [id])
+
+  @@index([deletedBy])
+  @@index([scheduledDeletion])
+  @@index([deletedAt(sort: Desc)])
+}
+
+model StorageProviderConfig {
+  id          String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId      String          @db.Uuid
+  provider    StorageProvider
+  isDefault   Boolean         @default(false)
+  displayName String?         @db.VarChar(100)
+  config      Json
+  isActive    Boolean         @default(true)
+  createdAt   DateTime        @default(now()) @db.Timestamptz(6)
+  updatedAt   DateTime        @updatedAt @db.Timestamptz(6)
+  user        User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, provider])
+  @@index([userId, isDefault])
+}
+
+model User {
+  id              String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  username        String                  @unique @db.VarChar(50)
+  passwordHash    String?                 @db.Char(60)
+  email           String                  @unique @db.VarChar(255)
+  role            UserRole                @default(guest)
+  settings        Json?                   @db.JsonB
+  settingsVersion Int                     @default(1)
+  createdAt       DateTime                @default(now()) @db.Timestamptz(6)
+  updatedAt       DateTime                @updatedAt @db.Timestamptz(6)
+  accounts        Account[]
+  categories      Category[]
+  contentHistory  ContentHistory[]
+  contentNodes    ContentNode[]
+  sessions        Session[]
+  storageConfigs  StorageProviderConfig[]
+  tags            Tag[]
+  trashedContent  TrashBin[]
+  viewGrants      ViewGrant[]
+
+  @@index([email])
+}
+
+model Category {
+  id           String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name         String        @db.VarChar(100)
+  slug         String        @unique @db.VarChar(100)
+  description  String?
+  ownerId      String        @db.Uuid
+  displayOrder Int           @default(0)
+  isPublished  Boolean       @default(false)
+  createdAt    DateTime      @default(now()) @db.Timestamptz(6)
+  updatedAt    DateTime      @updatedAt @db.Timestamptz(6)
+  owner        User          @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  contentNodes ContentNode[]
+
+  @@index([ownerId, displayOrder])
+}
+
+model Tag {
+  id          String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name        String       @db.VarChar(50)
+  slug        String       @db.VarChar(50)
+  createdAt   DateTime     @default(now()) @db.Timestamptz(6)
+  color       String?      @db.VarChar(7)
+  userId      String       @db.Uuid
+  contentTags ContentTag[]
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, slug])
+  @@index([userId, name])
+}
+
+model ViewGrant {
+  id          String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  contentId   String      @db.Uuid
+  userId      String      @db.Uuid
+  accessLevel String      @db.VarChar(20)
+  grantedAt   DateTime    @default(now()) @db.Timestamptz(6)
+  expiresAt   DateTime?   @db.Timestamptz(6)
+  content     ContentNode @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([contentId, userId])
+  @@index([userId])
+}
+
+model Session {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String   @db.Uuid
+  token     String   @unique @db.VarChar(255)
+  expiresAt DateTime @db.Timestamptz(6)
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model Account {
+  id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId            String    @db.Uuid
+  provider          String    @db.VarChar(50)
+  providerAccountId String    @db.VarChar(255)
+  refreshToken      String?
+  accessToken       String?
+  expiresAt         DateTime? @db.Timestamptz(6)
+  createdAt         DateTime  @default(now()) @db.Timestamptz(6)
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@unique([provider, providerAccountId], map: "Account_provider_providerAccId_key")
+  @@index([userId])
+  @@index([provider])
+}
 
 enum UserRole {
   owner
@@ -31,348 +322,4 @@ enum StorageProvider {
   r2
   s3
   vercel
-}
-
-// ============================================================
-// CORE CONTENT MODEL (v2.0)
-// ============================================================
-
-model ContentNode {
-  id            String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  ownerId       String         @db.Uuid
-  title         String         @db.VarChar(255)
-  slug          String         @unique @db.VarChar(255)
-
-  // Hierarchy
-  parentId      String?        @db.Uuid
-  displayOrder  Int            @default(0)
-
-  // Categorization
-  categoryId    String?        @db.Uuid
-
-  // Publication
-  isPublished   Boolean        @default(false)
-  createdAt     DateTime       @default(now()) @db.Timestamptz()
-  updatedAt     DateTime       @updatedAt @db.Timestamptz()
-
-  // Soft delete
-  deletedAt     DateTime?      @db.Timestamptz()
-  deletedBy     String?        @db.Uuid
-
-  // Visual customization
-  customIcon    String?        @db.VarChar(100)
-  iconColor     String?        @db.VarChar(20)
-
-  // Relationships
-  owner         User           @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  parent        ContentNode?   @relation("Hierarchy", fields: [parentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  children      ContentNode[]  @relation("Hierarchy")
-  category      Category?      @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-
-  // Typed payloads (exactly one should exist for leaf nodes, none for folders)
-  notePayload   NotePayload?
-  filePayload   FilePayload?
-  htmlPayload   HtmlPayload?
-  codePayload   CodePayload?
-
-  // Related entities
-  history       ContentHistory[]
-  contentPath   ContentPath?
-  sourceLinks   ContentLink[]    @relation("SourceContent")
-  targetLinks   ContentLink[]    @relation("TargetContent")
-  contentTags   ContentTag[]
-  viewGrants    ViewGrant[]
-  trashBinEntry TrashBin?
-
-  @@index([ownerId, deletedAt])
-  @@index([parentId, displayOrder])
-  @@index([categoryId, displayOrder])
-  @@index([deletedAt])
-}
-
-// ============================================================
-// TYPED PAYLOADS
-// ============================================================
-
-model NotePayload {
-  contentId   String   @id @db.Uuid
-  tiptapJson  Json     @db.JsonB
-  searchText  String   @default("") @db.Text
-  metadata    Json     @default("{}") @db.JsonB
-  createdAt   DateTime @default(now()) @db.Timestamptz()
-  updatedAt   DateTime @updatedAt @db.Timestamptz()
-
-  content     ContentNode @relation(fields: [contentId], references: [id], onDelete: Cascade)
-
-  @@index([searchText(ops: raw("gin_trgm_ops"))], type: Gin)
-}
-
-model FilePayload {
-  contentId         String          @id @db.Uuid
-  fileName          String          @db.VarChar(255)
-  fileExtension     String?         @db.VarChar(10)
-  mimeType          String          @db.VarChar(127)
-  fileSize          BigInt
-  checksum          String          @db.VarChar(64)
-
-  storageProvider   StorageProvider @default(r2)
-  storageKey        String          @db.VarChar(512)
-  storageUrl        String?         @db.Text
-  storageMetadata   Json            @default("{}") @db.JsonB
-
-  uploadStatus      UploadStatus    @default(uploading)
-  uploadedAt        DateTime?       @db.Timestamptz()
-  uploadError       String?         @db.Text
-
-  processingStatus  String          @default("pending") @db.VarChar(20)
-  isProcessed       Boolean         @default(false)
-
-  thumbnailUrl      String?         @db.Text
-  width             Int?
-  height            Int?
-  duration          Int?
-
-  lastAccessedAt    DateTime?       @db.Timestamptz()
-  createdAt         DateTime        @default(now()) @db.Timestamptz()
-  updatedAt         DateTime        @updatedAt @db.Timestamptz()
-
-  content           ContentNode     @relation(fields: [contentId], references: [id], onDelete: Cascade)
-
-  @@index([uploadStatus])
-  @@index([storageProvider, uploadedAt(sort: Desc)])
-  @@index([checksum, fileSize])
-  @@index([mimeType])
-  @@index([processingStatus, isProcessed])
-}
-
-model HtmlPayload {
-  contentId        String   @id @db.Uuid
-  html             String   @db.Text
-  searchText       String   @default("") @db.Text
-  isTemplate       Boolean  @default(false)
-  templateSchema   Json?    @db.JsonB
-  templateMetadata Json     @default("{}") @db.JsonB
-  renderMode       String   @default("static") @db.VarChar(20)
-  templateEngine   String?  @db.VarChar(20)
-  createdAt        DateTime @default(now()) @db.Timestamptz()
-  updatedAt        DateTime @updatedAt @db.Timestamptz()
-
-  content          ContentNode @relation(fields: [contentId], references: [id], onDelete: Cascade)
-
-  @@index([searchText(ops: raw("gin_trgm_ops"))], type: Gin)
-  @@index([isTemplate])
-}
-
-model CodePayload {
-  contentId   String   @id @db.Uuid
-  code        String   @db.Text
-  language    String   @db.VarChar(50)
-  searchText  String   @default("") @db.Text
-  metadata    Json     @default("{}") @db.JsonB
-  createdAt   DateTime @default(now()) @db.Timestamptz()
-  updatedAt   DateTime @updatedAt @db.Timestamptz()
-
-  content     ContentNode @relation(fields: [contentId], references: [id], onDelete: Cascade)
-
-  @@index([searchText(ops: raw("gin_trgm_ops"))], type: Gin)
-  @@index([language])
-}
-
-// ============================================================
-// RELATED ENTITIES (renamed from Document* to Content*)
-// ============================================================
-
-model ContentHistory {
-  id          String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  contentId   String      @db.Uuid
-  version     Int
-  snapshot    Json        @db.JsonB
-  changedBy   String      @db.Uuid
-  changedAt   DateTime    @default(now()) @db.Timestamptz()
-
-  content     ContentNode @relation(fields: [contentId], references: [id], onDelete: Cascade)
-  user        User        @relation(fields: [changedBy], references: [id])
-
-  @@unique([contentId, version])
-  @@index([contentId, version(sort: Desc)])
-}
-
-model ContentPath {
-  contentId         String      @id @db.Uuid
-  path              String      @db.VarChar(2048)
-  pathSegments      String[]
-  depth             Int
-  lastUpdated       DateTime    @updatedAt @db.Timestamptz()
-
-  content           ContentNode @relation(fields: [contentId], references: [id], onDelete: Cascade)
-
-  @@index([path])
-  @@index([depth])
-}
-
-model ContentLink {
-  id              String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  sourceId        String      @db.Uuid
-  targetId        String      @db.Uuid
-  linkType        String      @db.VarChar(20)
-  targetFragment  String?     @db.VarChar(255)
-  context         String?     @db.Text
-  createdAt       DateTime    @default(now()) @db.Timestamptz()
-
-  source          ContentNode @relation("SourceContent", fields: [sourceId], references: [id], onDelete: Cascade)
-  target          ContentNode @relation("TargetContent", fields: [targetId], references: [id], onDelete: Cascade)
-
-  @@unique([sourceId, targetId, linkType])
-  @@index([targetId])
-}
-
-model ContentTag {
-  id          String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  contentId   String      @db.Uuid
-  tagId       String      @db.Uuid
-  createdAt   DateTime    @default(now()) @db.Timestamptz()
-
-  content     ContentNode @relation(fields: [contentId], references: [id], onDelete: Cascade)
-  tag         Tag         @relation(fields: [tagId], references: [id], onDelete: Cascade)
-
-  @@unique([contentId, tagId])
-  @@index([tagId])
-}
-
-// ============================================================
-// TRASH & STORAGE CONFIG
-// ============================================================
-
-model TrashBin {
-  id                  String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  contentId           String      @unique @db.Uuid
-  originalPath        String?     @db.Text
-  deletedBy           String      @db.Uuid
-  deletedAt           DateTime    @default(now()) @db.Timestamptz()
-  scheduledDeletion   DateTime    @db.Timestamptz()
-  deletionReason      String?     @db.VarChar(255)
-  contentSnapshot     Json        @db.JsonB
-
-  content             ContentNode @relation(fields: [contentId], references: [id], onDelete: Cascade)
-  deletedByUser       User        @relation(fields: [deletedBy], references: [id])
-
-  @@index([deletedBy])
-  @@index([scheduledDeletion])
-  @@index([deletedAt(sort: Desc)])
-}
-
-model StorageProviderConfig {
-  id            String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  userId        String          @db.Uuid
-  provider      StorageProvider
-  isDefault     Boolean         @default(false)
-  displayName   String?         @db.VarChar(100)
-  config        Json            @db.JsonB
-  isActive      Boolean         @default(true)
-  createdAt     DateTime        @default(now()) @db.Timestamptz()
-  updatedAt     DateTime        @updatedAt @db.Timestamptz()
-
-  user          User            @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, provider])
-  @@index([userId, isDefault])
-}
-
-// ============================================================
-// EXISTING MODELS (User, Category, Tag, ViewGrant, Session)
-// ============================================================
-
-model User {
-  id                  String                    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  username            String                    @unique @db.VarChar(50)
-  passwordHash        String?                   @db.Char(60)
-  email               String                    @unique @db.VarChar(255)
-  role                UserRole                  @default(guest)
-  createdAt           DateTime                  @default(now()) @db.Timestamptz()
-  updatedAt           DateTime                  @updatedAt @db.Timestamptz()
-
-  // Relationships
-  contentNodes        ContentNode[]
-  contentHistory      ContentHistory[]
-  storageConfigs      StorageProviderConfig[]
-  sessions            Session[]
-  accounts            Account[]
-  categories          Category[]
-  viewGrants          ViewGrant[]
-  trashedContent      TrashBin[]
-
-  @@index([email])
-}
-
-model Category {
-  id            String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  name          String        @db.VarChar(100)
-  slug          String        @unique @db.VarChar(100)
-  description   String?       @db.Text
-  ownerId       String        @db.Uuid
-  displayOrder  Int           @default(0)
-  isPublished   Boolean       @default(false)
-  createdAt     DateTime      @default(now()) @db.Timestamptz()
-  updatedAt     DateTime      @updatedAt @db.Timestamptz()
-
-  owner         User          @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  contentNodes  ContentNode[]
-
-  @@index([ownerId, displayOrder])
-}
-
-model Tag {
-  id            String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  name          String       @unique @db.VarChar(50)
-  slug          String       @unique @db.VarChar(50)
-  createdAt     DateTime     @default(now()) @db.Timestamptz()
-
-  contentTags   ContentTag[]
-
-  @@index([name])
-}
-
-model ViewGrant {
-  id          String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  contentId   String      @db.Uuid
-  userId      String      @db.Uuid
-  accessLevel String      @db.VarChar(20)
-  grantedAt   DateTime    @default(now()) @db.Timestamptz()
-  expiresAt   DateTime?   @db.Timestamptz()
-
-  content     ContentNode @relation(fields: [contentId], references: [id], onDelete: Cascade)
-  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([contentId, userId])
-  @@index([userId])
-}
-
-model Session {
-  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  userId      String    @db.Uuid
-  token       String    @unique @db.VarChar(255)
-  expiresAt   DateTime  @db.Timestamptz()
-  createdAt   DateTime  @default(now()) @db.Timestamptz()
-
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
-  @@index([expiresAt])
-}
-
-model Account {
-  id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  userId             String    @db.Uuid
-  provider           String    @db.VarChar(50)
-  providerAccountId  String    @db.VarChar(255)
-  refreshToken       String?   @db.Text
-  accessToken        String?   @db.Text
-  expiresAt          DateTime? @db.Timestamptz()
-  createdAt          DateTime  @default(now()) @db.Timestamptz()
-
-  user               User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([provider, providerAccountId])
-  @@index([userId])
-  @@index([provider])
 }
