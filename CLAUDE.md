@@ -4,16 +4,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repository Overview
 
-This is a **pnpm monorepo** using **Turbo** for task orchestration. It contains three applications:
+This is a **Next.js 16 application** - Digital Garden Content IDE, an Obsidian-inspired knowledge management system.
 
-- **`apps/web`** - Digital Garden Notes IDE (primary focus, active development)
-- **`apps/web-amino`** - Amino acid learning platform
-- **`apps/open-notes`** - Documentation and research repository
+**Archived Applications** (in `/archive`, not actively developed):
+- `archive/web-amino` - Amino acid learning platform
+- `archive/open-notes` - Documentation and research repository
 
 **Configuration Files:**
-- `pnpm-workspace.yaml` - Workspace package definitions (`apps/*`, `packages/*`)
-- `turbo.json` - Task orchestration and caching configuration
-- `tsconfig.base.json` - Shared TypeScript configuration
+- `package.json` - Dependencies and scripts
+- `tsconfig.json` - TypeScript configuration
+- `next.config.ts` - Next.js configuration
+- `prisma/schema.prisma` - Database schema
 
 ## Environment Setup
 
@@ -25,55 +26,25 @@ This is a **pnpm monorepo** using **Turbo** for task orchestration. It contains 
 
 **First-Time Setup:**
 ```bash
-# 1. Install dependencies (from root)
+# 1. Install dependencies
 pnpm install
 
-# 2. Navigate to web app
-cd apps/web
+# 2. Set up environment variables
+cp .env.example .env.local  # Copy and edit with your database URL
 
-# 3. Set up environment variables
-cp .env.local .env.local  # Copy and edit with your database URL
-
-# 4. Generate Prisma client
+# 3. Generate Prisma client
 npx prisma generate
 
-# 5. Run migrations and seed database
+# 4. Run migrations and seed database
 npx prisma migrate reset --force  # Development only!
 
-# 6. Start development server
+# 5. Start development server
 pnpm dev
 ```
 
 ## Development Commands
 
-### Root Level (Turbo)
-
 ```bash
-# Default target is web-amino (set in root package.json)
-pnpm dev          # Run development server
-pnpm build        # Build application
-pnpm typecheck    # Run TypeScript type checking
-pnpm lint         # Run ESLint
-
-# Target specific apps with --filter flag
-turbo run dev --filter=web        # Run Notes IDE only
-turbo run build --filter=web      # Build Notes IDE only
-```
-
-**Important:** Root-level scripts default to `web-amino`. To work on the Notes IDE (`apps/web`), either:
-1. Use `--filter=web` flag with turbo commands
-2. Navigate to `cd apps/web` and run commands directly
-
-**Build Tool Differences:**
-- `apps/web` - Uses **turbopack** (Next.js 16 default, faster dev builds)
-- `apps/web-amino` - Uses **webpack** (`--webpack` flag, for compatibility)
-
-### Notes IDE (apps/web)
-
-```bash
-# Navigate to the web app
-cd apps/web
-
 # Development
 pnpm dev          # Start Next.js dev server (http://localhost:3000)
 pnpm build        # Generate Prisma client + design tokens + build Next.js
@@ -95,11 +66,11 @@ pnpm build:tokens # Generate CSS variables from design tokens (style-dictionary)
 2. `pnpm build:tokens` - Generates CSS variables in `app/globals.css`
 3. `next build` - Builds the Next.js application
 
-## Notes IDE Architecture (apps/web)
+## Content IDE Architecture
 
-The Notes IDE is an Obsidian-inspired knowledge management system with a panel-based layout, file tree navigation, rich text editing, and multi-cloud storage support.
+The Content IDE is an Obsidian-inspired knowledge management system with a panel-based layout, file tree navigation, rich text editing, and multi-cloud storage support.
 
-**Current Status:** See [IMPLEMENTATION-STATUS.md](apps/web/docs/notes-feature/IMPLEMENTATION-STATUS.md) for detailed progress.
+**Current Status:** See [IMPLEMENTATION-STATUS.md](docs/notes-feature/IMPLEMENTATION-STATUS.md) for detailed progress.
 - ✅ M1-M6: Database, API, UI foundation, file tree, editor, search, tags (complete)
 - 🚀 M7: File management & media (active)
 
@@ -121,7 +92,7 @@ A single `ContentNode` table acts as a universal container for all content types
 - Category grouping and publication status
 - Full-text search via `searchText` field
 
-**Schema Location:** `apps/web/prisma/schema.prisma`
+**Schema Location:** `prisma/schema.prisma`
 
 ### Storage Architecture: Multi-Cloud Provider System
 
@@ -174,38 +145,38 @@ bucket/
 
 ### API Architecture (14+ Endpoints)
 
-All endpoints are in `apps/web/app/api/notes/`:
+All endpoints are in `app/api/content/`:
 
 **Content CRUD:**
 ```
-GET/POST     /api/notes/content              # List/create content
-GET/PATCH/DELETE /api/notes/content/[id]     # Individual content operations
-GET          /api/notes/content/tree         # Hierarchical tree structure
-POST         /api/notes/content/move         # Drag-and-drop reordering
+GET/POST     /api/content/content              # List/create content
+GET/PATCH/DELETE /api/content/content/[id]     # Individual content operations
+GET          /api/content/content/tree         # Hierarchical tree structure
+POST         /api/content/content/move         # Drag-and-drop reordering
 ```
 
 **Two-Phase File Upload:**
 ```
-POST /api/notes/content/upload/initiate      # Get presigned URL
-POST /api/notes/content/upload/finalize      # Confirm upload completion
+POST /api/content/content/upload/initiate      # Get presigned URL
+POST /api/content/content/upload/finalize      # Confirm upload completion
 ```
 
 **Storage Configuration:**
 ```
-GET/POST     /api/notes/storage              # List/create storage configs
-GET/PATCH/DELETE /api/notes/storage/[id]     # Individual config operations
+GET/POST     /api/content/storage              # List/create storage configs
+GET/PATCH/DELETE /api/content/storage/[id]     # Individual config operations
 ```
 
 **Search, Backlinks & Tags:**
 ```
-GET /api/notes/search                        # Full-text search with filters
-GET /api/notes/backlinks                     # Get backlinks for a note
-GET /api/notes/tags                          # List all tags with usage counts
-GET /api/notes/tags/content/[id]             # Get tags for specific content
-POST /api/notes/tags                         # Create new tag
+GET /api/content/search                        # Full-text search with filters
+GET /api/content/backlinks                     # Get backlinks for a note
+GET /api/content/tags                          # List all tags with usage counts
+GET /api/content/tags/content/[id]             # Get tags for specific content
+POST /api/content/tags                         # Create new tag
 ```
 
-**Type Definitions:** `apps/web/lib/content/api-types.ts`
+**Type Definitions:** `lib/content/api-types.ts`
 
 ### UI Architecture: Server/Client Split
 
@@ -244,7 +215,7 @@ export function Panel() {
 
 ### Design System: Liquid Glass
 
-**Location:** `apps/web/lib/design-system/`
+**Location:** `lib/design-system/`
 
 **Three Token Categories:**
 - **`surfaces.ts`** - Glass-0/1/2 blur levels for glassmorphism effects
@@ -269,13 +240,13 @@ const glass0 = getSurfaceStyles("glass-0");
 ```
 
 **Strategy:**
-- `/notes/**` routes: Glass-UI + DiceUI (shadcn-compatible registries)
+- `/content/**` routes: Glass-UI + DiceUI (shadcn-compatible registries)
 - Rest of app: shadcn/ui with matching tokens
 - Both share same surface/intent/motion token system
 
 ### State Management
 
-**Zustand Stores:** All in `apps/web/stores/`
+**Zustand Stores:** All in `stores/`
 
 **Panel State** (`panel-store.ts`):
 - Panel widths (left: 200px, right: 300px defaults)
@@ -329,8 +300,8 @@ glob "**/*Header*.tsx"
 glob "**/*Panel*.tsx"
 
 # Search for existing patterns
-grep -r "useState.*Tab" apps/web/components
-grep -r "lucide-react" apps/web/components/notes/headers
+grep -r "useState.*Tab" components
+grep -r "lucide-react" components/content/headers
 ```
 
 **Component Architecture Pattern (Both Sidebars):**
@@ -353,14 +324,14 @@ Sidebar Wrapper (Client Component)
 - Prevents duplicate implementations
 - Clear data flow
 
-**See:** `apps/web/docs/notes-feature/ARCHITECTURE-RIGHT-SIDEBAR-REFACTOR.md`
+**See:** `docs/notes-feature/ARCHITECTURE-RIGHT-SIDEBAR-REFACTOR.md`
 
 ### Type-Safe API Calls
 
 ```tsx
 import type { ContentTreeItem } from "@/lib/content/api-types";
 
-const response = await fetch("/api/notes/content/tree");
+const response = await fetch("/api/content/content/tree");
 if (!response.ok) {
   throw new Error(`API error: ${response.status}`);
 }
@@ -376,18 +347,18 @@ const tree: ContentTreeItem[] = await response.json();
 ### Database Workflows
 
 **🚨 BEFORE ANY DATABASE CHANGE:**
-- [DATABASE-CHANGE-CHECKLIST.md](apps/web/docs/notes-feature/DATABASE-CHANGE-CHECKLIST.md) - **MANDATORY checklist for all schema changes** 👈 **USE THIS!**
+- [DATABASE-CHANGE-CHECKLIST.md](docs/notes-feature/DATABASE-CHANGE-CHECKLIST.md) - **MANDATORY checklist for all schema changes** 👈 **USE THIS!**
 
 **📘 Complete Guides:**
-- [PRISMA-DATABASE-GUIDE.md](apps/web/docs/notes-feature/PRISMA-DATABASE-GUIDE.md) - Comprehensive database management reference
-- [PRISMA-MIGRATION-GUIDE.md](apps/web/docs/notes-feature/PRISMA-MIGRATION-GUIDE.md) - Migration drift resolution & workflows
+- [PRISMA-DATABASE-GUIDE.md](docs/notes-feature/PRISMA-DATABASE-GUIDE.md) - Comprehensive database management reference
+- [PRISMA-MIGRATION-GUIDE.md](docs/notes-feature/PRISMA-MIGRATION-GUIDE.md) - Migration drift resolution & workflows
 
 **Quick Reference - Making Schema Changes (RECOMMENDED):**
 
 **Development Workflow (Use This!):**
 ```bash
-cd apps/web
-# 1. Edit apps/web/prisma/schema.prisma
+# From repository root
+# 1. Edit prisma/schema.prisma
 # 2. Push changes directly (no migration file, no data loss)
 npx prisma db push
 # 3. Regenerate client
@@ -396,7 +367,7 @@ npx prisma generate
 
 **Production Workflow (When Ready for Prod):**
 ```bash
-cd apps/web
+# From repository root
 # 1. Create migration file
 npx prisma migrate dev --name descriptive_migration_name --create-only
 # 2. Review SQL in prisma/migrations/
@@ -414,7 +385,7 @@ npx prisma migrate deploy
 
 **Seeding Database:**
 ```bash
-cd apps/web
+# From repository root
 pnpm db:seed  # Creates test ContentNode hierarchy with all payload types
 ```
 
@@ -434,7 +405,7 @@ npx prisma studio  # Open database GUI to debug
 
 ### Design Token Changes
 
-1. Modify token files in `apps/web/lib/design-system/`
+1. Modify token files in `lib/design-system/`
 2. Run `pnpm build:tokens` to regenerate CSS variables
 3. Restart dev server to see changes
 
@@ -449,7 +420,7 @@ npx prisma studio  # Open database GUI to debug
 
 ### Zustand Store Patterns
 
-**Location:** All stores in `apps/web/stores/`
+**Location:** All stores in `stores/`
 
 **Standard Pattern:**
 ```tsx
@@ -486,7 +457,7 @@ export const useMyStore = create<MyStore>()(
 
 ### TipTap Editor Extensions
 
-**Location:** `apps/web/lib/editor/`
+**Location:** `lib/editor/`
 
 **Core Extensions** (`extensions.ts`):
 - `getEditorExtensions()` - Full client-side extensions (includes React components)
@@ -540,7 +511,7 @@ const editor = useEditor({
 
 **Database:**
 - PostgreSQL with Prisma 7.2.0
-- Client output: `apps/web/lib/generated/prisma`
+- Client output: `lib/generated/prisma`
 
 **UI & State:**
 - Tailwind CSS 4.1.16 with custom design tokens
@@ -562,7 +533,7 @@ const editor = useEditor({
 
 ## Documentation
 
-**Start Here:** `apps/web/docs/notes-feature/00-index.md` - Master documentation index
+**Start Here:** `docs/notes-feature/00-index.md` - Master documentation index
 
 **Critical Architecture:**
 - `IMPLEMENTATION-STATUS.md` - Current progress and milestone tracking
@@ -590,33 +561,34 @@ const editor = useEditor({
 ## Critical Files Reference
 
 **Quick Navigation:**
-- **Docs:** `apps/web/docs/notes-feature/` - Start with 00-index.md
-- **Database:** `apps/web/prisma/schema.prisma` - ContentNode v2.0 schema
-- **API Routes:** `apps/web/app/api/notes/` - 14+ REST endpoints
-- **Components:** `apps/web/components/notes/` - UI components (tree, editor, panels)
-- **State Stores:** `apps/web/stores/` - Zustand stores (6 stores)
-- **Design System:** `apps/web/lib/design-system/` - Liquid Glass tokens
-- **Editor Extensions:** `apps/web/lib/editor/` - TipTap custom extensions
-- **Type Definitions:** `apps/web/lib/content/api-types.ts` - API interfaces
+- **Docs:** `docs/notes-feature/` - Start with 00-index.md
+- **Database:** `prisma/schema.prisma` - ContentNode v2.0 schema
+- **API Routes:** `app/api/content/` - 14+ REST endpoints
+- **Components:** `components/content/` - UI components (tree, editor, panels)
+- **State Stores:** `stores/` - Zustand stores (8+ stores)
+- **Design System:** `lib/design-system/` - Liquid Glass tokens
+- **Editor Extensions:** `lib/editor/` - TipTap custom extensions
+- **Type Definitions:** `lib/content/api-types.ts` - API interfaces
 
 **Key Directories:**
 ```
-apps/web/
+Digital-Garden/
 ├── docs/notes-feature/          # All documentation (start here)
-├── app/api/notes/               # API routes
-├── app/(authenticated)/notes/   # Notes UI routes
-├── components/notes/            # UI components
+├── app/api/content/             # API routes
+├── app/(authenticated)/content/ # Content UI routes
+├── components/content/          # UI components
 ├── lib/content/                 # Content utilities
 ├── lib/design-system/           # Design tokens
 ├── lib/editor/                  # TipTap extensions
 ├── stores/                      # State management
-└── prisma/                      # Database schema + seed
+├── prisma/                      # Database schema + seed
+└── archive/                     # Archived apps (not in build)
 ```
 
 ## Development Workflow
 
 **Before Implementing:**
-1. Check `apps/web/docs/notes-feature/IMPLEMENTATION-STATUS.md` for current milestone status
+1. Check `docs/notes-feature/IMPLEMENTATION-STATUS.md` for current milestone status
 2. Read relevant milestone documentation (e.g., `M4-FILE-TREE-IMPLEMENTATION.md`)
 3. Review architecture docs (`01-architecture.md`, `03-database-design.md`)
 4. Understand the ContentNode v2.0 polymorph pattern
