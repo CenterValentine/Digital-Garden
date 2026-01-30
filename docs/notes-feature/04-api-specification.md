@@ -1,8 +1,8 @@
 # API Specification v2.0
 
-**Version:** 2.0  
-**Last Updated:** January 12, 2026  
-**Schema Alignment:** ContentNode + Typed Payloads (Database Design v2.0)
+**Version:** 2.0
+**Last Updated:** January 28, 2026
+**Schema Alignment:** ContentNode + Typed Payloads (Database Design v2.0 + Phase 2)
 
 ## Overview
 
@@ -14,19 +14,35 @@ This API provides access to the Content Management system built on ContentNode +
 
 **Typed Payloads (1:1 with ContentNode):**
 
+**Phase 1 Payloads:**
 - `NotePayload` - Rich text notes (TipTap JSON)
 - `FilePayload` - Binary files (images, PDFs, videos, etc.) with upload state machine
 - `HtmlPayload` - HTML pages and templates
 - `CodePayload` - Source code files
 
-**Content Type (Derived):** Type is determined by which payload exists:
+**Phase 2 Payloads:**
+- `FolderPayload` - Folder view settings (view mode, sort order, preferences)
+- `ExternalPayload` - External URL bookmarks with Open Graph preview
+- `ChatPayload` - Chat conversations (stub)
+- `VisualizationPayload` - Charts and graphs (stub)
+- `DataPayload` - Data tables (stub)
+- `HopePayload` - Goals and aspirations (stub)
+- `WorkflowPayload` - Automation workflows (stub, inert)
 
-- `folder` - Has children (no payload)
+**Content Type (Explicit):** Type is stored in `ContentNode.contentType` field:
+
+- `folder` - Has `FolderPayload` for view settings
 - `note` - Has `NotePayload`
 - `file` - Has `FilePayload`
 - `html` - Has `HtmlPayload` (isTemplate=false)
 - `template` - Has `HtmlPayload` (isTemplate=true)
 - `code` - Has `CodePayload`
+- `external` - Has `ExternalPayload` (Phase 2)
+- `chat` - Has `ChatPayload` (Phase 2, stub)
+- `visualization` - Has `VisualizationPayload` (Phase 2, stub)
+- `data` - Has `DataPayload` (Phase 2, stub)
+- `hope` - Has `HopePayload` (Phase 2, stub)
+- `workflow` - Has `WorkflowPayload` (Phase 2, stub)
 
 **Markdown File Handling:**
 
@@ -772,6 +788,156 @@ Content-Length: {fileSize}
 - Checks `uploadStatus === 'ready'`
 - Generates short-lived presigned URL for storage
 - Redirects or proxies binary data
+
+## Folder View API
+
+**Phase 2:** Folder-specific view mode management for customizing folder display.
+
+### GET /api/content/folder/[id]/view
+
+Get folder view settings (view mode, sort order, preferences).
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "viewMode": "list",
+    "sortMode": null,
+    "viewPrefs": {},
+    "includeReferencedContent": false
+  }
+}
+```
+
+**Field Descriptions:**
+
+- `viewMode`: One of `list`, `gallery`, `kanban`, `dashboard`, `canvas`
+- `sortMode`: `null` (manual/tree order), `"asc"` (A-Z), or `"desc"` (Z-A)
+- `viewPrefs`: View-specific settings (e.g., grid size, tile layout)
+- `includeReferencedContent`: Show/hide referenced content in this folder
+
+**Error Responses:**
+
+```json
+// Not a folder
+{
+  "success": false,
+  "error": {
+    "code": "INVALID_TYPE",
+    "message": "Content is not a folder"
+  }
+}
+
+// Forbidden
+{
+  "success": false,
+  "error": {
+    "code": "FORBIDDEN",
+    "message": "Access denied"
+  }
+}
+```
+
+### PATCH /api/content/folder/[id]/view
+
+Update folder view mode and settings.
+
+**Request Body:**
+
+```json
+{
+  "viewMode": "gallery",
+  "sortMode": "asc",
+  "viewPrefs": {
+    "gridSize": "medium"
+  },
+  "includeReferencedContent": true
+}
+```
+
+**Validation:**
+
+- `viewMode`: Must be one of: `list`, `gallery`, `kanban`, `dashboard`, `canvas`
+- `sortMode`: Must be one of: `null`, `"asc"`, `"desc"`
+- `viewPrefs`: JSON object (view-specific settings)
+- `includeReferencedContent`: Boolean
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "viewMode": "gallery",
+    "sortMode": "asc",
+    "viewPrefs": {
+      "gridSize": "medium"
+    },
+    "includeReferencedContent": true
+  }
+}
+```
+
+**Error Responses:**
+
+```json
+// Invalid view mode
+{
+  "success": false,
+  "error": {
+    "code": "INVALID_VIEW_MODE",
+    "message": "Invalid view mode. Must be one of: list, gallery, kanban, dashboard, canvas"
+  }
+}
+
+// Invalid sort mode
+{
+  "success": false,
+  "error": {
+    "code": "INVALID_SORT_MODE",
+    "message": "Invalid sort mode. Must be one of: null, asc, desc"
+  }
+}
+```
+
+**Implementation Notes:**
+
+- Upserts `FolderPayload` record (creates if doesn't exist)
+- Only updates provided fields (partial updates)
+- Automatically sets `updatedAt` timestamp
+- View mode persists across page reloads
+
+**Database Schema:**
+
+```prisma
+model FolderPayload {
+  contentId                 String         @id @db.Uuid
+  viewMode                  FolderViewMode @default(list)
+  sortMode                  String?        @db.VarChar(20)
+  viewPrefs                 Json           @default("{}")
+  includeReferencedContent  Boolean        @default(false)
+  createdAt                 DateTime       @default(now())
+  updatedAt                 DateTime       @updatedAt
+
+  content ContentNode @relation(...)
+}
+
+enum FolderViewMode {
+  list       // Default list view
+  gallery    // Media-focused grid
+  kanban     // Drag-drop cards
+  dashboard  // Rearrangeable tiles
+  canvas     // Visual graph
+}
+```
+
+**UI Integration:**
+
+1. **Toggle Buttons:** Click view mode icon in folder header → instant update + persist
+2. **Context Menu:** Right-click folder → "Set View" → select mode → persist
+3. **Optimistic UI:** Local state updates immediately, reverts on error
 
 ## Tree Navigation API
 

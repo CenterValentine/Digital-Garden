@@ -80,11 +80,10 @@ export async function POST(request: NextRequest) {
     if (targetParentId !== null && targetParentId !== undefined) {
       const targetParent = await prisma.contentNode.findUnique({
         where: { id: targetParentId },
-        include: {
-          notePayload: true,
-          filePayload: true,
-          htmlPayload: true,
-          codePayload: true,
+        select: {
+          id: true,
+          ownerId: true,
+          contentType: true,
         },
       });
 
@@ -114,14 +113,8 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // Validate target is a folder (has no payload)
-      const hasPayload =
-        targetParent.notePayload ||
-        targetParent.filePayload ||
-        targetParent.htmlPayload ||
-        targetParent.codePayload;
-
-      if (hasPayload) {
+      // Validate target is a folder (check contentType discriminant)
+      if (targetParent.contentType !== "folder") {
         return NextResponse.json(
           {
             success: false,
@@ -291,11 +284,11 @@ async function moveContentToPosition(
       parentId,
       deletedAt: null  // CRITICAL: Exclude soft-deleted items
     },
-    include: {
-      notePayload: true,
-      filePayload: true,
-      htmlPayload: true,
-      codePayload: true,
+    select: {
+      id: true,
+      title: true,
+      displayOrder: true,
+      contentType: true,
     },
   });
 
@@ -324,11 +317,11 @@ async function moveContentToPosition(
   if (!movedItem) {
     movedItem = await prisma.contentNode.findUnique({
       where: { id: contentId },
-      include: {
-        notePayload: true,
-        filePayload: true,
-        htmlPayload: true,
-        codePayload: true,
+      select: {
+        id: true,
+        title: true,
+        displayOrder: true,
+        contentType: true,
       },
     });
     if (!movedItem) {

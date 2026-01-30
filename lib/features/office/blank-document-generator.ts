@@ -90,21 +90,23 @@ export function generateBlankXlsx(fileName?: string): Buffer {
 }
 
 /**
- * Create blank office document based on file extension
+ * Create blank office document based on file type
  *
- * @param fileName - File name with extension (.docx or .xlsx)
+ * @param fileType - The type of file to generate ("docx" or "xlsx")
+ * @param fileName - Optional file name (without extension required)
  * @returns Buffer containing the generated file
- * @throws Error if file extension is not supported
+ * @throws Error if file type is not supported
  */
-export async function createBlankOfficeDocument(fileName: string): Promise<Buffer> {
-  const extension = fileName.split(".").pop()?.toLowerCase();
-
-  switch (extension) {
+export async function createBlankOfficeDocument(
+  fileType: "docx" | "xlsx",
+  fileName?: string
+): Promise<Buffer> {
+  switch (fileType) {
     case "docx":
       return await generateBlankDocx(fileName);
     case "xlsx":
       return generateBlankXlsx(fileName);
     default:
-      throw new Error(`Unsupported file type: ${extension}. Supported types: .docx, .xlsx`);
+      throw new Error(`Unsupported file type: ${fileType}. Supported types: docx, xlsx`);
   }
 }

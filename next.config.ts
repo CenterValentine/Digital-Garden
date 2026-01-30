@@ -29,6 +29,33 @@ const nextConfig: NextConfig = {
     }
     return config;
   },
+  // Security headers for visualization iframes
+  async headers() {
+    return [
+      {
+        // Apply CSP to visualization routes
+        source: "/content/visualization/:path*",
+        headers: [
+          {
+            key: "Content-Security-Policy",
+            value: [
+              "default-src 'self'",
+              // Allow diagrams.net iframe
+              "frame-src https://embed.diagrams.net https://*.diagrams.net",
+              // Allow inline scripts for React and Next.js
+              "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+              // Allow inline styles for Tailwind CSS
+              "style-src 'self' 'unsafe-inline'",
+              // Allow images from diagrams.net CDN
+              "img-src 'self' data: https: blob:",
+              // Allow connections to API
+              "connect-src 'self'",
+            ].join("; "),
+          },
+        ],
+      },
+    ];
+  },
   // Empty turbopack config for local dev (uses Turbopack by default)
   turbopack: {},
 };

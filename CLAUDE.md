@@ -71,8 +71,14 @@ pnpm build:tokens # Generate CSS variables from design tokens (style-dictionary)
 The Content IDE is an Obsidian-inspired knowledge management system with a panel-based layout, file tree navigation, rich text editing, and multi-cloud storage support.
 
 **Current Status:** See [IMPLEMENTATION-STATUS.md](docs/notes-feature/IMPLEMENTATION-STATUS.md) for detailed progress.
-- ✅ M1-M6: Database, API, UI foundation, file tree, editor, search, tags (complete)
-- 🚀 M7: File management & media (active)
+- ✅ M1-M8: Database, API, UI foundation, file tree, editor, search, tags, file management & media, export & backup (complete)
+- 🚀 M9: Type System Refactor + New Content Types (active - 40% Phase 2)
+  - ✅ Phase 1: ContentType discriminant refactor (complete)
+  - ✅ Phase 2: ExternalPayload with Open Graph preview (complete)
+  - ✅ Menu consolidation: Shared "New" menu configuration (complete)
+  - ✅ ContentRole: Per-folder referenced content toggle (complete)
+  - ⏳ Remaining: FolderPayload (5 views), 5 stub payloads (~3 weeks)
+- 📋 M10-M15: Advanced features (pending)
 
 ### Database: ContentNode v2.0 (Hybrid Type-Safe Polymorphism)
 
@@ -84,6 +90,7 @@ A single `ContentNode` table acts as a universal container for all content types
 - `FilePayload` - Binary files with storage metadata (images, PDFs, etc.)
 - `HtmlPayload` - Rendered HTML content
 - `CodePayload` - Code snippets with syntax highlighting
+- `ExternalPayload` - External URL bookmarks with Open Graph preview (Phase 2)
 
 **Key Features:**
 - Hierarchical structure via `parentId` with `displayOrder` for ordering
@@ -121,6 +128,111 @@ bucket/
 
 **Configuration:** `StorageProviderConfig` model splits metadata (bucket, region) from encrypted credentials (access keys)
 
+### Export & Backup System
+
+**Location:** `lib/domain/export/`
+
+**Core Pattern:** TipTap-to-multi-format converter with metadata preservation via sidecar files.
+
+**Supported Formats:**
+- **Markdown** - Obsidian-compatible with wiki-links `[[Note]]`, callouts `> [!type]`, YAML frontmatter
+- **HTML** - Standalone with embedded CSS, light/dark themes, syntax highlighting
+- **JSON** - Lossless TipTap export for re-import (no data loss)
+- **Plain Text** - Simple text extraction for search indexing
+- **PDF/DOCX** - Stub implementations ready for integration
+
+**Metadata Sidecar System:**
+- Preserves semantic information lost in format conversion
+- Stores: content ID, tags with colors, wiki-links with target IDs, callout types, timestamps
+- Format: `.meta.json` files alongside exports
+- Enables accurate re-import with full context restoration
+
+**Bulk Export Features:**
+- Export entire vault or filtered subset as ZIP archive
+- Preserves folder hierarchy
+- Auto-generated README in exports
+- Configurable file naming (slug/title/ID)
+- Batch processing for performance
+
+**Key Files:**
+- `lib/domain/export/converters/` - Format-specific converters
+- `lib/domain/export/metadata.ts` - Metadata sidecar generation
+- `lib/domain/export/bulk-export.ts` - ZIP archive creation
+
+**Documentation:** `EXPORT-SYSTEM-IMPLEMENTATION.md`, `EXPORT-BACKUP-ARCHITECTURE.md`, `EXPORT-MARKDOWN-SOLUTION.md`
+
+### External Link/Bookmark System (Phase 2)
+
+**Location:** `lib/domain/content/`, `components/content/external/`
+
+**Core Pattern:** Bookmark external URLs with optional Open Graph metadata preview, similar to iMessage/WhatsApp/Slack link previews.
+
+**Key Features:**
+- **ExternalPayload** - Stores URL, subtype (website/application), and cached preview metadata
+- **Open Graph Fetcher** - Fetches `og:title`, `og:description`, `og:image`, `og:site_name` from external sites
+- **Security Controls** - HTTPS-only by default, domain allowlist, "Allow All Domains" override, SSL error handling
+- **Smart URL Handling** - Auto-prepends `https://`, allows www redirects (example.com ↔ www.example.com)
+- **Preview States** - Full preview (image + metadata), partial preview (metadata only with placeholder), error state
+- **Settings Integration** - User-configurable allowlist, preview toggle, HTTP allowance (dev only)
+
+**Open Graph Fetcher (`lib/domain/content/open-graph-fetcher.ts`):**
+- Fetches HTML from external URLs with timeout (5s) and size limits (256KB)
+- Parses `<meta property="og:*">` tags via regex
+- Falls back to standard `<meta name="title">` and `<title>` tags
+- Blocks cross-domain redirects (except www variants)
+- Handles SSL certificate errors with helpful dev-mode bypass instructions
+- Returns `null` on failure (no metadata, timeout, network error)
+
+**Security & Validation:**
+- `validateExternalUrl()` - HTTPS-only enforcement (bypass via `allowHttp` setting)
+- `isHostnameAllowed()` - Wildcard domain matching (`*.github.io`, `google.com`)
+- Default allowlist: 50+ popular domains (Google, GitHub, social media, dev resources, news)
+- `allowAllDomains` override for power users (bypasses allowlist entirely)
+
+**UI Components:**
+- **ExternalLinkDialog** - Create/edit external links with name and URL fields
+- **ExternalLinkViewer** - Display preview card with OG metadata, URL card, action buttons
+- **ExternalViewer** - Wrapper for MainPanelContent integration
+- **Placeholder Image** - Gradient background with subtle pattern when no OG image available
+
+**API Endpoint:**
+```
+POST /api/content/external/preview       # Fetch Open Graph metadata
+  - Validates user settings (previewsEnabled, allowlist)
+  - Fetches OG data with security checks
+  - Returns cached metadata or error
+```
+
+**Context Menu Integration:**
+- "New → External → Website" creates external link
+- "New → External → Application" creates external link with subtype
+- Edit external link via inline rename (triggers dialog, not text edit)
+
+**Settings Schema (`lib/features/settings/validation.ts`):**
+```typescript
+external: {
+  previewsEnabled: boolean          // Master toggle (default: false)
+  allowAllDomains: boolean          // Bypass allowlist (default: false)
+  allowlistedHosts: string[]        // Wildcard-supported domains
+  allowHttp: boolean                // Allow HTTP URLs (default: false, dev only)
+}
+```
+
+**Key Implementation Details:**
+- Double-click prevention with `useRef` for save button (prevents duplicate toasts)
+- Deep merge strategy for partial settings updates
+- URL change detection with `useEffect` to refresh preview on edit
+- Event-driven architecture: `content-updated` event dispatches preview refetch
+- SSL bypass: `NODE_TLS_REJECT_UNAUTHORIZED=0` in `.env.local` for dev (NEVER in production)
+
+**Known Limitations:**
+- No iframe embedding (security risk, performance concern)
+- No link mutation/workflow integration (simple bookmark only)
+- Some sites don't provide OG metadata (shows placeholder)
+- SSL certificate errors require dev-mode bypass (some sites have misconfigured certs)
+
+**Documentation:** See plan file at `~/.claude/plans/declarative-seeking-ocean.md` for Phase 2 implementation details
+
 ### Authentication System
 
 **Provider:** Custom OAuth implementation with Google Sign-In
@@ -144,7 +256,7 @@ bucket/
 
 **Note:** Google Drive integration planned but not yet implemented (see M7+ roadmap)
 
-### API Architecture (14+ Endpoints)
+### API Architecture (20+ Endpoints)
 
 All endpoints are in `app/api/content/`:
 
@@ -171,10 +283,24 @@ GET/PATCH/DELETE /api/content/storage/[id]     # Individual config operations
 **Search, Backlinks & Tags:**
 ```
 GET /api/content/search                        # Full-text search with filters
-GET /api/content/backlinks                     # Get backlinks for a note
+GET /api/content/backlinks?contentId={id}      # Get backlinks for a note
 GET /api/content/tags                          # List all tags with usage counts
 GET /api/content/tags/content/[id]             # Get tags for specific content
 POST /api/content/tags                         # Create new tag
+```
+
+**Export & Backup:**
+```
+POST /api/content/export/[id]                  # Single document export (markdown/HTML/JSON/text)
+POST /api/content/export/vault                 # Bulk vault export as ZIP
+GET  /api/content/export/health                # Export system health check
+```
+
+**External Links (Phase 2):**
+```
+POST /api/content/external/preview             # Fetch Open Graph metadata for URL
+  - Security: HTTPS-only, domain allowlist, timeout/size limits
+  - Returns: { success, data: { url, metadata, fetchedAt } }
 ```
 
 **Type Definitions:** `lib/domain/content/api-types.ts`
@@ -298,6 +424,28 @@ const glass0 = getSurfaceStyles("glass-0");
 - Hierarchical heading structure extracted from TipTap JSON
 - Active heading tracking
 - Click-to-scroll support
+
+**Search State** (`search-store.ts`):
+- Search query and filters
+- Search results caching
+- Filter state (tags, content type, date range)
+- Recent searches tracking
+
+**Settings State** (`settings-store.ts`):
+- User preferences
+- Storage provider configuration
+- Export settings
+- Editor preferences
+
+**Upload Settings** (`upload-settings-store.ts`):
+- Upload preferences (folder destination, naming)
+- Default file type handling
+- Auto-upload behavior
+
+**Left Panel State** (`left-panel-view-store.ts`, `left-panel-collapse-store.ts`):
+- Active view (tree/search/tags)
+- Collapse/expand state per section
+- View history and navigation
 
 **Pattern:**
 ```tsx
@@ -487,7 +635,7 @@ npx prisma studio  # Open database GUI to debug
 
 ### Zustand Store Patterns
 
-**Location:** All stores in `stores/`
+**Location:** All stores in `state/`
 
 **Standard Pattern:**
 ```tsx
@@ -606,9 +754,12 @@ const editor = useEditor({
 - `IMPLEMENTATION-STATUS.md` - Current progress and milestone tracking
 - `01-architecture.md` - System architecture overview
 - `03-database-design.md` - Complete Prisma v2.0 schema
-- `04-api-specification.md` - All 14+ REST endpoints
+- `04-api-specification.md` - All 20+ REST endpoints
 - `LIQUID-GLASS-DESIGN-SYSTEM.md` - Design system strategy
 - `ARCHITECTURE-RIGHT-SIDEBAR-REFACTOR.md` - Component architecture patterns
+- `EXPORT-SYSTEM-IMPLEMENTATION.md` - Multi-format export architecture
+- `EXPORT-BACKUP-ARCHITECTURE.md` - Backup strategy and metadata sidecars
+- `EXPORT-MARKDOWN-SOLUTION.md` - Markdown conversion specifics
 
 **Implementation Guides:**
 - `M1-FOUNDATION-README.md` - Database & utilities setup
@@ -622,19 +773,24 @@ const editor = useEditor({
 - `M7-DRAG-DROP-UPLOAD.md` - File upload with drag-and-drop
 - `M7-MEDIA-VIEWERS-IMPLEMENTATION.md` - Image/video/audio viewers
 - `M7-OFFICE-DOCUMENTS-IMPLEMENTATION.md` - PDF, Word, Excel support
+- `EXPORT-SYSTEM-IMPLEMENTATION.md` - Multi-format export & backup (M8)
+- `EXPORT-MARKDOWN-SOLUTION.md` - Obsidian-compatible markdown export
+- `EXPORT-BACKUP-ARCHITECTURE.md` - Metadata sidecar system
 
-**Additional docs:** See `00-index.md` for complete catalog of 30+ documents.
+**Additional docs:** See `00-index.md` for complete catalog of 90+ documents.
 
 ## Critical Files Reference
 
 **Quick Navigation:**
 - **Docs:** `docs/notes-feature/` - Start with 00-index.md
 - **Database:** `prisma/schema.prisma` - ContentNode v2.0 schema
-- **API Routes:** `app/api/content/` - 14+ REST endpoints
-- **Components:** `components/content/` - UI components (tree, editor, panels)
-- **State Stores:** `state/` - Zustand stores (renamed from `stores/`)
+- **API Routes:** `app/api/content/` - 20+ REST endpoints
+- **Components:** `components/content/` - UI components (tree, editor, panels, external)
+- **State Stores:** `state/` - 12 Zustand stores (renamed from `stores/`)
 - **Design System:** `lib/design/system/` - Liquid Glass tokens
 - **Editor Extensions:** `lib/domain/editor/` - TipTap custom extensions
+- **Export System:** `lib/domain/export/` - Multi-format converters
+- **External Links:** `lib/domain/content/` - Open Graph fetcher, validation
 - **Type Definitions:** `lib/domain/content/api-types.ts` - API interfaces
 
 **Key Directories:**
@@ -665,12 +821,18 @@ lib/
 ├── domain/                      # Business logic modules
 │   ├── admin/                   # Admin panel utilities
 │   ├── content/                 # ContentNode v2.0 utilities (31 imports)
+│   │   ├── open-graph-fetcher.ts    # Open Graph metadata fetcher
+│   │   └── external-validation.ts   # URL validation for external links
 │   ├── editor/                  # TipTap extensions (2 imports)
 │   │   ├── index.ts             # Barrel export
 │   │   ├── extensions-client.ts # Client-side extensions
 │   │   ├── extensions-server.ts # Server-side extensions
 │   │   ├── extensions/          # Individual extension files
 │   │   └── commands/            # Slash commands
+│   ├── export/                  # Multi-format export system
+│   │   ├── converters/          # Format-specific converters
+│   │   ├── metadata.ts          # Metadata sidecar generation
+│   │   └── bulk-export.ts       # ZIP archive creation
 │   └── search/                  # Search filters (4 imports)
 ├── infrastructure/              # External service integrations
 │   ├── auth/                    # OAuth, sessions, middleware (55 imports)
@@ -717,6 +879,14 @@ lib/
 
 **Known Issues & Next Steps:**
 - See `IMPLEMENTATION-STATUS.md` for detailed known limitations per milestone
-- ✅ M6 is 100% complete (tags system finished Jan 20, 2026)
+- ✅ M1-M8: Database, API, UI, file tree, editor, search, tags, file management, export & backup (complete)
+- 🚀 M9: Type System Refactor + New Content Types (active - Jan 28, 2026, 40% Phase 2)
+  - ✅ Phase 1: ContentType discriminant refactor (complete)
+  - ✅ ExternalPayload: External link bookmarks with Open Graph preview (complete)
+  - ✅ Menu consolidation: Shared configuration prevents duplication (complete)
+  - ✅ ContentRole: Per-folder referenced content toggle (complete)
+  - ⏳ Remaining: FolderPayload (5 view modes), 5 stub payload viewers (~3 weeks)
 - Minor TODOs: scroll-to-heading (needs editor ref), active heading auto-detection (intersection observer)
-- 🚀 M7 (File management & media) is now active priority
+- 🚀 M9-M14: Advanced features (collaboration, plugins, mobile, AI) pending
+- **PDF/DOCX Export:** Stub implementations ready for Puppeteer/docx library integration
+- **External Links:** SSL certificate errors may require `NODE_TLS_REJECT_UNAUTHORIZED=0` in dev for misconfigured sites

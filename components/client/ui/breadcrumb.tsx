@@ -76,7 +76,7 @@ const BreadcrumbSeparator = ({
   children,
   className,
   ...props
-}: React.ComponentProps<"li">) => (
+}: Omit<React.ComponentProps<"li">, "ref">) => (
   <li
     role="presentation"
     aria-hidden="true"
@@ -91,7 +91,7 @@ BreadcrumbSeparator.displayName = "BreadcrumbSeparator"
 const BreadcrumbEllipsis = ({
   className,
   ...props
-}: React.ComponentProps<"span">) => (
+}: Omit<React.ComponentProps<"span">, "ref">) => (
   <span
     role="presentation"
     aria-hidden="true"

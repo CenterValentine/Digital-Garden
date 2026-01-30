@@ -19,6 +19,19 @@ interface LeftSidebarHeaderProps {
   onCreateFile: () => void;
   onCreateDocument?: () => void;
   onCreateSpreadsheet?: () => void;
+  onCreateCode?: () => void;
+  onCreateHtml?: () => void;
+  onCreateJson?: () => void;
+  onCreateExternal?: () => void;
+  // Visualization engine-specific creators
+  onCreateVisualizationMermaid?: () => void;
+  onCreateVisualizationExcalidraw?: () => void;
+  onCreateVisualizationDiagramsNet?: () => void;
+  // Stub types disabled until implemented:
+  // onCreateChat?: () => void;
+  // onCreateData?: () => void;
+  // onCreateHope?: () => void;
+  // onCreateWorkflow?: () => void;
   isCreateDisabled?: boolean;
 }
 
@@ -28,6 +41,13 @@ export function LeftSidebarHeader({
   onCreateFile,
   onCreateDocument,
   onCreateSpreadsheet,
+  onCreateCode,
+  onCreateHtml,
+  onCreateJson,
+  onCreateExternal,
+  onCreateVisualizationMermaid,
+  onCreateVisualizationExcalidraw,
+  onCreateVisualizationDiagramsNet,
   isCreateDisabled = false,
 }: LeftSidebarHeaderProps) {
   const { isSearchOpen, toggleSearch } = useSearchStore();
@@ -113,11 +133,18 @@ export function LeftSidebarHeader({
       {/* Right side: Actions + Toggle */}
       <div className="flex items-center gap-1">
         <LeftSidebarHeaderActions
-          onCreateFolder={onCreateFolder}
-          onCreateNote={onCreateNote}
-          onCreateFile={onCreateFile}
-          onCreateDocument={onCreateDocument}
-          onCreateSpreadsheet={onCreateSpreadsheet}
+          onCreateFolder={onCreateFolder ? () => onCreateFolder() : undefined}
+          onCreateNote={onCreateNote ? () => onCreateNote() : undefined}
+          onCreateFile={onCreateFile ? () => onCreateFile() : undefined}
+          onCreateDocument={onCreateDocument ? () => onCreateDocument() : undefined}
+          onCreateSpreadsheet={onCreateSpreadsheet ? () => onCreateSpreadsheet() : undefined}
+          onCreateCode={onCreateCode ? () => onCreateCode() : undefined}
+          onCreateHtml={onCreateHtml ? () => onCreateHtml() : undefined}
+          onCreateJson={onCreateJson ? () => onCreateJson() : undefined}
+          onCreateExternal={onCreateExternal ? () => onCreateExternal() : undefined}
+          onCreateVisualizationMermaid={onCreateVisualizationMermaid ? () => onCreateVisualizationMermaid() : undefined}
+          onCreateVisualizationExcalidraw={onCreateVisualizationExcalidraw ? () => onCreateVisualizationExcalidraw() : undefined}
+          onCreateVisualizationDiagramsNet={onCreateVisualizationDiagramsNet ? () => onCreateVisualizationDiagramsNet() : undefined}
           disabled={isCreateDisabled}
         />
 

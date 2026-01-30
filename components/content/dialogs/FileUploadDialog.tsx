@@ -86,9 +86,8 @@ export function FileUploadDialog({ parentId, onSuccess, onCancel, initialFiles }
             const folders: Folder[] = [];
 
             for (const node of nodes) {
-              // Check if it's a folder (contentType === 'folder' or no payload)
-              const isFolder = node.contentType === 'folder' ||
-                (!node.note && !node.file && !node.html && !node.code);
+              // Check if it's a folder (use contentType discriminant)
+              const isFolder = node.contentType === 'folder';
 
               if (isFolder) {
                 folders.push({

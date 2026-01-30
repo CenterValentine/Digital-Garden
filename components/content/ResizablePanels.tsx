@@ -14,6 +14,7 @@ import "allotment/dist/style.css";
 import { usePanelStore } from "@/state/panel-store";
 import { useSearchStore } from "@/state/search-store";
 import { useLeftPanelCollapseStore } from "@/state/left-panel-collapse-store";
+import { useRightPanelCollapseStore } from "@/state/right-panel-collapse-store";
 import { ContextMenu } from "./context-menu/ContextMenu";
 import { fileTreeActionProvider } from "./context-menu/file-tree-actions";
 
@@ -38,6 +39,7 @@ export function ResizablePanels({ children }: ResizablePanelsProps) {
   const toggleSearch = useSearchStore((state) => state.toggleSearch);
   const { mode: panelMode, setMode: setPanelMode } = useLeftPanelCollapseStore();
   const togglePanelCollapse = useLeftPanelCollapseStore((state) => state.toggleMode);
+  const { isCollapsed: isRightPanelCollapsed } = useRightPanelCollapseStore();
 
   const [isMounted, setIsMounted] = useState(false);
 
@@ -115,7 +117,7 @@ export function ResizablePanels({ children }: ResizablePanelsProps) {
           vertical={false}
           onDragEnd={(sizes) => {
             if (!isMounted) return;
-            if (rightSidebarVisible) {
+            if (rightSidebarVisible && !isRightPanelCollapsed) {
               const rightIndex = leftSidebarVisible ? 1 : 0;
               const newWidth = sizes[rightIndex];
               if (newWidth !== rightSidebarWidth) {
@@ -128,9 +130,9 @@ export function ResizablePanels({ children }: ResizablePanelsProps) {
 
           {rightSidebarVisible && (
             <Allotment.Pane
-              minSize={200}
-              maxSize={600}
-              preferredSize={rightSidebarWidth}
+              minSize={isRightPanelCollapsed ? 0 : 200}
+              maxSize={isRightPanelCollapsed ? 0 : 600}
+              preferredSize={isRightPanelCollapsed ? 0 : rightSidebarWidth}
             >
               {rightPanel}
             </Allotment.Pane>

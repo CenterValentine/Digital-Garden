@@ -1,7 +1,7 @@
 # Notes Feature Documentation Index
 
 **Version:** 2.3
-**Last Updated:** January 23, 2026
+**Last Updated:** January 27, 2026
 **Status:** Active Development (M7 Office Documents Complete)
 
 ## Overview
@@ -148,6 +148,17 @@ The notes feature transforms the application into a powerful knowledge managemen
 - **[M7: Storage Architecture](./M7-STORAGE-ARCHITECTURE-V2.md)** - Storage provider abstraction design
 - **[M7: Office Documents Implementation](./M7-OFFICE-DOCUMENTS-IMPLEMENTATION.md)** - Multi-tier Office document viewing (Google Docs, ONLYOFFICE, Microsoft Viewer) ✅ Complete
 - **[M7: Media Viewers Implementation](./M7-MEDIA-VIEWERS-IMPLEMENTATION.md)** - Enhanced image, PDF, video, and audio viewers with keyboard shortcuts ✅ Complete
+
+**Export & Backup System:**
+
+- **[Export & Backup Architecture](./EXPORT-BACKUP-ARCHITECTURE.md)** - Complete multi-format export system design
+- **[Export System Implementation](./EXPORT-SYSTEM-IMPLEMENTATION.md)** - Implementation summary and file locations
+- **[Export Markdown Solution](./EXPORT-MARKDOWN-SOLUTION.md)** - Markdown compatibility with metadata sidecars
+- **[Versioning Quick Reference](./VERSIONING-QUICK-REFERENCE.md)** - ⭐ One-page cheat sheet for schema versioning
+- **[TipTap Schema Evolution Guide](./TIPTAP-SCHEMA-EVOLUTION-GUIDE.md)** - Comprehensive guide for handling TipTap changes
+- **[TipTap Extension Example](./TIPTAP-EXTENSION-EXAMPLE.md)** - Step-by-step extension development walkthrough
+- **[Schema Evolution Summary](./SCHEMA-EVOLUTION-SUMMARY.md)** - Executive summary of protection system
+- **[Error Handling Guide](./ERROR-HANDLING-GUIDE.md)** - Validation, monitoring, and discrepancy detection
 
 **Architecture & Patterns:**
 
@@ -350,6 +361,7 @@ When updating these documents:
 | 2.0     | 2026-01-12 | System | Database v2.0 refactor (ContentNode + Typed Payloads), API v2.0, complete terminology migration from docType/contentData |
 | 2.1     | 2026-01-13 | System | Documentation cleanup: consolidated summaries into V2-ARCHITECTURE-OVERVIEW.md, removed deprecated files                 |
 | 2.2     | 2026-01-20 | System | Added CURRENT-STATE.md for active work tracking, archived M4/M6 session logs to archive/sessions/, updated index structure |
+| 2.3     | 2026-01-27 | System | Added conventional versioning documentation for TipTap schema evolution, including quick reference card and comprehensive guides |
 
 ## Next Steps
 

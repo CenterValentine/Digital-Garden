@@ -1,11 +1,11 @@
 # Implementation Status
 
-**Last Updated:** January 23, 2026
-**Current Phase:** M6 Complete (100%), M7 Complete (100%)
+**Last Updated:** January 28, 2026
+**Current Phase:** M9 Partial (Type System Refactor + ExternalPayload complete, remaining Phase 2 work pending)
 
 ## Completed Milestones
 
-**Overall Progress:** 7/14 milestones complete (50%)
+**Overall Progress:** 8/15 milestones complete (53%) + M9 Partial (Phase 1 complete, Phase 2: 40% - ExternalPayload + ContentRole + menu)
 
 ### ✅ M1: Foundation & Database (Complete)
 
@@ -602,21 +602,445 @@ Media Viewers (January 23, 2026):
 
 ---
 
-### 📋 M8-M14: Advanced Features
+### ✅ M8: Export & Backup System (Complete)
 
-**M8:** Settings & Preferences
-**M9:** Export & Import
-**M10:** Templates & Command Palette
-**M11:** Collaboration Features
-**M12:** Performance Optimization
-**M13:** Advanced Content Types (Gallery folders, Resume integration)
-**M14:** Testing & Deployment
+**Status:** Fully implemented and documented (January 26, 2026)
+
+**Completed Deliverables:**
+
+Multi-Format Export System:
+- ✅ Markdown export (Obsidian-compatible with wiki-links, callouts, YAML frontmatter)
+- ✅ HTML export (standalone with embedded CSS, light/dark themes, syntax highlighting)
+- ✅ JSON export (lossless TipTap export for re-import)
+- ✅ Plain text export (simple text extraction)
+- ✅ PDF/DOCX export stubs (ready for integration)
+
+Bulk Export & Backup:
+- ✅ ZIP archive creation for entire vault or filtered subset
+- ✅ Preserves folder hierarchy in exports
+- ✅ Auto-generated README in exports
+- ✅ Configurable file naming (slug/title/ID)
+- ✅ Batch processing for performance
+
+Metadata Sidecar System:
+- ✅ Preserves semantic information lost in format conversion
+- ✅ Stores: content ID, tags with colors, wiki-links with target IDs, callout types, timestamps
+- ✅ Format: `.meta.json` files alongside exports
+- ✅ Enables accurate re-import with full context restoration
+
+**Key Components:**
+
+Export Converters:
+- `lib/domain/export/converters/markdown-converter.ts` - Obsidian-compatible markdown
+- `lib/domain/export/converters/html-converter.ts` - Standalone HTML with themes
+- `lib/domain/export/converters/json-converter.ts` - Lossless TipTap JSON
+- `lib/domain/export/converters/text-converter.ts` - Plain text extraction
+- `lib/domain/export/metadata.ts` - Metadata sidecar generation
+- `lib/domain/export/bulk-export.ts` - ZIP archive creation
+
+API Endpoints:
+- `app/api/content/export/[id]/route.ts` - Single document export
+- `app/api/content/export/vault/route.ts` - Bulk vault export as ZIP
+- `app/api/content/export/health/route.ts` - Export system health check
+
+Settings Integration:
+- `app/(authenticated)/settings/export/page.tsx` - Export settings UI
+- `lib/features/settings/validation.ts` - Export settings schema
+
+**Features:**
+
+Markdown Export:
+- Wiki-link preservation: `[[Note Title]]` syntax maintained
+- Callout conversion: TipTap callouts → Obsidian `> [!type]` syntax
+- YAML frontmatter with metadata (title, tags, dates, content ID)
+- Code block language preservation
+- Task list conversion
+- Image/file reference handling
+
+HTML Export:
+- Standalone files with embedded CSS
+- Light/dark theme toggle
+- Syntax highlighting for code blocks
+- Responsive design
+- Print-friendly styles
+- Navigation structure
+
+Metadata Sidecars:
+- JSON format alongside exported files
+- Preserves: contentId, tags (with colors), wiki-link targets, callout types
+- Enables lossless round-trip (export → import)
+- Future-proofs for feature additions
+
+**Documentation:**
+- `EXPORT-SYSTEM-IMPLEMENTATION.md` - Complete export architecture
+- `EXPORT-BACKUP-ARCHITECTURE.md` - Backup strategy and metadata
+- `EXPORT-MARKDOWN-SOLUTION.md` - Markdown conversion specifics
+
+**Statistics:**
+- Export Formats: 4 (markdown, HTML, JSON, text)
+- Converters: 5 (4 formats + metadata)
+- API Routes: 3 (single export, bulk export, health)
+- Settings Pages: 1 (export preferences)
+- Lines of Code: ~2,000
+- Documentation: 3 comprehensive guides
 
 ---
 
-### 📋 M15: Offline Mode (Future)
+### 🔄 M9: Type System Refactor + New Content Types (Partial)
+
+**Status:** Phase 1 complete (100%), Phase 2 partial (40% - ExternalPayload + menu + ContentRole complete)
+**Started:** January 28, 2026
+
+**Phase 1: Type System Refactor (Complete - January 28, 2026)**
+
+Completed Deliverables:
+- ✅ Added `contentType` enum field to `ContentNode` table (database-stored discriminant)
+- ✅ Removed `deriveContentType()` function (eliminated runtime type derivation)
+- ✅ Converted to discriminated unions for type safety
+- ✅ Updated 14+ API endpoints to use explicit `contentType` field
+- ✅ Updated type guards to check `contentType` instead of payload presence
+- ✅ Added database CHECK constraint to enforce contentType ↔ payload consistency
+- ✅ 3-phase safe migration (add nullable → backfill → make non-null)
+
+Phase 1 Benefits:
+- **Explicit discriminants:** No more "type-by-absence" pattern (folder = no payload)
+- **Compile-time safety:** TypeScript enforces contentType ↔ payload consistency
+- **Database integrity:** CHECK constraint prevents invalid states
+- **Performance:** No runtime type derivation, direct field access
+- **Maintainability:** Clear, unambiguous type system
+
+**Phase 2: New Content Types + Features (Partial - ExternalPayload Complete)**
+
+Completed (Week 3):
+- ✅ **ExternalPayload** - External URL bookmarks with Open Graph preview
+  - ✅ Database schema: `ExternalPayload` table with url, subtype, preview JSON
+  - ✅ Open Graph fetcher with timeout/size limits, SSL error handling
+  - ✅ Security controls: HTTPS-only, domain allowlist (50+ defaults), "Allow All Domains" override
+  - ✅ Smart URL handling: auto-prepends https://, allows www redirects
+  - ✅ UI components: ExternalLinkDialog, ExternalLinkViewer, ExternalViewer
+  - ✅ Settings integration: previewsEnabled, allowAllDomains, allowlistedHosts, allowHttp
+  - ✅ API endpoint: `POST /api/content/external/preview` for OG metadata
+  - ✅ Context menu integration: "New → External" in both menus
+  - ✅ Placeholder image for missing OG metadata (gradient + SVG pattern)
+
+Completed (Week 2 - Partial):
+- ✅ **Root Node UI** - Compact header row above file tree showing workspace name
+- ✅ **Per-folder referenced content toggle** - Eye icon toggle in folders to show/hide referenced content
+
+Completed (Menu Consolidation - January 28, 2026):
+- ✅ **Shared Menu Configuration** - Single source of truth for "New" menu items
+  - ✅ `components/content/menu-items/new-content-menu.tsx` - Shared configuration
+  - ✅ Both "+" button dropdown and context menu "New" submenu use same logic
+  - ✅ Stub payloads (Chat, Visualization, Data, Hope, Workflow) always shown but disabled
+  - ✅ Prevents duplication and ensures consistency across all menus
+
+**Phase 2: Remaining Work (Not Started)**
+
+Pending Features:
+- ❌ **FolderPayload** (Weeks 1, 4, 5) - Transform folders into rich view containers
+  - ✅  Database schema: `FolderPayload` table with viewMode, sortMode, viewPrefs
+  - ✅  5 view modes: List (current), Gallery, Kanban, Dashboard, Canvas
+  - ✅  Dynamic folder icons based on view mode
+  - ✅  API endpoint: `GET/PATCH /api/content/folder/[id]/view`
+  - ✅  Libraries needed: react-grid-layout, reactflow, @dnd-kit
+  - ✅  View components: FolderViewContainer, ListView, GalleryView, KanbanView, DashboardView, CanvasView
+
+- ✅ **ContentRole Enum** (Week 2) - File tree visibility control (COMPLETE)
+  - ✅ Implemented as per-folder toggle instead of global enum
+  - ✅ Eye icon toggle in folder context menu
+  - ✅ `includeReferencedContent` field on FolderPayload (future work)
+  - ✅ Sufficient for M9 scope (global toggle deferred to M10+)
+
+- ❌ **5 Stub Payloads** (Week 6) - Basic implementations with "Coming soon" banners
+  - ❌ ChatPayload: messages JSON array, read-only viewer
+  - ✅  VisualizationPayload: engine + doc JSON, placeholder viewer
+  - ❌ DataPayload: mode + source JSON, inline table renderer
+  - ❌ HopePayload: kind + status + description, simple viewer/editor
+  - ❌ WorkflowPayload: engine + definition JSON, "Execution blocked" warning
+  - ✅ Menu items already added (disabled until viewers implemented)
+
+- ❌ **Folder View Context Menu Actions** (Week 6) - Folder-specific view switching
+  - ❌ Add "Set View" submenu to context menu for folders
+  - ❌ Options: List, Gallery, Kanban, Dashboard, Canvas
+  - ❌ Requires FolderPayload implementation first
+
+**Key Files Modified (Phase 1):**
+- `prisma/schema.prisma` - Added contentType enum + CHECK constraint
+- `lib/domain/content/types.ts` - Removed deriveContentType, updated type guards
+- `app/api/content/content/route.ts` - Set contentType on creation, filter by field
+- `app/api/content/content/tree/route.ts` - Use contentType directly
+- 10+ other API routes and components
+
+**Key Files Created (Phase 2 - ExternalPayload):**
+- `lib/domain/content/open-graph-fetcher.ts` - OG metadata fetcher
+- `lib/domain/content/external-validation.ts` - URL validation
+- `components/content/external/ExternalLinkDialog.tsx` - Create/edit dialog
+- `components/content/external/ExternalLinkViewer.tsx` - Preview viewer
+- `components/content/viewer/ExternalViewer.tsx` - MainPanel wrapper
+- `app/api/content/external/preview/route.ts` - OG preview API
+- `lib/features/settings/validation.ts` - External settings schema (updated)
+
+**Key Files Created (Menu Consolidation):**
+- `components/content/menu-items/new-content-menu.tsx` - Shared menu configuration (NEW)
+- `components/content/headers/LeftSidebarHeaderActions.tsx` - Uses shared config (updated)
+- `components/content/context-menu/file-tree-actions.tsx` - Uses shared config (updated)
+
+**Documentation:**
+- `~/.claude/plans/declarative-seeking-ocean.md` - Complete Phase 1 & 2 implementation plan
+- `CLAUDE.md` - External Link/Bookmark System section added
+
+**Statistics (M9 Completed Work):**
+- Database Migrations: 1 (contentType discriminant + ExternalPayload table)
+- New Payload Types: 1 implemented (ExternalPayload), 5 stub menu items (Chat, Viz, Data, Hope, Workflow)
+- API Endpoints: 1 new (external/preview)
+- Components: 4 new (ExternalLinkDialog, ExternalLinkViewer, ExternalViewer, new-content-menu)
+- Settings Fields: 4 (previewsEnabled, allowAllDomains, allowlistedHosts, allowHttp)
+- Lines of Code: ~1,700
+- Documentation: 3 files updated (CLAUDE.md, IMPLEMENTATION-STATUS.md, plan file)
+
+**Remaining Effort Estimate:**
+- FolderPayload: 2-3 weeks (5 complex view modes + libraries)
+- Stub Payloads: 3-4 days (5 minimal implementations)
+- Folder View Context Menu: 0.5 days (add view switching submenu, requires FolderPayload)
+- **Total Remaining: ~3 weeks**
+
+---
+
+### 📋 M10: Advanced TipTap Editor Features (Planned)
+
+**Status:** Planned (Not Started)
+**Prerequisites:** M9 Complete
+**Estimated Time:** 2-3 weeks
+**Documentation:** [M10-ADVANCED-EDITOR.md](./M10-ADVANCED-EDITOR.md)
+
+**Overview:**
+Enhance the TipTap editor with advanced features and architectural improvements that enable AI integration, templates, and power-user workflows.
+
+**Key Features:**
+- 📝 Advanced editing: Comments, suggestions, track changes
+- 🎨 Rich formatting: Custom styles, themes, better tables
+- 🔗 Enhanced linking: Bi-directional links, link previews, embeds
+- 📋 Templates system foundation
+- 🏗️ Editor architecture: Plugins, custom nodes, collaboration prep
+- ⚡ Performance: Large document handling, virtual scrolling
+- 🤖 AI prep: Structured content extraction, context API
+
+**Implementation Phases:**
+- **Phase 1 (Week 1):** Core extensions - Comments, suggestions, custom nodes
+- **Phase 2 (Week 2):** Advanced features - Templates, embeds, better tables
+- **Phase 3 (Week 3):** Architecture - Plugin system, performance, AI hooks
+
+**Paves the Way For:**
+- M11: AI Chat Integration (needs structured content extraction)
+- M12: Real-time Collaboration (needs conflict-free architecture)
+- Templates & Command Palette (needs template system)
+
+---
+
+### 📋 M11: AI Chat Integration (Planned)
+
+**Status:** Planned (Not Started)
+**Prerequisites:** M8 Phase 1 (Unified Settings) ✅ Complete, M10 (Advanced Editor) Complete
+**Estimated Time:** 2-3 weeks
+**Documentation:** [M11-AI-CHAT-INTEGRATION.md](./M11-AI-CHAT-INTEGRATION.md)
+
+**Overview:**
+Integrate AI assistant directly into Notes IDE with context-aware chat, document analysis, and streaming responses.
+
+**Key Features:**
+- 🤖 AI chat panel in right sidebar (Vercel AI SDK + Claude Sonnet 4.5)
+- 💬 Context-aware responses (AI understands current note)
+- 📊 Document analysis (DOCX, XLSX, PDF)
+- 🔒 Privacy controls (user chooses what AI sees)
+- ⚡ Streaming responses with real-time feedback
+- 💰 Usage tracking and monthly quotas
+
+**Research Complete:**
+- ✅ [M8-AI-INTEGRATION-RESEARCH.md](./M8-AI-INTEGRATION-RESEARCH.md) - Comprehensive 10K+ word technical analysis
+- ✅ Tech stack selected: Vercel AI SDK 6, Anthropic Claude, AI Elements
+- ✅ Database architecture designed (future-proof for MCP)
+- ✅ Document processing strategy (xlsx for Excel, mammoth for DOCX)
+
+**Implementation Phases:**
+- **Phase 1 (Week 1):** Core infrastructure - Database, streaming API, basic UI
+- **Phase 2 (Week 2):** Document analysis - Excel/DOCX processing, entity extraction
+- **Phase 3 (Week 3):** Polish - Conversation management, settings UI, quota enforcement
+
+**Integration with M8 & M10:**
+- Uses unified settings system from M8 Phase 1
+- Uses M10's structured content extraction API
+- Leverages M10's custom node architecture
+
+**Cost Estimates:**
+- Monthly Active User: ~$0.90/month (100K tokens)
+- Heavy User: ~$4.50/month (500K tokens)
+- Power User: ~$9.00/month (1M tokens)
+
+---
+
+### 📋 M12: Multi-View Workspace (Planned)
+
+**Status:** Planned (Not Started)
+**Prerequisites:** M9, M10, M11 Complete
+**Estimated Time:** 3 weeks (15 days)
+**Documentation:** Plan file at `~/.claude/plans/snazzy-floating-globe.md`
+
+**Overview:**
+Enable users to view and edit multiple content items simultaneously in a customizable split-screen layout, similar to VS Code's editor groups or Obsidian's panes.
+
+**Strategic Decision: Query-Based URLs Preserved**
+- **Decision:** Abandon path-based URL migration (`/content/{id}`)
+- **Keep:** Query-based navigation (`/content?content={id}`)
+- **Reason:** Multi-view requires encoding multiple content IDs in URL
+  - Example: `/content?v1={id1}&v2={id2}&layout=horizontal&vf=v2`
+  - Path-based routing cannot support unlimited views or layout metadata
+
+**Milestone Placement Rationale:**
+- **Before M13 (Collaboration):** Multi-view enables better collaboration workflows
+  - View your doc + collaborator's doc side-by-side
+  - Keep chat/comments panel alongside document
+- **After M10-M11 (Editor/AI):** Builds on stable editor foundation
+- **Self-contained:** No dependencies on incomplete features
+  - Allotment already installed ✅
+  - Zustand state management ready ✅
+  - Query-based URL structure preserved ✅
+
+**Phase 1: Core Features (Weeks 1-2)**
+
+Multi-View State Management:
+- `state/multi-view-store.ts` - View layout and focus tracking
+- URL sync: Parse/write `?v1=&v2=&layout=&vf=&sizes=` params
+- Backward compatibility: `?content={id}` → `?v1={id}` (single view)
+- Coordinate with `content-store.ts` (per-view content tracking)
+
+Layout Engine:
+- `MultiViewContainer.tsx` - Main container with Allotment integration
+- Horizontal layout (side-by-side views)
+- Vertical layout (stacked views)
+- Dynamic view count (1-6 views)
+- Resize and split functionality
+
+View Management UI:
+- View toolbar (split, close, layout toggle buttons)
+- Context menu actions ("Split Right", "Split Below", "Close View")
+- Keyboard shortcuts: `Cmd+\`, `Cmd+Shift+\`, `Cmd+W`, `Cmd+1/2/3`, `Cmd+K Cmd+→/←`
+
+Focus Management:
+- Visual focus indicator (gold border on active view)
+- Keyboard navigation between views
+- Right panel content syncs with focused view
+- Focus persistence across navigation
+
+**Phase 2: Advanced Features (Week 3)**
+
+Grid Layout:
+- 2x2 grid layout (dashboard-style)
+- Nested Allotment implementation
+- Dynamic view count handling
+
+Synchronized Scrolling:
+- "Sync Scroll" toolbar toggle
+- Proportional scroll synchronization
+- Useful for comparing documents side-by-side
+
+View Presets:
+- Save/load layout configurations
+- Default presets ("2-Column Research", "Dashboard")
+- localStorage persistence
+
+**URL Schema:**
+
+Single View (backward compatible):
+```
+/content?content={id}
+/content?v1={id}  # Equivalent
+```
+
+Multi-View:
+```
+/content?v1={id1}&v2={id2}&layout=horizontal&vf=v2&sizes=50,50
+/content?v1={id1}&v2={id2}&v3={id3}&layout=grid
+```
+
+**Use Cases:**
+- Research: View 2-3 source documents while writing notes
+- Dashboard: Monitor multiple data views simultaneously
+- Comparison: Side-by-side document comparison with sync scrolling
+
+**Key Components:**
+
+New Files (9):
+1. `state/multi-view-store.ts` - Multi-view state management
+2. `components/content/MultiViewContainer.tsx` - Main layout container
+3. `components/content/ViewToolbar.tsx` - View management UI
+4. `components/content/GridLayoutManager.tsx` - Grid layout helper
+5. `components/content/ViewPresetManager.tsx` - Preset management
+6. `docs/notes-feature/M12-MULTI-VIEW-IMPLEMENTATION.md` - Implementation guide
+7. `docs/notes-feature/MULTI-VIEW-USER-GUIDE.md` - User documentation
+8. `__tests__/multi-view-store.test.ts` - Unit tests
+9. `__tests__/multi-view-container.test.tsx` - Component tests
+
+Modified Files (6):
+1. `app/(authenticated)/content/page.tsx` - URL parsing for multi-view
+2. `state/content-store.ts` - Per-view content tracking
+3. `components/content/headers/MainPanelHeader.tsx` - View toolbar integration
+4. `components/content/context-menu/file-tree-actions.tsx` - View context menu
+5. `CLAUDE.md` - Multi-View Architecture section
+6. `IMPLEMENTATION-STATUS.md` - This file
+
+**Success Criteria:**
+- [ ] Users can open 2+ content items side-by-side
+- [ ] Horizontal, vertical, and grid layouts work correctly
+- [ ] URL syncs correctly (refresh, bookmark, share)
+- [ ] Focus management works (keyboard shortcuts, visual indicator)
+- [ ] All navigation flows work in multi-view context
+- [ ] View toolbar buttons functional
+- [ ] Context menu actions work
+- [ ] Synchronized scrolling works
+- [ ] View presets save/load correctly
+- [ ] Performance acceptable with 4+ views
+- [ ] Backward compatible with single-view URLs
+
+**Statistics:**
+- New Components: 5 (MultiViewContainer, ViewToolbar, GridLayoutManager, ViewPresetManager, + tests)
+- State Stores: 1 new (multi-view-store), 1 modified (content-store)
+- Modified Files: 6
+- Documentation: 2 comprehensive guides
+- Lines of Code: ~2,000 (estimated)
+- Timeline: 3 weeks (15 days)
+
+**Dependencies:**
+- Allotment 1.20.3 (already installed)
+- Zustand 5.0.2 (already installed)
+- No new package installations required
+
+**Future Enhancements (M12.5 or M19):**
+- Tab-based views (like browser tabs)
+- Detachable views (pop-out windows)
+- View history (back/forward per view)
+- Cross-view search
+- Drag content between views
+
+---
+
+### 📋 M10-M18: Advanced Features (Planned)
+
+**M10:** Advanced TipTap Editor Features
+**M11:** Templates & Command Palette
+**M12:** Multi-View Workspace (NEW - see detailed plan below)
+**M13:** Collaboration Features (shifted from M12)
+**M14:** Performance Optimization (shifted from M13)
+**M15:** Advanced Content Types (shifted from M14)
+**M16:** Mobile & Responsive Design (shifted from M15)
+**M17:** Testing & Deployment (shifted from M16)
+**M18:** Offline Mode (shifted from M17)
+
+---
+
+### 📋 M17: Offline Mode (Future)
 
 **Status:** Planned for future release
+**Prerequisites:** M19 (PWA) Recommended
 
 **Description:**
 Enable full offline functionality with local-first architecture, allowing users to work without internet connection and sync when reconnected.
@@ -717,6 +1141,178 @@ Enable full offline functionality with local-first architecture, allowing users 
 - IndexedDB schema design
 - Conflict resolution strategy
 - Testing offline scenarios
+
+---
+
+### 📋 M19: Progressive Web App (PWA) (Planned)
+
+**Status:** Planned for future release
+**Prerequisites:** M1-M8 Complete (stable online experience)
+**Estimated Time:** 1-2 weeks
+**Documentation:** To be created - `M19-PWA-IMPLEMENTATION.md`
+
+**Overview:**
+Make the `/content/` route installable as a Progressive Web App on desktop and mobile devices, providing a native app-like experience with offline asset caching and home screen installation.
+
+**Key Features:**
+
+1. **Web App Manifest**
+   - App metadata (name, description, icons)
+   - Display mode: standalone (hides browser chrome)
+   - Theme color matching Liquid Glass design
+   - Start URL: `/content`
+   - Scope: `/content/` (isolated from rest of site)
+   - App shortcuts (quick actions from home screen)
+
+2. **Service Worker Integration**
+   - Static asset caching (JS, CSS, fonts, images)
+   - API response caching with stale-while-revalidate
+   - Background sync for failed requests
+   - Update notifications for new versions
+   - Strategic caching for performance
+
+3. **App Icons & Branding**
+   - Icon sizes: 192x192, 512x512 (maskable)
+   - Apple touch icon (180x180 for iOS)
+   - Favicon integration
+   - Splash screens for mobile
+
+4. **Installation Prompts**
+   - Custom install banner (optional)
+   - Browser-native install prompt
+   - Install button in settings page
+   - Track installation analytics
+
+5. **Platform Integration**
+   - Share target (receive files/text from other apps)
+   - File handler registration (open .md files)
+   - Protocol handler (custom URL schemes)
+   - Badge API for notification counts
+
+**Implementation Plan:**
+
+**Phase 1: Core PWA Setup (Week 1)**
+- Install and configure `next-pwa` package
+- Create web app manifest with branding
+- Generate app icons (multiple sizes)
+- Update Next.js config with PWA wrapper
+- Configure service worker with caching strategies
+- Update root layout metadata for PWA
+
+**Phase 2: Advanced Features (Week 2)**
+- Custom install prompt UI
+- Share target API integration
+- File handler registration
+- Update notification system
+- Performance optimization
+- Cross-browser testing (Chrome, Edge, Safari)
+
+**Caching Strategies:**
+
+```typescript
+// Static Assets - CacheFirst
+- Fonts: 1 year cache
+- Images: 1 day cache
+- JS/CSS: 1 day cache with version hashing
+
+// API Responses - NetworkFirst with fallback
+- Content tree: 5 min cache, 10s network timeout
+- Search results: No cache (always fresh)
+- File metadata: 1 hour cache
+
+// Dynamic Content - StaleWhileRevalidate
+- TipTap content: Serve cached, update in background
+- User settings: Serve cached, update in background
+```
+
+**Key Components:**
+
+New Files (6):
+1. `public/manifest.json` - Web app manifest
+2. `public/icons/icon-192x192.png` - Standard app icon
+3. `public/icons/icon-512x512.png` - High-res app icon
+4. `public/icons/apple-touch-icon.png` - iOS icon
+5. `components/settings/PWAInstallPrompt.tsx` - Custom install UI
+6. `docs/notes-feature/M19-PWA-IMPLEMENTATION.md` - Implementation guide
+
+Modified Files (4):
+1. `next.config.ts` - Wrap with `withPWA()` configuration
+2. `app/layout.tsx` - Add PWA metadata (manifest, theme color, viewport)
+3. `.gitignore` - Exclude auto-generated service worker files
+4. `package.json` - Add `next-pwa` dependency
+
+**Technical Stack:**
+- **next-pwa** - Next.js PWA plugin (wraps Workbox)
+- **Workbox** - Service Worker toolkit (Google)
+- **Web App Manifest** - Standard JSON manifest
+- **Service Worker API** - Browser native
+
+**Success Criteria:**
+- [ ] App installable on Chrome/Edge desktop
+- [ ] App installable on iOS Safari
+- [ ] App installable on Android Chrome
+- [ ] Manifest validates in Chrome DevTools
+- [ ] Service worker registers successfully
+- [ ] Lighthouse PWA audit score 100/100
+- [ ] Static assets cached correctly
+- [ ] App works offline (cached assets only)
+- [ ] Update mechanism works (new version notifications)
+- [ ] Icons display correctly on all platforms
+- [ ] Theme color matches Liquid Glass design
+- [ ] Scope isolation works (doesn't affect rest of site)
+
+**Platform Support:**
+- ✅ **Chrome/Edge (Desktop/Android):** Full PWA support
+- ✅ **Samsung Internet:** Full PWA support
+- ⚠️ **Safari (iOS/macOS):** Limited support (no push notifications, no background sync)
+- ⚠️ **Firefox:** Limited support (manifest support, no install prompt)
+
+**Benefits:**
+- Native app experience without app store
+- Faster load times (cached assets)
+- Offline asset availability
+- Home screen presence (brand visibility)
+- Reduced bounce rate (instant loading)
+- Mobile engagement boost
+
+**Challenges:**
+- iOS Safari limitations (no background sync, limited notifications)
+- Service worker debugging complexity
+- Cache invalidation strategy
+- Update rollout coordination
+- Cross-browser compatibility
+
+**Statistics:**
+- New Files: 6 (manifest, icons, install prompt, docs)
+- Modified Files: 4 (config, layout, gitignore, package.json)
+- New Dependencies: 1 (`next-pwa`)
+- Lines of Code: ~500 (mostly config and UI)
+- Documentation: 1 implementation guide
+- Timeline: 1-2 weeks
+
+**Future Enhancements (M19.5 or M20):**
+- Push notifications (requires backend support)
+- Background sync for content edits
+- Periodic background sync for content updates
+- App shortcuts customization (user-defined quick actions)
+- File handler improvements (drag-drop .md files to open)
+
+**Relationship to M17 (Offline Mode):**
+- M19 focuses on **installability** and **basic asset caching**
+- M17 focuses on **full offline functionality** with local database
+- M19 is simpler and can be implemented independently
+- M17 builds on M19's service worker infrastructure
+
+**Dependencies:**
+- Stable online experience (M1-M8) ✅ Complete
+- Production deployment (HTTPS required for service workers)
+- Design system icons/branding (M3) ✅ Complete
+
+**Documentation:**
+- PWA implementation guide (to be created)
+- Service worker caching strategies
+- Cross-browser compatibility notes
+- Installation instructions for users
 
 ---
 
@@ -1040,23 +1636,38 @@ These errors disappear after running setup:
 
 ## Conclusion
 
-**Current Status:** M5 Complete (5/14 milestones, 36% progress)
+**Current Status:** M8 Complete + Phase 1 Complete + Phase 2 Partial (8/14 milestones + Type System Refactor + ExternalPayload, 57% progress)
 
-**Next Action:** Begin M6 implementation (Search & Backlinks)
+**Completed Milestones:**
+- ✅ M1: Foundation & Database
+- ✅ M2: Core API
+- ✅ M3: UI Foundation
+- ✅ M4: File Tree
+- ✅ M5: Content Editors & Viewers
+- ✅ M6: Search & Knowledge Features
+- ✅ M7: File Management & Media
+- ✅ M8: Export & Backup System
+- ✅ Phase 1: Type System Refactor (contentType discriminant)
+- 🔄 Phase 2: ExternalPayload + ContentRole complete (FolderPayload + 5 stubs remaining)
 
-**Timeline Estimate:**
+**Next Actions:**
+1. **FolderPayload** - 5 view modes (List, Gallery, Kanban, Dashboard, Canvas) - 2-3 weeks
+2. **5 Stub Payloads** - Chat, Visualization, Data, Hope, Workflow - 3-4 days
+3. **Folder View Context Menu** - Add view switching submenu - 0.5 days
 
-- M3: 1-2 weeks
-- M4: 1-2 weeks
-- M5: 2-3 weeks
-- M6-M14: 8-10 weeks
+**Remaining Timeline Estimate:**
 
-**Total Estimated:** 12-17 weeks for full feature implementation
+- M9 Phase 2 Completion: 3 weeks
+- M10-M15: 8-12 weeks
 
-**Documentation:** Comprehensive, well-organized, ready for team use
+**Total Estimated:** 11-15 weeks for full feature implementation (65% complete)
+
+**Documentation:** Comprehensive, well-organized, regularly updated
 
 **Code Quality:** Type-safe, tested, following best practices
 
-**Design System:** Clearly specified with implementation guide
+**Design System:** Liquid Glass fully implemented with conservative motion
 
-Ready to proceed with M3 implementation! 🚀
+**Architecture:** Clean separation of concerns, barrel exports, discriminated unions
+
+Ready for Phase 2 completion (FolderPayload, ContentRole, stub payloads)! 🚀

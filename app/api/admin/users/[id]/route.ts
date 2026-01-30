@@ -15,7 +15,6 @@ import {
   calculateUserStorage,
   formatBytes,
   handleApiError,
-  deriveContentType,
 } from "@/lib/domain/admin/audit";
 import { AUDIT_ACTIONS, type AdminUserDetail } from "@/lib/domain/admin/api-types";
 
@@ -47,6 +46,7 @@ export async function GET(
           select: {
             id: true,
             title: true,
+            contentType: true,
             updatedAt: true,
             notePayload: { select: { contentId: true } },
             filePayload: { select: { contentId: true } },
@@ -99,7 +99,7 @@ export async function GET(
       recentContent: user.contentNodes.map((content) => ({
         id: content.id,
         title: content.title,
-        contentType: deriveContentType(content),
+        contentType: content.contentType,
         updatedAt: content.updatedAt,
       })),
       settings: user.settings as Record<string, unknown> | undefined,

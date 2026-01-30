@@ -33,6 +33,15 @@ interface FileTreeProps {
   onDelete?: (ids: string | string[]) => Promise<void>; // Support both single ID and batch delete
   onDuplicate?: (ids: string[]) => Promise<void>; // Duplicate content node(s)
   onDownload?: (ids: string[]) => Promise<void>; // Download file(s)
+  onChangeIcon?: (id: string) => void; // Change custom icon
+  /** Phase 2: Folder view mode switching */
+  onSetFolderView?: (id: string, viewMode: "list" | "gallery" | "kanban" | "dashboard" | "canvas") => Promise<void>;
+  /** Phase 2: Toggle referenced content visibility for folder */
+  onToggleReferencedContent?: (id: string, currentValue: boolean) => Promise<void>;
+  /** Visualization engine-specific creators */
+  onCreateVisualizationMermaid?: (parentId: string | null) => Promise<void>;
+  onCreateVisualizationExcalidraw?: (parentId: string | null) => Promise<void>;
+  onCreateVisualizationDiagramsNet?: (parentId: string | null) => Promise<void>;
   height?: number;
   editingNodeId?: string; // If set, automatically triggers edit mode on this node
   expandNodeId?: string | null; // If set, imperatively expands this node
@@ -49,6 +58,12 @@ export function FileTree({
   onDelete,
   onDuplicate,
   onDownload,
+  onChangeIcon,
+  onSetFolderView,
+  onToggleReferencedContent,
+  onCreateVisualizationMermaid,
+  onCreateVisualizationExcalidraw,
+  onCreateVisualizationDiagramsNet,
   height = 600,
   editingNodeId,
   expandNodeId,
@@ -176,7 +191,7 @@ export function FileTree({
 
   // Create a wrapper component that has access to callbacks
   const NodeWithCallbacks = (props: any) => {
-    return <FileNode {...props} onRename={onRename} onCreate={onCreate} onDelete={onDelete} onDuplicate={onDuplicate} onDownload={onDownload} />;
+    return <FileNode {...props} onRename={onRename} onCreate={onCreate} onDelete={onDelete} onDuplicate={onDuplicate} onDownload={onDownload} onChangeIcon={onChangeIcon} onSetFolderView={onSetFolderView} onToggleReferencedContent={onToggleReferencedContent} onCreateVisualizationMermaid={onCreateVisualizationMermaid} onCreateVisualizationExcalidraw={onCreateVisualizationExcalidraw} onCreateVisualizationDiagramsNet={onCreateVisualizationDiagramsNet} />;
   };
 
   // Get initial open state from persisted IDs
@@ -287,13 +302,24 @@ export function FileTree({
 
       // R - Rename selected node (single-key, Vim-style)
       // Safer than F2 which Vivaldi intercepts
+      // Special case: For external links, triggers Edit Link dialog instead
       if (e.key === "r" && isPlainKey && onRename) {
         e.preventDefault();
         e.stopPropagation();
         const tree = treeRef.current;
         if (tree?.selectedNodes?.length === 1) {
           const node = tree.selectedNodes[0];
-          node.edit();
+
+          // Check if this is an external link
+          if (node.data.contentType === "external") {
+            // Dispatch edit event for external links instead of inline rename
+            window.dispatchEvent(new CustomEvent('edit-external-link', {
+              detail: { id: node.id }
+            }));
+          } else {
+            // Original behavior: inline rename for all other content types
+            node.edit();
+          }
         }
         return;
       }
@@ -426,7 +452,7 @@ export function FileTree({
         disableMultiSelection={false}
         width="100%"
         height={height}
-        indent={20}
+        indent={15}
         rowHeight={32}
         overscanCount={10}
         paddingTop={8}

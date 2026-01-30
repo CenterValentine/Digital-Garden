@@ -9,7 +9,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/database/client";
 import { requireAuth } from "@/lib/infrastructure/auth/middleware";
-import { deriveContentType } from "@/lib/domain/content";
 
 // ============================================================
 // GET /api/content/content/tree - Get Content Tree
@@ -21,6 +20,7 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url);
     const includeDeleted = searchParams.get("includeDeleted") === "true";
+    const showReferencedContent = searchParams.get("showReferencedContent") === "true";
     const maxDepth = Number.parseInt(searchParams.get("maxDepth") || "10");
 
     // Fetch all content for user (flat list)
@@ -29,11 +29,17 @@ export async function GET(request: NextRequest) {
       where: {
         ownerId: session.user.id,
         deletedAt: includeDeleted ? undefined : null,
+        // Phase 2: Filter by role - hide referenced/system content by default
+        role: showReferencedContent
+          ? { in: ["primary", "referenced"] }
+          : "primary",
       },
       select: {
         id: true,
         title: true,
         slug: true,
+        contentType: true,
+        role: true, // Phase 2: Include role for visibility indicators
         parentId: true,
         displayOrder: true,
         customIcon: true,
@@ -68,6 +74,24 @@ export async function GET(request: NextRequest) {
             language: true,
           },
         },
+        folderPayload: {
+          select: {
+            viewMode: true,
+            sortMode: true,
+            includeReferencedContent: true,
+          },
+        },
+        externalPayload: {
+          select: {
+            url: true,
+            subtype: true,
+          },
+        },
+        visualizationPayload: {
+          select: {
+            engine: true,
+          },
+        },
       },
     });
 
@@ -93,8 +117,6 @@ export async function GET(request: NextRequest) {
 
     // First pass: Create all nodes
     for (const item of allContent) {
-      const contentType = deriveContentType(item as any);
-
       const node: any = {
         id: item.id,
         title: item.title,
@@ -104,7 +126,8 @@ export async function GET(request: NextRequest) {
         customIcon: item.customIcon,
         iconColor: item.iconColor,
         isPublished: item.isPublished,
-        contentType,
+        contentType: item.contentType,
+        role: item.role, // Phase 2: Include role for UI indicators
         children: [],
         createdAt: item.createdAt,
         updatedAt: item.updatedAt,
@@ -114,6 +137,13 @@ export async function GET(request: NextRequest) {
       // Add payload summaries
       if (item.notePayload) {
         node.note = item.notePayload.metadata;
+      }
+      if (item.folderPayload) {
+        node.folder = {
+          viewMode: item.folderPayload.viewMode,
+          sortMode: item.folderPayload.sortMode,
+          includeReferencedContent: item.folderPayload.includeReferencedContent,
+        };
       }
       if (item.filePayload) {
         node.file = {
@@ -132,6 +162,19 @@ export async function GET(request: NextRequest) {
       if (item.codePayload) {
         node.code = {
           language: item.codePayload.language,
+        };
+      }
+      // Phase 2: External payload
+      if (item.externalPayload) {
+        node.external = {
+          url: item.externalPayload.url,
+          subtype: item.externalPayload.subtype,
+        };
+      }
+      // Visualization payload
+      if (item.visualizationPayload) {
+        node.visualization = {
+          engine: item.visualizationPayload.engine,
         };
       }
 

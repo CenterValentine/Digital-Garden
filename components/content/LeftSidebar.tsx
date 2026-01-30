@@ -22,8 +22,9 @@ export function LeftSidebar() {
   const { activeView } = useLeftPanelViewStore();
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [createTrigger, setCreateTrigger] = useState<{
-    type: "folder" | "note" | "docx" | "xlsx";
+    type: "folder" | "note" | "docx" | "xlsx" | "json" | "code" | "html" | "external" | "chat" | "visualization" | "data" | "hope" | "workflow";
     timestamp: number;
+    engine?: "diagrams-net" | "excalidraw" | "mermaid"; // For visualization type
   } | null>(null);
   const [isCreateDisabled, setIsCreateDisabled] = useState(false);
   const [showFileUpload, setShowFileUpload] = useState(false);
@@ -79,6 +80,53 @@ export function LeftSidebar() {
     setCreateTrigger({ type: "xlsx", timestamp: Date.now() });
   }, []);
 
+  const handleCreateJson = useCallback(() => {
+    setCreateTrigger({ type: "json", timestamp: Date.now() });
+  }, []);
+
+  // Phase 2: New content type handlers (Active types only)
+  const handleCreateCode = useCallback(() => {
+    setCreateTrigger({ type: "code", timestamp: Date.now() });
+  }, []);
+
+  const handleCreateHtml = useCallback(() => {
+    setCreateTrigger({ type: "html", timestamp: Date.now() });
+  }, []);
+
+  const handleCreateExternal = useCallback(() => {
+    setCreateTrigger({ type: "external", timestamp: Date.now() });
+  }, []);
+
+  // Phase 2: Visualization engine-specific handlers
+  const handleCreateVisualizationMermaid = useCallback(() => {
+    setCreateTrigger({ type: "visualization", engine: "mermaid", timestamp: Date.now() });
+  }, []);
+
+  const handleCreateVisualizationExcalidraw = useCallback(() => {
+    setCreateTrigger({ type: "visualization", engine: "excalidraw", timestamp: Date.now() });
+  }, []);
+
+  const handleCreateVisualizationDiagramsNet = useCallback(() => {
+    setCreateTrigger({ type: "visualization", engine: "diagrams-net", timestamp: Date.now() });
+  }, []);
+
+  // Phase 2: Stub types - Disabled until implemented
+  // const handleCreateChat = useCallback(() => {
+  //   setCreateTrigger({ type: "chat", timestamp: Date.now() });
+  // }, []);
+
+  // const handleCreateData = useCallback(() => {
+  //   setCreateTrigger({ type: "data", timestamp: Date.now() });
+  // }, []);
+
+  // const handleCreateHope = useCallback(() => {
+  //   setCreateTrigger({ type: "hope", timestamp: Date.now() });
+  // }, []);
+
+  // const handleCreateWorkflow = useCallback(() => {
+  //   setCreateTrigger({ type: "workflow", timestamp: Date.now() });
+  // }, []);
+
   const handleFileUploadSuccess = useCallback((fileId: string) => {
     setShowFileUpload(false);
     setFileUploadParentId(null);
@@ -117,6 +165,13 @@ export function LeftSidebar() {
           onCreateFile={handleCreateFile}
           onCreateDocument={hasGoogleAuth ? handleCreateDocument : undefined}
           onCreateSpreadsheet={hasGoogleAuth ? handleCreateSpreadsheet : undefined}
+          onCreateCode={handleCreateCode}
+          onCreateHtml={handleCreateHtml}
+          onCreateJson={handleCreateJson}
+          onCreateExternal={handleCreateExternal}
+          onCreateVisualizationMermaid={handleCreateVisualizationMermaid}
+          onCreateVisualizationExcalidraw={handleCreateVisualizationExcalidraw}
+          onCreateVisualizationDiagramsNet={handleCreateVisualizationDiagramsNet}
           isCreateDisabled={isCreateDisabled}
         />
 

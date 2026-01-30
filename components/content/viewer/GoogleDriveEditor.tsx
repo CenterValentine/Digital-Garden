@@ -42,6 +42,7 @@ export function GoogleDriveEditor({
   const [error, setError] = useState<string | null>(null);
   const [hasGoogleAuth, setHasGoogleAuth] = useState(false);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+  const [lastTokenRefresh, setLastTokenRefresh] = useState<number>(Date.now());
 
   // Check if this file type is supported by Google Drive
   const isGoogleDriveSupportedType =
@@ -174,7 +175,47 @@ export function GoogleDriveEditor({
     }
 
     loadOrUploadToGoogleDrive();
-  }, [hasGoogleAuth, isCheckingAuth, contentId, downloadUrl, fileName, mimeType]);
+  }, [hasGoogleAuth, isCheckingAuth, contentId, downloadUrl, fileName, mimeType, isGoogleDriveSupportedType]);
+
+  // Proactively refresh Google access token when tab becomes visible
+  // This prevents "token expired" errors after long inactivity
+  useEffect(() => {
+    // Only relevant for authenticated Google users with supported file types
+    if (!hasGoogleAuth || !isGoogleDriveSupportedType || !googleFileId) {
+      return;
+    }
+
+    async function refreshTokenOnVisibilityChange() {
+      // Only refresh if document is visible and hasn't been refreshed recently (5min buffer)
+      if (document.visibilityState === "visible") {
+        const timeSinceLastRefresh = Date.now() - lastTokenRefresh;
+        const fiveMinutes = 5 * 60 * 1000;
+
+        if (timeSinceLastRefresh > fiveMinutes) {
+          try {
+            // Ping API to trigger token refresh if needed
+            // The server-side getValidGoogleAccessToken() will auto-refresh
+            await fetch("/api/auth/provider");
+            setLastTokenRefresh(Date.now());
+            console.log("[GoogleDriveEditor] Token refreshed on tab activation");
+          } catch (err) {
+            // Silent failure - token refresh will happen on next API call anyway
+            console.warn("[GoogleDriveEditor] Token refresh failed:", err);
+          }
+        }
+      }
+    }
+
+    // Refresh immediately when component mounts (if needed)
+    refreshTokenOnVisibilityChange();
+
+    // Listen for visibility changes (tab activation)
+    document.addEventListener("visibilitychange", refreshTokenOnVisibilityChange);
+
+    return () => {
+      document.removeEventListener("visibilitychange", refreshTokenOnVisibilityChange);
+    };
+  }, [hasGoogleAuth, isGoogleDriveSupportedType, googleFileId, lastTokenRefresh]);
 
   // Determine Google app type from MIME type
   const getGoogleAppUrl = (fileId: string): string => {

@@ -13,7 +13,6 @@ import {
   logAuditAction,
   formatBytes,
   handleApiError,
-  deriveContentType,
   shouldLogAction,
 } from "@/lib/domain/admin/audit";
 import { AUDIT_ACTIONS, type AdminContentListItem } from "@/lib/domain/admin/api-types";
@@ -59,20 +58,7 @@ export async function GET(request: NextRequest) {
 
     // Filter by content type
     if (type) {
-      if (type === "folder") {
-        where.notePayload = null;
-        where.filePayload = null;
-        where.htmlPayload = null;
-        where.codePayload = null;
-      } else if (type === "note") {
-        where.notePayload = { isNot: null };
-      } else if (type === "file") {
-        where.filePayload = { isNot: null };
-      } else if (type === "html") {
-        where.htmlPayload = { isNot: null };
-      } else if (type === "code") {
-        where.codePayload = { isNot: null };
-      }
+      where.contentType = type as any;
     }
 
     // Query content
@@ -83,6 +69,7 @@ export async function GET(request: NextRequest) {
           id: true,
           ownerId: true,
           title: true,
+          contentType: true,
           isPublished: true,
           createdAt: true,
           updatedAt: true,
@@ -112,7 +99,7 @@ export async function GET(request: NextRequest) {
       ownerId: item.ownerId,
       ownerUsername: item.owner.username,
       title: item.title,
-      contentType: deriveContentType(item) as AdminContentListItem['contentType'],
+      contentType: item.contentType as AdminContentListItem['contentType'],
       isPublished: item.isPublished,
       createdAt: item.createdAt,
       updatedAt: item.updatedAt,

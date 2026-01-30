@@ -147,31 +147,9 @@ export async function GET(request: NextRequest) {
       ];
     }
 
-    // Content type filter (based on which payload exists)
+    // Content type filter (use contentType discriminant)
     if (typeParam && typeParam !== "all") {
-      switch (typeParam as ContentType) {
-        case "note":
-          where.notePayload = { isNot: null };
-          break;
-        case "file":
-          where.filePayload = { isNot: null };
-          break;
-        case "html":
-          where.htmlPayload = { isNot: null };
-          break;
-        case "code":
-          where.codePayload = { isNot: null };
-          break;
-        case "folder":
-          // Folders have no payload
-          where.AND = [
-            { notePayload: null },
-            { filePayload: null },
-            { htmlPayload: null },
-            { codePayload: null },
-          ];
-          break;
-      }
+      where.contentType = typeParam as ContentType;
     }
 
     // Execute search
@@ -181,6 +159,7 @@ export async function GET(request: NextRequest) {
         id: true,
         title: true,
         slug: true,
+        contentType: true,
         updatedAt: true,
         notePayload: {
           select: {
@@ -210,19 +189,13 @@ export async function GET(request: NextRequest) {
       take: 100, // Limit results
     });
 
-    // Transform results - compute contentType based on which payload exists
+    // Transform results - use contentType from database (discriminant)
     const results = items.map((item) => {
-      let contentType: ContentType = "folder";
-      if (item.notePayload) contentType = "note";
-      else if (item.filePayload) contentType = "file";
-      else if (item.htmlPayload) contentType = "html";
-      else if (item.codePayload) contentType = "code";
-
       return {
         id: item.id,
         title: item.title,
         slug: item.slug,
-        contentType,
+        contentType: item.contentType,
         updatedAt: item.updatedAt.toISOString(),
         note: item.notePayload
           ? {
