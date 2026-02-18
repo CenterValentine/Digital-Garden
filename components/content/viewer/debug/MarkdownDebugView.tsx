@@ -29,7 +29,9 @@ export function MarkdownDebugView({ content, title }: MarkdownDebugViewProps) {
       try {
         const converter = new MarkdownConverter();
         const result = await converter.convert(content, {
+          format: "markdown",
           settings: {
+            defaultFormat: "markdown",
             markdown: {
               wikiLinkStyle: "[[]]", // Obsidian-style
               codeBlockLanguagePrefix: true,
@@ -41,25 +43,44 @@ export function MarkdownDebugView({ content, title }: MarkdownDebugViewProps) {
               theme: "light",
               includeCSS: true,
               standalone: true,
-              syntaxHighlighting: true,
+              syntaxHighlight: true,
             },
-            json: {
-              pretty: true,
-              includeMetadata: false,
+            pdf: {
+              pageSize: "A4",
+              margins: { top: 72, right: 72, bottom: 72, left: 72 },
+              headerFooter: false,
+              includeTableOfContents: false,
+              colorScheme: "color",
             },
-            plaintext: {
-              preserveFormatting: false,
+            autoBackup: {
+              enabled: false,
+              frequency: "manual",
+              formats: ["markdown"],
+              storageProvider: "local",
+              includeDeleted: false,
+              maxBackups: 0,
+              lastBackupAt: null,
+            },
+            bulkExport: {
+              batchSize: 1,
+              compressionFormat: "none",
+              includeStructure: false,
+              fileNaming: "title",
             },
           },
           metadata: {
-            title,
-            contentId: "",
-            exportDate: new Date().toISOString(),
+            includeMetadata: false,
+            customMetadata: {
+              title,
+              contentId: "",
+              exportDate: new Date().toISOString(),
+            },
           },
         });
 
         if (result.success && result.files.length > 0) {
-          setMarkdown(result.files[0].content);
+          const content = result.files[0].content;
+          setMarkdown(typeof content === "string" ? content : content.toString("utf-8"));
         }
       } catch (error) {
         console.error("[MarkdownDebugView] Conversion error:", error);
