@@ -40,6 +40,14 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+# macOS Finder duplicate files (prevents " 2", " 3" suffix files)
+**/* [0-9].js
+**/* [0-9].ts
+**/* [0-9].mjs
+**/* [0-9].json
+**/* [0-9].md
+**/* [0-9].txt
+
 /lib/generated/prisma
 
 /lib/generated/prisma
