@@ -106,7 +106,7 @@ function MenuAction({
 }
 
 /**
- * SubMenu Component - Renders submenu items
+ * SubMenu Component - Renders submenu items (supports nested submenus)
  */
 function SubMenu({
   actions,
@@ -126,16 +126,72 @@ function SubMenu({
   const localSubmenuRef = useRef<HTMLDivElement>(null);
   const refToUse = submenuRef || localSubmenuRef;
   const [mounted, setMounted] = useState(false);
+  const [nestedSubmenu, setNestedSubmenu] = useState<{
+    id: string;
+    position: { x: number; y: number };
+    maxHeight?: number;
+  } | null>(null);
+  const nestedSubmenuCloseTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
+  const handleNestedSubmenuOpen = (actionId: string, buttonRect: DOMRect) => {
+    // Cancel any pending close
+    if (nestedSubmenuCloseTimeoutRef.current) {
+      clearTimeout(nestedSubmenuCloseTimeoutRef.current);
+      nestedSubmenuCloseTimeoutRef.current = null;
+    }
+
+    // Find nested submenu actions
+    const action = actions.find(a => a.id === actionId);
+    if (!action || !action.submenu || action.submenu.length === 0) return;
+
+    // Calculate nested submenu position
+    const parentRect = refToUse.current?.getBoundingClientRect();
+    if (!parentRect) return;
+
+    const estimatedHeight = Math.min(action.submenu.length * 32 + 8, 400);
+    const estimatedWidth = 180;
+
+    const calculatedPosition = calculateSubmenuPosition({
+      parentMenuRect: parentRect,
+      parentItemRect: buttonRect,
+      submenuDimensions: {
+        width: estimatedWidth,
+        height: estimatedHeight,
+      },
+      viewportPadding: 8,
+    });
+
+    setNestedSubmenu({
+      id: actionId,
+      position: {
+        x: calculatedPosition.x,
+        y: calculatedPosition.y,
+      },
+      maxHeight: calculatedPosition.maxHeight,
+    });
+  };
+
+  const handleNestedSubmenuClose = () => {
+    nestedSubmenuCloseTimeoutRef.current = setTimeout(() => {
+      setNestedSubmenu(null);
+    }, 200);
+  };
+
+  const handleNestedSubmenuMouseEnter = () => {
+    if (nestedSubmenuCloseTimeoutRef.current) {
+      clearTimeout(nestedSubmenuCloseTimeoutRef.current);
+      nestedSubmenuCloseTimeoutRef.current = null;
+    }
+  };
 
   const submenuContent = (
     <div
       ref={refToUse}
-      className="fixed z-[60] min-w-[180px] rounded-md border border-white/20 bg-white/95 shadow-lg backdrop-blur-sm dark:bg-gray-900/95 overflow-y-auto"
+      className="fixed z-[130] min-w-[180px] rounded-md border border-white/20 bg-white/95 shadow-lg backdrop-blur-sm dark:bg-gray-900/95 overflow-y-auto"
       style={{
         left: `${position.x}px`,
         top: `${position.y}px`,
@@ -146,43 +202,32 @@ function SubMenu({
     >
       <div className="py-0.5">
         {actions.map((subAction) => (
-          <button
+          <MenuAction
             key={subAction.id}
-            onClick={async () => {
-              console.log("[SubMenu] Button clicked:", subAction.id, "hasOnClick:", !!subAction.onClick);
-              if (subAction.onClick) {
-                await subAction.onClick();
-                onClose();
-              }
-            }}
-            disabled={subAction.disabled}
-            className={`
-              flex w-full items-center justify-between gap-3 px-2.5 py-1 text-left text-sm transition-colors
-              ${subAction.disabled
-                ? "cursor-not-allowed opacity-40"
-                : subAction.destructive
-                  ? "text-gray-900 hover:bg-red-500/10 hover:text-red-600 dark:text-gray-100 dark:hover:text-red-400"
-                  : "text-gray-900 hover:bg-primary/10 hover:text-primary dark:text-gray-100"
-              }
-            `}
-          >
-            {/* Left: Icon + Label */}
-            <div className="flex items-center gap-2">
-              {subAction.icon && <span className="flex-shrink-0 text-current opacity-70">{subAction.icon}</span>}
-              <span className={subAction.destructive ? "text-red-600 dark:text-red-400" : ""}>
-                {subAction.label}
-              </span>
-            </div>
-
-            {/* Right: Keyboard shortcut */}
-            {subAction.shortcut && (
-              <span className="text-[11px] text-gray-400 dark:text-gray-500">
-                {subAction.shortcut}
-              </span>
-            )}
-          </button>
+            action={subAction}
+            onClose={onClose}
+            onSubmenuOpen={handleNestedSubmenuOpen}
+            onSubmenuClose={handleNestedSubmenuClose}
+            openSubmenuId={nestedSubmenu?.id || null}
+          />
         ))}
       </div>
+
+      {/* Render nested submenu if open */}
+      {nestedSubmenu && (() => {
+        const action = actions.find(a => a.id === nestedSubmenu.id);
+        if (!action || !action.submenu) return null;
+
+        return (
+          <SubMenu
+            actions={action.submenu}
+            position={nestedSubmenu.position}
+            onClose={onClose}
+            onMouseEnter={handleNestedSubmenuMouseEnter}
+            onMouseLeave={handleNestedSubmenuClose}
+          />
+        );
+      })()}
     </div>
   );
 
@@ -372,7 +417,7 @@ export function ContextMenu({ actionProviders }: ContextMenuProps) {
   const menuContent = (
     <div
       ref={menuRef}
-      className="fixed z-50 min-w-[180px] rounded-md border border-white/20 bg-white/95 shadow-lg backdrop-blur-sm dark:bg-gray-900/95 overflow-y-auto"
+      className="fixed z-[120] min-w-[180px] rounded-md border border-white/20 bg-white/95 shadow-lg backdrop-blur-sm dark:bg-gray-900/95 overflow-y-auto"
       style={initialMenuStyle}
       onMouseLeave={handleSubmenuClose}
     >

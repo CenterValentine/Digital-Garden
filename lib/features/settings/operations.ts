@@ -54,6 +54,14 @@ export async function updateUserSettings(
     // Validate
     const validated = userSettingsSchema.parse(updated);
 
+    console.log("[Settings Utils] Saving settings:", {
+      userId,
+      updates,
+      current: current.external,
+      updated: updated.external,
+      validated: validated.external,
+    });
+
     // Save to database
     await prisma.user.update({
       where: { id: userId },
@@ -62,6 +70,8 @@ export async function updateUserSettings(
         updatedAt: new Date(),
       },
     });
+
+    console.log("[Settings Utils] Settings saved successfully");
 
     return validated;
   } catch (error) {

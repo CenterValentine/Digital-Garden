@@ -25,9 +25,26 @@ export interface ContentListItem {
   deletedAt: Date | null;
   customIcon: string | null;
   iconColor: string | null;
-  contentType: "folder" | "note" | "file" | "html" | "template" | "code";
+  contentType:
+    | "folder"
+    | "note"
+    | "file"
+    | "html"
+    | "template"
+    | "code"
+    | "external"
+    | "chat"
+    | "visualization"
+    | "data"
+    | "hope"
+    | "workflow";
   
   // Optional payload summaries
+  folder?: {
+    viewMode: string;
+    sortMode: string | null;
+    includeReferencedContent: boolean;
+  };
   note?: {
     wordCount?: number;
     characterCount?: number;
@@ -38,6 +55,7 @@ export interface ContentListItem {
     mimeType: string;
     fileSize: string;
     uploadStatus: "uploading" | "ready" | "failed";
+    url?: string | null;
     thumbnailUrl?: string | null;
     width?: number | null;
     height?: number | null;
@@ -47,6 +65,10 @@ export interface ContentListItem {
   };
   code?: {
     language: string;
+  };
+  external?: {
+    url: string;
+    subtype: string;
   };
   childCount?: number;
 }
@@ -62,7 +84,19 @@ export interface ContentDetailResponse {
   isPublished: boolean;
   customIcon: string | null;
   iconColor: string | null;
-  contentType: "folder" | "note" | "file" | "html" | "template" | "code";
+  contentType:
+    | "folder"
+    | "note"
+    | "file"
+    | "html"
+    | "template"
+    | "code"
+    | "external"
+    | "chat"
+    | "visualization"
+    | "data"
+    | "hope"
+    | "workflow";
   createdAt: Date;
   updatedAt: Date;
   deletedAt: Date | null;
@@ -104,6 +138,25 @@ export interface ContentDetailResponse {
     language: string;
     metadata: Record<string, unknown>;
   };
+  // Phase 2: Folder payload
+  folder?: {
+    viewMode: string;
+    sortMode: string | null;
+    viewPrefs: Record<string, unknown>;
+    includeReferencedContent: boolean;
+  };
+  // Phase 2: External payload
+  external?: {
+    url: string;
+    subtype: string;
+    preview: Record<string, unknown>;
+  };
+  // Visualization payload
+  visualization?: {
+    engine: string;
+    config: Record<string, unknown>;
+    data: Record<string, unknown>;
+  };
 }
 
 // ============================================================
@@ -116,7 +169,7 @@ export interface CreateContentRequest {
   categoryId?: string | null;
   customIcon?: string | null;
   iconColor?: string | null;
-  
+
   // Content type (exactly one should be specified)
   isFolder?: boolean;
   tiptapJson?: JSONContent;
@@ -127,6 +180,18 @@ export interface CreateContentRequest {
   templateMetadata?: Record<string, unknown>;
   code?: string;
   language?: string;
+  url?: string; // Phase 2: External link URL
+  subtype?: string; // Phase 2: "website" | "application"
+
+  // Visualization fields
+  engine?: string; // "diagrams-net" | "excalidraw" | "mermaid"
+  chartConfig?: Record<string, unknown>; // Engine-specific configuration
+  chartData?: Record<string, unknown>; // Engine-specific data
+
+  // Phase 2: Folder-specific options (optional)
+  viewMode?: "list" | "gallery" | "kanban" | "dashboard" | "canvas";
+  sortMode?: string | null;
+  includeReferencedContent?: boolean;
 }
 
 export interface UpdateContentRequest {
@@ -137,13 +202,23 @@ export interface UpdateContentRequest {
   customIcon?: string | null;
   iconColor?: string | null;
   displayOrder?: number;
-  
+
   // Payload updates
   tiptapJson?: JSONContent;
   markdown?: string;
   html?: string;
   code?: string;
   language?: string;
+  url?: string; // Phase 2: External link URL update
+
+  // Phase 2: Folder payload updates
+  viewMode?: "list" | "gallery" | "kanban" | "dashboard" | "canvas";
+  sortMode?: string | null;
+  includeReferencedContent?: boolean;
+  viewPrefs?: Record<string, unknown>;
+
+  // Visualization payload updates
+  visualizationData?: Record<string, unknown>; // Engine-specific data (contains xml, elements, or source)
 }
 
 export interface MoveContentRequest {
@@ -229,10 +304,13 @@ export type ContentWhereInput = Prisma.ContentNodeWhereInput & {
 // PAYLOAD DATA TYPES (for creation)
 // ============================================================
 
-export type CreatePayloadData = 
+export type CreatePayloadData =
+  | { folderPayload: { create: Prisma.FolderPayloadCreateWithoutContentInput } }
   | { notePayload: { create: Prisma.NotePayloadCreateWithoutContentInput } }
   | { filePayload: { create: Prisma.FilePayloadCreateWithoutContentInput } }
   | { htmlPayload: { create: Prisma.HtmlPayloadCreateWithoutContentInput } }
   | { codePayload: { create: Prisma.CodePayloadCreateWithoutContentInput } }
-  | Record<string, never>; // Empty object for folders
+  | { externalPayload: { create: Prisma.ExternalPayloadCreateWithoutContentInput } }
+  | { visualizationPayload: { create: Prisma.VisualizationPayloadCreateWithoutContentInput } }
+  | Record<string, never>; // Empty object for backward compatibility only
 

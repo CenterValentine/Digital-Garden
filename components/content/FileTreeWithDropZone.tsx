@@ -21,6 +21,15 @@ interface FileTreeWithDropZoneProps {
   onDelete?: (ids: string | string[]) => Promise<void>;
   onDuplicate?: (ids: string[]) => Promise<void>;
   onDownload?: (ids: string[]) => Promise<void>;
+  onChangeIcon?: (id: string) => void;
+  /** Phase 2: Folder view mode switching */
+  onSetFolderView?: (id: string, viewMode: "list" | "gallery" | "kanban" | "dashboard" | "canvas") => Promise<void>;
+  /** Phase 2: Toggle referenced content visibility for folder */
+  onToggleReferencedContent?: (id: string, currentValue: boolean) => Promise<void>;
+  /** Visualization engine-specific creators */
+  onCreateVisualizationMermaid?: (parentId: string | null) => Promise<void>;
+  onCreateVisualizationExcalidraw?: (parentId: string | null) => Promise<void>;
+  onCreateVisualizationDiagramsNet?: (parentId: string | null) => Promise<void>;
   height?: number;
   editingNodeId?: string;
   expandNodeId?: string | null;

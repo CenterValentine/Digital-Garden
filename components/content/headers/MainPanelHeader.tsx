@@ -1,7 +1,12 @@
 /**
  * Main Panel Header / Tab Bar (Server Component)
  *
- * Renders immediately to show tab structure.
+ * Shows the filename tab for the active document.
+ * Renders immediately to show tab structure without JS.
+ *
+ * TODO: Make filename dynamic based on selected content
+ * TODO: Implement tab close functionality
+ * TODO: Support multiple tabs for multi-note views
  */
 
 import { FileText, X } from "lucide-react";
@@ -18,6 +23,7 @@ export function MainPanelHeader() {
         backdropFilter: glass1.backdropFilter,
       }}
     >
+      {/* TODO: Replace hardcoded filename with dynamic content title */}
       <div className="flex items-center gap-1 border-r border-white/10 px-3 py-2 text-sm">
         <FileText className="h-4 w-4" />
         <span>Welcome.md</span>

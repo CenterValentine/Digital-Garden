@@ -135,24 +135,6 @@ export async function calculateUserStorage(userId: string): Promise<number> {
   return Number(result._sum.fileSize || 0);
 }
 
-/**
- * Derive content type from payload presence
- *
- * @param content - Content node with payloads
- * @returns Content type string
- */
-export function deriveContentType(content: {
-  notePayload?: unknown;
-  filePayload?: unknown;
-  htmlPayload?: unknown;
-  codePayload?: unknown;
-}): string {
-  if (content.notePayload) return "note";
-  if (content.filePayload) return "file";
-  if (content.htmlPayload) return "html";
-  if (content.codePayload) return "code";
-  return "folder";
-}
 
 /**
  * Generate CSV from audit logs

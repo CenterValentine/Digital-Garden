@@ -10,7 +10,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/database/client";
 import { requireAuth } from "@/lib/infrastructure/auth/middleware";
 import {
-  deriveContentType,
   generateUniqueSlug,
   extractSearchTextFromTipTap,
   extractSearchTextFromHtml,
@@ -72,7 +71,6 @@ export async function GET(
     }
 
     // Format response
-    const contentType = deriveContentType(content as any);
     const response: ContentDetailResponse = {
       id: content.id,
       ownerId: content.ownerId,
@@ -84,7 +82,7 @@ export async function GET(
       isPublished: content.isPublished,
       customIcon: content.customIcon,
       iconColor: content.iconColor,
-      contentType,
+      contentType: content.contentType,
       createdAt: content.createdAt,
       updatedAt: content.updatedAt,
       deletedAt: content.deletedAt,
@@ -133,6 +131,31 @@ export async function GET(
         code: content.codePayload.code,
         language: content.codePayload.language,
         metadata: content.codePayload.metadata as any,
+      };
+    }
+    // Phase 2: Folder payload
+    if (content.folderPayload) {
+      response.folder = {
+        viewMode: content.folderPayload.viewMode,
+        sortMode: content.folderPayload.sortMode,
+        viewPrefs: content.folderPayload.viewPrefs as any,
+        includeReferencedContent: content.folderPayload.includeReferencedContent,
+      };
+    }
+    // Phase 2: External payload
+    if (content.externalPayload) {
+      response.external = {
+        url: content.externalPayload.url,
+        subtype: content.externalPayload.subtype || "website",
+        preview: content.externalPayload.preview as any,
+      };
+    }
+    // Visualization payload
+    if (content.visualizationPayload) {
+      response.visualization = {
+        engine: content.visualizationPayload.engine,
+        config: content.visualizationPayload.config as any,
+        data: content.visualizationPayload.data as any,
       };
     }
 
@@ -214,6 +237,12 @@ export async function PATCH(
       customIcon,
       iconColor,
       displayOrder,
+      url, // Phase 2: External link URL
+      viewMode, // Phase 2: Folder view mode
+      sortMode, // Phase 2: Folder sort mode
+      includeReferencedContent, // Phase 2: Folder referenced content
+      viewPrefs, // Phase 2: Folder view preferences
+      visualizationData, // Visualization payload data (engine-specific)
     } = body;
 
     // Prepare update data
@@ -324,6 +353,52 @@ export async function PATCH(
       });
     }
 
+    // Phase 2: Update external link URL
+    if (existing.externalPayload && url !== undefined) {
+      await prisma.externalPayload.update({
+        where: { contentId: id },
+        data: {
+          url,
+        },
+      });
+    }
+
+    // Phase 2: Update folder payload
+    if (existing.folderPayload) {
+      const folderUpdateData: Record<string, unknown> = {};
+
+      if (viewMode !== undefined) {
+        folderUpdateData.viewMode = viewMode;
+      }
+      if (sortMode !== undefined) {
+        folderUpdateData.sortMode = sortMode;
+      }
+      if (includeReferencedContent !== undefined) {
+        folderUpdateData.includeReferencedContent = includeReferencedContent;
+      }
+      if (viewPrefs !== undefined) {
+        folderUpdateData.viewPrefs = viewPrefs;
+      }
+
+      if (Object.keys(folderUpdateData).length > 0) {
+        await prisma.folderPayload.update({
+          where: { contentId: id },
+          data: folderUpdateData,
+        });
+      }
+    }
+
+    // Update visualization payload
+    if (existing.visualizationPayload && visualizationData !== undefined) {
+      await prisma.visualizationPayload.update({
+        where: { contentId: id },
+        data: {
+          data: visualizationData as any, // Cast to any for JSON type compatibility
+          updatedAt: new Date(),
+        },
+      });
+    }
+
     // Update content node
     const updated = await prisma.contentNode.update({
       where: { id },
@@ -373,7 +448,6 @@ export async function PATCH(
     }
 
     // Format response
-    const contentType = deriveContentType(updated as any);
     const response: ContentDetailResponse = {
       id: updated.id,
       ownerId: updated.ownerId,
@@ -385,13 +459,21 @@ export async function PATCH(
       isPublished: updated.isPublished,
       customIcon: updated.customIcon,
       iconColor: updated.iconColor,
-      contentType,
+      contentType: updated.contentType,
       createdAt: updated.createdAt,
       updatedAt: updated.updatedAt,
       deletedAt: updated.deletedAt,
     };
 
     // Include payload data
+    if (updated.folderPayload) {
+      response.folder = {
+        viewMode: updated.folderPayload.viewMode,
+        sortMode: updated.folderPayload.sortMode,
+        viewPrefs: updated.folderPayload.viewPrefs as any,
+        includeReferencedContent: updated.folderPayload.includeReferencedContent,
+      };
+    }
     if (updated.notePayload) {
       response.note = {
         tiptapJson: updated.notePayload.tiptapJson as any,
@@ -414,6 +496,13 @@ export async function PATCH(
         code: updated.codePayload.code,
         language: updated.codePayload.language,
         metadata: updated.codePayload.metadata as any,
+      };
+    }
+    if (updated.externalPayload) {
+      response.external = {
+        url: updated.externalPayload.url,
+        subtype: updated.externalPayload.subtype || "website",
+        preview: updated.externalPayload.preview as any,
       };
     }
 

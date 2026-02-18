@@ -12,7 +12,6 @@ import { requireRole } from "@/lib/infrastructure/auth/middleware";
 import {
   logAuditAction,
   handleApiError,
-  deriveContentType,
 } from "@/lib/domain/admin/audit";
 import { AUDIT_ACTIONS, type AdminContentDetail } from "@/lib/domain/admin/api-types";
 
@@ -31,7 +30,16 @@ export async function GET(
     // Fetch content with full details (but truncate payload for security)
     const content = await prisma.contentNode.findUnique({
       where: { id: contentId },
-      include: {
+      select: {
+        id: true,
+        ownerId: true,
+        title: true,
+        slug: true,
+        contentType: true,
+        isPublished: true,
+        createdAt: true,
+        updatedAt: true,
+        deletedAt: true,
         owner: { select: { username: true } },
         notePayload: { select: { searchText: true, metadata: true } },
         filePayload: {
@@ -66,7 +74,7 @@ export async function GET(
       ownerUsername: content.owner.username,
       title: content.title,
       slug: content.slug,
-      contentType: deriveContentType(content),
+      contentType: content.contentType,
       isPublished: content.isPublished,
       createdAt: content.createdAt,
       updatedAt: content.updatedAt,

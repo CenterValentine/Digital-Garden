@@ -42,6 +42,8 @@ export {
   exchangeCodeForTokens,
   findOrCreateOAuthUser,
   linkOAuthAccount,
+  refreshGoogleAccessToken,
+  getValidGoogleAccessToken,
 } from "./oauth";
 
 // Password utilities

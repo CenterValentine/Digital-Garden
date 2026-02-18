@@ -186,6 +186,104 @@ export async function findOrCreateOAuthUser(
 }
 
 /**
+ * Refresh Google access token using refresh token
+ * @param refreshToken - Google refresh token
+ * @returns New access token, refresh token (if rotated), and expiration time
+ */
+export async function refreshGoogleAccessToken(refreshToken: string): Promise<{
+  accessToken: string;
+  refreshToken?: string;
+  expiresIn: number;
+}> {
+  if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) {
+    throw new Error("Google OAuth not configured");
+  }
+
+  const client = new OAuth2Client(
+    GOOGLE_CLIENT_ID,
+    GOOGLE_CLIENT_SECRET
+  );
+
+  // Set the refresh token
+  client.setCredentials({
+    refresh_token: refreshToken,
+  });
+
+  try {
+    // Request new access token
+    const { credentials } = await client.refreshAccessToken();
+
+    if (!credentials.access_token) {
+      throw new Error("Failed to refresh access token");
+    }
+
+    return {
+      accessToken: credentials.access_token,
+      refreshToken: credentials.refresh_token || undefined, // Google may rotate refresh token
+      expiresIn: credentials.expiry_date
+        ? Math.floor((credentials.expiry_date - Date.now()) / 1000)
+        : 3600, // Default to 1 hour
+    };
+  } catch (error) {
+    throw new Error(`Failed to refresh Google token: ${error}`);
+  }
+}
+
+/**
+ * Get valid Google access token, refreshing if expired
+ * @param userId - User ID
+ * @returns Valid access token
+ * @throws Error if no Google account linked or refresh fails
+ */
+export async function getValidGoogleAccessToken(userId: string): Promise<string> {
+  const account = await prisma.account.findFirst({
+    where: {
+      userId,
+      provider: "google",
+    },
+  });
+
+  if (!account || !account.accessToken) {
+    throw new Error("No Google account linked");
+  }
+
+  // Check if token is still valid (with 5-minute buffer)
+  const now = new Date();
+  const expiresAt = account.expiresAt ? new Date(Number(account.expiresAt)) : null;
+
+  if (expiresAt && expiresAt > new Date(now.getTime() + 5 * 60 * 1000)) {
+    // Token is still valid
+    return account.accessToken;
+  }
+
+  // Token is expired or about to expire, refresh it
+  if (!account.refreshToken) {
+    throw new Error("No refresh token available. Please re-authenticate.");
+  }
+
+  try {
+    const { accessToken, refreshToken, expiresIn } = await refreshGoogleAccessToken(
+      account.refreshToken
+    );
+
+    // Update account with new tokens
+    await prisma.account.update({
+      where: { id: account.id },
+      data: {
+        accessToken,
+        refreshToken: refreshToken || account.refreshToken, // Keep old refresh token if not rotated
+        expiresAt: new Date(Date.now() + expiresIn * 1000),
+      },
+    });
+
+    return accessToken;
+  } catch (error) {
+    // Refresh failed, user needs to re-authenticate
+    throw new Error("Token refresh failed. Please re-authenticate with Google.");
+  }
+}
+
+/**
  * Link OAuth account to existing user
  * @param userId - User ID
  * @param provider - OAuth provider

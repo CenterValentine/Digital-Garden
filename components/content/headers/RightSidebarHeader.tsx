@@ -3,10 +3,14 @@
  *
  * Tab navigation for switching between Backlinks, Outline, and Chat.
  * Uses inline SVG for consistency with LeftSidebarHeader pattern.
+ *
+ * Includes collapse toggle button for hiding/showing the panel.
  */
 
 "use client";
 
+import { PanelRightClose } from "lucide-react";
+import { useRightPanelCollapseStore } from "@/state/right-panel-collapse-store";
 import type { RightSidebarTab } from "../RightSidebar";
 
 interface RightSidebarHeaderProps {
@@ -15,9 +19,11 @@ interface RightSidebarHeaderProps {
 }
 
 export function RightSidebarHeader({ activeTab, onTabChange }: RightSidebarHeaderProps) {
+  const { toggleCollapsed } = useRightPanelCollapseStore();
+
   return (
-    <div className="flex h-12 shrink-0 items-center border-b border-white/10">
-      <div className="flex w-full items-center justify-around">
+    <div className="flex h-12 shrink-0 items-center justify-between border-b border-white/10 px-4">
+      <div className="flex flex-1 items-center justify-around">
         {/* Backlinks Tab */}
         <button
           onClick={() => onTabChange("backlinks")}
@@ -122,6 +128,16 @@ export function RightSidebarHeader({ activeTab, onTabChange }: RightSidebarHeade
           </svg>
         </button>
       </div>
+
+      {/* Panel collapse toggle */}
+      <button
+        onClick={toggleCollapsed}
+        className="rounded p-1 transition-colors hover:bg-white/10 text-gray-400 hover:text-gold-primary"
+        title="Collapse sidebar (Cmd+.)"
+        type="button"
+      >
+        <PanelRightClose className="h-4 w-4" />
+      </button>
     </div>
   );
 }

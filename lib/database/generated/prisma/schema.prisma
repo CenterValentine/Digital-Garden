@@ -7,23 +7,72 @@ datasource db {
   provider = "postgresql"
 }
 
+enum ContentType {
+  // Phase 1 types (existing)
+  folder
+  note
+  file
+  html
+  template
+  code
+
+  // Phase 2 types (new)
+  external // ExternalPayload - bookmarks with Open Graph preview
+  chat // ChatPayload - chat conversations (stub)
+  visualization // VisualizationPayload - charts/graphs (stub)
+  data // DataPayload - structured data tables (stub)
+  hope // HopePayload - goals/aspirations (stub)
+  workflow // WorkflowPayload - automation workflows (stub, inert)
+}
+
+enum ContentRole {
+  primary // Shown in file tree by default
+  referenced // Hidden by default (toggle to show) - embedded/linked content
+  system // Always hidden - internal system nodes
+}
+
+enum FolderViewMode {
+  list // Default list view (current behavior)
+  gallery // Media-focused grid with thumbnails
+  kanban // Drag-drop cards (project management)
+  dashboard // Rearrangeable tiles (overview layout)
+  canvas // Visual graph (mind map style)
+}
+
 model ContentNode {
-  id            String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  ownerId       String           @db.Uuid
-  title         String           @db.VarChar(255)
-  slug          String           @db.VarChar(255)
-  parentId      String?          @db.Uuid
-  displayOrder  Int              @default(0)
-  categoryId    String?          @db.Uuid
-  isPublished   Boolean          @default(false)
-  createdAt     DateTime         @default(now()) @db.Timestamptz(6)
-  updatedAt     DateTime         @updatedAt @db.Timestamptz(6)
-  deletedAt     DateTime?        @db.Timestamptz(6)
-  deletedBy     String?          @db.Uuid
-  customIcon    String?          @db.VarChar(100)
-  iconColor     String?          @db.VarChar(20)
-  auditLogs     AuditLog[]       @relation("AuditedContent")
-  codePayload   CodePayload?
+  id           String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ownerId      String      @db.Uuid
+  title        String      @db.VarChar(255)
+  slug         String      @db.VarChar(255)
+  contentType  ContentType // Required after Phase 1 backfill
+  role         ContentRole @default(primary) // Phase 2: visibility control
+  parentId     String?     @db.Uuid
+  displayOrder Int         @default(0)
+  categoryId   String?     @db.Uuid
+  isPublished  Boolean     @default(false)
+  createdAt    DateTime    @default(now()) @db.Timestamptz(6)
+  updatedAt    DateTime    @updatedAt @db.Timestamptz(6)
+  deletedAt    DateTime?   @db.Timestamptz(6)
+  deletedBy    String?     @db.Uuid
+  customIcon   String?     @db.VarChar(100)
+  iconColor    String?     @db.VarChar(20)
+  auditLogs    AuditLog[]  @relation("AuditedContent")
+
+  // Phase 1 payloads
+  codePayload CodePayload?
+  filePayload FilePayload?
+  htmlPayload HtmlPayload?
+  notePayload NotePayload?
+
+  // Phase 2 payloads
+  folderPayload        FolderPayload?
+  externalPayload      ExternalPayload?
+  chatPayload          ChatPayload?
+  visualizationPayload VisualizationPayload?
+  dataPayload          DataPayload?
+  hopePayload          HopePayload?
+  workflowPayload      WorkflowPayload?
+
   history       ContentHistory[]
   sourceLinks   ContentLink[]    @relation("SourceContent")
   targetLinks   ContentLink[]    @relation("TargetContent")
@@ -33,9 +82,6 @@ model ContentNode {
   children      ContentNode[]    @relation("Hierarchy")
   contentPath   ContentPath?
   contentTags   ContentTag[]
-  filePayload   FilePayload?
-  htmlPayload   HtmlPayload?
-  notePayload   NotePayload?
   trashBinEntry TrashBin?
   viewGrants    ViewGrant[]
 
@@ -44,6 +90,7 @@ model ContentNode {
   @@index([parentId, displayOrder])
   @@index([categoryId, displayOrder])
   @@index([deletedAt])
+  @@index([role]) // Phase 2: for filtering by visibility
 }
 
 model NotePayload {
@@ -216,13 +263,13 @@ model User {
   passwordHash    String?                 @db.Char(60)
   email           String                  @unique @db.VarChar(255)
   role            UserRole                @default(guest)
-  settings        Json?                   @db.JsonB
-  settingsVersion Int                     @default(1)
   createdAt       DateTime                @default(now()) @db.Timestamptz(6)
   updatedAt       DateTime                @updatedAt @db.Timestamptz(6)
+  settings        Json?
+  settingsVersion Int                     @default(1)
   accounts        Account[]
-  adminActions    AuditLog[]              @relation("AdminActions")
   auditTargets    AuditLog[]              @relation("AuditTargets")
+  adminActions    AuditLog[]              @relation("AdminActions")
   categories      Category[]
   contentHistory  ContentHistory[]
   contentNodes    ContentNode[]
@@ -256,8 +303,8 @@ model Tag {
   name        String       @db.VarChar(50)
   slug        String       @db.VarChar(50)
   createdAt   DateTime     @default(now()) @db.Timestamptz(6)
-  color       String?      @db.VarChar(7)
   userId      String       @db.Uuid
+  color       String?      @db.VarChar(7)
   contentTags ContentTag[]
   user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -318,9 +365,9 @@ model AuditLog {
   ipAddress       String?      @db.VarChar(45)
   userAgent       String?      @db.VarChar(512)
   createdAt       DateTime     @default(now()) @db.Timestamptz(6)
+  targetContent   ContentNode? @relation("AuditedContent", fields: [targetContentId], references: [id])
+  targetUser      User?        @relation("AuditTargets", fields: [targetUserId], references: [id])
   user            User         @relation("AdminActions", fields: [userId], references: [id], onDelete: Cascade)
-  targetUser      User?        @relation("AuditTargets", fields: [targetUserId], references: [id], onDelete: SetNull)
-  targetContent   ContentNode? @relation("AuditedContent", fields: [targetContentId], references: [id], onDelete: SetNull)
 
   @@index([userId, createdAt(sort: Desc)])
   @@index([targetUserId, createdAt(sort: Desc)])
@@ -345,4 +392,101 @@ enum StorageProvider {
   r2
   s3
   vercel
+}
+
+// ============================================================
+// Phase 2 Payload Models
+// ============================================================
+
+model FolderPayload {
+  contentId                String         @id @db.Uuid
+  viewMode                 FolderViewMode @default(list)
+  sortMode                 String?        @db.VarChar(20) // "asc" | "desc" | null (null = manual/tree order)
+  viewPrefs                Json           @default("{}") // View-specific settings (grid size, tile layout, etc.)
+  includeReferencedContent Boolean        @default(false) // Show referenced content in this folder view
+  createdAt                DateTime       @default(now()) @db.Timestamptz(6)
+  updatedAt                DateTime       @updatedAt @db.Timestamptz(6)
+
+  content ContentNode @relation(fields: [contentId], references: [id], onDelete: Cascade)
+
+  @@index([viewMode])
+}
+
+model ExternalPayload {
+  contentId String   @id @db.Uuid
+  url       String // External URL (HTTPS-only by default)
+  subtype   String?  @default("website") @db.VarChar(20) // "website" | "application" (cosmetic)
+  preview   Json     @default("{}") // { mode: "none" | "open_graph", cached: {...} }
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+
+  content ContentNode @relation(fields: [contentId], references: [id], onDelete: Cascade)
+
+  @@index([url])
+}
+
+model ChatPayload {
+  contentId String   @id @db.Uuid
+  messages  Json     @default("[]") // Array of { role, content, timestamp }
+  metadata  Json     @default("{}") // { model, temperature, etc. }
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+
+  content ContentNode @relation(fields: [contentId], references: [id], onDelete: Cascade)
+}
+
+model VisualizationPayload {
+  contentId String   @id @db.Uuid
+  engine    String   @db.VarChar(50) // "chartjs" | "d3" | "plotly" | "mermaid"
+  config    Json     @default("{}") // Engine-specific configuration
+  data      Json     @default("{}") // Visualization data
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+
+  content ContentNode @relation(fields: [contentId], references: [id], onDelete: Cascade)
+
+  @@index([engine])
+}
+
+model DataPayload {
+  contentId String   @id @db.Uuid
+  mode      String   @db.VarChar(20) // "inline" | "external" | "query"
+  source    Json     @default("{}") // Table data or external source config
+  schema    Json     @default("{}") // Column definitions
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+
+  content ContentNode @relation(fields: [contentId], references: [id], onDelete: Cascade)
+
+  @@index([mode])
+}
+
+model HopePayload {
+  contentId   String    @id @db.Uuid
+  kind        String    @db.VarChar(50) // "goal" | "aspiration" | "milestone" | "dream"
+  status      String    @db.VarChar(20) // "active" | "achieved" | "deferred" | "archived"
+  description String? // Optional rich description
+  targetDate  DateTime? @db.Timestamptz(6)
+  metadata    Json      @default("{}") // Progress tracking, tags, etc.
+  createdAt   DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt   DateTime  @updatedAt @db.Timestamptz(6)
+
+  content ContentNode @relation(fields: [contentId], references: [id], onDelete: Cascade)
+
+  @@index([kind])
+  @@index([status])
+}
+
+model WorkflowPayload {
+  contentId  String   @id @db.Uuid
+  engine     String   @db.VarChar(50) // "temporal" | "n8n" | "zapier" (stub only)
+  definition Json     @default("{}") // Workflow definition
+  enabled    Boolean  @default(false) // ALWAYS false (execution blocked in Phase 2)
+  metadata   Json     @default("{}") // Triggers, schedule, etc.
+  createdAt  DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt  DateTime @updatedAt @db.Timestamptz(6)
+
+  content ContentNode @relation(fields: [contentId], references: [id], onDelete: Cascade)
+
+  @@index([enabled])
 }

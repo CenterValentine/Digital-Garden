@@ -147,6 +147,7 @@ export async function POST(request: NextRequest) {
         ownerId: session.user.id,
         title: contentTitle,
         slug,
+        contentType: "file",
         parentId: parentId || null,
         customIcon: customIcon || null,
         iconColor: iconColor || null,

@@ -14,9 +14,11 @@ import TaskItem from "@tiptap/extension-task-item";
 import Link from "@tiptap/extension-link";
 import { Table } from "@tiptap/extension-table";
 import TableRow from "@tiptap/extension-table-row";
+import TableHeader from "@tiptap/extension-table-header";
 import TableCell from "@tiptap/extension-table-cell";
 import CharacterCount from "@tiptap/extension-character-count";
 import { common, createLowlight } from "lowlight";
+import { Callout } from "./extensions/callout";
 
 // Create lowlight instance with common languages
 const lowlight = createLowlight(common);
@@ -59,8 +61,7 @@ export function getServerExtensions(): Extensions {
     Placeholder.configure({
       placeholder: ({ node }) => {
         if (node.type.name === "heading") {
-          const level = node.attrs.level || 1;
-          return `H${level} Header`;
+          return "Heading...";
         }
         return "Start writing...";
       },
@@ -80,17 +81,15 @@ export function getServerExtensions(): Extensions {
       },
     }),
 
-    Table.configure({
-      resizable: true,
-      allowTableNodeSelection: true,
-    }),
-    TableRow.extend({
-      content: "tableCell*",
-    }),
+    Table,
+    TableRow,
+    TableHeader,
     TableCell,
-    // Note: TableHeader excluded to prevent header rows
 
     CharacterCount,
+
+    // M7: Callouts (server-side markdown parsing)
+    Callout,
 
     // Note: SlashCommands excluded - it uses React components
   ];

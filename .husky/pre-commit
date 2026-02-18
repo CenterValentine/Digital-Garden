@@ -1,0 +1,6 @@
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+# Clean up macOS Finder duplicate files before commit
+echo "🧹 Cleaning macOS Finder duplicate files..."
+find . -type f -name "* [0-9].*" ! -path "./node_modules/*" ! -path "./.git/*" -delete 2>/dev/null && echo "✓ Removed Finder duplicates" || echo "✓ No duplicates found"

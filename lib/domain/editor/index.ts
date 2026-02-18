@@ -7,15 +7,15 @@
 // Extension configurations (client-side with React components)
 export {
   getEditorExtensions,
+  getViewerExtensions,
+  getPlainTextExtensions,
   type EditorExtensionsOptions,
 } from "./extensions-client";
 
 // Extension configurations (server-side, no React components)
 export {
   getServerExtensions,
-  getViewerExtensions,
-  getPlainTextExtensions,
-} from "./extensions-client";
+} from "./extensions-server";
 
 // Re-export individual extensions for advanced use cases
 export { SlashCommands } from "./commands/slash-commands";

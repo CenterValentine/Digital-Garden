@@ -10,8 +10,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { getSession } from "@/lib/infrastructure/auth/session";
-import { prisma } from "@/lib/database/client";
+import { getSession, getValidGoogleAccessToken } from "@/lib/infrastructure/auth";
 
 interface DeleteRequest {
   fileId: string;
@@ -39,32 +38,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get user's Google OAuth tokens
-    const account = await prisma.account.findFirst({
-      where: {
-        userId: session.user.id,
-        provider: "google",
-      },
-      select: {
-        accessToken: true,
-        refreshToken: true,
-        expiresAt: true,
-      },
-    });
-
-    if (!account || !account.accessToken) {
+    // Get valid Google access token (automatically refreshes if expired)
+    let accessToken: string;
+    try {
+      accessToken = await getValidGoogleAccessToken(session.user.id);
+    } catch (error) {
       return NextResponse.json(
-        { error: "Google authentication required" },
-        { status: 403 }
-      );
-    }
-
-    // Check if token is expired
-    let accessToken = account.accessToken;
-    if (account.expiresAt && new Date() > account.expiresAt) {
-      // TODO: Implement token refresh
-      return NextResponse.json(
-        { error: "Google access token expired. Please re-authenticate." },
+        {
+          error:
+            error instanceof Error
+              ? error.message
+              : "Google authentication required",
+        },
         { status: 403 }
       );
     }

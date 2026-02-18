@@ -1,9 +1,9 @@
 /**
- * Create Blank Office Document
+ * Create Blank Office Document or JSON File
  *
  * POST /api/content/content/create-document
  *
- * Creates a blank .docx or .xlsx file, uploads to storage, and creates ContentNode
+ * Creates a blank .docx, .xlsx, or .json file, uploads to storage, and creates ContentNode
  * Similar to file upload but generates the file content programmatically
  */
 
@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
       provider = null,
     }: {
       fileName: string;
-      fileType: "docx" | "xlsx";
+      fileType: "docx" | "xlsx" | "json";
       parentId?: string | null;
       provider?: "r2" | "s3" | "vercel" | null;
     } = body;
@@ -45,25 +45,32 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!fileType || !["docx", "xlsx"].includes(fileType)) {
+    if (!fileType || !["docx", "xlsx", "json"].includes(fileType)) {
       return NextResponse.json(
         {
           success: false,
           error: {
             code: "VALIDATION_ERROR",
-            message: "File type must be 'docx' or 'xlsx'",
+            message: "File type must be 'docx', 'xlsx', or 'json'",
           },
         },
         { status: 400 }
       );
     }
 
-    // Ensure fileName has correct extension
+    // Use fileName exactly as provided (no modification)
+    const finalFileName = fileName;
     const extension = `.${fileType}`;
-    const finalFileName = fileName.endsWith(extension) ? fileName : `${fileName}${extension}`;
 
-    // Generate blank document
-    const buffer = await createBlankOfficeDocument(finalFileName);
+    // Generate blank document or JSON file
+    let buffer: Buffer;
+    if (fileType === "json") {
+      // Create blank JSON object
+      buffer = Buffer.from("{}", "utf-8");
+    } else {
+      // Generate blank Office document (docx or xlsx)
+      buffer = await createBlankOfficeDocument(fileType as "docx" | "xlsx", finalFileName);
+    }
     const fileSize = buffer.length;
 
     // Calculate checksum
@@ -80,14 +87,31 @@ export async function POST(request: NextRequest) {
     );
 
     // Upload to storage
-    const mimeType = fileType === "docx"
-      ? "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-      : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+    const mimeType =
+      fileType === "docx" ? "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+      : fileType === "xlsx" ? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+      : "application/json";
 
     await storageProvider.uploadFile(storageKey, buffer, mimeType);
 
     // Determine which provider was actually used
     const usedProvider = provider || "r2";
+
+    // Calculate displayOrder to place new file at the top
+    // Find the minimum displayOrder among siblings to place this one above all others
+    const siblings = await prisma.contentNode.findMany({
+      where: {
+        ownerId: session.user.id,
+        parentId: parentId || null,
+        deletedAt: null,
+      },
+      select: { displayOrder: true },
+      orderBy: { displayOrder: "asc" },
+      take: 1,
+    });
+
+    const minDisplayOrder = siblings.length > 0 ? siblings[0].displayOrder : 0;
+    const newDisplayOrder = minDisplayOrder - 1;
 
     // Generate slug and create ContentNode with retry logic
     let slug = await generateUniqueSlug(finalFileName, session.user.id);
@@ -105,8 +129,9 @@ export async function POST(request: NextRequest) {
             ownerId: session.user.id,
             title: finalFileName,
             slug,
+            contentType: "file",
             parentId: parentId || null,
-            displayOrder: 0,
+            displayOrder: newDisplayOrder,
             filePayload: {
               create: {
                 fileName: finalFileName,

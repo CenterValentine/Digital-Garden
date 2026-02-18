@@ -7,16 +7,20 @@
 
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { toast } from "sonner";
 import { FileTreeWithDropZone } from "../FileTreeWithDropZone";
 import { FileTreeSkeleton } from "../skeletons/FileTreeSkeleton";
 import { SearchPanel } from "../SearchPanel";
 import { ConfirmDialog } from "../ConfirmDialog";
+import { ExternalLinkDialog } from "../external/ExternalLinkDialog";
+import { IconSelector } from "../IconSelector";
 import { LeftSidebarStatusBar } from "../LeftSidebarStatusBar";
+import { RootNodeHeader } from "../file-tree/RootNodeHeader";
 import { useContentStore } from "@/state/content-store";
 import { useSearchStore } from "@/state/search-store";
 import { useTreeStateStore } from "@/state/tree-state-store";
+import { useContextMenuStore } from "@/state/context-menu-store";
 import type { TreeNode, ContentType } from "@/lib/domain/content/types";
 
 interface TreeApiResponse {
@@ -38,7 +42,11 @@ interface TreeApiResponse {
 
 interface LeftSidebarContentProps {
   refreshTrigger: number;
-  createTrigger?: { type: "folder" | "note" | "docx" | "xlsx"; timestamp: number } | null;
+  createTrigger?: {
+    type: "folder" | "note" | "docx" | "xlsx" | "json" | "code" | "html" | "external" | "chat" | "visualization" | "data" | "hope" | "workflow";
+    timestamp: number;
+    engine?: "diagrams-net" | "excalidraw" | "mermaid"; // For visualization type
+  } | null;
   onSelectionChange?: (hasMultipleSelections: boolean) => void;
   onFileDrop?: (files: File[]) => void;
 }
@@ -54,7 +62,7 @@ export function LeftSidebarContent({
   const [error, setError] = useState<string | null>(null);
   const [selectedCount, setSelectedCount] = useState(0);
   const [creatingItem, setCreatingItem] = useState<{
-    type: "folder" | "note" | "file" | "code" | "html" | "docx" | "xlsx";
+    type: "folder" | "note" | "file" | "code" | "html" | "docx" | "xlsx" | "json" | "external" | "chat" | "visualization" | "data" | "hope" | "workflow";
     parentId: string | null;
     tempId: string; // Temporary ID for the placeholder node
   } | null>(null);
@@ -66,6 +74,22 @@ export function LeftSidebarContent({
     hasChildren: boolean;
     hasGoogleDriveFiles: boolean;
   } | null>(null);
+  const [externalLinkDialog, setExternalLinkDialog] = useState<{
+    open: boolean;
+    mode: "create" | "edit";
+    initialName: string;
+    initialUrl: string;
+    editingId: string | null; // ID of external link being edited (null for create)
+  }>({ open: false, mode: "create", initialName: "", initialUrl: "https://", editingId: null });
+
+  // Ref to temporarily store visualization engine when creating from context menu
+  const pendingVisualizationEngine = useRef<"diagrams-net" | "excalidraw" | "mermaid" | null>(null);
+  const [iconSelector, setIconSelector] = useState<{
+    open: boolean;
+    contentId: string;
+    currentIcon: string | null;
+    triggerPosition: { x: number; y: number };
+  }>({ open: false, contentId: "", currentIcon: null, triggerPosition: { x: 0, y: 0 } });
   const [errorDialog, setErrorDialog] = useState<{
     title: string;
     message: string;
@@ -162,9 +186,20 @@ export function LeftSidebarContent({
   // Watch for create trigger from + button
   useEffect(() => {
     if (createTrigger) {
-      // Pass the actual type from createTrigger (folder, note, docx, or xlsx)
-      // parentId will be determined in handleCreate based on current selection
-      handleCreate(null, createTrigger.type); // Pass null, we'll determine parent inside handleCreate
+      // For external links, show dialog for name and URL
+      if (createTrigger.type === "external") {
+        setExternalLinkDialog({
+          open: true,
+          mode: "create",
+          initialName: "",
+          initialUrl: "https://",
+          editingId: null,
+        });
+      } else {
+        // Pass the actual type from createTrigger (folder, note, docx, or xlsx)
+        // parentId will be determined in handleCreate based on current selection
+        handleCreate(null, createTrigger.type);
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [createTrigger]);
@@ -176,6 +211,48 @@ export function LeftSidebarContent({
       setSelectedIds([selectedContentId]);
     }
   }, [selectedContentId, setSelectedIds]);
+
+  // Listen for edit-external-link events from context menu
+  useEffect(() => {
+    const handleEditExternal = async (event: CustomEvent<{ id: string }>) => {
+      const { id } = event.detail;
+
+      try {
+        // Fetch external link data
+        const response = await fetch(`/api/content/content/${id}`, {
+          credentials: "include",
+        });
+
+        if (!response.ok) {
+          const result = await response.json();
+          throw new Error(result.error?.message || "Failed to fetch external link");
+        }
+
+        const result = await response.json();
+        const externalData = result.data;
+
+        // Open dialog in edit mode
+        setExternalLinkDialog({
+          open: true,
+          mode: "edit",
+          initialName: externalData.title,
+          initialUrl: externalData.external?.url || "https://",
+          editingId: id,
+        });
+      } catch (err) {
+        console.error("[LeftSidebarContent] Failed to load external link:", err);
+        toast.error("Failed to load external link", {
+          description: err instanceof Error ? err.message : "Unknown error",
+        });
+      }
+    };
+
+    window.addEventListener('edit-external-link' as any, handleEditExternal);
+    return () => {
+      window.removeEventListener('edit-external-link' as any, handleEditExternal);
+    };
+  }, []);
+
 
   // Apply move operation to tree structure (for optimistic updates)
   const applyMoveToTree = (
@@ -402,18 +479,113 @@ export function LeftSidebarContent({
     if (firstNode) {
       console.log("Selected node:", firstNode);
 
-      // Open notes and files in the main panel
-      if (firstNode.contentType === "note" || firstNode.contentType === "file") {
-        setSelectedContentId(firstNode.id);
-      } else {
-        // For folders and other types, clear the content selection
-        // This prevents folders from being loaded in main panel
-        setSelectedContentId(null);
-        console.log("Selected folder:", firstNode.title);
-      }
+      // Phase 2: All content types can now be displayed in main panel
+      // MainPanelContent will route to appropriate viewer based on contentType
+      setSelectedContentId(firstNode.id);
     } else {
       // No selection - clear content
       setSelectedContentId(null);
+    }
+  };
+
+  // Handler: Create or edit external link from dialog
+  const handleExternalLinkCreate = async (data: { name: string; url: string }) => {
+    try {
+      const isEditing = externalLinkDialog.mode === "edit" && externalLinkDialog.editingId;
+
+      if (isEditing) {
+        // Edit existing external link
+        const response = await fetch(`/api/content/content/${externalLinkDialog.editingId}`, {
+          method: "PATCH",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title: data.name.trim(),
+            url: data.url,
+          }),
+        });
+
+        const result = await response.json();
+
+        if (!response.ok || !result.success) {
+          console.error("Update external link failed:", result.error);
+          setErrorDialog({
+            title: "Failed to update external link",
+            message: result.error?.message || "Unknown error occurred. Please try again.",
+          });
+          return;
+        }
+
+        // Success! Refresh tree
+        await fetchTree();
+        toast.success(`Updated external link "${data.name}"`);
+
+        // Notify MainPanel to refetch content (to update URL in viewer)
+        window.dispatchEvent(new CustomEvent('content-updated', {
+          detail: {
+            contentId: externalLinkDialog.editingId,
+            updates: { title: data.name.trim(), url: data.url }
+          }
+        }));
+      } else {
+        // Create new external link
+        // Determine parentId based on current selection
+        let parentId: string | null = null;
+        const { selectedIds: treeSelectedIds } = useTreeStateStore.getState();
+
+        if (treeData && treeSelectedIds.length === 1) {
+          const findNode = (nodes: TreeNode[]): TreeNode | null => {
+            for (const node of nodes) {
+              if (node.id === treeSelectedIds[0]) return node;
+              if (node.children) {
+                const found = findNode(node.children);
+                if (found) return found;
+              }
+            }
+            return null;
+          };
+
+          const selectedNode = findNode(treeData);
+          if (selectedNode) {
+            parentId = selectedNode.contentType === "folder" ? selectedNode.id : selectedNode.parentId;
+          }
+        }
+
+        // Create via API
+        const response = await fetch("/api/content/content", {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title: data.name.trim(),
+            parentId,
+            url: data.url,
+            subtype: "website",
+          }),
+        });
+
+        const result = await response.json();
+
+        if (!response.ok || !result.success) {
+          console.error("Create external link failed:", result.error);
+          setErrorDialog({
+            title: "Failed to create external link",
+            message: result.error?.message || "Unknown error occurred. Please try again.",
+          });
+          return;
+        }
+
+        // Success! Refresh tree and navigate to new link
+        await fetchTree();
+        setSelectedContentId(result.data.id);
+        toast.success(`Created external link "${data.name}"`);
+      }
+    } catch (err) {
+      console.error("Failed to save external link:", err);
+      setErrorDialog({
+        title: `Failed to ${externalLinkDialog.mode === "edit" ? "update" : "create"} external link`,
+        message: "An unexpected error occurred. Please try again.",
+      });
     }
   };
 
@@ -436,7 +608,7 @@ export function LeftSidebarContent({
 
     try {
       // Prepare payload based on content type
-      const defaults: Record<string, { title: string; payload?: any; fileType?: "docx" | "xlsx" }> = {
+      const defaults: Record<string, { title: string; payload?: any; fileType?: "docx" | "xlsx" | "json" }> = {
         folder: { title: title.trim() },
         note: {
           title: title.trim(),
@@ -465,12 +637,54 @@ export function LeftSidebarContent({
           // File type requires upload flow - should not reach here
         },
         docx: {
-          title: title.trim().endsWith(".docx") ? title.trim() : `${title.trim()}.docx`,
+          title: title.trim(), // API will add .docx extension
           fileType: "docx",
         },
         xlsx: {
-          title: title.trim().endsWith(".xlsx") ? title.trim() : `${title.trim()}.xlsx`,
+          title: title.trim(), // API will add .xlsx extension
           fileType: "xlsx",
+        },
+        json: {
+          title: title.trim(), // API will add .json extension
+          fileType: "json",
+        },
+        // Phase 2: New content types (external handled separately via dialog)
+        chat: {
+          title: title.trim(),
+          payload: {
+            messages: [],
+          },
+        },
+        visualization: {
+          title: title.trim(),
+          payload: {
+            engine: createTrigger?.engine || pendingVisualizationEngine.current || "mermaid", // Default to mermaid if not specified
+            config: {}, // Engine-specific configuration
+            data: {}, // Engine-specific data
+          },
+        },
+        data: {
+          title: title.trim(),
+          payload: {
+            mode: "inline",
+            source: {},
+          },
+        },
+        hope: {
+          title: title.trim(),
+          payload: {
+            kind: "goal",
+            status: "active",
+            description: "",
+          },
+        },
+        workflow: {
+          title: title.trim(),
+          payload: {
+            engine: "placeholder",
+            definition: {},
+            enabled: false,
+          },
         },
       };
 
@@ -486,8 +700,8 @@ export function LeftSidebarContent({
       };
 
       // Add type-specific payloads or use special endpoints
-      if (type === "docx" || type === "xlsx") {
-        // Office documents use dedicated creation endpoint
+      if (type === "docx" || type === "xlsx" || type === "json") {
+        // Office documents and JSON files use dedicated creation endpoint
         const response = await fetch("/api/content/content/create-document", {
           method: "POST",
           credentials: "include",
@@ -543,7 +757,12 @@ export function LeftSidebarContent({
         requestBody.language = config.payload?.language;
       } else if (type === "html") {
         requestBody.html = config.payload?.html;
+      } else if (type === "visualization") {
+        requestBody.engine = config.payload?.engine;
+        requestBody.chartConfig = config.payload?.config || {};
+        requestBody.chartData = config.payload?.data || {};
       }
+      // Note: external type handled separately via handleExternalLinkCreate
 
       // Create via API
       const response = await fetch("/api/content/content", {
@@ -640,6 +859,11 @@ export function LeftSidebarContent({
         setTreeData(replaceTempNode(treeData));
         setCreatingItem(null);
 
+        // Clear pending visualization engine if it was set from context menu
+        if (type === "visualization") {
+          pendingVisualizationEngine.current = null;
+        }
+
         // Navigate to newly created file (but not folders)
         if (type !== "folder") {
           setSelectedContentId(apiResponse.id);
@@ -651,6 +875,9 @@ export function LeftSidebarContent({
       }
     } catch (err) {
       console.error("Failed to create item:", err);
+
+      // Clear pending visualization engine on error
+      pendingVisualizationEngine.current = null;
 
       // Remove temp node on error
       if (treeData) {
@@ -1135,9 +1362,203 @@ export function LeftSidebarContent({
     }
   };
 
+  /** Phase 2: Handler for changing folder view mode */
+  const handleSetFolderView = async (
+    id: string,
+    viewMode: "list" | "gallery" | "kanban" | "dashboard" | "canvas"
+  ) => {
+    try {
+      console.log("[LeftSidebarContent] Setting folder view:", { id, viewMode });
+
+      // Call API to persist view mode
+      const response = await fetch(`/api/content/folder/${id}/view`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ viewMode }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error?.message || "Failed to update folder view");
+      }
+
+      const result = await response.json();
+      console.log("[LeftSidebarContent] Folder view updated:", result.data);
+
+      // Show success toast
+      toast.success(`Folder view changed to ${viewMode}`, {
+        description: "Folder view mode has been saved",
+      });
+
+      // Refresh tree to reflect changes in main panel
+      await fetchTree();
+    } catch (err) {
+      console.error("Failed to set folder view:", err);
+      toast.error("Failed to change folder view", {
+        description: err instanceof Error ? err.message : "An unexpected error occurred. Please try again.",
+      });
+    }
+  };
+
+  /** Phase 2: Handler for toggling referenced content visibility for folder */
+  const handleToggleReferencedContent = async (id: string, currentValue: boolean) => {
+    try {
+      const newValue = !currentValue;
+      console.log("[LeftSidebarContent] Toggling referenced content:", { id, currentValue, newValue });
+
+      // Call API to persist setting
+      const response = await fetch(`/api/content/folder/${id}/view`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ includeReferencedContent: newValue }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error?.message || "Failed to update folder setting");
+      }
+
+      const result = await response.json();
+      console.log("[LeftSidebarContent] Referenced content toggled:", result.data);
+
+      // Show success toast
+      toast.success(newValue ? "Showing referenced content" : "Hiding referenced content", {
+        description: "Folder setting has been saved",
+      });
+
+      // Refresh tree to reflect changes in main panel
+      await fetchTree();
+    } catch (err) {
+      console.error("Failed to toggle referenced content:", err);
+      toast.error("Failed to update folder setting", {
+        description: err instanceof Error ? err.message : "An unexpected error occurred. Please try again.",
+      });
+    }
+  };
+
+  // Handler: Change icon for content
+  const handleChangeIcon = (id: string) => {
+    // Find node to get current icon
+    const findNode = (nodes: TreeNode[]): TreeNode | null => {
+      for (const node of nodes) {
+        if (node.id === id) return node;
+        if (node.children) {
+          const found = findNode(node.children);
+          if (found) return found;
+        }
+      }
+      return null;
+    };
+
+    const node = treeData ? findNode(treeData) : null;
+
+    // Try to get position from context menu store (if triggered from context menu)
+    const contextMenuState = useContextMenuStore.getState();
+    const contextMenuPosition = contextMenuState.position;
+
+    // Get file node position (fallback to icon position if available)
+    const fileRow = document.querySelector(`[data-node-id="${id}"]`);
+    const iconElement = fileRow?.querySelector('[data-file-icon]');
+
+    let triggerPosition: { x: number; y: number };
+
+    if (contextMenuPosition) {
+      // Use context menu click position (most accurate)
+      triggerPosition = { x: contextMenuPosition.x, y: contextMenuPosition.y };
+    } else if (iconElement) {
+      // Use icon position (second best)
+      const iconRect = iconElement.getBoundingClientRect();
+      triggerPosition = { x: iconRect.right + 4, y: iconRect.top };
+    } else if (fileRow) {
+      // Fallback to file row position
+      const rect = fileRow.getBoundingClientRect();
+      triggerPosition = { x: rect.left + 40, y: rect.top };
+    } else {
+      // Last resort: center of screen
+      triggerPosition = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+    }
+
+    setIconSelector({
+      open: true,
+      contentId: id,
+      currentIcon: node?.customIcon || null,
+      triggerPosition,
+    });
+  };
+
+  const handleIconSelect = async (icon: string) => {
+    const contentId = iconSelector.contentId;
+    const previousIcon = iconSelector.currentIcon;
+
+    // OPTIMISTIC UPDATE: Update icon in tree immediately
+    if (treeData) {
+      const updateIconInTree = (nodes: TreeNode[]): TreeNode[] => {
+        return nodes.map((node) => {
+          if (node.id === contentId) {
+            return { ...node, customIcon: icon };
+          }
+          if (node.children) {
+            return { ...node, children: updateIconInTree(node.children) };
+          }
+          return node;
+        });
+      };
+
+      setTreeData(updateIconInTree(treeData));
+    }
+
+    // Close icon selector immediately
+    setIconSelector({ open: false, contentId: "", currentIcon: null, triggerPosition: { x: 0, y: 0 } });
+
+    // Make API call in background
+    try {
+      const response = await fetch(`/api/content/content/${contentId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ customIcon: icon }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error?.message || "Failed to update icon");
+      }
+
+      toast.success("Icon updated");
+    } catch (err) {
+      console.error("Failed to update icon:", err);
+      toast.error("Failed to update icon", {
+        description: err instanceof Error ? err.message : "An unexpected error occurred",
+      });
+
+      // REVERT: Restore previous icon on error
+      if (treeData) {
+        const revertIconInTree = (nodes: TreeNode[]): TreeNode[] => {
+          return nodes.map((node) => {
+            if (node.id === contentId) {
+              return { ...node, customIcon: previousIcon };
+            }
+            if (node.children) {
+              return { ...node, children: revertIconInTree(node.children) };
+            }
+            return node;
+          });
+        };
+
+        setTreeData(revertIconInTree(treeData));
+      }
+    }
+  };
+
   // Handler: Create new content node (all types)
   // This creates a temporary placeholder node in the tree for inline naming
-  const handleCreate = async (requestedParentId: string | null, type: "folder" | "note" | "file" | "code" | "html" | "docx" | "xlsx") => {
+  const handleCreate = async (
+    requestedParentId: string | null,
+    type: "folder" | "note" | "file" | "code" | "html" | "docx" | "xlsx" | "json" | "external" | "chat" | "visualization" | "data" | "hope" | "workflow"
+  ) => {
     // File upload requires special two-phase flow - show dialog instead
     if (type === "file") {
       setErrorDialog({
@@ -1191,6 +1612,7 @@ export function LeftSidebarContent({
 
     // Create temporary placeholder node
     // Note: docx/xlsx types use contentType="file" since they're FilePayload
+    // Phase 2 types (external, chat, visualization, data, hope, workflow) map directly to their contentType
     const contentType: ContentType = (type === "docx" || type === "xlsx") ? "file" : type as ContentType;
 
     const tempNode: TreeNode = {
@@ -1207,6 +1629,16 @@ export function LeftSidebarContent({
       createdAt: new Date(),
       updatedAt: new Date(),
       deletedAt: null,
+      // Add minimal file metadata for extension display during inline editing
+      file: (type === "docx" || type === "xlsx" || type === "json") ? {
+        fileName: "",
+        mimeType:
+          type === "docx" ? "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+          : type === "xlsx" ? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+          : "application/json",
+        fileSize: "0",
+        uploadStatus: "ready" as const,
+      } : undefined,
     };
 
     // Insert temporary node into tree data
@@ -1255,6 +1687,28 @@ export function LeftSidebarContent({
     // Note: The actual API call happens in handleCreateSubmit when user presses Enter
   };
 
+  // Visualization engine-specific handlers for context menu
+  // These are called from the context menu and need to trigger the inline creation flow
+  // with the correct engine stored temporarily for handleCreate to use
+  const handleCreateVisualizationMermaid = async (parentId: string | null) => {
+    // Temporarily set create trigger with engine, which will be picked up by useEffect
+    // This mirrors how the + button works from LeftSidebar
+    // Note: We can't call setCreateTrigger here as it doesn't exist in this component
+    // Instead, we'll store the engine in a ref and call handleCreate
+    pendingVisualizationEngine.current = "mermaid";
+    await handleCreate(parentId, "visualization");
+  };
+
+  const handleCreateVisualizationExcalidraw = async (parentId: string | null) => {
+    pendingVisualizationEngine.current = "excalidraw";
+    await handleCreate(parentId, "visualization");
+  };
+
+  const handleCreateVisualizationDiagramsNet = async (parentId: string | null) => {
+    pendingVisualizationEngine.current = "diagrams-net";
+    await handleCreate(parentId, "visualization");
+  };
+
   // Show search panel when search is active
   if (isSearchOpen) {
     return <SearchPanel />;
@@ -1299,6 +1753,10 @@ export function LeftSidebarContent({
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* File tree with drag-and-drop zone */}
         <div className="flex-1 min-h-0 overflow-hidden">
+          <RootNodeHeader
+            workspaceName="root"
+            totalFiles={countTotalNodes(treeData)}
+          />
           <FileTreeWithDropZone
             data={treeData}
             onMove={handleMove}
@@ -1308,6 +1766,12 @@ export function LeftSidebarContent({
             onDelete={handleDelete}
             onDuplicate={handleDuplicate}
             onDownload={handleDownload}
+            onChangeIcon={handleChangeIcon}
+            onSetFolderView={handleSetFolderView}
+            onToggleReferencedContent={handleToggleReferencedContent}
+            onCreateVisualizationMermaid={handleCreateVisualizationMermaid}
+            onCreateVisualizationExcalidraw={handleCreateVisualizationExcalidraw}
+            onCreateVisualizationDiagramsNet={handleCreateVisualizationDiagramsNet}
             height={800}
             editingNodeId={creatingItem?.tempId}
             expandNodeId={expandNodeId}
@@ -1347,6 +1811,27 @@ export function LeftSidebarContent({
           checked: deleteFromGoogleDrive,
           onChange: setDeleteFromGoogleDrive,
         } : undefined}
+      />
+
+      {/* External link dialog */}
+      <ExternalLinkDialog
+        open={externalLinkDialog.open}
+        onOpenChange={(open) =>
+          setExternalLinkDialog((prev) => ({ ...prev, open }))
+        }
+        onConfirm={handleExternalLinkCreate}
+        initialName={externalLinkDialog.initialName}
+        initialUrl={externalLinkDialog.initialUrl}
+        mode={externalLinkDialog.mode}
+      />
+
+      {/* Icon Selector */}
+      <IconSelector
+        isOpen={iconSelector.open}
+        onClose={() => setIconSelector({ open: false, contentId: "", currentIcon: null, triggerPosition: { x: 0, y: 0 } })}
+        onSelectIcon={handleIconSelect}
+        currentIcon={iconSelector.currentIcon}
+        triggerPosition={iconSelector.triggerPosition}
       />
 
       {/* Error dialog */}

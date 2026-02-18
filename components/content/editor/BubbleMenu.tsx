@@ -10,7 +10,6 @@
 
 "use client";
 
-import { useState, useEffect } from "react";
 import { BubbleMenu as TipTapBubbleMenu } from "@tiptap/react/menus";
 import type { Editor } from "@tiptap/core";
 import { PluginKey } from "@tiptap/pm/state";
@@ -34,26 +33,6 @@ export interface BubbleMenuProps {
 }
 
 export function BubbleMenu({ editor, onLinkClick }: BubbleMenuProps) {
-  // Force re-render when selection changes to update active states
-  const [, setUpdateCounter] = useState(0);
-
-  useEffect(() => {
-    if (!editor) return;
-
-    const updateActiveStates = () => {
-      setUpdateCounter((prev) => prev + 1);
-    };
-
-    // Listen to selection updates to refresh active states
-    editor.on("selectionUpdate", updateActiveStates);
-    editor.on("transaction", updateActiveStates);
-
-    return () => {
-      editor.off("selectionUpdate", updateActiveStates);
-      editor.off("transaction", updateActiveStates);
-    };
-  }, [editor]);
-
   if (!editor) {
     return null;
   }

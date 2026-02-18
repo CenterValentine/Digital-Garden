@@ -103,12 +103,85 @@ export type Account = $Result.DefaultSelection<Prisma.$AccountPayload>
  * 
  */
 export type AuditLog = $Result.DefaultSelection<Prisma.$AuditLogPayload>
+/**
+ * Model FolderPayload
+ * 
+ */
+export type FolderPayload = $Result.DefaultSelection<Prisma.$FolderPayloadPayload>
+/**
+ * Model ExternalPayload
+ * 
+ */
+export type ExternalPayload = $Result.DefaultSelection<Prisma.$ExternalPayloadPayload>
+/**
+ * Model ChatPayload
+ * 
+ */
+export type ChatPayload = $Result.DefaultSelection<Prisma.$ChatPayloadPayload>
+/**
+ * Model VisualizationPayload
+ * 
+ */
+export type VisualizationPayload = $Result.DefaultSelection<Prisma.$VisualizationPayloadPayload>
+/**
+ * Model DataPayload
+ * 
+ */
+export type DataPayload = $Result.DefaultSelection<Prisma.$DataPayloadPayload>
+/**
+ * Model HopePayload
+ * 
+ */
+export type HopePayload = $Result.DefaultSelection<Prisma.$HopePayloadPayload>
+/**
+ * Model WorkflowPayload
+ * 
+ */
+export type WorkflowPayload = $Result.DefaultSelection<Prisma.$WorkflowPayloadPayload>
 
 /**
  * Enums
  */
 export namespace $Enums {
-  export const UserRole: {
+  export const ContentType: {
+  folder: 'folder',
+  note: 'note',
+  file: 'file',
+  html: 'html',
+  template: 'template',
+  code: 'code',
+  external: 'external',
+  chat: 'chat',
+  visualization: 'visualization',
+  data: 'data',
+  hope: 'hope',
+  workflow: 'workflow'
+};
+
+export type ContentType = (typeof ContentType)[keyof typeof ContentType]
+
+
+export const ContentRole: {
+  primary: 'primary',
+  referenced: 'referenced',
+  system: 'system'
+};
+
+export type ContentRole = (typeof ContentRole)[keyof typeof ContentRole]
+
+
+export const FolderViewMode: {
+  list: 'list',
+  gallery: 'gallery',
+  kanban: 'kanban',
+  dashboard: 'dashboard',
+  canvas: 'canvas'
+};
+
+export type FolderViewMode = (typeof FolderViewMode)[keyof typeof FolderViewMode]
+
+
+export const UserRole: {
   owner: 'owner',
   admin: 'admin',
   member: 'member',
@@ -136,6 +209,18 @@ export const StorageProvider: {
 export type StorageProvider = (typeof StorageProvider)[keyof typeof StorageProvider]
 
 }
+
+export type ContentType = $Enums.ContentType
+
+export const ContentType: typeof $Enums.ContentType
+
+export type ContentRole = $Enums.ContentRole
+
+export const ContentRole: typeof $Enums.ContentRole
+
+export type FolderViewMode = $Enums.FolderViewMode
+
+export const FolderViewMode: typeof $Enums.FolderViewMode
 
 export type UserRole = $Enums.UserRole
 
@@ -445,6 +530,76 @@ export class PrismaClient<
     * ```
     */
   get auditLog(): Prisma.AuditLogDelegate<ExtArgs, ClientOptions>;
+
+  /**
+   * `prisma.folderPayload`: Exposes CRUD operations for the **FolderPayload** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more FolderPayloads
+    * const folderPayloads = await prisma.folderPayload.findMany()
+    * ```
+    */
+  get folderPayload(): Prisma.FolderPayloadDelegate<ExtArgs, ClientOptions>;
+
+  /**
+   * `prisma.externalPayload`: Exposes CRUD operations for the **ExternalPayload** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more ExternalPayloads
+    * const externalPayloads = await prisma.externalPayload.findMany()
+    * ```
+    */
+  get externalPayload(): Prisma.ExternalPayloadDelegate<ExtArgs, ClientOptions>;
+
+  /**
+   * `prisma.chatPayload`: Exposes CRUD operations for the **ChatPayload** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more ChatPayloads
+    * const chatPayloads = await prisma.chatPayload.findMany()
+    * ```
+    */
+  get chatPayload(): Prisma.ChatPayloadDelegate<ExtArgs, ClientOptions>;
+
+  /**
+   * `prisma.visualizationPayload`: Exposes CRUD operations for the **VisualizationPayload** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more VisualizationPayloads
+    * const visualizationPayloads = await prisma.visualizationPayload.findMany()
+    * ```
+    */
+  get visualizationPayload(): Prisma.VisualizationPayloadDelegate<ExtArgs, ClientOptions>;
+
+  /**
+   * `prisma.dataPayload`: Exposes CRUD operations for the **DataPayload** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more DataPayloads
+    * const dataPayloads = await prisma.dataPayload.findMany()
+    * ```
+    */
+  get dataPayload(): Prisma.DataPayloadDelegate<ExtArgs, ClientOptions>;
+
+  /**
+   * `prisma.hopePayload`: Exposes CRUD operations for the **HopePayload** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more HopePayloads
+    * const hopePayloads = await prisma.hopePayload.findMany()
+    * ```
+    */
+  get hopePayload(): Prisma.HopePayloadDelegate<ExtArgs, ClientOptions>;
+
+  /**
+   * `prisma.workflowPayload`: Exposes CRUD operations for the **WorkflowPayload** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more WorkflowPayloads
+    * const workflowPayloads = await prisma.workflowPayload.findMany()
+    * ```
+    */
+  get workflowPayload(): Prisma.WorkflowPayloadDelegate<ExtArgs, ClientOptions>;
 }
 
 export namespace Prisma {
@@ -896,7 +1051,14 @@ export namespace Prisma {
     ViewGrant: 'ViewGrant',
     Session: 'Session',
     Account: 'Account',
-    AuditLog: 'AuditLog'
+    AuditLog: 'AuditLog',
+    FolderPayload: 'FolderPayload',
+    ExternalPayload: 'ExternalPayload',
+    ChatPayload: 'ChatPayload',
+    VisualizationPayload: 'VisualizationPayload',
+    DataPayload: 'DataPayload',
+    HopePayload: 'HopePayload',
+    WorkflowPayload: 'WorkflowPayload'
   };
 
   export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -912,7 +1074,7 @@ export namespace Prisma {
       omit: GlobalOmitOptions
     }
     meta: {
-      modelProps: "contentNode" | "notePayload" | "filePayload" | "htmlPayload" | "codePayload" | "contentHistory" | "contentPath" | "contentLink" | "contentTag" | "trashBin" | "storageProviderConfig" | "user" | "category" | "tag" | "viewGrant" | "session" | "account" | "auditLog"
+      modelProps: "contentNode" | "notePayload" | "filePayload" | "htmlPayload" | "codePayload" | "contentHistory" | "contentPath" | "contentLink" | "contentTag" | "trashBin" | "storageProviderConfig" | "user" | "category" | "tag" | "viewGrant" | "session" | "account" | "auditLog" | "folderPayload" | "externalPayload" | "chatPayload" | "visualizationPayload" | "dataPayload" | "hopePayload" | "workflowPayload"
       txIsolationLevel: Prisma.TransactionIsolationLevel
     }
     model: {
@@ -2248,6 +2410,524 @@ export namespace Prisma {
           }
         }
       }
+      FolderPayload: {
+        payload: Prisma.$FolderPayloadPayload<ExtArgs>
+        fields: Prisma.FolderPayloadFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.FolderPayloadFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$FolderPayloadPayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.FolderPayloadFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$FolderPayloadPayload>
+          }
+          findFirst: {
+            args: Prisma.FolderPayloadFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$FolderPayloadPayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.FolderPayloadFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$FolderPayloadPayload>
+          }
+          findMany: {
+            args: Prisma.FolderPayloadFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$FolderPayloadPayload>[]
+          }
+          create: {
+            args: Prisma.FolderPayloadCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$FolderPayloadPayload>
+          }
+          createMany: {
+            args: Prisma.FolderPayloadCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          createManyAndReturn: {
+            args: Prisma.FolderPayloadCreateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$FolderPayloadPayload>[]
+          }
+          delete: {
+            args: Prisma.FolderPayloadDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$FolderPayloadPayload>
+          }
+          update: {
+            args: Prisma.FolderPayloadUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$FolderPayloadPayload>
+          }
+          deleteMany: {
+            args: Prisma.FolderPayloadDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.FolderPayloadUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateManyAndReturn: {
+            args: Prisma.FolderPayloadUpdateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$FolderPayloadPayload>[]
+          }
+          upsert: {
+            args: Prisma.FolderPayloadUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$FolderPayloadPayload>
+          }
+          aggregate: {
+            args: Prisma.FolderPayloadAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregateFolderPayload>
+          }
+          groupBy: {
+            args: Prisma.FolderPayloadGroupByArgs<ExtArgs>
+            result: $Utils.Optional<FolderPayloadGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.FolderPayloadCountArgs<ExtArgs>
+            result: $Utils.Optional<FolderPayloadCountAggregateOutputType> | number
+          }
+        }
+      }
+      ExternalPayload: {
+        payload: Prisma.$ExternalPayloadPayload<ExtArgs>
+        fields: Prisma.ExternalPayloadFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.ExternalPayloadFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ExternalPayloadPayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.ExternalPayloadFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ExternalPayloadPayload>
+          }
+          findFirst: {
+            args: Prisma.ExternalPayloadFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ExternalPayloadPayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.ExternalPayloadFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ExternalPayloadPayload>
+          }
+          findMany: {
+            args: Prisma.ExternalPayloadFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ExternalPayloadPayload>[]
+          }
+          create: {
+            args: Prisma.ExternalPayloadCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ExternalPayloadPayload>
+          }
+          createMany: {
+            args: Prisma.ExternalPayloadCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          createManyAndReturn: {
+            args: Prisma.ExternalPayloadCreateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ExternalPayloadPayload>[]
+          }
+          delete: {
+            args: Prisma.ExternalPayloadDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ExternalPayloadPayload>
+          }
+          update: {
+            args: Prisma.ExternalPayloadUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ExternalPayloadPayload>
+          }
+          deleteMany: {
+            args: Prisma.ExternalPayloadDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.ExternalPayloadUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateManyAndReturn: {
+            args: Prisma.ExternalPayloadUpdateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ExternalPayloadPayload>[]
+          }
+          upsert: {
+            args: Prisma.ExternalPayloadUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ExternalPayloadPayload>
+          }
+          aggregate: {
+            args: Prisma.ExternalPayloadAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregateExternalPayload>
+          }
+          groupBy: {
+            args: Prisma.ExternalPayloadGroupByArgs<ExtArgs>
+            result: $Utils.Optional<ExternalPayloadGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.ExternalPayloadCountArgs<ExtArgs>
+            result: $Utils.Optional<ExternalPayloadCountAggregateOutputType> | number
+          }
+        }
+      }
+      ChatPayload: {
+        payload: Prisma.$ChatPayloadPayload<ExtArgs>
+        fields: Prisma.ChatPayloadFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.ChatPayloadFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ChatPayloadPayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.ChatPayloadFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ChatPayloadPayload>
+          }
+          findFirst: {
+            args: Prisma.ChatPayloadFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ChatPayloadPayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.ChatPayloadFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ChatPayloadPayload>
+          }
+          findMany: {
+            args: Prisma.ChatPayloadFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ChatPayloadPayload>[]
+          }
+          create: {
+            args: Prisma.ChatPayloadCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ChatPayloadPayload>
+          }
+          createMany: {
+            args: Prisma.ChatPayloadCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          createManyAndReturn: {
+            args: Prisma.ChatPayloadCreateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ChatPayloadPayload>[]
+          }
+          delete: {
+            args: Prisma.ChatPayloadDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ChatPayloadPayload>
+          }
+          update: {
+            args: Prisma.ChatPayloadUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ChatPayloadPayload>
+          }
+          deleteMany: {
+            args: Prisma.ChatPayloadDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.ChatPayloadUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateManyAndReturn: {
+            args: Prisma.ChatPayloadUpdateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ChatPayloadPayload>[]
+          }
+          upsert: {
+            args: Prisma.ChatPayloadUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ChatPayloadPayload>
+          }
+          aggregate: {
+            args: Prisma.ChatPayloadAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregateChatPayload>
+          }
+          groupBy: {
+            args: Prisma.ChatPayloadGroupByArgs<ExtArgs>
+            result: $Utils.Optional<ChatPayloadGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.ChatPayloadCountArgs<ExtArgs>
+            result: $Utils.Optional<ChatPayloadCountAggregateOutputType> | number
+          }
+        }
+      }
+      VisualizationPayload: {
+        payload: Prisma.$VisualizationPayloadPayload<ExtArgs>
+        fields: Prisma.VisualizationPayloadFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.VisualizationPayloadFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$VisualizationPayloadPayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.VisualizationPayloadFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$VisualizationPayloadPayload>
+          }
+          findFirst: {
+            args: Prisma.VisualizationPayloadFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$VisualizationPayloadPayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.VisualizationPayloadFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$VisualizationPayloadPayload>
+          }
+          findMany: {
+            args: Prisma.VisualizationPayloadFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$VisualizationPayloadPayload>[]
+          }
+          create: {
+            args: Prisma.VisualizationPayloadCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$VisualizationPayloadPayload>
+          }
+          createMany: {
+            args: Prisma.VisualizationPayloadCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          createManyAndReturn: {
+            args: Prisma.VisualizationPayloadCreateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$VisualizationPayloadPayload>[]
+          }
+          delete: {
+            args: Prisma.VisualizationPayloadDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$VisualizationPayloadPayload>
+          }
+          update: {
+            args: Prisma.VisualizationPayloadUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$VisualizationPayloadPayload>
+          }
+          deleteMany: {
+            args: Prisma.VisualizationPayloadDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.VisualizationPayloadUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateManyAndReturn: {
+            args: Prisma.VisualizationPayloadUpdateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$VisualizationPayloadPayload>[]
+          }
+          upsert: {
+            args: Prisma.VisualizationPayloadUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$VisualizationPayloadPayload>
+          }
+          aggregate: {
+            args: Prisma.VisualizationPayloadAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregateVisualizationPayload>
+          }
+          groupBy: {
+            args: Prisma.VisualizationPayloadGroupByArgs<ExtArgs>
+            result: $Utils.Optional<VisualizationPayloadGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.VisualizationPayloadCountArgs<ExtArgs>
+            result: $Utils.Optional<VisualizationPayloadCountAggregateOutputType> | number
+          }
+        }
+      }
+      DataPayload: {
+        payload: Prisma.$DataPayloadPayload<ExtArgs>
+        fields: Prisma.DataPayloadFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.DataPayloadFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$DataPayloadPayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.DataPayloadFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$DataPayloadPayload>
+          }
+          findFirst: {
+            args: Prisma.DataPayloadFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$DataPayloadPayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.DataPayloadFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$DataPayloadPayload>
+          }
+          findMany: {
+            args: Prisma.DataPayloadFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$DataPayloadPayload>[]
+          }
+          create: {
+            args: Prisma.DataPayloadCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$DataPayloadPayload>
+          }
+          createMany: {
+            args: Prisma.DataPayloadCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          createManyAndReturn: {
+            args: Prisma.DataPayloadCreateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$DataPayloadPayload>[]
+          }
+          delete: {
+            args: Prisma.DataPayloadDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$DataPayloadPayload>
+          }
+          update: {
+            args: Prisma.DataPayloadUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$DataPayloadPayload>
+          }
+          deleteMany: {
+            args: Prisma.DataPayloadDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.DataPayloadUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateManyAndReturn: {
+            args: Prisma.DataPayloadUpdateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$DataPayloadPayload>[]
+          }
+          upsert: {
+            args: Prisma.DataPayloadUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$DataPayloadPayload>
+          }
+          aggregate: {
+            args: Prisma.DataPayloadAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregateDataPayload>
+          }
+          groupBy: {
+            args: Prisma.DataPayloadGroupByArgs<ExtArgs>
+            result: $Utils.Optional<DataPayloadGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.DataPayloadCountArgs<ExtArgs>
+            result: $Utils.Optional<DataPayloadCountAggregateOutputType> | number
+          }
+        }
+      }
+      HopePayload: {
+        payload: Prisma.$HopePayloadPayload<ExtArgs>
+        fields: Prisma.HopePayloadFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.HopePayloadFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$HopePayloadPayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.HopePayloadFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$HopePayloadPayload>
+          }
+          findFirst: {
+            args: Prisma.HopePayloadFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$HopePayloadPayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.HopePayloadFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$HopePayloadPayload>
+          }
+          findMany: {
+            args: Prisma.HopePayloadFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$HopePayloadPayload>[]
+          }
+          create: {
+            args: Prisma.HopePayloadCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$HopePayloadPayload>
+          }
+          createMany: {
+            args: Prisma.HopePayloadCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          createManyAndReturn: {
+            args: Prisma.HopePayloadCreateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$HopePayloadPayload>[]
+          }
+          delete: {
+            args: Prisma.HopePayloadDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$HopePayloadPayload>
+          }
+          update: {
+            args: Prisma.HopePayloadUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$HopePayloadPayload>
+          }
+          deleteMany: {
+            args: Prisma.HopePayloadDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.HopePayloadUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateManyAndReturn: {
+            args: Prisma.HopePayloadUpdateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$HopePayloadPayload>[]
+          }
+          upsert: {
+            args: Prisma.HopePayloadUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$HopePayloadPayload>
+          }
+          aggregate: {
+            args: Prisma.HopePayloadAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregateHopePayload>
+          }
+          groupBy: {
+            args: Prisma.HopePayloadGroupByArgs<ExtArgs>
+            result: $Utils.Optional<HopePayloadGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.HopePayloadCountArgs<ExtArgs>
+            result: $Utils.Optional<HopePayloadCountAggregateOutputType> | number
+          }
+        }
+      }
+      WorkflowPayload: {
+        payload: Prisma.$WorkflowPayloadPayload<ExtArgs>
+        fields: Prisma.WorkflowPayloadFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.WorkflowPayloadFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$WorkflowPayloadPayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.WorkflowPayloadFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$WorkflowPayloadPayload>
+          }
+          findFirst: {
+            args: Prisma.WorkflowPayloadFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$WorkflowPayloadPayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.WorkflowPayloadFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$WorkflowPayloadPayload>
+          }
+          findMany: {
+            args: Prisma.WorkflowPayloadFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$WorkflowPayloadPayload>[]
+          }
+          create: {
+            args: Prisma.WorkflowPayloadCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$WorkflowPayloadPayload>
+          }
+          createMany: {
+            args: Prisma.WorkflowPayloadCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          createManyAndReturn: {
+            args: Prisma.WorkflowPayloadCreateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$WorkflowPayloadPayload>[]
+          }
+          delete: {
+            args: Prisma.WorkflowPayloadDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$WorkflowPayloadPayload>
+          }
+          update: {
+            args: Prisma.WorkflowPayloadUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$WorkflowPayloadPayload>
+          }
+          deleteMany: {
+            args: Prisma.WorkflowPayloadDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.WorkflowPayloadUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateManyAndReturn: {
+            args: Prisma.WorkflowPayloadUpdateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$WorkflowPayloadPayload>[]
+          }
+          upsert: {
+            args: Prisma.WorkflowPayloadUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$WorkflowPayloadPayload>
+          }
+          aggregate: {
+            args: Prisma.WorkflowPayloadAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregateWorkflowPayload>
+          }
+          groupBy: {
+            args: Prisma.WorkflowPayloadGroupByArgs<ExtArgs>
+            result: $Utils.Optional<WorkflowPayloadGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.WorkflowPayloadCountArgs<ExtArgs>
+            result: $Utils.Optional<WorkflowPayloadCountAggregateOutputType> | number
+          }
+        }
+      }
     }
   } & {
     other: {
@@ -2374,6 +3054,13 @@ export namespace Prisma {
     session?: SessionOmit
     account?: AccountOmit
     auditLog?: AuditLogOmit
+    folderPayload?: FolderPayloadOmit
+    externalPayload?: ExternalPayloadOmit
+    chatPayload?: ChatPayloadOmit
+    visualizationPayload?: VisualizationPayloadOmit
+    dataPayload?: DataPayloadOmit
+    hopePayload?: HopePayloadOmit
+    workflowPayload?: WorkflowPayloadOmit
   }
 
   /* Types for Logging */
@@ -2540,8 +3227,8 @@ export namespace Prisma {
 
   export type UserCountOutputType = {
     accounts: number
-    adminActions: number
     auditTargets: number
+    adminActions: number
     categories: number
     contentHistory: number
     contentNodes: number
@@ -2554,8 +3241,8 @@ export namespace Prisma {
 
   export type UserCountOutputTypeSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     accounts?: boolean | UserCountOutputTypeCountAccountsArgs
-    adminActions?: boolean | UserCountOutputTypeCountAdminActionsArgs
     auditTargets?: boolean | UserCountOutputTypeCountAuditTargetsArgs
+    adminActions?: boolean | UserCountOutputTypeCountAdminActionsArgs
     categories?: boolean | UserCountOutputTypeCountCategoriesArgs
     contentHistory?: boolean | UserCountOutputTypeCountContentHistoryArgs
     contentNodes?: boolean | UserCountOutputTypeCountContentNodesArgs
@@ -2587,14 +3274,14 @@ export namespace Prisma {
   /**
    * UserCountOutputType without action
    */
-  export type UserCountOutputTypeCountAdminActionsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+  export type UserCountOutputTypeCountAuditTargetsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     where?: AuditLogWhereInput
   }
 
   /**
    * UserCountOutputType without action
    */
-  export type UserCountOutputTypeCountAuditTargetsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+  export type UserCountOutputTypeCountAdminActionsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     where?: AuditLogWhereInput
   }
 
@@ -2746,6 +3433,8 @@ export namespace Prisma {
     ownerId: string | null
     title: string | null
     slug: string | null
+    contentType: $Enums.ContentType | null
+    role: $Enums.ContentRole | null
     parentId: string | null
     displayOrder: number | null
     categoryId: string | null
@@ -2763,6 +3452,8 @@ export namespace Prisma {
     ownerId: string | null
     title: string | null
     slug: string | null
+    contentType: $Enums.ContentType | null
+    role: $Enums.ContentRole | null
     parentId: string | null
     displayOrder: number | null
     categoryId: string | null
@@ -2780,6 +3471,8 @@ export namespace Prisma {
     ownerId: number
     title: number
     slug: number
+    contentType: number
+    role: number
     parentId: number
     displayOrder: number
     categoryId: number
@@ -2807,6 +3500,8 @@ export namespace Prisma {
     ownerId?: true
     title?: true
     slug?: true
+    contentType?: true
+    role?: true
     parentId?: true
     displayOrder?: true
     categoryId?: true
@@ -2824,6 +3519,8 @@ export namespace Prisma {
     ownerId?: true
     title?: true
     slug?: true
+    contentType?: true
+    role?: true
     parentId?: true
     displayOrder?: true
     categoryId?: true
@@ -2841,6 +3538,8 @@ export namespace Prisma {
     ownerId?: true
     title?: true
     slug?: true
+    contentType?: true
+    role?: true
     parentId?: true
     displayOrder?: true
     categoryId?: true
@@ -2945,6 +3644,8 @@ export namespace Prisma {
     ownerId: string
     title: string
     slug: string
+    contentType: $Enums.ContentType
+    role: $Enums.ContentRole
     parentId: string | null
     displayOrder: number
     categoryId: string | null
@@ -2981,6 +3682,8 @@ export namespace Prisma {
     ownerId?: boolean
     title?: boolean
     slug?: boolean
+    contentType?: boolean
+    role?: boolean
     parentId?: boolean
     displayOrder?: boolean
     categoryId?: boolean
@@ -2993,6 +3696,16 @@ export namespace Prisma {
     iconColor?: boolean
     auditLogs?: boolean | ContentNode$auditLogsArgs<ExtArgs>
     codePayload?: boolean | ContentNode$codePayloadArgs<ExtArgs>
+    filePayload?: boolean | ContentNode$filePayloadArgs<ExtArgs>
+    htmlPayload?: boolean | ContentNode$htmlPayloadArgs<ExtArgs>
+    notePayload?: boolean | ContentNode$notePayloadArgs<ExtArgs>
+    folderPayload?: boolean | ContentNode$folderPayloadArgs<ExtArgs>
+    externalPayload?: boolean | ContentNode$externalPayloadArgs<ExtArgs>
+    chatPayload?: boolean | ContentNode$chatPayloadArgs<ExtArgs>
+    visualizationPayload?: boolean | ContentNode$visualizationPayloadArgs<ExtArgs>
+    dataPayload?: boolean | ContentNode$dataPayloadArgs<ExtArgs>
+    hopePayload?: boolean | ContentNode$hopePayloadArgs<ExtArgs>
+    workflowPayload?: boolean | ContentNode$workflowPayloadArgs<ExtArgs>
     history?: boolean | ContentNode$historyArgs<ExtArgs>
     sourceLinks?: boolean | ContentNode$sourceLinksArgs<ExtArgs>
     targetLinks?: boolean | ContentNode$targetLinksArgs<ExtArgs>
@@ -3002,9 +3715,6 @@ export namespace Prisma {
     children?: boolean | ContentNode$childrenArgs<ExtArgs>
     contentPath?: boolean | ContentNode$contentPathArgs<ExtArgs>
     contentTags?: boolean | ContentNode$contentTagsArgs<ExtArgs>
-    filePayload?: boolean | ContentNode$filePayloadArgs<ExtArgs>
-    htmlPayload?: boolean | ContentNode$htmlPayloadArgs<ExtArgs>
-    notePayload?: boolean | ContentNode$notePayloadArgs<ExtArgs>
     trashBinEntry?: boolean | ContentNode$trashBinEntryArgs<ExtArgs>
     viewGrants?: boolean | ContentNode$viewGrantsArgs<ExtArgs>
     _count?: boolean | ContentNodeCountOutputTypeDefaultArgs<ExtArgs>
@@ -3015,6 +3725,8 @@ export namespace Prisma {
     ownerId?: boolean
     title?: boolean
     slug?: boolean
+    contentType?: boolean
+    role?: boolean
     parentId?: boolean
     displayOrder?: boolean
     categoryId?: boolean
@@ -3035,6 +3747,8 @@ export namespace Prisma {
     ownerId?: boolean
     title?: boolean
     slug?: boolean
+    contentType?: boolean
+    role?: boolean
     parentId?: boolean
     displayOrder?: boolean
     categoryId?: boolean
@@ -3055,6 +3769,8 @@ export namespace Prisma {
     ownerId?: boolean
     title?: boolean
     slug?: boolean
+    contentType?: boolean
+    role?: boolean
     parentId?: boolean
     displayOrder?: boolean
     categoryId?: boolean
@@ -3067,10 +3783,20 @@ export namespace Prisma {
     iconColor?: boolean
   }
 
-  export type ContentNodeOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "ownerId" | "title" | "slug" | "parentId" | "displayOrder" | "categoryId" | "isPublished" | "createdAt" | "updatedAt" | "deletedAt" | "deletedBy" | "customIcon" | "iconColor", ExtArgs["result"]["contentNode"]>
+  export type ContentNodeOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "ownerId" | "title" | "slug" | "contentType" | "role" | "parentId" | "displayOrder" | "categoryId" | "isPublished" | "createdAt" | "updatedAt" | "deletedAt" | "deletedBy" | "customIcon" | "iconColor", ExtArgs["result"]["contentNode"]>
   export type ContentNodeInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     auditLogs?: boolean | ContentNode$auditLogsArgs<ExtArgs>
     codePayload?: boolean | ContentNode$codePayloadArgs<ExtArgs>
+    filePayload?: boolean | ContentNode$filePayloadArgs<ExtArgs>
+    htmlPayload?: boolean | ContentNode$htmlPayloadArgs<ExtArgs>
+    notePayload?: boolean | ContentNode$notePayloadArgs<ExtArgs>
+    folderPayload?: boolean | ContentNode$folderPayloadArgs<ExtArgs>
+    externalPayload?: boolean | ContentNode$externalPayloadArgs<ExtArgs>
+    chatPayload?: boolean | ContentNode$chatPayloadArgs<ExtArgs>
+    visualizationPayload?: boolean | ContentNode$visualizationPayloadArgs<ExtArgs>
+    dataPayload?: boolean | ContentNode$dataPayloadArgs<ExtArgs>
+    hopePayload?: boolean | ContentNode$hopePayloadArgs<ExtArgs>
+    workflowPayload?: boolean | ContentNode$workflowPayloadArgs<ExtArgs>
     history?: boolean | ContentNode$historyArgs<ExtArgs>
     sourceLinks?: boolean | ContentNode$sourceLinksArgs<ExtArgs>
     targetLinks?: boolean | ContentNode$targetLinksArgs<ExtArgs>
@@ -3080,9 +3806,6 @@ export namespace Prisma {
     children?: boolean | ContentNode$childrenArgs<ExtArgs>
     contentPath?: boolean | ContentNode$contentPathArgs<ExtArgs>
     contentTags?: boolean | ContentNode$contentTagsArgs<ExtArgs>
-    filePayload?: boolean | ContentNode$filePayloadArgs<ExtArgs>
-    htmlPayload?: boolean | ContentNode$htmlPayloadArgs<ExtArgs>
-    notePayload?: boolean | ContentNode$notePayloadArgs<ExtArgs>
     trashBinEntry?: boolean | ContentNode$trashBinEntryArgs<ExtArgs>
     viewGrants?: boolean | ContentNode$viewGrantsArgs<ExtArgs>
     _count?: boolean | ContentNodeCountOutputTypeDefaultArgs<ExtArgs>
@@ -3103,6 +3826,16 @@ export namespace Prisma {
     objects: {
       auditLogs: Prisma.$AuditLogPayload<ExtArgs>[]
       codePayload: Prisma.$CodePayloadPayload<ExtArgs> | null
+      filePayload: Prisma.$FilePayloadPayload<ExtArgs> | null
+      htmlPayload: Prisma.$HtmlPayloadPayload<ExtArgs> | null
+      notePayload: Prisma.$NotePayloadPayload<ExtArgs> | null
+      folderPayload: Prisma.$FolderPayloadPayload<ExtArgs> | null
+      externalPayload: Prisma.$ExternalPayloadPayload<ExtArgs> | null
+      chatPayload: Prisma.$ChatPayloadPayload<ExtArgs> | null
+      visualizationPayload: Prisma.$VisualizationPayloadPayload<ExtArgs> | null
+      dataPayload: Prisma.$DataPayloadPayload<ExtArgs> | null
+      hopePayload: Prisma.$HopePayloadPayload<ExtArgs> | null
+      workflowPayload: Prisma.$WorkflowPayloadPayload<ExtArgs> | null
       history: Prisma.$ContentHistoryPayload<ExtArgs>[]
       sourceLinks: Prisma.$ContentLinkPayload<ExtArgs>[]
       targetLinks: Prisma.$ContentLinkPayload<ExtArgs>[]
@@ -3112,9 +3845,6 @@ export namespace Prisma {
       children: Prisma.$ContentNodePayload<ExtArgs>[]
       contentPath: Prisma.$ContentPathPayload<ExtArgs> | null
       contentTags: Prisma.$ContentTagPayload<ExtArgs>[]
-      filePayload: Prisma.$FilePayloadPayload<ExtArgs> | null
-      htmlPayload: Prisma.$HtmlPayloadPayload<ExtArgs> | null
-      notePayload: Prisma.$NotePayloadPayload<ExtArgs> | null
       trashBinEntry: Prisma.$TrashBinPayload<ExtArgs> | null
       viewGrants: Prisma.$ViewGrantPayload<ExtArgs>[]
     }
@@ -3123,6 +3853,8 @@ export namespace Prisma {
       ownerId: string
       title: string
       slug: string
+      contentType: $Enums.ContentType
+      role: $Enums.ContentRole
       parentId: string | null
       displayOrder: number
       categoryId: string | null
@@ -3529,6 +4261,16 @@ export namespace Prisma {
     readonly [Symbol.toStringTag]: "PrismaPromise"
     auditLogs<T extends ContentNode$auditLogsArgs<ExtArgs> = {}>(args?: Subset<T, ContentNode$auditLogsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$AuditLogPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     codePayload<T extends ContentNode$codePayloadArgs<ExtArgs> = {}>(args?: Subset<T, ContentNode$codePayloadArgs<ExtArgs>>): Prisma__CodePayloadClient<$Result.GetResult<Prisma.$CodePayloadPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+    filePayload<T extends ContentNode$filePayloadArgs<ExtArgs> = {}>(args?: Subset<T, ContentNode$filePayloadArgs<ExtArgs>>): Prisma__FilePayloadClient<$Result.GetResult<Prisma.$FilePayloadPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+    htmlPayload<T extends ContentNode$htmlPayloadArgs<ExtArgs> = {}>(args?: Subset<T, ContentNode$htmlPayloadArgs<ExtArgs>>): Prisma__HtmlPayloadClient<$Result.GetResult<Prisma.$HtmlPayloadPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+    notePayload<T extends ContentNode$notePayloadArgs<ExtArgs> = {}>(args?: Subset<T, ContentNode$notePayloadArgs<ExtArgs>>): Prisma__NotePayloadClient<$Result.GetResult<Prisma.$NotePayloadPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+    folderPayload<T extends ContentNode$folderPayloadArgs<ExtArgs> = {}>(args?: Subset<T, ContentNode$folderPayloadArgs<ExtArgs>>): Prisma__FolderPayloadClient<$Result.GetResult<Prisma.$FolderPayloadPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+    externalPayload<T extends ContentNode$externalPayloadArgs<ExtArgs> = {}>(args?: Subset<T, ContentNode$externalPayloadArgs<ExtArgs>>): Prisma__ExternalPayloadClient<$Result.GetResult<Prisma.$ExternalPayloadPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+    chatPayload<T extends ContentNode$chatPayloadArgs<ExtArgs> = {}>(args?: Subset<T, ContentNode$chatPayloadArgs<ExtArgs>>): Prisma__ChatPayloadClient<$Result.GetResult<Prisma.$ChatPayloadPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+    visualizationPayload<T extends ContentNode$visualizationPayloadArgs<ExtArgs> = {}>(args?: Subset<T, ContentNode$visualizationPayloadArgs<ExtArgs>>): Prisma__VisualizationPayloadClient<$Result.GetResult<Prisma.$VisualizationPayloadPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+    dataPayload<T extends ContentNode$dataPayloadArgs<ExtArgs> = {}>(args?: Subset<T, ContentNode$dataPayloadArgs<ExtArgs>>): Prisma__DataPayloadClient<$Result.GetResult<Prisma.$DataPayloadPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+    hopePayload<T extends ContentNode$hopePayloadArgs<ExtArgs> = {}>(args?: Subset<T, ContentNode$hopePayloadArgs<ExtArgs>>): Prisma__HopePayloadClient<$Result.GetResult<Prisma.$HopePayloadPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+    workflowPayload<T extends ContentNode$workflowPayloadArgs<ExtArgs> = {}>(args?: Subset<T, ContentNode$workflowPayloadArgs<ExtArgs>>): Prisma__WorkflowPayloadClient<$Result.GetResult<Prisma.$WorkflowPayloadPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
     history<T extends ContentNode$historyArgs<ExtArgs> = {}>(args?: Subset<T, ContentNode$historyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ContentHistoryPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     sourceLinks<T extends ContentNode$sourceLinksArgs<ExtArgs> = {}>(args?: Subset<T, ContentNode$sourceLinksArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ContentLinkPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     targetLinks<T extends ContentNode$targetLinksArgs<ExtArgs> = {}>(args?: Subset<T, ContentNode$targetLinksArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ContentLinkPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
@@ -3538,9 +4280,6 @@ export namespace Prisma {
     children<T extends ContentNode$childrenArgs<ExtArgs> = {}>(args?: Subset<T, ContentNode$childrenArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ContentNodePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     contentPath<T extends ContentNode$contentPathArgs<ExtArgs> = {}>(args?: Subset<T, ContentNode$contentPathArgs<ExtArgs>>): Prisma__ContentPathClient<$Result.GetResult<Prisma.$ContentPathPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
     contentTags<T extends ContentNode$contentTagsArgs<ExtArgs> = {}>(args?: Subset<T, ContentNode$contentTagsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ContentTagPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
-    filePayload<T extends ContentNode$filePayloadArgs<ExtArgs> = {}>(args?: Subset<T, ContentNode$filePayloadArgs<ExtArgs>>): Prisma__FilePayloadClient<$Result.GetResult<Prisma.$FilePayloadPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
-    htmlPayload<T extends ContentNode$htmlPayloadArgs<ExtArgs> = {}>(args?: Subset<T, ContentNode$htmlPayloadArgs<ExtArgs>>): Prisma__HtmlPayloadClient<$Result.GetResult<Prisma.$HtmlPayloadPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
-    notePayload<T extends ContentNode$notePayloadArgs<ExtArgs> = {}>(args?: Subset<T, ContentNode$notePayloadArgs<ExtArgs>>): Prisma__NotePayloadClient<$Result.GetResult<Prisma.$NotePayloadPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
     trashBinEntry<T extends ContentNode$trashBinEntryArgs<ExtArgs> = {}>(args?: Subset<T, ContentNode$trashBinEntryArgs<ExtArgs>>): Prisma__TrashBinClient<$Result.GetResult<Prisma.$TrashBinPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
     viewGrants<T extends ContentNode$viewGrantsArgs<ExtArgs> = {}>(args?: Subset<T, ContentNode$viewGrantsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ViewGrantPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     /**
@@ -3576,6 +4315,8 @@ export namespace Prisma {
     readonly ownerId: FieldRef<"ContentNode", 'String'>
     readonly title: FieldRef<"ContentNode", 'String'>
     readonly slug: FieldRef<"ContentNode", 'String'>
+    readonly contentType: FieldRef<"ContentNode", 'ContentType'>
+    readonly role: FieldRef<"ContentNode", 'ContentRole'>
     readonly parentId: FieldRef<"ContentNode", 'String'>
     readonly displayOrder: FieldRef<"ContentNode", 'Int'>
     readonly categoryId: FieldRef<"ContentNode", 'String'>
@@ -4025,6 +4766,196 @@ export namespace Prisma {
   }
 
   /**
+   * ContentNode.filePayload
+   */
+  export type ContentNode$filePayloadArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the FilePayload
+     */
+    select?: FilePayloadSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the FilePayload
+     */
+    omit?: FilePayloadOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: FilePayloadInclude<ExtArgs> | null
+    where?: FilePayloadWhereInput
+  }
+
+  /**
+   * ContentNode.htmlPayload
+   */
+  export type ContentNode$htmlPayloadArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the HtmlPayload
+     */
+    select?: HtmlPayloadSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the HtmlPayload
+     */
+    omit?: HtmlPayloadOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: HtmlPayloadInclude<ExtArgs> | null
+    where?: HtmlPayloadWhereInput
+  }
+
+  /**
+   * ContentNode.notePayload
+   */
+  export type ContentNode$notePayloadArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the NotePayload
+     */
+    select?: NotePayloadSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the NotePayload
+     */
+    omit?: NotePayloadOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: NotePayloadInclude<ExtArgs> | null
+    where?: NotePayloadWhereInput
+  }
+
+  /**
+   * ContentNode.folderPayload
+   */
+  export type ContentNode$folderPayloadArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the FolderPayload
+     */
+    select?: FolderPayloadSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the FolderPayload
+     */
+    omit?: FolderPayloadOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: FolderPayloadInclude<ExtArgs> | null
+    where?: FolderPayloadWhereInput
+  }
+
+  /**
+   * ContentNode.externalPayload
+   */
+  export type ContentNode$externalPayloadArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ExternalPayload
+     */
+    select?: ExternalPayloadSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ExternalPayload
+     */
+    omit?: ExternalPayloadOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ExternalPayloadInclude<ExtArgs> | null
+    where?: ExternalPayloadWhereInput
+  }
+
+  /**
+   * ContentNode.chatPayload
+   */
+  export type ContentNode$chatPayloadArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ChatPayload
+     */
+    select?: ChatPayloadSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ChatPayload
+     */
+    omit?: ChatPayloadOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ChatPayloadInclude<ExtArgs> | null
+    where?: ChatPayloadWhereInput
+  }
+
+  /**
+   * ContentNode.visualizationPayload
+   */
+  export type ContentNode$visualizationPayloadArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the VisualizationPayload
+     */
+    select?: VisualizationPayloadSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the VisualizationPayload
+     */
+    omit?: VisualizationPayloadOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: VisualizationPayloadInclude<ExtArgs> | null
+    where?: VisualizationPayloadWhereInput
+  }
+
+  /**
+   * ContentNode.dataPayload
+   */
+  export type ContentNode$dataPayloadArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the DataPayload
+     */
+    select?: DataPayloadSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the DataPayload
+     */
+    omit?: DataPayloadOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: DataPayloadInclude<ExtArgs> | null
+    where?: DataPayloadWhereInput
+  }
+
+  /**
+   * ContentNode.hopePayload
+   */
+  export type ContentNode$hopePayloadArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the HopePayload
+     */
+    select?: HopePayloadSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the HopePayload
+     */
+    omit?: HopePayloadOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: HopePayloadInclude<ExtArgs> | null
+    where?: HopePayloadWhereInput
+  }
+
+  /**
+   * ContentNode.workflowPayload
+   */
+  export type ContentNode$workflowPayloadArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the WorkflowPayload
+     */
+    select?: WorkflowPayloadSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the WorkflowPayload
+     */
+    omit?: WorkflowPayloadOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: WorkflowPayloadInclude<ExtArgs> | null
+    where?: WorkflowPayloadWhereInput
+  }
+
+  /**
    * ContentNode.history
    */
   export type ContentNode$historyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
@@ -4199,63 +5130,6 @@ export namespace Prisma {
     take?: number
     skip?: number
     distinct?: ContentTagScalarFieldEnum | ContentTagScalarFieldEnum[]
-  }
-
-  /**
-   * ContentNode.filePayload
-   */
-  export type ContentNode$filePayloadArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
-    /**
-     * Select specific fields to fetch from the FilePayload
-     */
-    select?: FilePayloadSelect<ExtArgs> | null
-    /**
-     * Omit specific fields from the FilePayload
-     */
-    omit?: FilePayloadOmit<ExtArgs> | null
-    /**
-     * Choose, which related nodes to fetch as well
-     */
-    include?: FilePayloadInclude<ExtArgs> | null
-    where?: FilePayloadWhereInput
-  }
-
-  /**
-   * ContentNode.htmlPayload
-   */
-  export type ContentNode$htmlPayloadArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
-    /**
-     * Select specific fields to fetch from the HtmlPayload
-     */
-    select?: HtmlPayloadSelect<ExtArgs> | null
-    /**
-     * Omit specific fields from the HtmlPayload
-     */
-    omit?: HtmlPayloadOmit<ExtArgs> | null
-    /**
-     * Choose, which related nodes to fetch as well
-     */
-    include?: HtmlPayloadInclude<ExtArgs> | null
-    where?: HtmlPayloadWhereInput
-  }
-
-  /**
-   * ContentNode.notePayload
-   */
-  export type ContentNode$notePayloadArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
-    /**
-     * Select specific fields to fetch from the NotePayload
-     */
-    select?: NotePayloadSelect<ExtArgs> | null
-    /**
-     * Omit specific fields from the NotePayload
-     */
-    omit?: NotePayloadOmit<ExtArgs> | null
-    /**
-     * Choose, which related nodes to fetch as well
-     */
-    include?: NotePayloadInclude<ExtArgs> | null
-    where?: NotePayloadWhereInput
   }
 
   /**
@@ -15496,9 +16370,9 @@ export namespace Prisma {
     passwordHash: string | null
     email: string | null
     role: $Enums.UserRole | null
-    settingsVersion: number | null
     createdAt: Date | null
     updatedAt: Date | null
+    settingsVersion: number | null
   }
 
   export type UserMaxAggregateOutputType = {
@@ -15507,9 +16381,9 @@ export namespace Prisma {
     passwordHash: string | null
     email: string | null
     role: $Enums.UserRole | null
-    settingsVersion: number | null
     createdAt: Date | null
     updatedAt: Date | null
+    settingsVersion: number | null
   }
 
   export type UserCountAggregateOutputType = {
@@ -15518,10 +16392,10 @@ export namespace Prisma {
     passwordHash: number
     email: number
     role: number
-    settings: number
-    settingsVersion: number
     createdAt: number
     updatedAt: number
+    settings: number
+    settingsVersion: number
     _all: number
   }
 
@@ -15540,9 +16414,9 @@ export namespace Prisma {
     passwordHash?: true
     email?: true
     role?: true
-    settingsVersion?: true
     createdAt?: true
     updatedAt?: true
+    settingsVersion?: true
   }
 
   export type UserMaxAggregateInputType = {
@@ -15551,9 +16425,9 @@ export namespace Prisma {
     passwordHash?: true
     email?: true
     role?: true
-    settingsVersion?: true
     createdAt?: true
     updatedAt?: true
+    settingsVersion?: true
   }
 
   export type UserCountAggregateInputType = {
@@ -15562,10 +16436,10 @@ export namespace Prisma {
     passwordHash?: true
     email?: true
     role?: true
-    settings?: true
-    settingsVersion?: true
     createdAt?: true
     updatedAt?: true
+    settings?: true
+    settingsVersion?: true
     _all?: true
   }
 
@@ -15661,10 +16535,10 @@ export namespace Prisma {
     passwordHash: string | null
     email: string
     role: $Enums.UserRole
-    settings: JsonValue | null
-    settingsVersion: number
     createdAt: Date
     updatedAt: Date
+    settings: JsonValue | null
+    settingsVersion: number
     _count: UserCountAggregateOutputType | null
     _avg: UserAvgAggregateOutputType | null
     _sum: UserSumAggregateOutputType | null
@@ -15692,13 +16566,13 @@ export namespace Prisma {
     passwordHash?: boolean
     email?: boolean
     role?: boolean
-    settings?: boolean
-    settingsVersion?: boolean
     createdAt?: boolean
     updatedAt?: boolean
+    settings?: boolean
+    settingsVersion?: boolean
     accounts?: boolean | User$accountsArgs<ExtArgs>
-    adminActions?: boolean | User$adminActionsArgs<ExtArgs>
     auditTargets?: boolean | User$auditTargetsArgs<ExtArgs>
+    adminActions?: boolean | User$adminActionsArgs<ExtArgs>
     categories?: boolean | User$categoriesArgs<ExtArgs>
     contentHistory?: boolean | User$contentHistoryArgs<ExtArgs>
     contentNodes?: boolean | User$contentNodesArgs<ExtArgs>
@@ -15716,10 +16590,10 @@ export namespace Prisma {
     passwordHash?: boolean
     email?: boolean
     role?: boolean
-    settings?: boolean
-    settingsVersion?: boolean
     createdAt?: boolean
     updatedAt?: boolean
+    settings?: boolean
+    settingsVersion?: boolean
   }, ExtArgs["result"]["user"]>
 
   export type UserSelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
@@ -15728,10 +16602,10 @@ export namespace Prisma {
     passwordHash?: boolean
     email?: boolean
     role?: boolean
-    settings?: boolean
-    settingsVersion?: boolean
     createdAt?: boolean
     updatedAt?: boolean
+    settings?: boolean
+    settingsVersion?: boolean
   }, ExtArgs["result"]["user"]>
 
   export type UserSelectScalar = {
@@ -15740,17 +16614,17 @@ export namespace Prisma {
     passwordHash?: boolean
     email?: boolean
     role?: boolean
-    settings?: boolean
-    settingsVersion?: boolean
     createdAt?: boolean
     updatedAt?: boolean
+    settings?: boolean
+    settingsVersion?: boolean
   }
 
-  export type UserOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "username" | "passwordHash" | "email" | "role" | "settings" | "settingsVersion" | "createdAt" | "updatedAt", ExtArgs["result"]["user"]>
+  export type UserOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "username" | "passwordHash" | "email" | "role" | "createdAt" | "updatedAt" | "settings" | "settingsVersion", ExtArgs["result"]["user"]>
   export type UserInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     accounts?: boolean | User$accountsArgs<ExtArgs>
-    adminActions?: boolean | User$adminActionsArgs<ExtArgs>
     auditTargets?: boolean | User$auditTargetsArgs<ExtArgs>
+    adminActions?: boolean | User$adminActionsArgs<ExtArgs>
     categories?: boolean | User$categoriesArgs<ExtArgs>
     contentHistory?: boolean | User$contentHistoryArgs<ExtArgs>
     contentNodes?: boolean | User$contentNodesArgs<ExtArgs>
@@ -15768,8 +16642,8 @@ export namespace Prisma {
     name: "User"
     objects: {
       accounts: Prisma.$AccountPayload<ExtArgs>[]
-      adminActions: Prisma.$AuditLogPayload<ExtArgs>[]
       auditTargets: Prisma.$AuditLogPayload<ExtArgs>[]
+      adminActions: Prisma.$AuditLogPayload<ExtArgs>[]
       categories: Prisma.$CategoryPayload<ExtArgs>[]
       contentHistory: Prisma.$ContentHistoryPayload<ExtArgs>[]
       contentNodes: Prisma.$ContentNodePayload<ExtArgs>[]
@@ -15785,10 +16659,10 @@ export namespace Prisma {
       passwordHash: string | null
       email: string
       role: $Enums.UserRole
-      settings: Prisma.JsonValue | null
-      settingsVersion: number
       createdAt: Date
       updatedAt: Date
+      settings: Prisma.JsonValue | null
+      settingsVersion: number
     }, ExtArgs["result"]["user"]>
     composites: {}
   }
@@ -16184,8 +17058,8 @@ export namespace Prisma {
   export interface Prisma__UserClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
     readonly [Symbol.toStringTag]: "PrismaPromise"
     accounts<T extends User$accountsArgs<ExtArgs> = {}>(args?: Subset<T, User$accountsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$AccountPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
-    adminActions<T extends User$adminActionsArgs<ExtArgs> = {}>(args?: Subset<T, User$adminActionsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$AuditLogPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     auditTargets<T extends User$auditTargetsArgs<ExtArgs> = {}>(args?: Subset<T, User$auditTargetsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$AuditLogPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+    adminActions<T extends User$adminActionsArgs<ExtArgs> = {}>(args?: Subset<T, User$adminActionsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$AuditLogPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     categories<T extends User$categoriesArgs<ExtArgs> = {}>(args?: Subset<T, User$categoriesArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$CategoryPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     contentHistory<T extends User$contentHistoryArgs<ExtArgs> = {}>(args?: Subset<T, User$contentHistoryArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ContentHistoryPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     contentNodes<T extends User$contentNodesArgs<ExtArgs> = {}>(args?: Subset<T, User$contentNodesArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ContentNodePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
@@ -16228,10 +17102,10 @@ export namespace Prisma {
     readonly passwordHash: FieldRef<"User", 'String'>
     readonly email: FieldRef<"User", 'String'>
     readonly role: FieldRef<"User", 'UserRole'>
-    readonly settings: FieldRef<"User", 'Json'>
-    readonly settingsVersion: FieldRef<"User", 'Int'>
     readonly createdAt: FieldRef<"User", 'DateTime'>
     readonly updatedAt: FieldRef<"User", 'DateTime'>
+    readonly settings: FieldRef<"User", 'Json'>
+    readonly settingsVersion: FieldRef<"User", 'Int'>
   }
     
 
@@ -16644,9 +17518,9 @@ export namespace Prisma {
   }
 
   /**
-   * User.adminActions
+   * User.auditTargets
    */
-  export type User$adminActionsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+  export type User$auditTargetsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     /**
      * Select specific fields to fetch from the AuditLog
      */
@@ -16668,9 +17542,9 @@ export namespace Prisma {
   }
 
   /**
-   * User.auditTargets
+   * User.adminActions
    */
-  export type User$auditTargetsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+  export type User$adminActionsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     /**
      * Select specific fields to fetch from the AuditLog
      */
@@ -18091,8 +18965,8 @@ export namespace Prisma {
     name: string | null
     slug: string | null
     createdAt: Date | null
-    color: string | null
     userId: string | null
+    color: string | null
   }
 
   export type TagMaxAggregateOutputType = {
@@ -18100,8 +18974,8 @@ export namespace Prisma {
     name: string | null
     slug: string | null
     createdAt: Date | null
-    color: string | null
     userId: string | null
+    color: string | null
   }
 
   export type TagCountAggregateOutputType = {
@@ -18109,8 +18983,8 @@ export namespace Prisma {
     name: number
     slug: number
     createdAt: number
-    color: number
     userId: number
+    color: number
     _all: number
   }
 
@@ -18120,8 +18994,8 @@ export namespace Prisma {
     name?: true
     slug?: true
     createdAt?: true
-    color?: true
     userId?: true
+    color?: true
   }
 
   export type TagMaxAggregateInputType = {
@@ -18129,8 +19003,8 @@ export namespace Prisma {
     name?: true
     slug?: true
     createdAt?: true
-    color?: true
     userId?: true
+    color?: true
   }
 
   export type TagCountAggregateInputType = {
@@ -18138,8 +19012,8 @@ export namespace Prisma {
     name?: true
     slug?: true
     createdAt?: true
-    color?: true
     userId?: true
+    color?: true
     _all?: true
   }
 
@@ -18220,8 +19094,8 @@ export namespace Prisma {
     name: string
     slug: string
     createdAt: Date
-    color: string | null
     userId: string
+    color: string | null
     _count: TagCountAggregateOutputType | null
     _min: TagMinAggregateOutputType | null
     _max: TagMaxAggregateOutputType | null
@@ -18246,8 +19120,8 @@ export namespace Prisma {
     name?: boolean
     slug?: boolean
     createdAt?: boolean
-    color?: boolean
     userId?: boolean
+    color?: boolean
     contentTags?: boolean | Tag$contentTagsArgs<ExtArgs>
     user?: boolean | UserDefaultArgs<ExtArgs>
     _count?: boolean | TagCountOutputTypeDefaultArgs<ExtArgs>
@@ -18258,8 +19132,8 @@ export namespace Prisma {
     name?: boolean
     slug?: boolean
     createdAt?: boolean
-    color?: boolean
     userId?: boolean
+    color?: boolean
     user?: boolean | UserDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["tag"]>
 
@@ -18268,8 +19142,8 @@ export namespace Prisma {
     name?: boolean
     slug?: boolean
     createdAt?: boolean
-    color?: boolean
     userId?: boolean
+    color?: boolean
     user?: boolean | UserDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["tag"]>
 
@@ -18278,11 +19152,11 @@ export namespace Prisma {
     name?: boolean
     slug?: boolean
     createdAt?: boolean
-    color?: boolean
     userId?: boolean
+    color?: boolean
   }
 
-  export type TagOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "name" | "slug" | "createdAt" | "color" | "userId", ExtArgs["result"]["tag"]>
+  export type TagOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "name" | "slug" | "createdAt" | "userId" | "color", ExtArgs["result"]["tag"]>
   export type TagInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     contentTags?: boolean | Tag$contentTagsArgs<ExtArgs>
     user?: boolean | UserDefaultArgs<ExtArgs>
@@ -18306,8 +19180,8 @@ export namespace Prisma {
       name: string
       slug: string
       createdAt: Date
-      color: string | null
       userId: string
+      color: string | null
     }, ExtArgs["result"]["tag"]>
     composites: {}
   }
@@ -18737,8 +19611,8 @@ export namespace Prisma {
     readonly name: FieldRef<"Tag", 'String'>
     readonly slug: FieldRef<"Tag", 'String'>
     readonly createdAt: FieldRef<"Tag", 'DateTime'>
-    readonly color: FieldRef<"Tag", 'String'>
     readonly userId: FieldRef<"Tag", 'String'>
+    readonly color: FieldRef<"Tag", 'String'>
   }
     
 
@@ -22603,9 +23477,9 @@ export namespace Prisma {
     ipAddress?: boolean
     userAgent?: boolean
     createdAt?: boolean
-    user?: boolean | UserDefaultArgs<ExtArgs>
-    targetUser?: boolean | AuditLog$targetUserArgs<ExtArgs>
     targetContent?: boolean | AuditLog$targetContentArgs<ExtArgs>
+    targetUser?: boolean | AuditLog$targetUserArgs<ExtArgs>
+    user?: boolean | UserDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["auditLog"]>
 
   export type AuditLogSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
@@ -22618,9 +23492,9 @@ export namespace Prisma {
     ipAddress?: boolean
     userAgent?: boolean
     createdAt?: boolean
-    user?: boolean | UserDefaultArgs<ExtArgs>
-    targetUser?: boolean | AuditLog$targetUserArgs<ExtArgs>
     targetContent?: boolean | AuditLog$targetContentArgs<ExtArgs>
+    targetUser?: boolean | AuditLog$targetUserArgs<ExtArgs>
+    user?: boolean | UserDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["auditLog"]>
 
   export type AuditLogSelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
@@ -22633,9 +23507,9 @@ export namespace Prisma {
     ipAddress?: boolean
     userAgent?: boolean
     createdAt?: boolean
-    user?: boolean | UserDefaultArgs<ExtArgs>
-    targetUser?: boolean | AuditLog$targetUserArgs<ExtArgs>
     targetContent?: boolean | AuditLog$targetContentArgs<ExtArgs>
+    targetUser?: boolean | AuditLog$targetUserArgs<ExtArgs>
+    user?: boolean | UserDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["auditLog"]>
 
   export type AuditLogSelectScalar = {
@@ -22652,27 +23526,27 @@ export namespace Prisma {
 
   export type AuditLogOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "userId" | "action" | "targetUserId" | "targetContentId" | "details" | "ipAddress" | "userAgent" | "createdAt", ExtArgs["result"]["auditLog"]>
   export type AuditLogInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
-    user?: boolean | UserDefaultArgs<ExtArgs>
-    targetUser?: boolean | AuditLog$targetUserArgs<ExtArgs>
     targetContent?: boolean | AuditLog$targetContentArgs<ExtArgs>
+    targetUser?: boolean | AuditLog$targetUserArgs<ExtArgs>
+    user?: boolean | UserDefaultArgs<ExtArgs>
   }
   export type AuditLogIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
-    user?: boolean | UserDefaultArgs<ExtArgs>
-    targetUser?: boolean | AuditLog$targetUserArgs<ExtArgs>
     targetContent?: boolean | AuditLog$targetContentArgs<ExtArgs>
+    targetUser?: boolean | AuditLog$targetUserArgs<ExtArgs>
+    user?: boolean | UserDefaultArgs<ExtArgs>
   }
   export type AuditLogIncludeUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
-    user?: boolean | UserDefaultArgs<ExtArgs>
-    targetUser?: boolean | AuditLog$targetUserArgs<ExtArgs>
     targetContent?: boolean | AuditLog$targetContentArgs<ExtArgs>
+    targetUser?: boolean | AuditLog$targetUserArgs<ExtArgs>
+    user?: boolean | UserDefaultArgs<ExtArgs>
   }
 
   export type $AuditLogPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     name: "AuditLog"
     objects: {
-      user: Prisma.$UserPayload<ExtArgs>
-      targetUser: Prisma.$UserPayload<ExtArgs> | null
       targetContent: Prisma.$ContentNodePayload<ExtArgs> | null
+      targetUser: Prisma.$UserPayload<ExtArgs> | null
+      user: Prisma.$UserPayload<ExtArgs>
     }
     scalars: $Extensions.GetPayloadResult<{
       id: string
@@ -23078,9 +23952,9 @@ export namespace Prisma {
    */
   export interface Prisma__AuditLogClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
     readonly [Symbol.toStringTag]: "PrismaPromise"
-    user<T extends UserDefaultArgs<ExtArgs> = {}>(args?: Subset<T, UserDefaultArgs<ExtArgs>>): Prisma__UserClient<$Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
-    targetUser<T extends AuditLog$targetUserArgs<ExtArgs> = {}>(args?: Subset<T, AuditLog$targetUserArgs<ExtArgs>>): Prisma__UserClient<$Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
     targetContent<T extends AuditLog$targetContentArgs<ExtArgs> = {}>(args?: Subset<T, AuditLog$targetContentArgs<ExtArgs>>): Prisma__ContentNodeClient<$Result.GetResult<Prisma.$ContentNodePayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+    targetUser<T extends AuditLog$targetUserArgs<ExtArgs> = {}>(args?: Subset<T, AuditLog$targetUserArgs<ExtArgs>>): Prisma__UserClient<$Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+    user<T extends UserDefaultArgs<ExtArgs> = {}>(args?: Subset<T, UserDefaultArgs<ExtArgs>>): Prisma__UserClient<$Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
     /**
      * Attaches callbacks for the resolution and/or rejection of the Promise.
      * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -23515,25 +24389,6 @@ export namespace Prisma {
   }
 
   /**
-   * AuditLog.targetUser
-   */
-  export type AuditLog$targetUserArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
-    /**
-     * Select specific fields to fetch from the User
-     */
-    select?: UserSelect<ExtArgs> | null
-    /**
-     * Omit specific fields from the User
-     */
-    omit?: UserOmit<ExtArgs> | null
-    /**
-     * Choose, which related nodes to fetch as well
-     */
-    include?: UserInclude<ExtArgs> | null
-    where?: UserWhereInput
-  }
-
-  /**
    * AuditLog.targetContent
    */
   export type AuditLog$targetContentArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
@@ -23550,6 +24405,25 @@ export namespace Prisma {
      */
     include?: ContentNodeInclude<ExtArgs> | null
     where?: ContentNodeWhereInput
+  }
+
+  /**
+   * AuditLog.targetUser
+   */
+  export type AuditLog$targetUserArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the User
+     */
+    select?: UserSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the User
+     */
+    omit?: UserOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: UserInclude<ExtArgs> | null
+    where?: UserWhereInput
   }
 
   /**
@@ -23572,6 +24446,7498 @@ export namespace Prisma {
 
 
   /**
+   * Model FolderPayload
+   */
+
+  export type AggregateFolderPayload = {
+    _count: FolderPayloadCountAggregateOutputType | null
+    _min: FolderPayloadMinAggregateOutputType | null
+    _max: FolderPayloadMaxAggregateOutputType | null
+  }
+
+  export type FolderPayloadMinAggregateOutputType = {
+    contentId: string | null
+    viewMode: $Enums.FolderViewMode | null
+    sortMode: string | null
+    includeReferencedContent: boolean | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type FolderPayloadMaxAggregateOutputType = {
+    contentId: string | null
+    viewMode: $Enums.FolderViewMode | null
+    sortMode: string | null
+    includeReferencedContent: boolean | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type FolderPayloadCountAggregateOutputType = {
+    contentId: number
+    viewMode: number
+    sortMode: number
+    viewPrefs: number
+    includeReferencedContent: number
+    createdAt: number
+    updatedAt: number
+    _all: number
+  }
+
+
+  export type FolderPayloadMinAggregateInputType = {
+    contentId?: true
+    viewMode?: true
+    sortMode?: true
+    includeReferencedContent?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type FolderPayloadMaxAggregateInputType = {
+    contentId?: true
+    viewMode?: true
+    sortMode?: true
+    includeReferencedContent?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type FolderPayloadCountAggregateInputType = {
+    contentId?: true
+    viewMode?: true
+    sortMode?: true
+    viewPrefs?: true
+    includeReferencedContent?: true
+    createdAt?: true
+    updatedAt?: true
+    _all?: true
+  }
+
+  export type FolderPayloadAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which FolderPayload to aggregate.
+     */
+    where?: FolderPayloadWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of FolderPayloads to fetch.
+     */
+    orderBy?: FolderPayloadOrderByWithRelationInput | FolderPayloadOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: FolderPayloadWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` FolderPayloads from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` FolderPayloads.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned FolderPayloads
+    **/
+    _count?: true | FolderPayloadCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: FolderPayloadMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: FolderPayloadMaxAggregateInputType
+  }
+
+  export type GetFolderPayloadAggregateType<T extends FolderPayloadAggregateArgs> = {
+        [P in keyof T & keyof AggregateFolderPayload]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateFolderPayload[P]>
+      : GetScalarType<T[P], AggregateFolderPayload[P]>
+  }
+
+
+
+
+  export type FolderPayloadGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: FolderPayloadWhereInput
+    orderBy?: FolderPayloadOrderByWithAggregationInput | FolderPayloadOrderByWithAggregationInput[]
+    by: FolderPayloadScalarFieldEnum[] | FolderPayloadScalarFieldEnum
+    having?: FolderPayloadScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: FolderPayloadCountAggregateInputType | true
+    _min?: FolderPayloadMinAggregateInputType
+    _max?: FolderPayloadMaxAggregateInputType
+  }
+
+  export type FolderPayloadGroupByOutputType = {
+    contentId: string
+    viewMode: $Enums.FolderViewMode
+    sortMode: string | null
+    viewPrefs: JsonValue
+    includeReferencedContent: boolean
+    createdAt: Date
+    updatedAt: Date
+    _count: FolderPayloadCountAggregateOutputType | null
+    _min: FolderPayloadMinAggregateOutputType | null
+    _max: FolderPayloadMaxAggregateOutputType | null
+  }
+
+  type GetFolderPayloadGroupByPayload<T extends FolderPayloadGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<FolderPayloadGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof FolderPayloadGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], FolderPayloadGroupByOutputType[P]>
+            : GetScalarType<T[P], FolderPayloadGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type FolderPayloadSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    contentId?: boolean
+    viewMode?: boolean
+    sortMode?: boolean
+    viewPrefs?: boolean
+    includeReferencedContent?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    content?: boolean | ContentNodeDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["folderPayload"]>
+
+  export type FolderPayloadSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    contentId?: boolean
+    viewMode?: boolean
+    sortMode?: boolean
+    viewPrefs?: boolean
+    includeReferencedContent?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    content?: boolean | ContentNodeDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["folderPayload"]>
+
+  export type FolderPayloadSelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    contentId?: boolean
+    viewMode?: boolean
+    sortMode?: boolean
+    viewPrefs?: boolean
+    includeReferencedContent?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    content?: boolean | ContentNodeDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["folderPayload"]>
+
+  export type FolderPayloadSelectScalar = {
+    contentId?: boolean
+    viewMode?: boolean
+    sortMode?: boolean
+    viewPrefs?: boolean
+    includeReferencedContent?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+  }
+
+  export type FolderPayloadOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"contentId" | "viewMode" | "sortMode" | "viewPrefs" | "includeReferencedContent" | "createdAt" | "updatedAt", ExtArgs["result"]["folderPayload"]>
+  export type FolderPayloadInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    content?: boolean | ContentNodeDefaultArgs<ExtArgs>
+  }
+  export type FolderPayloadIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    content?: boolean | ContentNodeDefaultArgs<ExtArgs>
+  }
+  export type FolderPayloadIncludeUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    content?: boolean | ContentNodeDefaultArgs<ExtArgs>
+  }
+
+  export type $FolderPayloadPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "FolderPayload"
+    objects: {
+      content: Prisma.$ContentNodePayload<ExtArgs>
+    }
+    scalars: $Extensions.GetPayloadResult<{
+      contentId: string
+      viewMode: $Enums.FolderViewMode
+      sortMode: string | null
+      viewPrefs: Prisma.JsonValue
+      includeReferencedContent: boolean
+      createdAt: Date
+      updatedAt: Date
+    }, ExtArgs["result"]["folderPayload"]>
+    composites: {}
+  }
+
+  type FolderPayloadGetPayload<S extends boolean | null | undefined | FolderPayloadDefaultArgs> = $Result.GetResult<Prisma.$FolderPayloadPayload, S>
+
+  type FolderPayloadCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> =
+    Omit<FolderPayloadFindManyArgs, 'select' | 'include' | 'distinct' | 'omit'> & {
+      select?: FolderPayloadCountAggregateInputType | true
+    }
+
+  export interface FolderPayloadDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['FolderPayload'], meta: { name: 'FolderPayload' } }
+    /**
+     * Find zero or one FolderPayload that matches the filter.
+     * @param {FolderPayloadFindUniqueArgs} args - Arguments to find a FolderPayload
+     * @example
+     * // Get one FolderPayload
+     * const folderPayload = await prisma.folderPayload.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends FolderPayloadFindUniqueArgs>(args: SelectSubset<T, FolderPayloadFindUniqueArgs<ExtArgs>>): Prisma__FolderPayloadClient<$Result.GetResult<Prisma.$FolderPayloadPayload<ExtArgs>, T, "findUnique", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find one FolderPayload that matches the filter or throw an error with `error.code='P2025'`
+     * if no matches were found.
+     * @param {FolderPayloadFindUniqueOrThrowArgs} args - Arguments to find a FolderPayload
+     * @example
+     * // Get one FolderPayload
+     * const folderPayload = await prisma.folderPayload.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends FolderPayloadFindUniqueOrThrowArgs>(args: SelectSubset<T, FolderPayloadFindUniqueOrThrowArgs<ExtArgs>>): Prisma__FolderPayloadClient<$Result.GetResult<Prisma.$FolderPayloadPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first FolderPayload that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {FolderPayloadFindFirstArgs} args - Arguments to find a FolderPayload
+     * @example
+     * // Get one FolderPayload
+     * const folderPayload = await prisma.folderPayload.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends FolderPayloadFindFirstArgs>(args?: SelectSubset<T, FolderPayloadFindFirstArgs<ExtArgs>>): Prisma__FolderPayloadClient<$Result.GetResult<Prisma.$FolderPayloadPayload<ExtArgs>, T, "findFirst", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first FolderPayload that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {FolderPayloadFindFirstOrThrowArgs} args - Arguments to find a FolderPayload
+     * @example
+     * // Get one FolderPayload
+     * const folderPayload = await prisma.folderPayload.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends FolderPayloadFindFirstOrThrowArgs>(args?: SelectSubset<T, FolderPayloadFindFirstOrThrowArgs<ExtArgs>>): Prisma__FolderPayloadClient<$Result.GetResult<Prisma.$FolderPayloadPayload<ExtArgs>, T, "findFirstOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find zero or more FolderPayloads that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {FolderPayloadFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all FolderPayloads
+     * const folderPayloads = await prisma.folderPayload.findMany()
+     * 
+     * // Get first 10 FolderPayloads
+     * const folderPayloads = await prisma.folderPayload.findMany({ take: 10 })
+     * 
+     * // Only select the `contentId`
+     * const folderPayloadWithContentIdOnly = await prisma.folderPayload.findMany({ select: { contentId: true } })
+     * 
+     */
+    findMany<T extends FolderPayloadFindManyArgs>(args?: SelectSubset<T, FolderPayloadFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$FolderPayloadPayload<ExtArgs>, T, "findMany", GlobalOmitOptions>>
+
+    /**
+     * Create a FolderPayload.
+     * @param {FolderPayloadCreateArgs} args - Arguments to create a FolderPayload.
+     * @example
+     * // Create one FolderPayload
+     * const FolderPayload = await prisma.folderPayload.create({
+     *   data: {
+     *     // ... data to create a FolderPayload
+     *   }
+     * })
+     * 
+     */
+    create<T extends FolderPayloadCreateArgs>(args: SelectSubset<T, FolderPayloadCreateArgs<ExtArgs>>): Prisma__FolderPayloadClient<$Result.GetResult<Prisma.$FolderPayloadPayload<ExtArgs>, T, "create", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Create many FolderPayloads.
+     * @param {FolderPayloadCreateManyArgs} args - Arguments to create many FolderPayloads.
+     * @example
+     * // Create many FolderPayloads
+     * const folderPayload = await prisma.folderPayload.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *     
+     */
+    createMany<T extends FolderPayloadCreateManyArgs>(args?: SelectSubset<T, FolderPayloadCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create many FolderPayloads and returns the data saved in the database.
+     * @param {FolderPayloadCreateManyAndReturnArgs} args - Arguments to create many FolderPayloads.
+     * @example
+     * // Create many FolderPayloads
+     * const folderPayload = await prisma.folderPayload.createManyAndReturn({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Create many FolderPayloads and only return the `contentId`
+     * const folderPayloadWithContentIdOnly = await prisma.folderPayload.createManyAndReturn({
+     *   select: { contentId: true },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    createManyAndReturn<T extends FolderPayloadCreateManyAndReturnArgs>(args?: SelectSubset<T, FolderPayloadCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$FolderPayloadPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Delete a FolderPayload.
+     * @param {FolderPayloadDeleteArgs} args - Arguments to delete one FolderPayload.
+     * @example
+     * // Delete one FolderPayload
+     * const FolderPayload = await prisma.folderPayload.delete({
+     *   where: {
+     *     // ... filter to delete one FolderPayload
+     *   }
+     * })
+     * 
+     */
+    delete<T extends FolderPayloadDeleteArgs>(args: SelectSubset<T, FolderPayloadDeleteArgs<ExtArgs>>): Prisma__FolderPayloadClient<$Result.GetResult<Prisma.$FolderPayloadPayload<ExtArgs>, T, "delete", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Update one FolderPayload.
+     * @param {FolderPayloadUpdateArgs} args - Arguments to update one FolderPayload.
+     * @example
+     * // Update one FolderPayload
+     * const folderPayload = await prisma.folderPayload.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    update<T extends FolderPayloadUpdateArgs>(args: SelectSubset<T, FolderPayloadUpdateArgs<ExtArgs>>): Prisma__FolderPayloadClient<$Result.GetResult<Prisma.$FolderPayloadPayload<ExtArgs>, T, "update", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Delete zero or more FolderPayloads.
+     * @param {FolderPayloadDeleteManyArgs} args - Arguments to filter FolderPayloads to delete.
+     * @example
+     * // Delete a few FolderPayloads
+     * const { count } = await prisma.folderPayload.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+     */
+    deleteMany<T extends FolderPayloadDeleteManyArgs>(args?: SelectSubset<T, FolderPayloadDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more FolderPayloads.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {FolderPayloadUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many FolderPayloads
+     * const folderPayload = await prisma.folderPayload.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    updateMany<T extends FolderPayloadUpdateManyArgs>(args: SelectSubset<T, FolderPayloadUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more FolderPayloads and returns the data updated in the database.
+     * @param {FolderPayloadUpdateManyAndReturnArgs} args - Arguments to update many FolderPayloads.
+     * @example
+     * // Update many FolderPayloads
+     * const folderPayload = await prisma.folderPayload.updateManyAndReturn({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Update zero or more FolderPayloads and only return the `contentId`
+     * const folderPayloadWithContentIdOnly = await prisma.folderPayload.updateManyAndReturn({
+     *   select: { contentId: true },
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    updateManyAndReturn<T extends FolderPayloadUpdateManyAndReturnArgs>(args: SelectSubset<T, FolderPayloadUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$FolderPayloadPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Create or update one FolderPayload.
+     * @param {FolderPayloadUpsertArgs} args - Arguments to update or create a FolderPayload.
+     * @example
+     * // Update or create a FolderPayload
+     * const folderPayload = await prisma.folderPayload.upsert({
+     *   create: {
+     *     // ... data to create a FolderPayload
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the FolderPayload we want to update
+     *   }
+     * })
+     */
+    upsert<T extends FolderPayloadUpsertArgs>(args: SelectSubset<T, FolderPayloadUpsertArgs<ExtArgs>>): Prisma__FolderPayloadClient<$Result.GetResult<Prisma.$FolderPayloadPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+
+    /**
+     * Count the number of FolderPayloads.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {FolderPayloadCountArgs} args - Arguments to filter FolderPayloads to count.
+     * @example
+     * // Count the number of FolderPayloads
+     * const count = await prisma.folderPayload.count({
+     *   where: {
+     *     // ... the filter for the FolderPayloads we want to count
+     *   }
+     * })
+    **/
+    count<T extends FolderPayloadCountArgs>(
+      args?: Subset<T, FolderPayloadCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], FolderPayloadCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a FolderPayload.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {FolderPayloadAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends FolderPayloadAggregateArgs>(args: Subset<T, FolderPayloadAggregateArgs>): Prisma.PrismaPromise<GetFolderPayloadAggregateType<T>>
+
+    /**
+     * Group by FolderPayload.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {FolderPayloadGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends FolderPayloadGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: FolderPayloadGroupByArgs['orderBy'] }
+        : { orderBy?: FolderPayloadGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, FolderPayloadGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetFolderPayloadGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the FolderPayload model
+   */
+  readonly fields: FolderPayloadFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for FolderPayload.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__FolderPayloadClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    content<T extends ContentNodeDefaultArgs<ExtArgs> = {}>(args?: Subset<T, ContentNodeDefaultArgs<ExtArgs>>): Prisma__ContentNodeClient<$Result.GetResult<Prisma.$ContentNodePayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the FolderPayload model
+   */
+  interface FolderPayloadFieldRefs {
+    readonly contentId: FieldRef<"FolderPayload", 'String'>
+    readonly viewMode: FieldRef<"FolderPayload", 'FolderViewMode'>
+    readonly sortMode: FieldRef<"FolderPayload", 'String'>
+    readonly viewPrefs: FieldRef<"FolderPayload", 'Json'>
+    readonly includeReferencedContent: FieldRef<"FolderPayload", 'Boolean'>
+    readonly createdAt: FieldRef<"FolderPayload", 'DateTime'>
+    readonly updatedAt: FieldRef<"FolderPayload", 'DateTime'>
+  }
+    
+
+  // Custom InputTypes
+  /**
+   * FolderPayload findUnique
+   */
+  export type FolderPayloadFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the FolderPayload
+     */
+    select?: FolderPayloadSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the FolderPayload
+     */
+    omit?: FolderPayloadOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: FolderPayloadInclude<ExtArgs> | null
+    /**
+     * Filter, which FolderPayload to fetch.
+     */
+    where: FolderPayloadWhereUniqueInput
+  }
+
+  /**
+   * FolderPayload findUniqueOrThrow
+   */
+  export type FolderPayloadFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the FolderPayload
+     */
+    select?: FolderPayloadSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the FolderPayload
+     */
+    omit?: FolderPayloadOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: FolderPayloadInclude<ExtArgs> | null
+    /**
+     * Filter, which FolderPayload to fetch.
+     */
+    where: FolderPayloadWhereUniqueInput
+  }
+
+  /**
+   * FolderPayload findFirst
+   */
+  export type FolderPayloadFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the FolderPayload
+     */
+    select?: FolderPayloadSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the FolderPayload
+     */
+    omit?: FolderPayloadOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: FolderPayloadInclude<ExtArgs> | null
+    /**
+     * Filter, which FolderPayload to fetch.
+     */
+    where?: FolderPayloadWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of FolderPayloads to fetch.
+     */
+    orderBy?: FolderPayloadOrderByWithRelationInput | FolderPayloadOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for FolderPayloads.
+     */
+    cursor?: FolderPayloadWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` FolderPayloads from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` FolderPayloads.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of FolderPayloads.
+     */
+    distinct?: FolderPayloadScalarFieldEnum | FolderPayloadScalarFieldEnum[]
+  }
+
+  /**
+   * FolderPayload findFirstOrThrow
+   */
+  export type FolderPayloadFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the FolderPayload
+     */
+    select?: FolderPayloadSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the FolderPayload
+     */
+    omit?: FolderPayloadOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: FolderPayloadInclude<ExtArgs> | null
+    /**
+     * Filter, which FolderPayload to fetch.
+     */
+    where?: FolderPayloadWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of FolderPayloads to fetch.
+     */
+    orderBy?: FolderPayloadOrderByWithRelationInput | FolderPayloadOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for FolderPayloads.
+     */
+    cursor?: FolderPayloadWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` FolderPayloads from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` FolderPayloads.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of FolderPayloads.
+     */
+    distinct?: FolderPayloadScalarFieldEnum | FolderPayloadScalarFieldEnum[]
+  }
+
+  /**
+   * FolderPayload findMany
+   */
+  export type FolderPayloadFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the FolderPayload
+     */
+    select?: FolderPayloadSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the FolderPayload
+     */
+    omit?: FolderPayloadOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: FolderPayloadInclude<ExtArgs> | null
+    /**
+     * Filter, which FolderPayloads to fetch.
+     */
+    where?: FolderPayloadWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of FolderPayloads to fetch.
+     */
+    orderBy?: FolderPayloadOrderByWithRelationInput | FolderPayloadOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing FolderPayloads.
+     */
+    cursor?: FolderPayloadWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` FolderPayloads from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` FolderPayloads.
+     */
+    skip?: number
+    distinct?: FolderPayloadScalarFieldEnum | FolderPayloadScalarFieldEnum[]
+  }
+
+  /**
+   * FolderPayload create
+   */
+  export type FolderPayloadCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the FolderPayload
+     */
+    select?: FolderPayloadSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the FolderPayload
+     */
+    omit?: FolderPayloadOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: FolderPayloadInclude<ExtArgs> | null
+    /**
+     * The data needed to create a FolderPayload.
+     */
+    data: XOR<FolderPayloadCreateInput, FolderPayloadUncheckedCreateInput>
+  }
+
+  /**
+   * FolderPayload createMany
+   */
+  export type FolderPayloadCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many FolderPayloads.
+     */
+    data: FolderPayloadCreateManyInput | FolderPayloadCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * FolderPayload createManyAndReturn
+   */
+  export type FolderPayloadCreateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the FolderPayload
+     */
+    select?: FolderPayloadSelectCreateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the FolderPayload
+     */
+    omit?: FolderPayloadOmit<ExtArgs> | null
+    /**
+     * The data used to create many FolderPayloads.
+     */
+    data: FolderPayloadCreateManyInput | FolderPayloadCreateManyInput[]
+    skipDuplicates?: boolean
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: FolderPayloadIncludeCreateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * FolderPayload update
+   */
+  export type FolderPayloadUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the FolderPayload
+     */
+    select?: FolderPayloadSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the FolderPayload
+     */
+    omit?: FolderPayloadOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: FolderPayloadInclude<ExtArgs> | null
+    /**
+     * The data needed to update a FolderPayload.
+     */
+    data: XOR<FolderPayloadUpdateInput, FolderPayloadUncheckedUpdateInput>
+    /**
+     * Choose, which FolderPayload to update.
+     */
+    where: FolderPayloadWhereUniqueInput
+  }
+
+  /**
+   * FolderPayload updateMany
+   */
+  export type FolderPayloadUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update FolderPayloads.
+     */
+    data: XOR<FolderPayloadUpdateManyMutationInput, FolderPayloadUncheckedUpdateManyInput>
+    /**
+     * Filter which FolderPayloads to update
+     */
+    where?: FolderPayloadWhereInput
+    /**
+     * Limit how many FolderPayloads to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * FolderPayload updateManyAndReturn
+   */
+  export type FolderPayloadUpdateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the FolderPayload
+     */
+    select?: FolderPayloadSelectUpdateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the FolderPayload
+     */
+    omit?: FolderPayloadOmit<ExtArgs> | null
+    /**
+     * The data used to update FolderPayloads.
+     */
+    data: XOR<FolderPayloadUpdateManyMutationInput, FolderPayloadUncheckedUpdateManyInput>
+    /**
+     * Filter which FolderPayloads to update
+     */
+    where?: FolderPayloadWhereInput
+    /**
+     * Limit how many FolderPayloads to update.
+     */
+    limit?: number
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: FolderPayloadIncludeUpdateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * FolderPayload upsert
+   */
+  export type FolderPayloadUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the FolderPayload
+     */
+    select?: FolderPayloadSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the FolderPayload
+     */
+    omit?: FolderPayloadOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: FolderPayloadInclude<ExtArgs> | null
+    /**
+     * The filter to search for the FolderPayload to update in case it exists.
+     */
+    where: FolderPayloadWhereUniqueInput
+    /**
+     * In case the FolderPayload found by the `where` argument doesn't exist, create a new FolderPayload with this data.
+     */
+    create: XOR<FolderPayloadCreateInput, FolderPayloadUncheckedCreateInput>
+    /**
+     * In case the FolderPayload was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<FolderPayloadUpdateInput, FolderPayloadUncheckedUpdateInput>
+  }
+
+  /**
+   * FolderPayload delete
+   */
+  export type FolderPayloadDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the FolderPayload
+     */
+    select?: FolderPayloadSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the FolderPayload
+     */
+    omit?: FolderPayloadOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: FolderPayloadInclude<ExtArgs> | null
+    /**
+     * Filter which FolderPayload to delete.
+     */
+    where: FolderPayloadWhereUniqueInput
+  }
+
+  /**
+   * FolderPayload deleteMany
+   */
+  export type FolderPayloadDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which FolderPayloads to delete
+     */
+    where?: FolderPayloadWhereInput
+    /**
+     * Limit how many FolderPayloads to delete.
+     */
+    limit?: number
+  }
+
+  /**
+   * FolderPayload without action
+   */
+  export type FolderPayloadDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the FolderPayload
+     */
+    select?: FolderPayloadSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the FolderPayload
+     */
+    omit?: FolderPayloadOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: FolderPayloadInclude<ExtArgs> | null
+  }
+
+
+  /**
+   * Model ExternalPayload
+   */
+
+  export type AggregateExternalPayload = {
+    _count: ExternalPayloadCountAggregateOutputType | null
+    _min: ExternalPayloadMinAggregateOutputType | null
+    _max: ExternalPayloadMaxAggregateOutputType | null
+  }
+
+  export type ExternalPayloadMinAggregateOutputType = {
+    contentId: string | null
+    url: string | null
+    subtype: string | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type ExternalPayloadMaxAggregateOutputType = {
+    contentId: string | null
+    url: string | null
+    subtype: string | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type ExternalPayloadCountAggregateOutputType = {
+    contentId: number
+    url: number
+    subtype: number
+    preview: number
+    createdAt: number
+    updatedAt: number
+    _all: number
+  }
+
+
+  export type ExternalPayloadMinAggregateInputType = {
+    contentId?: true
+    url?: true
+    subtype?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type ExternalPayloadMaxAggregateInputType = {
+    contentId?: true
+    url?: true
+    subtype?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type ExternalPayloadCountAggregateInputType = {
+    contentId?: true
+    url?: true
+    subtype?: true
+    preview?: true
+    createdAt?: true
+    updatedAt?: true
+    _all?: true
+  }
+
+  export type ExternalPayloadAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which ExternalPayload to aggregate.
+     */
+    where?: ExternalPayloadWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of ExternalPayloads to fetch.
+     */
+    orderBy?: ExternalPayloadOrderByWithRelationInput | ExternalPayloadOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: ExternalPayloadWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` ExternalPayloads from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` ExternalPayloads.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned ExternalPayloads
+    **/
+    _count?: true | ExternalPayloadCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: ExternalPayloadMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: ExternalPayloadMaxAggregateInputType
+  }
+
+  export type GetExternalPayloadAggregateType<T extends ExternalPayloadAggregateArgs> = {
+        [P in keyof T & keyof AggregateExternalPayload]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateExternalPayload[P]>
+      : GetScalarType<T[P], AggregateExternalPayload[P]>
+  }
+
+
+
+
+  export type ExternalPayloadGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: ExternalPayloadWhereInput
+    orderBy?: ExternalPayloadOrderByWithAggregationInput | ExternalPayloadOrderByWithAggregationInput[]
+    by: ExternalPayloadScalarFieldEnum[] | ExternalPayloadScalarFieldEnum
+    having?: ExternalPayloadScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: ExternalPayloadCountAggregateInputType | true
+    _min?: ExternalPayloadMinAggregateInputType
+    _max?: ExternalPayloadMaxAggregateInputType
+  }
+
+  export type ExternalPayloadGroupByOutputType = {
+    contentId: string
+    url: string
+    subtype: string | null
+    preview: JsonValue
+    createdAt: Date
+    updatedAt: Date
+    _count: ExternalPayloadCountAggregateOutputType | null
+    _min: ExternalPayloadMinAggregateOutputType | null
+    _max: ExternalPayloadMaxAggregateOutputType | null
+  }
+
+  type GetExternalPayloadGroupByPayload<T extends ExternalPayloadGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<ExternalPayloadGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof ExternalPayloadGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], ExternalPayloadGroupByOutputType[P]>
+            : GetScalarType<T[P], ExternalPayloadGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type ExternalPayloadSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    contentId?: boolean
+    url?: boolean
+    subtype?: boolean
+    preview?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    content?: boolean | ContentNodeDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["externalPayload"]>
+
+  export type ExternalPayloadSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    contentId?: boolean
+    url?: boolean
+    subtype?: boolean
+    preview?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    content?: boolean | ContentNodeDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["externalPayload"]>
+
+  export type ExternalPayloadSelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    contentId?: boolean
+    url?: boolean
+    subtype?: boolean
+    preview?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    content?: boolean | ContentNodeDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["externalPayload"]>
+
+  export type ExternalPayloadSelectScalar = {
+    contentId?: boolean
+    url?: boolean
+    subtype?: boolean
+    preview?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+  }
+
+  export type ExternalPayloadOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"contentId" | "url" | "subtype" | "preview" | "createdAt" | "updatedAt", ExtArgs["result"]["externalPayload"]>
+  export type ExternalPayloadInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    content?: boolean | ContentNodeDefaultArgs<ExtArgs>
+  }
+  export type ExternalPayloadIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    content?: boolean | ContentNodeDefaultArgs<ExtArgs>
+  }
+  export type ExternalPayloadIncludeUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    content?: boolean | ContentNodeDefaultArgs<ExtArgs>
+  }
+
+  export type $ExternalPayloadPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "ExternalPayload"
+    objects: {
+      content: Prisma.$ContentNodePayload<ExtArgs>
+    }
+    scalars: $Extensions.GetPayloadResult<{
+      contentId: string
+      url: string
+      subtype: string | null
+      preview: Prisma.JsonValue
+      createdAt: Date
+      updatedAt: Date
+    }, ExtArgs["result"]["externalPayload"]>
+    composites: {}
+  }
+
+  type ExternalPayloadGetPayload<S extends boolean | null | undefined | ExternalPayloadDefaultArgs> = $Result.GetResult<Prisma.$ExternalPayloadPayload, S>
+
+  type ExternalPayloadCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> =
+    Omit<ExternalPayloadFindManyArgs, 'select' | 'include' | 'distinct' | 'omit'> & {
+      select?: ExternalPayloadCountAggregateInputType | true
+    }
+
+  export interface ExternalPayloadDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['ExternalPayload'], meta: { name: 'ExternalPayload' } }
+    /**
+     * Find zero or one ExternalPayload that matches the filter.
+     * @param {ExternalPayloadFindUniqueArgs} args - Arguments to find a ExternalPayload
+     * @example
+     * // Get one ExternalPayload
+     * const externalPayload = await prisma.externalPayload.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends ExternalPayloadFindUniqueArgs>(args: SelectSubset<T, ExternalPayloadFindUniqueArgs<ExtArgs>>): Prisma__ExternalPayloadClient<$Result.GetResult<Prisma.$ExternalPayloadPayload<ExtArgs>, T, "findUnique", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find one ExternalPayload that matches the filter or throw an error with `error.code='P2025'`
+     * if no matches were found.
+     * @param {ExternalPayloadFindUniqueOrThrowArgs} args - Arguments to find a ExternalPayload
+     * @example
+     * // Get one ExternalPayload
+     * const externalPayload = await prisma.externalPayload.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends ExternalPayloadFindUniqueOrThrowArgs>(args: SelectSubset<T, ExternalPayloadFindUniqueOrThrowArgs<ExtArgs>>): Prisma__ExternalPayloadClient<$Result.GetResult<Prisma.$ExternalPayloadPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first ExternalPayload that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ExternalPayloadFindFirstArgs} args - Arguments to find a ExternalPayload
+     * @example
+     * // Get one ExternalPayload
+     * const externalPayload = await prisma.externalPayload.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends ExternalPayloadFindFirstArgs>(args?: SelectSubset<T, ExternalPayloadFindFirstArgs<ExtArgs>>): Prisma__ExternalPayloadClient<$Result.GetResult<Prisma.$ExternalPayloadPayload<ExtArgs>, T, "findFirst", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first ExternalPayload that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ExternalPayloadFindFirstOrThrowArgs} args - Arguments to find a ExternalPayload
+     * @example
+     * // Get one ExternalPayload
+     * const externalPayload = await prisma.externalPayload.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends ExternalPayloadFindFirstOrThrowArgs>(args?: SelectSubset<T, ExternalPayloadFindFirstOrThrowArgs<ExtArgs>>): Prisma__ExternalPayloadClient<$Result.GetResult<Prisma.$ExternalPayloadPayload<ExtArgs>, T, "findFirstOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find zero or more ExternalPayloads that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ExternalPayloadFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all ExternalPayloads
+     * const externalPayloads = await prisma.externalPayload.findMany()
+     * 
+     * // Get first 10 ExternalPayloads
+     * const externalPayloads = await prisma.externalPayload.findMany({ take: 10 })
+     * 
+     * // Only select the `contentId`
+     * const externalPayloadWithContentIdOnly = await prisma.externalPayload.findMany({ select: { contentId: true } })
+     * 
+     */
+    findMany<T extends ExternalPayloadFindManyArgs>(args?: SelectSubset<T, ExternalPayloadFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ExternalPayloadPayload<ExtArgs>, T, "findMany", GlobalOmitOptions>>
+
+    /**
+     * Create a ExternalPayload.
+     * @param {ExternalPayloadCreateArgs} args - Arguments to create a ExternalPayload.
+     * @example
+     * // Create one ExternalPayload
+     * const ExternalPayload = await prisma.externalPayload.create({
+     *   data: {
+     *     // ... data to create a ExternalPayload
+     *   }
+     * })
+     * 
+     */
+    create<T extends ExternalPayloadCreateArgs>(args: SelectSubset<T, ExternalPayloadCreateArgs<ExtArgs>>): Prisma__ExternalPayloadClient<$Result.GetResult<Prisma.$ExternalPayloadPayload<ExtArgs>, T, "create", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Create many ExternalPayloads.
+     * @param {ExternalPayloadCreateManyArgs} args - Arguments to create many ExternalPayloads.
+     * @example
+     * // Create many ExternalPayloads
+     * const externalPayload = await prisma.externalPayload.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *     
+     */
+    createMany<T extends ExternalPayloadCreateManyArgs>(args?: SelectSubset<T, ExternalPayloadCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create many ExternalPayloads and returns the data saved in the database.
+     * @param {ExternalPayloadCreateManyAndReturnArgs} args - Arguments to create many ExternalPayloads.
+     * @example
+     * // Create many ExternalPayloads
+     * const externalPayload = await prisma.externalPayload.createManyAndReturn({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Create many ExternalPayloads and only return the `contentId`
+     * const externalPayloadWithContentIdOnly = await prisma.externalPayload.createManyAndReturn({
+     *   select: { contentId: true },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    createManyAndReturn<T extends ExternalPayloadCreateManyAndReturnArgs>(args?: SelectSubset<T, ExternalPayloadCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ExternalPayloadPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Delete a ExternalPayload.
+     * @param {ExternalPayloadDeleteArgs} args - Arguments to delete one ExternalPayload.
+     * @example
+     * // Delete one ExternalPayload
+     * const ExternalPayload = await prisma.externalPayload.delete({
+     *   where: {
+     *     // ... filter to delete one ExternalPayload
+     *   }
+     * })
+     * 
+     */
+    delete<T extends ExternalPayloadDeleteArgs>(args: SelectSubset<T, ExternalPayloadDeleteArgs<ExtArgs>>): Prisma__ExternalPayloadClient<$Result.GetResult<Prisma.$ExternalPayloadPayload<ExtArgs>, T, "delete", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Update one ExternalPayload.
+     * @param {ExternalPayloadUpdateArgs} args - Arguments to update one ExternalPayload.
+     * @example
+     * // Update one ExternalPayload
+     * const externalPayload = await prisma.externalPayload.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    update<T extends ExternalPayloadUpdateArgs>(args: SelectSubset<T, ExternalPayloadUpdateArgs<ExtArgs>>): Prisma__ExternalPayloadClient<$Result.GetResult<Prisma.$ExternalPayloadPayload<ExtArgs>, T, "update", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Delete zero or more ExternalPayloads.
+     * @param {ExternalPayloadDeleteManyArgs} args - Arguments to filter ExternalPayloads to delete.
+     * @example
+     * // Delete a few ExternalPayloads
+     * const { count } = await prisma.externalPayload.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+     */
+    deleteMany<T extends ExternalPayloadDeleteManyArgs>(args?: SelectSubset<T, ExternalPayloadDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more ExternalPayloads.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ExternalPayloadUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many ExternalPayloads
+     * const externalPayload = await prisma.externalPayload.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    updateMany<T extends ExternalPayloadUpdateManyArgs>(args: SelectSubset<T, ExternalPayloadUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more ExternalPayloads and returns the data updated in the database.
+     * @param {ExternalPayloadUpdateManyAndReturnArgs} args - Arguments to update many ExternalPayloads.
+     * @example
+     * // Update many ExternalPayloads
+     * const externalPayload = await prisma.externalPayload.updateManyAndReturn({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Update zero or more ExternalPayloads and only return the `contentId`
+     * const externalPayloadWithContentIdOnly = await prisma.externalPayload.updateManyAndReturn({
+     *   select: { contentId: true },
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    updateManyAndReturn<T extends ExternalPayloadUpdateManyAndReturnArgs>(args: SelectSubset<T, ExternalPayloadUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ExternalPayloadPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Create or update one ExternalPayload.
+     * @param {ExternalPayloadUpsertArgs} args - Arguments to update or create a ExternalPayload.
+     * @example
+     * // Update or create a ExternalPayload
+     * const externalPayload = await prisma.externalPayload.upsert({
+     *   create: {
+     *     // ... data to create a ExternalPayload
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the ExternalPayload we want to update
+     *   }
+     * })
+     */
+    upsert<T extends ExternalPayloadUpsertArgs>(args: SelectSubset<T, ExternalPayloadUpsertArgs<ExtArgs>>): Prisma__ExternalPayloadClient<$Result.GetResult<Prisma.$ExternalPayloadPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+
+    /**
+     * Count the number of ExternalPayloads.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ExternalPayloadCountArgs} args - Arguments to filter ExternalPayloads to count.
+     * @example
+     * // Count the number of ExternalPayloads
+     * const count = await prisma.externalPayload.count({
+     *   where: {
+     *     // ... the filter for the ExternalPayloads we want to count
+     *   }
+     * })
+    **/
+    count<T extends ExternalPayloadCountArgs>(
+      args?: Subset<T, ExternalPayloadCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], ExternalPayloadCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a ExternalPayload.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ExternalPayloadAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends ExternalPayloadAggregateArgs>(args: Subset<T, ExternalPayloadAggregateArgs>): Prisma.PrismaPromise<GetExternalPayloadAggregateType<T>>
+
+    /**
+     * Group by ExternalPayload.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ExternalPayloadGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends ExternalPayloadGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: ExternalPayloadGroupByArgs['orderBy'] }
+        : { orderBy?: ExternalPayloadGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, ExternalPayloadGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetExternalPayloadGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the ExternalPayload model
+   */
+  readonly fields: ExternalPayloadFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for ExternalPayload.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__ExternalPayloadClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    content<T extends ContentNodeDefaultArgs<ExtArgs> = {}>(args?: Subset<T, ContentNodeDefaultArgs<ExtArgs>>): Prisma__ContentNodeClient<$Result.GetResult<Prisma.$ContentNodePayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the ExternalPayload model
+   */
+  interface ExternalPayloadFieldRefs {
+    readonly contentId: FieldRef<"ExternalPayload", 'String'>
+    readonly url: FieldRef<"ExternalPayload", 'String'>
+    readonly subtype: FieldRef<"ExternalPayload", 'String'>
+    readonly preview: FieldRef<"ExternalPayload", 'Json'>
+    readonly createdAt: FieldRef<"ExternalPayload", 'DateTime'>
+    readonly updatedAt: FieldRef<"ExternalPayload", 'DateTime'>
+  }
+    
+
+  // Custom InputTypes
+  /**
+   * ExternalPayload findUnique
+   */
+  export type ExternalPayloadFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ExternalPayload
+     */
+    select?: ExternalPayloadSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ExternalPayload
+     */
+    omit?: ExternalPayloadOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ExternalPayloadInclude<ExtArgs> | null
+    /**
+     * Filter, which ExternalPayload to fetch.
+     */
+    where: ExternalPayloadWhereUniqueInput
+  }
+
+  /**
+   * ExternalPayload findUniqueOrThrow
+   */
+  export type ExternalPayloadFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ExternalPayload
+     */
+    select?: ExternalPayloadSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ExternalPayload
+     */
+    omit?: ExternalPayloadOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ExternalPayloadInclude<ExtArgs> | null
+    /**
+     * Filter, which ExternalPayload to fetch.
+     */
+    where: ExternalPayloadWhereUniqueInput
+  }
+
+  /**
+   * ExternalPayload findFirst
+   */
+  export type ExternalPayloadFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ExternalPayload
+     */
+    select?: ExternalPayloadSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ExternalPayload
+     */
+    omit?: ExternalPayloadOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ExternalPayloadInclude<ExtArgs> | null
+    /**
+     * Filter, which ExternalPayload to fetch.
+     */
+    where?: ExternalPayloadWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of ExternalPayloads to fetch.
+     */
+    orderBy?: ExternalPayloadOrderByWithRelationInput | ExternalPayloadOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for ExternalPayloads.
+     */
+    cursor?: ExternalPayloadWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` ExternalPayloads from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` ExternalPayloads.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of ExternalPayloads.
+     */
+    distinct?: ExternalPayloadScalarFieldEnum | ExternalPayloadScalarFieldEnum[]
+  }
+
+  /**
+   * ExternalPayload findFirstOrThrow
+   */
+  export type ExternalPayloadFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ExternalPayload
+     */
+    select?: ExternalPayloadSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ExternalPayload
+     */
+    omit?: ExternalPayloadOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ExternalPayloadInclude<ExtArgs> | null
+    /**
+     * Filter, which ExternalPayload to fetch.
+     */
+    where?: ExternalPayloadWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of ExternalPayloads to fetch.
+     */
+    orderBy?: ExternalPayloadOrderByWithRelationInput | ExternalPayloadOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for ExternalPayloads.
+     */
+    cursor?: ExternalPayloadWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` ExternalPayloads from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` ExternalPayloads.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of ExternalPayloads.
+     */
+    distinct?: ExternalPayloadScalarFieldEnum | ExternalPayloadScalarFieldEnum[]
+  }
+
+  /**
+   * ExternalPayload findMany
+   */
+  export type ExternalPayloadFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ExternalPayload
+     */
+    select?: ExternalPayloadSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ExternalPayload
+     */
+    omit?: ExternalPayloadOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ExternalPayloadInclude<ExtArgs> | null
+    /**
+     * Filter, which ExternalPayloads to fetch.
+     */
+    where?: ExternalPayloadWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of ExternalPayloads to fetch.
+     */
+    orderBy?: ExternalPayloadOrderByWithRelationInput | ExternalPayloadOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing ExternalPayloads.
+     */
+    cursor?: ExternalPayloadWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` ExternalPayloads from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` ExternalPayloads.
+     */
+    skip?: number
+    distinct?: ExternalPayloadScalarFieldEnum | ExternalPayloadScalarFieldEnum[]
+  }
+
+  /**
+   * ExternalPayload create
+   */
+  export type ExternalPayloadCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ExternalPayload
+     */
+    select?: ExternalPayloadSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ExternalPayload
+     */
+    omit?: ExternalPayloadOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ExternalPayloadInclude<ExtArgs> | null
+    /**
+     * The data needed to create a ExternalPayload.
+     */
+    data: XOR<ExternalPayloadCreateInput, ExternalPayloadUncheckedCreateInput>
+  }
+
+  /**
+   * ExternalPayload createMany
+   */
+  export type ExternalPayloadCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many ExternalPayloads.
+     */
+    data: ExternalPayloadCreateManyInput | ExternalPayloadCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * ExternalPayload createManyAndReturn
+   */
+  export type ExternalPayloadCreateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ExternalPayload
+     */
+    select?: ExternalPayloadSelectCreateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the ExternalPayload
+     */
+    omit?: ExternalPayloadOmit<ExtArgs> | null
+    /**
+     * The data used to create many ExternalPayloads.
+     */
+    data: ExternalPayloadCreateManyInput | ExternalPayloadCreateManyInput[]
+    skipDuplicates?: boolean
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ExternalPayloadIncludeCreateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * ExternalPayload update
+   */
+  export type ExternalPayloadUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ExternalPayload
+     */
+    select?: ExternalPayloadSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ExternalPayload
+     */
+    omit?: ExternalPayloadOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ExternalPayloadInclude<ExtArgs> | null
+    /**
+     * The data needed to update a ExternalPayload.
+     */
+    data: XOR<ExternalPayloadUpdateInput, ExternalPayloadUncheckedUpdateInput>
+    /**
+     * Choose, which ExternalPayload to update.
+     */
+    where: ExternalPayloadWhereUniqueInput
+  }
+
+  /**
+   * ExternalPayload updateMany
+   */
+  export type ExternalPayloadUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update ExternalPayloads.
+     */
+    data: XOR<ExternalPayloadUpdateManyMutationInput, ExternalPayloadUncheckedUpdateManyInput>
+    /**
+     * Filter which ExternalPayloads to update
+     */
+    where?: ExternalPayloadWhereInput
+    /**
+     * Limit how many ExternalPayloads to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * ExternalPayload updateManyAndReturn
+   */
+  export type ExternalPayloadUpdateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ExternalPayload
+     */
+    select?: ExternalPayloadSelectUpdateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the ExternalPayload
+     */
+    omit?: ExternalPayloadOmit<ExtArgs> | null
+    /**
+     * The data used to update ExternalPayloads.
+     */
+    data: XOR<ExternalPayloadUpdateManyMutationInput, ExternalPayloadUncheckedUpdateManyInput>
+    /**
+     * Filter which ExternalPayloads to update
+     */
+    where?: ExternalPayloadWhereInput
+    /**
+     * Limit how many ExternalPayloads to update.
+     */
+    limit?: number
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ExternalPayloadIncludeUpdateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * ExternalPayload upsert
+   */
+  export type ExternalPayloadUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ExternalPayload
+     */
+    select?: ExternalPayloadSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ExternalPayload
+     */
+    omit?: ExternalPayloadOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ExternalPayloadInclude<ExtArgs> | null
+    /**
+     * The filter to search for the ExternalPayload to update in case it exists.
+     */
+    where: ExternalPayloadWhereUniqueInput
+    /**
+     * In case the ExternalPayload found by the `where` argument doesn't exist, create a new ExternalPayload with this data.
+     */
+    create: XOR<ExternalPayloadCreateInput, ExternalPayloadUncheckedCreateInput>
+    /**
+     * In case the ExternalPayload was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<ExternalPayloadUpdateInput, ExternalPayloadUncheckedUpdateInput>
+  }
+
+  /**
+   * ExternalPayload delete
+   */
+  export type ExternalPayloadDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ExternalPayload
+     */
+    select?: ExternalPayloadSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ExternalPayload
+     */
+    omit?: ExternalPayloadOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ExternalPayloadInclude<ExtArgs> | null
+    /**
+     * Filter which ExternalPayload to delete.
+     */
+    where: ExternalPayloadWhereUniqueInput
+  }
+
+  /**
+   * ExternalPayload deleteMany
+   */
+  export type ExternalPayloadDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which ExternalPayloads to delete
+     */
+    where?: ExternalPayloadWhereInput
+    /**
+     * Limit how many ExternalPayloads to delete.
+     */
+    limit?: number
+  }
+
+  /**
+   * ExternalPayload without action
+   */
+  export type ExternalPayloadDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ExternalPayload
+     */
+    select?: ExternalPayloadSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ExternalPayload
+     */
+    omit?: ExternalPayloadOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ExternalPayloadInclude<ExtArgs> | null
+  }
+
+
+  /**
+   * Model ChatPayload
+   */
+
+  export type AggregateChatPayload = {
+    _count: ChatPayloadCountAggregateOutputType | null
+    _min: ChatPayloadMinAggregateOutputType | null
+    _max: ChatPayloadMaxAggregateOutputType | null
+  }
+
+  export type ChatPayloadMinAggregateOutputType = {
+    contentId: string | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type ChatPayloadMaxAggregateOutputType = {
+    contentId: string | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type ChatPayloadCountAggregateOutputType = {
+    contentId: number
+    messages: number
+    metadata: number
+    createdAt: number
+    updatedAt: number
+    _all: number
+  }
+
+
+  export type ChatPayloadMinAggregateInputType = {
+    contentId?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type ChatPayloadMaxAggregateInputType = {
+    contentId?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type ChatPayloadCountAggregateInputType = {
+    contentId?: true
+    messages?: true
+    metadata?: true
+    createdAt?: true
+    updatedAt?: true
+    _all?: true
+  }
+
+  export type ChatPayloadAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which ChatPayload to aggregate.
+     */
+    where?: ChatPayloadWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of ChatPayloads to fetch.
+     */
+    orderBy?: ChatPayloadOrderByWithRelationInput | ChatPayloadOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: ChatPayloadWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` ChatPayloads from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` ChatPayloads.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned ChatPayloads
+    **/
+    _count?: true | ChatPayloadCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: ChatPayloadMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: ChatPayloadMaxAggregateInputType
+  }
+
+  export type GetChatPayloadAggregateType<T extends ChatPayloadAggregateArgs> = {
+        [P in keyof T & keyof AggregateChatPayload]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateChatPayload[P]>
+      : GetScalarType<T[P], AggregateChatPayload[P]>
+  }
+
+
+
+
+  export type ChatPayloadGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: ChatPayloadWhereInput
+    orderBy?: ChatPayloadOrderByWithAggregationInput | ChatPayloadOrderByWithAggregationInput[]
+    by: ChatPayloadScalarFieldEnum[] | ChatPayloadScalarFieldEnum
+    having?: ChatPayloadScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: ChatPayloadCountAggregateInputType | true
+    _min?: ChatPayloadMinAggregateInputType
+    _max?: ChatPayloadMaxAggregateInputType
+  }
+
+  export type ChatPayloadGroupByOutputType = {
+    contentId: string
+    messages: JsonValue
+    metadata: JsonValue
+    createdAt: Date
+    updatedAt: Date
+    _count: ChatPayloadCountAggregateOutputType | null
+    _min: ChatPayloadMinAggregateOutputType | null
+    _max: ChatPayloadMaxAggregateOutputType | null
+  }
+
+  type GetChatPayloadGroupByPayload<T extends ChatPayloadGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<ChatPayloadGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof ChatPayloadGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], ChatPayloadGroupByOutputType[P]>
+            : GetScalarType<T[P], ChatPayloadGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type ChatPayloadSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    contentId?: boolean
+    messages?: boolean
+    metadata?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    content?: boolean | ContentNodeDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["chatPayload"]>
+
+  export type ChatPayloadSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    contentId?: boolean
+    messages?: boolean
+    metadata?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    content?: boolean | ContentNodeDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["chatPayload"]>
+
+  export type ChatPayloadSelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    contentId?: boolean
+    messages?: boolean
+    metadata?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    content?: boolean | ContentNodeDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["chatPayload"]>
+
+  export type ChatPayloadSelectScalar = {
+    contentId?: boolean
+    messages?: boolean
+    metadata?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+  }
+
+  export type ChatPayloadOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"contentId" | "messages" | "metadata" | "createdAt" | "updatedAt", ExtArgs["result"]["chatPayload"]>
+  export type ChatPayloadInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    content?: boolean | ContentNodeDefaultArgs<ExtArgs>
+  }
+  export type ChatPayloadIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    content?: boolean | ContentNodeDefaultArgs<ExtArgs>
+  }
+  export type ChatPayloadIncludeUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    content?: boolean | ContentNodeDefaultArgs<ExtArgs>
+  }
+
+  export type $ChatPayloadPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "ChatPayload"
+    objects: {
+      content: Prisma.$ContentNodePayload<ExtArgs>
+    }
+    scalars: $Extensions.GetPayloadResult<{
+      contentId: string
+      messages: Prisma.JsonValue
+      metadata: Prisma.JsonValue
+      createdAt: Date
+      updatedAt: Date
+    }, ExtArgs["result"]["chatPayload"]>
+    composites: {}
+  }
+
+  type ChatPayloadGetPayload<S extends boolean | null | undefined | ChatPayloadDefaultArgs> = $Result.GetResult<Prisma.$ChatPayloadPayload, S>
+
+  type ChatPayloadCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> =
+    Omit<ChatPayloadFindManyArgs, 'select' | 'include' | 'distinct' | 'omit'> & {
+      select?: ChatPayloadCountAggregateInputType | true
+    }
+
+  export interface ChatPayloadDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['ChatPayload'], meta: { name: 'ChatPayload' } }
+    /**
+     * Find zero or one ChatPayload that matches the filter.
+     * @param {ChatPayloadFindUniqueArgs} args - Arguments to find a ChatPayload
+     * @example
+     * // Get one ChatPayload
+     * const chatPayload = await prisma.chatPayload.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends ChatPayloadFindUniqueArgs>(args: SelectSubset<T, ChatPayloadFindUniqueArgs<ExtArgs>>): Prisma__ChatPayloadClient<$Result.GetResult<Prisma.$ChatPayloadPayload<ExtArgs>, T, "findUnique", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find one ChatPayload that matches the filter or throw an error with `error.code='P2025'`
+     * if no matches were found.
+     * @param {ChatPayloadFindUniqueOrThrowArgs} args - Arguments to find a ChatPayload
+     * @example
+     * // Get one ChatPayload
+     * const chatPayload = await prisma.chatPayload.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends ChatPayloadFindUniqueOrThrowArgs>(args: SelectSubset<T, ChatPayloadFindUniqueOrThrowArgs<ExtArgs>>): Prisma__ChatPayloadClient<$Result.GetResult<Prisma.$ChatPayloadPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first ChatPayload that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ChatPayloadFindFirstArgs} args - Arguments to find a ChatPayload
+     * @example
+     * // Get one ChatPayload
+     * const chatPayload = await prisma.chatPayload.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends ChatPayloadFindFirstArgs>(args?: SelectSubset<T, ChatPayloadFindFirstArgs<ExtArgs>>): Prisma__ChatPayloadClient<$Result.GetResult<Prisma.$ChatPayloadPayload<ExtArgs>, T, "findFirst", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first ChatPayload that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ChatPayloadFindFirstOrThrowArgs} args - Arguments to find a ChatPayload
+     * @example
+     * // Get one ChatPayload
+     * const chatPayload = await prisma.chatPayload.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends ChatPayloadFindFirstOrThrowArgs>(args?: SelectSubset<T, ChatPayloadFindFirstOrThrowArgs<ExtArgs>>): Prisma__ChatPayloadClient<$Result.GetResult<Prisma.$ChatPayloadPayload<ExtArgs>, T, "findFirstOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find zero or more ChatPayloads that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ChatPayloadFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all ChatPayloads
+     * const chatPayloads = await prisma.chatPayload.findMany()
+     * 
+     * // Get first 10 ChatPayloads
+     * const chatPayloads = await prisma.chatPayload.findMany({ take: 10 })
+     * 
+     * // Only select the `contentId`
+     * const chatPayloadWithContentIdOnly = await prisma.chatPayload.findMany({ select: { contentId: true } })
+     * 
+     */
+    findMany<T extends ChatPayloadFindManyArgs>(args?: SelectSubset<T, ChatPayloadFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ChatPayloadPayload<ExtArgs>, T, "findMany", GlobalOmitOptions>>
+
+    /**
+     * Create a ChatPayload.
+     * @param {ChatPayloadCreateArgs} args - Arguments to create a ChatPayload.
+     * @example
+     * // Create one ChatPayload
+     * const ChatPayload = await prisma.chatPayload.create({
+     *   data: {
+     *     // ... data to create a ChatPayload
+     *   }
+     * })
+     * 
+     */
+    create<T extends ChatPayloadCreateArgs>(args: SelectSubset<T, ChatPayloadCreateArgs<ExtArgs>>): Prisma__ChatPayloadClient<$Result.GetResult<Prisma.$ChatPayloadPayload<ExtArgs>, T, "create", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Create many ChatPayloads.
+     * @param {ChatPayloadCreateManyArgs} args - Arguments to create many ChatPayloads.
+     * @example
+     * // Create many ChatPayloads
+     * const chatPayload = await prisma.chatPayload.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *     
+     */
+    createMany<T extends ChatPayloadCreateManyArgs>(args?: SelectSubset<T, ChatPayloadCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create many ChatPayloads and returns the data saved in the database.
+     * @param {ChatPayloadCreateManyAndReturnArgs} args - Arguments to create many ChatPayloads.
+     * @example
+     * // Create many ChatPayloads
+     * const chatPayload = await prisma.chatPayload.createManyAndReturn({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Create many ChatPayloads and only return the `contentId`
+     * const chatPayloadWithContentIdOnly = await prisma.chatPayload.createManyAndReturn({
+     *   select: { contentId: true },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    createManyAndReturn<T extends ChatPayloadCreateManyAndReturnArgs>(args?: SelectSubset<T, ChatPayloadCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ChatPayloadPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Delete a ChatPayload.
+     * @param {ChatPayloadDeleteArgs} args - Arguments to delete one ChatPayload.
+     * @example
+     * // Delete one ChatPayload
+     * const ChatPayload = await prisma.chatPayload.delete({
+     *   where: {
+     *     // ... filter to delete one ChatPayload
+     *   }
+     * })
+     * 
+     */
+    delete<T extends ChatPayloadDeleteArgs>(args: SelectSubset<T, ChatPayloadDeleteArgs<ExtArgs>>): Prisma__ChatPayloadClient<$Result.GetResult<Prisma.$ChatPayloadPayload<ExtArgs>, T, "delete", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Update one ChatPayload.
+     * @param {ChatPayloadUpdateArgs} args - Arguments to update one ChatPayload.
+     * @example
+     * // Update one ChatPayload
+     * const chatPayload = await prisma.chatPayload.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    update<T extends ChatPayloadUpdateArgs>(args: SelectSubset<T, ChatPayloadUpdateArgs<ExtArgs>>): Prisma__ChatPayloadClient<$Result.GetResult<Prisma.$ChatPayloadPayload<ExtArgs>, T, "update", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Delete zero or more ChatPayloads.
+     * @param {ChatPayloadDeleteManyArgs} args - Arguments to filter ChatPayloads to delete.
+     * @example
+     * // Delete a few ChatPayloads
+     * const { count } = await prisma.chatPayload.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+     */
+    deleteMany<T extends ChatPayloadDeleteManyArgs>(args?: SelectSubset<T, ChatPayloadDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more ChatPayloads.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ChatPayloadUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many ChatPayloads
+     * const chatPayload = await prisma.chatPayload.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    updateMany<T extends ChatPayloadUpdateManyArgs>(args: SelectSubset<T, ChatPayloadUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more ChatPayloads and returns the data updated in the database.
+     * @param {ChatPayloadUpdateManyAndReturnArgs} args - Arguments to update many ChatPayloads.
+     * @example
+     * // Update many ChatPayloads
+     * const chatPayload = await prisma.chatPayload.updateManyAndReturn({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Update zero or more ChatPayloads and only return the `contentId`
+     * const chatPayloadWithContentIdOnly = await prisma.chatPayload.updateManyAndReturn({
+     *   select: { contentId: true },
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    updateManyAndReturn<T extends ChatPayloadUpdateManyAndReturnArgs>(args: SelectSubset<T, ChatPayloadUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ChatPayloadPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Create or update one ChatPayload.
+     * @param {ChatPayloadUpsertArgs} args - Arguments to update or create a ChatPayload.
+     * @example
+     * // Update or create a ChatPayload
+     * const chatPayload = await prisma.chatPayload.upsert({
+     *   create: {
+     *     // ... data to create a ChatPayload
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the ChatPayload we want to update
+     *   }
+     * })
+     */
+    upsert<T extends ChatPayloadUpsertArgs>(args: SelectSubset<T, ChatPayloadUpsertArgs<ExtArgs>>): Prisma__ChatPayloadClient<$Result.GetResult<Prisma.$ChatPayloadPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+
+    /**
+     * Count the number of ChatPayloads.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ChatPayloadCountArgs} args - Arguments to filter ChatPayloads to count.
+     * @example
+     * // Count the number of ChatPayloads
+     * const count = await prisma.chatPayload.count({
+     *   where: {
+     *     // ... the filter for the ChatPayloads we want to count
+     *   }
+     * })
+    **/
+    count<T extends ChatPayloadCountArgs>(
+      args?: Subset<T, ChatPayloadCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], ChatPayloadCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a ChatPayload.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ChatPayloadAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends ChatPayloadAggregateArgs>(args: Subset<T, ChatPayloadAggregateArgs>): Prisma.PrismaPromise<GetChatPayloadAggregateType<T>>
+
+    /**
+     * Group by ChatPayload.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ChatPayloadGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends ChatPayloadGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: ChatPayloadGroupByArgs['orderBy'] }
+        : { orderBy?: ChatPayloadGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, ChatPayloadGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetChatPayloadGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the ChatPayload model
+   */
+  readonly fields: ChatPayloadFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for ChatPayload.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__ChatPayloadClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    content<T extends ContentNodeDefaultArgs<ExtArgs> = {}>(args?: Subset<T, ContentNodeDefaultArgs<ExtArgs>>): Prisma__ContentNodeClient<$Result.GetResult<Prisma.$ContentNodePayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the ChatPayload model
+   */
+  interface ChatPayloadFieldRefs {
+    readonly contentId: FieldRef<"ChatPayload", 'String'>
+    readonly messages: FieldRef<"ChatPayload", 'Json'>
+    readonly metadata: FieldRef<"ChatPayload", 'Json'>
+    readonly createdAt: FieldRef<"ChatPayload", 'DateTime'>
+    readonly updatedAt: FieldRef<"ChatPayload", 'DateTime'>
+  }
+    
+
+  // Custom InputTypes
+  /**
+   * ChatPayload findUnique
+   */
+  export type ChatPayloadFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ChatPayload
+     */
+    select?: ChatPayloadSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ChatPayload
+     */
+    omit?: ChatPayloadOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ChatPayloadInclude<ExtArgs> | null
+    /**
+     * Filter, which ChatPayload to fetch.
+     */
+    where: ChatPayloadWhereUniqueInput
+  }
+
+  /**
+   * ChatPayload findUniqueOrThrow
+   */
+  export type ChatPayloadFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ChatPayload
+     */
+    select?: ChatPayloadSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ChatPayload
+     */
+    omit?: ChatPayloadOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ChatPayloadInclude<ExtArgs> | null
+    /**
+     * Filter, which ChatPayload to fetch.
+     */
+    where: ChatPayloadWhereUniqueInput
+  }
+
+  /**
+   * ChatPayload findFirst
+   */
+  export type ChatPayloadFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ChatPayload
+     */
+    select?: ChatPayloadSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ChatPayload
+     */
+    omit?: ChatPayloadOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ChatPayloadInclude<ExtArgs> | null
+    /**
+     * Filter, which ChatPayload to fetch.
+     */
+    where?: ChatPayloadWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of ChatPayloads to fetch.
+     */
+    orderBy?: ChatPayloadOrderByWithRelationInput | ChatPayloadOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for ChatPayloads.
+     */
+    cursor?: ChatPayloadWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` ChatPayloads from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` ChatPayloads.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of ChatPayloads.
+     */
+    distinct?: ChatPayloadScalarFieldEnum | ChatPayloadScalarFieldEnum[]
+  }
+
+  /**
+   * ChatPayload findFirstOrThrow
+   */
+  export type ChatPayloadFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ChatPayload
+     */
+    select?: ChatPayloadSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ChatPayload
+     */
+    omit?: ChatPayloadOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ChatPayloadInclude<ExtArgs> | null
+    /**
+     * Filter, which ChatPayload to fetch.
+     */
+    where?: ChatPayloadWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of ChatPayloads to fetch.
+     */
+    orderBy?: ChatPayloadOrderByWithRelationInput | ChatPayloadOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for ChatPayloads.
+     */
+    cursor?: ChatPayloadWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` ChatPayloads from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` ChatPayloads.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of ChatPayloads.
+     */
+    distinct?: ChatPayloadScalarFieldEnum | ChatPayloadScalarFieldEnum[]
+  }
+
+  /**
+   * ChatPayload findMany
+   */
+  export type ChatPayloadFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ChatPayload
+     */
+    select?: ChatPayloadSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ChatPayload
+     */
+    omit?: ChatPayloadOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ChatPayloadInclude<ExtArgs> | null
+    /**
+     * Filter, which ChatPayloads to fetch.
+     */
+    where?: ChatPayloadWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of ChatPayloads to fetch.
+     */
+    orderBy?: ChatPayloadOrderByWithRelationInput | ChatPayloadOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing ChatPayloads.
+     */
+    cursor?: ChatPayloadWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` ChatPayloads from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` ChatPayloads.
+     */
+    skip?: number
+    distinct?: ChatPayloadScalarFieldEnum | ChatPayloadScalarFieldEnum[]
+  }
+
+  /**
+   * ChatPayload create
+   */
+  export type ChatPayloadCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ChatPayload
+     */
+    select?: ChatPayloadSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ChatPayload
+     */
+    omit?: ChatPayloadOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ChatPayloadInclude<ExtArgs> | null
+    /**
+     * The data needed to create a ChatPayload.
+     */
+    data: XOR<ChatPayloadCreateInput, ChatPayloadUncheckedCreateInput>
+  }
+
+  /**
+   * ChatPayload createMany
+   */
+  export type ChatPayloadCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many ChatPayloads.
+     */
+    data: ChatPayloadCreateManyInput | ChatPayloadCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * ChatPayload createManyAndReturn
+   */
+  export type ChatPayloadCreateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ChatPayload
+     */
+    select?: ChatPayloadSelectCreateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the ChatPayload
+     */
+    omit?: ChatPayloadOmit<ExtArgs> | null
+    /**
+     * The data used to create many ChatPayloads.
+     */
+    data: ChatPayloadCreateManyInput | ChatPayloadCreateManyInput[]
+    skipDuplicates?: boolean
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ChatPayloadIncludeCreateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * ChatPayload update
+   */
+  export type ChatPayloadUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ChatPayload
+     */
+    select?: ChatPayloadSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ChatPayload
+     */
+    omit?: ChatPayloadOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ChatPayloadInclude<ExtArgs> | null
+    /**
+     * The data needed to update a ChatPayload.
+     */
+    data: XOR<ChatPayloadUpdateInput, ChatPayloadUncheckedUpdateInput>
+    /**
+     * Choose, which ChatPayload to update.
+     */
+    where: ChatPayloadWhereUniqueInput
+  }
+
+  /**
+   * ChatPayload updateMany
+   */
+  export type ChatPayloadUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update ChatPayloads.
+     */
+    data: XOR<ChatPayloadUpdateManyMutationInput, ChatPayloadUncheckedUpdateManyInput>
+    /**
+     * Filter which ChatPayloads to update
+     */
+    where?: ChatPayloadWhereInput
+    /**
+     * Limit how many ChatPayloads to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * ChatPayload updateManyAndReturn
+   */
+  export type ChatPayloadUpdateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ChatPayload
+     */
+    select?: ChatPayloadSelectUpdateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the ChatPayload
+     */
+    omit?: ChatPayloadOmit<ExtArgs> | null
+    /**
+     * The data used to update ChatPayloads.
+     */
+    data: XOR<ChatPayloadUpdateManyMutationInput, ChatPayloadUncheckedUpdateManyInput>
+    /**
+     * Filter which ChatPayloads to update
+     */
+    where?: ChatPayloadWhereInput
+    /**
+     * Limit how many ChatPayloads to update.
+     */
+    limit?: number
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ChatPayloadIncludeUpdateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * ChatPayload upsert
+   */
+  export type ChatPayloadUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ChatPayload
+     */
+    select?: ChatPayloadSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ChatPayload
+     */
+    omit?: ChatPayloadOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ChatPayloadInclude<ExtArgs> | null
+    /**
+     * The filter to search for the ChatPayload to update in case it exists.
+     */
+    where: ChatPayloadWhereUniqueInput
+    /**
+     * In case the ChatPayload found by the `where` argument doesn't exist, create a new ChatPayload with this data.
+     */
+    create: XOR<ChatPayloadCreateInput, ChatPayloadUncheckedCreateInput>
+    /**
+     * In case the ChatPayload was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<ChatPayloadUpdateInput, ChatPayloadUncheckedUpdateInput>
+  }
+
+  /**
+   * ChatPayload delete
+   */
+  export type ChatPayloadDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ChatPayload
+     */
+    select?: ChatPayloadSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ChatPayload
+     */
+    omit?: ChatPayloadOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ChatPayloadInclude<ExtArgs> | null
+    /**
+     * Filter which ChatPayload to delete.
+     */
+    where: ChatPayloadWhereUniqueInput
+  }
+
+  /**
+   * ChatPayload deleteMany
+   */
+  export type ChatPayloadDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which ChatPayloads to delete
+     */
+    where?: ChatPayloadWhereInput
+    /**
+     * Limit how many ChatPayloads to delete.
+     */
+    limit?: number
+  }
+
+  /**
+   * ChatPayload without action
+   */
+  export type ChatPayloadDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ChatPayload
+     */
+    select?: ChatPayloadSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ChatPayload
+     */
+    omit?: ChatPayloadOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ChatPayloadInclude<ExtArgs> | null
+  }
+
+
+  /**
+   * Model VisualizationPayload
+   */
+
+  export type AggregateVisualizationPayload = {
+    _count: VisualizationPayloadCountAggregateOutputType | null
+    _min: VisualizationPayloadMinAggregateOutputType | null
+    _max: VisualizationPayloadMaxAggregateOutputType | null
+  }
+
+  export type VisualizationPayloadMinAggregateOutputType = {
+    contentId: string | null
+    engine: string | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type VisualizationPayloadMaxAggregateOutputType = {
+    contentId: string | null
+    engine: string | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type VisualizationPayloadCountAggregateOutputType = {
+    contentId: number
+    engine: number
+    config: number
+    data: number
+    createdAt: number
+    updatedAt: number
+    _all: number
+  }
+
+
+  export type VisualizationPayloadMinAggregateInputType = {
+    contentId?: true
+    engine?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type VisualizationPayloadMaxAggregateInputType = {
+    contentId?: true
+    engine?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type VisualizationPayloadCountAggregateInputType = {
+    contentId?: true
+    engine?: true
+    config?: true
+    data?: true
+    createdAt?: true
+    updatedAt?: true
+    _all?: true
+  }
+
+  export type VisualizationPayloadAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which VisualizationPayload to aggregate.
+     */
+    where?: VisualizationPayloadWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of VisualizationPayloads to fetch.
+     */
+    orderBy?: VisualizationPayloadOrderByWithRelationInput | VisualizationPayloadOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: VisualizationPayloadWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` VisualizationPayloads from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` VisualizationPayloads.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned VisualizationPayloads
+    **/
+    _count?: true | VisualizationPayloadCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: VisualizationPayloadMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: VisualizationPayloadMaxAggregateInputType
+  }
+
+  export type GetVisualizationPayloadAggregateType<T extends VisualizationPayloadAggregateArgs> = {
+        [P in keyof T & keyof AggregateVisualizationPayload]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateVisualizationPayload[P]>
+      : GetScalarType<T[P], AggregateVisualizationPayload[P]>
+  }
+
+
+
+
+  export type VisualizationPayloadGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: VisualizationPayloadWhereInput
+    orderBy?: VisualizationPayloadOrderByWithAggregationInput | VisualizationPayloadOrderByWithAggregationInput[]
+    by: VisualizationPayloadScalarFieldEnum[] | VisualizationPayloadScalarFieldEnum
+    having?: VisualizationPayloadScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: VisualizationPayloadCountAggregateInputType | true
+    _min?: VisualizationPayloadMinAggregateInputType
+    _max?: VisualizationPayloadMaxAggregateInputType
+  }
+
+  export type VisualizationPayloadGroupByOutputType = {
+    contentId: string
+    engine: string
+    config: JsonValue
+    data: JsonValue
+    createdAt: Date
+    updatedAt: Date
+    _count: VisualizationPayloadCountAggregateOutputType | null
+    _min: VisualizationPayloadMinAggregateOutputType | null
+    _max: VisualizationPayloadMaxAggregateOutputType | null
+  }
+
+  type GetVisualizationPayloadGroupByPayload<T extends VisualizationPayloadGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<VisualizationPayloadGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof VisualizationPayloadGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], VisualizationPayloadGroupByOutputType[P]>
+            : GetScalarType<T[P], VisualizationPayloadGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type VisualizationPayloadSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    contentId?: boolean
+    engine?: boolean
+    config?: boolean
+    data?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    content?: boolean | ContentNodeDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["visualizationPayload"]>
+
+  export type VisualizationPayloadSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    contentId?: boolean
+    engine?: boolean
+    config?: boolean
+    data?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    content?: boolean | ContentNodeDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["visualizationPayload"]>
+
+  export type VisualizationPayloadSelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    contentId?: boolean
+    engine?: boolean
+    config?: boolean
+    data?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    content?: boolean | ContentNodeDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["visualizationPayload"]>
+
+  export type VisualizationPayloadSelectScalar = {
+    contentId?: boolean
+    engine?: boolean
+    config?: boolean
+    data?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+  }
+
+  export type VisualizationPayloadOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"contentId" | "engine" | "config" | "data" | "createdAt" | "updatedAt", ExtArgs["result"]["visualizationPayload"]>
+  export type VisualizationPayloadInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    content?: boolean | ContentNodeDefaultArgs<ExtArgs>
+  }
+  export type VisualizationPayloadIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    content?: boolean | ContentNodeDefaultArgs<ExtArgs>
+  }
+  export type VisualizationPayloadIncludeUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    content?: boolean | ContentNodeDefaultArgs<ExtArgs>
+  }
+
+  export type $VisualizationPayloadPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "VisualizationPayload"
+    objects: {
+      content: Prisma.$ContentNodePayload<ExtArgs>
+    }
+    scalars: $Extensions.GetPayloadResult<{
+      contentId: string
+      engine: string
+      config: Prisma.JsonValue
+      data: Prisma.JsonValue
+      createdAt: Date
+      updatedAt: Date
+    }, ExtArgs["result"]["visualizationPayload"]>
+    composites: {}
+  }
+
+  type VisualizationPayloadGetPayload<S extends boolean | null | undefined | VisualizationPayloadDefaultArgs> = $Result.GetResult<Prisma.$VisualizationPayloadPayload, S>
+
+  type VisualizationPayloadCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> =
+    Omit<VisualizationPayloadFindManyArgs, 'select' | 'include' | 'distinct' | 'omit'> & {
+      select?: VisualizationPayloadCountAggregateInputType | true
+    }
+
+  export interface VisualizationPayloadDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['VisualizationPayload'], meta: { name: 'VisualizationPayload' } }
+    /**
+     * Find zero or one VisualizationPayload that matches the filter.
+     * @param {VisualizationPayloadFindUniqueArgs} args - Arguments to find a VisualizationPayload
+     * @example
+     * // Get one VisualizationPayload
+     * const visualizationPayload = await prisma.visualizationPayload.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends VisualizationPayloadFindUniqueArgs>(args: SelectSubset<T, VisualizationPayloadFindUniqueArgs<ExtArgs>>): Prisma__VisualizationPayloadClient<$Result.GetResult<Prisma.$VisualizationPayloadPayload<ExtArgs>, T, "findUnique", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find one VisualizationPayload that matches the filter or throw an error with `error.code='P2025'`
+     * if no matches were found.
+     * @param {VisualizationPayloadFindUniqueOrThrowArgs} args - Arguments to find a VisualizationPayload
+     * @example
+     * // Get one VisualizationPayload
+     * const visualizationPayload = await prisma.visualizationPayload.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends VisualizationPayloadFindUniqueOrThrowArgs>(args: SelectSubset<T, VisualizationPayloadFindUniqueOrThrowArgs<ExtArgs>>): Prisma__VisualizationPayloadClient<$Result.GetResult<Prisma.$VisualizationPayloadPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first VisualizationPayload that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {VisualizationPayloadFindFirstArgs} args - Arguments to find a VisualizationPayload
+     * @example
+     * // Get one VisualizationPayload
+     * const visualizationPayload = await prisma.visualizationPayload.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends VisualizationPayloadFindFirstArgs>(args?: SelectSubset<T, VisualizationPayloadFindFirstArgs<ExtArgs>>): Prisma__VisualizationPayloadClient<$Result.GetResult<Prisma.$VisualizationPayloadPayload<ExtArgs>, T, "findFirst", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first VisualizationPayload that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {VisualizationPayloadFindFirstOrThrowArgs} args - Arguments to find a VisualizationPayload
+     * @example
+     * // Get one VisualizationPayload
+     * const visualizationPayload = await prisma.visualizationPayload.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends VisualizationPayloadFindFirstOrThrowArgs>(args?: SelectSubset<T, VisualizationPayloadFindFirstOrThrowArgs<ExtArgs>>): Prisma__VisualizationPayloadClient<$Result.GetResult<Prisma.$VisualizationPayloadPayload<ExtArgs>, T, "findFirstOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find zero or more VisualizationPayloads that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {VisualizationPayloadFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all VisualizationPayloads
+     * const visualizationPayloads = await prisma.visualizationPayload.findMany()
+     * 
+     * // Get first 10 VisualizationPayloads
+     * const visualizationPayloads = await prisma.visualizationPayload.findMany({ take: 10 })
+     * 
+     * // Only select the `contentId`
+     * const visualizationPayloadWithContentIdOnly = await prisma.visualizationPayload.findMany({ select: { contentId: true } })
+     * 
+     */
+    findMany<T extends VisualizationPayloadFindManyArgs>(args?: SelectSubset<T, VisualizationPayloadFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$VisualizationPayloadPayload<ExtArgs>, T, "findMany", GlobalOmitOptions>>
+
+    /**
+     * Create a VisualizationPayload.
+     * @param {VisualizationPayloadCreateArgs} args - Arguments to create a VisualizationPayload.
+     * @example
+     * // Create one VisualizationPayload
+     * const VisualizationPayload = await prisma.visualizationPayload.create({
+     *   data: {
+     *     // ... data to create a VisualizationPayload
+     *   }
+     * })
+     * 
+     */
+    create<T extends VisualizationPayloadCreateArgs>(args: SelectSubset<T, VisualizationPayloadCreateArgs<ExtArgs>>): Prisma__VisualizationPayloadClient<$Result.GetResult<Prisma.$VisualizationPayloadPayload<ExtArgs>, T, "create", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Create many VisualizationPayloads.
+     * @param {VisualizationPayloadCreateManyArgs} args - Arguments to create many VisualizationPayloads.
+     * @example
+     * // Create many VisualizationPayloads
+     * const visualizationPayload = await prisma.visualizationPayload.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *     
+     */
+    createMany<T extends VisualizationPayloadCreateManyArgs>(args?: SelectSubset<T, VisualizationPayloadCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create many VisualizationPayloads and returns the data saved in the database.
+     * @param {VisualizationPayloadCreateManyAndReturnArgs} args - Arguments to create many VisualizationPayloads.
+     * @example
+     * // Create many VisualizationPayloads
+     * const visualizationPayload = await prisma.visualizationPayload.createManyAndReturn({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Create many VisualizationPayloads and only return the `contentId`
+     * const visualizationPayloadWithContentIdOnly = await prisma.visualizationPayload.createManyAndReturn({
+     *   select: { contentId: true },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    createManyAndReturn<T extends VisualizationPayloadCreateManyAndReturnArgs>(args?: SelectSubset<T, VisualizationPayloadCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$VisualizationPayloadPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Delete a VisualizationPayload.
+     * @param {VisualizationPayloadDeleteArgs} args - Arguments to delete one VisualizationPayload.
+     * @example
+     * // Delete one VisualizationPayload
+     * const VisualizationPayload = await prisma.visualizationPayload.delete({
+     *   where: {
+     *     // ... filter to delete one VisualizationPayload
+     *   }
+     * })
+     * 
+     */
+    delete<T extends VisualizationPayloadDeleteArgs>(args: SelectSubset<T, VisualizationPayloadDeleteArgs<ExtArgs>>): Prisma__VisualizationPayloadClient<$Result.GetResult<Prisma.$VisualizationPayloadPayload<ExtArgs>, T, "delete", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Update one VisualizationPayload.
+     * @param {VisualizationPayloadUpdateArgs} args - Arguments to update one VisualizationPayload.
+     * @example
+     * // Update one VisualizationPayload
+     * const visualizationPayload = await prisma.visualizationPayload.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    update<T extends VisualizationPayloadUpdateArgs>(args: SelectSubset<T, VisualizationPayloadUpdateArgs<ExtArgs>>): Prisma__VisualizationPayloadClient<$Result.GetResult<Prisma.$VisualizationPayloadPayload<ExtArgs>, T, "update", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Delete zero or more VisualizationPayloads.
+     * @param {VisualizationPayloadDeleteManyArgs} args - Arguments to filter VisualizationPayloads to delete.
+     * @example
+     * // Delete a few VisualizationPayloads
+     * const { count } = await prisma.visualizationPayload.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+     */
+    deleteMany<T extends VisualizationPayloadDeleteManyArgs>(args?: SelectSubset<T, VisualizationPayloadDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more VisualizationPayloads.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {VisualizationPayloadUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many VisualizationPayloads
+     * const visualizationPayload = await prisma.visualizationPayload.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    updateMany<T extends VisualizationPayloadUpdateManyArgs>(args: SelectSubset<T, VisualizationPayloadUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more VisualizationPayloads and returns the data updated in the database.
+     * @param {VisualizationPayloadUpdateManyAndReturnArgs} args - Arguments to update many VisualizationPayloads.
+     * @example
+     * // Update many VisualizationPayloads
+     * const visualizationPayload = await prisma.visualizationPayload.updateManyAndReturn({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Update zero or more VisualizationPayloads and only return the `contentId`
+     * const visualizationPayloadWithContentIdOnly = await prisma.visualizationPayload.updateManyAndReturn({
+     *   select: { contentId: true },
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    updateManyAndReturn<T extends VisualizationPayloadUpdateManyAndReturnArgs>(args: SelectSubset<T, VisualizationPayloadUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$VisualizationPayloadPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Create or update one VisualizationPayload.
+     * @param {VisualizationPayloadUpsertArgs} args - Arguments to update or create a VisualizationPayload.
+     * @example
+     * // Update or create a VisualizationPayload
+     * const visualizationPayload = await prisma.visualizationPayload.upsert({
+     *   create: {
+     *     // ... data to create a VisualizationPayload
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the VisualizationPayload we want to update
+     *   }
+     * })
+     */
+    upsert<T extends VisualizationPayloadUpsertArgs>(args: SelectSubset<T, VisualizationPayloadUpsertArgs<ExtArgs>>): Prisma__VisualizationPayloadClient<$Result.GetResult<Prisma.$VisualizationPayloadPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+
+    /**
+     * Count the number of VisualizationPayloads.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {VisualizationPayloadCountArgs} args - Arguments to filter VisualizationPayloads to count.
+     * @example
+     * // Count the number of VisualizationPayloads
+     * const count = await prisma.visualizationPayload.count({
+     *   where: {
+     *     // ... the filter for the VisualizationPayloads we want to count
+     *   }
+     * })
+    **/
+    count<T extends VisualizationPayloadCountArgs>(
+      args?: Subset<T, VisualizationPayloadCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], VisualizationPayloadCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a VisualizationPayload.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {VisualizationPayloadAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends VisualizationPayloadAggregateArgs>(args: Subset<T, VisualizationPayloadAggregateArgs>): Prisma.PrismaPromise<GetVisualizationPayloadAggregateType<T>>
+
+    /**
+     * Group by VisualizationPayload.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {VisualizationPayloadGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends VisualizationPayloadGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: VisualizationPayloadGroupByArgs['orderBy'] }
+        : { orderBy?: VisualizationPayloadGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, VisualizationPayloadGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetVisualizationPayloadGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the VisualizationPayload model
+   */
+  readonly fields: VisualizationPayloadFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for VisualizationPayload.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__VisualizationPayloadClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    content<T extends ContentNodeDefaultArgs<ExtArgs> = {}>(args?: Subset<T, ContentNodeDefaultArgs<ExtArgs>>): Prisma__ContentNodeClient<$Result.GetResult<Prisma.$ContentNodePayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the VisualizationPayload model
+   */
+  interface VisualizationPayloadFieldRefs {
+    readonly contentId: FieldRef<"VisualizationPayload", 'String'>
+    readonly engine: FieldRef<"VisualizationPayload", 'String'>
+    readonly config: FieldRef<"VisualizationPayload", 'Json'>
+    readonly data: FieldRef<"VisualizationPayload", 'Json'>
+    readonly createdAt: FieldRef<"VisualizationPayload", 'DateTime'>
+    readonly updatedAt: FieldRef<"VisualizationPayload", 'DateTime'>
+  }
+    
+
+  // Custom InputTypes
+  /**
+   * VisualizationPayload findUnique
+   */
+  export type VisualizationPayloadFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the VisualizationPayload
+     */
+    select?: VisualizationPayloadSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the VisualizationPayload
+     */
+    omit?: VisualizationPayloadOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: VisualizationPayloadInclude<ExtArgs> | null
+    /**
+     * Filter, which VisualizationPayload to fetch.
+     */
+    where: VisualizationPayloadWhereUniqueInput
+  }
+
+  /**
+   * VisualizationPayload findUniqueOrThrow
+   */
+  export type VisualizationPayloadFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the VisualizationPayload
+     */
+    select?: VisualizationPayloadSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the VisualizationPayload
+     */
+    omit?: VisualizationPayloadOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: VisualizationPayloadInclude<ExtArgs> | null
+    /**
+     * Filter, which VisualizationPayload to fetch.
+     */
+    where: VisualizationPayloadWhereUniqueInput
+  }
+
+  /**
+   * VisualizationPayload findFirst
+   */
+  export type VisualizationPayloadFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the VisualizationPayload
+     */
+    select?: VisualizationPayloadSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the VisualizationPayload
+     */
+    omit?: VisualizationPayloadOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: VisualizationPayloadInclude<ExtArgs> | null
+    /**
+     * Filter, which VisualizationPayload to fetch.
+     */
+    where?: VisualizationPayloadWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of VisualizationPayloads to fetch.
+     */
+    orderBy?: VisualizationPayloadOrderByWithRelationInput | VisualizationPayloadOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for VisualizationPayloads.
+     */
+    cursor?: VisualizationPayloadWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` VisualizationPayloads from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` VisualizationPayloads.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of VisualizationPayloads.
+     */
+    distinct?: VisualizationPayloadScalarFieldEnum | VisualizationPayloadScalarFieldEnum[]
+  }
+
+  /**
+   * VisualizationPayload findFirstOrThrow
+   */
+  export type VisualizationPayloadFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the VisualizationPayload
+     */
+    select?: VisualizationPayloadSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the VisualizationPayload
+     */
+    omit?: VisualizationPayloadOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: VisualizationPayloadInclude<ExtArgs> | null
+    /**
+     * Filter, which VisualizationPayload to fetch.
+     */
+    where?: VisualizationPayloadWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of VisualizationPayloads to fetch.
+     */
+    orderBy?: VisualizationPayloadOrderByWithRelationInput | VisualizationPayloadOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for VisualizationPayloads.
+     */
+    cursor?: VisualizationPayloadWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` VisualizationPayloads from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` VisualizationPayloads.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of VisualizationPayloads.
+     */
+    distinct?: VisualizationPayloadScalarFieldEnum | VisualizationPayloadScalarFieldEnum[]
+  }
+
+  /**
+   * VisualizationPayload findMany
+   */
+  export type VisualizationPayloadFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the VisualizationPayload
+     */
+    select?: VisualizationPayloadSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the VisualizationPayload
+     */
+    omit?: VisualizationPayloadOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: VisualizationPayloadInclude<ExtArgs> | null
+    /**
+     * Filter, which VisualizationPayloads to fetch.
+     */
+    where?: VisualizationPayloadWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of VisualizationPayloads to fetch.
+     */
+    orderBy?: VisualizationPayloadOrderByWithRelationInput | VisualizationPayloadOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing VisualizationPayloads.
+     */
+    cursor?: VisualizationPayloadWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` VisualizationPayloads from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` VisualizationPayloads.
+     */
+    skip?: number
+    distinct?: VisualizationPayloadScalarFieldEnum | VisualizationPayloadScalarFieldEnum[]
+  }
+
+  /**
+   * VisualizationPayload create
+   */
+  export type VisualizationPayloadCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the VisualizationPayload
+     */
+    select?: VisualizationPayloadSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the VisualizationPayload
+     */
+    omit?: VisualizationPayloadOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: VisualizationPayloadInclude<ExtArgs> | null
+    /**
+     * The data needed to create a VisualizationPayload.
+     */
+    data: XOR<VisualizationPayloadCreateInput, VisualizationPayloadUncheckedCreateInput>
+  }
+
+  /**
+   * VisualizationPayload createMany
+   */
+  export type VisualizationPayloadCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many VisualizationPayloads.
+     */
+    data: VisualizationPayloadCreateManyInput | VisualizationPayloadCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * VisualizationPayload createManyAndReturn
+   */
+  export type VisualizationPayloadCreateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the VisualizationPayload
+     */
+    select?: VisualizationPayloadSelectCreateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the VisualizationPayload
+     */
+    omit?: VisualizationPayloadOmit<ExtArgs> | null
+    /**
+     * The data used to create many VisualizationPayloads.
+     */
+    data: VisualizationPayloadCreateManyInput | VisualizationPayloadCreateManyInput[]
+    skipDuplicates?: boolean
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: VisualizationPayloadIncludeCreateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * VisualizationPayload update
+   */
+  export type VisualizationPayloadUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the VisualizationPayload
+     */
+    select?: VisualizationPayloadSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the VisualizationPayload
+     */
+    omit?: VisualizationPayloadOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: VisualizationPayloadInclude<ExtArgs> | null
+    /**
+     * The data needed to update a VisualizationPayload.
+     */
+    data: XOR<VisualizationPayloadUpdateInput, VisualizationPayloadUncheckedUpdateInput>
+    /**
+     * Choose, which VisualizationPayload to update.
+     */
+    where: VisualizationPayloadWhereUniqueInput
+  }
+
+  /**
+   * VisualizationPayload updateMany
+   */
+  export type VisualizationPayloadUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update VisualizationPayloads.
+     */
+    data: XOR<VisualizationPayloadUpdateManyMutationInput, VisualizationPayloadUncheckedUpdateManyInput>
+    /**
+     * Filter which VisualizationPayloads to update
+     */
+    where?: VisualizationPayloadWhereInput
+    /**
+     * Limit how many VisualizationPayloads to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * VisualizationPayload updateManyAndReturn
+   */
+  export type VisualizationPayloadUpdateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the VisualizationPayload
+     */
+    select?: VisualizationPayloadSelectUpdateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the VisualizationPayload
+     */
+    omit?: VisualizationPayloadOmit<ExtArgs> | null
+    /**
+     * The data used to update VisualizationPayloads.
+     */
+    data: XOR<VisualizationPayloadUpdateManyMutationInput, VisualizationPayloadUncheckedUpdateManyInput>
+    /**
+     * Filter which VisualizationPayloads to update
+     */
+    where?: VisualizationPayloadWhereInput
+    /**
+     * Limit how many VisualizationPayloads to update.
+     */
+    limit?: number
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: VisualizationPayloadIncludeUpdateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * VisualizationPayload upsert
+   */
+  export type VisualizationPayloadUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the VisualizationPayload
+     */
+    select?: VisualizationPayloadSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the VisualizationPayload
+     */
+    omit?: VisualizationPayloadOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: VisualizationPayloadInclude<ExtArgs> | null
+    /**
+     * The filter to search for the VisualizationPayload to update in case it exists.
+     */
+    where: VisualizationPayloadWhereUniqueInput
+    /**
+     * In case the VisualizationPayload found by the `where` argument doesn't exist, create a new VisualizationPayload with this data.
+     */
+    create: XOR<VisualizationPayloadCreateInput, VisualizationPayloadUncheckedCreateInput>
+    /**
+     * In case the VisualizationPayload was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<VisualizationPayloadUpdateInput, VisualizationPayloadUncheckedUpdateInput>
+  }
+
+  /**
+   * VisualizationPayload delete
+   */
+  export type VisualizationPayloadDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the VisualizationPayload
+     */
+    select?: VisualizationPayloadSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the VisualizationPayload
+     */
+    omit?: VisualizationPayloadOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: VisualizationPayloadInclude<ExtArgs> | null
+    /**
+     * Filter which VisualizationPayload to delete.
+     */
+    where: VisualizationPayloadWhereUniqueInput
+  }
+
+  /**
+   * VisualizationPayload deleteMany
+   */
+  export type VisualizationPayloadDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which VisualizationPayloads to delete
+     */
+    where?: VisualizationPayloadWhereInput
+    /**
+     * Limit how many VisualizationPayloads to delete.
+     */
+    limit?: number
+  }
+
+  /**
+   * VisualizationPayload without action
+   */
+  export type VisualizationPayloadDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the VisualizationPayload
+     */
+    select?: VisualizationPayloadSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the VisualizationPayload
+     */
+    omit?: VisualizationPayloadOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: VisualizationPayloadInclude<ExtArgs> | null
+  }
+
+
+  /**
+   * Model DataPayload
+   */
+
+  export type AggregateDataPayload = {
+    _count: DataPayloadCountAggregateOutputType | null
+    _min: DataPayloadMinAggregateOutputType | null
+    _max: DataPayloadMaxAggregateOutputType | null
+  }
+
+  export type DataPayloadMinAggregateOutputType = {
+    contentId: string | null
+    mode: string | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type DataPayloadMaxAggregateOutputType = {
+    contentId: string | null
+    mode: string | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type DataPayloadCountAggregateOutputType = {
+    contentId: number
+    mode: number
+    source: number
+    schema: number
+    createdAt: number
+    updatedAt: number
+    _all: number
+  }
+
+
+  export type DataPayloadMinAggregateInputType = {
+    contentId?: true
+    mode?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type DataPayloadMaxAggregateInputType = {
+    contentId?: true
+    mode?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type DataPayloadCountAggregateInputType = {
+    contentId?: true
+    mode?: true
+    source?: true
+    schema?: true
+    createdAt?: true
+    updatedAt?: true
+    _all?: true
+  }
+
+  export type DataPayloadAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which DataPayload to aggregate.
+     */
+    where?: DataPayloadWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of DataPayloads to fetch.
+     */
+    orderBy?: DataPayloadOrderByWithRelationInput | DataPayloadOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: DataPayloadWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` DataPayloads from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` DataPayloads.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned DataPayloads
+    **/
+    _count?: true | DataPayloadCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: DataPayloadMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: DataPayloadMaxAggregateInputType
+  }
+
+  export type GetDataPayloadAggregateType<T extends DataPayloadAggregateArgs> = {
+        [P in keyof T & keyof AggregateDataPayload]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateDataPayload[P]>
+      : GetScalarType<T[P], AggregateDataPayload[P]>
+  }
+
+
+
+
+  export type DataPayloadGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: DataPayloadWhereInput
+    orderBy?: DataPayloadOrderByWithAggregationInput | DataPayloadOrderByWithAggregationInput[]
+    by: DataPayloadScalarFieldEnum[] | DataPayloadScalarFieldEnum
+    having?: DataPayloadScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: DataPayloadCountAggregateInputType | true
+    _min?: DataPayloadMinAggregateInputType
+    _max?: DataPayloadMaxAggregateInputType
+  }
+
+  export type DataPayloadGroupByOutputType = {
+    contentId: string
+    mode: string
+    source: JsonValue
+    schema: JsonValue
+    createdAt: Date
+    updatedAt: Date
+    _count: DataPayloadCountAggregateOutputType | null
+    _min: DataPayloadMinAggregateOutputType | null
+    _max: DataPayloadMaxAggregateOutputType | null
+  }
+
+  type GetDataPayloadGroupByPayload<T extends DataPayloadGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<DataPayloadGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof DataPayloadGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], DataPayloadGroupByOutputType[P]>
+            : GetScalarType<T[P], DataPayloadGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type DataPayloadSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    contentId?: boolean
+    mode?: boolean
+    source?: boolean
+    schema?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    content?: boolean | ContentNodeDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["dataPayload"]>
+
+  export type DataPayloadSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    contentId?: boolean
+    mode?: boolean
+    source?: boolean
+    schema?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    content?: boolean | ContentNodeDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["dataPayload"]>
+
+  export type DataPayloadSelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    contentId?: boolean
+    mode?: boolean
+    source?: boolean
+    schema?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    content?: boolean | ContentNodeDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["dataPayload"]>
+
+  export type DataPayloadSelectScalar = {
+    contentId?: boolean
+    mode?: boolean
+    source?: boolean
+    schema?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+  }
+
+  export type DataPayloadOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"contentId" | "mode" | "source" | "schema" | "createdAt" | "updatedAt", ExtArgs["result"]["dataPayload"]>
+  export type DataPayloadInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    content?: boolean | ContentNodeDefaultArgs<ExtArgs>
+  }
+  export type DataPayloadIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    content?: boolean | ContentNodeDefaultArgs<ExtArgs>
+  }
+  export type DataPayloadIncludeUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    content?: boolean | ContentNodeDefaultArgs<ExtArgs>
+  }
+
+  export type $DataPayloadPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "DataPayload"
+    objects: {
+      content: Prisma.$ContentNodePayload<ExtArgs>
+    }
+    scalars: $Extensions.GetPayloadResult<{
+      contentId: string
+      mode: string
+      source: Prisma.JsonValue
+      schema: Prisma.JsonValue
+      createdAt: Date
+      updatedAt: Date
+    }, ExtArgs["result"]["dataPayload"]>
+    composites: {}
+  }
+
+  type DataPayloadGetPayload<S extends boolean | null | undefined | DataPayloadDefaultArgs> = $Result.GetResult<Prisma.$DataPayloadPayload, S>
+
+  type DataPayloadCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> =
+    Omit<DataPayloadFindManyArgs, 'select' | 'include' | 'distinct' | 'omit'> & {
+      select?: DataPayloadCountAggregateInputType | true
+    }
+
+  export interface DataPayloadDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['DataPayload'], meta: { name: 'DataPayload' } }
+    /**
+     * Find zero or one DataPayload that matches the filter.
+     * @param {DataPayloadFindUniqueArgs} args - Arguments to find a DataPayload
+     * @example
+     * // Get one DataPayload
+     * const dataPayload = await prisma.dataPayload.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends DataPayloadFindUniqueArgs>(args: SelectSubset<T, DataPayloadFindUniqueArgs<ExtArgs>>): Prisma__DataPayloadClient<$Result.GetResult<Prisma.$DataPayloadPayload<ExtArgs>, T, "findUnique", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find one DataPayload that matches the filter or throw an error with `error.code='P2025'`
+     * if no matches were found.
+     * @param {DataPayloadFindUniqueOrThrowArgs} args - Arguments to find a DataPayload
+     * @example
+     * // Get one DataPayload
+     * const dataPayload = await prisma.dataPayload.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends DataPayloadFindUniqueOrThrowArgs>(args: SelectSubset<T, DataPayloadFindUniqueOrThrowArgs<ExtArgs>>): Prisma__DataPayloadClient<$Result.GetResult<Prisma.$DataPayloadPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first DataPayload that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {DataPayloadFindFirstArgs} args - Arguments to find a DataPayload
+     * @example
+     * // Get one DataPayload
+     * const dataPayload = await prisma.dataPayload.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends DataPayloadFindFirstArgs>(args?: SelectSubset<T, DataPayloadFindFirstArgs<ExtArgs>>): Prisma__DataPayloadClient<$Result.GetResult<Prisma.$DataPayloadPayload<ExtArgs>, T, "findFirst", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first DataPayload that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {DataPayloadFindFirstOrThrowArgs} args - Arguments to find a DataPayload
+     * @example
+     * // Get one DataPayload
+     * const dataPayload = await prisma.dataPayload.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends DataPayloadFindFirstOrThrowArgs>(args?: SelectSubset<T, DataPayloadFindFirstOrThrowArgs<ExtArgs>>): Prisma__DataPayloadClient<$Result.GetResult<Prisma.$DataPayloadPayload<ExtArgs>, T, "findFirstOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find zero or more DataPayloads that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {DataPayloadFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all DataPayloads
+     * const dataPayloads = await prisma.dataPayload.findMany()
+     * 
+     * // Get first 10 DataPayloads
+     * const dataPayloads = await prisma.dataPayload.findMany({ take: 10 })
+     * 
+     * // Only select the `contentId`
+     * const dataPayloadWithContentIdOnly = await prisma.dataPayload.findMany({ select: { contentId: true } })
+     * 
+     */
+    findMany<T extends DataPayloadFindManyArgs>(args?: SelectSubset<T, DataPayloadFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$DataPayloadPayload<ExtArgs>, T, "findMany", GlobalOmitOptions>>
+
+    /**
+     * Create a DataPayload.
+     * @param {DataPayloadCreateArgs} args - Arguments to create a DataPayload.
+     * @example
+     * // Create one DataPayload
+     * const DataPayload = await prisma.dataPayload.create({
+     *   data: {
+     *     // ... data to create a DataPayload
+     *   }
+     * })
+     * 
+     */
+    create<T extends DataPayloadCreateArgs>(args: SelectSubset<T, DataPayloadCreateArgs<ExtArgs>>): Prisma__DataPayloadClient<$Result.GetResult<Prisma.$DataPayloadPayload<ExtArgs>, T, "create", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Create many DataPayloads.
+     * @param {DataPayloadCreateManyArgs} args - Arguments to create many DataPayloads.
+     * @example
+     * // Create many DataPayloads
+     * const dataPayload = await prisma.dataPayload.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *     
+     */
+    createMany<T extends DataPayloadCreateManyArgs>(args?: SelectSubset<T, DataPayloadCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create many DataPayloads and returns the data saved in the database.
+     * @param {DataPayloadCreateManyAndReturnArgs} args - Arguments to create many DataPayloads.
+     * @example
+     * // Create many DataPayloads
+     * const dataPayload = await prisma.dataPayload.createManyAndReturn({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Create many DataPayloads and only return the `contentId`
+     * const dataPayloadWithContentIdOnly = await prisma.dataPayload.createManyAndReturn({
+     *   select: { contentId: true },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    createManyAndReturn<T extends DataPayloadCreateManyAndReturnArgs>(args?: SelectSubset<T, DataPayloadCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$DataPayloadPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Delete a DataPayload.
+     * @param {DataPayloadDeleteArgs} args - Arguments to delete one DataPayload.
+     * @example
+     * // Delete one DataPayload
+     * const DataPayload = await prisma.dataPayload.delete({
+     *   where: {
+     *     // ... filter to delete one DataPayload
+     *   }
+     * })
+     * 
+     */
+    delete<T extends DataPayloadDeleteArgs>(args: SelectSubset<T, DataPayloadDeleteArgs<ExtArgs>>): Prisma__DataPayloadClient<$Result.GetResult<Prisma.$DataPayloadPayload<ExtArgs>, T, "delete", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Update one DataPayload.
+     * @param {DataPayloadUpdateArgs} args - Arguments to update one DataPayload.
+     * @example
+     * // Update one DataPayload
+     * const dataPayload = await prisma.dataPayload.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    update<T extends DataPayloadUpdateArgs>(args: SelectSubset<T, DataPayloadUpdateArgs<ExtArgs>>): Prisma__DataPayloadClient<$Result.GetResult<Prisma.$DataPayloadPayload<ExtArgs>, T, "update", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Delete zero or more DataPayloads.
+     * @param {DataPayloadDeleteManyArgs} args - Arguments to filter DataPayloads to delete.
+     * @example
+     * // Delete a few DataPayloads
+     * const { count } = await prisma.dataPayload.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+     */
+    deleteMany<T extends DataPayloadDeleteManyArgs>(args?: SelectSubset<T, DataPayloadDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more DataPayloads.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {DataPayloadUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many DataPayloads
+     * const dataPayload = await prisma.dataPayload.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    updateMany<T extends DataPayloadUpdateManyArgs>(args: SelectSubset<T, DataPayloadUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more DataPayloads and returns the data updated in the database.
+     * @param {DataPayloadUpdateManyAndReturnArgs} args - Arguments to update many DataPayloads.
+     * @example
+     * // Update many DataPayloads
+     * const dataPayload = await prisma.dataPayload.updateManyAndReturn({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Update zero or more DataPayloads and only return the `contentId`
+     * const dataPayloadWithContentIdOnly = await prisma.dataPayload.updateManyAndReturn({
+     *   select: { contentId: true },
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    updateManyAndReturn<T extends DataPayloadUpdateManyAndReturnArgs>(args: SelectSubset<T, DataPayloadUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$DataPayloadPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Create or update one DataPayload.
+     * @param {DataPayloadUpsertArgs} args - Arguments to update or create a DataPayload.
+     * @example
+     * // Update or create a DataPayload
+     * const dataPayload = await prisma.dataPayload.upsert({
+     *   create: {
+     *     // ... data to create a DataPayload
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the DataPayload we want to update
+     *   }
+     * })
+     */
+    upsert<T extends DataPayloadUpsertArgs>(args: SelectSubset<T, DataPayloadUpsertArgs<ExtArgs>>): Prisma__DataPayloadClient<$Result.GetResult<Prisma.$DataPayloadPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+
+    /**
+     * Count the number of DataPayloads.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {DataPayloadCountArgs} args - Arguments to filter DataPayloads to count.
+     * @example
+     * // Count the number of DataPayloads
+     * const count = await prisma.dataPayload.count({
+     *   where: {
+     *     // ... the filter for the DataPayloads we want to count
+     *   }
+     * })
+    **/
+    count<T extends DataPayloadCountArgs>(
+      args?: Subset<T, DataPayloadCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], DataPayloadCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a DataPayload.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {DataPayloadAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends DataPayloadAggregateArgs>(args: Subset<T, DataPayloadAggregateArgs>): Prisma.PrismaPromise<GetDataPayloadAggregateType<T>>
+
+    /**
+     * Group by DataPayload.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {DataPayloadGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends DataPayloadGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: DataPayloadGroupByArgs['orderBy'] }
+        : { orderBy?: DataPayloadGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, DataPayloadGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetDataPayloadGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the DataPayload model
+   */
+  readonly fields: DataPayloadFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for DataPayload.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__DataPayloadClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    content<T extends ContentNodeDefaultArgs<ExtArgs> = {}>(args?: Subset<T, ContentNodeDefaultArgs<ExtArgs>>): Prisma__ContentNodeClient<$Result.GetResult<Prisma.$ContentNodePayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the DataPayload model
+   */
+  interface DataPayloadFieldRefs {
+    readonly contentId: FieldRef<"DataPayload", 'String'>
+    readonly mode: FieldRef<"DataPayload", 'String'>
+    readonly source: FieldRef<"DataPayload", 'Json'>
+    readonly schema: FieldRef<"DataPayload", 'Json'>
+    readonly createdAt: FieldRef<"DataPayload", 'DateTime'>
+    readonly updatedAt: FieldRef<"DataPayload", 'DateTime'>
+  }
+    
+
+  // Custom InputTypes
+  /**
+   * DataPayload findUnique
+   */
+  export type DataPayloadFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the DataPayload
+     */
+    select?: DataPayloadSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the DataPayload
+     */
+    omit?: DataPayloadOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: DataPayloadInclude<ExtArgs> | null
+    /**
+     * Filter, which DataPayload to fetch.
+     */
+    where: DataPayloadWhereUniqueInput
+  }
+
+  /**
+   * DataPayload findUniqueOrThrow
+   */
+  export type DataPayloadFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the DataPayload
+     */
+    select?: DataPayloadSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the DataPayload
+     */
+    omit?: DataPayloadOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: DataPayloadInclude<ExtArgs> | null
+    /**
+     * Filter, which DataPayload to fetch.
+     */
+    where: DataPayloadWhereUniqueInput
+  }
+
+  /**
+   * DataPayload findFirst
+   */
+  export type DataPayloadFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the DataPayload
+     */
+    select?: DataPayloadSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the DataPayload
+     */
+    omit?: DataPayloadOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: DataPayloadInclude<ExtArgs> | null
+    /**
+     * Filter, which DataPayload to fetch.
+     */
+    where?: DataPayloadWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of DataPayloads to fetch.
+     */
+    orderBy?: DataPayloadOrderByWithRelationInput | DataPayloadOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for DataPayloads.
+     */
+    cursor?: DataPayloadWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` DataPayloads from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` DataPayloads.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of DataPayloads.
+     */
+    distinct?: DataPayloadScalarFieldEnum | DataPayloadScalarFieldEnum[]
+  }
+
+  /**
+   * DataPayload findFirstOrThrow
+   */
+  export type DataPayloadFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the DataPayload
+     */
+    select?: DataPayloadSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the DataPayload
+     */
+    omit?: DataPayloadOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: DataPayloadInclude<ExtArgs> | null
+    /**
+     * Filter, which DataPayload to fetch.
+     */
+    where?: DataPayloadWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of DataPayloads to fetch.
+     */
+    orderBy?: DataPayloadOrderByWithRelationInput | DataPayloadOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for DataPayloads.
+     */
+    cursor?: DataPayloadWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` DataPayloads from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` DataPayloads.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of DataPayloads.
+     */
+    distinct?: DataPayloadScalarFieldEnum | DataPayloadScalarFieldEnum[]
+  }
+
+  /**
+   * DataPayload findMany
+   */
+  export type DataPayloadFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the DataPayload
+     */
+    select?: DataPayloadSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the DataPayload
+     */
+    omit?: DataPayloadOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: DataPayloadInclude<ExtArgs> | null
+    /**
+     * Filter, which DataPayloads to fetch.
+     */
+    where?: DataPayloadWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of DataPayloads to fetch.
+     */
+    orderBy?: DataPayloadOrderByWithRelationInput | DataPayloadOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing DataPayloads.
+     */
+    cursor?: DataPayloadWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` DataPayloads from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` DataPayloads.
+     */
+    skip?: number
+    distinct?: DataPayloadScalarFieldEnum | DataPayloadScalarFieldEnum[]
+  }
+
+  /**
+   * DataPayload create
+   */
+  export type DataPayloadCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the DataPayload
+     */
+    select?: DataPayloadSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the DataPayload
+     */
+    omit?: DataPayloadOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: DataPayloadInclude<ExtArgs> | null
+    /**
+     * The data needed to create a DataPayload.
+     */
+    data: XOR<DataPayloadCreateInput, DataPayloadUncheckedCreateInput>
+  }
+
+  /**
+   * DataPayload createMany
+   */
+  export type DataPayloadCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many DataPayloads.
+     */
+    data: DataPayloadCreateManyInput | DataPayloadCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * DataPayload createManyAndReturn
+   */
+  export type DataPayloadCreateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the DataPayload
+     */
+    select?: DataPayloadSelectCreateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the DataPayload
+     */
+    omit?: DataPayloadOmit<ExtArgs> | null
+    /**
+     * The data used to create many DataPayloads.
+     */
+    data: DataPayloadCreateManyInput | DataPayloadCreateManyInput[]
+    skipDuplicates?: boolean
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: DataPayloadIncludeCreateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * DataPayload update
+   */
+  export type DataPayloadUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the DataPayload
+     */
+    select?: DataPayloadSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the DataPayload
+     */
+    omit?: DataPayloadOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: DataPayloadInclude<ExtArgs> | null
+    /**
+     * The data needed to update a DataPayload.
+     */
+    data: XOR<DataPayloadUpdateInput, DataPayloadUncheckedUpdateInput>
+    /**
+     * Choose, which DataPayload to update.
+     */
+    where: DataPayloadWhereUniqueInput
+  }
+
+  /**
+   * DataPayload updateMany
+   */
+  export type DataPayloadUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update DataPayloads.
+     */
+    data: XOR<DataPayloadUpdateManyMutationInput, DataPayloadUncheckedUpdateManyInput>
+    /**
+     * Filter which DataPayloads to update
+     */
+    where?: DataPayloadWhereInput
+    /**
+     * Limit how many DataPayloads to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * DataPayload updateManyAndReturn
+   */
+  export type DataPayloadUpdateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the DataPayload
+     */
+    select?: DataPayloadSelectUpdateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the DataPayload
+     */
+    omit?: DataPayloadOmit<ExtArgs> | null
+    /**
+     * The data used to update DataPayloads.
+     */
+    data: XOR<DataPayloadUpdateManyMutationInput, DataPayloadUncheckedUpdateManyInput>
+    /**
+     * Filter which DataPayloads to update
+     */
+    where?: DataPayloadWhereInput
+    /**
+     * Limit how many DataPayloads to update.
+     */
+    limit?: number
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: DataPayloadIncludeUpdateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * DataPayload upsert
+   */
+  export type DataPayloadUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the DataPayload
+     */
+    select?: DataPayloadSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the DataPayload
+     */
+    omit?: DataPayloadOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: DataPayloadInclude<ExtArgs> | null
+    /**
+     * The filter to search for the DataPayload to update in case it exists.
+     */
+    where: DataPayloadWhereUniqueInput
+    /**
+     * In case the DataPayload found by the `where` argument doesn't exist, create a new DataPayload with this data.
+     */
+    create: XOR<DataPayloadCreateInput, DataPayloadUncheckedCreateInput>
+    /**
+     * In case the DataPayload was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<DataPayloadUpdateInput, DataPayloadUncheckedUpdateInput>
+  }
+
+  /**
+   * DataPayload delete
+   */
+  export type DataPayloadDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the DataPayload
+     */
+    select?: DataPayloadSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the DataPayload
+     */
+    omit?: DataPayloadOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: DataPayloadInclude<ExtArgs> | null
+    /**
+     * Filter which DataPayload to delete.
+     */
+    where: DataPayloadWhereUniqueInput
+  }
+
+  /**
+   * DataPayload deleteMany
+   */
+  export type DataPayloadDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which DataPayloads to delete
+     */
+    where?: DataPayloadWhereInput
+    /**
+     * Limit how many DataPayloads to delete.
+     */
+    limit?: number
+  }
+
+  /**
+   * DataPayload without action
+   */
+  export type DataPayloadDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the DataPayload
+     */
+    select?: DataPayloadSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the DataPayload
+     */
+    omit?: DataPayloadOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: DataPayloadInclude<ExtArgs> | null
+  }
+
+
+  /**
+   * Model HopePayload
+   */
+
+  export type AggregateHopePayload = {
+    _count: HopePayloadCountAggregateOutputType | null
+    _min: HopePayloadMinAggregateOutputType | null
+    _max: HopePayloadMaxAggregateOutputType | null
+  }
+
+  export type HopePayloadMinAggregateOutputType = {
+    contentId: string | null
+    kind: string | null
+    status: string | null
+    description: string | null
+    targetDate: Date | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type HopePayloadMaxAggregateOutputType = {
+    contentId: string | null
+    kind: string | null
+    status: string | null
+    description: string | null
+    targetDate: Date | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type HopePayloadCountAggregateOutputType = {
+    contentId: number
+    kind: number
+    status: number
+    description: number
+    targetDate: number
+    metadata: number
+    createdAt: number
+    updatedAt: number
+    _all: number
+  }
+
+
+  export type HopePayloadMinAggregateInputType = {
+    contentId?: true
+    kind?: true
+    status?: true
+    description?: true
+    targetDate?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type HopePayloadMaxAggregateInputType = {
+    contentId?: true
+    kind?: true
+    status?: true
+    description?: true
+    targetDate?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type HopePayloadCountAggregateInputType = {
+    contentId?: true
+    kind?: true
+    status?: true
+    description?: true
+    targetDate?: true
+    metadata?: true
+    createdAt?: true
+    updatedAt?: true
+    _all?: true
+  }
+
+  export type HopePayloadAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which HopePayload to aggregate.
+     */
+    where?: HopePayloadWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of HopePayloads to fetch.
+     */
+    orderBy?: HopePayloadOrderByWithRelationInput | HopePayloadOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: HopePayloadWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` HopePayloads from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` HopePayloads.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned HopePayloads
+    **/
+    _count?: true | HopePayloadCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: HopePayloadMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: HopePayloadMaxAggregateInputType
+  }
+
+  export type GetHopePayloadAggregateType<T extends HopePayloadAggregateArgs> = {
+        [P in keyof T & keyof AggregateHopePayload]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateHopePayload[P]>
+      : GetScalarType<T[P], AggregateHopePayload[P]>
+  }
+
+
+
+
+  export type HopePayloadGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: HopePayloadWhereInput
+    orderBy?: HopePayloadOrderByWithAggregationInput | HopePayloadOrderByWithAggregationInput[]
+    by: HopePayloadScalarFieldEnum[] | HopePayloadScalarFieldEnum
+    having?: HopePayloadScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: HopePayloadCountAggregateInputType | true
+    _min?: HopePayloadMinAggregateInputType
+    _max?: HopePayloadMaxAggregateInputType
+  }
+
+  export type HopePayloadGroupByOutputType = {
+    contentId: string
+    kind: string
+    status: string
+    description: string | null
+    targetDate: Date | null
+    metadata: JsonValue
+    createdAt: Date
+    updatedAt: Date
+    _count: HopePayloadCountAggregateOutputType | null
+    _min: HopePayloadMinAggregateOutputType | null
+    _max: HopePayloadMaxAggregateOutputType | null
+  }
+
+  type GetHopePayloadGroupByPayload<T extends HopePayloadGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<HopePayloadGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof HopePayloadGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], HopePayloadGroupByOutputType[P]>
+            : GetScalarType<T[P], HopePayloadGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type HopePayloadSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    contentId?: boolean
+    kind?: boolean
+    status?: boolean
+    description?: boolean
+    targetDate?: boolean
+    metadata?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    content?: boolean | ContentNodeDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["hopePayload"]>
+
+  export type HopePayloadSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    contentId?: boolean
+    kind?: boolean
+    status?: boolean
+    description?: boolean
+    targetDate?: boolean
+    metadata?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    content?: boolean | ContentNodeDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["hopePayload"]>
+
+  export type HopePayloadSelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    contentId?: boolean
+    kind?: boolean
+    status?: boolean
+    description?: boolean
+    targetDate?: boolean
+    metadata?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    content?: boolean | ContentNodeDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["hopePayload"]>
+
+  export type HopePayloadSelectScalar = {
+    contentId?: boolean
+    kind?: boolean
+    status?: boolean
+    description?: boolean
+    targetDate?: boolean
+    metadata?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+  }
+
+  export type HopePayloadOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"contentId" | "kind" | "status" | "description" | "targetDate" | "metadata" | "createdAt" | "updatedAt", ExtArgs["result"]["hopePayload"]>
+  export type HopePayloadInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    content?: boolean | ContentNodeDefaultArgs<ExtArgs>
+  }
+  export type HopePayloadIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    content?: boolean | ContentNodeDefaultArgs<ExtArgs>
+  }
+  export type HopePayloadIncludeUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    content?: boolean | ContentNodeDefaultArgs<ExtArgs>
+  }
+
+  export type $HopePayloadPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "HopePayload"
+    objects: {
+      content: Prisma.$ContentNodePayload<ExtArgs>
+    }
+    scalars: $Extensions.GetPayloadResult<{
+      contentId: string
+      kind: string
+      status: string
+      description: string | null
+      targetDate: Date | null
+      metadata: Prisma.JsonValue
+      createdAt: Date
+      updatedAt: Date
+    }, ExtArgs["result"]["hopePayload"]>
+    composites: {}
+  }
+
+  type HopePayloadGetPayload<S extends boolean | null | undefined | HopePayloadDefaultArgs> = $Result.GetResult<Prisma.$HopePayloadPayload, S>
+
+  type HopePayloadCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> =
+    Omit<HopePayloadFindManyArgs, 'select' | 'include' | 'distinct' | 'omit'> & {
+      select?: HopePayloadCountAggregateInputType | true
+    }
+
+  export interface HopePayloadDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['HopePayload'], meta: { name: 'HopePayload' } }
+    /**
+     * Find zero or one HopePayload that matches the filter.
+     * @param {HopePayloadFindUniqueArgs} args - Arguments to find a HopePayload
+     * @example
+     * // Get one HopePayload
+     * const hopePayload = await prisma.hopePayload.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends HopePayloadFindUniqueArgs>(args: SelectSubset<T, HopePayloadFindUniqueArgs<ExtArgs>>): Prisma__HopePayloadClient<$Result.GetResult<Prisma.$HopePayloadPayload<ExtArgs>, T, "findUnique", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find one HopePayload that matches the filter or throw an error with `error.code='P2025'`
+     * if no matches were found.
+     * @param {HopePayloadFindUniqueOrThrowArgs} args - Arguments to find a HopePayload
+     * @example
+     * // Get one HopePayload
+     * const hopePayload = await prisma.hopePayload.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends HopePayloadFindUniqueOrThrowArgs>(args: SelectSubset<T, HopePayloadFindUniqueOrThrowArgs<ExtArgs>>): Prisma__HopePayloadClient<$Result.GetResult<Prisma.$HopePayloadPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first HopePayload that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {HopePayloadFindFirstArgs} args - Arguments to find a HopePayload
+     * @example
+     * // Get one HopePayload
+     * const hopePayload = await prisma.hopePayload.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends HopePayloadFindFirstArgs>(args?: SelectSubset<T, HopePayloadFindFirstArgs<ExtArgs>>): Prisma__HopePayloadClient<$Result.GetResult<Prisma.$HopePayloadPayload<ExtArgs>, T, "findFirst", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first HopePayload that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {HopePayloadFindFirstOrThrowArgs} args - Arguments to find a HopePayload
+     * @example
+     * // Get one HopePayload
+     * const hopePayload = await prisma.hopePayload.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends HopePayloadFindFirstOrThrowArgs>(args?: SelectSubset<T, HopePayloadFindFirstOrThrowArgs<ExtArgs>>): Prisma__HopePayloadClient<$Result.GetResult<Prisma.$HopePayloadPayload<ExtArgs>, T, "findFirstOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find zero or more HopePayloads that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {HopePayloadFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all HopePayloads
+     * const hopePayloads = await prisma.hopePayload.findMany()
+     * 
+     * // Get first 10 HopePayloads
+     * const hopePayloads = await prisma.hopePayload.findMany({ take: 10 })
+     * 
+     * // Only select the `contentId`
+     * const hopePayloadWithContentIdOnly = await prisma.hopePayload.findMany({ select: { contentId: true } })
+     * 
+     */
+    findMany<T extends HopePayloadFindManyArgs>(args?: SelectSubset<T, HopePayloadFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$HopePayloadPayload<ExtArgs>, T, "findMany", GlobalOmitOptions>>
+
+    /**
+     * Create a HopePayload.
+     * @param {HopePayloadCreateArgs} args - Arguments to create a HopePayload.
+     * @example
+     * // Create one HopePayload
+     * const HopePayload = await prisma.hopePayload.create({
+     *   data: {
+     *     // ... data to create a HopePayload
+     *   }
+     * })
+     * 
+     */
+    create<T extends HopePayloadCreateArgs>(args: SelectSubset<T, HopePayloadCreateArgs<ExtArgs>>): Prisma__HopePayloadClient<$Result.GetResult<Prisma.$HopePayloadPayload<ExtArgs>, T, "create", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Create many HopePayloads.
+     * @param {HopePayloadCreateManyArgs} args - Arguments to create many HopePayloads.
+     * @example
+     * // Create many HopePayloads
+     * const hopePayload = await prisma.hopePayload.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *     
+     */
+    createMany<T extends HopePayloadCreateManyArgs>(args?: SelectSubset<T, HopePayloadCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create many HopePayloads and returns the data saved in the database.
+     * @param {HopePayloadCreateManyAndReturnArgs} args - Arguments to create many HopePayloads.
+     * @example
+     * // Create many HopePayloads
+     * const hopePayload = await prisma.hopePayload.createManyAndReturn({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Create many HopePayloads and only return the `contentId`
+     * const hopePayloadWithContentIdOnly = await prisma.hopePayload.createManyAndReturn({
+     *   select: { contentId: true },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    createManyAndReturn<T extends HopePayloadCreateManyAndReturnArgs>(args?: SelectSubset<T, HopePayloadCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$HopePayloadPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Delete a HopePayload.
+     * @param {HopePayloadDeleteArgs} args - Arguments to delete one HopePayload.
+     * @example
+     * // Delete one HopePayload
+     * const HopePayload = await prisma.hopePayload.delete({
+     *   where: {
+     *     // ... filter to delete one HopePayload
+     *   }
+     * })
+     * 
+     */
+    delete<T extends HopePayloadDeleteArgs>(args: SelectSubset<T, HopePayloadDeleteArgs<ExtArgs>>): Prisma__HopePayloadClient<$Result.GetResult<Prisma.$HopePayloadPayload<ExtArgs>, T, "delete", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Update one HopePayload.
+     * @param {HopePayloadUpdateArgs} args - Arguments to update one HopePayload.
+     * @example
+     * // Update one HopePayload
+     * const hopePayload = await prisma.hopePayload.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    update<T extends HopePayloadUpdateArgs>(args: SelectSubset<T, HopePayloadUpdateArgs<ExtArgs>>): Prisma__HopePayloadClient<$Result.GetResult<Prisma.$HopePayloadPayload<ExtArgs>, T, "update", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Delete zero or more HopePayloads.
+     * @param {HopePayloadDeleteManyArgs} args - Arguments to filter HopePayloads to delete.
+     * @example
+     * // Delete a few HopePayloads
+     * const { count } = await prisma.hopePayload.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+     */
+    deleteMany<T extends HopePayloadDeleteManyArgs>(args?: SelectSubset<T, HopePayloadDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more HopePayloads.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {HopePayloadUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many HopePayloads
+     * const hopePayload = await prisma.hopePayload.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    updateMany<T extends HopePayloadUpdateManyArgs>(args: SelectSubset<T, HopePayloadUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more HopePayloads and returns the data updated in the database.
+     * @param {HopePayloadUpdateManyAndReturnArgs} args - Arguments to update many HopePayloads.
+     * @example
+     * // Update many HopePayloads
+     * const hopePayload = await prisma.hopePayload.updateManyAndReturn({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Update zero or more HopePayloads and only return the `contentId`
+     * const hopePayloadWithContentIdOnly = await prisma.hopePayload.updateManyAndReturn({
+     *   select: { contentId: true },
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    updateManyAndReturn<T extends HopePayloadUpdateManyAndReturnArgs>(args: SelectSubset<T, HopePayloadUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$HopePayloadPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Create or update one HopePayload.
+     * @param {HopePayloadUpsertArgs} args - Arguments to update or create a HopePayload.
+     * @example
+     * // Update or create a HopePayload
+     * const hopePayload = await prisma.hopePayload.upsert({
+     *   create: {
+     *     // ... data to create a HopePayload
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the HopePayload we want to update
+     *   }
+     * })
+     */
+    upsert<T extends HopePayloadUpsertArgs>(args: SelectSubset<T, HopePayloadUpsertArgs<ExtArgs>>): Prisma__HopePayloadClient<$Result.GetResult<Prisma.$HopePayloadPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+
+    /**
+     * Count the number of HopePayloads.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {HopePayloadCountArgs} args - Arguments to filter HopePayloads to count.
+     * @example
+     * // Count the number of HopePayloads
+     * const count = await prisma.hopePayload.count({
+     *   where: {
+     *     // ... the filter for the HopePayloads we want to count
+     *   }
+     * })
+    **/
+    count<T extends HopePayloadCountArgs>(
+      args?: Subset<T, HopePayloadCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], HopePayloadCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a HopePayload.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {HopePayloadAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends HopePayloadAggregateArgs>(args: Subset<T, HopePayloadAggregateArgs>): Prisma.PrismaPromise<GetHopePayloadAggregateType<T>>
+
+    /**
+     * Group by HopePayload.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {HopePayloadGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends HopePayloadGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: HopePayloadGroupByArgs['orderBy'] }
+        : { orderBy?: HopePayloadGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, HopePayloadGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetHopePayloadGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the HopePayload model
+   */
+  readonly fields: HopePayloadFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for HopePayload.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__HopePayloadClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    content<T extends ContentNodeDefaultArgs<ExtArgs> = {}>(args?: Subset<T, ContentNodeDefaultArgs<ExtArgs>>): Prisma__ContentNodeClient<$Result.GetResult<Prisma.$ContentNodePayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the HopePayload model
+   */
+  interface HopePayloadFieldRefs {
+    readonly contentId: FieldRef<"HopePayload", 'String'>
+    readonly kind: FieldRef<"HopePayload", 'String'>
+    readonly status: FieldRef<"HopePayload", 'String'>
+    readonly description: FieldRef<"HopePayload", 'String'>
+    readonly targetDate: FieldRef<"HopePayload", 'DateTime'>
+    readonly metadata: FieldRef<"HopePayload", 'Json'>
+    readonly createdAt: FieldRef<"HopePayload", 'DateTime'>
+    readonly updatedAt: FieldRef<"HopePayload", 'DateTime'>
+  }
+    
+
+  // Custom InputTypes
+  /**
+   * HopePayload findUnique
+   */
+  export type HopePayloadFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the HopePayload
+     */
+    select?: HopePayloadSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the HopePayload
+     */
+    omit?: HopePayloadOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: HopePayloadInclude<ExtArgs> | null
+    /**
+     * Filter, which HopePayload to fetch.
+     */
+    where: HopePayloadWhereUniqueInput
+  }
+
+  /**
+   * HopePayload findUniqueOrThrow
+   */
+  export type HopePayloadFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the HopePayload
+     */
+    select?: HopePayloadSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the HopePayload
+     */
+    omit?: HopePayloadOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: HopePayloadInclude<ExtArgs> | null
+    /**
+     * Filter, which HopePayload to fetch.
+     */
+    where: HopePayloadWhereUniqueInput
+  }
+
+  /**
+   * HopePayload findFirst
+   */
+  export type HopePayloadFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the HopePayload
+     */
+    select?: HopePayloadSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the HopePayload
+     */
+    omit?: HopePayloadOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: HopePayloadInclude<ExtArgs> | null
+    /**
+     * Filter, which HopePayload to fetch.
+     */
+    where?: HopePayloadWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of HopePayloads to fetch.
+     */
+    orderBy?: HopePayloadOrderByWithRelationInput | HopePayloadOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for HopePayloads.
+     */
+    cursor?: HopePayloadWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` HopePayloads from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` HopePayloads.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of HopePayloads.
+     */
+    distinct?: HopePayloadScalarFieldEnum | HopePayloadScalarFieldEnum[]
+  }
+
+  /**
+   * HopePayload findFirstOrThrow
+   */
+  export type HopePayloadFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the HopePayload
+     */
+    select?: HopePayloadSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the HopePayload
+     */
+    omit?: HopePayloadOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: HopePayloadInclude<ExtArgs> | null
+    /**
+     * Filter, which HopePayload to fetch.
+     */
+    where?: HopePayloadWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of HopePayloads to fetch.
+     */
+    orderBy?: HopePayloadOrderByWithRelationInput | HopePayloadOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for HopePayloads.
+     */
+    cursor?: HopePayloadWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` HopePayloads from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` HopePayloads.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of HopePayloads.
+     */
+    distinct?: HopePayloadScalarFieldEnum | HopePayloadScalarFieldEnum[]
+  }
+
+  /**
+   * HopePayload findMany
+   */
+  export type HopePayloadFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the HopePayload
+     */
+    select?: HopePayloadSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the HopePayload
+     */
+    omit?: HopePayloadOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: HopePayloadInclude<ExtArgs> | null
+    /**
+     * Filter, which HopePayloads to fetch.
+     */
+    where?: HopePayloadWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of HopePayloads to fetch.
+     */
+    orderBy?: HopePayloadOrderByWithRelationInput | HopePayloadOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing HopePayloads.
+     */
+    cursor?: HopePayloadWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` HopePayloads from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` HopePayloads.
+     */
+    skip?: number
+    distinct?: HopePayloadScalarFieldEnum | HopePayloadScalarFieldEnum[]
+  }
+
+  /**
+   * HopePayload create
+   */
+  export type HopePayloadCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the HopePayload
+     */
+    select?: HopePayloadSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the HopePayload
+     */
+    omit?: HopePayloadOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: HopePayloadInclude<ExtArgs> | null
+    /**
+     * The data needed to create a HopePayload.
+     */
+    data: XOR<HopePayloadCreateInput, HopePayloadUncheckedCreateInput>
+  }
+
+  /**
+   * HopePayload createMany
+   */
+  export type HopePayloadCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many HopePayloads.
+     */
+    data: HopePayloadCreateManyInput | HopePayloadCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * HopePayload createManyAndReturn
+   */
+  export type HopePayloadCreateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the HopePayload
+     */
+    select?: HopePayloadSelectCreateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the HopePayload
+     */
+    omit?: HopePayloadOmit<ExtArgs> | null
+    /**
+     * The data used to create many HopePayloads.
+     */
+    data: HopePayloadCreateManyInput | HopePayloadCreateManyInput[]
+    skipDuplicates?: boolean
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: HopePayloadIncludeCreateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * HopePayload update
+   */
+  export type HopePayloadUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the HopePayload
+     */
+    select?: HopePayloadSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the HopePayload
+     */
+    omit?: HopePayloadOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: HopePayloadInclude<ExtArgs> | null
+    /**
+     * The data needed to update a HopePayload.
+     */
+    data: XOR<HopePayloadUpdateInput, HopePayloadUncheckedUpdateInput>
+    /**
+     * Choose, which HopePayload to update.
+     */
+    where: HopePayloadWhereUniqueInput
+  }
+
+  /**
+   * HopePayload updateMany
+   */
+  export type HopePayloadUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update HopePayloads.
+     */
+    data: XOR<HopePayloadUpdateManyMutationInput, HopePayloadUncheckedUpdateManyInput>
+    /**
+     * Filter which HopePayloads to update
+     */
+    where?: HopePayloadWhereInput
+    /**
+     * Limit how many HopePayloads to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * HopePayload updateManyAndReturn
+   */
+  export type HopePayloadUpdateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the HopePayload
+     */
+    select?: HopePayloadSelectUpdateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the HopePayload
+     */
+    omit?: HopePayloadOmit<ExtArgs> | null
+    /**
+     * The data used to update HopePayloads.
+     */
+    data: XOR<HopePayloadUpdateManyMutationInput, HopePayloadUncheckedUpdateManyInput>
+    /**
+     * Filter which HopePayloads to update
+     */
+    where?: HopePayloadWhereInput
+    /**
+     * Limit how many HopePayloads to update.
+     */
+    limit?: number
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: HopePayloadIncludeUpdateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * HopePayload upsert
+   */
+  export type HopePayloadUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the HopePayload
+     */
+    select?: HopePayloadSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the HopePayload
+     */
+    omit?: HopePayloadOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: HopePayloadInclude<ExtArgs> | null
+    /**
+     * The filter to search for the HopePayload to update in case it exists.
+     */
+    where: HopePayloadWhereUniqueInput
+    /**
+     * In case the HopePayload found by the `where` argument doesn't exist, create a new HopePayload with this data.
+     */
+    create: XOR<HopePayloadCreateInput, HopePayloadUncheckedCreateInput>
+    /**
+     * In case the HopePayload was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<HopePayloadUpdateInput, HopePayloadUncheckedUpdateInput>
+  }
+
+  /**
+   * HopePayload delete
+   */
+  export type HopePayloadDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the HopePayload
+     */
+    select?: HopePayloadSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the HopePayload
+     */
+    omit?: HopePayloadOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: HopePayloadInclude<ExtArgs> | null
+    /**
+     * Filter which HopePayload to delete.
+     */
+    where: HopePayloadWhereUniqueInput
+  }
+
+  /**
+   * HopePayload deleteMany
+   */
+  export type HopePayloadDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which HopePayloads to delete
+     */
+    where?: HopePayloadWhereInput
+    /**
+     * Limit how many HopePayloads to delete.
+     */
+    limit?: number
+  }
+
+  /**
+   * HopePayload without action
+   */
+  export type HopePayloadDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the HopePayload
+     */
+    select?: HopePayloadSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the HopePayload
+     */
+    omit?: HopePayloadOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: HopePayloadInclude<ExtArgs> | null
+  }
+
+
+  /**
+   * Model WorkflowPayload
+   */
+
+  export type AggregateWorkflowPayload = {
+    _count: WorkflowPayloadCountAggregateOutputType | null
+    _min: WorkflowPayloadMinAggregateOutputType | null
+    _max: WorkflowPayloadMaxAggregateOutputType | null
+  }
+
+  export type WorkflowPayloadMinAggregateOutputType = {
+    contentId: string | null
+    engine: string | null
+    enabled: boolean | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type WorkflowPayloadMaxAggregateOutputType = {
+    contentId: string | null
+    engine: string | null
+    enabled: boolean | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type WorkflowPayloadCountAggregateOutputType = {
+    contentId: number
+    engine: number
+    definition: number
+    enabled: number
+    metadata: number
+    createdAt: number
+    updatedAt: number
+    _all: number
+  }
+
+
+  export type WorkflowPayloadMinAggregateInputType = {
+    contentId?: true
+    engine?: true
+    enabled?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type WorkflowPayloadMaxAggregateInputType = {
+    contentId?: true
+    engine?: true
+    enabled?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type WorkflowPayloadCountAggregateInputType = {
+    contentId?: true
+    engine?: true
+    definition?: true
+    enabled?: true
+    metadata?: true
+    createdAt?: true
+    updatedAt?: true
+    _all?: true
+  }
+
+  export type WorkflowPayloadAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which WorkflowPayload to aggregate.
+     */
+    where?: WorkflowPayloadWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of WorkflowPayloads to fetch.
+     */
+    orderBy?: WorkflowPayloadOrderByWithRelationInput | WorkflowPayloadOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: WorkflowPayloadWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` WorkflowPayloads from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` WorkflowPayloads.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned WorkflowPayloads
+    **/
+    _count?: true | WorkflowPayloadCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: WorkflowPayloadMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: WorkflowPayloadMaxAggregateInputType
+  }
+
+  export type GetWorkflowPayloadAggregateType<T extends WorkflowPayloadAggregateArgs> = {
+        [P in keyof T & keyof AggregateWorkflowPayload]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateWorkflowPayload[P]>
+      : GetScalarType<T[P], AggregateWorkflowPayload[P]>
+  }
+
+
+
+
+  export type WorkflowPayloadGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: WorkflowPayloadWhereInput
+    orderBy?: WorkflowPayloadOrderByWithAggregationInput | WorkflowPayloadOrderByWithAggregationInput[]
+    by: WorkflowPayloadScalarFieldEnum[] | WorkflowPayloadScalarFieldEnum
+    having?: WorkflowPayloadScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: WorkflowPayloadCountAggregateInputType | true
+    _min?: WorkflowPayloadMinAggregateInputType
+    _max?: WorkflowPayloadMaxAggregateInputType
+  }
+
+  export type WorkflowPayloadGroupByOutputType = {
+    contentId: string
+    engine: string
+    definition: JsonValue
+    enabled: boolean
+    metadata: JsonValue
+    createdAt: Date
+    updatedAt: Date
+    _count: WorkflowPayloadCountAggregateOutputType | null
+    _min: WorkflowPayloadMinAggregateOutputType | null
+    _max: WorkflowPayloadMaxAggregateOutputType | null
+  }
+
+  type GetWorkflowPayloadGroupByPayload<T extends WorkflowPayloadGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<WorkflowPayloadGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof WorkflowPayloadGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], WorkflowPayloadGroupByOutputType[P]>
+            : GetScalarType<T[P], WorkflowPayloadGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type WorkflowPayloadSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    contentId?: boolean
+    engine?: boolean
+    definition?: boolean
+    enabled?: boolean
+    metadata?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    content?: boolean | ContentNodeDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["workflowPayload"]>
+
+  export type WorkflowPayloadSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    contentId?: boolean
+    engine?: boolean
+    definition?: boolean
+    enabled?: boolean
+    metadata?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    content?: boolean | ContentNodeDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["workflowPayload"]>
+
+  export type WorkflowPayloadSelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    contentId?: boolean
+    engine?: boolean
+    definition?: boolean
+    enabled?: boolean
+    metadata?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    content?: boolean | ContentNodeDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["workflowPayload"]>
+
+  export type WorkflowPayloadSelectScalar = {
+    contentId?: boolean
+    engine?: boolean
+    definition?: boolean
+    enabled?: boolean
+    metadata?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+  }
+
+  export type WorkflowPayloadOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"contentId" | "engine" | "definition" | "enabled" | "metadata" | "createdAt" | "updatedAt", ExtArgs["result"]["workflowPayload"]>
+  export type WorkflowPayloadInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    content?: boolean | ContentNodeDefaultArgs<ExtArgs>
+  }
+  export type WorkflowPayloadIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    content?: boolean | ContentNodeDefaultArgs<ExtArgs>
+  }
+  export type WorkflowPayloadIncludeUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    content?: boolean | ContentNodeDefaultArgs<ExtArgs>
+  }
+
+  export type $WorkflowPayloadPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "WorkflowPayload"
+    objects: {
+      content: Prisma.$ContentNodePayload<ExtArgs>
+    }
+    scalars: $Extensions.GetPayloadResult<{
+      contentId: string
+      engine: string
+      definition: Prisma.JsonValue
+      enabled: boolean
+      metadata: Prisma.JsonValue
+      createdAt: Date
+      updatedAt: Date
+    }, ExtArgs["result"]["workflowPayload"]>
+    composites: {}
+  }
+
+  type WorkflowPayloadGetPayload<S extends boolean | null | undefined | WorkflowPayloadDefaultArgs> = $Result.GetResult<Prisma.$WorkflowPayloadPayload, S>
+
+  type WorkflowPayloadCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> =
+    Omit<WorkflowPayloadFindManyArgs, 'select' | 'include' | 'distinct' | 'omit'> & {
+      select?: WorkflowPayloadCountAggregateInputType | true
+    }
+
+  export interface WorkflowPayloadDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['WorkflowPayload'], meta: { name: 'WorkflowPayload' } }
+    /**
+     * Find zero or one WorkflowPayload that matches the filter.
+     * @param {WorkflowPayloadFindUniqueArgs} args - Arguments to find a WorkflowPayload
+     * @example
+     * // Get one WorkflowPayload
+     * const workflowPayload = await prisma.workflowPayload.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends WorkflowPayloadFindUniqueArgs>(args: SelectSubset<T, WorkflowPayloadFindUniqueArgs<ExtArgs>>): Prisma__WorkflowPayloadClient<$Result.GetResult<Prisma.$WorkflowPayloadPayload<ExtArgs>, T, "findUnique", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find one WorkflowPayload that matches the filter or throw an error with `error.code='P2025'`
+     * if no matches were found.
+     * @param {WorkflowPayloadFindUniqueOrThrowArgs} args - Arguments to find a WorkflowPayload
+     * @example
+     * // Get one WorkflowPayload
+     * const workflowPayload = await prisma.workflowPayload.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends WorkflowPayloadFindUniqueOrThrowArgs>(args: SelectSubset<T, WorkflowPayloadFindUniqueOrThrowArgs<ExtArgs>>): Prisma__WorkflowPayloadClient<$Result.GetResult<Prisma.$WorkflowPayloadPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first WorkflowPayload that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {WorkflowPayloadFindFirstArgs} args - Arguments to find a WorkflowPayload
+     * @example
+     * // Get one WorkflowPayload
+     * const workflowPayload = await prisma.workflowPayload.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends WorkflowPayloadFindFirstArgs>(args?: SelectSubset<T, WorkflowPayloadFindFirstArgs<ExtArgs>>): Prisma__WorkflowPayloadClient<$Result.GetResult<Prisma.$WorkflowPayloadPayload<ExtArgs>, T, "findFirst", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first WorkflowPayload that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {WorkflowPayloadFindFirstOrThrowArgs} args - Arguments to find a WorkflowPayload
+     * @example
+     * // Get one WorkflowPayload
+     * const workflowPayload = await prisma.workflowPayload.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends WorkflowPayloadFindFirstOrThrowArgs>(args?: SelectSubset<T, WorkflowPayloadFindFirstOrThrowArgs<ExtArgs>>): Prisma__WorkflowPayloadClient<$Result.GetResult<Prisma.$WorkflowPayloadPayload<ExtArgs>, T, "findFirstOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find zero or more WorkflowPayloads that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {WorkflowPayloadFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all WorkflowPayloads
+     * const workflowPayloads = await prisma.workflowPayload.findMany()
+     * 
+     * // Get first 10 WorkflowPayloads
+     * const workflowPayloads = await prisma.workflowPayload.findMany({ take: 10 })
+     * 
+     * // Only select the `contentId`
+     * const workflowPayloadWithContentIdOnly = await prisma.workflowPayload.findMany({ select: { contentId: true } })
+     * 
+     */
+    findMany<T extends WorkflowPayloadFindManyArgs>(args?: SelectSubset<T, WorkflowPayloadFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$WorkflowPayloadPayload<ExtArgs>, T, "findMany", GlobalOmitOptions>>
+
+    /**
+     * Create a WorkflowPayload.
+     * @param {WorkflowPayloadCreateArgs} args - Arguments to create a WorkflowPayload.
+     * @example
+     * // Create one WorkflowPayload
+     * const WorkflowPayload = await prisma.workflowPayload.create({
+     *   data: {
+     *     // ... data to create a WorkflowPayload
+     *   }
+     * })
+     * 
+     */
+    create<T extends WorkflowPayloadCreateArgs>(args: SelectSubset<T, WorkflowPayloadCreateArgs<ExtArgs>>): Prisma__WorkflowPayloadClient<$Result.GetResult<Prisma.$WorkflowPayloadPayload<ExtArgs>, T, "create", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Create many WorkflowPayloads.
+     * @param {WorkflowPayloadCreateManyArgs} args - Arguments to create many WorkflowPayloads.
+     * @example
+     * // Create many WorkflowPayloads
+     * const workflowPayload = await prisma.workflowPayload.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *     
+     */
+    createMany<T extends WorkflowPayloadCreateManyArgs>(args?: SelectSubset<T, WorkflowPayloadCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create many WorkflowPayloads and returns the data saved in the database.
+     * @param {WorkflowPayloadCreateManyAndReturnArgs} args - Arguments to create many WorkflowPayloads.
+     * @example
+     * // Create many WorkflowPayloads
+     * const workflowPayload = await prisma.workflowPayload.createManyAndReturn({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Create many WorkflowPayloads and only return the `contentId`
+     * const workflowPayloadWithContentIdOnly = await prisma.workflowPayload.createManyAndReturn({
+     *   select: { contentId: true },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    createManyAndReturn<T extends WorkflowPayloadCreateManyAndReturnArgs>(args?: SelectSubset<T, WorkflowPayloadCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$WorkflowPayloadPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Delete a WorkflowPayload.
+     * @param {WorkflowPayloadDeleteArgs} args - Arguments to delete one WorkflowPayload.
+     * @example
+     * // Delete one WorkflowPayload
+     * const WorkflowPayload = await prisma.workflowPayload.delete({
+     *   where: {
+     *     // ... filter to delete one WorkflowPayload
+     *   }
+     * })
+     * 
+     */
+    delete<T extends WorkflowPayloadDeleteArgs>(args: SelectSubset<T, WorkflowPayloadDeleteArgs<ExtArgs>>): Prisma__WorkflowPayloadClient<$Result.GetResult<Prisma.$WorkflowPayloadPayload<ExtArgs>, T, "delete", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Update one WorkflowPayload.
+     * @param {WorkflowPayloadUpdateArgs} args - Arguments to update one WorkflowPayload.
+     * @example
+     * // Update one WorkflowPayload
+     * const workflowPayload = await prisma.workflowPayload.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    update<T extends WorkflowPayloadUpdateArgs>(args: SelectSubset<T, WorkflowPayloadUpdateArgs<ExtArgs>>): Prisma__WorkflowPayloadClient<$Result.GetResult<Prisma.$WorkflowPayloadPayload<ExtArgs>, T, "update", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Delete zero or more WorkflowPayloads.
+     * @param {WorkflowPayloadDeleteManyArgs} args - Arguments to filter WorkflowPayloads to delete.
+     * @example
+     * // Delete a few WorkflowPayloads
+     * const { count } = await prisma.workflowPayload.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+     */
+    deleteMany<T extends WorkflowPayloadDeleteManyArgs>(args?: SelectSubset<T, WorkflowPayloadDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more WorkflowPayloads.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {WorkflowPayloadUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many WorkflowPayloads
+     * const workflowPayload = await prisma.workflowPayload.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    updateMany<T extends WorkflowPayloadUpdateManyArgs>(args: SelectSubset<T, WorkflowPayloadUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more WorkflowPayloads and returns the data updated in the database.
+     * @param {WorkflowPayloadUpdateManyAndReturnArgs} args - Arguments to update many WorkflowPayloads.
+     * @example
+     * // Update many WorkflowPayloads
+     * const workflowPayload = await prisma.workflowPayload.updateManyAndReturn({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Update zero or more WorkflowPayloads and only return the `contentId`
+     * const workflowPayloadWithContentIdOnly = await prisma.workflowPayload.updateManyAndReturn({
+     *   select: { contentId: true },
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    updateManyAndReturn<T extends WorkflowPayloadUpdateManyAndReturnArgs>(args: SelectSubset<T, WorkflowPayloadUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$WorkflowPayloadPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Create or update one WorkflowPayload.
+     * @param {WorkflowPayloadUpsertArgs} args - Arguments to update or create a WorkflowPayload.
+     * @example
+     * // Update or create a WorkflowPayload
+     * const workflowPayload = await prisma.workflowPayload.upsert({
+     *   create: {
+     *     // ... data to create a WorkflowPayload
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the WorkflowPayload we want to update
+     *   }
+     * })
+     */
+    upsert<T extends WorkflowPayloadUpsertArgs>(args: SelectSubset<T, WorkflowPayloadUpsertArgs<ExtArgs>>): Prisma__WorkflowPayloadClient<$Result.GetResult<Prisma.$WorkflowPayloadPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+
+    /**
+     * Count the number of WorkflowPayloads.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {WorkflowPayloadCountArgs} args - Arguments to filter WorkflowPayloads to count.
+     * @example
+     * // Count the number of WorkflowPayloads
+     * const count = await prisma.workflowPayload.count({
+     *   where: {
+     *     // ... the filter for the WorkflowPayloads we want to count
+     *   }
+     * })
+    **/
+    count<T extends WorkflowPayloadCountArgs>(
+      args?: Subset<T, WorkflowPayloadCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], WorkflowPayloadCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a WorkflowPayload.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {WorkflowPayloadAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends WorkflowPayloadAggregateArgs>(args: Subset<T, WorkflowPayloadAggregateArgs>): Prisma.PrismaPromise<GetWorkflowPayloadAggregateType<T>>
+
+    /**
+     * Group by WorkflowPayload.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {WorkflowPayloadGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends WorkflowPayloadGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: WorkflowPayloadGroupByArgs['orderBy'] }
+        : { orderBy?: WorkflowPayloadGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, WorkflowPayloadGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetWorkflowPayloadGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the WorkflowPayload model
+   */
+  readonly fields: WorkflowPayloadFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for WorkflowPayload.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__WorkflowPayloadClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    content<T extends ContentNodeDefaultArgs<ExtArgs> = {}>(args?: Subset<T, ContentNodeDefaultArgs<ExtArgs>>): Prisma__ContentNodeClient<$Result.GetResult<Prisma.$ContentNodePayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the WorkflowPayload model
+   */
+  interface WorkflowPayloadFieldRefs {
+    readonly contentId: FieldRef<"WorkflowPayload", 'String'>
+    readonly engine: FieldRef<"WorkflowPayload", 'String'>
+    readonly definition: FieldRef<"WorkflowPayload", 'Json'>
+    readonly enabled: FieldRef<"WorkflowPayload", 'Boolean'>
+    readonly metadata: FieldRef<"WorkflowPayload", 'Json'>
+    readonly createdAt: FieldRef<"WorkflowPayload", 'DateTime'>
+    readonly updatedAt: FieldRef<"WorkflowPayload", 'DateTime'>
+  }
+    
+
+  // Custom InputTypes
+  /**
+   * WorkflowPayload findUnique
+   */
+  export type WorkflowPayloadFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the WorkflowPayload
+     */
+    select?: WorkflowPayloadSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the WorkflowPayload
+     */
+    omit?: WorkflowPayloadOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: WorkflowPayloadInclude<ExtArgs> | null
+    /**
+     * Filter, which WorkflowPayload to fetch.
+     */
+    where: WorkflowPayloadWhereUniqueInput
+  }
+
+  /**
+   * WorkflowPayload findUniqueOrThrow
+   */
+  export type WorkflowPayloadFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the WorkflowPayload
+     */
+    select?: WorkflowPayloadSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the WorkflowPayload
+     */
+    omit?: WorkflowPayloadOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: WorkflowPayloadInclude<ExtArgs> | null
+    /**
+     * Filter, which WorkflowPayload to fetch.
+     */
+    where: WorkflowPayloadWhereUniqueInput
+  }
+
+  /**
+   * WorkflowPayload findFirst
+   */
+  export type WorkflowPayloadFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the WorkflowPayload
+     */
+    select?: WorkflowPayloadSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the WorkflowPayload
+     */
+    omit?: WorkflowPayloadOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: WorkflowPayloadInclude<ExtArgs> | null
+    /**
+     * Filter, which WorkflowPayload to fetch.
+     */
+    where?: WorkflowPayloadWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of WorkflowPayloads to fetch.
+     */
+    orderBy?: WorkflowPayloadOrderByWithRelationInput | WorkflowPayloadOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for WorkflowPayloads.
+     */
+    cursor?: WorkflowPayloadWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` WorkflowPayloads from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` WorkflowPayloads.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of WorkflowPayloads.
+     */
+    distinct?: WorkflowPayloadScalarFieldEnum | WorkflowPayloadScalarFieldEnum[]
+  }
+
+  /**
+   * WorkflowPayload findFirstOrThrow
+   */
+  export type WorkflowPayloadFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the WorkflowPayload
+     */
+    select?: WorkflowPayloadSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the WorkflowPayload
+     */
+    omit?: WorkflowPayloadOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: WorkflowPayloadInclude<ExtArgs> | null
+    /**
+     * Filter, which WorkflowPayload to fetch.
+     */
+    where?: WorkflowPayloadWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of WorkflowPayloads to fetch.
+     */
+    orderBy?: WorkflowPayloadOrderByWithRelationInput | WorkflowPayloadOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for WorkflowPayloads.
+     */
+    cursor?: WorkflowPayloadWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` WorkflowPayloads from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` WorkflowPayloads.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of WorkflowPayloads.
+     */
+    distinct?: WorkflowPayloadScalarFieldEnum | WorkflowPayloadScalarFieldEnum[]
+  }
+
+  /**
+   * WorkflowPayload findMany
+   */
+  export type WorkflowPayloadFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the WorkflowPayload
+     */
+    select?: WorkflowPayloadSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the WorkflowPayload
+     */
+    omit?: WorkflowPayloadOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: WorkflowPayloadInclude<ExtArgs> | null
+    /**
+     * Filter, which WorkflowPayloads to fetch.
+     */
+    where?: WorkflowPayloadWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of WorkflowPayloads to fetch.
+     */
+    orderBy?: WorkflowPayloadOrderByWithRelationInput | WorkflowPayloadOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing WorkflowPayloads.
+     */
+    cursor?: WorkflowPayloadWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` WorkflowPayloads from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` WorkflowPayloads.
+     */
+    skip?: number
+    distinct?: WorkflowPayloadScalarFieldEnum | WorkflowPayloadScalarFieldEnum[]
+  }
+
+  /**
+   * WorkflowPayload create
+   */
+  export type WorkflowPayloadCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the WorkflowPayload
+     */
+    select?: WorkflowPayloadSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the WorkflowPayload
+     */
+    omit?: WorkflowPayloadOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: WorkflowPayloadInclude<ExtArgs> | null
+    /**
+     * The data needed to create a WorkflowPayload.
+     */
+    data: XOR<WorkflowPayloadCreateInput, WorkflowPayloadUncheckedCreateInput>
+  }
+
+  /**
+   * WorkflowPayload createMany
+   */
+  export type WorkflowPayloadCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many WorkflowPayloads.
+     */
+    data: WorkflowPayloadCreateManyInput | WorkflowPayloadCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * WorkflowPayload createManyAndReturn
+   */
+  export type WorkflowPayloadCreateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the WorkflowPayload
+     */
+    select?: WorkflowPayloadSelectCreateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the WorkflowPayload
+     */
+    omit?: WorkflowPayloadOmit<ExtArgs> | null
+    /**
+     * The data used to create many WorkflowPayloads.
+     */
+    data: WorkflowPayloadCreateManyInput | WorkflowPayloadCreateManyInput[]
+    skipDuplicates?: boolean
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: WorkflowPayloadIncludeCreateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * WorkflowPayload update
+   */
+  export type WorkflowPayloadUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the WorkflowPayload
+     */
+    select?: WorkflowPayloadSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the WorkflowPayload
+     */
+    omit?: WorkflowPayloadOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: WorkflowPayloadInclude<ExtArgs> | null
+    /**
+     * The data needed to update a WorkflowPayload.
+     */
+    data: XOR<WorkflowPayloadUpdateInput, WorkflowPayloadUncheckedUpdateInput>
+    /**
+     * Choose, which WorkflowPayload to update.
+     */
+    where: WorkflowPayloadWhereUniqueInput
+  }
+
+  /**
+   * WorkflowPayload updateMany
+   */
+  export type WorkflowPayloadUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update WorkflowPayloads.
+     */
+    data: XOR<WorkflowPayloadUpdateManyMutationInput, WorkflowPayloadUncheckedUpdateManyInput>
+    /**
+     * Filter which WorkflowPayloads to update
+     */
+    where?: WorkflowPayloadWhereInput
+    /**
+     * Limit how many WorkflowPayloads to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * WorkflowPayload updateManyAndReturn
+   */
+  export type WorkflowPayloadUpdateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the WorkflowPayload
+     */
+    select?: WorkflowPayloadSelectUpdateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the WorkflowPayload
+     */
+    omit?: WorkflowPayloadOmit<ExtArgs> | null
+    /**
+     * The data used to update WorkflowPayloads.
+     */
+    data: XOR<WorkflowPayloadUpdateManyMutationInput, WorkflowPayloadUncheckedUpdateManyInput>
+    /**
+     * Filter which WorkflowPayloads to update
+     */
+    where?: WorkflowPayloadWhereInput
+    /**
+     * Limit how many WorkflowPayloads to update.
+     */
+    limit?: number
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: WorkflowPayloadIncludeUpdateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * WorkflowPayload upsert
+   */
+  export type WorkflowPayloadUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the WorkflowPayload
+     */
+    select?: WorkflowPayloadSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the WorkflowPayload
+     */
+    omit?: WorkflowPayloadOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: WorkflowPayloadInclude<ExtArgs> | null
+    /**
+     * The filter to search for the WorkflowPayload to update in case it exists.
+     */
+    where: WorkflowPayloadWhereUniqueInput
+    /**
+     * In case the WorkflowPayload found by the `where` argument doesn't exist, create a new WorkflowPayload with this data.
+     */
+    create: XOR<WorkflowPayloadCreateInput, WorkflowPayloadUncheckedCreateInput>
+    /**
+     * In case the WorkflowPayload was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<WorkflowPayloadUpdateInput, WorkflowPayloadUncheckedUpdateInput>
+  }
+
+  /**
+   * WorkflowPayload delete
+   */
+  export type WorkflowPayloadDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the WorkflowPayload
+     */
+    select?: WorkflowPayloadSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the WorkflowPayload
+     */
+    omit?: WorkflowPayloadOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: WorkflowPayloadInclude<ExtArgs> | null
+    /**
+     * Filter which WorkflowPayload to delete.
+     */
+    where: WorkflowPayloadWhereUniqueInput
+  }
+
+  /**
+   * WorkflowPayload deleteMany
+   */
+  export type WorkflowPayloadDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which WorkflowPayloads to delete
+     */
+    where?: WorkflowPayloadWhereInput
+    /**
+     * Limit how many WorkflowPayloads to delete.
+     */
+    limit?: number
+  }
+
+  /**
+   * WorkflowPayload without action
+   */
+  export type WorkflowPayloadDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the WorkflowPayload
+     */
+    select?: WorkflowPayloadSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the WorkflowPayload
+     */
+    omit?: WorkflowPayloadOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: WorkflowPayloadInclude<ExtArgs> | null
+  }
+
+
+  /**
    * Enums
    */
 
@@ -23590,6 +31956,8 @@ export namespace Prisma {
     ownerId: 'ownerId',
     title: 'title',
     slug: 'slug',
+    contentType: 'contentType',
+    role: 'role',
     parentId: 'parentId',
     displayOrder: 'displayOrder',
     categoryId: 'categoryId',
@@ -23757,10 +32125,10 @@ export namespace Prisma {
     passwordHash: 'passwordHash',
     email: 'email',
     role: 'role',
-    settings: 'settings',
-    settingsVersion: 'settingsVersion',
     createdAt: 'createdAt',
-    updatedAt: 'updatedAt'
+    updatedAt: 'updatedAt',
+    settings: 'settings',
+    settingsVersion: 'settingsVersion'
   };
 
   export type UserScalarFieldEnum = (typeof UserScalarFieldEnum)[keyof typeof UserScalarFieldEnum]
@@ -23786,8 +32154,8 @@ export namespace Prisma {
     name: 'name',
     slug: 'slug',
     createdAt: 'createdAt',
-    color: 'color',
-    userId: 'userId'
+    userId: 'userId',
+    color: 'color'
   };
 
   export type TagScalarFieldEnum = (typeof TagScalarFieldEnum)[keyof typeof TagScalarFieldEnum]
@@ -23843,6 +32211,93 @@ export namespace Prisma {
   };
 
   export type AuditLogScalarFieldEnum = (typeof AuditLogScalarFieldEnum)[keyof typeof AuditLogScalarFieldEnum]
+
+
+  export const FolderPayloadScalarFieldEnum: {
+    contentId: 'contentId',
+    viewMode: 'viewMode',
+    sortMode: 'sortMode',
+    viewPrefs: 'viewPrefs',
+    includeReferencedContent: 'includeReferencedContent',
+    createdAt: 'createdAt',
+    updatedAt: 'updatedAt'
+  };
+
+  export type FolderPayloadScalarFieldEnum = (typeof FolderPayloadScalarFieldEnum)[keyof typeof FolderPayloadScalarFieldEnum]
+
+
+  export const ExternalPayloadScalarFieldEnum: {
+    contentId: 'contentId',
+    url: 'url',
+    subtype: 'subtype',
+    preview: 'preview',
+    createdAt: 'createdAt',
+    updatedAt: 'updatedAt'
+  };
+
+  export type ExternalPayloadScalarFieldEnum = (typeof ExternalPayloadScalarFieldEnum)[keyof typeof ExternalPayloadScalarFieldEnum]
+
+
+  export const ChatPayloadScalarFieldEnum: {
+    contentId: 'contentId',
+    messages: 'messages',
+    metadata: 'metadata',
+    createdAt: 'createdAt',
+    updatedAt: 'updatedAt'
+  };
+
+  export type ChatPayloadScalarFieldEnum = (typeof ChatPayloadScalarFieldEnum)[keyof typeof ChatPayloadScalarFieldEnum]
+
+
+  export const VisualizationPayloadScalarFieldEnum: {
+    contentId: 'contentId',
+    engine: 'engine',
+    config: 'config',
+    data: 'data',
+    createdAt: 'createdAt',
+    updatedAt: 'updatedAt'
+  };
+
+  export type VisualizationPayloadScalarFieldEnum = (typeof VisualizationPayloadScalarFieldEnum)[keyof typeof VisualizationPayloadScalarFieldEnum]
+
+
+  export const DataPayloadScalarFieldEnum: {
+    contentId: 'contentId',
+    mode: 'mode',
+    source: 'source',
+    schema: 'schema',
+    createdAt: 'createdAt',
+    updatedAt: 'updatedAt'
+  };
+
+  export type DataPayloadScalarFieldEnum = (typeof DataPayloadScalarFieldEnum)[keyof typeof DataPayloadScalarFieldEnum]
+
+
+  export const HopePayloadScalarFieldEnum: {
+    contentId: 'contentId',
+    kind: 'kind',
+    status: 'status',
+    description: 'description',
+    targetDate: 'targetDate',
+    metadata: 'metadata',
+    createdAt: 'createdAt',
+    updatedAt: 'updatedAt'
+  };
+
+  export type HopePayloadScalarFieldEnum = (typeof HopePayloadScalarFieldEnum)[keyof typeof HopePayloadScalarFieldEnum]
+
+
+  export const WorkflowPayloadScalarFieldEnum: {
+    contentId: 'contentId',
+    engine: 'engine',
+    definition: 'definition',
+    enabled: 'enabled',
+    metadata: 'metadata',
+    createdAt: 'createdAt',
+    updatedAt: 'updatedAt'
+  };
+
+  export type WorkflowPayloadScalarFieldEnum = (typeof WorkflowPayloadScalarFieldEnum)[keyof typeof WorkflowPayloadScalarFieldEnum]
 
 
   export const SortOrder: {
@@ -23909,6 +32364,34 @@ export namespace Prisma {
    * Reference to a field of type 'String[]'
    */
   export type ListStringFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'String[]'>
+    
+
+
+  /**
+   * Reference to a field of type 'ContentType'
+   */
+  export type EnumContentTypeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'ContentType'>
+    
+
+
+  /**
+   * Reference to a field of type 'ContentType[]'
+   */
+  export type ListEnumContentTypeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'ContentType[]'>
+    
+
+
+  /**
+   * Reference to a field of type 'ContentRole'
+   */
+  export type EnumContentRoleFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'ContentRole'>
+    
+
+
+  /**
+   * Reference to a field of type 'ContentRole[]'
+   */
+  export type ListEnumContentRoleFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'ContentRole[]'>
     
 
 
@@ -24018,6 +32501,20 @@ export namespace Prisma {
 
 
   /**
+   * Reference to a field of type 'FolderViewMode'
+   */
+  export type EnumFolderViewModeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'FolderViewMode'>
+    
+
+
+  /**
+   * Reference to a field of type 'FolderViewMode[]'
+   */
+  export type ListEnumFolderViewModeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'FolderViewMode[]'>
+    
+
+
+  /**
    * Reference to a field of type 'Float'
    */
   export type FloatFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Float'>
@@ -24042,6 +32539,8 @@ export namespace Prisma {
     ownerId?: UuidFilter<"ContentNode"> | string
     title?: StringFilter<"ContentNode"> | string
     slug?: StringFilter<"ContentNode"> | string
+    contentType?: EnumContentTypeFilter<"ContentNode"> | $Enums.ContentType
+    role?: EnumContentRoleFilter<"ContentNode"> | $Enums.ContentRole
     parentId?: UuidNullableFilter<"ContentNode"> | string | null
     displayOrder?: IntFilter<"ContentNode"> | number
     categoryId?: UuidNullableFilter<"ContentNode"> | string | null
@@ -24054,6 +32553,16 @@ export namespace Prisma {
     iconColor?: StringNullableFilter<"ContentNode"> | string | null
     auditLogs?: AuditLogListRelationFilter
     codePayload?: XOR<CodePayloadNullableScalarRelationFilter, CodePayloadWhereInput> | null
+    filePayload?: XOR<FilePayloadNullableScalarRelationFilter, FilePayloadWhereInput> | null
+    htmlPayload?: XOR<HtmlPayloadNullableScalarRelationFilter, HtmlPayloadWhereInput> | null
+    notePayload?: XOR<NotePayloadNullableScalarRelationFilter, NotePayloadWhereInput> | null
+    folderPayload?: XOR<FolderPayloadNullableScalarRelationFilter, FolderPayloadWhereInput> | null
+    externalPayload?: XOR<ExternalPayloadNullableScalarRelationFilter, ExternalPayloadWhereInput> | null
+    chatPayload?: XOR<ChatPayloadNullableScalarRelationFilter, ChatPayloadWhereInput> | null
+    visualizationPayload?: XOR<VisualizationPayloadNullableScalarRelationFilter, VisualizationPayloadWhereInput> | null
+    dataPayload?: XOR<DataPayloadNullableScalarRelationFilter, DataPayloadWhereInput> | null
+    hopePayload?: XOR<HopePayloadNullableScalarRelationFilter, HopePayloadWhereInput> | null
+    workflowPayload?: XOR<WorkflowPayloadNullableScalarRelationFilter, WorkflowPayloadWhereInput> | null
     history?: ContentHistoryListRelationFilter
     sourceLinks?: ContentLinkListRelationFilter
     targetLinks?: ContentLinkListRelationFilter
@@ -24063,9 +32572,6 @@ export namespace Prisma {
     children?: ContentNodeListRelationFilter
     contentPath?: XOR<ContentPathNullableScalarRelationFilter, ContentPathWhereInput> | null
     contentTags?: ContentTagListRelationFilter
-    filePayload?: XOR<FilePayloadNullableScalarRelationFilter, FilePayloadWhereInput> | null
-    htmlPayload?: XOR<HtmlPayloadNullableScalarRelationFilter, HtmlPayloadWhereInput> | null
-    notePayload?: XOR<NotePayloadNullableScalarRelationFilter, NotePayloadWhereInput> | null
     trashBinEntry?: XOR<TrashBinNullableScalarRelationFilter, TrashBinWhereInput> | null
     viewGrants?: ViewGrantListRelationFilter
   }
@@ -24075,6 +32581,8 @@ export namespace Prisma {
     ownerId?: SortOrder
     title?: SortOrder
     slug?: SortOrder
+    contentType?: SortOrder
+    role?: SortOrder
     parentId?: SortOrderInput | SortOrder
     displayOrder?: SortOrder
     categoryId?: SortOrderInput | SortOrder
@@ -24087,6 +32595,16 @@ export namespace Prisma {
     iconColor?: SortOrderInput | SortOrder
     auditLogs?: AuditLogOrderByRelationAggregateInput
     codePayload?: CodePayloadOrderByWithRelationInput
+    filePayload?: FilePayloadOrderByWithRelationInput
+    htmlPayload?: HtmlPayloadOrderByWithRelationInput
+    notePayload?: NotePayloadOrderByWithRelationInput
+    folderPayload?: FolderPayloadOrderByWithRelationInput
+    externalPayload?: ExternalPayloadOrderByWithRelationInput
+    chatPayload?: ChatPayloadOrderByWithRelationInput
+    visualizationPayload?: VisualizationPayloadOrderByWithRelationInput
+    dataPayload?: DataPayloadOrderByWithRelationInput
+    hopePayload?: HopePayloadOrderByWithRelationInput
+    workflowPayload?: WorkflowPayloadOrderByWithRelationInput
     history?: ContentHistoryOrderByRelationAggregateInput
     sourceLinks?: ContentLinkOrderByRelationAggregateInput
     targetLinks?: ContentLinkOrderByRelationAggregateInput
@@ -24096,9 +32614,6 @@ export namespace Prisma {
     children?: ContentNodeOrderByRelationAggregateInput
     contentPath?: ContentPathOrderByWithRelationInput
     contentTags?: ContentTagOrderByRelationAggregateInput
-    filePayload?: FilePayloadOrderByWithRelationInput
-    htmlPayload?: HtmlPayloadOrderByWithRelationInput
-    notePayload?: NotePayloadOrderByWithRelationInput
     trashBinEntry?: TrashBinOrderByWithRelationInput
     viewGrants?: ViewGrantOrderByRelationAggregateInput
   }
@@ -24112,6 +32627,8 @@ export namespace Prisma {
     ownerId?: UuidFilter<"ContentNode"> | string
     title?: StringFilter<"ContentNode"> | string
     slug?: StringFilter<"ContentNode"> | string
+    contentType?: EnumContentTypeFilter<"ContentNode"> | $Enums.ContentType
+    role?: EnumContentRoleFilter<"ContentNode"> | $Enums.ContentRole
     parentId?: UuidNullableFilter<"ContentNode"> | string | null
     displayOrder?: IntFilter<"ContentNode"> | number
     categoryId?: UuidNullableFilter<"ContentNode"> | string | null
@@ -24124,6 +32641,16 @@ export namespace Prisma {
     iconColor?: StringNullableFilter<"ContentNode"> | string | null
     auditLogs?: AuditLogListRelationFilter
     codePayload?: XOR<CodePayloadNullableScalarRelationFilter, CodePayloadWhereInput> | null
+    filePayload?: XOR<FilePayloadNullableScalarRelationFilter, FilePayloadWhereInput> | null
+    htmlPayload?: XOR<HtmlPayloadNullableScalarRelationFilter, HtmlPayloadWhereInput> | null
+    notePayload?: XOR<NotePayloadNullableScalarRelationFilter, NotePayloadWhereInput> | null
+    folderPayload?: XOR<FolderPayloadNullableScalarRelationFilter, FolderPayloadWhereInput> | null
+    externalPayload?: XOR<ExternalPayloadNullableScalarRelationFilter, ExternalPayloadWhereInput> | null
+    chatPayload?: XOR<ChatPayloadNullableScalarRelationFilter, ChatPayloadWhereInput> | null
+    visualizationPayload?: XOR<VisualizationPayloadNullableScalarRelationFilter, VisualizationPayloadWhereInput> | null
+    dataPayload?: XOR<DataPayloadNullableScalarRelationFilter, DataPayloadWhereInput> | null
+    hopePayload?: XOR<HopePayloadNullableScalarRelationFilter, HopePayloadWhereInput> | null
+    workflowPayload?: XOR<WorkflowPayloadNullableScalarRelationFilter, WorkflowPayloadWhereInput> | null
     history?: ContentHistoryListRelationFilter
     sourceLinks?: ContentLinkListRelationFilter
     targetLinks?: ContentLinkListRelationFilter
@@ -24133,9 +32660,6 @@ export namespace Prisma {
     children?: ContentNodeListRelationFilter
     contentPath?: XOR<ContentPathNullableScalarRelationFilter, ContentPathWhereInput> | null
     contentTags?: ContentTagListRelationFilter
-    filePayload?: XOR<FilePayloadNullableScalarRelationFilter, FilePayloadWhereInput> | null
-    htmlPayload?: XOR<HtmlPayloadNullableScalarRelationFilter, HtmlPayloadWhereInput> | null
-    notePayload?: XOR<NotePayloadNullableScalarRelationFilter, NotePayloadWhereInput> | null
     trashBinEntry?: XOR<TrashBinNullableScalarRelationFilter, TrashBinWhereInput> | null
     viewGrants?: ViewGrantListRelationFilter
   }, "id" | "ownerId_slug">
@@ -24145,6 +32669,8 @@ export namespace Prisma {
     ownerId?: SortOrder
     title?: SortOrder
     slug?: SortOrder
+    contentType?: SortOrder
+    role?: SortOrder
     parentId?: SortOrderInput | SortOrder
     displayOrder?: SortOrder
     categoryId?: SortOrderInput | SortOrder
@@ -24170,6 +32696,8 @@ export namespace Prisma {
     ownerId?: UuidWithAggregatesFilter<"ContentNode"> | string
     title?: StringWithAggregatesFilter<"ContentNode"> | string
     slug?: StringWithAggregatesFilter<"ContentNode"> | string
+    contentType?: EnumContentTypeWithAggregatesFilter<"ContentNode"> | $Enums.ContentType
+    role?: EnumContentRoleWithAggregatesFilter<"ContentNode"> | $Enums.ContentRole
     parentId?: UuidNullableWithAggregatesFilter<"ContentNode"> | string | null
     displayOrder?: IntWithAggregatesFilter<"ContentNode"> | number
     categoryId?: UuidNullableWithAggregatesFilter<"ContentNode"> | string | null
@@ -24943,13 +33471,13 @@ export namespace Prisma {
     passwordHash?: StringNullableFilter<"User"> | string | null
     email?: StringFilter<"User"> | string
     role?: EnumUserRoleFilter<"User"> | $Enums.UserRole
-    settings?: JsonNullableFilter<"User">
-    settingsVersion?: IntFilter<"User"> | number
     createdAt?: DateTimeFilter<"User"> | Date | string
     updatedAt?: DateTimeFilter<"User"> | Date | string
+    settings?: JsonNullableFilter<"User">
+    settingsVersion?: IntFilter<"User"> | number
     accounts?: AccountListRelationFilter
-    adminActions?: AuditLogListRelationFilter
     auditTargets?: AuditLogListRelationFilter
+    adminActions?: AuditLogListRelationFilter
     categories?: CategoryListRelationFilter
     contentHistory?: ContentHistoryListRelationFilter
     contentNodes?: ContentNodeListRelationFilter
@@ -24966,13 +33494,13 @@ export namespace Prisma {
     passwordHash?: SortOrderInput | SortOrder
     email?: SortOrder
     role?: SortOrder
-    settings?: SortOrderInput | SortOrder
-    settingsVersion?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
+    settings?: SortOrderInput | SortOrder
+    settingsVersion?: SortOrder
     accounts?: AccountOrderByRelationAggregateInput
-    adminActions?: AuditLogOrderByRelationAggregateInput
     auditTargets?: AuditLogOrderByRelationAggregateInput
+    adminActions?: AuditLogOrderByRelationAggregateInput
     categories?: CategoryOrderByRelationAggregateInput
     contentHistory?: ContentHistoryOrderByRelationAggregateInput
     contentNodes?: ContentNodeOrderByRelationAggregateInput
@@ -24992,13 +33520,13 @@ export namespace Prisma {
     NOT?: UserWhereInput | UserWhereInput[]
     passwordHash?: StringNullableFilter<"User"> | string | null
     role?: EnumUserRoleFilter<"User"> | $Enums.UserRole
-    settings?: JsonNullableFilter<"User">
-    settingsVersion?: IntFilter<"User"> | number
     createdAt?: DateTimeFilter<"User"> | Date | string
     updatedAt?: DateTimeFilter<"User"> | Date | string
+    settings?: JsonNullableFilter<"User">
+    settingsVersion?: IntFilter<"User"> | number
     accounts?: AccountListRelationFilter
-    adminActions?: AuditLogListRelationFilter
     auditTargets?: AuditLogListRelationFilter
+    adminActions?: AuditLogListRelationFilter
     categories?: CategoryListRelationFilter
     contentHistory?: ContentHistoryListRelationFilter
     contentNodes?: ContentNodeListRelationFilter
@@ -25015,10 +33543,10 @@ export namespace Prisma {
     passwordHash?: SortOrderInput | SortOrder
     email?: SortOrder
     role?: SortOrder
-    settings?: SortOrderInput | SortOrder
-    settingsVersion?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
+    settings?: SortOrderInput | SortOrder
+    settingsVersion?: SortOrder
     _count?: UserCountOrderByAggregateInput
     _avg?: UserAvgOrderByAggregateInput
     _max?: UserMaxOrderByAggregateInput
@@ -25035,10 +33563,10 @@ export namespace Prisma {
     passwordHash?: StringNullableWithAggregatesFilter<"User"> | string | null
     email?: StringWithAggregatesFilter<"User"> | string
     role?: EnumUserRoleWithAggregatesFilter<"User"> | $Enums.UserRole
-    settings?: JsonNullableWithAggregatesFilter<"User">
-    settingsVersion?: IntWithAggregatesFilter<"User"> | number
     createdAt?: DateTimeWithAggregatesFilter<"User"> | Date | string
     updatedAt?: DateTimeWithAggregatesFilter<"User"> | Date | string
+    settings?: JsonNullableWithAggregatesFilter<"User">
+    settingsVersion?: IntWithAggregatesFilter<"User"> | number
   }
 
   export type CategoryWhereInput = {
@@ -25129,8 +33657,8 @@ export namespace Prisma {
     name?: StringFilter<"Tag"> | string
     slug?: StringFilter<"Tag"> | string
     createdAt?: DateTimeFilter<"Tag"> | Date | string
-    color?: StringNullableFilter<"Tag"> | string | null
     userId?: UuidFilter<"Tag"> | string
+    color?: StringNullableFilter<"Tag"> | string | null
     contentTags?: ContentTagListRelationFilter
     user?: XOR<UserScalarRelationFilter, UserWhereInput>
   }
@@ -25140,8 +33668,8 @@ export namespace Prisma {
     name?: SortOrder
     slug?: SortOrder
     createdAt?: SortOrder
-    color?: SortOrderInput | SortOrder
     userId?: SortOrder
+    color?: SortOrderInput | SortOrder
     contentTags?: ContentTagOrderByRelationAggregateInput
     user?: UserOrderByWithRelationInput
   }
@@ -25155,8 +33683,8 @@ export namespace Prisma {
     name?: StringFilter<"Tag"> | string
     slug?: StringFilter<"Tag"> | string
     createdAt?: DateTimeFilter<"Tag"> | Date | string
-    color?: StringNullableFilter<"Tag"> | string | null
     userId?: UuidFilter<"Tag"> | string
+    color?: StringNullableFilter<"Tag"> | string | null
     contentTags?: ContentTagListRelationFilter
     user?: XOR<UserScalarRelationFilter, UserWhereInput>
   }, "id" | "userId_slug">
@@ -25166,8 +33694,8 @@ export namespace Prisma {
     name?: SortOrder
     slug?: SortOrder
     createdAt?: SortOrder
-    color?: SortOrderInput | SortOrder
     userId?: SortOrder
+    color?: SortOrderInput | SortOrder
     _count?: TagCountOrderByAggregateInput
     _max?: TagMaxOrderByAggregateInput
     _min?: TagMinOrderByAggregateInput
@@ -25181,8 +33709,8 @@ export namespace Prisma {
     name?: StringWithAggregatesFilter<"Tag"> | string
     slug?: StringWithAggregatesFilter<"Tag"> | string
     createdAt?: DateTimeWithAggregatesFilter<"Tag"> | Date | string
-    color?: StringNullableWithAggregatesFilter<"Tag"> | string | null
     userId?: UuidWithAggregatesFilter<"Tag"> | string
+    color?: StringNullableWithAggregatesFilter<"Tag"> | string | null
   }
 
   export type ViewGrantWhereInput = {
@@ -25388,9 +33916,9 @@ export namespace Prisma {
     ipAddress?: StringNullableFilter<"AuditLog"> | string | null
     userAgent?: StringNullableFilter<"AuditLog"> | string | null
     createdAt?: DateTimeFilter<"AuditLog"> | Date | string
-    user?: XOR<UserScalarRelationFilter, UserWhereInput>
-    targetUser?: XOR<UserNullableScalarRelationFilter, UserWhereInput> | null
     targetContent?: XOR<ContentNodeNullableScalarRelationFilter, ContentNodeWhereInput> | null
+    targetUser?: XOR<UserNullableScalarRelationFilter, UserWhereInput> | null
+    user?: XOR<UserScalarRelationFilter, UserWhereInput>
   }
 
   export type AuditLogOrderByWithRelationInput = {
@@ -25403,9 +33931,9 @@ export namespace Prisma {
     ipAddress?: SortOrderInput | SortOrder
     userAgent?: SortOrderInput | SortOrder
     createdAt?: SortOrder
-    user?: UserOrderByWithRelationInput
-    targetUser?: UserOrderByWithRelationInput
     targetContent?: ContentNodeOrderByWithRelationInput
+    targetUser?: UserOrderByWithRelationInput
+    user?: UserOrderByWithRelationInput
   }
 
   export type AuditLogWhereUniqueInput = Prisma.AtLeast<{
@@ -25421,9 +33949,9 @@ export namespace Prisma {
     ipAddress?: StringNullableFilter<"AuditLog"> | string | null
     userAgent?: StringNullableFilter<"AuditLog"> | string | null
     createdAt?: DateTimeFilter<"AuditLog"> | Date | string
-    user?: XOR<UserScalarRelationFilter, UserWhereInput>
-    targetUser?: XOR<UserNullableScalarRelationFilter, UserWhereInput> | null
     targetContent?: XOR<ContentNodeNullableScalarRelationFilter, ContentNodeWhereInput> | null
+    targetUser?: XOR<UserNullableScalarRelationFilter, UserWhereInput> | null
+    user?: XOR<UserScalarRelationFilter, UserWhereInput>
   }, "id">
 
   export type AuditLogOrderByWithAggregationInput = {
@@ -25456,10 +33984,447 @@ export namespace Prisma {
     createdAt?: DateTimeWithAggregatesFilter<"AuditLog"> | Date | string
   }
 
+  export type FolderPayloadWhereInput = {
+    AND?: FolderPayloadWhereInput | FolderPayloadWhereInput[]
+    OR?: FolderPayloadWhereInput[]
+    NOT?: FolderPayloadWhereInput | FolderPayloadWhereInput[]
+    contentId?: UuidFilter<"FolderPayload"> | string
+    viewMode?: EnumFolderViewModeFilter<"FolderPayload"> | $Enums.FolderViewMode
+    sortMode?: StringNullableFilter<"FolderPayload"> | string | null
+    viewPrefs?: JsonFilter<"FolderPayload">
+    includeReferencedContent?: BoolFilter<"FolderPayload"> | boolean
+    createdAt?: DateTimeFilter<"FolderPayload"> | Date | string
+    updatedAt?: DateTimeFilter<"FolderPayload"> | Date | string
+    content?: XOR<ContentNodeScalarRelationFilter, ContentNodeWhereInput>
+  }
+
+  export type FolderPayloadOrderByWithRelationInput = {
+    contentId?: SortOrder
+    viewMode?: SortOrder
+    sortMode?: SortOrderInput | SortOrder
+    viewPrefs?: SortOrder
+    includeReferencedContent?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+    content?: ContentNodeOrderByWithRelationInput
+  }
+
+  export type FolderPayloadWhereUniqueInput = Prisma.AtLeast<{
+    contentId?: string
+    AND?: FolderPayloadWhereInput | FolderPayloadWhereInput[]
+    OR?: FolderPayloadWhereInput[]
+    NOT?: FolderPayloadWhereInput | FolderPayloadWhereInput[]
+    viewMode?: EnumFolderViewModeFilter<"FolderPayload"> | $Enums.FolderViewMode
+    sortMode?: StringNullableFilter<"FolderPayload"> | string | null
+    viewPrefs?: JsonFilter<"FolderPayload">
+    includeReferencedContent?: BoolFilter<"FolderPayload"> | boolean
+    createdAt?: DateTimeFilter<"FolderPayload"> | Date | string
+    updatedAt?: DateTimeFilter<"FolderPayload"> | Date | string
+    content?: XOR<ContentNodeScalarRelationFilter, ContentNodeWhereInput>
+  }, "contentId">
+
+  export type FolderPayloadOrderByWithAggregationInput = {
+    contentId?: SortOrder
+    viewMode?: SortOrder
+    sortMode?: SortOrderInput | SortOrder
+    viewPrefs?: SortOrder
+    includeReferencedContent?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+    _count?: FolderPayloadCountOrderByAggregateInput
+    _max?: FolderPayloadMaxOrderByAggregateInput
+    _min?: FolderPayloadMinOrderByAggregateInput
+  }
+
+  export type FolderPayloadScalarWhereWithAggregatesInput = {
+    AND?: FolderPayloadScalarWhereWithAggregatesInput | FolderPayloadScalarWhereWithAggregatesInput[]
+    OR?: FolderPayloadScalarWhereWithAggregatesInput[]
+    NOT?: FolderPayloadScalarWhereWithAggregatesInput | FolderPayloadScalarWhereWithAggregatesInput[]
+    contentId?: UuidWithAggregatesFilter<"FolderPayload"> | string
+    viewMode?: EnumFolderViewModeWithAggregatesFilter<"FolderPayload"> | $Enums.FolderViewMode
+    sortMode?: StringNullableWithAggregatesFilter<"FolderPayload"> | string | null
+    viewPrefs?: JsonWithAggregatesFilter<"FolderPayload">
+    includeReferencedContent?: BoolWithAggregatesFilter<"FolderPayload"> | boolean
+    createdAt?: DateTimeWithAggregatesFilter<"FolderPayload"> | Date | string
+    updatedAt?: DateTimeWithAggregatesFilter<"FolderPayload"> | Date | string
+  }
+
+  export type ExternalPayloadWhereInput = {
+    AND?: ExternalPayloadWhereInput | ExternalPayloadWhereInput[]
+    OR?: ExternalPayloadWhereInput[]
+    NOT?: ExternalPayloadWhereInput | ExternalPayloadWhereInput[]
+    contentId?: UuidFilter<"ExternalPayload"> | string
+    url?: StringFilter<"ExternalPayload"> | string
+    subtype?: StringNullableFilter<"ExternalPayload"> | string | null
+    preview?: JsonFilter<"ExternalPayload">
+    createdAt?: DateTimeFilter<"ExternalPayload"> | Date | string
+    updatedAt?: DateTimeFilter<"ExternalPayload"> | Date | string
+    content?: XOR<ContentNodeScalarRelationFilter, ContentNodeWhereInput>
+  }
+
+  export type ExternalPayloadOrderByWithRelationInput = {
+    contentId?: SortOrder
+    url?: SortOrder
+    subtype?: SortOrderInput | SortOrder
+    preview?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+    content?: ContentNodeOrderByWithRelationInput
+  }
+
+  export type ExternalPayloadWhereUniqueInput = Prisma.AtLeast<{
+    contentId?: string
+    AND?: ExternalPayloadWhereInput | ExternalPayloadWhereInput[]
+    OR?: ExternalPayloadWhereInput[]
+    NOT?: ExternalPayloadWhereInput | ExternalPayloadWhereInput[]
+    url?: StringFilter<"ExternalPayload"> | string
+    subtype?: StringNullableFilter<"ExternalPayload"> | string | null
+    preview?: JsonFilter<"ExternalPayload">
+    createdAt?: DateTimeFilter<"ExternalPayload"> | Date | string
+    updatedAt?: DateTimeFilter<"ExternalPayload"> | Date | string
+    content?: XOR<ContentNodeScalarRelationFilter, ContentNodeWhereInput>
+  }, "contentId">
+
+  export type ExternalPayloadOrderByWithAggregationInput = {
+    contentId?: SortOrder
+    url?: SortOrder
+    subtype?: SortOrderInput | SortOrder
+    preview?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+    _count?: ExternalPayloadCountOrderByAggregateInput
+    _max?: ExternalPayloadMaxOrderByAggregateInput
+    _min?: ExternalPayloadMinOrderByAggregateInput
+  }
+
+  export type ExternalPayloadScalarWhereWithAggregatesInput = {
+    AND?: ExternalPayloadScalarWhereWithAggregatesInput | ExternalPayloadScalarWhereWithAggregatesInput[]
+    OR?: ExternalPayloadScalarWhereWithAggregatesInput[]
+    NOT?: ExternalPayloadScalarWhereWithAggregatesInput | ExternalPayloadScalarWhereWithAggregatesInput[]
+    contentId?: UuidWithAggregatesFilter<"ExternalPayload"> | string
+    url?: StringWithAggregatesFilter<"ExternalPayload"> | string
+    subtype?: StringNullableWithAggregatesFilter<"ExternalPayload"> | string | null
+    preview?: JsonWithAggregatesFilter<"ExternalPayload">
+    createdAt?: DateTimeWithAggregatesFilter<"ExternalPayload"> | Date | string
+    updatedAt?: DateTimeWithAggregatesFilter<"ExternalPayload"> | Date | string
+  }
+
+  export type ChatPayloadWhereInput = {
+    AND?: ChatPayloadWhereInput | ChatPayloadWhereInput[]
+    OR?: ChatPayloadWhereInput[]
+    NOT?: ChatPayloadWhereInput | ChatPayloadWhereInput[]
+    contentId?: UuidFilter<"ChatPayload"> | string
+    messages?: JsonFilter<"ChatPayload">
+    metadata?: JsonFilter<"ChatPayload">
+    createdAt?: DateTimeFilter<"ChatPayload"> | Date | string
+    updatedAt?: DateTimeFilter<"ChatPayload"> | Date | string
+    content?: XOR<ContentNodeScalarRelationFilter, ContentNodeWhereInput>
+  }
+
+  export type ChatPayloadOrderByWithRelationInput = {
+    contentId?: SortOrder
+    messages?: SortOrder
+    metadata?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+    content?: ContentNodeOrderByWithRelationInput
+  }
+
+  export type ChatPayloadWhereUniqueInput = Prisma.AtLeast<{
+    contentId?: string
+    AND?: ChatPayloadWhereInput | ChatPayloadWhereInput[]
+    OR?: ChatPayloadWhereInput[]
+    NOT?: ChatPayloadWhereInput | ChatPayloadWhereInput[]
+    messages?: JsonFilter<"ChatPayload">
+    metadata?: JsonFilter<"ChatPayload">
+    createdAt?: DateTimeFilter<"ChatPayload"> | Date | string
+    updatedAt?: DateTimeFilter<"ChatPayload"> | Date | string
+    content?: XOR<ContentNodeScalarRelationFilter, ContentNodeWhereInput>
+  }, "contentId">
+
+  export type ChatPayloadOrderByWithAggregationInput = {
+    contentId?: SortOrder
+    messages?: SortOrder
+    metadata?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+    _count?: ChatPayloadCountOrderByAggregateInput
+    _max?: ChatPayloadMaxOrderByAggregateInput
+    _min?: ChatPayloadMinOrderByAggregateInput
+  }
+
+  export type ChatPayloadScalarWhereWithAggregatesInput = {
+    AND?: ChatPayloadScalarWhereWithAggregatesInput | ChatPayloadScalarWhereWithAggregatesInput[]
+    OR?: ChatPayloadScalarWhereWithAggregatesInput[]
+    NOT?: ChatPayloadScalarWhereWithAggregatesInput | ChatPayloadScalarWhereWithAggregatesInput[]
+    contentId?: UuidWithAggregatesFilter<"ChatPayload"> | string
+    messages?: JsonWithAggregatesFilter<"ChatPayload">
+    metadata?: JsonWithAggregatesFilter<"ChatPayload">
+    createdAt?: DateTimeWithAggregatesFilter<"ChatPayload"> | Date | string
+    updatedAt?: DateTimeWithAggregatesFilter<"ChatPayload"> | Date | string
+  }
+
+  export type VisualizationPayloadWhereInput = {
+    AND?: VisualizationPayloadWhereInput | VisualizationPayloadWhereInput[]
+    OR?: VisualizationPayloadWhereInput[]
+    NOT?: VisualizationPayloadWhereInput | VisualizationPayloadWhereInput[]
+    contentId?: UuidFilter<"VisualizationPayload"> | string
+    engine?: StringFilter<"VisualizationPayload"> | string
+    config?: JsonFilter<"VisualizationPayload">
+    data?: JsonFilter<"VisualizationPayload">
+    createdAt?: DateTimeFilter<"VisualizationPayload"> | Date | string
+    updatedAt?: DateTimeFilter<"VisualizationPayload"> | Date | string
+    content?: XOR<ContentNodeScalarRelationFilter, ContentNodeWhereInput>
+  }
+
+  export type VisualizationPayloadOrderByWithRelationInput = {
+    contentId?: SortOrder
+    engine?: SortOrder
+    config?: SortOrder
+    data?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+    content?: ContentNodeOrderByWithRelationInput
+  }
+
+  export type VisualizationPayloadWhereUniqueInput = Prisma.AtLeast<{
+    contentId?: string
+    AND?: VisualizationPayloadWhereInput | VisualizationPayloadWhereInput[]
+    OR?: VisualizationPayloadWhereInput[]
+    NOT?: VisualizationPayloadWhereInput | VisualizationPayloadWhereInput[]
+    engine?: StringFilter<"VisualizationPayload"> | string
+    config?: JsonFilter<"VisualizationPayload">
+    data?: JsonFilter<"VisualizationPayload">
+    createdAt?: DateTimeFilter<"VisualizationPayload"> | Date | string
+    updatedAt?: DateTimeFilter<"VisualizationPayload"> | Date | string
+    content?: XOR<ContentNodeScalarRelationFilter, ContentNodeWhereInput>
+  }, "contentId">
+
+  export type VisualizationPayloadOrderByWithAggregationInput = {
+    contentId?: SortOrder
+    engine?: SortOrder
+    config?: SortOrder
+    data?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+    _count?: VisualizationPayloadCountOrderByAggregateInput
+    _max?: VisualizationPayloadMaxOrderByAggregateInput
+    _min?: VisualizationPayloadMinOrderByAggregateInput
+  }
+
+  export type VisualizationPayloadScalarWhereWithAggregatesInput = {
+    AND?: VisualizationPayloadScalarWhereWithAggregatesInput | VisualizationPayloadScalarWhereWithAggregatesInput[]
+    OR?: VisualizationPayloadScalarWhereWithAggregatesInput[]
+    NOT?: VisualizationPayloadScalarWhereWithAggregatesInput | VisualizationPayloadScalarWhereWithAggregatesInput[]
+    contentId?: UuidWithAggregatesFilter<"VisualizationPayload"> | string
+    engine?: StringWithAggregatesFilter<"VisualizationPayload"> | string
+    config?: JsonWithAggregatesFilter<"VisualizationPayload">
+    data?: JsonWithAggregatesFilter<"VisualizationPayload">
+    createdAt?: DateTimeWithAggregatesFilter<"VisualizationPayload"> | Date | string
+    updatedAt?: DateTimeWithAggregatesFilter<"VisualizationPayload"> | Date | string
+  }
+
+  export type DataPayloadWhereInput = {
+    AND?: DataPayloadWhereInput | DataPayloadWhereInput[]
+    OR?: DataPayloadWhereInput[]
+    NOT?: DataPayloadWhereInput | DataPayloadWhereInput[]
+    contentId?: UuidFilter<"DataPayload"> | string
+    mode?: StringFilter<"DataPayload"> | string
+    source?: JsonFilter<"DataPayload">
+    schema?: JsonFilter<"DataPayload">
+    createdAt?: DateTimeFilter<"DataPayload"> | Date | string
+    updatedAt?: DateTimeFilter<"DataPayload"> | Date | string
+    content?: XOR<ContentNodeScalarRelationFilter, ContentNodeWhereInput>
+  }
+
+  export type DataPayloadOrderByWithRelationInput = {
+    contentId?: SortOrder
+    mode?: SortOrder
+    source?: SortOrder
+    schema?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+    content?: ContentNodeOrderByWithRelationInput
+  }
+
+  export type DataPayloadWhereUniqueInput = Prisma.AtLeast<{
+    contentId?: string
+    AND?: DataPayloadWhereInput | DataPayloadWhereInput[]
+    OR?: DataPayloadWhereInput[]
+    NOT?: DataPayloadWhereInput | DataPayloadWhereInput[]
+    mode?: StringFilter<"DataPayload"> | string
+    source?: JsonFilter<"DataPayload">
+    schema?: JsonFilter<"DataPayload">
+    createdAt?: DateTimeFilter<"DataPayload"> | Date | string
+    updatedAt?: DateTimeFilter<"DataPayload"> | Date | string
+    content?: XOR<ContentNodeScalarRelationFilter, ContentNodeWhereInput>
+  }, "contentId">
+
+  export type DataPayloadOrderByWithAggregationInput = {
+    contentId?: SortOrder
+    mode?: SortOrder
+    source?: SortOrder
+    schema?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+    _count?: DataPayloadCountOrderByAggregateInput
+    _max?: DataPayloadMaxOrderByAggregateInput
+    _min?: DataPayloadMinOrderByAggregateInput
+  }
+
+  export type DataPayloadScalarWhereWithAggregatesInput = {
+    AND?: DataPayloadScalarWhereWithAggregatesInput | DataPayloadScalarWhereWithAggregatesInput[]
+    OR?: DataPayloadScalarWhereWithAggregatesInput[]
+    NOT?: DataPayloadScalarWhereWithAggregatesInput | DataPayloadScalarWhereWithAggregatesInput[]
+    contentId?: UuidWithAggregatesFilter<"DataPayload"> | string
+    mode?: StringWithAggregatesFilter<"DataPayload"> | string
+    source?: JsonWithAggregatesFilter<"DataPayload">
+    schema?: JsonWithAggregatesFilter<"DataPayload">
+    createdAt?: DateTimeWithAggregatesFilter<"DataPayload"> | Date | string
+    updatedAt?: DateTimeWithAggregatesFilter<"DataPayload"> | Date | string
+  }
+
+  export type HopePayloadWhereInput = {
+    AND?: HopePayloadWhereInput | HopePayloadWhereInput[]
+    OR?: HopePayloadWhereInput[]
+    NOT?: HopePayloadWhereInput | HopePayloadWhereInput[]
+    contentId?: UuidFilter<"HopePayload"> | string
+    kind?: StringFilter<"HopePayload"> | string
+    status?: StringFilter<"HopePayload"> | string
+    description?: StringNullableFilter<"HopePayload"> | string | null
+    targetDate?: DateTimeNullableFilter<"HopePayload"> | Date | string | null
+    metadata?: JsonFilter<"HopePayload">
+    createdAt?: DateTimeFilter<"HopePayload"> | Date | string
+    updatedAt?: DateTimeFilter<"HopePayload"> | Date | string
+    content?: XOR<ContentNodeScalarRelationFilter, ContentNodeWhereInput>
+  }
+
+  export type HopePayloadOrderByWithRelationInput = {
+    contentId?: SortOrder
+    kind?: SortOrder
+    status?: SortOrder
+    description?: SortOrderInput | SortOrder
+    targetDate?: SortOrderInput | SortOrder
+    metadata?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+    content?: ContentNodeOrderByWithRelationInput
+  }
+
+  export type HopePayloadWhereUniqueInput = Prisma.AtLeast<{
+    contentId?: string
+    AND?: HopePayloadWhereInput | HopePayloadWhereInput[]
+    OR?: HopePayloadWhereInput[]
+    NOT?: HopePayloadWhereInput | HopePayloadWhereInput[]
+    kind?: StringFilter<"HopePayload"> | string
+    status?: StringFilter<"HopePayload"> | string
+    description?: StringNullableFilter<"HopePayload"> | string | null
+    targetDate?: DateTimeNullableFilter<"HopePayload"> | Date | string | null
+    metadata?: JsonFilter<"HopePayload">
+    createdAt?: DateTimeFilter<"HopePayload"> | Date | string
+    updatedAt?: DateTimeFilter<"HopePayload"> | Date | string
+    content?: XOR<ContentNodeScalarRelationFilter, ContentNodeWhereInput>
+  }, "contentId">
+
+  export type HopePayloadOrderByWithAggregationInput = {
+    contentId?: SortOrder
+    kind?: SortOrder
+    status?: SortOrder
+    description?: SortOrderInput | SortOrder
+    targetDate?: SortOrderInput | SortOrder
+    metadata?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+    _count?: HopePayloadCountOrderByAggregateInput
+    _max?: HopePayloadMaxOrderByAggregateInput
+    _min?: HopePayloadMinOrderByAggregateInput
+  }
+
+  export type HopePayloadScalarWhereWithAggregatesInput = {
+    AND?: HopePayloadScalarWhereWithAggregatesInput | HopePayloadScalarWhereWithAggregatesInput[]
+    OR?: HopePayloadScalarWhereWithAggregatesInput[]
+    NOT?: HopePayloadScalarWhereWithAggregatesInput | HopePayloadScalarWhereWithAggregatesInput[]
+    contentId?: UuidWithAggregatesFilter<"HopePayload"> | string
+    kind?: StringWithAggregatesFilter<"HopePayload"> | string
+    status?: StringWithAggregatesFilter<"HopePayload"> | string
+    description?: StringNullableWithAggregatesFilter<"HopePayload"> | string | null
+    targetDate?: DateTimeNullableWithAggregatesFilter<"HopePayload"> | Date | string | null
+    metadata?: JsonWithAggregatesFilter<"HopePayload">
+    createdAt?: DateTimeWithAggregatesFilter<"HopePayload"> | Date | string
+    updatedAt?: DateTimeWithAggregatesFilter<"HopePayload"> | Date | string
+  }
+
+  export type WorkflowPayloadWhereInput = {
+    AND?: WorkflowPayloadWhereInput | WorkflowPayloadWhereInput[]
+    OR?: WorkflowPayloadWhereInput[]
+    NOT?: WorkflowPayloadWhereInput | WorkflowPayloadWhereInput[]
+    contentId?: UuidFilter<"WorkflowPayload"> | string
+    engine?: StringFilter<"WorkflowPayload"> | string
+    definition?: JsonFilter<"WorkflowPayload">
+    enabled?: BoolFilter<"WorkflowPayload"> | boolean
+    metadata?: JsonFilter<"WorkflowPayload">
+    createdAt?: DateTimeFilter<"WorkflowPayload"> | Date | string
+    updatedAt?: DateTimeFilter<"WorkflowPayload"> | Date | string
+    content?: XOR<ContentNodeScalarRelationFilter, ContentNodeWhereInput>
+  }
+
+  export type WorkflowPayloadOrderByWithRelationInput = {
+    contentId?: SortOrder
+    engine?: SortOrder
+    definition?: SortOrder
+    enabled?: SortOrder
+    metadata?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+    content?: ContentNodeOrderByWithRelationInput
+  }
+
+  export type WorkflowPayloadWhereUniqueInput = Prisma.AtLeast<{
+    contentId?: string
+    AND?: WorkflowPayloadWhereInput | WorkflowPayloadWhereInput[]
+    OR?: WorkflowPayloadWhereInput[]
+    NOT?: WorkflowPayloadWhereInput | WorkflowPayloadWhereInput[]
+    engine?: StringFilter<"WorkflowPayload"> | string
+    definition?: JsonFilter<"WorkflowPayload">
+    enabled?: BoolFilter<"WorkflowPayload"> | boolean
+    metadata?: JsonFilter<"WorkflowPayload">
+    createdAt?: DateTimeFilter<"WorkflowPayload"> | Date | string
+    updatedAt?: DateTimeFilter<"WorkflowPayload"> | Date | string
+    content?: XOR<ContentNodeScalarRelationFilter, ContentNodeWhereInput>
+  }, "contentId">
+
+  export type WorkflowPayloadOrderByWithAggregationInput = {
+    contentId?: SortOrder
+    engine?: SortOrder
+    definition?: SortOrder
+    enabled?: SortOrder
+    metadata?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+    _count?: WorkflowPayloadCountOrderByAggregateInput
+    _max?: WorkflowPayloadMaxOrderByAggregateInput
+    _min?: WorkflowPayloadMinOrderByAggregateInput
+  }
+
+  export type WorkflowPayloadScalarWhereWithAggregatesInput = {
+    AND?: WorkflowPayloadScalarWhereWithAggregatesInput | WorkflowPayloadScalarWhereWithAggregatesInput[]
+    OR?: WorkflowPayloadScalarWhereWithAggregatesInput[]
+    NOT?: WorkflowPayloadScalarWhereWithAggregatesInput | WorkflowPayloadScalarWhereWithAggregatesInput[]
+    contentId?: UuidWithAggregatesFilter<"WorkflowPayload"> | string
+    engine?: StringWithAggregatesFilter<"WorkflowPayload"> | string
+    definition?: JsonWithAggregatesFilter<"WorkflowPayload">
+    enabled?: BoolWithAggregatesFilter<"WorkflowPayload"> | boolean
+    metadata?: JsonWithAggregatesFilter<"WorkflowPayload">
+    createdAt?: DateTimeWithAggregatesFilter<"WorkflowPayload"> | Date | string
+    updatedAt?: DateTimeWithAggregatesFilter<"WorkflowPayload"> | Date | string
+  }
+
   export type ContentNodeCreateInput = {
     id?: string
     title: string
     slug: string
+    contentType: $Enums.ContentType
+    role?: $Enums.ContentRole
     displayOrder?: number
     isPublished?: boolean
     createdAt?: Date | string
@@ -25470,6 +34435,16 @@ export namespace Prisma {
     iconColor?: string | null
     auditLogs?: AuditLogCreateNestedManyWithoutTargetContentInput
     codePayload?: CodePayloadCreateNestedOneWithoutContentInput
+    filePayload?: FilePayloadCreateNestedOneWithoutContentInput
+    htmlPayload?: HtmlPayloadCreateNestedOneWithoutContentInput
+    notePayload?: NotePayloadCreateNestedOneWithoutContentInput
+    folderPayload?: FolderPayloadCreateNestedOneWithoutContentInput
+    externalPayload?: ExternalPayloadCreateNestedOneWithoutContentInput
+    chatPayload?: ChatPayloadCreateNestedOneWithoutContentInput
+    visualizationPayload?: VisualizationPayloadCreateNestedOneWithoutContentInput
+    dataPayload?: DataPayloadCreateNestedOneWithoutContentInput
+    hopePayload?: HopePayloadCreateNestedOneWithoutContentInput
+    workflowPayload?: WorkflowPayloadCreateNestedOneWithoutContentInput
     history?: ContentHistoryCreateNestedManyWithoutContentInput
     sourceLinks?: ContentLinkCreateNestedManyWithoutSourceInput
     targetLinks?: ContentLinkCreateNestedManyWithoutTargetInput
@@ -25479,9 +34454,6 @@ export namespace Prisma {
     children?: ContentNodeCreateNestedManyWithoutParentInput
     contentPath?: ContentPathCreateNestedOneWithoutContentInput
     contentTags?: ContentTagCreateNestedManyWithoutContentInput
-    filePayload?: FilePayloadCreateNestedOneWithoutContentInput
-    htmlPayload?: HtmlPayloadCreateNestedOneWithoutContentInput
-    notePayload?: NotePayloadCreateNestedOneWithoutContentInput
     trashBinEntry?: TrashBinCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantCreateNestedManyWithoutContentInput
   }
@@ -25491,6 +34463,8 @@ export namespace Prisma {
     ownerId: string
     title: string
     slug: string
+    contentType: $Enums.ContentType
+    role?: $Enums.ContentRole
     parentId?: string | null
     displayOrder?: number
     categoryId?: string | null
@@ -25503,15 +34477,22 @@ export namespace Prisma {
     iconColor?: string | null
     auditLogs?: AuditLogUncheckedCreateNestedManyWithoutTargetContentInput
     codePayload?: CodePayloadUncheckedCreateNestedOneWithoutContentInput
+    filePayload?: FilePayloadUncheckedCreateNestedOneWithoutContentInput
+    htmlPayload?: HtmlPayloadUncheckedCreateNestedOneWithoutContentInput
+    notePayload?: NotePayloadUncheckedCreateNestedOneWithoutContentInput
+    folderPayload?: FolderPayloadUncheckedCreateNestedOneWithoutContentInput
+    externalPayload?: ExternalPayloadUncheckedCreateNestedOneWithoutContentInput
+    chatPayload?: ChatPayloadUncheckedCreateNestedOneWithoutContentInput
+    visualizationPayload?: VisualizationPayloadUncheckedCreateNestedOneWithoutContentInput
+    dataPayload?: DataPayloadUncheckedCreateNestedOneWithoutContentInput
+    hopePayload?: HopePayloadUncheckedCreateNestedOneWithoutContentInput
+    workflowPayload?: WorkflowPayloadUncheckedCreateNestedOneWithoutContentInput
     history?: ContentHistoryUncheckedCreateNestedManyWithoutContentInput
     sourceLinks?: ContentLinkUncheckedCreateNestedManyWithoutSourceInput
     targetLinks?: ContentLinkUncheckedCreateNestedManyWithoutTargetInput
     children?: ContentNodeUncheckedCreateNestedManyWithoutParentInput
     contentPath?: ContentPathUncheckedCreateNestedOneWithoutContentInput
     contentTags?: ContentTagUncheckedCreateNestedManyWithoutContentInput
-    filePayload?: FilePayloadUncheckedCreateNestedOneWithoutContentInput
-    htmlPayload?: HtmlPayloadUncheckedCreateNestedOneWithoutContentInput
-    notePayload?: NotePayloadUncheckedCreateNestedOneWithoutContentInput
     trashBinEntry?: TrashBinUncheckedCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantUncheckedCreateNestedManyWithoutContentInput
   }
@@ -25520,6 +34501,8 @@ export namespace Prisma {
     id?: StringFieldUpdateOperationsInput | string
     title?: StringFieldUpdateOperationsInput | string
     slug?: StringFieldUpdateOperationsInput | string
+    contentType?: EnumContentTypeFieldUpdateOperationsInput | $Enums.ContentType
+    role?: EnumContentRoleFieldUpdateOperationsInput | $Enums.ContentRole
     displayOrder?: IntFieldUpdateOperationsInput | number
     isPublished?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
@@ -25530,6 +34513,16 @@ export namespace Prisma {
     iconColor?: NullableStringFieldUpdateOperationsInput | string | null
     auditLogs?: AuditLogUpdateManyWithoutTargetContentNestedInput
     codePayload?: CodePayloadUpdateOneWithoutContentNestedInput
+    filePayload?: FilePayloadUpdateOneWithoutContentNestedInput
+    htmlPayload?: HtmlPayloadUpdateOneWithoutContentNestedInput
+    notePayload?: NotePayloadUpdateOneWithoutContentNestedInput
+    folderPayload?: FolderPayloadUpdateOneWithoutContentNestedInput
+    externalPayload?: ExternalPayloadUpdateOneWithoutContentNestedInput
+    chatPayload?: ChatPayloadUpdateOneWithoutContentNestedInput
+    visualizationPayload?: VisualizationPayloadUpdateOneWithoutContentNestedInput
+    dataPayload?: DataPayloadUpdateOneWithoutContentNestedInput
+    hopePayload?: HopePayloadUpdateOneWithoutContentNestedInput
+    workflowPayload?: WorkflowPayloadUpdateOneWithoutContentNestedInput
     history?: ContentHistoryUpdateManyWithoutContentNestedInput
     sourceLinks?: ContentLinkUpdateManyWithoutSourceNestedInput
     targetLinks?: ContentLinkUpdateManyWithoutTargetNestedInput
@@ -25539,9 +34532,6 @@ export namespace Prisma {
     children?: ContentNodeUpdateManyWithoutParentNestedInput
     contentPath?: ContentPathUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUpdateManyWithoutContentNestedInput
-    filePayload?: FilePayloadUpdateOneWithoutContentNestedInput
-    htmlPayload?: HtmlPayloadUpdateOneWithoutContentNestedInput
-    notePayload?: NotePayloadUpdateOneWithoutContentNestedInput
     trashBinEntry?: TrashBinUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUpdateManyWithoutContentNestedInput
   }
@@ -25551,6 +34541,8 @@ export namespace Prisma {
     ownerId?: StringFieldUpdateOperationsInput | string
     title?: StringFieldUpdateOperationsInput | string
     slug?: StringFieldUpdateOperationsInput | string
+    contentType?: EnumContentTypeFieldUpdateOperationsInput | $Enums.ContentType
+    role?: EnumContentRoleFieldUpdateOperationsInput | $Enums.ContentRole
     parentId?: NullableStringFieldUpdateOperationsInput | string | null
     displayOrder?: IntFieldUpdateOperationsInput | number
     categoryId?: NullableStringFieldUpdateOperationsInput | string | null
@@ -25563,15 +34555,22 @@ export namespace Prisma {
     iconColor?: NullableStringFieldUpdateOperationsInput | string | null
     auditLogs?: AuditLogUncheckedUpdateManyWithoutTargetContentNestedInput
     codePayload?: CodePayloadUncheckedUpdateOneWithoutContentNestedInput
+    filePayload?: FilePayloadUncheckedUpdateOneWithoutContentNestedInput
+    htmlPayload?: HtmlPayloadUncheckedUpdateOneWithoutContentNestedInput
+    notePayload?: NotePayloadUncheckedUpdateOneWithoutContentNestedInput
+    folderPayload?: FolderPayloadUncheckedUpdateOneWithoutContentNestedInput
+    externalPayload?: ExternalPayloadUncheckedUpdateOneWithoutContentNestedInput
+    chatPayload?: ChatPayloadUncheckedUpdateOneWithoutContentNestedInput
+    visualizationPayload?: VisualizationPayloadUncheckedUpdateOneWithoutContentNestedInput
+    dataPayload?: DataPayloadUncheckedUpdateOneWithoutContentNestedInput
+    hopePayload?: HopePayloadUncheckedUpdateOneWithoutContentNestedInput
+    workflowPayload?: WorkflowPayloadUncheckedUpdateOneWithoutContentNestedInput
     history?: ContentHistoryUncheckedUpdateManyWithoutContentNestedInput
     sourceLinks?: ContentLinkUncheckedUpdateManyWithoutSourceNestedInput
     targetLinks?: ContentLinkUncheckedUpdateManyWithoutTargetNestedInput
     children?: ContentNodeUncheckedUpdateManyWithoutParentNestedInput
     contentPath?: ContentPathUncheckedUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUncheckedUpdateManyWithoutContentNestedInput
-    filePayload?: FilePayloadUncheckedUpdateOneWithoutContentNestedInput
-    htmlPayload?: HtmlPayloadUncheckedUpdateOneWithoutContentNestedInput
-    notePayload?: NotePayloadUncheckedUpdateOneWithoutContentNestedInput
     trashBinEntry?: TrashBinUncheckedUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUncheckedUpdateManyWithoutContentNestedInput
   }
@@ -25581,6 +34580,8 @@ export namespace Prisma {
     ownerId: string
     title: string
     slug: string
+    contentType: $Enums.ContentType
+    role?: $Enums.ContentRole
     parentId?: string | null
     displayOrder?: number
     categoryId?: string | null
@@ -25597,6 +34598,8 @@ export namespace Prisma {
     id?: StringFieldUpdateOperationsInput | string
     title?: StringFieldUpdateOperationsInput | string
     slug?: StringFieldUpdateOperationsInput | string
+    contentType?: EnumContentTypeFieldUpdateOperationsInput | $Enums.ContentType
+    role?: EnumContentRoleFieldUpdateOperationsInput | $Enums.ContentRole
     displayOrder?: IntFieldUpdateOperationsInput | number
     isPublished?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
@@ -25612,6 +34615,8 @@ export namespace Prisma {
     ownerId?: StringFieldUpdateOperationsInput | string
     title?: StringFieldUpdateOperationsInput | string
     slug?: StringFieldUpdateOperationsInput | string
+    contentType?: EnumContentTypeFieldUpdateOperationsInput | $Enums.ContentType
+    role?: EnumContentRoleFieldUpdateOperationsInput | $Enums.ContentRole
     parentId?: NullableStringFieldUpdateOperationsInput | string | null
     displayOrder?: IntFieldUpdateOperationsInput | number
     categoryId?: NullableStringFieldUpdateOperationsInput | string | null
@@ -26428,13 +35433,13 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
-    settings?: NullableJsonNullValueInput | InputJsonValue
-    settingsVersion?: number
     createdAt?: Date | string
     updatedAt?: Date | string
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: number
     accounts?: AccountCreateNestedManyWithoutUserInput
-    adminActions?: AuditLogCreateNestedManyWithoutUserInput
     auditTargets?: AuditLogCreateNestedManyWithoutTargetUserInput
+    adminActions?: AuditLogCreateNestedManyWithoutUserInput
     categories?: CategoryCreateNestedManyWithoutOwnerInput
     contentHistory?: ContentHistoryCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeCreateNestedManyWithoutOwnerInput
@@ -26451,13 +35456,13 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
-    settings?: NullableJsonNullValueInput | InputJsonValue
-    settingsVersion?: number
     createdAt?: Date | string
     updatedAt?: Date | string
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: number
     accounts?: AccountUncheckedCreateNestedManyWithoutUserInput
-    adminActions?: AuditLogUncheckedCreateNestedManyWithoutUserInput
     auditTargets?: AuditLogUncheckedCreateNestedManyWithoutTargetUserInput
+    adminActions?: AuditLogUncheckedCreateNestedManyWithoutUserInput
     categories?: CategoryUncheckedCreateNestedManyWithoutOwnerInput
     contentHistory?: ContentHistoryUncheckedCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeUncheckedCreateNestedManyWithoutOwnerInput
@@ -26474,13 +35479,13 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
-    settings?: NullableJsonNullValueInput | InputJsonValue
-    settingsVersion?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: IntFieldUpdateOperationsInput | number
     accounts?: AccountUpdateManyWithoutUserNestedInput
-    adminActions?: AuditLogUpdateManyWithoutUserNestedInput
     auditTargets?: AuditLogUpdateManyWithoutTargetUserNestedInput
+    adminActions?: AuditLogUpdateManyWithoutUserNestedInput
     categories?: CategoryUpdateManyWithoutOwnerNestedInput
     contentHistory?: ContentHistoryUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUpdateManyWithoutOwnerNestedInput
@@ -26497,13 +35502,13 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
-    settings?: NullableJsonNullValueInput | InputJsonValue
-    settingsVersion?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: IntFieldUpdateOperationsInput | number
     accounts?: AccountUncheckedUpdateManyWithoutUserNestedInput
-    adminActions?: AuditLogUncheckedUpdateManyWithoutUserNestedInput
     auditTargets?: AuditLogUncheckedUpdateManyWithoutTargetUserNestedInput
+    adminActions?: AuditLogUncheckedUpdateManyWithoutUserNestedInput
     categories?: CategoryUncheckedUpdateManyWithoutOwnerNestedInput
     contentHistory?: ContentHistoryUncheckedUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUncheckedUpdateManyWithoutOwnerNestedInput
@@ -26520,10 +35525,10 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
-    settings?: NullableJsonNullValueInput | InputJsonValue
-    settingsVersion?: number
     createdAt?: Date | string
     updatedAt?: Date | string
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: number
   }
 
   export type UserUpdateManyMutationInput = {
@@ -26532,10 +35537,10 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
-    settings?: NullableJsonNullValueInput | InputJsonValue
-    settingsVersion?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: IntFieldUpdateOperationsInput | number
   }
 
   export type UserUncheckedUpdateManyInput = {
@@ -26544,10 +35549,10 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
-    settings?: NullableJsonNullValueInput | InputJsonValue
-    settingsVersion?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: IntFieldUpdateOperationsInput | number
   }
 
   export type CategoryCreateInput = {
@@ -26652,8 +35657,8 @@ export namespace Prisma {
     name: string
     slug: string
     createdAt?: Date | string
-    color?: string | null
     userId: string
+    color?: string | null
     contentTags?: ContentTagUncheckedCreateNestedManyWithoutTagInput
   }
 
@@ -26672,8 +35677,8 @@ export namespace Prisma {
     name?: StringFieldUpdateOperationsInput | string
     slug?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    color?: NullableStringFieldUpdateOperationsInput | string | null
     userId?: StringFieldUpdateOperationsInput | string
+    color?: NullableStringFieldUpdateOperationsInput | string | null
     contentTags?: ContentTagUncheckedUpdateManyWithoutTagNestedInput
   }
 
@@ -26682,8 +35687,8 @@ export namespace Prisma {
     name: string
     slug: string
     createdAt?: Date | string
-    color?: string | null
     userId: string
+    color?: string | null
   }
 
   export type TagUpdateManyMutationInput = {
@@ -26699,8 +35704,8 @@ export namespace Prisma {
     name?: StringFieldUpdateOperationsInput | string
     slug?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    color?: NullableStringFieldUpdateOperationsInput | string | null
     userId?: StringFieldUpdateOperationsInput | string
+    color?: NullableStringFieldUpdateOperationsInput | string | null
   }
 
   export type ViewGrantCreateInput = {
@@ -26902,9 +35907,9 @@ export namespace Prisma {
     ipAddress?: string | null
     userAgent?: string | null
     createdAt?: Date | string
-    user: UserCreateNestedOneWithoutAdminActionsInput
-    targetUser?: UserCreateNestedOneWithoutAuditTargetsInput
     targetContent?: ContentNodeCreateNestedOneWithoutAuditLogsInput
+    targetUser?: UserCreateNestedOneWithoutAuditTargetsInput
+    user: UserCreateNestedOneWithoutAdminActionsInput
   }
 
   export type AuditLogUncheckedCreateInput = {
@@ -26926,9 +35931,9 @@ export namespace Prisma {
     ipAddress?: NullableStringFieldUpdateOperationsInput | string | null
     userAgent?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    user?: UserUpdateOneRequiredWithoutAdminActionsNestedInput
-    targetUser?: UserUpdateOneWithoutAuditTargetsNestedInput
     targetContent?: ContentNodeUpdateOneWithoutAuditLogsNestedInput
+    targetUser?: UserUpdateOneWithoutAuditTargetsNestedInput
+    user?: UserUpdateOneRequiredWithoutAdminActionsNestedInput
   }
 
   export type AuditLogUncheckedUpdateInput = {
@@ -26976,6 +35981,461 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
+  export type FolderPayloadCreateInput = {
+    viewMode?: $Enums.FolderViewMode
+    sortMode?: string | null
+    viewPrefs?: JsonNullValueInput | InputJsonValue
+    includeReferencedContent?: boolean
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    content: ContentNodeCreateNestedOneWithoutFolderPayloadInput
+  }
+
+  export type FolderPayloadUncheckedCreateInput = {
+    contentId: string
+    viewMode?: $Enums.FolderViewMode
+    sortMode?: string | null
+    viewPrefs?: JsonNullValueInput | InputJsonValue
+    includeReferencedContent?: boolean
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type FolderPayloadUpdateInput = {
+    viewMode?: EnumFolderViewModeFieldUpdateOperationsInput | $Enums.FolderViewMode
+    sortMode?: NullableStringFieldUpdateOperationsInput | string | null
+    viewPrefs?: JsonNullValueInput | InputJsonValue
+    includeReferencedContent?: BoolFieldUpdateOperationsInput | boolean
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    content?: ContentNodeUpdateOneRequiredWithoutFolderPayloadNestedInput
+  }
+
+  export type FolderPayloadUncheckedUpdateInput = {
+    contentId?: StringFieldUpdateOperationsInput | string
+    viewMode?: EnumFolderViewModeFieldUpdateOperationsInput | $Enums.FolderViewMode
+    sortMode?: NullableStringFieldUpdateOperationsInput | string | null
+    viewPrefs?: JsonNullValueInput | InputJsonValue
+    includeReferencedContent?: BoolFieldUpdateOperationsInput | boolean
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type FolderPayloadCreateManyInput = {
+    contentId: string
+    viewMode?: $Enums.FolderViewMode
+    sortMode?: string | null
+    viewPrefs?: JsonNullValueInput | InputJsonValue
+    includeReferencedContent?: boolean
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type FolderPayloadUpdateManyMutationInput = {
+    viewMode?: EnumFolderViewModeFieldUpdateOperationsInput | $Enums.FolderViewMode
+    sortMode?: NullableStringFieldUpdateOperationsInput | string | null
+    viewPrefs?: JsonNullValueInput | InputJsonValue
+    includeReferencedContent?: BoolFieldUpdateOperationsInput | boolean
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type FolderPayloadUncheckedUpdateManyInput = {
+    contentId?: StringFieldUpdateOperationsInput | string
+    viewMode?: EnumFolderViewModeFieldUpdateOperationsInput | $Enums.FolderViewMode
+    sortMode?: NullableStringFieldUpdateOperationsInput | string | null
+    viewPrefs?: JsonNullValueInput | InputJsonValue
+    includeReferencedContent?: BoolFieldUpdateOperationsInput | boolean
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type ExternalPayloadCreateInput = {
+    url: string
+    subtype?: string | null
+    preview?: JsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    content: ContentNodeCreateNestedOneWithoutExternalPayloadInput
+  }
+
+  export type ExternalPayloadUncheckedCreateInput = {
+    contentId: string
+    url: string
+    subtype?: string | null
+    preview?: JsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type ExternalPayloadUpdateInput = {
+    url?: StringFieldUpdateOperationsInput | string
+    subtype?: NullableStringFieldUpdateOperationsInput | string | null
+    preview?: JsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    content?: ContentNodeUpdateOneRequiredWithoutExternalPayloadNestedInput
+  }
+
+  export type ExternalPayloadUncheckedUpdateInput = {
+    contentId?: StringFieldUpdateOperationsInput | string
+    url?: StringFieldUpdateOperationsInput | string
+    subtype?: NullableStringFieldUpdateOperationsInput | string | null
+    preview?: JsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type ExternalPayloadCreateManyInput = {
+    contentId: string
+    url: string
+    subtype?: string | null
+    preview?: JsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type ExternalPayloadUpdateManyMutationInput = {
+    url?: StringFieldUpdateOperationsInput | string
+    subtype?: NullableStringFieldUpdateOperationsInput | string | null
+    preview?: JsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type ExternalPayloadUncheckedUpdateManyInput = {
+    contentId?: StringFieldUpdateOperationsInput | string
+    url?: StringFieldUpdateOperationsInput | string
+    subtype?: NullableStringFieldUpdateOperationsInput | string | null
+    preview?: JsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type ChatPayloadCreateInput = {
+    messages?: JsonNullValueInput | InputJsonValue
+    metadata?: JsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    content: ContentNodeCreateNestedOneWithoutChatPayloadInput
+  }
+
+  export type ChatPayloadUncheckedCreateInput = {
+    contentId: string
+    messages?: JsonNullValueInput | InputJsonValue
+    metadata?: JsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type ChatPayloadUpdateInput = {
+    messages?: JsonNullValueInput | InputJsonValue
+    metadata?: JsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    content?: ContentNodeUpdateOneRequiredWithoutChatPayloadNestedInput
+  }
+
+  export type ChatPayloadUncheckedUpdateInput = {
+    contentId?: StringFieldUpdateOperationsInput | string
+    messages?: JsonNullValueInput | InputJsonValue
+    metadata?: JsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type ChatPayloadCreateManyInput = {
+    contentId: string
+    messages?: JsonNullValueInput | InputJsonValue
+    metadata?: JsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type ChatPayloadUpdateManyMutationInput = {
+    messages?: JsonNullValueInput | InputJsonValue
+    metadata?: JsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type ChatPayloadUncheckedUpdateManyInput = {
+    contentId?: StringFieldUpdateOperationsInput | string
+    messages?: JsonNullValueInput | InputJsonValue
+    metadata?: JsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type VisualizationPayloadCreateInput = {
+    engine: string
+    config?: JsonNullValueInput | InputJsonValue
+    data?: JsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    content: ContentNodeCreateNestedOneWithoutVisualizationPayloadInput
+  }
+
+  export type VisualizationPayloadUncheckedCreateInput = {
+    contentId: string
+    engine: string
+    config?: JsonNullValueInput | InputJsonValue
+    data?: JsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type VisualizationPayloadUpdateInput = {
+    engine?: StringFieldUpdateOperationsInput | string
+    config?: JsonNullValueInput | InputJsonValue
+    data?: JsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    content?: ContentNodeUpdateOneRequiredWithoutVisualizationPayloadNestedInput
+  }
+
+  export type VisualizationPayloadUncheckedUpdateInput = {
+    contentId?: StringFieldUpdateOperationsInput | string
+    engine?: StringFieldUpdateOperationsInput | string
+    config?: JsonNullValueInput | InputJsonValue
+    data?: JsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type VisualizationPayloadCreateManyInput = {
+    contentId: string
+    engine: string
+    config?: JsonNullValueInput | InputJsonValue
+    data?: JsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type VisualizationPayloadUpdateManyMutationInput = {
+    engine?: StringFieldUpdateOperationsInput | string
+    config?: JsonNullValueInput | InputJsonValue
+    data?: JsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type VisualizationPayloadUncheckedUpdateManyInput = {
+    contentId?: StringFieldUpdateOperationsInput | string
+    engine?: StringFieldUpdateOperationsInput | string
+    config?: JsonNullValueInput | InputJsonValue
+    data?: JsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type DataPayloadCreateInput = {
+    mode: string
+    source?: JsonNullValueInput | InputJsonValue
+    schema?: JsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    content: ContentNodeCreateNestedOneWithoutDataPayloadInput
+  }
+
+  export type DataPayloadUncheckedCreateInput = {
+    contentId: string
+    mode: string
+    source?: JsonNullValueInput | InputJsonValue
+    schema?: JsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type DataPayloadUpdateInput = {
+    mode?: StringFieldUpdateOperationsInput | string
+    source?: JsonNullValueInput | InputJsonValue
+    schema?: JsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    content?: ContentNodeUpdateOneRequiredWithoutDataPayloadNestedInput
+  }
+
+  export type DataPayloadUncheckedUpdateInput = {
+    contentId?: StringFieldUpdateOperationsInput | string
+    mode?: StringFieldUpdateOperationsInput | string
+    source?: JsonNullValueInput | InputJsonValue
+    schema?: JsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type DataPayloadCreateManyInput = {
+    contentId: string
+    mode: string
+    source?: JsonNullValueInput | InputJsonValue
+    schema?: JsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type DataPayloadUpdateManyMutationInput = {
+    mode?: StringFieldUpdateOperationsInput | string
+    source?: JsonNullValueInput | InputJsonValue
+    schema?: JsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type DataPayloadUncheckedUpdateManyInput = {
+    contentId?: StringFieldUpdateOperationsInput | string
+    mode?: StringFieldUpdateOperationsInput | string
+    source?: JsonNullValueInput | InputJsonValue
+    schema?: JsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type HopePayloadCreateInput = {
+    kind: string
+    status: string
+    description?: string | null
+    targetDate?: Date | string | null
+    metadata?: JsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    content: ContentNodeCreateNestedOneWithoutHopePayloadInput
+  }
+
+  export type HopePayloadUncheckedCreateInput = {
+    contentId: string
+    kind: string
+    status: string
+    description?: string | null
+    targetDate?: Date | string | null
+    metadata?: JsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type HopePayloadUpdateInput = {
+    kind?: StringFieldUpdateOperationsInput | string
+    status?: StringFieldUpdateOperationsInput | string
+    description?: NullableStringFieldUpdateOperationsInput | string | null
+    targetDate?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    metadata?: JsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    content?: ContentNodeUpdateOneRequiredWithoutHopePayloadNestedInput
+  }
+
+  export type HopePayloadUncheckedUpdateInput = {
+    contentId?: StringFieldUpdateOperationsInput | string
+    kind?: StringFieldUpdateOperationsInput | string
+    status?: StringFieldUpdateOperationsInput | string
+    description?: NullableStringFieldUpdateOperationsInput | string | null
+    targetDate?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    metadata?: JsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type HopePayloadCreateManyInput = {
+    contentId: string
+    kind: string
+    status: string
+    description?: string | null
+    targetDate?: Date | string | null
+    metadata?: JsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type HopePayloadUpdateManyMutationInput = {
+    kind?: StringFieldUpdateOperationsInput | string
+    status?: StringFieldUpdateOperationsInput | string
+    description?: NullableStringFieldUpdateOperationsInput | string | null
+    targetDate?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    metadata?: JsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type HopePayloadUncheckedUpdateManyInput = {
+    contentId?: StringFieldUpdateOperationsInput | string
+    kind?: StringFieldUpdateOperationsInput | string
+    status?: StringFieldUpdateOperationsInput | string
+    description?: NullableStringFieldUpdateOperationsInput | string | null
+    targetDate?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    metadata?: JsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type WorkflowPayloadCreateInput = {
+    engine: string
+    definition?: JsonNullValueInput | InputJsonValue
+    enabled?: boolean
+    metadata?: JsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    content: ContentNodeCreateNestedOneWithoutWorkflowPayloadInput
+  }
+
+  export type WorkflowPayloadUncheckedCreateInput = {
+    contentId: string
+    engine: string
+    definition?: JsonNullValueInput | InputJsonValue
+    enabled?: boolean
+    metadata?: JsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type WorkflowPayloadUpdateInput = {
+    engine?: StringFieldUpdateOperationsInput | string
+    definition?: JsonNullValueInput | InputJsonValue
+    enabled?: BoolFieldUpdateOperationsInput | boolean
+    metadata?: JsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    content?: ContentNodeUpdateOneRequiredWithoutWorkflowPayloadNestedInput
+  }
+
+  export type WorkflowPayloadUncheckedUpdateInput = {
+    contentId?: StringFieldUpdateOperationsInput | string
+    engine?: StringFieldUpdateOperationsInput | string
+    definition?: JsonNullValueInput | InputJsonValue
+    enabled?: BoolFieldUpdateOperationsInput | boolean
+    metadata?: JsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type WorkflowPayloadCreateManyInput = {
+    contentId: string
+    engine: string
+    definition?: JsonNullValueInput | InputJsonValue
+    enabled?: boolean
+    metadata?: JsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type WorkflowPayloadUpdateManyMutationInput = {
+    engine?: StringFieldUpdateOperationsInput | string
+    definition?: JsonNullValueInput | InputJsonValue
+    enabled?: BoolFieldUpdateOperationsInput | boolean
+    metadata?: JsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type WorkflowPayloadUncheckedUpdateManyInput = {
+    contentId?: StringFieldUpdateOperationsInput | string
+    engine?: StringFieldUpdateOperationsInput | string
+    definition?: JsonNullValueInput | InputJsonValue
+    enabled?: BoolFieldUpdateOperationsInput | boolean
+    metadata?: JsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
   export type UuidFilter<$PrismaModel = never> = {
     equals?: string | StringFieldRefInput<$PrismaModel>
     in?: string[] | ListStringFieldRefInput<$PrismaModel>
@@ -27001,6 +36461,20 @@ export namespace Prisma {
     endsWith?: string | StringFieldRefInput<$PrismaModel>
     mode?: QueryMode
     not?: NestedStringFilter<$PrismaModel> | string
+  }
+
+  export type EnumContentTypeFilter<$PrismaModel = never> = {
+    equals?: $Enums.ContentType | EnumContentTypeFieldRefInput<$PrismaModel>
+    in?: $Enums.ContentType[] | ListEnumContentTypeFieldRefInput<$PrismaModel>
+    notIn?: $Enums.ContentType[] | ListEnumContentTypeFieldRefInput<$PrismaModel>
+    not?: NestedEnumContentTypeFilter<$PrismaModel> | $Enums.ContentType
+  }
+
+  export type EnumContentRoleFilter<$PrismaModel = never> = {
+    equals?: $Enums.ContentRole | EnumContentRoleFieldRefInput<$PrismaModel>
+    in?: $Enums.ContentRole[] | ListEnumContentRoleFieldRefInput<$PrismaModel>
+    notIn?: $Enums.ContentRole[] | ListEnumContentRoleFieldRefInput<$PrismaModel>
+    not?: NestedEnumContentRoleFilter<$PrismaModel> | $Enums.ContentRole
   }
 
   export type UuidNullableFilter<$PrismaModel = never> = {
@@ -27079,6 +36553,56 @@ export namespace Prisma {
     isNot?: CodePayloadWhereInput | null
   }
 
+  export type FilePayloadNullableScalarRelationFilter = {
+    is?: FilePayloadWhereInput | null
+    isNot?: FilePayloadWhereInput | null
+  }
+
+  export type HtmlPayloadNullableScalarRelationFilter = {
+    is?: HtmlPayloadWhereInput | null
+    isNot?: HtmlPayloadWhereInput | null
+  }
+
+  export type NotePayloadNullableScalarRelationFilter = {
+    is?: NotePayloadWhereInput | null
+    isNot?: NotePayloadWhereInput | null
+  }
+
+  export type FolderPayloadNullableScalarRelationFilter = {
+    is?: FolderPayloadWhereInput | null
+    isNot?: FolderPayloadWhereInput | null
+  }
+
+  export type ExternalPayloadNullableScalarRelationFilter = {
+    is?: ExternalPayloadWhereInput | null
+    isNot?: ExternalPayloadWhereInput | null
+  }
+
+  export type ChatPayloadNullableScalarRelationFilter = {
+    is?: ChatPayloadWhereInput | null
+    isNot?: ChatPayloadWhereInput | null
+  }
+
+  export type VisualizationPayloadNullableScalarRelationFilter = {
+    is?: VisualizationPayloadWhereInput | null
+    isNot?: VisualizationPayloadWhereInput | null
+  }
+
+  export type DataPayloadNullableScalarRelationFilter = {
+    is?: DataPayloadWhereInput | null
+    isNot?: DataPayloadWhereInput | null
+  }
+
+  export type HopePayloadNullableScalarRelationFilter = {
+    is?: HopePayloadWhereInput | null
+    isNot?: HopePayloadWhereInput | null
+  }
+
+  export type WorkflowPayloadNullableScalarRelationFilter = {
+    is?: WorkflowPayloadWhereInput | null
+    isNot?: WorkflowPayloadWhereInput | null
+  }
+
   export type ContentHistoryListRelationFilter = {
     every?: ContentHistoryWhereInput
     some?: ContentHistoryWhereInput
@@ -27121,21 +36645,6 @@ export namespace Prisma {
     every?: ContentTagWhereInput
     some?: ContentTagWhereInput
     none?: ContentTagWhereInput
-  }
-
-  export type FilePayloadNullableScalarRelationFilter = {
-    is?: FilePayloadWhereInput | null
-    isNot?: FilePayloadWhereInput | null
-  }
-
-  export type HtmlPayloadNullableScalarRelationFilter = {
-    is?: HtmlPayloadWhereInput | null
-    isNot?: HtmlPayloadWhereInput | null
-  }
-
-  export type NotePayloadNullableScalarRelationFilter = {
-    is?: NotePayloadWhereInput | null
-    isNot?: NotePayloadWhereInput | null
   }
 
   export type TrashBinNullableScalarRelationFilter = {
@@ -27188,6 +36697,8 @@ export namespace Prisma {
     ownerId?: SortOrder
     title?: SortOrder
     slug?: SortOrder
+    contentType?: SortOrder
+    role?: SortOrder
     parentId?: SortOrder
     displayOrder?: SortOrder
     categoryId?: SortOrder
@@ -27209,6 +36720,8 @@ export namespace Prisma {
     ownerId?: SortOrder
     title?: SortOrder
     slug?: SortOrder
+    contentType?: SortOrder
+    role?: SortOrder
     parentId?: SortOrder
     displayOrder?: SortOrder
     categoryId?: SortOrder
@@ -27226,6 +36739,8 @@ export namespace Prisma {
     ownerId?: SortOrder
     title?: SortOrder
     slug?: SortOrder
+    contentType?: SortOrder
+    role?: SortOrder
     parentId?: SortOrder
     displayOrder?: SortOrder
     categoryId?: SortOrder
@@ -27273,6 +36788,26 @@ export namespace Prisma {
     _count?: NestedIntFilter<$PrismaModel>
     _min?: NestedStringFilter<$PrismaModel>
     _max?: NestedStringFilter<$PrismaModel>
+  }
+
+  export type EnumContentTypeWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: $Enums.ContentType | EnumContentTypeFieldRefInput<$PrismaModel>
+    in?: $Enums.ContentType[] | ListEnumContentTypeFieldRefInput<$PrismaModel>
+    notIn?: $Enums.ContentType[] | ListEnumContentTypeFieldRefInput<$PrismaModel>
+    not?: NestedEnumContentTypeWithAggregatesFilter<$PrismaModel> | $Enums.ContentType
+    _count?: NestedIntFilter<$PrismaModel>
+    _min?: NestedEnumContentTypeFilter<$PrismaModel>
+    _max?: NestedEnumContentTypeFilter<$PrismaModel>
+  }
+
+  export type EnumContentRoleWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: $Enums.ContentRole | EnumContentRoleFieldRefInput<$PrismaModel>
+    in?: $Enums.ContentRole[] | ListEnumContentRoleFieldRefInput<$PrismaModel>
+    notIn?: $Enums.ContentRole[] | ListEnumContentRoleFieldRefInput<$PrismaModel>
+    not?: NestedEnumContentRoleWithAggregatesFilter<$PrismaModel> | $Enums.ContentRole
+    _count?: NestedIntFilter<$PrismaModel>
+    _min?: NestedEnumContentRoleFilter<$PrismaModel>
+    _max?: NestedEnumContentRoleFilter<$PrismaModel>
   }
 
   export type UuidNullableWithAggregatesFilter<$PrismaModel = never> = {
@@ -28014,10 +37549,10 @@ export namespace Prisma {
     passwordHash?: SortOrder
     email?: SortOrder
     role?: SortOrder
-    settings?: SortOrder
-    settingsVersion?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
+    settings?: SortOrder
+    settingsVersion?: SortOrder
   }
 
   export type UserAvgOrderByAggregateInput = {
@@ -28030,9 +37565,9 @@ export namespace Prisma {
     passwordHash?: SortOrder
     email?: SortOrder
     role?: SortOrder
-    settingsVersion?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
+    settingsVersion?: SortOrder
   }
 
   export type UserMinOrderByAggregateInput = {
@@ -28041,9 +37576,9 @@ export namespace Prisma {
     passwordHash?: SortOrder
     email?: SortOrder
     role?: SortOrder
-    settingsVersion?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
+    settingsVersion?: SortOrder
   }
 
   export type UserSumOrderByAggregateInput = {
@@ -28114,8 +37649,8 @@ export namespace Prisma {
     name?: SortOrder
     slug?: SortOrder
     createdAt?: SortOrder
-    color?: SortOrder
     userId?: SortOrder
+    color?: SortOrder
   }
 
   export type TagMaxOrderByAggregateInput = {
@@ -28123,8 +37658,8 @@ export namespace Prisma {
     name?: SortOrder
     slug?: SortOrder
     createdAt?: SortOrder
-    color?: SortOrder
     userId?: SortOrder
+    color?: SortOrder
   }
 
   export type TagMinOrderByAggregateInput = {
@@ -28132,8 +37667,8 @@ export namespace Prisma {
     name?: SortOrder
     slug?: SortOrder
     createdAt?: SortOrder
-    color?: SortOrder
     userId?: SortOrder
+    color?: SortOrder
   }
 
   export type ViewGrantContentIdUserIdCompoundUniqueInput = {
@@ -28269,6 +37804,199 @@ export namespace Prisma {
     createdAt?: SortOrder
   }
 
+  export type EnumFolderViewModeFilter<$PrismaModel = never> = {
+    equals?: $Enums.FolderViewMode | EnumFolderViewModeFieldRefInput<$PrismaModel>
+    in?: $Enums.FolderViewMode[] | ListEnumFolderViewModeFieldRefInput<$PrismaModel>
+    notIn?: $Enums.FolderViewMode[] | ListEnumFolderViewModeFieldRefInput<$PrismaModel>
+    not?: NestedEnumFolderViewModeFilter<$PrismaModel> | $Enums.FolderViewMode
+  }
+
+  export type FolderPayloadCountOrderByAggregateInput = {
+    contentId?: SortOrder
+    viewMode?: SortOrder
+    sortMode?: SortOrder
+    viewPrefs?: SortOrder
+    includeReferencedContent?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type FolderPayloadMaxOrderByAggregateInput = {
+    contentId?: SortOrder
+    viewMode?: SortOrder
+    sortMode?: SortOrder
+    includeReferencedContent?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type FolderPayloadMinOrderByAggregateInput = {
+    contentId?: SortOrder
+    viewMode?: SortOrder
+    sortMode?: SortOrder
+    includeReferencedContent?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type EnumFolderViewModeWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: $Enums.FolderViewMode | EnumFolderViewModeFieldRefInput<$PrismaModel>
+    in?: $Enums.FolderViewMode[] | ListEnumFolderViewModeFieldRefInput<$PrismaModel>
+    notIn?: $Enums.FolderViewMode[] | ListEnumFolderViewModeFieldRefInput<$PrismaModel>
+    not?: NestedEnumFolderViewModeWithAggregatesFilter<$PrismaModel> | $Enums.FolderViewMode
+    _count?: NestedIntFilter<$PrismaModel>
+    _min?: NestedEnumFolderViewModeFilter<$PrismaModel>
+    _max?: NestedEnumFolderViewModeFilter<$PrismaModel>
+  }
+
+  export type ExternalPayloadCountOrderByAggregateInput = {
+    contentId?: SortOrder
+    url?: SortOrder
+    subtype?: SortOrder
+    preview?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type ExternalPayloadMaxOrderByAggregateInput = {
+    contentId?: SortOrder
+    url?: SortOrder
+    subtype?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type ExternalPayloadMinOrderByAggregateInput = {
+    contentId?: SortOrder
+    url?: SortOrder
+    subtype?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type ChatPayloadCountOrderByAggregateInput = {
+    contentId?: SortOrder
+    messages?: SortOrder
+    metadata?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type ChatPayloadMaxOrderByAggregateInput = {
+    contentId?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type ChatPayloadMinOrderByAggregateInput = {
+    contentId?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type VisualizationPayloadCountOrderByAggregateInput = {
+    contentId?: SortOrder
+    engine?: SortOrder
+    config?: SortOrder
+    data?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type VisualizationPayloadMaxOrderByAggregateInput = {
+    contentId?: SortOrder
+    engine?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type VisualizationPayloadMinOrderByAggregateInput = {
+    contentId?: SortOrder
+    engine?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type DataPayloadCountOrderByAggregateInput = {
+    contentId?: SortOrder
+    mode?: SortOrder
+    source?: SortOrder
+    schema?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type DataPayloadMaxOrderByAggregateInput = {
+    contentId?: SortOrder
+    mode?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type DataPayloadMinOrderByAggregateInput = {
+    contentId?: SortOrder
+    mode?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type HopePayloadCountOrderByAggregateInput = {
+    contentId?: SortOrder
+    kind?: SortOrder
+    status?: SortOrder
+    description?: SortOrder
+    targetDate?: SortOrder
+    metadata?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type HopePayloadMaxOrderByAggregateInput = {
+    contentId?: SortOrder
+    kind?: SortOrder
+    status?: SortOrder
+    description?: SortOrder
+    targetDate?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type HopePayloadMinOrderByAggregateInput = {
+    contentId?: SortOrder
+    kind?: SortOrder
+    status?: SortOrder
+    description?: SortOrder
+    targetDate?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type WorkflowPayloadCountOrderByAggregateInput = {
+    contentId?: SortOrder
+    engine?: SortOrder
+    definition?: SortOrder
+    enabled?: SortOrder
+    metadata?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type WorkflowPayloadMaxOrderByAggregateInput = {
+    contentId?: SortOrder
+    engine?: SortOrder
+    enabled?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type WorkflowPayloadMinOrderByAggregateInput = {
+    contentId?: SortOrder
+    engine?: SortOrder
+    enabled?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
   export type AuditLogCreateNestedManyWithoutTargetContentInput = {
     create?: XOR<AuditLogCreateWithoutTargetContentInput, AuditLogUncheckedCreateWithoutTargetContentInput> | AuditLogCreateWithoutTargetContentInput[] | AuditLogUncheckedCreateWithoutTargetContentInput[]
     connectOrCreate?: AuditLogCreateOrConnectWithoutTargetContentInput | AuditLogCreateOrConnectWithoutTargetContentInput[]
@@ -28280,6 +38008,66 @@ export namespace Prisma {
     create?: XOR<CodePayloadCreateWithoutContentInput, CodePayloadUncheckedCreateWithoutContentInput>
     connectOrCreate?: CodePayloadCreateOrConnectWithoutContentInput
     connect?: CodePayloadWhereUniqueInput
+  }
+
+  export type FilePayloadCreateNestedOneWithoutContentInput = {
+    create?: XOR<FilePayloadCreateWithoutContentInput, FilePayloadUncheckedCreateWithoutContentInput>
+    connectOrCreate?: FilePayloadCreateOrConnectWithoutContentInput
+    connect?: FilePayloadWhereUniqueInput
+  }
+
+  export type HtmlPayloadCreateNestedOneWithoutContentInput = {
+    create?: XOR<HtmlPayloadCreateWithoutContentInput, HtmlPayloadUncheckedCreateWithoutContentInput>
+    connectOrCreate?: HtmlPayloadCreateOrConnectWithoutContentInput
+    connect?: HtmlPayloadWhereUniqueInput
+  }
+
+  export type NotePayloadCreateNestedOneWithoutContentInput = {
+    create?: XOR<NotePayloadCreateWithoutContentInput, NotePayloadUncheckedCreateWithoutContentInput>
+    connectOrCreate?: NotePayloadCreateOrConnectWithoutContentInput
+    connect?: NotePayloadWhereUniqueInput
+  }
+
+  export type FolderPayloadCreateNestedOneWithoutContentInput = {
+    create?: XOR<FolderPayloadCreateWithoutContentInput, FolderPayloadUncheckedCreateWithoutContentInput>
+    connectOrCreate?: FolderPayloadCreateOrConnectWithoutContentInput
+    connect?: FolderPayloadWhereUniqueInput
+  }
+
+  export type ExternalPayloadCreateNestedOneWithoutContentInput = {
+    create?: XOR<ExternalPayloadCreateWithoutContentInput, ExternalPayloadUncheckedCreateWithoutContentInput>
+    connectOrCreate?: ExternalPayloadCreateOrConnectWithoutContentInput
+    connect?: ExternalPayloadWhereUniqueInput
+  }
+
+  export type ChatPayloadCreateNestedOneWithoutContentInput = {
+    create?: XOR<ChatPayloadCreateWithoutContentInput, ChatPayloadUncheckedCreateWithoutContentInput>
+    connectOrCreate?: ChatPayloadCreateOrConnectWithoutContentInput
+    connect?: ChatPayloadWhereUniqueInput
+  }
+
+  export type VisualizationPayloadCreateNestedOneWithoutContentInput = {
+    create?: XOR<VisualizationPayloadCreateWithoutContentInput, VisualizationPayloadUncheckedCreateWithoutContentInput>
+    connectOrCreate?: VisualizationPayloadCreateOrConnectWithoutContentInput
+    connect?: VisualizationPayloadWhereUniqueInput
+  }
+
+  export type DataPayloadCreateNestedOneWithoutContentInput = {
+    create?: XOR<DataPayloadCreateWithoutContentInput, DataPayloadUncheckedCreateWithoutContentInput>
+    connectOrCreate?: DataPayloadCreateOrConnectWithoutContentInput
+    connect?: DataPayloadWhereUniqueInput
+  }
+
+  export type HopePayloadCreateNestedOneWithoutContentInput = {
+    create?: XOR<HopePayloadCreateWithoutContentInput, HopePayloadUncheckedCreateWithoutContentInput>
+    connectOrCreate?: HopePayloadCreateOrConnectWithoutContentInput
+    connect?: HopePayloadWhereUniqueInput
+  }
+
+  export type WorkflowPayloadCreateNestedOneWithoutContentInput = {
+    create?: XOR<WorkflowPayloadCreateWithoutContentInput, WorkflowPayloadUncheckedCreateWithoutContentInput>
+    connectOrCreate?: WorkflowPayloadCreateOrConnectWithoutContentInput
+    connect?: WorkflowPayloadWhereUniqueInput
   }
 
   export type ContentHistoryCreateNestedManyWithoutContentInput = {
@@ -28341,24 +38129,6 @@ export namespace Prisma {
     connect?: ContentTagWhereUniqueInput | ContentTagWhereUniqueInput[]
   }
 
-  export type FilePayloadCreateNestedOneWithoutContentInput = {
-    create?: XOR<FilePayloadCreateWithoutContentInput, FilePayloadUncheckedCreateWithoutContentInput>
-    connectOrCreate?: FilePayloadCreateOrConnectWithoutContentInput
-    connect?: FilePayloadWhereUniqueInput
-  }
-
-  export type HtmlPayloadCreateNestedOneWithoutContentInput = {
-    create?: XOR<HtmlPayloadCreateWithoutContentInput, HtmlPayloadUncheckedCreateWithoutContentInput>
-    connectOrCreate?: HtmlPayloadCreateOrConnectWithoutContentInput
-    connect?: HtmlPayloadWhereUniqueInput
-  }
-
-  export type NotePayloadCreateNestedOneWithoutContentInput = {
-    create?: XOR<NotePayloadCreateWithoutContentInput, NotePayloadUncheckedCreateWithoutContentInput>
-    connectOrCreate?: NotePayloadCreateOrConnectWithoutContentInput
-    connect?: NotePayloadWhereUniqueInput
-  }
-
   export type TrashBinCreateNestedOneWithoutContentInput = {
     create?: XOR<TrashBinCreateWithoutContentInput, TrashBinUncheckedCreateWithoutContentInput>
     connectOrCreate?: TrashBinCreateOrConnectWithoutContentInput
@@ -28383,6 +38153,66 @@ export namespace Prisma {
     create?: XOR<CodePayloadCreateWithoutContentInput, CodePayloadUncheckedCreateWithoutContentInput>
     connectOrCreate?: CodePayloadCreateOrConnectWithoutContentInput
     connect?: CodePayloadWhereUniqueInput
+  }
+
+  export type FilePayloadUncheckedCreateNestedOneWithoutContentInput = {
+    create?: XOR<FilePayloadCreateWithoutContentInput, FilePayloadUncheckedCreateWithoutContentInput>
+    connectOrCreate?: FilePayloadCreateOrConnectWithoutContentInput
+    connect?: FilePayloadWhereUniqueInput
+  }
+
+  export type HtmlPayloadUncheckedCreateNestedOneWithoutContentInput = {
+    create?: XOR<HtmlPayloadCreateWithoutContentInput, HtmlPayloadUncheckedCreateWithoutContentInput>
+    connectOrCreate?: HtmlPayloadCreateOrConnectWithoutContentInput
+    connect?: HtmlPayloadWhereUniqueInput
+  }
+
+  export type NotePayloadUncheckedCreateNestedOneWithoutContentInput = {
+    create?: XOR<NotePayloadCreateWithoutContentInput, NotePayloadUncheckedCreateWithoutContentInput>
+    connectOrCreate?: NotePayloadCreateOrConnectWithoutContentInput
+    connect?: NotePayloadWhereUniqueInput
+  }
+
+  export type FolderPayloadUncheckedCreateNestedOneWithoutContentInput = {
+    create?: XOR<FolderPayloadCreateWithoutContentInput, FolderPayloadUncheckedCreateWithoutContentInput>
+    connectOrCreate?: FolderPayloadCreateOrConnectWithoutContentInput
+    connect?: FolderPayloadWhereUniqueInput
+  }
+
+  export type ExternalPayloadUncheckedCreateNestedOneWithoutContentInput = {
+    create?: XOR<ExternalPayloadCreateWithoutContentInput, ExternalPayloadUncheckedCreateWithoutContentInput>
+    connectOrCreate?: ExternalPayloadCreateOrConnectWithoutContentInput
+    connect?: ExternalPayloadWhereUniqueInput
+  }
+
+  export type ChatPayloadUncheckedCreateNestedOneWithoutContentInput = {
+    create?: XOR<ChatPayloadCreateWithoutContentInput, ChatPayloadUncheckedCreateWithoutContentInput>
+    connectOrCreate?: ChatPayloadCreateOrConnectWithoutContentInput
+    connect?: ChatPayloadWhereUniqueInput
+  }
+
+  export type VisualizationPayloadUncheckedCreateNestedOneWithoutContentInput = {
+    create?: XOR<VisualizationPayloadCreateWithoutContentInput, VisualizationPayloadUncheckedCreateWithoutContentInput>
+    connectOrCreate?: VisualizationPayloadCreateOrConnectWithoutContentInput
+    connect?: VisualizationPayloadWhereUniqueInput
+  }
+
+  export type DataPayloadUncheckedCreateNestedOneWithoutContentInput = {
+    create?: XOR<DataPayloadCreateWithoutContentInput, DataPayloadUncheckedCreateWithoutContentInput>
+    connectOrCreate?: DataPayloadCreateOrConnectWithoutContentInput
+    connect?: DataPayloadWhereUniqueInput
+  }
+
+  export type HopePayloadUncheckedCreateNestedOneWithoutContentInput = {
+    create?: XOR<HopePayloadCreateWithoutContentInput, HopePayloadUncheckedCreateWithoutContentInput>
+    connectOrCreate?: HopePayloadCreateOrConnectWithoutContentInput
+    connect?: HopePayloadWhereUniqueInput
+  }
+
+  export type WorkflowPayloadUncheckedCreateNestedOneWithoutContentInput = {
+    create?: XOR<WorkflowPayloadCreateWithoutContentInput, WorkflowPayloadUncheckedCreateWithoutContentInput>
+    connectOrCreate?: WorkflowPayloadCreateOrConnectWithoutContentInput
+    connect?: WorkflowPayloadWhereUniqueInput
   }
 
   export type ContentHistoryUncheckedCreateNestedManyWithoutContentInput = {
@@ -28426,24 +38256,6 @@ export namespace Prisma {
     connect?: ContentTagWhereUniqueInput | ContentTagWhereUniqueInput[]
   }
 
-  export type FilePayloadUncheckedCreateNestedOneWithoutContentInput = {
-    create?: XOR<FilePayloadCreateWithoutContentInput, FilePayloadUncheckedCreateWithoutContentInput>
-    connectOrCreate?: FilePayloadCreateOrConnectWithoutContentInput
-    connect?: FilePayloadWhereUniqueInput
-  }
-
-  export type HtmlPayloadUncheckedCreateNestedOneWithoutContentInput = {
-    create?: XOR<HtmlPayloadCreateWithoutContentInput, HtmlPayloadUncheckedCreateWithoutContentInput>
-    connectOrCreate?: HtmlPayloadCreateOrConnectWithoutContentInput
-    connect?: HtmlPayloadWhereUniqueInput
-  }
-
-  export type NotePayloadUncheckedCreateNestedOneWithoutContentInput = {
-    create?: XOR<NotePayloadCreateWithoutContentInput, NotePayloadUncheckedCreateWithoutContentInput>
-    connectOrCreate?: NotePayloadCreateOrConnectWithoutContentInput
-    connect?: NotePayloadWhereUniqueInput
-  }
-
   export type TrashBinUncheckedCreateNestedOneWithoutContentInput = {
     create?: XOR<TrashBinCreateWithoutContentInput, TrashBinUncheckedCreateWithoutContentInput>
     connectOrCreate?: TrashBinCreateOrConnectWithoutContentInput
@@ -28459,6 +38271,14 @@ export namespace Prisma {
 
   export type StringFieldUpdateOperationsInput = {
     set?: string
+  }
+
+  export type EnumContentTypeFieldUpdateOperationsInput = {
+    set?: $Enums.ContentType
+  }
+
+  export type EnumContentRoleFieldUpdateOperationsInput = {
+    set?: $Enums.ContentRole
   }
 
   export type IntFieldUpdateOperationsInput = {
@@ -28507,6 +38327,106 @@ export namespace Prisma {
     delete?: CodePayloadWhereInput | boolean
     connect?: CodePayloadWhereUniqueInput
     update?: XOR<XOR<CodePayloadUpdateToOneWithWhereWithoutContentInput, CodePayloadUpdateWithoutContentInput>, CodePayloadUncheckedUpdateWithoutContentInput>
+  }
+
+  export type FilePayloadUpdateOneWithoutContentNestedInput = {
+    create?: XOR<FilePayloadCreateWithoutContentInput, FilePayloadUncheckedCreateWithoutContentInput>
+    connectOrCreate?: FilePayloadCreateOrConnectWithoutContentInput
+    upsert?: FilePayloadUpsertWithoutContentInput
+    disconnect?: FilePayloadWhereInput | boolean
+    delete?: FilePayloadWhereInput | boolean
+    connect?: FilePayloadWhereUniqueInput
+    update?: XOR<XOR<FilePayloadUpdateToOneWithWhereWithoutContentInput, FilePayloadUpdateWithoutContentInput>, FilePayloadUncheckedUpdateWithoutContentInput>
+  }
+
+  export type HtmlPayloadUpdateOneWithoutContentNestedInput = {
+    create?: XOR<HtmlPayloadCreateWithoutContentInput, HtmlPayloadUncheckedCreateWithoutContentInput>
+    connectOrCreate?: HtmlPayloadCreateOrConnectWithoutContentInput
+    upsert?: HtmlPayloadUpsertWithoutContentInput
+    disconnect?: HtmlPayloadWhereInput | boolean
+    delete?: HtmlPayloadWhereInput | boolean
+    connect?: HtmlPayloadWhereUniqueInput
+    update?: XOR<XOR<HtmlPayloadUpdateToOneWithWhereWithoutContentInput, HtmlPayloadUpdateWithoutContentInput>, HtmlPayloadUncheckedUpdateWithoutContentInput>
+  }
+
+  export type NotePayloadUpdateOneWithoutContentNestedInput = {
+    create?: XOR<NotePayloadCreateWithoutContentInput, NotePayloadUncheckedCreateWithoutContentInput>
+    connectOrCreate?: NotePayloadCreateOrConnectWithoutContentInput
+    upsert?: NotePayloadUpsertWithoutContentInput
+    disconnect?: NotePayloadWhereInput | boolean
+    delete?: NotePayloadWhereInput | boolean
+    connect?: NotePayloadWhereUniqueInput
+    update?: XOR<XOR<NotePayloadUpdateToOneWithWhereWithoutContentInput, NotePayloadUpdateWithoutContentInput>, NotePayloadUncheckedUpdateWithoutContentInput>
+  }
+
+  export type FolderPayloadUpdateOneWithoutContentNestedInput = {
+    create?: XOR<FolderPayloadCreateWithoutContentInput, FolderPayloadUncheckedCreateWithoutContentInput>
+    connectOrCreate?: FolderPayloadCreateOrConnectWithoutContentInput
+    upsert?: FolderPayloadUpsertWithoutContentInput
+    disconnect?: FolderPayloadWhereInput | boolean
+    delete?: FolderPayloadWhereInput | boolean
+    connect?: FolderPayloadWhereUniqueInput
+    update?: XOR<XOR<FolderPayloadUpdateToOneWithWhereWithoutContentInput, FolderPayloadUpdateWithoutContentInput>, FolderPayloadUncheckedUpdateWithoutContentInput>
+  }
+
+  export type ExternalPayloadUpdateOneWithoutContentNestedInput = {
+    create?: XOR<ExternalPayloadCreateWithoutContentInput, ExternalPayloadUncheckedCreateWithoutContentInput>
+    connectOrCreate?: ExternalPayloadCreateOrConnectWithoutContentInput
+    upsert?: ExternalPayloadUpsertWithoutContentInput
+    disconnect?: ExternalPayloadWhereInput | boolean
+    delete?: ExternalPayloadWhereInput | boolean
+    connect?: ExternalPayloadWhereUniqueInput
+    update?: XOR<XOR<ExternalPayloadUpdateToOneWithWhereWithoutContentInput, ExternalPayloadUpdateWithoutContentInput>, ExternalPayloadUncheckedUpdateWithoutContentInput>
+  }
+
+  export type ChatPayloadUpdateOneWithoutContentNestedInput = {
+    create?: XOR<ChatPayloadCreateWithoutContentInput, ChatPayloadUncheckedCreateWithoutContentInput>
+    connectOrCreate?: ChatPayloadCreateOrConnectWithoutContentInput
+    upsert?: ChatPayloadUpsertWithoutContentInput
+    disconnect?: ChatPayloadWhereInput | boolean
+    delete?: ChatPayloadWhereInput | boolean
+    connect?: ChatPayloadWhereUniqueInput
+    update?: XOR<XOR<ChatPayloadUpdateToOneWithWhereWithoutContentInput, ChatPayloadUpdateWithoutContentInput>, ChatPayloadUncheckedUpdateWithoutContentInput>
+  }
+
+  export type VisualizationPayloadUpdateOneWithoutContentNestedInput = {
+    create?: XOR<VisualizationPayloadCreateWithoutContentInput, VisualizationPayloadUncheckedCreateWithoutContentInput>
+    connectOrCreate?: VisualizationPayloadCreateOrConnectWithoutContentInput
+    upsert?: VisualizationPayloadUpsertWithoutContentInput
+    disconnect?: VisualizationPayloadWhereInput | boolean
+    delete?: VisualizationPayloadWhereInput | boolean
+    connect?: VisualizationPayloadWhereUniqueInput
+    update?: XOR<XOR<VisualizationPayloadUpdateToOneWithWhereWithoutContentInput, VisualizationPayloadUpdateWithoutContentInput>, VisualizationPayloadUncheckedUpdateWithoutContentInput>
+  }
+
+  export type DataPayloadUpdateOneWithoutContentNestedInput = {
+    create?: XOR<DataPayloadCreateWithoutContentInput, DataPayloadUncheckedCreateWithoutContentInput>
+    connectOrCreate?: DataPayloadCreateOrConnectWithoutContentInput
+    upsert?: DataPayloadUpsertWithoutContentInput
+    disconnect?: DataPayloadWhereInput | boolean
+    delete?: DataPayloadWhereInput | boolean
+    connect?: DataPayloadWhereUniqueInput
+    update?: XOR<XOR<DataPayloadUpdateToOneWithWhereWithoutContentInput, DataPayloadUpdateWithoutContentInput>, DataPayloadUncheckedUpdateWithoutContentInput>
+  }
+
+  export type HopePayloadUpdateOneWithoutContentNestedInput = {
+    create?: XOR<HopePayloadCreateWithoutContentInput, HopePayloadUncheckedCreateWithoutContentInput>
+    connectOrCreate?: HopePayloadCreateOrConnectWithoutContentInput
+    upsert?: HopePayloadUpsertWithoutContentInput
+    disconnect?: HopePayloadWhereInput | boolean
+    delete?: HopePayloadWhereInput | boolean
+    connect?: HopePayloadWhereUniqueInput
+    update?: XOR<XOR<HopePayloadUpdateToOneWithWhereWithoutContentInput, HopePayloadUpdateWithoutContentInput>, HopePayloadUncheckedUpdateWithoutContentInput>
+  }
+
+  export type WorkflowPayloadUpdateOneWithoutContentNestedInput = {
+    create?: XOR<WorkflowPayloadCreateWithoutContentInput, WorkflowPayloadUncheckedCreateWithoutContentInput>
+    connectOrCreate?: WorkflowPayloadCreateOrConnectWithoutContentInput
+    upsert?: WorkflowPayloadUpsertWithoutContentInput
+    disconnect?: WorkflowPayloadWhereInput | boolean
+    delete?: WorkflowPayloadWhereInput | boolean
+    connect?: WorkflowPayloadWhereUniqueInput
+    update?: XOR<XOR<WorkflowPayloadUpdateToOneWithWhereWithoutContentInput, WorkflowPayloadUpdateWithoutContentInput>, WorkflowPayloadUncheckedUpdateWithoutContentInput>
   }
 
   export type ContentHistoryUpdateManyWithoutContentNestedInput = {
@@ -28617,36 +38537,6 @@ export namespace Prisma {
     deleteMany?: ContentTagScalarWhereInput | ContentTagScalarWhereInput[]
   }
 
-  export type FilePayloadUpdateOneWithoutContentNestedInput = {
-    create?: XOR<FilePayloadCreateWithoutContentInput, FilePayloadUncheckedCreateWithoutContentInput>
-    connectOrCreate?: FilePayloadCreateOrConnectWithoutContentInput
-    upsert?: FilePayloadUpsertWithoutContentInput
-    disconnect?: FilePayloadWhereInput | boolean
-    delete?: FilePayloadWhereInput | boolean
-    connect?: FilePayloadWhereUniqueInput
-    update?: XOR<XOR<FilePayloadUpdateToOneWithWhereWithoutContentInput, FilePayloadUpdateWithoutContentInput>, FilePayloadUncheckedUpdateWithoutContentInput>
-  }
-
-  export type HtmlPayloadUpdateOneWithoutContentNestedInput = {
-    create?: XOR<HtmlPayloadCreateWithoutContentInput, HtmlPayloadUncheckedCreateWithoutContentInput>
-    connectOrCreate?: HtmlPayloadCreateOrConnectWithoutContentInput
-    upsert?: HtmlPayloadUpsertWithoutContentInput
-    disconnect?: HtmlPayloadWhereInput | boolean
-    delete?: HtmlPayloadWhereInput | boolean
-    connect?: HtmlPayloadWhereUniqueInput
-    update?: XOR<XOR<HtmlPayloadUpdateToOneWithWhereWithoutContentInput, HtmlPayloadUpdateWithoutContentInput>, HtmlPayloadUncheckedUpdateWithoutContentInput>
-  }
-
-  export type NotePayloadUpdateOneWithoutContentNestedInput = {
-    create?: XOR<NotePayloadCreateWithoutContentInput, NotePayloadUncheckedCreateWithoutContentInput>
-    connectOrCreate?: NotePayloadCreateOrConnectWithoutContentInput
-    upsert?: NotePayloadUpsertWithoutContentInput
-    disconnect?: NotePayloadWhereInput | boolean
-    delete?: NotePayloadWhereInput | boolean
-    connect?: NotePayloadWhereUniqueInput
-    update?: XOR<XOR<NotePayloadUpdateToOneWithWhereWithoutContentInput, NotePayloadUpdateWithoutContentInput>, NotePayloadUncheckedUpdateWithoutContentInput>
-  }
-
   export type TrashBinUpdateOneWithoutContentNestedInput = {
     create?: XOR<TrashBinCreateWithoutContentInput, TrashBinUncheckedCreateWithoutContentInput>
     connectOrCreate?: TrashBinCreateOrConnectWithoutContentInput
@@ -28693,6 +38583,106 @@ export namespace Prisma {
     delete?: CodePayloadWhereInput | boolean
     connect?: CodePayloadWhereUniqueInput
     update?: XOR<XOR<CodePayloadUpdateToOneWithWhereWithoutContentInput, CodePayloadUpdateWithoutContentInput>, CodePayloadUncheckedUpdateWithoutContentInput>
+  }
+
+  export type FilePayloadUncheckedUpdateOneWithoutContentNestedInput = {
+    create?: XOR<FilePayloadCreateWithoutContentInput, FilePayloadUncheckedCreateWithoutContentInput>
+    connectOrCreate?: FilePayloadCreateOrConnectWithoutContentInput
+    upsert?: FilePayloadUpsertWithoutContentInput
+    disconnect?: FilePayloadWhereInput | boolean
+    delete?: FilePayloadWhereInput | boolean
+    connect?: FilePayloadWhereUniqueInput
+    update?: XOR<XOR<FilePayloadUpdateToOneWithWhereWithoutContentInput, FilePayloadUpdateWithoutContentInput>, FilePayloadUncheckedUpdateWithoutContentInput>
+  }
+
+  export type HtmlPayloadUncheckedUpdateOneWithoutContentNestedInput = {
+    create?: XOR<HtmlPayloadCreateWithoutContentInput, HtmlPayloadUncheckedCreateWithoutContentInput>
+    connectOrCreate?: HtmlPayloadCreateOrConnectWithoutContentInput
+    upsert?: HtmlPayloadUpsertWithoutContentInput
+    disconnect?: HtmlPayloadWhereInput | boolean
+    delete?: HtmlPayloadWhereInput | boolean
+    connect?: HtmlPayloadWhereUniqueInput
+    update?: XOR<XOR<HtmlPayloadUpdateToOneWithWhereWithoutContentInput, HtmlPayloadUpdateWithoutContentInput>, HtmlPayloadUncheckedUpdateWithoutContentInput>
+  }
+
+  export type NotePayloadUncheckedUpdateOneWithoutContentNestedInput = {
+    create?: XOR<NotePayloadCreateWithoutContentInput, NotePayloadUncheckedCreateWithoutContentInput>
+    connectOrCreate?: NotePayloadCreateOrConnectWithoutContentInput
+    upsert?: NotePayloadUpsertWithoutContentInput
+    disconnect?: NotePayloadWhereInput | boolean
+    delete?: NotePayloadWhereInput | boolean
+    connect?: NotePayloadWhereUniqueInput
+    update?: XOR<XOR<NotePayloadUpdateToOneWithWhereWithoutContentInput, NotePayloadUpdateWithoutContentInput>, NotePayloadUncheckedUpdateWithoutContentInput>
+  }
+
+  export type FolderPayloadUncheckedUpdateOneWithoutContentNestedInput = {
+    create?: XOR<FolderPayloadCreateWithoutContentInput, FolderPayloadUncheckedCreateWithoutContentInput>
+    connectOrCreate?: FolderPayloadCreateOrConnectWithoutContentInput
+    upsert?: FolderPayloadUpsertWithoutContentInput
+    disconnect?: FolderPayloadWhereInput | boolean
+    delete?: FolderPayloadWhereInput | boolean
+    connect?: FolderPayloadWhereUniqueInput
+    update?: XOR<XOR<FolderPayloadUpdateToOneWithWhereWithoutContentInput, FolderPayloadUpdateWithoutContentInput>, FolderPayloadUncheckedUpdateWithoutContentInput>
+  }
+
+  export type ExternalPayloadUncheckedUpdateOneWithoutContentNestedInput = {
+    create?: XOR<ExternalPayloadCreateWithoutContentInput, ExternalPayloadUncheckedCreateWithoutContentInput>
+    connectOrCreate?: ExternalPayloadCreateOrConnectWithoutContentInput
+    upsert?: ExternalPayloadUpsertWithoutContentInput
+    disconnect?: ExternalPayloadWhereInput | boolean
+    delete?: ExternalPayloadWhereInput | boolean
+    connect?: ExternalPayloadWhereUniqueInput
+    update?: XOR<XOR<ExternalPayloadUpdateToOneWithWhereWithoutContentInput, ExternalPayloadUpdateWithoutContentInput>, ExternalPayloadUncheckedUpdateWithoutContentInput>
+  }
+
+  export type ChatPayloadUncheckedUpdateOneWithoutContentNestedInput = {
+    create?: XOR<ChatPayloadCreateWithoutContentInput, ChatPayloadUncheckedCreateWithoutContentInput>
+    connectOrCreate?: ChatPayloadCreateOrConnectWithoutContentInput
+    upsert?: ChatPayloadUpsertWithoutContentInput
+    disconnect?: ChatPayloadWhereInput | boolean
+    delete?: ChatPayloadWhereInput | boolean
+    connect?: ChatPayloadWhereUniqueInput
+    update?: XOR<XOR<ChatPayloadUpdateToOneWithWhereWithoutContentInput, ChatPayloadUpdateWithoutContentInput>, ChatPayloadUncheckedUpdateWithoutContentInput>
+  }
+
+  export type VisualizationPayloadUncheckedUpdateOneWithoutContentNestedInput = {
+    create?: XOR<VisualizationPayloadCreateWithoutContentInput, VisualizationPayloadUncheckedCreateWithoutContentInput>
+    connectOrCreate?: VisualizationPayloadCreateOrConnectWithoutContentInput
+    upsert?: VisualizationPayloadUpsertWithoutContentInput
+    disconnect?: VisualizationPayloadWhereInput | boolean
+    delete?: VisualizationPayloadWhereInput | boolean
+    connect?: VisualizationPayloadWhereUniqueInput
+    update?: XOR<XOR<VisualizationPayloadUpdateToOneWithWhereWithoutContentInput, VisualizationPayloadUpdateWithoutContentInput>, VisualizationPayloadUncheckedUpdateWithoutContentInput>
+  }
+
+  export type DataPayloadUncheckedUpdateOneWithoutContentNestedInput = {
+    create?: XOR<DataPayloadCreateWithoutContentInput, DataPayloadUncheckedCreateWithoutContentInput>
+    connectOrCreate?: DataPayloadCreateOrConnectWithoutContentInput
+    upsert?: DataPayloadUpsertWithoutContentInput
+    disconnect?: DataPayloadWhereInput | boolean
+    delete?: DataPayloadWhereInput | boolean
+    connect?: DataPayloadWhereUniqueInput
+    update?: XOR<XOR<DataPayloadUpdateToOneWithWhereWithoutContentInput, DataPayloadUpdateWithoutContentInput>, DataPayloadUncheckedUpdateWithoutContentInput>
+  }
+
+  export type HopePayloadUncheckedUpdateOneWithoutContentNestedInput = {
+    create?: XOR<HopePayloadCreateWithoutContentInput, HopePayloadUncheckedCreateWithoutContentInput>
+    connectOrCreate?: HopePayloadCreateOrConnectWithoutContentInput
+    upsert?: HopePayloadUpsertWithoutContentInput
+    disconnect?: HopePayloadWhereInput | boolean
+    delete?: HopePayloadWhereInput | boolean
+    connect?: HopePayloadWhereUniqueInput
+    update?: XOR<XOR<HopePayloadUpdateToOneWithWhereWithoutContentInput, HopePayloadUpdateWithoutContentInput>, HopePayloadUncheckedUpdateWithoutContentInput>
+  }
+
+  export type WorkflowPayloadUncheckedUpdateOneWithoutContentNestedInput = {
+    create?: XOR<WorkflowPayloadCreateWithoutContentInput, WorkflowPayloadUncheckedCreateWithoutContentInput>
+    connectOrCreate?: WorkflowPayloadCreateOrConnectWithoutContentInput
+    upsert?: WorkflowPayloadUpsertWithoutContentInput
+    disconnect?: WorkflowPayloadWhereInput | boolean
+    delete?: WorkflowPayloadWhereInput | boolean
+    connect?: WorkflowPayloadWhereUniqueInput
+    update?: XOR<XOR<WorkflowPayloadUpdateToOneWithWhereWithoutContentInput, WorkflowPayloadUpdateWithoutContentInput>, WorkflowPayloadUncheckedUpdateWithoutContentInput>
   }
 
   export type ContentHistoryUncheckedUpdateManyWithoutContentNestedInput = {
@@ -28773,36 +38763,6 @@ export namespace Prisma {
     update?: ContentTagUpdateWithWhereUniqueWithoutContentInput | ContentTagUpdateWithWhereUniqueWithoutContentInput[]
     updateMany?: ContentTagUpdateManyWithWhereWithoutContentInput | ContentTagUpdateManyWithWhereWithoutContentInput[]
     deleteMany?: ContentTagScalarWhereInput | ContentTagScalarWhereInput[]
-  }
-
-  export type FilePayloadUncheckedUpdateOneWithoutContentNestedInput = {
-    create?: XOR<FilePayloadCreateWithoutContentInput, FilePayloadUncheckedCreateWithoutContentInput>
-    connectOrCreate?: FilePayloadCreateOrConnectWithoutContentInput
-    upsert?: FilePayloadUpsertWithoutContentInput
-    disconnect?: FilePayloadWhereInput | boolean
-    delete?: FilePayloadWhereInput | boolean
-    connect?: FilePayloadWhereUniqueInput
-    update?: XOR<XOR<FilePayloadUpdateToOneWithWhereWithoutContentInput, FilePayloadUpdateWithoutContentInput>, FilePayloadUncheckedUpdateWithoutContentInput>
-  }
-
-  export type HtmlPayloadUncheckedUpdateOneWithoutContentNestedInput = {
-    create?: XOR<HtmlPayloadCreateWithoutContentInput, HtmlPayloadUncheckedCreateWithoutContentInput>
-    connectOrCreate?: HtmlPayloadCreateOrConnectWithoutContentInput
-    upsert?: HtmlPayloadUpsertWithoutContentInput
-    disconnect?: HtmlPayloadWhereInput | boolean
-    delete?: HtmlPayloadWhereInput | boolean
-    connect?: HtmlPayloadWhereUniqueInput
-    update?: XOR<XOR<HtmlPayloadUpdateToOneWithWhereWithoutContentInput, HtmlPayloadUpdateWithoutContentInput>, HtmlPayloadUncheckedUpdateWithoutContentInput>
-  }
-
-  export type NotePayloadUncheckedUpdateOneWithoutContentNestedInput = {
-    create?: XOR<NotePayloadCreateWithoutContentInput, NotePayloadUncheckedCreateWithoutContentInput>
-    connectOrCreate?: NotePayloadCreateOrConnectWithoutContentInput
-    upsert?: NotePayloadUpsertWithoutContentInput
-    disconnect?: NotePayloadWhereInput | boolean
-    delete?: NotePayloadWhereInput | boolean
-    connect?: NotePayloadWhereUniqueInput
-    update?: XOR<XOR<NotePayloadUpdateToOneWithWhereWithoutContentInput, NotePayloadUpdateWithoutContentInput>, NotePayloadUncheckedUpdateWithoutContentInput>
   }
 
   export type TrashBinUncheckedUpdateOneWithoutContentNestedInput = {
@@ -29065,17 +39025,17 @@ export namespace Prisma {
     connect?: AccountWhereUniqueInput | AccountWhereUniqueInput[]
   }
 
-  export type AuditLogCreateNestedManyWithoutUserInput = {
-    create?: XOR<AuditLogCreateWithoutUserInput, AuditLogUncheckedCreateWithoutUserInput> | AuditLogCreateWithoutUserInput[] | AuditLogUncheckedCreateWithoutUserInput[]
-    connectOrCreate?: AuditLogCreateOrConnectWithoutUserInput | AuditLogCreateOrConnectWithoutUserInput[]
-    createMany?: AuditLogCreateManyUserInputEnvelope
-    connect?: AuditLogWhereUniqueInput | AuditLogWhereUniqueInput[]
-  }
-
   export type AuditLogCreateNestedManyWithoutTargetUserInput = {
     create?: XOR<AuditLogCreateWithoutTargetUserInput, AuditLogUncheckedCreateWithoutTargetUserInput> | AuditLogCreateWithoutTargetUserInput[] | AuditLogUncheckedCreateWithoutTargetUserInput[]
     connectOrCreate?: AuditLogCreateOrConnectWithoutTargetUserInput | AuditLogCreateOrConnectWithoutTargetUserInput[]
     createMany?: AuditLogCreateManyTargetUserInputEnvelope
+    connect?: AuditLogWhereUniqueInput | AuditLogWhereUniqueInput[]
+  }
+
+  export type AuditLogCreateNestedManyWithoutUserInput = {
+    create?: XOR<AuditLogCreateWithoutUserInput, AuditLogUncheckedCreateWithoutUserInput> | AuditLogCreateWithoutUserInput[] | AuditLogUncheckedCreateWithoutUserInput[]
+    connectOrCreate?: AuditLogCreateOrConnectWithoutUserInput | AuditLogCreateOrConnectWithoutUserInput[]
+    createMany?: AuditLogCreateManyUserInputEnvelope
     connect?: AuditLogWhereUniqueInput | AuditLogWhereUniqueInput[]
   }
 
@@ -29142,17 +39102,17 @@ export namespace Prisma {
     connect?: AccountWhereUniqueInput | AccountWhereUniqueInput[]
   }
 
-  export type AuditLogUncheckedCreateNestedManyWithoutUserInput = {
-    create?: XOR<AuditLogCreateWithoutUserInput, AuditLogUncheckedCreateWithoutUserInput> | AuditLogCreateWithoutUserInput[] | AuditLogUncheckedCreateWithoutUserInput[]
-    connectOrCreate?: AuditLogCreateOrConnectWithoutUserInput | AuditLogCreateOrConnectWithoutUserInput[]
-    createMany?: AuditLogCreateManyUserInputEnvelope
-    connect?: AuditLogWhereUniqueInput | AuditLogWhereUniqueInput[]
-  }
-
   export type AuditLogUncheckedCreateNestedManyWithoutTargetUserInput = {
     create?: XOR<AuditLogCreateWithoutTargetUserInput, AuditLogUncheckedCreateWithoutTargetUserInput> | AuditLogCreateWithoutTargetUserInput[] | AuditLogUncheckedCreateWithoutTargetUserInput[]
     connectOrCreate?: AuditLogCreateOrConnectWithoutTargetUserInput | AuditLogCreateOrConnectWithoutTargetUserInput[]
     createMany?: AuditLogCreateManyTargetUserInputEnvelope
+    connect?: AuditLogWhereUniqueInput | AuditLogWhereUniqueInput[]
+  }
+
+  export type AuditLogUncheckedCreateNestedManyWithoutUserInput = {
+    create?: XOR<AuditLogCreateWithoutUserInput, AuditLogUncheckedCreateWithoutUserInput> | AuditLogCreateWithoutUserInput[] | AuditLogUncheckedCreateWithoutUserInput[]
+    connectOrCreate?: AuditLogCreateOrConnectWithoutUserInput | AuditLogCreateOrConnectWithoutUserInput[]
+    createMany?: AuditLogCreateManyUserInputEnvelope
     connect?: AuditLogWhereUniqueInput | AuditLogWhereUniqueInput[]
   }
 
@@ -29230,20 +39190,6 @@ export namespace Prisma {
     deleteMany?: AccountScalarWhereInput | AccountScalarWhereInput[]
   }
 
-  export type AuditLogUpdateManyWithoutUserNestedInput = {
-    create?: XOR<AuditLogCreateWithoutUserInput, AuditLogUncheckedCreateWithoutUserInput> | AuditLogCreateWithoutUserInput[] | AuditLogUncheckedCreateWithoutUserInput[]
-    connectOrCreate?: AuditLogCreateOrConnectWithoutUserInput | AuditLogCreateOrConnectWithoutUserInput[]
-    upsert?: AuditLogUpsertWithWhereUniqueWithoutUserInput | AuditLogUpsertWithWhereUniqueWithoutUserInput[]
-    createMany?: AuditLogCreateManyUserInputEnvelope
-    set?: AuditLogWhereUniqueInput | AuditLogWhereUniqueInput[]
-    disconnect?: AuditLogWhereUniqueInput | AuditLogWhereUniqueInput[]
-    delete?: AuditLogWhereUniqueInput | AuditLogWhereUniqueInput[]
-    connect?: AuditLogWhereUniqueInput | AuditLogWhereUniqueInput[]
-    update?: AuditLogUpdateWithWhereUniqueWithoutUserInput | AuditLogUpdateWithWhereUniqueWithoutUserInput[]
-    updateMany?: AuditLogUpdateManyWithWhereWithoutUserInput | AuditLogUpdateManyWithWhereWithoutUserInput[]
-    deleteMany?: AuditLogScalarWhereInput | AuditLogScalarWhereInput[]
-  }
-
   export type AuditLogUpdateManyWithoutTargetUserNestedInput = {
     create?: XOR<AuditLogCreateWithoutTargetUserInput, AuditLogUncheckedCreateWithoutTargetUserInput> | AuditLogCreateWithoutTargetUserInput[] | AuditLogUncheckedCreateWithoutTargetUserInput[]
     connectOrCreate?: AuditLogCreateOrConnectWithoutTargetUserInput | AuditLogCreateOrConnectWithoutTargetUserInput[]
@@ -29255,6 +39201,20 @@ export namespace Prisma {
     connect?: AuditLogWhereUniqueInput | AuditLogWhereUniqueInput[]
     update?: AuditLogUpdateWithWhereUniqueWithoutTargetUserInput | AuditLogUpdateWithWhereUniqueWithoutTargetUserInput[]
     updateMany?: AuditLogUpdateManyWithWhereWithoutTargetUserInput | AuditLogUpdateManyWithWhereWithoutTargetUserInput[]
+    deleteMany?: AuditLogScalarWhereInput | AuditLogScalarWhereInput[]
+  }
+
+  export type AuditLogUpdateManyWithoutUserNestedInput = {
+    create?: XOR<AuditLogCreateWithoutUserInput, AuditLogUncheckedCreateWithoutUserInput> | AuditLogCreateWithoutUserInput[] | AuditLogUncheckedCreateWithoutUserInput[]
+    connectOrCreate?: AuditLogCreateOrConnectWithoutUserInput | AuditLogCreateOrConnectWithoutUserInput[]
+    upsert?: AuditLogUpsertWithWhereUniqueWithoutUserInput | AuditLogUpsertWithWhereUniqueWithoutUserInput[]
+    createMany?: AuditLogCreateManyUserInputEnvelope
+    set?: AuditLogWhereUniqueInput | AuditLogWhereUniqueInput[]
+    disconnect?: AuditLogWhereUniqueInput | AuditLogWhereUniqueInput[]
+    delete?: AuditLogWhereUniqueInput | AuditLogWhereUniqueInput[]
+    connect?: AuditLogWhereUniqueInput | AuditLogWhereUniqueInput[]
+    update?: AuditLogUpdateWithWhereUniqueWithoutUserInput | AuditLogUpdateWithWhereUniqueWithoutUserInput[]
+    updateMany?: AuditLogUpdateManyWithWhereWithoutUserInput | AuditLogUpdateManyWithWhereWithoutUserInput[]
     deleteMany?: AuditLogScalarWhereInput | AuditLogScalarWhereInput[]
   }
 
@@ -29384,20 +39344,6 @@ export namespace Prisma {
     deleteMany?: AccountScalarWhereInput | AccountScalarWhereInput[]
   }
 
-  export type AuditLogUncheckedUpdateManyWithoutUserNestedInput = {
-    create?: XOR<AuditLogCreateWithoutUserInput, AuditLogUncheckedCreateWithoutUserInput> | AuditLogCreateWithoutUserInput[] | AuditLogUncheckedCreateWithoutUserInput[]
-    connectOrCreate?: AuditLogCreateOrConnectWithoutUserInput | AuditLogCreateOrConnectWithoutUserInput[]
-    upsert?: AuditLogUpsertWithWhereUniqueWithoutUserInput | AuditLogUpsertWithWhereUniqueWithoutUserInput[]
-    createMany?: AuditLogCreateManyUserInputEnvelope
-    set?: AuditLogWhereUniqueInput | AuditLogWhereUniqueInput[]
-    disconnect?: AuditLogWhereUniqueInput | AuditLogWhereUniqueInput[]
-    delete?: AuditLogWhereUniqueInput | AuditLogWhereUniqueInput[]
-    connect?: AuditLogWhereUniqueInput | AuditLogWhereUniqueInput[]
-    update?: AuditLogUpdateWithWhereUniqueWithoutUserInput | AuditLogUpdateWithWhereUniqueWithoutUserInput[]
-    updateMany?: AuditLogUpdateManyWithWhereWithoutUserInput | AuditLogUpdateManyWithWhereWithoutUserInput[]
-    deleteMany?: AuditLogScalarWhereInput | AuditLogScalarWhereInput[]
-  }
-
   export type AuditLogUncheckedUpdateManyWithoutTargetUserNestedInput = {
     create?: XOR<AuditLogCreateWithoutTargetUserInput, AuditLogUncheckedCreateWithoutTargetUserInput> | AuditLogCreateWithoutTargetUserInput[] | AuditLogUncheckedCreateWithoutTargetUserInput[]
     connectOrCreate?: AuditLogCreateOrConnectWithoutTargetUserInput | AuditLogCreateOrConnectWithoutTargetUserInput[]
@@ -29409,6 +39355,20 @@ export namespace Prisma {
     connect?: AuditLogWhereUniqueInput | AuditLogWhereUniqueInput[]
     update?: AuditLogUpdateWithWhereUniqueWithoutTargetUserInput | AuditLogUpdateWithWhereUniqueWithoutTargetUserInput[]
     updateMany?: AuditLogUpdateManyWithWhereWithoutTargetUserInput | AuditLogUpdateManyWithWhereWithoutTargetUserInput[]
+    deleteMany?: AuditLogScalarWhereInput | AuditLogScalarWhereInput[]
+  }
+
+  export type AuditLogUncheckedUpdateManyWithoutUserNestedInput = {
+    create?: XOR<AuditLogCreateWithoutUserInput, AuditLogUncheckedCreateWithoutUserInput> | AuditLogCreateWithoutUserInput[] | AuditLogUncheckedCreateWithoutUserInput[]
+    connectOrCreate?: AuditLogCreateOrConnectWithoutUserInput | AuditLogCreateOrConnectWithoutUserInput[]
+    upsert?: AuditLogUpsertWithWhereUniqueWithoutUserInput | AuditLogUpsertWithWhereUniqueWithoutUserInput[]
+    createMany?: AuditLogCreateManyUserInputEnvelope
+    set?: AuditLogWhereUniqueInput | AuditLogWhereUniqueInput[]
+    disconnect?: AuditLogWhereUniqueInput | AuditLogWhereUniqueInput[]
+    delete?: AuditLogWhereUniqueInput | AuditLogWhereUniqueInput[]
+    connect?: AuditLogWhereUniqueInput | AuditLogWhereUniqueInput[]
+    update?: AuditLogUpdateWithWhereUniqueWithoutUserInput | AuditLogUpdateWithWhereUniqueWithoutUserInput[]
+    updateMany?: AuditLogUpdateManyWithWhereWithoutUserInput | AuditLogUpdateManyWithWhereWithoutUserInput[]
     deleteMany?: AuditLogScalarWhereInput | AuditLogScalarWhereInput[]
   }
 
@@ -29692,10 +39652,10 @@ export namespace Prisma {
     update?: XOR<XOR<UserUpdateToOneWithWhereWithoutAccountsInput, UserUpdateWithoutAccountsInput>, UserUncheckedUpdateWithoutAccountsInput>
   }
 
-  export type UserCreateNestedOneWithoutAdminActionsInput = {
-    create?: XOR<UserCreateWithoutAdminActionsInput, UserUncheckedCreateWithoutAdminActionsInput>
-    connectOrCreate?: UserCreateOrConnectWithoutAdminActionsInput
-    connect?: UserWhereUniqueInput
+  export type ContentNodeCreateNestedOneWithoutAuditLogsInput = {
+    create?: XOR<ContentNodeCreateWithoutAuditLogsInput, ContentNodeUncheckedCreateWithoutAuditLogsInput>
+    connectOrCreate?: ContentNodeCreateOrConnectWithoutAuditLogsInput
+    connect?: ContentNodeWhereUniqueInput
   }
 
   export type UserCreateNestedOneWithoutAuditTargetsInput = {
@@ -29704,18 +39664,20 @@ export namespace Prisma {
     connect?: UserWhereUniqueInput
   }
 
-  export type ContentNodeCreateNestedOneWithoutAuditLogsInput = {
-    create?: XOR<ContentNodeCreateWithoutAuditLogsInput, ContentNodeUncheckedCreateWithoutAuditLogsInput>
-    connectOrCreate?: ContentNodeCreateOrConnectWithoutAuditLogsInput
-    connect?: ContentNodeWhereUniqueInput
-  }
-
-  export type UserUpdateOneRequiredWithoutAdminActionsNestedInput = {
+  export type UserCreateNestedOneWithoutAdminActionsInput = {
     create?: XOR<UserCreateWithoutAdminActionsInput, UserUncheckedCreateWithoutAdminActionsInput>
     connectOrCreate?: UserCreateOrConnectWithoutAdminActionsInput
-    upsert?: UserUpsertWithoutAdminActionsInput
     connect?: UserWhereUniqueInput
-    update?: XOR<XOR<UserUpdateToOneWithWhereWithoutAdminActionsInput, UserUpdateWithoutAdminActionsInput>, UserUncheckedUpdateWithoutAdminActionsInput>
+  }
+
+  export type ContentNodeUpdateOneWithoutAuditLogsNestedInput = {
+    create?: XOR<ContentNodeCreateWithoutAuditLogsInput, ContentNodeUncheckedCreateWithoutAuditLogsInput>
+    connectOrCreate?: ContentNodeCreateOrConnectWithoutAuditLogsInput
+    upsert?: ContentNodeUpsertWithoutAuditLogsInput
+    disconnect?: ContentNodeWhereInput | boolean
+    delete?: ContentNodeWhereInput | boolean
+    connect?: ContentNodeWhereUniqueInput
+    update?: XOR<XOR<ContentNodeUpdateToOneWithWhereWithoutAuditLogsInput, ContentNodeUpdateWithoutAuditLogsInput>, ContentNodeUncheckedUpdateWithoutAuditLogsInput>
   }
 
   export type UserUpdateOneWithoutAuditTargetsNestedInput = {
@@ -29728,14 +39690,114 @@ export namespace Prisma {
     update?: XOR<XOR<UserUpdateToOneWithWhereWithoutAuditTargetsInput, UserUpdateWithoutAuditTargetsInput>, UserUncheckedUpdateWithoutAuditTargetsInput>
   }
 
-  export type ContentNodeUpdateOneWithoutAuditLogsNestedInput = {
-    create?: XOR<ContentNodeCreateWithoutAuditLogsInput, ContentNodeUncheckedCreateWithoutAuditLogsInput>
-    connectOrCreate?: ContentNodeCreateOrConnectWithoutAuditLogsInput
-    upsert?: ContentNodeUpsertWithoutAuditLogsInput
-    disconnect?: ContentNodeWhereInput | boolean
-    delete?: ContentNodeWhereInput | boolean
+  export type UserUpdateOneRequiredWithoutAdminActionsNestedInput = {
+    create?: XOR<UserCreateWithoutAdminActionsInput, UserUncheckedCreateWithoutAdminActionsInput>
+    connectOrCreate?: UserCreateOrConnectWithoutAdminActionsInput
+    upsert?: UserUpsertWithoutAdminActionsInput
+    connect?: UserWhereUniqueInput
+    update?: XOR<XOR<UserUpdateToOneWithWhereWithoutAdminActionsInput, UserUpdateWithoutAdminActionsInput>, UserUncheckedUpdateWithoutAdminActionsInput>
+  }
+
+  export type ContentNodeCreateNestedOneWithoutFolderPayloadInput = {
+    create?: XOR<ContentNodeCreateWithoutFolderPayloadInput, ContentNodeUncheckedCreateWithoutFolderPayloadInput>
+    connectOrCreate?: ContentNodeCreateOrConnectWithoutFolderPayloadInput
     connect?: ContentNodeWhereUniqueInput
-    update?: XOR<XOR<ContentNodeUpdateToOneWithWhereWithoutAuditLogsInput, ContentNodeUpdateWithoutAuditLogsInput>, ContentNodeUncheckedUpdateWithoutAuditLogsInput>
+  }
+
+  export type EnumFolderViewModeFieldUpdateOperationsInput = {
+    set?: $Enums.FolderViewMode
+  }
+
+  export type ContentNodeUpdateOneRequiredWithoutFolderPayloadNestedInput = {
+    create?: XOR<ContentNodeCreateWithoutFolderPayloadInput, ContentNodeUncheckedCreateWithoutFolderPayloadInput>
+    connectOrCreate?: ContentNodeCreateOrConnectWithoutFolderPayloadInput
+    upsert?: ContentNodeUpsertWithoutFolderPayloadInput
+    connect?: ContentNodeWhereUniqueInput
+    update?: XOR<XOR<ContentNodeUpdateToOneWithWhereWithoutFolderPayloadInput, ContentNodeUpdateWithoutFolderPayloadInput>, ContentNodeUncheckedUpdateWithoutFolderPayloadInput>
+  }
+
+  export type ContentNodeCreateNestedOneWithoutExternalPayloadInput = {
+    create?: XOR<ContentNodeCreateWithoutExternalPayloadInput, ContentNodeUncheckedCreateWithoutExternalPayloadInput>
+    connectOrCreate?: ContentNodeCreateOrConnectWithoutExternalPayloadInput
+    connect?: ContentNodeWhereUniqueInput
+  }
+
+  export type ContentNodeUpdateOneRequiredWithoutExternalPayloadNestedInput = {
+    create?: XOR<ContentNodeCreateWithoutExternalPayloadInput, ContentNodeUncheckedCreateWithoutExternalPayloadInput>
+    connectOrCreate?: ContentNodeCreateOrConnectWithoutExternalPayloadInput
+    upsert?: ContentNodeUpsertWithoutExternalPayloadInput
+    connect?: ContentNodeWhereUniqueInput
+    update?: XOR<XOR<ContentNodeUpdateToOneWithWhereWithoutExternalPayloadInput, ContentNodeUpdateWithoutExternalPayloadInput>, ContentNodeUncheckedUpdateWithoutExternalPayloadInput>
+  }
+
+  export type ContentNodeCreateNestedOneWithoutChatPayloadInput = {
+    create?: XOR<ContentNodeCreateWithoutChatPayloadInput, ContentNodeUncheckedCreateWithoutChatPayloadInput>
+    connectOrCreate?: ContentNodeCreateOrConnectWithoutChatPayloadInput
+    connect?: ContentNodeWhereUniqueInput
+  }
+
+  export type ContentNodeUpdateOneRequiredWithoutChatPayloadNestedInput = {
+    create?: XOR<ContentNodeCreateWithoutChatPayloadInput, ContentNodeUncheckedCreateWithoutChatPayloadInput>
+    connectOrCreate?: ContentNodeCreateOrConnectWithoutChatPayloadInput
+    upsert?: ContentNodeUpsertWithoutChatPayloadInput
+    connect?: ContentNodeWhereUniqueInput
+    update?: XOR<XOR<ContentNodeUpdateToOneWithWhereWithoutChatPayloadInput, ContentNodeUpdateWithoutChatPayloadInput>, ContentNodeUncheckedUpdateWithoutChatPayloadInput>
+  }
+
+  export type ContentNodeCreateNestedOneWithoutVisualizationPayloadInput = {
+    create?: XOR<ContentNodeCreateWithoutVisualizationPayloadInput, ContentNodeUncheckedCreateWithoutVisualizationPayloadInput>
+    connectOrCreate?: ContentNodeCreateOrConnectWithoutVisualizationPayloadInput
+    connect?: ContentNodeWhereUniqueInput
+  }
+
+  export type ContentNodeUpdateOneRequiredWithoutVisualizationPayloadNestedInput = {
+    create?: XOR<ContentNodeCreateWithoutVisualizationPayloadInput, ContentNodeUncheckedCreateWithoutVisualizationPayloadInput>
+    connectOrCreate?: ContentNodeCreateOrConnectWithoutVisualizationPayloadInput
+    upsert?: ContentNodeUpsertWithoutVisualizationPayloadInput
+    connect?: ContentNodeWhereUniqueInput
+    update?: XOR<XOR<ContentNodeUpdateToOneWithWhereWithoutVisualizationPayloadInput, ContentNodeUpdateWithoutVisualizationPayloadInput>, ContentNodeUncheckedUpdateWithoutVisualizationPayloadInput>
+  }
+
+  export type ContentNodeCreateNestedOneWithoutDataPayloadInput = {
+    create?: XOR<ContentNodeCreateWithoutDataPayloadInput, ContentNodeUncheckedCreateWithoutDataPayloadInput>
+    connectOrCreate?: ContentNodeCreateOrConnectWithoutDataPayloadInput
+    connect?: ContentNodeWhereUniqueInput
+  }
+
+  export type ContentNodeUpdateOneRequiredWithoutDataPayloadNestedInput = {
+    create?: XOR<ContentNodeCreateWithoutDataPayloadInput, ContentNodeUncheckedCreateWithoutDataPayloadInput>
+    connectOrCreate?: ContentNodeCreateOrConnectWithoutDataPayloadInput
+    upsert?: ContentNodeUpsertWithoutDataPayloadInput
+    connect?: ContentNodeWhereUniqueInput
+    update?: XOR<XOR<ContentNodeUpdateToOneWithWhereWithoutDataPayloadInput, ContentNodeUpdateWithoutDataPayloadInput>, ContentNodeUncheckedUpdateWithoutDataPayloadInput>
+  }
+
+  export type ContentNodeCreateNestedOneWithoutHopePayloadInput = {
+    create?: XOR<ContentNodeCreateWithoutHopePayloadInput, ContentNodeUncheckedCreateWithoutHopePayloadInput>
+    connectOrCreate?: ContentNodeCreateOrConnectWithoutHopePayloadInput
+    connect?: ContentNodeWhereUniqueInput
+  }
+
+  export type ContentNodeUpdateOneRequiredWithoutHopePayloadNestedInput = {
+    create?: XOR<ContentNodeCreateWithoutHopePayloadInput, ContentNodeUncheckedCreateWithoutHopePayloadInput>
+    connectOrCreate?: ContentNodeCreateOrConnectWithoutHopePayloadInput
+    upsert?: ContentNodeUpsertWithoutHopePayloadInput
+    connect?: ContentNodeWhereUniqueInput
+    update?: XOR<XOR<ContentNodeUpdateToOneWithWhereWithoutHopePayloadInput, ContentNodeUpdateWithoutHopePayloadInput>, ContentNodeUncheckedUpdateWithoutHopePayloadInput>
+  }
+
+  export type ContentNodeCreateNestedOneWithoutWorkflowPayloadInput = {
+    create?: XOR<ContentNodeCreateWithoutWorkflowPayloadInput, ContentNodeUncheckedCreateWithoutWorkflowPayloadInput>
+    connectOrCreate?: ContentNodeCreateOrConnectWithoutWorkflowPayloadInput
+    connect?: ContentNodeWhereUniqueInput
+  }
+
+  export type ContentNodeUpdateOneRequiredWithoutWorkflowPayloadNestedInput = {
+    create?: XOR<ContentNodeCreateWithoutWorkflowPayloadInput, ContentNodeUncheckedCreateWithoutWorkflowPayloadInput>
+    connectOrCreate?: ContentNodeCreateOrConnectWithoutWorkflowPayloadInput
+    upsert?: ContentNodeUpsertWithoutWorkflowPayloadInput
+    connect?: ContentNodeWhereUniqueInput
+    update?: XOR<XOR<ContentNodeUpdateToOneWithWhereWithoutWorkflowPayloadInput, ContentNodeUpdateWithoutWorkflowPayloadInput>, ContentNodeUncheckedUpdateWithoutWorkflowPayloadInput>
   }
 
   export type NestedUuidFilter<$PrismaModel = never> = {
@@ -29761,6 +39823,20 @@ export namespace Prisma {
     startsWith?: string | StringFieldRefInput<$PrismaModel>
     endsWith?: string | StringFieldRefInput<$PrismaModel>
     not?: NestedStringFilter<$PrismaModel> | string
+  }
+
+  export type NestedEnumContentTypeFilter<$PrismaModel = never> = {
+    equals?: $Enums.ContentType | EnumContentTypeFieldRefInput<$PrismaModel>
+    in?: $Enums.ContentType[] | ListEnumContentTypeFieldRefInput<$PrismaModel>
+    notIn?: $Enums.ContentType[] | ListEnumContentTypeFieldRefInput<$PrismaModel>
+    not?: NestedEnumContentTypeFilter<$PrismaModel> | $Enums.ContentType
+  }
+
+  export type NestedEnumContentRoleFilter<$PrismaModel = never> = {
+    equals?: $Enums.ContentRole | EnumContentRoleFieldRefInput<$PrismaModel>
+    in?: $Enums.ContentRole[] | ListEnumContentRoleFieldRefInput<$PrismaModel>
+    notIn?: $Enums.ContentRole[] | ListEnumContentRoleFieldRefInput<$PrismaModel>
+    not?: NestedEnumContentRoleFilter<$PrismaModel> | $Enums.ContentRole
   }
 
   export type NestedUuidNullableFilter<$PrismaModel = never> = {
@@ -29855,6 +39931,26 @@ export namespace Prisma {
     _count?: NestedIntFilter<$PrismaModel>
     _min?: NestedStringFilter<$PrismaModel>
     _max?: NestedStringFilter<$PrismaModel>
+  }
+
+  export type NestedEnumContentTypeWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: $Enums.ContentType | EnumContentTypeFieldRefInput<$PrismaModel>
+    in?: $Enums.ContentType[] | ListEnumContentTypeFieldRefInput<$PrismaModel>
+    notIn?: $Enums.ContentType[] | ListEnumContentTypeFieldRefInput<$PrismaModel>
+    not?: NestedEnumContentTypeWithAggregatesFilter<$PrismaModel> | $Enums.ContentType
+    _count?: NestedIntFilter<$PrismaModel>
+    _min?: NestedEnumContentTypeFilter<$PrismaModel>
+    _max?: NestedEnumContentTypeFilter<$PrismaModel>
+  }
+
+  export type NestedEnumContentRoleWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: $Enums.ContentRole | EnumContentRoleFieldRefInput<$PrismaModel>
+    in?: $Enums.ContentRole[] | ListEnumContentRoleFieldRefInput<$PrismaModel>
+    notIn?: $Enums.ContentRole[] | ListEnumContentRoleFieldRefInput<$PrismaModel>
+    not?: NestedEnumContentRoleWithAggregatesFilter<$PrismaModel> | $Enums.ContentRole
+    _count?: NestedIntFilter<$PrismaModel>
+    _min?: NestedEnumContentRoleFilter<$PrismaModel>
+    _max?: NestedEnumContentRoleFilter<$PrismaModel>
   }
 
   export type NestedUuidNullableWithAggregatesFilter<$PrismaModel = never> = {
@@ -30113,6 +40209,23 @@ export namespace Prisma {
     _max?: NestedEnumUserRoleFilter<$PrismaModel>
   }
 
+  export type NestedEnumFolderViewModeFilter<$PrismaModel = never> = {
+    equals?: $Enums.FolderViewMode | EnumFolderViewModeFieldRefInput<$PrismaModel>
+    in?: $Enums.FolderViewMode[] | ListEnumFolderViewModeFieldRefInput<$PrismaModel>
+    notIn?: $Enums.FolderViewMode[] | ListEnumFolderViewModeFieldRefInput<$PrismaModel>
+    not?: NestedEnumFolderViewModeFilter<$PrismaModel> | $Enums.FolderViewMode
+  }
+
+  export type NestedEnumFolderViewModeWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: $Enums.FolderViewMode | EnumFolderViewModeFieldRefInput<$PrismaModel>
+    in?: $Enums.FolderViewMode[] | ListEnumFolderViewModeFieldRefInput<$PrismaModel>
+    notIn?: $Enums.FolderViewMode[] | ListEnumFolderViewModeFieldRefInput<$PrismaModel>
+    not?: NestedEnumFolderViewModeWithAggregatesFilter<$PrismaModel> | $Enums.FolderViewMode
+    _count?: NestedIntFilter<$PrismaModel>
+    _min?: NestedEnumFolderViewModeFilter<$PrismaModel>
+    _max?: NestedEnumFolderViewModeFilter<$PrismaModel>
+  }
+
   export type AuditLogCreateWithoutTargetContentInput = {
     id?: string
     action: string
@@ -30120,8 +40233,8 @@ export namespace Prisma {
     ipAddress?: string | null
     userAgent?: string | null
     createdAt?: Date | string
-    user: UserCreateNestedOneWithoutAdminActionsInput
     targetUser?: UserCreateNestedOneWithoutAuditTargetsInput
+    user: UserCreateNestedOneWithoutAdminActionsInput
   }
 
   export type AuditLogUncheckedCreateWithoutTargetContentInput = {
@@ -30166,6 +40279,264 @@ export namespace Prisma {
   export type CodePayloadCreateOrConnectWithoutContentInput = {
     where: CodePayloadWhereUniqueInput
     create: XOR<CodePayloadCreateWithoutContentInput, CodePayloadUncheckedCreateWithoutContentInput>
+  }
+
+  export type FilePayloadCreateWithoutContentInput = {
+    fileName: string
+    fileExtension?: string | null
+    mimeType: string
+    fileSize: bigint | number
+    checksum: string
+    storageProvider?: $Enums.StorageProvider
+    storageKey: string
+    storageUrl?: string | null
+    storageMetadata?: JsonNullValueInput | InputJsonValue
+    uploadStatus?: $Enums.UploadStatus
+    uploadedAt?: Date | string | null
+    uploadError?: string | null
+    processingStatus?: string
+    isProcessed?: boolean
+    thumbnailUrl?: string | null
+    width?: number | null
+    height?: number | null
+    duration?: number | null
+    lastAccessedAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    searchText?: string
+  }
+
+  export type FilePayloadUncheckedCreateWithoutContentInput = {
+    fileName: string
+    fileExtension?: string | null
+    mimeType: string
+    fileSize: bigint | number
+    checksum: string
+    storageProvider?: $Enums.StorageProvider
+    storageKey: string
+    storageUrl?: string | null
+    storageMetadata?: JsonNullValueInput | InputJsonValue
+    uploadStatus?: $Enums.UploadStatus
+    uploadedAt?: Date | string | null
+    uploadError?: string | null
+    processingStatus?: string
+    isProcessed?: boolean
+    thumbnailUrl?: string | null
+    width?: number | null
+    height?: number | null
+    duration?: number | null
+    lastAccessedAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    searchText?: string
+  }
+
+  export type FilePayloadCreateOrConnectWithoutContentInput = {
+    where: FilePayloadWhereUniqueInput
+    create: XOR<FilePayloadCreateWithoutContentInput, FilePayloadUncheckedCreateWithoutContentInput>
+  }
+
+  export type HtmlPayloadCreateWithoutContentInput = {
+    html: string
+    searchText?: string
+    isTemplate?: boolean
+    templateSchema?: NullableJsonNullValueInput | InputJsonValue
+    templateMetadata?: JsonNullValueInput | InputJsonValue
+    renderMode?: string
+    templateEngine?: string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type HtmlPayloadUncheckedCreateWithoutContentInput = {
+    html: string
+    searchText?: string
+    isTemplate?: boolean
+    templateSchema?: NullableJsonNullValueInput | InputJsonValue
+    templateMetadata?: JsonNullValueInput | InputJsonValue
+    renderMode?: string
+    templateEngine?: string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type HtmlPayloadCreateOrConnectWithoutContentInput = {
+    where: HtmlPayloadWhereUniqueInput
+    create: XOR<HtmlPayloadCreateWithoutContentInput, HtmlPayloadUncheckedCreateWithoutContentInput>
+  }
+
+  export type NotePayloadCreateWithoutContentInput = {
+    tiptapJson: JsonNullValueInput | InputJsonValue
+    searchText?: string
+    metadata?: JsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type NotePayloadUncheckedCreateWithoutContentInput = {
+    tiptapJson: JsonNullValueInput | InputJsonValue
+    searchText?: string
+    metadata?: JsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type NotePayloadCreateOrConnectWithoutContentInput = {
+    where: NotePayloadWhereUniqueInput
+    create: XOR<NotePayloadCreateWithoutContentInput, NotePayloadUncheckedCreateWithoutContentInput>
+  }
+
+  export type FolderPayloadCreateWithoutContentInput = {
+    viewMode?: $Enums.FolderViewMode
+    sortMode?: string | null
+    viewPrefs?: JsonNullValueInput | InputJsonValue
+    includeReferencedContent?: boolean
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type FolderPayloadUncheckedCreateWithoutContentInput = {
+    viewMode?: $Enums.FolderViewMode
+    sortMode?: string | null
+    viewPrefs?: JsonNullValueInput | InputJsonValue
+    includeReferencedContent?: boolean
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type FolderPayloadCreateOrConnectWithoutContentInput = {
+    where: FolderPayloadWhereUniqueInput
+    create: XOR<FolderPayloadCreateWithoutContentInput, FolderPayloadUncheckedCreateWithoutContentInput>
+  }
+
+  export type ExternalPayloadCreateWithoutContentInput = {
+    url: string
+    subtype?: string | null
+    preview?: JsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type ExternalPayloadUncheckedCreateWithoutContentInput = {
+    url: string
+    subtype?: string | null
+    preview?: JsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type ExternalPayloadCreateOrConnectWithoutContentInput = {
+    where: ExternalPayloadWhereUniqueInput
+    create: XOR<ExternalPayloadCreateWithoutContentInput, ExternalPayloadUncheckedCreateWithoutContentInput>
+  }
+
+  export type ChatPayloadCreateWithoutContentInput = {
+    messages?: JsonNullValueInput | InputJsonValue
+    metadata?: JsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type ChatPayloadUncheckedCreateWithoutContentInput = {
+    messages?: JsonNullValueInput | InputJsonValue
+    metadata?: JsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type ChatPayloadCreateOrConnectWithoutContentInput = {
+    where: ChatPayloadWhereUniqueInput
+    create: XOR<ChatPayloadCreateWithoutContentInput, ChatPayloadUncheckedCreateWithoutContentInput>
+  }
+
+  export type VisualizationPayloadCreateWithoutContentInput = {
+    engine: string
+    config?: JsonNullValueInput | InputJsonValue
+    data?: JsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type VisualizationPayloadUncheckedCreateWithoutContentInput = {
+    engine: string
+    config?: JsonNullValueInput | InputJsonValue
+    data?: JsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type VisualizationPayloadCreateOrConnectWithoutContentInput = {
+    where: VisualizationPayloadWhereUniqueInput
+    create: XOR<VisualizationPayloadCreateWithoutContentInput, VisualizationPayloadUncheckedCreateWithoutContentInput>
+  }
+
+  export type DataPayloadCreateWithoutContentInput = {
+    mode: string
+    source?: JsonNullValueInput | InputJsonValue
+    schema?: JsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type DataPayloadUncheckedCreateWithoutContentInput = {
+    mode: string
+    source?: JsonNullValueInput | InputJsonValue
+    schema?: JsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type DataPayloadCreateOrConnectWithoutContentInput = {
+    where: DataPayloadWhereUniqueInput
+    create: XOR<DataPayloadCreateWithoutContentInput, DataPayloadUncheckedCreateWithoutContentInput>
+  }
+
+  export type HopePayloadCreateWithoutContentInput = {
+    kind: string
+    status: string
+    description?: string | null
+    targetDate?: Date | string | null
+    metadata?: JsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type HopePayloadUncheckedCreateWithoutContentInput = {
+    kind: string
+    status: string
+    description?: string | null
+    targetDate?: Date | string | null
+    metadata?: JsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type HopePayloadCreateOrConnectWithoutContentInput = {
+    where: HopePayloadWhereUniqueInput
+    create: XOR<HopePayloadCreateWithoutContentInput, HopePayloadUncheckedCreateWithoutContentInput>
+  }
+
+  export type WorkflowPayloadCreateWithoutContentInput = {
+    engine: string
+    definition?: JsonNullValueInput | InputJsonValue
+    enabled?: boolean
+    metadata?: JsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type WorkflowPayloadUncheckedCreateWithoutContentInput = {
+    engine: string
+    definition?: JsonNullValueInput | InputJsonValue
+    enabled?: boolean
+    metadata?: JsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type WorkflowPayloadCreateOrConnectWithoutContentInput = {
+    where: WorkflowPayloadWhereUniqueInput
+    create: XOR<WorkflowPayloadCreateWithoutContentInput, WorkflowPayloadUncheckedCreateWithoutContentInput>
   }
 
   export type ContentHistoryCreateWithoutContentInput = {
@@ -30285,13 +40656,13 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
-    settings?: NullableJsonNullValueInput | InputJsonValue
-    settingsVersion?: number
     createdAt?: Date | string
     updatedAt?: Date | string
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: number
     accounts?: AccountCreateNestedManyWithoutUserInput
-    adminActions?: AuditLogCreateNestedManyWithoutUserInput
     auditTargets?: AuditLogCreateNestedManyWithoutTargetUserInput
+    adminActions?: AuditLogCreateNestedManyWithoutUserInput
     categories?: CategoryCreateNestedManyWithoutOwnerInput
     contentHistory?: ContentHistoryCreateNestedManyWithoutUserInput
     sessions?: SessionCreateNestedManyWithoutUserInput
@@ -30307,13 +40678,13 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
-    settings?: NullableJsonNullValueInput | InputJsonValue
-    settingsVersion?: number
     createdAt?: Date | string
     updatedAt?: Date | string
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: number
     accounts?: AccountUncheckedCreateNestedManyWithoutUserInput
-    adminActions?: AuditLogUncheckedCreateNestedManyWithoutUserInput
     auditTargets?: AuditLogUncheckedCreateNestedManyWithoutTargetUserInput
+    adminActions?: AuditLogUncheckedCreateNestedManyWithoutUserInput
     categories?: CategoryUncheckedCreateNestedManyWithoutOwnerInput
     contentHistory?: ContentHistoryUncheckedCreateNestedManyWithoutUserInput
     sessions?: SessionUncheckedCreateNestedManyWithoutUserInput
@@ -30332,6 +40703,8 @@ export namespace Prisma {
     id?: string
     title: string
     slug: string
+    contentType: $Enums.ContentType
+    role?: $Enums.ContentRole
     displayOrder?: number
     isPublished?: boolean
     createdAt?: Date | string
@@ -30342,6 +40715,16 @@ export namespace Prisma {
     iconColor?: string | null
     auditLogs?: AuditLogCreateNestedManyWithoutTargetContentInput
     codePayload?: CodePayloadCreateNestedOneWithoutContentInput
+    filePayload?: FilePayloadCreateNestedOneWithoutContentInput
+    htmlPayload?: HtmlPayloadCreateNestedOneWithoutContentInput
+    notePayload?: NotePayloadCreateNestedOneWithoutContentInput
+    folderPayload?: FolderPayloadCreateNestedOneWithoutContentInput
+    externalPayload?: ExternalPayloadCreateNestedOneWithoutContentInput
+    chatPayload?: ChatPayloadCreateNestedOneWithoutContentInput
+    visualizationPayload?: VisualizationPayloadCreateNestedOneWithoutContentInput
+    dataPayload?: DataPayloadCreateNestedOneWithoutContentInput
+    hopePayload?: HopePayloadCreateNestedOneWithoutContentInput
+    workflowPayload?: WorkflowPayloadCreateNestedOneWithoutContentInput
     history?: ContentHistoryCreateNestedManyWithoutContentInput
     sourceLinks?: ContentLinkCreateNestedManyWithoutSourceInput
     targetLinks?: ContentLinkCreateNestedManyWithoutTargetInput
@@ -30350,9 +40733,6 @@ export namespace Prisma {
     parent?: ContentNodeCreateNestedOneWithoutChildrenInput
     contentPath?: ContentPathCreateNestedOneWithoutContentInput
     contentTags?: ContentTagCreateNestedManyWithoutContentInput
-    filePayload?: FilePayloadCreateNestedOneWithoutContentInput
-    htmlPayload?: HtmlPayloadCreateNestedOneWithoutContentInput
-    notePayload?: NotePayloadCreateNestedOneWithoutContentInput
     trashBinEntry?: TrashBinCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantCreateNestedManyWithoutContentInput
   }
@@ -30362,6 +40742,8 @@ export namespace Prisma {
     ownerId: string
     title: string
     slug: string
+    contentType: $Enums.ContentType
+    role?: $Enums.ContentRole
     parentId?: string | null
     displayOrder?: number
     categoryId?: string | null
@@ -30374,14 +40756,21 @@ export namespace Prisma {
     iconColor?: string | null
     auditLogs?: AuditLogUncheckedCreateNestedManyWithoutTargetContentInput
     codePayload?: CodePayloadUncheckedCreateNestedOneWithoutContentInput
+    filePayload?: FilePayloadUncheckedCreateNestedOneWithoutContentInput
+    htmlPayload?: HtmlPayloadUncheckedCreateNestedOneWithoutContentInput
+    notePayload?: NotePayloadUncheckedCreateNestedOneWithoutContentInput
+    folderPayload?: FolderPayloadUncheckedCreateNestedOneWithoutContentInput
+    externalPayload?: ExternalPayloadUncheckedCreateNestedOneWithoutContentInput
+    chatPayload?: ChatPayloadUncheckedCreateNestedOneWithoutContentInput
+    visualizationPayload?: VisualizationPayloadUncheckedCreateNestedOneWithoutContentInput
+    dataPayload?: DataPayloadUncheckedCreateNestedOneWithoutContentInput
+    hopePayload?: HopePayloadUncheckedCreateNestedOneWithoutContentInput
+    workflowPayload?: WorkflowPayloadUncheckedCreateNestedOneWithoutContentInput
     history?: ContentHistoryUncheckedCreateNestedManyWithoutContentInput
     sourceLinks?: ContentLinkUncheckedCreateNestedManyWithoutSourceInput
     targetLinks?: ContentLinkUncheckedCreateNestedManyWithoutTargetInput
     contentPath?: ContentPathUncheckedCreateNestedOneWithoutContentInput
     contentTags?: ContentTagUncheckedCreateNestedManyWithoutContentInput
-    filePayload?: FilePayloadUncheckedCreateNestedOneWithoutContentInput
-    htmlPayload?: HtmlPayloadUncheckedCreateNestedOneWithoutContentInput
-    notePayload?: NotePayloadUncheckedCreateNestedOneWithoutContentInput
     trashBinEntry?: TrashBinUncheckedCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantUncheckedCreateNestedManyWithoutContentInput
   }
@@ -30395,6 +40784,8 @@ export namespace Prisma {
     id?: string
     title: string
     slug: string
+    contentType: $Enums.ContentType
+    role?: $Enums.ContentRole
     displayOrder?: number
     isPublished?: boolean
     createdAt?: Date | string
@@ -30405,6 +40796,16 @@ export namespace Prisma {
     iconColor?: string | null
     auditLogs?: AuditLogCreateNestedManyWithoutTargetContentInput
     codePayload?: CodePayloadCreateNestedOneWithoutContentInput
+    filePayload?: FilePayloadCreateNestedOneWithoutContentInput
+    htmlPayload?: HtmlPayloadCreateNestedOneWithoutContentInput
+    notePayload?: NotePayloadCreateNestedOneWithoutContentInput
+    folderPayload?: FolderPayloadCreateNestedOneWithoutContentInput
+    externalPayload?: ExternalPayloadCreateNestedOneWithoutContentInput
+    chatPayload?: ChatPayloadCreateNestedOneWithoutContentInput
+    visualizationPayload?: VisualizationPayloadCreateNestedOneWithoutContentInput
+    dataPayload?: DataPayloadCreateNestedOneWithoutContentInput
+    hopePayload?: HopePayloadCreateNestedOneWithoutContentInput
+    workflowPayload?: WorkflowPayloadCreateNestedOneWithoutContentInput
     history?: ContentHistoryCreateNestedManyWithoutContentInput
     sourceLinks?: ContentLinkCreateNestedManyWithoutSourceInput
     targetLinks?: ContentLinkCreateNestedManyWithoutTargetInput
@@ -30413,9 +40814,6 @@ export namespace Prisma {
     children?: ContentNodeCreateNestedManyWithoutParentInput
     contentPath?: ContentPathCreateNestedOneWithoutContentInput
     contentTags?: ContentTagCreateNestedManyWithoutContentInput
-    filePayload?: FilePayloadCreateNestedOneWithoutContentInput
-    htmlPayload?: HtmlPayloadCreateNestedOneWithoutContentInput
-    notePayload?: NotePayloadCreateNestedOneWithoutContentInput
     trashBinEntry?: TrashBinCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantCreateNestedManyWithoutContentInput
   }
@@ -30425,6 +40823,8 @@ export namespace Prisma {
     ownerId: string
     title: string
     slug: string
+    contentType: $Enums.ContentType
+    role?: $Enums.ContentRole
     displayOrder?: number
     categoryId?: string | null
     isPublished?: boolean
@@ -30436,15 +40836,22 @@ export namespace Prisma {
     iconColor?: string | null
     auditLogs?: AuditLogUncheckedCreateNestedManyWithoutTargetContentInput
     codePayload?: CodePayloadUncheckedCreateNestedOneWithoutContentInput
+    filePayload?: FilePayloadUncheckedCreateNestedOneWithoutContentInput
+    htmlPayload?: HtmlPayloadUncheckedCreateNestedOneWithoutContentInput
+    notePayload?: NotePayloadUncheckedCreateNestedOneWithoutContentInput
+    folderPayload?: FolderPayloadUncheckedCreateNestedOneWithoutContentInput
+    externalPayload?: ExternalPayloadUncheckedCreateNestedOneWithoutContentInput
+    chatPayload?: ChatPayloadUncheckedCreateNestedOneWithoutContentInput
+    visualizationPayload?: VisualizationPayloadUncheckedCreateNestedOneWithoutContentInput
+    dataPayload?: DataPayloadUncheckedCreateNestedOneWithoutContentInput
+    hopePayload?: HopePayloadUncheckedCreateNestedOneWithoutContentInput
+    workflowPayload?: WorkflowPayloadUncheckedCreateNestedOneWithoutContentInput
     history?: ContentHistoryUncheckedCreateNestedManyWithoutContentInput
     sourceLinks?: ContentLinkUncheckedCreateNestedManyWithoutSourceInput
     targetLinks?: ContentLinkUncheckedCreateNestedManyWithoutTargetInput
     children?: ContentNodeUncheckedCreateNestedManyWithoutParentInput
     contentPath?: ContentPathUncheckedCreateNestedOneWithoutContentInput
     contentTags?: ContentTagUncheckedCreateNestedManyWithoutContentInput
-    filePayload?: FilePayloadUncheckedCreateNestedOneWithoutContentInput
-    htmlPayload?: HtmlPayloadUncheckedCreateNestedOneWithoutContentInput
-    notePayload?: NotePayloadUncheckedCreateNestedOneWithoutContentInput
     trashBinEntry?: TrashBinUncheckedCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantUncheckedCreateNestedManyWithoutContentInput
   }
@@ -30500,111 +40907,6 @@ export namespace Prisma {
   export type ContentTagCreateManyContentInputEnvelope = {
     data: ContentTagCreateManyContentInput | ContentTagCreateManyContentInput[]
     skipDuplicates?: boolean
-  }
-
-  export type FilePayloadCreateWithoutContentInput = {
-    fileName: string
-    fileExtension?: string | null
-    mimeType: string
-    fileSize: bigint | number
-    checksum: string
-    storageProvider?: $Enums.StorageProvider
-    storageKey: string
-    storageUrl?: string | null
-    storageMetadata?: JsonNullValueInput | InputJsonValue
-    uploadStatus?: $Enums.UploadStatus
-    uploadedAt?: Date | string | null
-    uploadError?: string | null
-    processingStatus?: string
-    isProcessed?: boolean
-    thumbnailUrl?: string | null
-    width?: number | null
-    height?: number | null
-    duration?: number | null
-    lastAccessedAt?: Date | string | null
-    createdAt?: Date | string
-    updatedAt?: Date | string
-    searchText?: string
-  }
-
-  export type FilePayloadUncheckedCreateWithoutContentInput = {
-    fileName: string
-    fileExtension?: string | null
-    mimeType: string
-    fileSize: bigint | number
-    checksum: string
-    storageProvider?: $Enums.StorageProvider
-    storageKey: string
-    storageUrl?: string | null
-    storageMetadata?: JsonNullValueInput | InputJsonValue
-    uploadStatus?: $Enums.UploadStatus
-    uploadedAt?: Date | string | null
-    uploadError?: string | null
-    processingStatus?: string
-    isProcessed?: boolean
-    thumbnailUrl?: string | null
-    width?: number | null
-    height?: number | null
-    duration?: number | null
-    lastAccessedAt?: Date | string | null
-    createdAt?: Date | string
-    updatedAt?: Date | string
-    searchText?: string
-  }
-
-  export type FilePayloadCreateOrConnectWithoutContentInput = {
-    where: FilePayloadWhereUniqueInput
-    create: XOR<FilePayloadCreateWithoutContentInput, FilePayloadUncheckedCreateWithoutContentInput>
-  }
-
-  export type HtmlPayloadCreateWithoutContentInput = {
-    html: string
-    searchText?: string
-    isTemplate?: boolean
-    templateSchema?: NullableJsonNullValueInput | InputJsonValue
-    templateMetadata?: JsonNullValueInput | InputJsonValue
-    renderMode?: string
-    templateEngine?: string | null
-    createdAt?: Date | string
-    updatedAt?: Date | string
-  }
-
-  export type HtmlPayloadUncheckedCreateWithoutContentInput = {
-    html: string
-    searchText?: string
-    isTemplate?: boolean
-    templateSchema?: NullableJsonNullValueInput | InputJsonValue
-    templateMetadata?: JsonNullValueInput | InputJsonValue
-    renderMode?: string
-    templateEngine?: string | null
-    createdAt?: Date | string
-    updatedAt?: Date | string
-  }
-
-  export type HtmlPayloadCreateOrConnectWithoutContentInput = {
-    where: HtmlPayloadWhereUniqueInput
-    create: XOR<HtmlPayloadCreateWithoutContentInput, HtmlPayloadUncheckedCreateWithoutContentInput>
-  }
-
-  export type NotePayloadCreateWithoutContentInput = {
-    tiptapJson: JsonNullValueInput | InputJsonValue
-    searchText?: string
-    metadata?: JsonNullValueInput | InputJsonValue
-    createdAt?: Date | string
-    updatedAt?: Date | string
-  }
-
-  export type NotePayloadUncheckedCreateWithoutContentInput = {
-    tiptapJson: JsonNullValueInput | InputJsonValue
-    searchText?: string
-    metadata?: JsonNullValueInput | InputJsonValue
-    createdAt?: Date | string
-    updatedAt?: Date | string
-  }
-
-  export type NotePayloadCreateOrConnectWithoutContentInput = {
-    where: NotePayloadWhereUniqueInput
-    create: XOR<NotePayloadCreateWithoutContentInput, NotePayloadUncheckedCreateWithoutContentInput>
   }
 
   export type TrashBinCreateWithoutContentInput = {
@@ -30713,6 +41015,324 @@ export namespace Prisma {
     code?: StringFieldUpdateOperationsInput | string
     language?: StringFieldUpdateOperationsInput | string
     searchText?: StringFieldUpdateOperationsInput | string
+    metadata?: JsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type FilePayloadUpsertWithoutContentInput = {
+    update: XOR<FilePayloadUpdateWithoutContentInput, FilePayloadUncheckedUpdateWithoutContentInput>
+    create: XOR<FilePayloadCreateWithoutContentInput, FilePayloadUncheckedCreateWithoutContentInput>
+    where?: FilePayloadWhereInput
+  }
+
+  export type FilePayloadUpdateToOneWithWhereWithoutContentInput = {
+    where?: FilePayloadWhereInput
+    data: XOR<FilePayloadUpdateWithoutContentInput, FilePayloadUncheckedUpdateWithoutContentInput>
+  }
+
+  export type FilePayloadUpdateWithoutContentInput = {
+    fileName?: StringFieldUpdateOperationsInput | string
+    fileExtension?: NullableStringFieldUpdateOperationsInput | string | null
+    mimeType?: StringFieldUpdateOperationsInput | string
+    fileSize?: BigIntFieldUpdateOperationsInput | bigint | number
+    checksum?: StringFieldUpdateOperationsInput | string
+    storageProvider?: EnumStorageProviderFieldUpdateOperationsInput | $Enums.StorageProvider
+    storageKey?: StringFieldUpdateOperationsInput | string
+    storageUrl?: NullableStringFieldUpdateOperationsInput | string | null
+    storageMetadata?: JsonNullValueInput | InputJsonValue
+    uploadStatus?: EnumUploadStatusFieldUpdateOperationsInput | $Enums.UploadStatus
+    uploadedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    uploadError?: NullableStringFieldUpdateOperationsInput | string | null
+    processingStatus?: StringFieldUpdateOperationsInput | string
+    isProcessed?: BoolFieldUpdateOperationsInput | boolean
+    thumbnailUrl?: NullableStringFieldUpdateOperationsInput | string | null
+    width?: NullableIntFieldUpdateOperationsInput | number | null
+    height?: NullableIntFieldUpdateOperationsInput | number | null
+    duration?: NullableIntFieldUpdateOperationsInput | number | null
+    lastAccessedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    searchText?: StringFieldUpdateOperationsInput | string
+  }
+
+  export type FilePayloadUncheckedUpdateWithoutContentInput = {
+    fileName?: StringFieldUpdateOperationsInput | string
+    fileExtension?: NullableStringFieldUpdateOperationsInput | string | null
+    mimeType?: StringFieldUpdateOperationsInput | string
+    fileSize?: BigIntFieldUpdateOperationsInput | bigint | number
+    checksum?: StringFieldUpdateOperationsInput | string
+    storageProvider?: EnumStorageProviderFieldUpdateOperationsInput | $Enums.StorageProvider
+    storageKey?: StringFieldUpdateOperationsInput | string
+    storageUrl?: NullableStringFieldUpdateOperationsInput | string | null
+    storageMetadata?: JsonNullValueInput | InputJsonValue
+    uploadStatus?: EnumUploadStatusFieldUpdateOperationsInput | $Enums.UploadStatus
+    uploadedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    uploadError?: NullableStringFieldUpdateOperationsInput | string | null
+    processingStatus?: StringFieldUpdateOperationsInput | string
+    isProcessed?: BoolFieldUpdateOperationsInput | boolean
+    thumbnailUrl?: NullableStringFieldUpdateOperationsInput | string | null
+    width?: NullableIntFieldUpdateOperationsInput | number | null
+    height?: NullableIntFieldUpdateOperationsInput | number | null
+    duration?: NullableIntFieldUpdateOperationsInput | number | null
+    lastAccessedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    searchText?: StringFieldUpdateOperationsInput | string
+  }
+
+  export type HtmlPayloadUpsertWithoutContentInput = {
+    update: XOR<HtmlPayloadUpdateWithoutContentInput, HtmlPayloadUncheckedUpdateWithoutContentInput>
+    create: XOR<HtmlPayloadCreateWithoutContentInput, HtmlPayloadUncheckedCreateWithoutContentInput>
+    where?: HtmlPayloadWhereInput
+  }
+
+  export type HtmlPayloadUpdateToOneWithWhereWithoutContentInput = {
+    where?: HtmlPayloadWhereInput
+    data: XOR<HtmlPayloadUpdateWithoutContentInput, HtmlPayloadUncheckedUpdateWithoutContentInput>
+  }
+
+  export type HtmlPayloadUpdateWithoutContentInput = {
+    html?: StringFieldUpdateOperationsInput | string
+    searchText?: StringFieldUpdateOperationsInput | string
+    isTemplate?: BoolFieldUpdateOperationsInput | boolean
+    templateSchema?: NullableJsonNullValueInput | InputJsonValue
+    templateMetadata?: JsonNullValueInput | InputJsonValue
+    renderMode?: StringFieldUpdateOperationsInput | string
+    templateEngine?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type HtmlPayloadUncheckedUpdateWithoutContentInput = {
+    html?: StringFieldUpdateOperationsInput | string
+    searchText?: StringFieldUpdateOperationsInput | string
+    isTemplate?: BoolFieldUpdateOperationsInput | boolean
+    templateSchema?: NullableJsonNullValueInput | InputJsonValue
+    templateMetadata?: JsonNullValueInput | InputJsonValue
+    renderMode?: StringFieldUpdateOperationsInput | string
+    templateEngine?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type NotePayloadUpsertWithoutContentInput = {
+    update: XOR<NotePayloadUpdateWithoutContentInput, NotePayloadUncheckedUpdateWithoutContentInput>
+    create: XOR<NotePayloadCreateWithoutContentInput, NotePayloadUncheckedCreateWithoutContentInput>
+    where?: NotePayloadWhereInput
+  }
+
+  export type NotePayloadUpdateToOneWithWhereWithoutContentInput = {
+    where?: NotePayloadWhereInput
+    data: XOR<NotePayloadUpdateWithoutContentInput, NotePayloadUncheckedUpdateWithoutContentInput>
+  }
+
+  export type NotePayloadUpdateWithoutContentInput = {
+    tiptapJson?: JsonNullValueInput | InputJsonValue
+    searchText?: StringFieldUpdateOperationsInput | string
+    metadata?: JsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type NotePayloadUncheckedUpdateWithoutContentInput = {
+    tiptapJson?: JsonNullValueInput | InputJsonValue
+    searchText?: StringFieldUpdateOperationsInput | string
+    metadata?: JsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type FolderPayloadUpsertWithoutContentInput = {
+    update: XOR<FolderPayloadUpdateWithoutContentInput, FolderPayloadUncheckedUpdateWithoutContentInput>
+    create: XOR<FolderPayloadCreateWithoutContentInput, FolderPayloadUncheckedCreateWithoutContentInput>
+    where?: FolderPayloadWhereInput
+  }
+
+  export type FolderPayloadUpdateToOneWithWhereWithoutContentInput = {
+    where?: FolderPayloadWhereInput
+    data: XOR<FolderPayloadUpdateWithoutContentInput, FolderPayloadUncheckedUpdateWithoutContentInput>
+  }
+
+  export type FolderPayloadUpdateWithoutContentInput = {
+    viewMode?: EnumFolderViewModeFieldUpdateOperationsInput | $Enums.FolderViewMode
+    sortMode?: NullableStringFieldUpdateOperationsInput | string | null
+    viewPrefs?: JsonNullValueInput | InputJsonValue
+    includeReferencedContent?: BoolFieldUpdateOperationsInput | boolean
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type FolderPayloadUncheckedUpdateWithoutContentInput = {
+    viewMode?: EnumFolderViewModeFieldUpdateOperationsInput | $Enums.FolderViewMode
+    sortMode?: NullableStringFieldUpdateOperationsInput | string | null
+    viewPrefs?: JsonNullValueInput | InputJsonValue
+    includeReferencedContent?: BoolFieldUpdateOperationsInput | boolean
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type ExternalPayloadUpsertWithoutContentInput = {
+    update: XOR<ExternalPayloadUpdateWithoutContentInput, ExternalPayloadUncheckedUpdateWithoutContentInput>
+    create: XOR<ExternalPayloadCreateWithoutContentInput, ExternalPayloadUncheckedCreateWithoutContentInput>
+    where?: ExternalPayloadWhereInput
+  }
+
+  export type ExternalPayloadUpdateToOneWithWhereWithoutContentInput = {
+    where?: ExternalPayloadWhereInput
+    data: XOR<ExternalPayloadUpdateWithoutContentInput, ExternalPayloadUncheckedUpdateWithoutContentInput>
+  }
+
+  export type ExternalPayloadUpdateWithoutContentInput = {
+    url?: StringFieldUpdateOperationsInput | string
+    subtype?: NullableStringFieldUpdateOperationsInput | string | null
+    preview?: JsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type ExternalPayloadUncheckedUpdateWithoutContentInput = {
+    url?: StringFieldUpdateOperationsInput | string
+    subtype?: NullableStringFieldUpdateOperationsInput | string | null
+    preview?: JsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type ChatPayloadUpsertWithoutContentInput = {
+    update: XOR<ChatPayloadUpdateWithoutContentInput, ChatPayloadUncheckedUpdateWithoutContentInput>
+    create: XOR<ChatPayloadCreateWithoutContentInput, ChatPayloadUncheckedCreateWithoutContentInput>
+    where?: ChatPayloadWhereInput
+  }
+
+  export type ChatPayloadUpdateToOneWithWhereWithoutContentInput = {
+    where?: ChatPayloadWhereInput
+    data: XOR<ChatPayloadUpdateWithoutContentInput, ChatPayloadUncheckedUpdateWithoutContentInput>
+  }
+
+  export type ChatPayloadUpdateWithoutContentInput = {
+    messages?: JsonNullValueInput | InputJsonValue
+    metadata?: JsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type ChatPayloadUncheckedUpdateWithoutContentInput = {
+    messages?: JsonNullValueInput | InputJsonValue
+    metadata?: JsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type VisualizationPayloadUpsertWithoutContentInput = {
+    update: XOR<VisualizationPayloadUpdateWithoutContentInput, VisualizationPayloadUncheckedUpdateWithoutContentInput>
+    create: XOR<VisualizationPayloadCreateWithoutContentInput, VisualizationPayloadUncheckedCreateWithoutContentInput>
+    where?: VisualizationPayloadWhereInput
+  }
+
+  export type VisualizationPayloadUpdateToOneWithWhereWithoutContentInput = {
+    where?: VisualizationPayloadWhereInput
+    data: XOR<VisualizationPayloadUpdateWithoutContentInput, VisualizationPayloadUncheckedUpdateWithoutContentInput>
+  }
+
+  export type VisualizationPayloadUpdateWithoutContentInput = {
+    engine?: StringFieldUpdateOperationsInput | string
+    config?: JsonNullValueInput | InputJsonValue
+    data?: JsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type VisualizationPayloadUncheckedUpdateWithoutContentInput = {
+    engine?: StringFieldUpdateOperationsInput | string
+    config?: JsonNullValueInput | InputJsonValue
+    data?: JsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type DataPayloadUpsertWithoutContentInput = {
+    update: XOR<DataPayloadUpdateWithoutContentInput, DataPayloadUncheckedUpdateWithoutContentInput>
+    create: XOR<DataPayloadCreateWithoutContentInput, DataPayloadUncheckedCreateWithoutContentInput>
+    where?: DataPayloadWhereInput
+  }
+
+  export type DataPayloadUpdateToOneWithWhereWithoutContentInput = {
+    where?: DataPayloadWhereInput
+    data: XOR<DataPayloadUpdateWithoutContentInput, DataPayloadUncheckedUpdateWithoutContentInput>
+  }
+
+  export type DataPayloadUpdateWithoutContentInput = {
+    mode?: StringFieldUpdateOperationsInput | string
+    source?: JsonNullValueInput | InputJsonValue
+    schema?: JsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type DataPayloadUncheckedUpdateWithoutContentInput = {
+    mode?: StringFieldUpdateOperationsInput | string
+    source?: JsonNullValueInput | InputJsonValue
+    schema?: JsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type HopePayloadUpsertWithoutContentInput = {
+    update: XOR<HopePayloadUpdateWithoutContentInput, HopePayloadUncheckedUpdateWithoutContentInput>
+    create: XOR<HopePayloadCreateWithoutContentInput, HopePayloadUncheckedCreateWithoutContentInput>
+    where?: HopePayloadWhereInput
+  }
+
+  export type HopePayloadUpdateToOneWithWhereWithoutContentInput = {
+    where?: HopePayloadWhereInput
+    data: XOR<HopePayloadUpdateWithoutContentInput, HopePayloadUncheckedUpdateWithoutContentInput>
+  }
+
+  export type HopePayloadUpdateWithoutContentInput = {
+    kind?: StringFieldUpdateOperationsInput | string
+    status?: StringFieldUpdateOperationsInput | string
+    description?: NullableStringFieldUpdateOperationsInput | string | null
+    targetDate?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    metadata?: JsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type HopePayloadUncheckedUpdateWithoutContentInput = {
+    kind?: StringFieldUpdateOperationsInput | string
+    status?: StringFieldUpdateOperationsInput | string
+    description?: NullableStringFieldUpdateOperationsInput | string | null
+    targetDate?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    metadata?: JsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type WorkflowPayloadUpsertWithoutContentInput = {
+    update: XOR<WorkflowPayloadUpdateWithoutContentInput, WorkflowPayloadUncheckedUpdateWithoutContentInput>
+    create: XOR<WorkflowPayloadCreateWithoutContentInput, WorkflowPayloadUncheckedCreateWithoutContentInput>
+    where?: WorkflowPayloadWhereInput
+  }
+
+  export type WorkflowPayloadUpdateToOneWithWhereWithoutContentInput = {
+    where?: WorkflowPayloadWhereInput
+    data: XOR<WorkflowPayloadUpdateWithoutContentInput, WorkflowPayloadUncheckedUpdateWithoutContentInput>
+  }
+
+  export type WorkflowPayloadUpdateWithoutContentInput = {
+    engine?: StringFieldUpdateOperationsInput | string
+    definition?: JsonNullValueInput | InputJsonValue
+    enabled?: BoolFieldUpdateOperationsInput | boolean
+    metadata?: JsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type WorkflowPayloadUncheckedUpdateWithoutContentInput = {
+    engine?: StringFieldUpdateOperationsInput | string
+    definition?: JsonNullValueInput | InputJsonValue
+    enabled?: BoolFieldUpdateOperationsInput | boolean
     metadata?: JsonNullValueInput | InputJsonValue
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
@@ -30843,13 +41463,13 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
-    settings?: NullableJsonNullValueInput | InputJsonValue
-    settingsVersion?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: IntFieldUpdateOperationsInput | number
     accounts?: AccountUpdateManyWithoutUserNestedInput
-    adminActions?: AuditLogUpdateManyWithoutUserNestedInput
     auditTargets?: AuditLogUpdateManyWithoutTargetUserNestedInput
+    adminActions?: AuditLogUpdateManyWithoutUserNestedInput
     categories?: CategoryUpdateManyWithoutOwnerNestedInput
     contentHistory?: ContentHistoryUpdateManyWithoutUserNestedInput
     sessions?: SessionUpdateManyWithoutUserNestedInput
@@ -30865,13 +41485,13 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
-    settings?: NullableJsonNullValueInput | InputJsonValue
-    settingsVersion?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: IntFieldUpdateOperationsInput | number
     accounts?: AccountUncheckedUpdateManyWithoutUserNestedInput
-    adminActions?: AuditLogUncheckedUpdateManyWithoutUserNestedInput
     auditTargets?: AuditLogUncheckedUpdateManyWithoutTargetUserNestedInput
+    adminActions?: AuditLogUncheckedUpdateManyWithoutUserNestedInput
     categories?: CategoryUncheckedUpdateManyWithoutOwnerNestedInput
     contentHistory?: ContentHistoryUncheckedUpdateManyWithoutUserNestedInput
     sessions?: SessionUncheckedUpdateManyWithoutUserNestedInput
@@ -30896,6 +41516,8 @@ export namespace Prisma {
     id?: StringFieldUpdateOperationsInput | string
     title?: StringFieldUpdateOperationsInput | string
     slug?: StringFieldUpdateOperationsInput | string
+    contentType?: EnumContentTypeFieldUpdateOperationsInput | $Enums.ContentType
+    role?: EnumContentRoleFieldUpdateOperationsInput | $Enums.ContentRole
     displayOrder?: IntFieldUpdateOperationsInput | number
     isPublished?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
@@ -30906,6 +41528,16 @@ export namespace Prisma {
     iconColor?: NullableStringFieldUpdateOperationsInput | string | null
     auditLogs?: AuditLogUpdateManyWithoutTargetContentNestedInput
     codePayload?: CodePayloadUpdateOneWithoutContentNestedInput
+    filePayload?: FilePayloadUpdateOneWithoutContentNestedInput
+    htmlPayload?: HtmlPayloadUpdateOneWithoutContentNestedInput
+    notePayload?: NotePayloadUpdateOneWithoutContentNestedInput
+    folderPayload?: FolderPayloadUpdateOneWithoutContentNestedInput
+    externalPayload?: ExternalPayloadUpdateOneWithoutContentNestedInput
+    chatPayload?: ChatPayloadUpdateOneWithoutContentNestedInput
+    visualizationPayload?: VisualizationPayloadUpdateOneWithoutContentNestedInput
+    dataPayload?: DataPayloadUpdateOneWithoutContentNestedInput
+    hopePayload?: HopePayloadUpdateOneWithoutContentNestedInput
+    workflowPayload?: WorkflowPayloadUpdateOneWithoutContentNestedInput
     history?: ContentHistoryUpdateManyWithoutContentNestedInput
     sourceLinks?: ContentLinkUpdateManyWithoutSourceNestedInput
     targetLinks?: ContentLinkUpdateManyWithoutTargetNestedInput
@@ -30914,9 +41546,6 @@ export namespace Prisma {
     parent?: ContentNodeUpdateOneWithoutChildrenNestedInput
     contentPath?: ContentPathUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUpdateManyWithoutContentNestedInput
-    filePayload?: FilePayloadUpdateOneWithoutContentNestedInput
-    htmlPayload?: HtmlPayloadUpdateOneWithoutContentNestedInput
-    notePayload?: NotePayloadUpdateOneWithoutContentNestedInput
     trashBinEntry?: TrashBinUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUpdateManyWithoutContentNestedInput
   }
@@ -30926,6 +41555,8 @@ export namespace Prisma {
     ownerId?: StringFieldUpdateOperationsInput | string
     title?: StringFieldUpdateOperationsInput | string
     slug?: StringFieldUpdateOperationsInput | string
+    contentType?: EnumContentTypeFieldUpdateOperationsInput | $Enums.ContentType
+    role?: EnumContentRoleFieldUpdateOperationsInput | $Enums.ContentRole
     parentId?: NullableStringFieldUpdateOperationsInput | string | null
     displayOrder?: IntFieldUpdateOperationsInput | number
     categoryId?: NullableStringFieldUpdateOperationsInput | string | null
@@ -30938,14 +41569,21 @@ export namespace Prisma {
     iconColor?: NullableStringFieldUpdateOperationsInput | string | null
     auditLogs?: AuditLogUncheckedUpdateManyWithoutTargetContentNestedInput
     codePayload?: CodePayloadUncheckedUpdateOneWithoutContentNestedInput
+    filePayload?: FilePayloadUncheckedUpdateOneWithoutContentNestedInput
+    htmlPayload?: HtmlPayloadUncheckedUpdateOneWithoutContentNestedInput
+    notePayload?: NotePayloadUncheckedUpdateOneWithoutContentNestedInput
+    folderPayload?: FolderPayloadUncheckedUpdateOneWithoutContentNestedInput
+    externalPayload?: ExternalPayloadUncheckedUpdateOneWithoutContentNestedInput
+    chatPayload?: ChatPayloadUncheckedUpdateOneWithoutContentNestedInput
+    visualizationPayload?: VisualizationPayloadUncheckedUpdateOneWithoutContentNestedInput
+    dataPayload?: DataPayloadUncheckedUpdateOneWithoutContentNestedInput
+    hopePayload?: HopePayloadUncheckedUpdateOneWithoutContentNestedInput
+    workflowPayload?: WorkflowPayloadUncheckedUpdateOneWithoutContentNestedInput
     history?: ContentHistoryUncheckedUpdateManyWithoutContentNestedInput
     sourceLinks?: ContentLinkUncheckedUpdateManyWithoutSourceNestedInput
     targetLinks?: ContentLinkUncheckedUpdateManyWithoutTargetNestedInput
     contentPath?: ContentPathUncheckedUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUncheckedUpdateManyWithoutContentNestedInput
-    filePayload?: FilePayloadUncheckedUpdateOneWithoutContentNestedInput
-    htmlPayload?: HtmlPayloadUncheckedUpdateOneWithoutContentNestedInput
-    notePayload?: NotePayloadUncheckedUpdateOneWithoutContentNestedInput
     trashBinEntry?: TrashBinUncheckedUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUncheckedUpdateManyWithoutContentNestedInput
   }
@@ -30974,6 +41612,8 @@ export namespace Prisma {
     ownerId?: UuidFilter<"ContentNode"> | string
     title?: StringFilter<"ContentNode"> | string
     slug?: StringFilter<"ContentNode"> | string
+    contentType?: EnumContentTypeFilter<"ContentNode"> | $Enums.ContentType
+    role?: EnumContentRoleFilter<"ContentNode"> | $Enums.ContentRole
     parentId?: UuidNullableFilter<"ContentNode"> | string | null
     displayOrder?: IntFilter<"ContentNode"> | number
     categoryId?: UuidNullableFilter<"ContentNode"> | string | null
@@ -31036,129 +41676,6 @@ export namespace Prisma {
     tagId?: UuidFilter<"ContentTag"> | string
     createdAt?: DateTimeFilter<"ContentTag"> | Date | string
     positions?: JsonFilter<"ContentTag">
-  }
-
-  export type FilePayloadUpsertWithoutContentInput = {
-    update: XOR<FilePayloadUpdateWithoutContentInput, FilePayloadUncheckedUpdateWithoutContentInput>
-    create: XOR<FilePayloadCreateWithoutContentInput, FilePayloadUncheckedCreateWithoutContentInput>
-    where?: FilePayloadWhereInput
-  }
-
-  export type FilePayloadUpdateToOneWithWhereWithoutContentInput = {
-    where?: FilePayloadWhereInput
-    data: XOR<FilePayloadUpdateWithoutContentInput, FilePayloadUncheckedUpdateWithoutContentInput>
-  }
-
-  export type FilePayloadUpdateWithoutContentInput = {
-    fileName?: StringFieldUpdateOperationsInput | string
-    fileExtension?: NullableStringFieldUpdateOperationsInput | string | null
-    mimeType?: StringFieldUpdateOperationsInput | string
-    fileSize?: BigIntFieldUpdateOperationsInput | bigint | number
-    checksum?: StringFieldUpdateOperationsInput | string
-    storageProvider?: EnumStorageProviderFieldUpdateOperationsInput | $Enums.StorageProvider
-    storageKey?: StringFieldUpdateOperationsInput | string
-    storageUrl?: NullableStringFieldUpdateOperationsInput | string | null
-    storageMetadata?: JsonNullValueInput | InputJsonValue
-    uploadStatus?: EnumUploadStatusFieldUpdateOperationsInput | $Enums.UploadStatus
-    uploadedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-    uploadError?: NullableStringFieldUpdateOperationsInput | string | null
-    processingStatus?: StringFieldUpdateOperationsInput | string
-    isProcessed?: BoolFieldUpdateOperationsInput | boolean
-    thumbnailUrl?: NullableStringFieldUpdateOperationsInput | string | null
-    width?: NullableIntFieldUpdateOperationsInput | number | null
-    height?: NullableIntFieldUpdateOperationsInput | number | null
-    duration?: NullableIntFieldUpdateOperationsInput | number | null
-    lastAccessedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    searchText?: StringFieldUpdateOperationsInput | string
-  }
-
-  export type FilePayloadUncheckedUpdateWithoutContentInput = {
-    fileName?: StringFieldUpdateOperationsInput | string
-    fileExtension?: NullableStringFieldUpdateOperationsInput | string | null
-    mimeType?: StringFieldUpdateOperationsInput | string
-    fileSize?: BigIntFieldUpdateOperationsInput | bigint | number
-    checksum?: StringFieldUpdateOperationsInput | string
-    storageProvider?: EnumStorageProviderFieldUpdateOperationsInput | $Enums.StorageProvider
-    storageKey?: StringFieldUpdateOperationsInput | string
-    storageUrl?: NullableStringFieldUpdateOperationsInput | string | null
-    storageMetadata?: JsonNullValueInput | InputJsonValue
-    uploadStatus?: EnumUploadStatusFieldUpdateOperationsInput | $Enums.UploadStatus
-    uploadedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-    uploadError?: NullableStringFieldUpdateOperationsInput | string | null
-    processingStatus?: StringFieldUpdateOperationsInput | string
-    isProcessed?: BoolFieldUpdateOperationsInput | boolean
-    thumbnailUrl?: NullableStringFieldUpdateOperationsInput | string | null
-    width?: NullableIntFieldUpdateOperationsInput | number | null
-    height?: NullableIntFieldUpdateOperationsInput | number | null
-    duration?: NullableIntFieldUpdateOperationsInput | number | null
-    lastAccessedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    searchText?: StringFieldUpdateOperationsInput | string
-  }
-
-  export type HtmlPayloadUpsertWithoutContentInput = {
-    update: XOR<HtmlPayloadUpdateWithoutContentInput, HtmlPayloadUncheckedUpdateWithoutContentInput>
-    create: XOR<HtmlPayloadCreateWithoutContentInput, HtmlPayloadUncheckedCreateWithoutContentInput>
-    where?: HtmlPayloadWhereInput
-  }
-
-  export type HtmlPayloadUpdateToOneWithWhereWithoutContentInput = {
-    where?: HtmlPayloadWhereInput
-    data: XOR<HtmlPayloadUpdateWithoutContentInput, HtmlPayloadUncheckedUpdateWithoutContentInput>
-  }
-
-  export type HtmlPayloadUpdateWithoutContentInput = {
-    html?: StringFieldUpdateOperationsInput | string
-    searchText?: StringFieldUpdateOperationsInput | string
-    isTemplate?: BoolFieldUpdateOperationsInput | boolean
-    templateSchema?: NullableJsonNullValueInput | InputJsonValue
-    templateMetadata?: JsonNullValueInput | InputJsonValue
-    renderMode?: StringFieldUpdateOperationsInput | string
-    templateEngine?: NullableStringFieldUpdateOperationsInput | string | null
-    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
-  }
-
-  export type HtmlPayloadUncheckedUpdateWithoutContentInput = {
-    html?: StringFieldUpdateOperationsInput | string
-    searchText?: StringFieldUpdateOperationsInput | string
-    isTemplate?: BoolFieldUpdateOperationsInput | boolean
-    templateSchema?: NullableJsonNullValueInput | InputJsonValue
-    templateMetadata?: JsonNullValueInput | InputJsonValue
-    renderMode?: StringFieldUpdateOperationsInput | string
-    templateEngine?: NullableStringFieldUpdateOperationsInput | string | null
-    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
-  }
-
-  export type NotePayloadUpsertWithoutContentInput = {
-    update: XOR<NotePayloadUpdateWithoutContentInput, NotePayloadUncheckedUpdateWithoutContentInput>
-    create: XOR<NotePayloadCreateWithoutContentInput, NotePayloadUncheckedCreateWithoutContentInput>
-    where?: NotePayloadWhereInput
-  }
-
-  export type NotePayloadUpdateToOneWithWhereWithoutContentInput = {
-    where?: NotePayloadWhereInput
-    data: XOR<NotePayloadUpdateWithoutContentInput, NotePayloadUncheckedUpdateWithoutContentInput>
-  }
-
-  export type NotePayloadUpdateWithoutContentInput = {
-    tiptapJson?: JsonNullValueInput | InputJsonValue
-    searchText?: StringFieldUpdateOperationsInput | string
-    metadata?: JsonNullValueInput | InputJsonValue
-    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
-  }
-
-  export type NotePayloadUncheckedUpdateWithoutContentInput = {
-    tiptapJson?: JsonNullValueInput | InputJsonValue
-    searchText?: StringFieldUpdateOperationsInput | string
-    metadata?: JsonNullValueInput | InputJsonValue
-    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
   export type TrashBinUpsertWithoutContentInput = {
@@ -31224,6 +41741,8 @@ export namespace Prisma {
     id?: string
     title: string
     slug: string
+    contentType: $Enums.ContentType
+    role?: $Enums.ContentRole
     displayOrder?: number
     isPublished?: boolean
     createdAt?: Date | string
@@ -31234,6 +41753,15 @@ export namespace Prisma {
     iconColor?: string | null
     auditLogs?: AuditLogCreateNestedManyWithoutTargetContentInput
     codePayload?: CodePayloadCreateNestedOneWithoutContentInput
+    filePayload?: FilePayloadCreateNestedOneWithoutContentInput
+    htmlPayload?: HtmlPayloadCreateNestedOneWithoutContentInput
+    folderPayload?: FolderPayloadCreateNestedOneWithoutContentInput
+    externalPayload?: ExternalPayloadCreateNestedOneWithoutContentInput
+    chatPayload?: ChatPayloadCreateNestedOneWithoutContentInput
+    visualizationPayload?: VisualizationPayloadCreateNestedOneWithoutContentInput
+    dataPayload?: DataPayloadCreateNestedOneWithoutContentInput
+    hopePayload?: HopePayloadCreateNestedOneWithoutContentInput
+    workflowPayload?: WorkflowPayloadCreateNestedOneWithoutContentInput
     history?: ContentHistoryCreateNestedManyWithoutContentInput
     sourceLinks?: ContentLinkCreateNestedManyWithoutSourceInput
     targetLinks?: ContentLinkCreateNestedManyWithoutTargetInput
@@ -31243,8 +41771,6 @@ export namespace Prisma {
     children?: ContentNodeCreateNestedManyWithoutParentInput
     contentPath?: ContentPathCreateNestedOneWithoutContentInput
     contentTags?: ContentTagCreateNestedManyWithoutContentInput
-    filePayload?: FilePayloadCreateNestedOneWithoutContentInput
-    htmlPayload?: HtmlPayloadCreateNestedOneWithoutContentInput
     trashBinEntry?: TrashBinCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantCreateNestedManyWithoutContentInput
   }
@@ -31254,6 +41780,8 @@ export namespace Prisma {
     ownerId: string
     title: string
     slug: string
+    contentType: $Enums.ContentType
+    role?: $Enums.ContentRole
     parentId?: string | null
     displayOrder?: number
     categoryId?: string | null
@@ -31266,14 +41794,21 @@ export namespace Prisma {
     iconColor?: string | null
     auditLogs?: AuditLogUncheckedCreateNestedManyWithoutTargetContentInput
     codePayload?: CodePayloadUncheckedCreateNestedOneWithoutContentInput
+    filePayload?: FilePayloadUncheckedCreateNestedOneWithoutContentInput
+    htmlPayload?: HtmlPayloadUncheckedCreateNestedOneWithoutContentInput
+    folderPayload?: FolderPayloadUncheckedCreateNestedOneWithoutContentInput
+    externalPayload?: ExternalPayloadUncheckedCreateNestedOneWithoutContentInput
+    chatPayload?: ChatPayloadUncheckedCreateNestedOneWithoutContentInput
+    visualizationPayload?: VisualizationPayloadUncheckedCreateNestedOneWithoutContentInput
+    dataPayload?: DataPayloadUncheckedCreateNestedOneWithoutContentInput
+    hopePayload?: HopePayloadUncheckedCreateNestedOneWithoutContentInput
+    workflowPayload?: WorkflowPayloadUncheckedCreateNestedOneWithoutContentInput
     history?: ContentHistoryUncheckedCreateNestedManyWithoutContentInput
     sourceLinks?: ContentLinkUncheckedCreateNestedManyWithoutSourceInput
     targetLinks?: ContentLinkUncheckedCreateNestedManyWithoutTargetInput
     children?: ContentNodeUncheckedCreateNestedManyWithoutParentInput
     contentPath?: ContentPathUncheckedCreateNestedOneWithoutContentInput
     contentTags?: ContentTagUncheckedCreateNestedManyWithoutContentInput
-    filePayload?: FilePayloadUncheckedCreateNestedOneWithoutContentInput
-    htmlPayload?: HtmlPayloadUncheckedCreateNestedOneWithoutContentInput
     trashBinEntry?: TrashBinUncheckedCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantUncheckedCreateNestedManyWithoutContentInput
   }
@@ -31298,6 +41833,8 @@ export namespace Prisma {
     id?: StringFieldUpdateOperationsInput | string
     title?: StringFieldUpdateOperationsInput | string
     slug?: StringFieldUpdateOperationsInput | string
+    contentType?: EnumContentTypeFieldUpdateOperationsInput | $Enums.ContentType
+    role?: EnumContentRoleFieldUpdateOperationsInput | $Enums.ContentRole
     displayOrder?: IntFieldUpdateOperationsInput | number
     isPublished?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
@@ -31308,6 +41845,15 @@ export namespace Prisma {
     iconColor?: NullableStringFieldUpdateOperationsInput | string | null
     auditLogs?: AuditLogUpdateManyWithoutTargetContentNestedInput
     codePayload?: CodePayloadUpdateOneWithoutContentNestedInput
+    filePayload?: FilePayloadUpdateOneWithoutContentNestedInput
+    htmlPayload?: HtmlPayloadUpdateOneWithoutContentNestedInput
+    folderPayload?: FolderPayloadUpdateOneWithoutContentNestedInput
+    externalPayload?: ExternalPayloadUpdateOneWithoutContentNestedInput
+    chatPayload?: ChatPayloadUpdateOneWithoutContentNestedInput
+    visualizationPayload?: VisualizationPayloadUpdateOneWithoutContentNestedInput
+    dataPayload?: DataPayloadUpdateOneWithoutContentNestedInput
+    hopePayload?: HopePayloadUpdateOneWithoutContentNestedInput
+    workflowPayload?: WorkflowPayloadUpdateOneWithoutContentNestedInput
     history?: ContentHistoryUpdateManyWithoutContentNestedInput
     sourceLinks?: ContentLinkUpdateManyWithoutSourceNestedInput
     targetLinks?: ContentLinkUpdateManyWithoutTargetNestedInput
@@ -31317,8 +41863,6 @@ export namespace Prisma {
     children?: ContentNodeUpdateManyWithoutParentNestedInput
     contentPath?: ContentPathUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUpdateManyWithoutContentNestedInput
-    filePayload?: FilePayloadUpdateOneWithoutContentNestedInput
-    htmlPayload?: HtmlPayloadUpdateOneWithoutContentNestedInput
     trashBinEntry?: TrashBinUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUpdateManyWithoutContentNestedInput
   }
@@ -31328,6 +41872,8 @@ export namespace Prisma {
     ownerId?: StringFieldUpdateOperationsInput | string
     title?: StringFieldUpdateOperationsInput | string
     slug?: StringFieldUpdateOperationsInput | string
+    contentType?: EnumContentTypeFieldUpdateOperationsInput | $Enums.ContentType
+    role?: EnumContentRoleFieldUpdateOperationsInput | $Enums.ContentRole
     parentId?: NullableStringFieldUpdateOperationsInput | string | null
     displayOrder?: IntFieldUpdateOperationsInput | number
     categoryId?: NullableStringFieldUpdateOperationsInput | string | null
@@ -31340,14 +41886,21 @@ export namespace Prisma {
     iconColor?: NullableStringFieldUpdateOperationsInput | string | null
     auditLogs?: AuditLogUncheckedUpdateManyWithoutTargetContentNestedInput
     codePayload?: CodePayloadUncheckedUpdateOneWithoutContentNestedInput
+    filePayload?: FilePayloadUncheckedUpdateOneWithoutContentNestedInput
+    htmlPayload?: HtmlPayloadUncheckedUpdateOneWithoutContentNestedInput
+    folderPayload?: FolderPayloadUncheckedUpdateOneWithoutContentNestedInput
+    externalPayload?: ExternalPayloadUncheckedUpdateOneWithoutContentNestedInput
+    chatPayload?: ChatPayloadUncheckedUpdateOneWithoutContentNestedInput
+    visualizationPayload?: VisualizationPayloadUncheckedUpdateOneWithoutContentNestedInput
+    dataPayload?: DataPayloadUncheckedUpdateOneWithoutContentNestedInput
+    hopePayload?: HopePayloadUncheckedUpdateOneWithoutContentNestedInput
+    workflowPayload?: WorkflowPayloadUncheckedUpdateOneWithoutContentNestedInput
     history?: ContentHistoryUncheckedUpdateManyWithoutContentNestedInput
     sourceLinks?: ContentLinkUncheckedUpdateManyWithoutSourceNestedInput
     targetLinks?: ContentLinkUncheckedUpdateManyWithoutTargetNestedInput
     children?: ContentNodeUncheckedUpdateManyWithoutParentNestedInput
     contentPath?: ContentPathUncheckedUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUncheckedUpdateManyWithoutContentNestedInput
-    filePayload?: FilePayloadUncheckedUpdateOneWithoutContentNestedInput
-    htmlPayload?: HtmlPayloadUncheckedUpdateOneWithoutContentNestedInput
     trashBinEntry?: TrashBinUncheckedUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUncheckedUpdateManyWithoutContentNestedInput
   }
@@ -31356,6 +41909,8 @@ export namespace Prisma {
     id?: string
     title: string
     slug: string
+    contentType: $Enums.ContentType
+    role?: $Enums.ContentRole
     displayOrder?: number
     isPublished?: boolean
     createdAt?: Date | string
@@ -31366,6 +41921,15 @@ export namespace Prisma {
     iconColor?: string | null
     auditLogs?: AuditLogCreateNestedManyWithoutTargetContentInput
     codePayload?: CodePayloadCreateNestedOneWithoutContentInput
+    htmlPayload?: HtmlPayloadCreateNestedOneWithoutContentInput
+    notePayload?: NotePayloadCreateNestedOneWithoutContentInput
+    folderPayload?: FolderPayloadCreateNestedOneWithoutContentInput
+    externalPayload?: ExternalPayloadCreateNestedOneWithoutContentInput
+    chatPayload?: ChatPayloadCreateNestedOneWithoutContentInput
+    visualizationPayload?: VisualizationPayloadCreateNestedOneWithoutContentInput
+    dataPayload?: DataPayloadCreateNestedOneWithoutContentInput
+    hopePayload?: HopePayloadCreateNestedOneWithoutContentInput
+    workflowPayload?: WorkflowPayloadCreateNestedOneWithoutContentInput
     history?: ContentHistoryCreateNestedManyWithoutContentInput
     sourceLinks?: ContentLinkCreateNestedManyWithoutSourceInput
     targetLinks?: ContentLinkCreateNestedManyWithoutTargetInput
@@ -31375,8 +41939,6 @@ export namespace Prisma {
     children?: ContentNodeCreateNestedManyWithoutParentInput
     contentPath?: ContentPathCreateNestedOneWithoutContentInput
     contentTags?: ContentTagCreateNestedManyWithoutContentInput
-    htmlPayload?: HtmlPayloadCreateNestedOneWithoutContentInput
-    notePayload?: NotePayloadCreateNestedOneWithoutContentInput
     trashBinEntry?: TrashBinCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantCreateNestedManyWithoutContentInput
   }
@@ -31386,6 +41948,8 @@ export namespace Prisma {
     ownerId: string
     title: string
     slug: string
+    contentType: $Enums.ContentType
+    role?: $Enums.ContentRole
     parentId?: string | null
     displayOrder?: number
     categoryId?: string | null
@@ -31398,14 +41962,21 @@ export namespace Prisma {
     iconColor?: string | null
     auditLogs?: AuditLogUncheckedCreateNestedManyWithoutTargetContentInput
     codePayload?: CodePayloadUncheckedCreateNestedOneWithoutContentInput
+    htmlPayload?: HtmlPayloadUncheckedCreateNestedOneWithoutContentInput
+    notePayload?: NotePayloadUncheckedCreateNestedOneWithoutContentInput
+    folderPayload?: FolderPayloadUncheckedCreateNestedOneWithoutContentInput
+    externalPayload?: ExternalPayloadUncheckedCreateNestedOneWithoutContentInput
+    chatPayload?: ChatPayloadUncheckedCreateNestedOneWithoutContentInput
+    visualizationPayload?: VisualizationPayloadUncheckedCreateNestedOneWithoutContentInput
+    dataPayload?: DataPayloadUncheckedCreateNestedOneWithoutContentInput
+    hopePayload?: HopePayloadUncheckedCreateNestedOneWithoutContentInput
+    workflowPayload?: WorkflowPayloadUncheckedCreateNestedOneWithoutContentInput
     history?: ContentHistoryUncheckedCreateNestedManyWithoutContentInput
     sourceLinks?: ContentLinkUncheckedCreateNestedManyWithoutSourceInput
     targetLinks?: ContentLinkUncheckedCreateNestedManyWithoutTargetInput
     children?: ContentNodeUncheckedCreateNestedManyWithoutParentInput
     contentPath?: ContentPathUncheckedCreateNestedOneWithoutContentInput
     contentTags?: ContentTagUncheckedCreateNestedManyWithoutContentInput
-    htmlPayload?: HtmlPayloadUncheckedCreateNestedOneWithoutContentInput
-    notePayload?: NotePayloadUncheckedCreateNestedOneWithoutContentInput
     trashBinEntry?: TrashBinUncheckedCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantUncheckedCreateNestedManyWithoutContentInput
   }
@@ -31430,6 +42001,8 @@ export namespace Prisma {
     id?: StringFieldUpdateOperationsInput | string
     title?: StringFieldUpdateOperationsInput | string
     slug?: StringFieldUpdateOperationsInput | string
+    contentType?: EnumContentTypeFieldUpdateOperationsInput | $Enums.ContentType
+    role?: EnumContentRoleFieldUpdateOperationsInput | $Enums.ContentRole
     displayOrder?: IntFieldUpdateOperationsInput | number
     isPublished?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
@@ -31440,6 +42013,15 @@ export namespace Prisma {
     iconColor?: NullableStringFieldUpdateOperationsInput | string | null
     auditLogs?: AuditLogUpdateManyWithoutTargetContentNestedInput
     codePayload?: CodePayloadUpdateOneWithoutContentNestedInput
+    htmlPayload?: HtmlPayloadUpdateOneWithoutContentNestedInput
+    notePayload?: NotePayloadUpdateOneWithoutContentNestedInput
+    folderPayload?: FolderPayloadUpdateOneWithoutContentNestedInput
+    externalPayload?: ExternalPayloadUpdateOneWithoutContentNestedInput
+    chatPayload?: ChatPayloadUpdateOneWithoutContentNestedInput
+    visualizationPayload?: VisualizationPayloadUpdateOneWithoutContentNestedInput
+    dataPayload?: DataPayloadUpdateOneWithoutContentNestedInput
+    hopePayload?: HopePayloadUpdateOneWithoutContentNestedInput
+    workflowPayload?: WorkflowPayloadUpdateOneWithoutContentNestedInput
     history?: ContentHistoryUpdateManyWithoutContentNestedInput
     sourceLinks?: ContentLinkUpdateManyWithoutSourceNestedInput
     targetLinks?: ContentLinkUpdateManyWithoutTargetNestedInput
@@ -31449,8 +42031,6 @@ export namespace Prisma {
     children?: ContentNodeUpdateManyWithoutParentNestedInput
     contentPath?: ContentPathUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUpdateManyWithoutContentNestedInput
-    htmlPayload?: HtmlPayloadUpdateOneWithoutContentNestedInput
-    notePayload?: NotePayloadUpdateOneWithoutContentNestedInput
     trashBinEntry?: TrashBinUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUpdateManyWithoutContentNestedInput
   }
@@ -31460,6 +42040,8 @@ export namespace Prisma {
     ownerId?: StringFieldUpdateOperationsInput | string
     title?: StringFieldUpdateOperationsInput | string
     slug?: StringFieldUpdateOperationsInput | string
+    contentType?: EnumContentTypeFieldUpdateOperationsInput | $Enums.ContentType
+    role?: EnumContentRoleFieldUpdateOperationsInput | $Enums.ContentRole
     parentId?: NullableStringFieldUpdateOperationsInput | string | null
     displayOrder?: IntFieldUpdateOperationsInput | number
     categoryId?: NullableStringFieldUpdateOperationsInput | string | null
@@ -31472,14 +42054,21 @@ export namespace Prisma {
     iconColor?: NullableStringFieldUpdateOperationsInput | string | null
     auditLogs?: AuditLogUncheckedUpdateManyWithoutTargetContentNestedInput
     codePayload?: CodePayloadUncheckedUpdateOneWithoutContentNestedInput
+    htmlPayload?: HtmlPayloadUncheckedUpdateOneWithoutContentNestedInput
+    notePayload?: NotePayloadUncheckedUpdateOneWithoutContentNestedInput
+    folderPayload?: FolderPayloadUncheckedUpdateOneWithoutContentNestedInput
+    externalPayload?: ExternalPayloadUncheckedUpdateOneWithoutContentNestedInput
+    chatPayload?: ChatPayloadUncheckedUpdateOneWithoutContentNestedInput
+    visualizationPayload?: VisualizationPayloadUncheckedUpdateOneWithoutContentNestedInput
+    dataPayload?: DataPayloadUncheckedUpdateOneWithoutContentNestedInput
+    hopePayload?: HopePayloadUncheckedUpdateOneWithoutContentNestedInput
+    workflowPayload?: WorkflowPayloadUncheckedUpdateOneWithoutContentNestedInput
     history?: ContentHistoryUncheckedUpdateManyWithoutContentNestedInput
     sourceLinks?: ContentLinkUncheckedUpdateManyWithoutSourceNestedInput
     targetLinks?: ContentLinkUncheckedUpdateManyWithoutTargetNestedInput
     children?: ContentNodeUncheckedUpdateManyWithoutParentNestedInput
     contentPath?: ContentPathUncheckedUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUncheckedUpdateManyWithoutContentNestedInput
-    htmlPayload?: HtmlPayloadUncheckedUpdateOneWithoutContentNestedInput
-    notePayload?: NotePayloadUncheckedUpdateOneWithoutContentNestedInput
     trashBinEntry?: TrashBinUncheckedUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUncheckedUpdateManyWithoutContentNestedInput
   }
@@ -31488,6 +42077,8 @@ export namespace Prisma {
     id?: string
     title: string
     slug: string
+    contentType: $Enums.ContentType
+    role?: $Enums.ContentRole
     displayOrder?: number
     isPublished?: boolean
     createdAt?: Date | string
@@ -31498,6 +42089,15 @@ export namespace Prisma {
     iconColor?: string | null
     auditLogs?: AuditLogCreateNestedManyWithoutTargetContentInput
     codePayload?: CodePayloadCreateNestedOneWithoutContentInput
+    filePayload?: FilePayloadCreateNestedOneWithoutContentInput
+    notePayload?: NotePayloadCreateNestedOneWithoutContentInput
+    folderPayload?: FolderPayloadCreateNestedOneWithoutContentInput
+    externalPayload?: ExternalPayloadCreateNestedOneWithoutContentInput
+    chatPayload?: ChatPayloadCreateNestedOneWithoutContentInput
+    visualizationPayload?: VisualizationPayloadCreateNestedOneWithoutContentInput
+    dataPayload?: DataPayloadCreateNestedOneWithoutContentInput
+    hopePayload?: HopePayloadCreateNestedOneWithoutContentInput
+    workflowPayload?: WorkflowPayloadCreateNestedOneWithoutContentInput
     history?: ContentHistoryCreateNestedManyWithoutContentInput
     sourceLinks?: ContentLinkCreateNestedManyWithoutSourceInput
     targetLinks?: ContentLinkCreateNestedManyWithoutTargetInput
@@ -31507,8 +42107,6 @@ export namespace Prisma {
     children?: ContentNodeCreateNestedManyWithoutParentInput
     contentPath?: ContentPathCreateNestedOneWithoutContentInput
     contentTags?: ContentTagCreateNestedManyWithoutContentInput
-    filePayload?: FilePayloadCreateNestedOneWithoutContentInput
-    notePayload?: NotePayloadCreateNestedOneWithoutContentInput
     trashBinEntry?: TrashBinCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantCreateNestedManyWithoutContentInput
   }
@@ -31518,6 +42116,8 @@ export namespace Prisma {
     ownerId: string
     title: string
     slug: string
+    contentType: $Enums.ContentType
+    role?: $Enums.ContentRole
     parentId?: string | null
     displayOrder?: number
     categoryId?: string | null
@@ -31530,14 +42130,21 @@ export namespace Prisma {
     iconColor?: string | null
     auditLogs?: AuditLogUncheckedCreateNestedManyWithoutTargetContentInput
     codePayload?: CodePayloadUncheckedCreateNestedOneWithoutContentInput
+    filePayload?: FilePayloadUncheckedCreateNestedOneWithoutContentInput
+    notePayload?: NotePayloadUncheckedCreateNestedOneWithoutContentInput
+    folderPayload?: FolderPayloadUncheckedCreateNestedOneWithoutContentInput
+    externalPayload?: ExternalPayloadUncheckedCreateNestedOneWithoutContentInput
+    chatPayload?: ChatPayloadUncheckedCreateNestedOneWithoutContentInput
+    visualizationPayload?: VisualizationPayloadUncheckedCreateNestedOneWithoutContentInput
+    dataPayload?: DataPayloadUncheckedCreateNestedOneWithoutContentInput
+    hopePayload?: HopePayloadUncheckedCreateNestedOneWithoutContentInput
+    workflowPayload?: WorkflowPayloadUncheckedCreateNestedOneWithoutContentInput
     history?: ContentHistoryUncheckedCreateNestedManyWithoutContentInput
     sourceLinks?: ContentLinkUncheckedCreateNestedManyWithoutSourceInput
     targetLinks?: ContentLinkUncheckedCreateNestedManyWithoutTargetInput
     children?: ContentNodeUncheckedCreateNestedManyWithoutParentInput
     contentPath?: ContentPathUncheckedCreateNestedOneWithoutContentInput
     contentTags?: ContentTagUncheckedCreateNestedManyWithoutContentInput
-    filePayload?: FilePayloadUncheckedCreateNestedOneWithoutContentInput
-    notePayload?: NotePayloadUncheckedCreateNestedOneWithoutContentInput
     trashBinEntry?: TrashBinUncheckedCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantUncheckedCreateNestedManyWithoutContentInput
   }
@@ -31562,6 +42169,8 @@ export namespace Prisma {
     id?: StringFieldUpdateOperationsInput | string
     title?: StringFieldUpdateOperationsInput | string
     slug?: StringFieldUpdateOperationsInput | string
+    contentType?: EnumContentTypeFieldUpdateOperationsInput | $Enums.ContentType
+    role?: EnumContentRoleFieldUpdateOperationsInput | $Enums.ContentRole
     displayOrder?: IntFieldUpdateOperationsInput | number
     isPublished?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
@@ -31572,6 +42181,15 @@ export namespace Prisma {
     iconColor?: NullableStringFieldUpdateOperationsInput | string | null
     auditLogs?: AuditLogUpdateManyWithoutTargetContentNestedInput
     codePayload?: CodePayloadUpdateOneWithoutContentNestedInput
+    filePayload?: FilePayloadUpdateOneWithoutContentNestedInput
+    notePayload?: NotePayloadUpdateOneWithoutContentNestedInput
+    folderPayload?: FolderPayloadUpdateOneWithoutContentNestedInput
+    externalPayload?: ExternalPayloadUpdateOneWithoutContentNestedInput
+    chatPayload?: ChatPayloadUpdateOneWithoutContentNestedInput
+    visualizationPayload?: VisualizationPayloadUpdateOneWithoutContentNestedInput
+    dataPayload?: DataPayloadUpdateOneWithoutContentNestedInput
+    hopePayload?: HopePayloadUpdateOneWithoutContentNestedInput
+    workflowPayload?: WorkflowPayloadUpdateOneWithoutContentNestedInput
     history?: ContentHistoryUpdateManyWithoutContentNestedInput
     sourceLinks?: ContentLinkUpdateManyWithoutSourceNestedInput
     targetLinks?: ContentLinkUpdateManyWithoutTargetNestedInput
@@ -31581,8 +42199,6 @@ export namespace Prisma {
     children?: ContentNodeUpdateManyWithoutParentNestedInput
     contentPath?: ContentPathUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUpdateManyWithoutContentNestedInput
-    filePayload?: FilePayloadUpdateOneWithoutContentNestedInput
-    notePayload?: NotePayloadUpdateOneWithoutContentNestedInput
     trashBinEntry?: TrashBinUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUpdateManyWithoutContentNestedInput
   }
@@ -31592,6 +42208,8 @@ export namespace Prisma {
     ownerId?: StringFieldUpdateOperationsInput | string
     title?: StringFieldUpdateOperationsInput | string
     slug?: StringFieldUpdateOperationsInput | string
+    contentType?: EnumContentTypeFieldUpdateOperationsInput | $Enums.ContentType
+    role?: EnumContentRoleFieldUpdateOperationsInput | $Enums.ContentRole
     parentId?: NullableStringFieldUpdateOperationsInput | string | null
     displayOrder?: IntFieldUpdateOperationsInput | number
     categoryId?: NullableStringFieldUpdateOperationsInput | string | null
@@ -31604,14 +42222,21 @@ export namespace Prisma {
     iconColor?: NullableStringFieldUpdateOperationsInput | string | null
     auditLogs?: AuditLogUncheckedUpdateManyWithoutTargetContentNestedInput
     codePayload?: CodePayloadUncheckedUpdateOneWithoutContentNestedInput
+    filePayload?: FilePayloadUncheckedUpdateOneWithoutContentNestedInput
+    notePayload?: NotePayloadUncheckedUpdateOneWithoutContentNestedInput
+    folderPayload?: FolderPayloadUncheckedUpdateOneWithoutContentNestedInput
+    externalPayload?: ExternalPayloadUncheckedUpdateOneWithoutContentNestedInput
+    chatPayload?: ChatPayloadUncheckedUpdateOneWithoutContentNestedInput
+    visualizationPayload?: VisualizationPayloadUncheckedUpdateOneWithoutContentNestedInput
+    dataPayload?: DataPayloadUncheckedUpdateOneWithoutContentNestedInput
+    hopePayload?: HopePayloadUncheckedUpdateOneWithoutContentNestedInput
+    workflowPayload?: WorkflowPayloadUncheckedUpdateOneWithoutContentNestedInput
     history?: ContentHistoryUncheckedUpdateManyWithoutContentNestedInput
     sourceLinks?: ContentLinkUncheckedUpdateManyWithoutSourceNestedInput
     targetLinks?: ContentLinkUncheckedUpdateManyWithoutTargetNestedInput
     children?: ContentNodeUncheckedUpdateManyWithoutParentNestedInput
     contentPath?: ContentPathUncheckedUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUncheckedUpdateManyWithoutContentNestedInput
-    filePayload?: FilePayloadUncheckedUpdateOneWithoutContentNestedInput
-    notePayload?: NotePayloadUncheckedUpdateOneWithoutContentNestedInput
     trashBinEntry?: TrashBinUncheckedUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUncheckedUpdateManyWithoutContentNestedInput
   }
@@ -31620,6 +42245,8 @@ export namespace Prisma {
     id?: string
     title: string
     slug: string
+    contentType: $Enums.ContentType
+    role?: $Enums.ContentRole
     displayOrder?: number
     isPublished?: boolean
     createdAt?: Date | string
@@ -31629,6 +42256,16 @@ export namespace Prisma {
     customIcon?: string | null
     iconColor?: string | null
     auditLogs?: AuditLogCreateNestedManyWithoutTargetContentInput
+    filePayload?: FilePayloadCreateNestedOneWithoutContentInput
+    htmlPayload?: HtmlPayloadCreateNestedOneWithoutContentInput
+    notePayload?: NotePayloadCreateNestedOneWithoutContentInput
+    folderPayload?: FolderPayloadCreateNestedOneWithoutContentInput
+    externalPayload?: ExternalPayloadCreateNestedOneWithoutContentInput
+    chatPayload?: ChatPayloadCreateNestedOneWithoutContentInput
+    visualizationPayload?: VisualizationPayloadCreateNestedOneWithoutContentInput
+    dataPayload?: DataPayloadCreateNestedOneWithoutContentInput
+    hopePayload?: HopePayloadCreateNestedOneWithoutContentInput
+    workflowPayload?: WorkflowPayloadCreateNestedOneWithoutContentInput
     history?: ContentHistoryCreateNestedManyWithoutContentInput
     sourceLinks?: ContentLinkCreateNestedManyWithoutSourceInput
     targetLinks?: ContentLinkCreateNestedManyWithoutTargetInput
@@ -31638,9 +42275,6 @@ export namespace Prisma {
     children?: ContentNodeCreateNestedManyWithoutParentInput
     contentPath?: ContentPathCreateNestedOneWithoutContentInput
     contentTags?: ContentTagCreateNestedManyWithoutContentInput
-    filePayload?: FilePayloadCreateNestedOneWithoutContentInput
-    htmlPayload?: HtmlPayloadCreateNestedOneWithoutContentInput
-    notePayload?: NotePayloadCreateNestedOneWithoutContentInput
     trashBinEntry?: TrashBinCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantCreateNestedManyWithoutContentInput
   }
@@ -31650,6 +42284,8 @@ export namespace Prisma {
     ownerId: string
     title: string
     slug: string
+    contentType: $Enums.ContentType
+    role?: $Enums.ContentRole
     parentId?: string | null
     displayOrder?: number
     categoryId?: string | null
@@ -31661,15 +42297,22 @@ export namespace Prisma {
     customIcon?: string | null
     iconColor?: string | null
     auditLogs?: AuditLogUncheckedCreateNestedManyWithoutTargetContentInput
+    filePayload?: FilePayloadUncheckedCreateNestedOneWithoutContentInput
+    htmlPayload?: HtmlPayloadUncheckedCreateNestedOneWithoutContentInput
+    notePayload?: NotePayloadUncheckedCreateNestedOneWithoutContentInput
+    folderPayload?: FolderPayloadUncheckedCreateNestedOneWithoutContentInput
+    externalPayload?: ExternalPayloadUncheckedCreateNestedOneWithoutContentInput
+    chatPayload?: ChatPayloadUncheckedCreateNestedOneWithoutContentInput
+    visualizationPayload?: VisualizationPayloadUncheckedCreateNestedOneWithoutContentInput
+    dataPayload?: DataPayloadUncheckedCreateNestedOneWithoutContentInput
+    hopePayload?: HopePayloadUncheckedCreateNestedOneWithoutContentInput
+    workflowPayload?: WorkflowPayloadUncheckedCreateNestedOneWithoutContentInput
     history?: ContentHistoryUncheckedCreateNestedManyWithoutContentInput
     sourceLinks?: ContentLinkUncheckedCreateNestedManyWithoutSourceInput
     targetLinks?: ContentLinkUncheckedCreateNestedManyWithoutTargetInput
     children?: ContentNodeUncheckedCreateNestedManyWithoutParentInput
     contentPath?: ContentPathUncheckedCreateNestedOneWithoutContentInput
     contentTags?: ContentTagUncheckedCreateNestedManyWithoutContentInput
-    filePayload?: FilePayloadUncheckedCreateNestedOneWithoutContentInput
-    htmlPayload?: HtmlPayloadUncheckedCreateNestedOneWithoutContentInput
-    notePayload?: NotePayloadUncheckedCreateNestedOneWithoutContentInput
     trashBinEntry?: TrashBinUncheckedCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantUncheckedCreateNestedManyWithoutContentInput
   }
@@ -31694,6 +42337,8 @@ export namespace Prisma {
     id?: StringFieldUpdateOperationsInput | string
     title?: StringFieldUpdateOperationsInput | string
     slug?: StringFieldUpdateOperationsInput | string
+    contentType?: EnumContentTypeFieldUpdateOperationsInput | $Enums.ContentType
+    role?: EnumContentRoleFieldUpdateOperationsInput | $Enums.ContentRole
     displayOrder?: IntFieldUpdateOperationsInput | number
     isPublished?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
@@ -31703,6 +42348,16 @@ export namespace Prisma {
     customIcon?: NullableStringFieldUpdateOperationsInput | string | null
     iconColor?: NullableStringFieldUpdateOperationsInput | string | null
     auditLogs?: AuditLogUpdateManyWithoutTargetContentNestedInput
+    filePayload?: FilePayloadUpdateOneWithoutContentNestedInput
+    htmlPayload?: HtmlPayloadUpdateOneWithoutContentNestedInput
+    notePayload?: NotePayloadUpdateOneWithoutContentNestedInput
+    folderPayload?: FolderPayloadUpdateOneWithoutContentNestedInput
+    externalPayload?: ExternalPayloadUpdateOneWithoutContentNestedInput
+    chatPayload?: ChatPayloadUpdateOneWithoutContentNestedInput
+    visualizationPayload?: VisualizationPayloadUpdateOneWithoutContentNestedInput
+    dataPayload?: DataPayloadUpdateOneWithoutContentNestedInput
+    hopePayload?: HopePayloadUpdateOneWithoutContentNestedInput
+    workflowPayload?: WorkflowPayloadUpdateOneWithoutContentNestedInput
     history?: ContentHistoryUpdateManyWithoutContentNestedInput
     sourceLinks?: ContentLinkUpdateManyWithoutSourceNestedInput
     targetLinks?: ContentLinkUpdateManyWithoutTargetNestedInput
@@ -31712,9 +42367,6 @@ export namespace Prisma {
     children?: ContentNodeUpdateManyWithoutParentNestedInput
     contentPath?: ContentPathUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUpdateManyWithoutContentNestedInput
-    filePayload?: FilePayloadUpdateOneWithoutContentNestedInput
-    htmlPayload?: HtmlPayloadUpdateOneWithoutContentNestedInput
-    notePayload?: NotePayloadUpdateOneWithoutContentNestedInput
     trashBinEntry?: TrashBinUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUpdateManyWithoutContentNestedInput
   }
@@ -31724,6 +42376,8 @@ export namespace Prisma {
     ownerId?: StringFieldUpdateOperationsInput | string
     title?: StringFieldUpdateOperationsInput | string
     slug?: StringFieldUpdateOperationsInput | string
+    contentType?: EnumContentTypeFieldUpdateOperationsInput | $Enums.ContentType
+    role?: EnumContentRoleFieldUpdateOperationsInput | $Enums.ContentRole
     parentId?: NullableStringFieldUpdateOperationsInput | string | null
     displayOrder?: IntFieldUpdateOperationsInput | number
     categoryId?: NullableStringFieldUpdateOperationsInput | string | null
@@ -31735,15 +42389,22 @@ export namespace Prisma {
     customIcon?: NullableStringFieldUpdateOperationsInput | string | null
     iconColor?: NullableStringFieldUpdateOperationsInput | string | null
     auditLogs?: AuditLogUncheckedUpdateManyWithoutTargetContentNestedInput
+    filePayload?: FilePayloadUncheckedUpdateOneWithoutContentNestedInput
+    htmlPayload?: HtmlPayloadUncheckedUpdateOneWithoutContentNestedInput
+    notePayload?: NotePayloadUncheckedUpdateOneWithoutContentNestedInput
+    folderPayload?: FolderPayloadUncheckedUpdateOneWithoutContentNestedInput
+    externalPayload?: ExternalPayloadUncheckedUpdateOneWithoutContentNestedInput
+    chatPayload?: ChatPayloadUncheckedUpdateOneWithoutContentNestedInput
+    visualizationPayload?: VisualizationPayloadUncheckedUpdateOneWithoutContentNestedInput
+    dataPayload?: DataPayloadUncheckedUpdateOneWithoutContentNestedInput
+    hopePayload?: HopePayloadUncheckedUpdateOneWithoutContentNestedInput
+    workflowPayload?: WorkflowPayloadUncheckedUpdateOneWithoutContentNestedInput
     history?: ContentHistoryUncheckedUpdateManyWithoutContentNestedInput
     sourceLinks?: ContentLinkUncheckedUpdateManyWithoutSourceNestedInput
     targetLinks?: ContentLinkUncheckedUpdateManyWithoutTargetNestedInput
     children?: ContentNodeUncheckedUpdateManyWithoutParentNestedInput
     contentPath?: ContentPathUncheckedUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUncheckedUpdateManyWithoutContentNestedInput
-    filePayload?: FilePayloadUncheckedUpdateOneWithoutContentNestedInput
-    htmlPayload?: HtmlPayloadUncheckedUpdateOneWithoutContentNestedInput
-    notePayload?: NotePayloadUncheckedUpdateOneWithoutContentNestedInput
     trashBinEntry?: TrashBinUncheckedUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUncheckedUpdateManyWithoutContentNestedInput
   }
@@ -31754,13 +42415,13 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
-    settings?: NullableJsonNullValueInput | InputJsonValue
-    settingsVersion?: number
     createdAt?: Date | string
     updatedAt?: Date | string
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: number
     accounts?: AccountCreateNestedManyWithoutUserInput
-    adminActions?: AuditLogCreateNestedManyWithoutUserInput
     auditTargets?: AuditLogCreateNestedManyWithoutTargetUserInput
+    adminActions?: AuditLogCreateNestedManyWithoutUserInput
     categories?: CategoryCreateNestedManyWithoutOwnerInput
     contentNodes?: ContentNodeCreateNestedManyWithoutOwnerInput
     sessions?: SessionCreateNestedManyWithoutUserInput
@@ -31776,13 +42437,13 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
-    settings?: NullableJsonNullValueInput | InputJsonValue
-    settingsVersion?: number
     createdAt?: Date | string
     updatedAt?: Date | string
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: number
     accounts?: AccountUncheckedCreateNestedManyWithoutUserInput
-    adminActions?: AuditLogUncheckedCreateNestedManyWithoutUserInput
     auditTargets?: AuditLogUncheckedCreateNestedManyWithoutTargetUserInput
+    adminActions?: AuditLogUncheckedCreateNestedManyWithoutUserInput
     categories?: CategoryUncheckedCreateNestedManyWithoutOwnerInput
     contentNodes?: ContentNodeUncheckedCreateNestedManyWithoutOwnerInput
     sessions?: SessionUncheckedCreateNestedManyWithoutUserInput
@@ -31801,6 +42462,8 @@ export namespace Prisma {
     id?: string
     title: string
     slug: string
+    contentType: $Enums.ContentType
+    role?: $Enums.ContentRole
     displayOrder?: number
     isPublished?: boolean
     createdAt?: Date | string
@@ -31811,6 +42474,16 @@ export namespace Prisma {
     iconColor?: string | null
     auditLogs?: AuditLogCreateNestedManyWithoutTargetContentInput
     codePayload?: CodePayloadCreateNestedOneWithoutContentInput
+    filePayload?: FilePayloadCreateNestedOneWithoutContentInput
+    htmlPayload?: HtmlPayloadCreateNestedOneWithoutContentInput
+    notePayload?: NotePayloadCreateNestedOneWithoutContentInput
+    folderPayload?: FolderPayloadCreateNestedOneWithoutContentInput
+    externalPayload?: ExternalPayloadCreateNestedOneWithoutContentInput
+    chatPayload?: ChatPayloadCreateNestedOneWithoutContentInput
+    visualizationPayload?: VisualizationPayloadCreateNestedOneWithoutContentInput
+    dataPayload?: DataPayloadCreateNestedOneWithoutContentInput
+    hopePayload?: HopePayloadCreateNestedOneWithoutContentInput
+    workflowPayload?: WorkflowPayloadCreateNestedOneWithoutContentInput
     sourceLinks?: ContentLinkCreateNestedManyWithoutSourceInput
     targetLinks?: ContentLinkCreateNestedManyWithoutTargetInput
     category?: CategoryCreateNestedOneWithoutContentNodesInput
@@ -31819,9 +42492,6 @@ export namespace Prisma {
     children?: ContentNodeCreateNestedManyWithoutParentInput
     contentPath?: ContentPathCreateNestedOneWithoutContentInput
     contentTags?: ContentTagCreateNestedManyWithoutContentInput
-    filePayload?: FilePayloadCreateNestedOneWithoutContentInput
-    htmlPayload?: HtmlPayloadCreateNestedOneWithoutContentInput
-    notePayload?: NotePayloadCreateNestedOneWithoutContentInput
     trashBinEntry?: TrashBinCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantCreateNestedManyWithoutContentInput
   }
@@ -31831,6 +42501,8 @@ export namespace Prisma {
     ownerId: string
     title: string
     slug: string
+    contentType: $Enums.ContentType
+    role?: $Enums.ContentRole
     parentId?: string | null
     displayOrder?: number
     categoryId?: string | null
@@ -31843,14 +42515,21 @@ export namespace Prisma {
     iconColor?: string | null
     auditLogs?: AuditLogUncheckedCreateNestedManyWithoutTargetContentInput
     codePayload?: CodePayloadUncheckedCreateNestedOneWithoutContentInput
+    filePayload?: FilePayloadUncheckedCreateNestedOneWithoutContentInput
+    htmlPayload?: HtmlPayloadUncheckedCreateNestedOneWithoutContentInput
+    notePayload?: NotePayloadUncheckedCreateNestedOneWithoutContentInput
+    folderPayload?: FolderPayloadUncheckedCreateNestedOneWithoutContentInput
+    externalPayload?: ExternalPayloadUncheckedCreateNestedOneWithoutContentInput
+    chatPayload?: ChatPayloadUncheckedCreateNestedOneWithoutContentInput
+    visualizationPayload?: VisualizationPayloadUncheckedCreateNestedOneWithoutContentInput
+    dataPayload?: DataPayloadUncheckedCreateNestedOneWithoutContentInput
+    hopePayload?: HopePayloadUncheckedCreateNestedOneWithoutContentInput
+    workflowPayload?: WorkflowPayloadUncheckedCreateNestedOneWithoutContentInput
     sourceLinks?: ContentLinkUncheckedCreateNestedManyWithoutSourceInput
     targetLinks?: ContentLinkUncheckedCreateNestedManyWithoutTargetInput
     children?: ContentNodeUncheckedCreateNestedManyWithoutParentInput
     contentPath?: ContentPathUncheckedCreateNestedOneWithoutContentInput
     contentTags?: ContentTagUncheckedCreateNestedManyWithoutContentInput
-    filePayload?: FilePayloadUncheckedCreateNestedOneWithoutContentInput
-    htmlPayload?: HtmlPayloadUncheckedCreateNestedOneWithoutContentInput
-    notePayload?: NotePayloadUncheckedCreateNestedOneWithoutContentInput
     trashBinEntry?: TrashBinUncheckedCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantUncheckedCreateNestedManyWithoutContentInput
   }
@@ -31877,13 +42556,13 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
-    settings?: NullableJsonNullValueInput | InputJsonValue
-    settingsVersion?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: IntFieldUpdateOperationsInput | number
     accounts?: AccountUpdateManyWithoutUserNestedInput
-    adminActions?: AuditLogUpdateManyWithoutUserNestedInput
     auditTargets?: AuditLogUpdateManyWithoutTargetUserNestedInput
+    adminActions?: AuditLogUpdateManyWithoutUserNestedInput
     categories?: CategoryUpdateManyWithoutOwnerNestedInput
     contentNodes?: ContentNodeUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUpdateManyWithoutUserNestedInput
@@ -31899,13 +42578,13 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
-    settings?: NullableJsonNullValueInput | InputJsonValue
-    settingsVersion?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: IntFieldUpdateOperationsInput | number
     accounts?: AccountUncheckedUpdateManyWithoutUserNestedInput
-    adminActions?: AuditLogUncheckedUpdateManyWithoutUserNestedInput
     auditTargets?: AuditLogUncheckedUpdateManyWithoutTargetUserNestedInput
+    adminActions?: AuditLogUncheckedUpdateManyWithoutUserNestedInput
     categories?: CategoryUncheckedUpdateManyWithoutOwnerNestedInput
     contentNodes?: ContentNodeUncheckedUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUncheckedUpdateManyWithoutUserNestedInput
@@ -31930,6 +42609,8 @@ export namespace Prisma {
     id?: StringFieldUpdateOperationsInput | string
     title?: StringFieldUpdateOperationsInput | string
     slug?: StringFieldUpdateOperationsInput | string
+    contentType?: EnumContentTypeFieldUpdateOperationsInput | $Enums.ContentType
+    role?: EnumContentRoleFieldUpdateOperationsInput | $Enums.ContentRole
     displayOrder?: IntFieldUpdateOperationsInput | number
     isPublished?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
@@ -31940,6 +42621,16 @@ export namespace Prisma {
     iconColor?: NullableStringFieldUpdateOperationsInput | string | null
     auditLogs?: AuditLogUpdateManyWithoutTargetContentNestedInput
     codePayload?: CodePayloadUpdateOneWithoutContentNestedInput
+    filePayload?: FilePayloadUpdateOneWithoutContentNestedInput
+    htmlPayload?: HtmlPayloadUpdateOneWithoutContentNestedInput
+    notePayload?: NotePayloadUpdateOneWithoutContentNestedInput
+    folderPayload?: FolderPayloadUpdateOneWithoutContentNestedInput
+    externalPayload?: ExternalPayloadUpdateOneWithoutContentNestedInput
+    chatPayload?: ChatPayloadUpdateOneWithoutContentNestedInput
+    visualizationPayload?: VisualizationPayloadUpdateOneWithoutContentNestedInput
+    dataPayload?: DataPayloadUpdateOneWithoutContentNestedInput
+    hopePayload?: HopePayloadUpdateOneWithoutContentNestedInput
+    workflowPayload?: WorkflowPayloadUpdateOneWithoutContentNestedInput
     sourceLinks?: ContentLinkUpdateManyWithoutSourceNestedInput
     targetLinks?: ContentLinkUpdateManyWithoutTargetNestedInput
     category?: CategoryUpdateOneWithoutContentNodesNestedInput
@@ -31948,9 +42639,6 @@ export namespace Prisma {
     children?: ContentNodeUpdateManyWithoutParentNestedInput
     contentPath?: ContentPathUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUpdateManyWithoutContentNestedInput
-    filePayload?: FilePayloadUpdateOneWithoutContentNestedInput
-    htmlPayload?: HtmlPayloadUpdateOneWithoutContentNestedInput
-    notePayload?: NotePayloadUpdateOneWithoutContentNestedInput
     trashBinEntry?: TrashBinUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUpdateManyWithoutContentNestedInput
   }
@@ -31960,6 +42648,8 @@ export namespace Prisma {
     ownerId?: StringFieldUpdateOperationsInput | string
     title?: StringFieldUpdateOperationsInput | string
     slug?: StringFieldUpdateOperationsInput | string
+    contentType?: EnumContentTypeFieldUpdateOperationsInput | $Enums.ContentType
+    role?: EnumContentRoleFieldUpdateOperationsInput | $Enums.ContentRole
     parentId?: NullableStringFieldUpdateOperationsInput | string | null
     displayOrder?: IntFieldUpdateOperationsInput | number
     categoryId?: NullableStringFieldUpdateOperationsInput | string | null
@@ -31972,14 +42662,21 @@ export namespace Prisma {
     iconColor?: NullableStringFieldUpdateOperationsInput | string | null
     auditLogs?: AuditLogUncheckedUpdateManyWithoutTargetContentNestedInput
     codePayload?: CodePayloadUncheckedUpdateOneWithoutContentNestedInput
+    filePayload?: FilePayloadUncheckedUpdateOneWithoutContentNestedInput
+    htmlPayload?: HtmlPayloadUncheckedUpdateOneWithoutContentNestedInput
+    notePayload?: NotePayloadUncheckedUpdateOneWithoutContentNestedInput
+    folderPayload?: FolderPayloadUncheckedUpdateOneWithoutContentNestedInput
+    externalPayload?: ExternalPayloadUncheckedUpdateOneWithoutContentNestedInput
+    chatPayload?: ChatPayloadUncheckedUpdateOneWithoutContentNestedInput
+    visualizationPayload?: VisualizationPayloadUncheckedUpdateOneWithoutContentNestedInput
+    dataPayload?: DataPayloadUncheckedUpdateOneWithoutContentNestedInput
+    hopePayload?: HopePayloadUncheckedUpdateOneWithoutContentNestedInput
+    workflowPayload?: WorkflowPayloadUncheckedUpdateOneWithoutContentNestedInput
     sourceLinks?: ContentLinkUncheckedUpdateManyWithoutSourceNestedInput
     targetLinks?: ContentLinkUncheckedUpdateManyWithoutTargetNestedInput
     children?: ContentNodeUncheckedUpdateManyWithoutParentNestedInput
     contentPath?: ContentPathUncheckedUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUncheckedUpdateManyWithoutContentNestedInput
-    filePayload?: FilePayloadUncheckedUpdateOneWithoutContentNestedInput
-    htmlPayload?: HtmlPayloadUncheckedUpdateOneWithoutContentNestedInput
-    notePayload?: NotePayloadUncheckedUpdateOneWithoutContentNestedInput
     trashBinEntry?: TrashBinUncheckedUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUncheckedUpdateManyWithoutContentNestedInput
   }
@@ -31988,6 +42685,8 @@ export namespace Prisma {
     id?: string
     title: string
     slug: string
+    contentType: $Enums.ContentType
+    role?: $Enums.ContentRole
     displayOrder?: number
     isPublished?: boolean
     createdAt?: Date | string
@@ -31998,6 +42697,16 @@ export namespace Prisma {
     iconColor?: string | null
     auditLogs?: AuditLogCreateNestedManyWithoutTargetContentInput
     codePayload?: CodePayloadCreateNestedOneWithoutContentInput
+    filePayload?: FilePayloadCreateNestedOneWithoutContentInput
+    htmlPayload?: HtmlPayloadCreateNestedOneWithoutContentInput
+    notePayload?: NotePayloadCreateNestedOneWithoutContentInput
+    folderPayload?: FolderPayloadCreateNestedOneWithoutContentInput
+    externalPayload?: ExternalPayloadCreateNestedOneWithoutContentInput
+    chatPayload?: ChatPayloadCreateNestedOneWithoutContentInput
+    visualizationPayload?: VisualizationPayloadCreateNestedOneWithoutContentInput
+    dataPayload?: DataPayloadCreateNestedOneWithoutContentInput
+    hopePayload?: HopePayloadCreateNestedOneWithoutContentInput
+    workflowPayload?: WorkflowPayloadCreateNestedOneWithoutContentInput
     history?: ContentHistoryCreateNestedManyWithoutContentInput
     sourceLinks?: ContentLinkCreateNestedManyWithoutSourceInput
     targetLinks?: ContentLinkCreateNestedManyWithoutTargetInput
@@ -32006,9 +42715,6 @@ export namespace Prisma {
     parent?: ContentNodeCreateNestedOneWithoutChildrenInput
     children?: ContentNodeCreateNestedManyWithoutParentInput
     contentTags?: ContentTagCreateNestedManyWithoutContentInput
-    filePayload?: FilePayloadCreateNestedOneWithoutContentInput
-    htmlPayload?: HtmlPayloadCreateNestedOneWithoutContentInput
-    notePayload?: NotePayloadCreateNestedOneWithoutContentInput
     trashBinEntry?: TrashBinCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantCreateNestedManyWithoutContentInput
   }
@@ -32018,6 +42724,8 @@ export namespace Prisma {
     ownerId: string
     title: string
     slug: string
+    contentType: $Enums.ContentType
+    role?: $Enums.ContentRole
     parentId?: string | null
     displayOrder?: number
     categoryId?: string | null
@@ -32030,14 +42738,21 @@ export namespace Prisma {
     iconColor?: string | null
     auditLogs?: AuditLogUncheckedCreateNestedManyWithoutTargetContentInput
     codePayload?: CodePayloadUncheckedCreateNestedOneWithoutContentInput
+    filePayload?: FilePayloadUncheckedCreateNestedOneWithoutContentInput
+    htmlPayload?: HtmlPayloadUncheckedCreateNestedOneWithoutContentInput
+    notePayload?: NotePayloadUncheckedCreateNestedOneWithoutContentInput
+    folderPayload?: FolderPayloadUncheckedCreateNestedOneWithoutContentInput
+    externalPayload?: ExternalPayloadUncheckedCreateNestedOneWithoutContentInput
+    chatPayload?: ChatPayloadUncheckedCreateNestedOneWithoutContentInput
+    visualizationPayload?: VisualizationPayloadUncheckedCreateNestedOneWithoutContentInput
+    dataPayload?: DataPayloadUncheckedCreateNestedOneWithoutContentInput
+    hopePayload?: HopePayloadUncheckedCreateNestedOneWithoutContentInput
+    workflowPayload?: WorkflowPayloadUncheckedCreateNestedOneWithoutContentInput
     history?: ContentHistoryUncheckedCreateNestedManyWithoutContentInput
     sourceLinks?: ContentLinkUncheckedCreateNestedManyWithoutSourceInput
     targetLinks?: ContentLinkUncheckedCreateNestedManyWithoutTargetInput
     children?: ContentNodeUncheckedCreateNestedManyWithoutParentInput
     contentTags?: ContentTagUncheckedCreateNestedManyWithoutContentInput
-    filePayload?: FilePayloadUncheckedCreateNestedOneWithoutContentInput
-    htmlPayload?: HtmlPayloadUncheckedCreateNestedOneWithoutContentInput
-    notePayload?: NotePayloadUncheckedCreateNestedOneWithoutContentInput
     trashBinEntry?: TrashBinUncheckedCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantUncheckedCreateNestedManyWithoutContentInput
   }
@@ -32062,6 +42777,8 @@ export namespace Prisma {
     id?: StringFieldUpdateOperationsInput | string
     title?: StringFieldUpdateOperationsInput | string
     slug?: StringFieldUpdateOperationsInput | string
+    contentType?: EnumContentTypeFieldUpdateOperationsInput | $Enums.ContentType
+    role?: EnumContentRoleFieldUpdateOperationsInput | $Enums.ContentRole
     displayOrder?: IntFieldUpdateOperationsInput | number
     isPublished?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
@@ -32072,6 +42789,16 @@ export namespace Prisma {
     iconColor?: NullableStringFieldUpdateOperationsInput | string | null
     auditLogs?: AuditLogUpdateManyWithoutTargetContentNestedInput
     codePayload?: CodePayloadUpdateOneWithoutContentNestedInput
+    filePayload?: FilePayloadUpdateOneWithoutContentNestedInput
+    htmlPayload?: HtmlPayloadUpdateOneWithoutContentNestedInput
+    notePayload?: NotePayloadUpdateOneWithoutContentNestedInput
+    folderPayload?: FolderPayloadUpdateOneWithoutContentNestedInput
+    externalPayload?: ExternalPayloadUpdateOneWithoutContentNestedInput
+    chatPayload?: ChatPayloadUpdateOneWithoutContentNestedInput
+    visualizationPayload?: VisualizationPayloadUpdateOneWithoutContentNestedInput
+    dataPayload?: DataPayloadUpdateOneWithoutContentNestedInput
+    hopePayload?: HopePayloadUpdateOneWithoutContentNestedInput
+    workflowPayload?: WorkflowPayloadUpdateOneWithoutContentNestedInput
     history?: ContentHistoryUpdateManyWithoutContentNestedInput
     sourceLinks?: ContentLinkUpdateManyWithoutSourceNestedInput
     targetLinks?: ContentLinkUpdateManyWithoutTargetNestedInput
@@ -32080,9 +42807,6 @@ export namespace Prisma {
     parent?: ContentNodeUpdateOneWithoutChildrenNestedInput
     children?: ContentNodeUpdateManyWithoutParentNestedInput
     contentTags?: ContentTagUpdateManyWithoutContentNestedInput
-    filePayload?: FilePayloadUpdateOneWithoutContentNestedInput
-    htmlPayload?: HtmlPayloadUpdateOneWithoutContentNestedInput
-    notePayload?: NotePayloadUpdateOneWithoutContentNestedInput
     trashBinEntry?: TrashBinUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUpdateManyWithoutContentNestedInput
   }
@@ -32092,6 +42816,8 @@ export namespace Prisma {
     ownerId?: StringFieldUpdateOperationsInput | string
     title?: StringFieldUpdateOperationsInput | string
     slug?: StringFieldUpdateOperationsInput | string
+    contentType?: EnumContentTypeFieldUpdateOperationsInput | $Enums.ContentType
+    role?: EnumContentRoleFieldUpdateOperationsInput | $Enums.ContentRole
     parentId?: NullableStringFieldUpdateOperationsInput | string | null
     displayOrder?: IntFieldUpdateOperationsInput | number
     categoryId?: NullableStringFieldUpdateOperationsInput | string | null
@@ -32104,14 +42830,21 @@ export namespace Prisma {
     iconColor?: NullableStringFieldUpdateOperationsInput | string | null
     auditLogs?: AuditLogUncheckedUpdateManyWithoutTargetContentNestedInput
     codePayload?: CodePayloadUncheckedUpdateOneWithoutContentNestedInput
+    filePayload?: FilePayloadUncheckedUpdateOneWithoutContentNestedInput
+    htmlPayload?: HtmlPayloadUncheckedUpdateOneWithoutContentNestedInput
+    notePayload?: NotePayloadUncheckedUpdateOneWithoutContentNestedInput
+    folderPayload?: FolderPayloadUncheckedUpdateOneWithoutContentNestedInput
+    externalPayload?: ExternalPayloadUncheckedUpdateOneWithoutContentNestedInput
+    chatPayload?: ChatPayloadUncheckedUpdateOneWithoutContentNestedInput
+    visualizationPayload?: VisualizationPayloadUncheckedUpdateOneWithoutContentNestedInput
+    dataPayload?: DataPayloadUncheckedUpdateOneWithoutContentNestedInput
+    hopePayload?: HopePayloadUncheckedUpdateOneWithoutContentNestedInput
+    workflowPayload?: WorkflowPayloadUncheckedUpdateOneWithoutContentNestedInput
     history?: ContentHistoryUncheckedUpdateManyWithoutContentNestedInput
     sourceLinks?: ContentLinkUncheckedUpdateManyWithoutSourceNestedInput
     targetLinks?: ContentLinkUncheckedUpdateManyWithoutTargetNestedInput
     children?: ContentNodeUncheckedUpdateManyWithoutParentNestedInput
     contentTags?: ContentTagUncheckedUpdateManyWithoutContentNestedInput
-    filePayload?: FilePayloadUncheckedUpdateOneWithoutContentNestedInput
-    htmlPayload?: HtmlPayloadUncheckedUpdateOneWithoutContentNestedInput
-    notePayload?: NotePayloadUncheckedUpdateOneWithoutContentNestedInput
     trashBinEntry?: TrashBinUncheckedUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUncheckedUpdateManyWithoutContentNestedInput
   }
@@ -32120,6 +42853,8 @@ export namespace Prisma {
     id?: string
     title: string
     slug: string
+    contentType: $Enums.ContentType
+    role?: $Enums.ContentRole
     displayOrder?: number
     isPublished?: boolean
     createdAt?: Date | string
@@ -32130,6 +42865,16 @@ export namespace Prisma {
     iconColor?: string | null
     auditLogs?: AuditLogCreateNestedManyWithoutTargetContentInput
     codePayload?: CodePayloadCreateNestedOneWithoutContentInput
+    filePayload?: FilePayloadCreateNestedOneWithoutContentInput
+    htmlPayload?: HtmlPayloadCreateNestedOneWithoutContentInput
+    notePayload?: NotePayloadCreateNestedOneWithoutContentInput
+    folderPayload?: FolderPayloadCreateNestedOneWithoutContentInput
+    externalPayload?: ExternalPayloadCreateNestedOneWithoutContentInput
+    chatPayload?: ChatPayloadCreateNestedOneWithoutContentInput
+    visualizationPayload?: VisualizationPayloadCreateNestedOneWithoutContentInput
+    dataPayload?: DataPayloadCreateNestedOneWithoutContentInput
+    hopePayload?: HopePayloadCreateNestedOneWithoutContentInput
+    workflowPayload?: WorkflowPayloadCreateNestedOneWithoutContentInput
     history?: ContentHistoryCreateNestedManyWithoutContentInput
     targetLinks?: ContentLinkCreateNestedManyWithoutTargetInput
     category?: CategoryCreateNestedOneWithoutContentNodesInput
@@ -32138,9 +42883,6 @@ export namespace Prisma {
     children?: ContentNodeCreateNestedManyWithoutParentInput
     contentPath?: ContentPathCreateNestedOneWithoutContentInput
     contentTags?: ContentTagCreateNestedManyWithoutContentInput
-    filePayload?: FilePayloadCreateNestedOneWithoutContentInput
-    htmlPayload?: HtmlPayloadCreateNestedOneWithoutContentInput
-    notePayload?: NotePayloadCreateNestedOneWithoutContentInput
     trashBinEntry?: TrashBinCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantCreateNestedManyWithoutContentInput
   }
@@ -32150,6 +42892,8 @@ export namespace Prisma {
     ownerId: string
     title: string
     slug: string
+    contentType: $Enums.ContentType
+    role?: $Enums.ContentRole
     parentId?: string | null
     displayOrder?: number
     categoryId?: string | null
@@ -32162,14 +42906,21 @@ export namespace Prisma {
     iconColor?: string | null
     auditLogs?: AuditLogUncheckedCreateNestedManyWithoutTargetContentInput
     codePayload?: CodePayloadUncheckedCreateNestedOneWithoutContentInput
+    filePayload?: FilePayloadUncheckedCreateNestedOneWithoutContentInput
+    htmlPayload?: HtmlPayloadUncheckedCreateNestedOneWithoutContentInput
+    notePayload?: NotePayloadUncheckedCreateNestedOneWithoutContentInput
+    folderPayload?: FolderPayloadUncheckedCreateNestedOneWithoutContentInput
+    externalPayload?: ExternalPayloadUncheckedCreateNestedOneWithoutContentInput
+    chatPayload?: ChatPayloadUncheckedCreateNestedOneWithoutContentInput
+    visualizationPayload?: VisualizationPayloadUncheckedCreateNestedOneWithoutContentInput
+    dataPayload?: DataPayloadUncheckedCreateNestedOneWithoutContentInput
+    hopePayload?: HopePayloadUncheckedCreateNestedOneWithoutContentInput
+    workflowPayload?: WorkflowPayloadUncheckedCreateNestedOneWithoutContentInput
     history?: ContentHistoryUncheckedCreateNestedManyWithoutContentInput
     targetLinks?: ContentLinkUncheckedCreateNestedManyWithoutTargetInput
     children?: ContentNodeUncheckedCreateNestedManyWithoutParentInput
     contentPath?: ContentPathUncheckedCreateNestedOneWithoutContentInput
     contentTags?: ContentTagUncheckedCreateNestedManyWithoutContentInput
-    filePayload?: FilePayloadUncheckedCreateNestedOneWithoutContentInput
-    htmlPayload?: HtmlPayloadUncheckedCreateNestedOneWithoutContentInput
-    notePayload?: NotePayloadUncheckedCreateNestedOneWithoutContentInput
     trashBinEntry?: TrashBinUncheckedCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantUncheckedCreateNestedManyWithoutContentInput
   }
@@ -32183,6 +42934,8 @@ export namespace Prisma {
     id?: string
     title: string
     slug: string
+    contentType: $Enums.ContentType
+    role?: $Enums.ContentRole
     displayOrder?: number
     isPublished?: boolean
     createdAt?: Date | string
@@ -32193,6 +42946,16 @@ export namespace Prisma {
     iconColor?: string | null
     auditLogs?: AuditLogCreateNestedManyWithoutTargetContentInput
     codePayload?: CodePayloadCreateNestedOneWithoutContentInput
+    filePayload?: FilePayloadCreateNestedOneWithoutContentInput
+    htmlPayload?: HtmlPayloadCreateNestedOneWithoutContentInput
+    notePayload?: NotePayloadCreateNestedOneWithoutContentInput
+    folderPayload?: FolderPayloadCreateNestedOneWithoutContentInput
+    externalPayload?: ExternalPayloadCreateNestedOneWithoutContentInput
+    chatPayload?: ChatPayloadCreateNestedOneWithoutContentInput
+    visualizationPayload?: VisualizationPayloadCreateNestedOneWithoutContentInput
+    dataPayload?: DataPayloadCreateNestedOneWithoutContentInput
+    hopePayload?: HopePayloadCreateNestedOneWithoutContentInput
+    workflowPayload?: WorkflowPayloadCreateNestedOneWithoutContentInput
     history?: ContentHistoryCreateNestedManyWithoutContentInput
     sourceLinks?: ContentLinkCreateNestedManyWithoutSourceInput
     category?: CategoryCreateNestedOneWithoutContentNodesInput
@@ -32201,9 +42964,6 @@ export namespace Prisma {
     children?: ContentNodeCreateNestedManyWithoutParentInput
     contentPath?: ContentPathCreateNestedOneWithoutContentInput
     contentTags?: ContentTagCreateNestedManyWithoutContentInput
-    filePayload?: FilePayloadCreateNestedOneWithoutContentInput
-    htmlPayload?: HtmlPayloadCreateNestedOneWithoutContentInput
-    notePayload?: NotePayloadCreateNestedOneWithoutContentInput
     trashBinEntry?: TrashBinCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantCreateNestedManyWithoutContentInput
   }
@@ -32213,6 +42973,8 @@ export namespace Prisma {
     ownerId: string
     title: string
     slug: string
+    contentType: $Enums.ContentType
+    role?: $Enums.ContentRole
     parentId?: string | null
     displayOrder?: number
     categoryId?: string | null
@@ -32225,14 +42987,21 @@ export namespace Prisma {
     iconColor?: string | null
     auditLogs?: AuditLogUncheckedCreateNestedManyWithoutTargetContentInput
     codePayload?: CodePayloadUncheckedCreateNestedOneWithoutContentInput
+    filePayload?: FilePayloadUncheckedCreateNestedOneWithoutContentInput
+    htmlPayload?: HtmlPayloadUncheckedCreateNestedOneWithoutContentInput
+    notePayload?: NotePayloadUncheckedCreateNestedOneWithoutContentInput
+    folderPayload?: FolderPayloadUncheckedCreateNestedOneWithoutContentInput
+    externalPayload?: ExternalPayloadUncheckedCreateNestedOneWithoutContentInput
+    chatPayload?: ChatPayloadUncheckedCreateNestedOneWithoutContentInput
+    visualizationPayload?: VisualizationPayloadUncheckedCreateNestedOneWithoutContentInput
+    dataPayload?: DataPayloadUncheckedCreateNestedOneWithoutContentInput
+    hopePayload?: HopePayloadUncheckedCreateNestedOneWithoutContentInput
+    workflowPayload?: WorkflowPayloadUncheckedCreateNestedOneWithoutContentInput
     history?: ContentHistoryUncheckedCreateNestedManyWithoutContentInput
     sourceLinks?: ContentLinkUncheckedCreateNestedManyWithoutSourceInput
     children?: ContentNodeUncheckedCreateNestedManyWithoutParentInput
     contentPath?: ContentPathUncheckedCreateNestedOneWithoutContentInput
     contentTags?: ContentTagUncheckedCreateNestedManyWithoutContentInput
-    filePayload?: FilePayloadUncheckedCreateNestedOneWithoutContentInput
-    htmlPayload?: HtmlPayloadUncheckedCreateNestedOneWithoutContentInput
-    notePayload?: NotePayloadUncheckedCreateNestedOneWithoutContentInput
     trashBinEntry?: TrashBinUncheckedCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantUncheckedCreateNestedManyWithoutContentInput
   }
@@ -32257,6 +43026,8 @@ export namespace Prisma {
     id?: StringFieldUpdateOperationsInput | string
     title?: StringFieldUpdateOperationsInput | string
     slug?: StringFieldUpdateOperationsInput | string
+    contentType?: EnumContentTypeFieldUpdateOperationsInput | $Enums.ContentType
+    role?: EnumContentRoleFieldUpdateOperationsInput | $Enums.ContentRole
     displayOrder?: IntFieldUpdateOperationsInput | number
     isPublished?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
@@ -32267,6 +43038,16 @@ export namespace Prisma {
     iconColor?: NullableStringFieldUpdateOperationsInput | string | null
     auditLogs?: AuditLogUpdateManyWithoutTargetContentNestedInput
     codePayload?: CodePayloadUpdateOneWithoutContentNestedInput
+    filePayload?: FilePayloadUpdateOneWithoutContentNestedInput
+    htmlPayload?: HtmlPayloadUpdateOneWithoutContentNestedInput
+    notePayload?: NotePayloadUpdateOneWithoutContentNestedInput
+    folderPayload?: FolderPayloadUpdateOneWithoutContentNestedInput
+    externalPayload?: ExternalPayloadUpdateOneWithoutContentNestedInput
+    chatPayload?: ChatPayloadUpdateOneWithoutContentNestedInput
+    visualizationPayload?: VisualizationPayloadUpdateOneWithoutContentNestedInput
+    dataPayload?: DataPayloadUpdateOneWithoutContentNestedInput
+    hopePayload?: HopePayloadUpdateOneWithoutContentNestedInput
+    workflowPayload?: WorkflowPayloadUpdateOneWithoutContentNestedInput
     history?: ContentHistoryUpdateManyWithoutContentNestedInput
     targetLinks?: ContentLinkUpdateManyWithoutTargetNestedInput
     category?: CategoryUpdateOneWithoutContentNodesNestedInput
@@ -32275,9 +43056,6 @@ export namespace Prisma {
     children?: ContentNodeUpdateManyWithoutParentNestedInput
     contentPath?: ContentPathUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUpdateManyWithoutContentNestedInput
-    filePayload?: FilePayloadUpdateOneWithoutContentNestedInput
-    htmlPayload?: HtmlPayloadUpdateOneWithoutContentNestedInput
-    notePayload?: NotePayloadUpdateOneWithoutContentNestedInput
     trashBinEntry?: TrashBinUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUpdateManyWithoutContentNestedInput
   }
@@ -32287,6 +43065,8 @@ export namespace Prisma {
     ownerId?: StringFieldUpdateOperationsInput | string
     title?: StringFieldUpdateOperationsInput | string
     slug?: StringFieldUpdateOperationsInput | string
+    contentType?: EnumContentTypeFieldUpdateOperationsInput | $Enums.ContentType
+    role?: EnumContentRoleFieldUpdateOperationsInput | $Enums.ContentRole
     parentId?: NullableStringFieldUpdateOperationsInput | string | null
     displayOrder?: IntFieldUpdateOperationsInput | number
     categoryId?: NullableStringFieldUpdateOperationsInput | string | null
@@ -32299,14 +43079,21 @@ export namespace Prisma {
     iconColor?: NullableStringFieldUpdateOperationsInput | string | null
     auditLogs?: AuditLogUncheckedUpdateManyWithoutTargetContentNestedInput
     codePayload?: CodePayloadUncheckedUpdateOneWithoutContentNestedInput
+    filePayload?: FilePayloadUncheckedUpdateOneWithoutContentNestedInput
+    htmlPayload?: HtmlPayloadUncheckedUpdateOneWithoutContentNestedInput
+    notePayload?: NotePayloadUncheckedUpdateOneWithoutContentNestedInput
+    folderPayload?: FolderPayloadUncheckedUpdateOneWithoutContentNestedInput
+    externalPayload?: ExternalPayloadUncheckedUpdateOneWithoutContentNestedInput
+    chatPayload?: ChatPayloadUncheckedUpdateOneWithoutContentNestedInput
+    visualizationPayload?: VisualizationPayloadUncheckedUpdateOneWithoutContentNestedInput
+    dataPayload?: DataPayloadUncheckedUpdateOneWithoutContentNestedInput
+    hopePayload?: HopePayloadUncheckedUpdateOneWithoutContentNestedInput
+    workflowPayload?: WorkflowPayloadUncheckedUpdateOneWithoutContentNestedInput
     history?: ContentHistoryUncheckedUpdateManyWithoutContentNestedInput
     targetLinks?: ContentLinkUncheckedUpdateManyWithoutTargetNestedInput
     children?: ContentNodeUncheckedUpdateManyWithoutParentNestedInput
     contentPath?: ContentPathUncheckedUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUncheckedUpdateManyWithoutContentNestedInput
-    filePayload?: FilePayloadUncheckedUpdateOneWithoutContentNestedInput
-    htmlPayload?: HtmlPayloadUncheckedUpdateOneWithoutContentNestedInput
-    notePayload?: NotePayloadUncheckedUpdateOneWithoutContentNestedInput
     trashBinEntry?: TrashBinUncheckedUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUncheckedUpdateManyWithoutContentNestedInput
   }
@@ -32326,6 +43113,8 @@ export namespace Prisma {
     id?: StringFieldUpdateOperationsInput | string
     title?: StringFieldUpdateOperationsInput | string
     slug?: StringFieldUpdateOperationsInput | string
+    contentType?: EnumContentTypeFieldUpdateOperationsInput | $Enums.ContentType
+    role?: EnumContentRoleFieldUpdateOperationsInput | $Enums.ContentRole
     displayOrder?: IntFieldUpdateOperationsInput | number
     isPublished?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
@@ -32336,6 +43125,16 @@ export namespace Prisma {
     iconColor?: NullableStringFieldUpdateOperationsInput | string | null
     auditLogs?: AuditLogUpdateManyWithoutTargetContentNestedInput
     codePayload?: CodePayloadUpdateOneWithoutContentNestedInput
+    filePayload?: FilePayloadUpdateOneWithoutContentNestedInput
+    htmlPayload?: HtmlPayloadUpdateOneWithoutContentNestedInput
+    notePayload?: NotePayloadUpdateOneWithoutContentNestedInput
+    folderPayload?: FolderPayloadUpdateOneWithoutContentNestedInput
+    externalPayload?: ExternalPayloadUpdateOneWithoutContentNestedInput
+    chatPayload?: ChatPayloadUpdateOneWithoutContentNestedInput
+    visualizationPayload?: VisualizationPayloadUpdateOneWithoutContentNestedInput
+    dataPayload?: DataPayloadUpdateOneWithoutContentNestedInput
+    hopePayload?: HopePayloadUpdateOneWithoutContentNestedInput
+    workflowPayload?: WorkflowPayloadUpdateOneWithoutContentNestedInput
     history?: ContentHistoryUpdateManyWithoutContentNestedInput
     sourceLinks?: ContentLinkUpdateManyWithoutSourceNestedInput
     category?: CategoryUpdateOneWithoutContentNodesNestedInput
@@ -32344,9 +43143,6 @@ export namespace Prisma {
     children?: ContentNodeUpdateManyWithoutParentNestedInput
     contentPath?: ContentPathUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUpdateManyWithoutContentNestedInput
-    filePayload?: FilePayloadUpdateOneWithoutContentNestedInput
-    htmlPayload?: HtmlPayloadUpdateOneWithoutContentNestedInput
-    notePayload?: NotePayloadUpdateOneWithoutContentNestedInput
     trashBinEntry?: TrashBinUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUpdateManyWithoutContentNestedInput
   }
@@ -32356,6 +43152,8 @@ export namespace Prisma {
     ownerId?: StringFieldUpdateOperationsInput | string
     title?: StringFieldUpdateOperationsInput | string
     slug?: StringFieldUpdateOperationsInput | string
+    contentType?: EnumContentTypeFieldUpdateOperationsInput | $Enums.ContentType
+    role?: EnumContentRoleFieldUpdateOperationsInput | $Enums.ContentRole
     parentId?: NullableStringFieldUpdateOperationsInput | string | null
     displayOrder?: IntFieldUpdateOperationsInput | number
     categoryId?: NullableStringFieldUpdateOperationsInput | string | null
@@ -32368,14 +43166,21 @@ export namespace Prisma {
     iconColor?: NullableStringFieldUpdateOperationsInput | string | null
     auditLogs?: AuditLogUncheckedUpdateManyWithoutTargetContentNestedInput
     codePayload?: CodePayloadUncheckedUpdateOneWithoutContentNestedInput
+    filePayload?: FilePayloadUncheckedUpdateOneWithoutContentNestedInput
+    htmlPayload?: HtmlPayloadUncheckedUpdateOneWithoutContentNestedInput
+    notePayload?: NotePayloadUncheckedUpdateOneWithoutContentNestedInput
+    folderPayload?: FolderPayloadUncheckedUpdateOneWithoutContentNestedInput
+    externalPayload?: ExternalPayloadUncheckedUpdateOneWithoutContentNestedInput
+    chatPayload?: ChatPayloadUncheckedUpdateOneWithoutContentNestedInput
+    visualizationPayload?: VisualizationPayloadUncheckedUpdateOneWithoutContentNestedInput
+    dataPayload?: DataPayloadUncheckedUpdateOneWithoutContentNestedInput
+    hopePayload?: HopePayloadUncheckedUpdateOneWithoutContentNestedInput
+    workflowPayload?: WorkflowPayloadUncheckedUpdateOneWithoutContentNestedInput
     history?: ContentHistoryUncheckedUpdateManyWithoutContentNestedInput
     sourceLinks?: ContentLinkUncheckedUpdateManyWithoutSourceNestedInput
     children?: ContentNodeUncheckedUpdateManyWithoutParentNestedInput
     contentPath?: ContentPathUncheckedUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUncheckedUpdateManyWithoutContentNestedInput
-    filePayload?: FilePayloadUncheckedUpdateOneWithoutContentNestedInput
-    htmlPayload?: HtmlPayloadUncheckedUpdateOneWithoutContentNestedInput
-    notePayload?: NotePayloadUncheckedUpdateOneWithoutContentNestedInput
     trashBinEntry?: TrashBinUncheckedUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUncheckedUpdateManyWithoutContentNestedInput
   }
@@ -32384,6 +43189,8 @@ export namespace Prisma {
     id?: string
     title: string
     slug: string
+    contentType: $Enums.ContentType
+    role?: $Enums.ContentRole
     displayOrder?: number
     isPublished?: boolean
     createdAt?: Date | string
@@ -32394,6 +43201,16 @@ export namespace Prisma {
     iconColor?: string | null
     auditLogs?: AuditLogCreateNestedManyWithoutTargetContentInput
     codePayload?: CodePayloadCreateNestedOneWithoutContentInput
+    filePayload?: FilePayloadCreateNestedOneWithoutContentInput
+    htmlPayload?: HtmlPayloadCreateNestedOneWithoutContentInput
+    notePayload?: NotePayloadCreateNestedOneWithoutContentInput
+    folderPayload?: FolderPayloadCreateNestedOneWithoutContentInput
+    externalPayload?: ExternalPayloadCreateNestedOneWithoutContentInput
+    chatPayload?: ChatPayloadCreateNestedOneWithoutContentInput
+    visualizationPayload?: VisualizationPayloadCreateNestedOneWithoutContentInput
+    dataPayload?: DataPayloadCreateNestedOneWithoutContentInput
+    hopePayload?: HopePayloadCreateNestedOneWithoutContentInput
+    workflowPayload?: WorkflowPayloadCreateNestedOneWithoutContentInput
     history?: ContentHistoryCreateNestedManyWithoutContentInput
     sourceLinks?: ContentLinkCreateNestedManyWithoutSourceInput
     targetLinks?: ContentLinkCreateNestedManyWithoutTargetInput
@@ -32402,9 +43219,6 @@ export namespace Prisma {
     parent?: ContentNodeCreateNestedOneWithoutChildrenInput
     children?: ContentNodeCreateNestedManyWithoutParentInput
     contentPath?: ContentPathCreateNestedOneWithoutContentInput
-    filePayload?: FilePayloadCreateNestedOneWithoutContentInput
-    htmlPayload?: HtmlPayloadCreateNestedOneWithoutContentInput
-    notePayload?: NotePayloadCreateNestedOneWithoutContentInput
     trashBinEntry?: TrashBinCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantCreateNestedManyWithoutContentInput
   }
@@ -32414,6 +43228,8 @@ export namespace Prisma {
     ownerId: string
     title: string
     slug: string
+    contentType: $Enums.ContentType
+    role?: $Enums.ContentRole
     parentId?: string | null
     displayOrder?: number
     categoryId?: string | null
@@ -32426,14 +43242,21 @@ export namespace Prisma {
     iconColor?: string | null
     auditLogs?: AuditLogUncheckedCreateNestedManyWithoutTargetContentInput
     codePayload?: CodePayloadUncheckedCreateNestedOneWithoutContentInput
+    filePayload?: FilePayloadUncheckedCreateNestedOneWithoutContentInput
+    htmlPayload?: HtmlPayloadUncheckedCreateNestedOneWithoutContentInput
+    notePayload?: NotePayloadUncheckedCreateNestedOneWithoutContentInput
+    folderPayload?: FolderPayloadUncheckedCreateNestedOneWithoutContentInput
+    externalPayload?: ExternalPayloadUncheckedCreateNestedOneWithoutContentInput
+    chatPayload?: ChatPayloadUncheckedCreateNestedOneWithoutContentInput
+    visualizationPayload?: VisualizationPayloadUncheckedCreateNestedOneWithoutContentInput
+    dataPayload?: DataPayloadUncheckedCreateNestedOneWithoutContentInput
+    hopePayload?: HopePayloadUncheckedCreateNestedOneWithoutContentInput
+    workflowPayload?: WorkflowPayloadUncheckedCreateNestedOneWithoutContentInput
     history?: ContentHistoryUncheckedCreateNestedManyWithoutContentInput
     sourceLinks?: ContentLinkUncheckedCreateNestedManyWithoutSourceInput
     targetLinks?: ContentLinkUncheckedCreateNestedManyWithoutTargetInput
     children?: ContentNodeUncheckedCreateNestedManyWithoutParentInput
     contentPath?: ContentPathUncheckedCreateNestedOneWithoutContentInput
-    filePayload?: FilePayloadUncheckedCreateNestedOneWithoutContentInput
-    htmlPayload?: HtmlPayloadUncheckedCreateNestedOneWithoutContentInput
-    notePayload?: NotePayloadUncheckedCreateNestedOneWithoutContentInput
     trashBinEntry?: TrashBinUncheckedCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantUncheckedCreateNestedManyWithoutContentInput
   }
@@ -32457,8 +43280,8 @@ export namespace Prisma {
     name: string
     slug: string
     createdAt?: Date | string
-    color?: string | null
     userId: string
+    color?: string | null
   }
 
   export type TagCreateOrConnectWithoutContentTagsInput = {
@@ -32481,6 +43304,8 @@ export namespace Prisma {
     id?: StringFieldUpdateOperationsInput | string
     title?: StringFieldUpdateOperationsInput | string
     slug?: StringFieldUpdateOperationsInput | string
+    contentType?: EnumContentTypeFieldUpdateOperationsInput | $Enums.ContentType
+    role?: EnumContentRoleFieldUpdateOperationsInput | $Enums.ContentRole
     displayOrder?: IntFieldUpdateOperationsInput | number
     isPublished?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
@@ -32491,6 +43316,16 @@ export namespace Prisma {
     iconColor?: NullableStringFieldUpdateOperationsInput | string | null
     auditLogs?: AuditLogUpdateManyWithoutTargetContentNestedInput
     codePayload?: CodePayloadUpdateOneWithoutContentNestedInput
+    filePayload?: FilePayloadUpdateOneWithoutContentNestedInput
+    htmlPayload?: HtmlPayloadUpdateOneWithoutContentNestedInput
+    notePayload?: NotePayloadUpdateOneWithoutContentNestedInput
+    folderPayload?: FolderPayloadUpdateOneWithoutContentNestedInput
+    externalPayload?: ExternalPayloadUpdateOneWithoutContentNestedInput
+    chatPayload?: ChatPayloadUpdateOneWithoutContentNestedInput
+    visualizationPayload?: VisualizationPayloadUpdateOneWithoutContentNestedInput
+    dataPayload?: DataPayloadUpdateOneWithoutContentNestedInput
+    hopePayload?: HopePayloadUpdateOneWithoutContentNestedInput
+    workflowPayload?: WorkflowPayloadUpdateOneWithoutContentNestedInput
     history?: ContentHistoryUpdateManyWithoutContentNestedInput
     sourceLinks?: ContentLinkUpdateManyWithoutSourceNestedInput
     targetLinks?: ContentLinkUpdateManyWithoutTargetNestedInput
@@ -32499,9 +43334,6 @@ export namespace Prisma {
     parent?: ContentNodeUpdateOneWithoutChildrenNestedInput
     children?: ContentNodeUpdateManyWithoutParentNestedInput
     contentPath?: ContentPathUpdateOneWithoutContentNestedInput
-    filePayload?: FilePayloadUpdateOneWithoutContentNestedInput
-    htmlPayload?: HtmlPayloadUpdateOneWithoutContentNestedInput
-    notePayload?: NotePayloadUpdateOneWithoutContentNestedInput
     trashBinEntry?: TrashBinUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUpdateManyWithoutContentNestedInput
   }
@@ -32511,6 +43343,8 @@ export namespace Prisma {
     ownerId?: StringFieldUpdateOperationsInput | string
     title?: StringFieldUpdateOperationsInput | string
     slug?: StringFieldUpdateOperationsInput | string
+    contentType?: EnumContentTypeFieldUpdateOperationsInput | $Enums.ContentType
+    role?: EnumContentRoleFieldUpdateOperationsInput | $Enums.ContentRole
     parentId?: NullableStringFieldUpdateOperationsInput | string | null
     displayOrder?: IntFieldUpdateOperationsInput | number
     categoryId?: NullableStringFieldUpdateOperationsInput | string | null
@@ -32523,14 +43357,21 @@ export namespace Prisma {
     iconColor?: NullableStringFieldUpdateOperationsInput | string | null
     auditLogs?: AuditLogUncheckedUpdateManyWithoutTargetContentNestedInput
     codePayload?: CodePayloadUncheckedUpdateOneWithoutContentNestedInput
+    filePayload?: FilePayloadUncheckedUpdateOneWithoutContentNestedInput
+    htmlPayload?: HtmlPayloadUncheckedUpdateOneWithoutContentNestedInput
+    notePayload?: NotePayloadUncheckedUpdateOneWithoutContentNestedInput
+    folderPayload?: FolderPayloadUncheckedUpdateOneWithoutContentNestedInput
+    externalPayload?: ExternalPayloadUncheckedUpdateOneWithoutContentNestedInput
+    chatPayload?: ChatPayloadUncheckedUpdateOneWithoutContentNestedInput
+    visualizationPayload?: VisualizationPayloadUncheckedUpdateOneWithoutContentNestedInput
+    dataPayload?: DataPayloadUncheckedUpdateOneWithoutContentNestedInput
+    hopePayload?: HopePayloadUncheckedUpdateOneWithoutContentNestedInput
+    workflowPayload?: WorkflowPayloadUncheckedUpdateOneWithoutContentNestedInput
     history?: ContentHistoryUncheckedUpdateManyWithoutContentNestedInput
     sourceLinks?: ContentLinkUncheckedUpdateManyWithoutSourceNestedInput
     targetLinks?: ContentLinkUncheckedUpdateManyWithoutTargetNestedInput
     children?: ContentNodeUncheckedUpdateManyWithoutParentNestedInput
     contentPath?: ContentPathUncheckedUpdateOneWithoutContentNestedInput
-    filePayload?: FilePayloadUncheckedUpdateOneWithoutContentNestedInput
-    htmlPayload?: HtmlPayloadUncheckedUpdateOneWithoutContentNestedInput
-    notePayload?: NotePayloadUncheckedUpdateOneWithoutContentNestedInput
     trashBinEntry?: TrashBinUncheckedUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUncheckedUpdateManyWithoutContentNestedInput
   }
@@ -32560,14 +43401,16 @@ export namespace Prisma {
     name?: StringFieldUpdateOperationsInput | string
     slug?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    color?: NullableStringFieldUpdateOperationsInput | string | null
     userId?: StringFieldUpdateOperationsInput | string
+    color?: NullableStringFieldUpdateOperationsInput | string | null
   }
 
   export type ContentNodeCreateWithoutTrashBinEntryInput = {
     id?: string
     title: string
     slug: string
+    contentType: $Enums.ContentType
+    role?: $Enums.ContentRole
     displayOrder?: number
     isPublished?: boolean
     createdAt?: Date | string
@@ -32578,6 +43421,16 @@ export namespace Prisma {
     iconColor?: string | null
     auditLogs?: AuditLogCreateNestedManyWithoutTargetContentInput
     codePayload?: CodePayloadCreateNestedOneWithoutContentInput
+    filePayload?: FilePayloadCreateNestedOneWithoutContentInput
+    htmlPayload?: HtmlPayloadCreateNestedOneWithoutContentInput
+    notePayload?: NotePayloadCreateNestedOneWithoutContentInput
+    folderPayload?: FolderPayloadCreateNestedOneWithoutContentInput
+    externalPayload?: ExternalPayloadCreateNestedOneWithoutContentInput
+    chatPayload?: ChatPayloadCreateNestedOneWithoutContentInput
+    visualizationPayload?: VisualizationPayloadCreateNestedOneWithoutContentInput
+    dataPayload?: DataPayloadCreateNestedOneWithoutContentInput
+    hopePayload?: HopePayloadCreateNestedOneWithoutContentInput
+    workflowPayload?: WorkflowPayloadCreateNestedOneWithoutContentInput
     history?: ContentHistoryCreateNestedManyWithoutContentInput
     sourceLinks?: ContentLinkCreateNestedManyWithoutSourceInput
     targetLinks?: ContentLinkCreateNestedManyWithoutTargetInput
@@ -32587,9 +43440,6 @@ export namespace Prisma {
     children?: ContentNodeCreateNestedManyWithoutParentInput
     contentPath?: ContentPathCreateNestedOneWithoutContentInput
     contentTags?: ContentTagCreateNestedManyWithoutContentInput
-    filePayload?: FilePayloadCreateNestedOneWithoutContentInput
-    htmlPayload?: HtmlPayloadCreateNestedOneWithoutContentInput
-    notePayload?: NotePayloadCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantCreateNestedManyWithoutContentInput
   }
 
@@ -32598,6 +43448,8 @@ export namespace Prisma {
     ownerId: string
     title: string
     slug: string
+    contentType: $Enums.ContentType
+    role?: $Enums.ContentRole
     parentId?: string | null
     displayOrder?: number
     categoryId?: string | null
@@ -32610,15 +43462,22 @@ export namespace Prisma {
     iconColor?: string | null
     auditLogs?: AuditLogUncheckedCreateNestedManyWithoutTargetContentInput
     codePayload?: CodePayloadUncheckedCreateNestedOneWithoutContentInput
+    filePayload?: FilePayloadUncheckedCreateNestedOneWithoutContentInput
+    htmlPayload?: HtmlPayloadUncheckedCreateNestedOneWithoutContentInput
+    notePayload?: NotePayloadUncheckedCreateNestedOneWithoutContentInput
+    folderPayload?: FolderPayloadUncheckedCreateNestedOneWithoutContentInput
+    externalPayload?: ExternalPayloadUncheckedCreateNestedOneWithoutContentInput
+    chatPayload?: ChatPayloadUncheckedCreateNestedOneWithoutContentInput
+    visualizationPayload?: VisualizationPayloadUncheckedCreateNestedOneWithoutContentInput
+    dataPayload?: DataPayloadUncheckedCreateNestedOneWithoutContentInput
+    hopePayload?: HopePayloadUncheckedCreateNestedOneWithoutContentInput
+    workflowPayload?: WorkflowPayloadUncheckedCreateNestedOneWithoutContentInput
     history?: ContentHistoryUncheckedCreateNestedManyWithoutContentInput
     sourceLinks?: ContentLinkUncheckedCreateNestedManyWithoutSourceInput
     targetLinks?: ContentLinkUncheckedCreateNestedManyWithoutTargetInput
     children?: ContentNodeUncheckedCreateNestedManyWithoutParentInput
     contentPath?: ContentPathUncheckedCreateNestedOneWithoutContentInput
     contentTags?: ContentTagUncheckedCreateNestedManyWithoutContentInput
-    filePayload?: FilePayloadUncheckedCreateNestedOneWithoutContentInput
-    htmlPayload?: HtmlPayloadUncheckedCreateNestedOneWithoutContentInput
-    notePayload?: NotePayloadUncheckedCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantUncheckedCreateNestedManyWithoutContentInput
   }
 
@@ -32633,13 +43492,13 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
-    settings?: NullableJsonNullValueInput | InputJsonValue
-    settingsVersion?: number
     createdAt?: Date | string
     updatedAt?: Date | string
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: number
     accounts?: AccountCreateNestedManyWithoutUserInput
-    adminActions?: AuditLogCreateNestedManyWithoutUserInput
     auditTargets?: AuditLogCreateNestedManyWithoutTargetUserInput
+    adminActions?: AuditLogCreateNestedManyWithoutUserInput
     categories?: CategoryCreateNestedManyWithoutOwnerInput
     contentHistory?: ContentHistoryCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeCreateNestedManyWithoutOwnerInput
@@ -32655,13 +43514,13 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
-    settings?: NullableJsonNullValueInput | InputJsonValue
-    settingsVersion?: number
     createdAt?: Date | string
     updatedAt?: Date | string
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: number
     accounts?: AccountUncheckedCreateNestedManyWithoutUserInput
-    adminActions?: AuditLogUncheckedCreateNestedManyWithoutUserInput
     auditTargets?: AuditLogUncheckedCreateNestedManyWithoutTargetUserInput
+    adminActions?: AuditLogUncheckedCreateNestedManyWithoutUserInput
     categories?: CategoryUncheckedCreateNestedManyWithoutOwnerInput
     contentHistory?: ContentHistoryUncheckedCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeUncheckedCreateNestedManyWithoutOwnerInput
@@ -32691,6 +43550,8 @@ export namespace Prisma {
     id?: StringFieldUpdateOperationsInput | string
     title?: StringFieldUpdateOperationsInput | string
     slug?: StringFieldUpdateOperationsInput | string
+    contentType?: EnumContentTypeFieldUpdateOperationsInput | $Enums.ContentType
+    role?: EnumContentRoleFieldUpdateOperationsInput | $Enums.ContentRole
     displayOrder?: IntFieldUpdateOperationsInput | number
     isPublished?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
@@ -32701,6 +43562,16 @@ export namespace Prisma {
     iconColor?: NullableStringFieldUpdateOperationsInput | string | null
     auditLogs?: AuditLogUpdateManyWithoutTargetContentNestedInput
     codePayload?: CodePayloadUpdateOneWithoutContentNestedInput
+    filePayload?: FilePayloadUpdateOneWithoutContentNestedInput
+    htmlPayload?: HtmlPayloadUpdateOneWithoutContentNestedInput
+    notePayload?: NotePayloadUpdateOneWithoutContentNestedInput
+    folderPayload?: FolderPayloadUpdateOneWithoutContentNestedInput
+    externalPayload?: ExternalPayloadUpdateOneWithoutContentNestedInput
+    chatPayload?: ChatPayloadUpdateOneWithoutContentNestedInput
+    visualizationPayload?: VisualizationPayloadUpdateOneWithoutContentNestedInput
+    dataPayload?: DataPayloadUpdateOneWithoutContentNestedInput
+    hopePayload?: HopePayloadUpdateOneWithoutContentNestedInput
+    workflowPayload?: WorkflowPayloadUpdateOneWithoutContentNestedInput
     history?: ContentHistoryUpdateManyWithoutContentNestedInput
     sourceLinks?: ContentLinkUpdateManyWithoutSourceNestedInput
     targetLinks?: ContentLinkUpdateManyWithoutTargetNestedInput
@@ -32710,9 +43581,6 @@ export namespace Prisma {
     children?: ContentNodeUpdateManyWithoutParentNestedInput
     contentPath?: ContentPathUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUpdateManyWithoutContentNestedInput
-    filePayload?: FilePayloadUpdateOneWithoutContentNestedInput
-    htmlPayload?: HtmlPayloadUpdateOneWithoutContentNestedInput
-    notePayload?: NotePayloadUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUpdateManyWithoutContentNestedInput
   }
 
@@ -32721,6 +43589,8 @@ export namespace Prisma {
     ownerId?: StringFieldUpdateOperationsInput | string
     title?: StringFieldUpdateOperationsInput | string
     slug?: StringFieldUpdateOperationsInput | string
+    contentType?: EnumContentTypeFieldUpdateOperationsInput | $Enums.ContentType
+    role?: EnumContentRoleFieldUpdateOperationsInput | $Enums.ContentRole
     parentId?: NullableStringFieldUpdateOperationsInput | string | null
     displayOrder?: IntFieldUpdateOperationsInput | number
     categoryId?: NullableStringFieldUpdateOperationsInput | string | null
@@ -32733,15 +43603,22 @@ export namespace Prisma {
     iconColor?: NullableStringFieldUpdateOperationsInput | string | null
     auditLogs?: AuditLogUncheckedUpdateManyWithoutTargetContentNestedInput
     codePayload?: CodePayloadUncheckedUpdateOneWithoutContentNestedInput
+    filePayload?: FilePayloadUncheckedUpdateOneWithoutContentNestedInput
+    htmlPayload?: HtmlPayloadUncheckedUpdateOneWithoutContentNestedInput
+    notePayload?: NotePayloadUncheckedUpdateOneWithoutContentNestedInput
+    folderPayload?: FolderPayloadUncheckedUpdateOneWithoutContentNestedInput
+    externalPayload?: ExternalPayloadUncheckedUpdateOneWithoutContentNestedInput
+    chatPayload?: ChatPayloadUncheckedUpdateOneWithoutContentNestedInput
+    visualizationPayload?: VisualizationPayloadUncheckedUpdateOneWithoutContentNestedInput
+    dataPayload?: DataPayloadUncheckedUpdateOneWithoutContentNestedInput
+    hopePayload?: HopePayloadUncheckedUpdateOneWithoutContentNestedInput
+    workflowPayload?: WorkflowPayloadUncheckedUpdateOneWithoutContentNestedInput
     history?: ContentHistoryUncheckedUpdateManyWithoutContentNestedInput
     sourceLinks?: ContentLinkUncheckedUpdateManyWithoutSourceNestedInput
     targetLinks?: ContentLinkUncheckedUpdateManyWithoutTargetNestedInput
     children?: ContentNodeUncheckedUpdateManyWithoutParentNestedInput
     contentPath?: ContentPathUncheckedUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUncheckedUpdateManyWithoutContentNestedInput
-    filePayload?: FilePayloadUncheckedUpdateOneWithoutContentNestedInput
-    htmlPayload?: HtmlPayloadUncheckedUpdateOneWithoutContentNestedInput
-    notePayload?: NotePayloadUncheckedUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUncheckedUpdateManyWithoutContentNestedInput
   }
 
@@ -32762,13 +43639,13 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
-    settings?: NullableJsonNullValueInput | InputJsonValue
-    settingsVersion?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: IntFieldUpdateOperationsInput | number
     accounts?: AccountUpdateManyWithoutUserNestedInput
-    adminActions?: AuditLogUpdateManyWithoutUserNestedInput
     auditTargets?: AuditLogUpdateManyWithoutTargetUserNestedInput
+    adminActions?: AuditLogUpdateManyWithoutUserNestedInput
     categories?: CategoryUpdateManyWithoutOwnerNestedInput
     contentHistory?: ContentHistoryUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUpdateManyWithoutOwnerNestedInput
@@ -32784,13 +43661,13 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
-    settings?: NullableJsonNullValueInput | InputJsonValue
-    settingsVersion?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: IntFieldUpdateOperationsInput | number
     accounts?: AccountUncheckedUpdateManyWithoutUserNestedInput
-    adminActions?: AuditLogUncheckedUpdateManyWithoutUserNestedInput
     auditTargets?: AuditLogUncheckedUpdateManyWithoutTargetUserNestedInput
+    adminActions?: AuditLogUncheckedUpdateManyWithoutUserNestedInput
     categories?: CategoryUncheckedUpdateManyWithoutOwnerNestedInput
     contentHistory?: ContentHistoryUncheckedUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUncheckedUpdateManyWithoutOwnerNestedInput
@@ -32806,13 +43683,13 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
-    settings?: NullableJsonNullValueInput | InputJsonValue
-    settingsVersion?: number
     createdAt?: Date | string
     updatedAt?: Date | string
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: number
     accounts?: AccountCreateNestedManyWithoutUserInput
-    adminActions?: AuditLogCreateNestedManyWithoutUserInput
     auditTargets?: AuditLogCreateNestedManyWithoutTargetUserInput
+    adminActions?: AuditLogCreateNestedManyWithoutUserInput
     categories?: CategoryCreateNestedManyWithoutOwnerInput
     contentHistory?: ContentHistoryCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeCreateNestedManyWithoutOwnerInput
@@ -32828,13 +43705,13 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
-    settings?: NullableJsonNullValueInput | InputJsonValue
-    settingsVersion?: number
     createdAt?: Date | string
     updatedAt?: Date | string
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: number
     accounts?: AccountUncheckedCreateNestedManyWithoutUserInput
-    adminActions?: AuditLogUncheckedCreateNestedManyWithoutUserInput
     auditTargets?: AuditLogUncheckedCreateNestedManyWithoutTargetUserInput
+    adminActions?: AuditLogUncheckedCreateNestedManyWithoutUserInput
     categories?: CategoryUncheckedCreateNestedManyWithoutOwnerInput
     contentHistory?: ContentHistoryUncheckedCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeUncheckedCreateNestedManyWithoutOwnerInput
@@ -32866,13 +43743,13 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
-    settings?: NullableJsonNullValueInput | InputJsonValue
-    settingsVersion?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: IntFieldUpdateOperationsInput | number
     accounts?: AccountUpdateManyWithoutUserNestedInput
-    adminActions?: AuditLogUpdateManyWithoutUserNestedInput
     auditTargets?: AuditLogUpdateManyWithoutTargetUserNestedInput
+    adminActions?: AuditLogUpdateManyWithoutUserNestedInput
     categories?: CategoryUpdateManyWithoutOwnerNestedInput
     contentHistory?: ContentHistoryUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUpdateManyWithoutOwnerNestedInput
@@ -32888,13 +43765,13 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
-    settings?: NullableJsonNullValueInput | InputJsonValue
-    settingsVersion?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: IntFieldUpdateOperationsInput | number
     accounts?: AccountUncheckedUpdateManyWithoutUserNestedInput
-    adminActions?: AuditLogUncheckedUpdateManyWithoutUserNestedInput
     auditTargets?: AuditLogUncheckedUpdateManyWithoutTargetUserNestedInput
+    adminActions?: AuditLogUncheckedUpdateManyWithoutUserNestedInput
     categories?: CategoryUncheckedUpdateManyWithoutOwnerNestedInput
     contentHistory?: ContentHistoryUncheckedUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUncheckedUpdateManyWithoutOwnerNestedInput
@@ -32934,38 +43811,6 @@ export namespace Prisma {
     skipDuplicates?: boolean
   }
 
-  export type AuditLogCreateWithoutUserInput = {
-    id?: string
-    action: string
-    details?: JsonNullValueInput | InputJsonValue
-    ipAddress?: string | null
-    userAgent?: string | null
-    createdAt?: Date | string
-    targetUser?: UserCreateNestedOneWithoutAuditTargetsInput
-    targetContent?: ContentNodeCreateNestedOneWithoutAuditLogsInput
-  }
-
-  export type AuditLogUncheckedCreateWithoutUserInput = {
-    id?: string
-    action: string
-    targetUserId?: string | null
-    targetContentId?: string | null
-    details?: JsonNullValueInput | InputJsonValue
-    ipAddress?: string | null
-    userAgent?: string | null
-    createdAt?: Date | string
-  }
-
-  export type AuditLogCreateOrConnectWithoutUserInput = {
-    where: AuditLogWhereUniqueInput
-    create: XOR<AuditLogCreateWithoutUserInput, AuditLogUncheckedCreateWithoutUserInput>
-  }
-
-  export type AuditLogCreateManyUserInputEnvelope = {
-    data: AuditLogCreateManyUserInput | AuditLogCreateManyUserInput[]
-    skipDuplicates?: boolean
-  }
-
   export type AuditLogCreateWithoutTargetUserInput = {
     id?: string
     action: string
@@ -32973,8 +43818,8 @@ export namespace Prisma {
     ipAddress?: string | null
     userAgent?: string | null
     createdAt?: Date | string
-    user: UserCreateNestedOneWithoutAdminActionsInput
     targetContent?: ContentNodeCreateNestedOneWithoutAuditLogsInput
+    user: UserCreateNestedOneWithoutAdminActionsInput
   }
 
   export type AuditLogUncheckedCreateWithoutTargetUserInput = {
@@ -32995,6 +43840,38 @@ export namespace Prisma {
 
   export type AuditLogCreateManyTargetUserInputEnvelope = {
     data: AuditLogCreateManyTargetUserInput | AuditLogCreateManyTargetUserInput[]
+    skipDuplicates?: boolean
+  }
+
+  export type AuditLogCreateWithoutUserInput = {
+    id?: string
+    action: string
+    details?: JsonNullValueInput | InputJsonValue
+    ipAddress?: string | null
+    userAgent?: string | null
+    createdAt?: Date | string
+    targetContent?: ContentNodeCreateNestedOneWithoutAuditLogsInput
+    targetUser?: UserCreateNestedOneWithoutAuditTargetsInput
+  }
+
+  export type AuditLogUncheckedCreateWithoutUserInput = {
+    id?: string
+    action: string
+    targetUserId?: string | null
+    targetContentId?: string | null
+    details?: JsonNullValueInput | InputJsonValue
+    ipAddress?: string | null
+    userAgent?: string | null
+    createdAt?: Date | string
+  }
+
+  export type AuditLogCreateOrConnectWithoutUserInput = {
+    where: AuditLogWhereUniqueInput
+    create: XOR<AuditLogCreateWithoutUserInput, AuditLogUncheckedCreateWithoutUserInput>
+  }
+
+  export type AuditLogCreateManyUserInputEnvelope = {
+    data: AuditLogCreateManyUserInput | AuditLogCreateManyUserInput[]
     skipDuplicates?: boolean
   }
 
@@ -33062,6 +43939,8 @@ export namespace Prisma {
     id?: string
     title: string
     slug: string
+    contentType: $Enums.ContentType
+    role?: $Enums.ContentRole
     displayOrder?: number
     isPublished?: boolean
     createdAt?: Date | string
@@ -33072,6 +43951,16 @@ export namespace Prisma {
     iconColor?: string | null
     auditLogs?: AuditLogCreateNestedManyWithoutTargetContentInput
     codePayload?: CodePayloadCreateNestedOneWithoutContentInput
+    filePayload?: FilePayloadCreateNestedOneWithoutContentInput
+    htmlPayload?: HtmlPayloadCreateNestedOneWithoutContentInput
+    notePayload?: NotePayloadCreateNestedOneWithoutContentInput
+    folderPayload?: FolderPayloadCreateNestedOneWithoutContentInput
+    externalPayload?: ExternalPayloadCreateNestedOneWithoutContentInput
+    chatPayload?: ChatPayloadCreateNestedOneWithoutContentInput
+    visualizationPayload?: VisualizationPayloadCreateNestedOneWithoutContentInput
+    dataPayload?: DataPayloadCreateNestedOneWithoutContentInput
+    hopePayload?: HopePayloadCreateNestedOneWithoutContentInput
+    workflowPayload?: WorkflowPayloadCreateNestedOneWithoutContentInput
     history?: ContentHistoryCreateNestedManyWithoutContentInput
     sourceLinks?: ContentLinkCreateNestedManyWithoutSourceInput
     targetLinks?: ContentLinkCreateNestedManyWithoutTargetInput
@@ -33080,9 +43969,6 @@ export namespace Prisma {
     children?: ContentNodeCreateNestedManyWithoutParentInput
     contentPath?: ContentPathCreateNestedOneWithoutContentInput
     contentTags?: ContentTagCreateNestedManyWithoutContentInput
-    filePayload?: FilePayloadCreateNestedOneWithoutContentInput
-    htmlPayload?: HtmlPayloadCreateNestedOneWithoutContentInput
-    notePayload?: NotePayloadCreateNestedOneWithoutContentInput
     trashBinEntry?: TrashBinCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantCreateNestedManyWithoutContentInput
   }
@@ -33091,6 +43977,8 @@ export namespace Prisma {
     id?: string
     title: string
     slug: string
+    contentType: $Enums.ContentType
+    role?: $Enums.ContentRole
     parentId?: string | null
     displayOrder?: number
     categoryId?: string | null
@@ -33103,15 +43991,22 @@ export namespace Prisma {
     iconColor?: string | null
     auditLogs?: AuditLogUncheckedCreateNestedManyWithoutTargetContentInput
     codePayload?: CodePayloadUncheckedCreateNestedOneWithoutContentInput
+    filePayload?: FilePayloadUncheckedCreateNestedOneWithoutContentInput
+    htmlPayload?: HtmlPayloadUncheckedCreateNestedOneWithoutContentInput
+    notePayload?: NotePayloadUncheckedCreateNestedOneWithoutContentInput
+    folderPayload?: FolderPayloadUncheckedCreateNestedOneWithoutContentInput
+    externalPayload?: ExternalPayloadUncheckedCreateNestedOneWithoutContentInput
+    chatPayload?: ChatPayloadUncheckedCreateNestedOneWithoutContentInput
+    visualizationPayload?: VisualizationPayloadUncheckedCreateNestedOneWithoutContentInput
+    dataPayload?: DataPayloadUncheckedCreateNestedOneWithoutContentInput
+    hopePayload?: HopePayloadUncheckedCreateNestedOneWithoutContentInput
+    workflowPayload?: WorkflowPayloadUncheckedCreateNestedOneWithoutContentInput
     history?: ContentHistoryUncheckedCreateNestedManyWithoutContentInput
     sourceLinks?: ContentLinkUncheckedCreateNestedManyWithoutSourceInput
     targetLinks?: ContentLinkUncheckedCreateNestedManyWithoutTargetInput
     children?: ContentNodeUncheckedCreateNestedManyWithoutParentInput
     contentPath?: ContentPathUncheckedCreateNestedOneWithoutContentInput
     contentTags?: ContentTagUncheckedCreateNestedManyWithoutContentInput
-    filePayload?: FilePayloadUncheckedCreateNestedOneWithoutContentInput
-    htmlPayload?: HtmlPayloadUncheckedCreateNestedOneWithoutContentInput
-    notePayload?: NotePayloadUncheckedCreateNestedOneWithoutContentInput
     trashBinEntry?: TrashBinUncheckedCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantUncheckedCreateNestedManyWithoutContentInput
   }
@@ -33296,22 +44191,6 @@ export namespace Prisma {
     createdAt?: DateTimeFilter<"Account"> | Date | string
   }
 
-  export type AuditLogUpsertWithWhereUniqueWithoutUserInput = {
-    where: AuditLogWhereUniqueInput
-    update: XOR<AuditLogUpdateWithoutUserInput, AuditLogUncheckedUpdateWithoutUserInput>
-    create: XOR<AuditLogCreateWithoutUserInput, AuditLogUncheckedCreateWithoutUserInput>
-  }
-
-  export type AuditLogUpdateWithWhereUniqueWithoutUserInput = {
-    where: AuditLogWhereUniqueInput
-    data: XOR<AuditLogUpdateWithoutUserInput, AuditLogUncheckedUpdateWithoutUserInput>
-  }
-
-  export type AuditLogUpdateManyWithWhereWithoutUserInput = {
-    where: AuditLogScalarWhereInput
-    data: XOR<AuditLogUpdateManyMutationInput, AuditLogUncheckedUpdateManyWithoutUserInput>
-  }
-
   export type AuditLogUpsertWithWhereUniqueWithoutTargetUserInput = {
     where: AuditLogWhereUniqueInput
     update: XOR<AuditLogUpdateWithoutTargetUserInput, AuditLogUncheckedUpdateWithoutTargetUserInput>
@@ -33326,6 +44205,22 @@ export namespace Prisma {
   export type AuditLogUpdateManyWithWhereWithoutTargetUserInput = {
     where: AuditLogScalarWhereInput
     data: XOR<AuditLogUpdateManyMutationInput, AuditLogUncheckedUpdateManyWithoutTargetUserInput>
+  }
+
+  export type AuditLogUpsertWithWhereUniqueWithoutUserInput = {
+    where: AuditLogWhereUniqueInput
+    update: XOR<AuditLogUpdateWithoutUserInput, AuditLogUncheckedUpdateWithoutUserInput>
+    create: XOR<AuditLogCreateWithoutUserInput, AuditLogUncheckedCreateWithoutUserInput>
+  }
+
+  export type AuditLogUpdateWithWhereUniqueWithoutUserInput = {
+    where: AuditLogWhereUniqueInput
+    data: XOR<AuditLogUpdateWithoutUserInput, AuditLogUncheckedUpdateWithoutUserInput>
+  }
+
+  export type AuditLogUpdateManyWithWhereWithoutUserInput = {
+    where: AuditLogScalarWhereInput
+    data: XOR<AuditLogUpdateManyMutationInput, AuditLogUncheckedUpdateManyWithoutUserInput>
   }
 
   export type CategoryUpsertWithWhereUniqueWithoutOwnerInput = {
@@ -33473,8 +44368,8 @@ export namespace Prisma {
     name?: StringFilter<"Tag"> | string
     slug?: StringFilter<"Tag"> | string
     createdAt?: DateTimeFilter<"Tag"> | Date | string
-    color?: StringNullableFilter<"Tag"> | string | null
     userId?: UuidFilter<"Tag"> | string
+    color?: StringNullableFilter<"Tag"> | string | null
   }
 
   export type TrashBinUpsertWithWhereUniqueWithoutDeletedByUserInput = {
@@ -33529,13 +44424,13 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
-    settings?: NullableJsonNullValueInput | InputJsonValue
-    settingsVersion?: number
     createdAt?: Date | string
     updatedAt?: Date | string
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: number
     accounts?: AccountCreateNestedManyWithoutUserInput
-    adminActions?: AuditLogCreateNestedManyWithoutUserInput
     auditTargets?: AuditLogCreateNestedManyWithoutTargetUserInput
+    adminActions?: AuditLogCreateNestedManyWithoutUserInput
     contentHistory?: ContentHistoryCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeCreateNestedManyWithoutOwnerInput
     sessions?: SessionCreateNestedManyWithoutUserInput
@@ -33551,13 +44446,13 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
-    settings?: NullableJsonNullValueInput | InputJsonValue
-    settingsVersion?: number
     createdAt?: Date | string
     updatedAt?: Date | string
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: number
     accounts?: AccountUncheckedCreateNestedManyWithoutUserInput
-    adminActions?: AuditLogUncheckedCreateNestedManyWithoutUserInput
     auditTargets?: AuditLogUncheckedCreateNestedManyWithoutTargetUserInput
+    adminActions?: AuditLogUncheckedCreateNestedManyWithoutUserInput
     contentHistory?: ContentHistoryUncheckedCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeUncheckedCreateNestedManyWithoutOwnerInput
     sessions?: SessionUncheckedCreateNestedManyWithoutUserInput
@@ -33576,6 +44471,8 @@ export namespace Prisma {
     id?: string
     title: string
     slug: string
+    contentType: $Enums.ContentType
+    role?: $Enums.ContentRole
     displayOrder?: number
     isPublished?: boolean
     createdAt?: Date | string
@@ -33586,6 +44483,16 @@ export namespace Prisma {
     iconColor?: string | null
     auditLogs?: AuditLogCreateNestedManyWithoutTargetContentInput
     codePayload?: CodePayloadCreateNestedOneWithoutContentInput
+    filePayload?: FilePayloadCreateNestedOneWithoutContentInput
+    htmlPayload?: HtmlPayloadCreateNestedOneWithoutContentInput
+    notePayload?: NotePayloadCreateNestedOneWithoutContentInput
+    folderPayload?: FolderPayloadCreateNestedOneWithoutContentInput
+    externalPayload?: ExternalPayloadCreateNestedOneWithoutContentInput
+    chatPayload?: ChatPayloadCreateNestedOneWithoutContentInput
+    visualizationPayload?: VisualizationPayloadCreateNestedOneWithoutContentInput
+    dataPayload?: DataPayloadCreateNestedOneWithoutContentInput
+    hopePayload?: HopePayloadCreateNestedOneWithoutContentInput
+    workflowPayload?: WorkflowPayloadCreateNestedOneWithoutContentInput
     history?: ContentHistoryCreateNestedManyWithoutContentInput
     sourceLinks?: ContentLinkCreateNestedManyWithoutSourceInput
     targetLinks?: ContentLinkCreateNestedManyWithoutTargetInput
@@ -33594,9 +44501,6 @@ export namespace Prisma {
     children?: ContentNodeCreateNestedManyWithoutParentInput
     contentPath?: ContentPathCreateNestedOneWithoutContentInput
     contentTags?: ContentTagCreateNestedManyWithoutContentInput
-    filePayload?: FilePayloadCreateNestedOneWithoutContentInput
-    htmlPayload?: HtmlPayloadCreateNestedOneWithoutContentInput
-    notePayload?: NotePayloadCreateNestedOneWithoutContentInput
     trashBinEntry?: TrashBinCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantCreateNestedManyWithoutContentInput
   }
@@ -33606,6 +44510,8 @@ export namespace Prisma {
     ownerId: string
     title: string
     slug: string
+    contentType: $Enums.ContentType
+    role?: $Enums.ContentRole
     parentId?: string | null
     displayOrder?: number
     isPublished?: boolean
@@ -33617,15 +44523,22 @@ export namespace Prisma {
     iconColor?: string | null
     auditLogs?: AuditLogUncheckedCreateNestedManyWithoutTargetContentInput
     codePayload?: CodePayloadUncheckedCreateNestedOneWithoutContentInput
+    filePayload?: FilePayloadUncheckedCreateNestedOneWithoutContentInput
+    htmlPayload?: HtmlPayloadUncheckedCreateNestedOneWithoutContentInput
+    notePayload?: NotePayloadUncheckedCreateNestedOneWithoutContentInput
+    folderPayload?: FolderPayloadUncheckedCreateNestedOneWithoutContentInput
+    externalPayload?: ExternalPayloadUncheckedCreateNestedOneWithoutContentInput
+    chatPayload?: ChatPayloadUncheckedCreateNestedOneWithoutContentInput
+    visualizationPayload?: VisualizationPayloadUncheckedCreateNestedOneWithoutContentInput
+    dataPayload?: DataPayloadUncheckedCreateNestedOneWithoutContentInput
+    hopePayload?: HopePayloadUncheckedCreateNestedOneWithoutContentInput
+    workflowPayload?: WorkflowPayloadUncheckedCreateNestedOneWithoutContentInput
     history?: ContentHistoryUncheckedCreateNestedManyWithoutContentInput
     sourceLinks?: ContentLinkUncheckedCreateNestedManyWithoutSourceInput
     targetLinks?: ContentLinkUncheckedCreateNestedManyWithoutTargetInput
     children?: ContentNodeUncheckedCreateNestedManyWithoutParentInput
     contentPath?: ContentPathUncheckedCreateNestedOneWithoutContentInput
     contentTags?: ContentTagUncheckedCreateNestedManyWithoutContentInput
-    filePayload?: FilePayloadUncheckedCreateNestedOneWithoutContentInput
-    htmlPayload?: HtmlPayloadUncheckedCreateNestedOneWithoutContentInput
-    notePayload?: NotePayloadUncheckedCreateNestedOneWithoutContentInput
     trashBinEntry?: TrashBinUncheckedCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantUncheckedCreateNestedManyWithoutContentInput
   }
@@ -33657,13 +44570,13 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
-    settings?: NullableJsonNullValueInput | InputJsonValue
-    settingsVersion?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: IntFieldUpdateOperationsInput | number
     accounts?: AccountUpdateManyWithoutUserNestedInput
-    adminActions?: AuditLogUpdateManyWithoutUserNestedInput
     auditTargets?: AuditLogUpdateManyWithoutTargetUserNestedInput
+    adminActions?: AuditLogUpdateManyWithoutUserNestedInput
     contentHistory?: ContentHistoryUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUpdateManyWithoutUserNestedInput
@@ -33679,13 +44592,13 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
-    settings?: NullableJsonNullValueInput | InputJsonValue
-    settingsVersion?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: IntFieldUpdateOperationsInput | number
     accounts?: AccountUncheckedUpdateManyWithoutUserNestedInput
-    adminActions?: AuditLogUncheckedUpdateManyWithoutUserNestedInput
     auditTargets?: AuditLogUncheckedUpdateManyWithoutTargetUserNestedInput
+    adminActions?: AuditLogUncheckedUpdateManyWithoutUserNestedInput
     contentHistory?: ContentHistoryUncheckedUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUncheckedUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUncheckedUpdateManyWithoutUserNestedInput
@@ -33741,13 +44654,13 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
-    settings?: NullableJsonNullValueInput | InputJsonValue
-    settingsVersion?: number
     createdAt?: Date | string
     updatedAt?: Date | string
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: number
     accounts?: AccountCreateNestedManyWithoutUserInput
-    adminActions?: AuditLogCreateNestedManyWithoutUserInput
     auditTargets?: AuditLogCreateNestedManyWithoutTargetUserInput
+    adminActions?: AuditLogCreateNestedManyWithoutUserInput
     categories?: CategoryCreateNestedManyWithoutOwnerInput
     contentHistory?: ContentHistoryCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeCreateNestedManyWithoutOwnerInput
@@ -33763,13 +44676,13 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
-    settings?: NullableJsonNullValueInput | InputJsonValue
-    settingsVersion?: number
     createdAt?: Date | string
     updatedAt?: Date | string
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: number
     accounts?: AccountUncheckedCreateNestedManyWithoutUserInput
-    adminActions?: AuditLogUncheckedCreateNestedManyWithoutUserInput
     auditTargets?: AuditLogUncheckedCreateNestedManyWithoutTargetUserInput
+    adminActions?: AuditLogUncheckedCreateNestedManyWithoutUserInput
     categories?: CategoryUncheckedCreateNestedManyWithoutOwnerInput
     contentHistory?: ContentHistoryUncheckedCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeUncheckedCreateNestedManyWithoutOwnerInput
@@ -33817,13 +44730,13 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
-    settings?: NullableJsonNullValueInput | InputJsonValue
-    settingsVersion?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: IntFieldUpdateOperationsInput | number
     accounts?: AccountUpdateManyWithoutUserNestedInput
-    adminActions?: AuditLogUpdateManyWithoutUserNestedInput
     auditTargets?: AuditLogUpdateManyWithoutTargetUserNestedInput
+    adminActions?: AuditLogUpdateManyWithoutUserNestedInput
     categories?: CategoryUpdateManyWithoutOwnerNestedInput
     contentHistory?: ContentHistoryUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUpdateManyWithoutOwnerNestedInput
@@ -33839,13 +44752,13 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
-    settings?: NullableJsonNullValueInput | InputJsonValue
-    settingsVersion?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: IntFieldUpdateOperationsInput | number
     accounts?: AccountUncheckedUpdateManyWithoutUserNestedInput
-    adminActions?: AuditLogUncheckedUpdateManyWithoutUserNestedInput
     auditTargets?: AuditLogUncheckedUpdateManyWithoutTargetUserNestedInput
+    adminActions?: AuditLogUncheckedUpdateManyWithoutUserNestedInput
     categories?: CategoryUncheckedUpdateManyWithoutOwnerNestedInput
     contentHistory?: ContentHistoryUncheckedUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUncheckedUpdateManyWithoutOwnerNestedInput
@@ -33859,6 +44772,8 @@ export namespace Prisma {
     id?: string
     title: string
     slug: string
+    contentType: $Enums.ContentType
+    role?: $Enums.ContentRole
     displayOrder?: number
     isPublished?: boolean
     createdAt?: Date | string
@@ -33869,6 +44784,16 @@ export namespace Prisma {
     iconColor?: string | null
     auditLogs?: AuditLogCreateNestedManyWithoutTargetContentInput
     codePayload?: CodePayloadCreateNestedOneWithoutContentInput
+    filePayload?: FilePayloadCreateNestedOneWithoutContentInput
+    htmlPayload?: HtmlPayloadCreateNestedOneWithoutContentInput
+    notePayload?: NotePayloadCreateNestedOneWithoutContentInput
+    folderPayload?: FolderPayloadCreateNestedOneWithoutContentInput
+    externalPayload?: ExternalPayloadCreateNestedOneWithoutContentInput
+    chatPayload?: ChatPayloadCreateNestedOneWithoutContentInput
+    visualizationPayload?: VisualizationPayloadCreateNestedOneWithoutContentInput
+    dataPayload?: DataPayloadCreateNestedOneWithoutContentInput
+    hopePayload?: HopePayloadCreateNestedOneWithoutContentInput
+    workflowPayload?: WorkflowPayloadCreateNestedOneWithoutContentInput
     history?: ContentHistoryCreateNestedManyWithoutContentInput
     sourceLinks?: ContentLinkCreateNestedManyWithoutSourceInput
     targetLinks?: ContentLinkCreateNestedManyWithoutTargetInput
@@ -33878,9 +44803,6 @@ export namespace Prisma {
     children?: ContentNodeCreateNestedManyWithoutParentInput
     contentPath?: ContentPathCreateNestedOneWithoutContentInput
     contentTags?: ContentTagCreateNestedManyWithoutContentInput
-    filePayload?: FilePayloadCreateNestedOneWithoutContentInput
-    htmlPayload?: HtmlPayloadCreateNestedOneWithoutContentInput
-    notePayload?: NotePayloadCreateNestedOneWithoutContentInput
     trashBinEntry?: TrashBinCreateNestedOneWithoutContentInput
   }
 
@@ -33889,6 +44811,8 @@ export namespace Prisma {
     ownerId: string
     title: string
     slug: string
+    contentType: $Enums.ContentType
+    role?: $Enums.ContentRole
     parentId?: string | null
     displayOrder?: number
     categoryId?: string | null
@@ -33901,15 +44825,22 @@ export namespace Prisma {
     iconColor?: string | null
     auditLogs?: AuditLogUncheckedCreateNestedManyWithoutTargetContentInput
     codePayload?: CodePayloadUncheckedCreateNestedOneWithoutContentInput
+    filePayload?: FilePayloadUncheckedCreateNestedOneWithoutContentInput
+    htmlPayload?: HtmlPayloadUncheckedCreateNestedOneWithoutContentInput
+    notePayload?: NotePayloadUncheckedCreateNestedOneWithoutContentInput
+    folderPayload?: FolderPayloadUncheckedCreateNestedOneWithoutContentInput
+    externalPayload?: ExternalPayloadUncheckedCreateNestedOneWithoutContentInput
+    chatPayload?: ChatPayloadUncheckedCreateNestedOneWithoutContentInput
+    visualizationPayload?: VisualizationPayloadUncheckedCreateNestedOneWithoutContentInput
+    dataPayload?: DataPayloadUncheckedCreateNestedOneWithoutContentInput
+    hopePayload?: HopePayloadUncheckedCreateNestedOneWithoutContentInput
+    workflowPayload?: WorkflowPayloadUncheckedCreateNestedOneWithoutContentInput
     history?: ContentHistoryUncheckedCreateNestedManyWithoutContentInput
     sourceLinks?: ContentLinkUncheckedCreateNestedManyWithoutSourceInput
     targetLinks?: ContentLinkUncheckedCreateNestedManyWithoutTargetInput
     children?: ContentNodeUncheckedCreateNestedManyWithoutParentInput
     contentPath?: ContentPathUncheckedCreateNestedOneWithoutContentInput
     contentTags?: ContentTagUncheckedCreateNestedManyWithoutContentInput
-    filePayload?: FilePayloadUncheckedCreateNestedOneWithoutContentInput
-    htmlPayload?: HtmlPayloadUncheckedCreateNestedOneWithoutContentInput
-    notePayload?: NotePayloadUncheckedCreateNestedOneWithoutContentInput
     trashBinEntry?: TrashBinUncheckedCreateNestedOneWithoutContentInput
   }
 
@@ -33924,13 +44855,13 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
-    settings?: NullableJsonNullValueInput | InputJsonValue
-    settingsVersion?: number
     createdAt?: Date | string
     updatedAt?: Date | string
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: number
     accounts?: AccountCreateNestedManyWithoutUserInput
-    adminActions?: AuditLogCreateNestedManyWithoutUserInput
     auditTargets?: AuditLogCreateNestedManyWithoutTargetUserInput
+    adminActions?: AuditLogCreateNestedManyWithoutUserInput
     categories?: CategoryCreateNestedManyWithoutOwnerInput
     contentHistory?: ContentHistoryCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeCreateNestedManyWithoutOwnerInput
@@ -33946,13 +44877,13 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
-    settings?: NullableJsonNullValueInput | InputJsonValue
-    settingsVersion?: number
     createdAt?: Date | string
     updatedAt?: Date | string
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: number
     accounts?: AccountUncheckedCreateNestedManyWithoutUserInput
-    adminActions?: AuditLogUncheckedCreateNestedManyWithoutUserInput
     auditTargets?: AuditLogUncheckedCreateNestedManyWithoutTargetUserInput
+    adminActions?: AuditLogUncheckedCreateNestedManyWithoutUserInput
     categories?: CategoryUncheckedCreateNestedManyWithoutOwnerInput
     contentHistory?: ContentHistoryUncheckedCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeUncheckedCreateNestedManyWithoutOwnerInput
@@ -33982,6 +44913,8 @@ export namespace Prisma {
     id?: StringFieldUpdateOperationsInput | string
     title?: StringFieldUpdateOperationsInput | string
     slug?: StringFieldUpdateOperationsInput | string
+    contentType?: EnumContentTypeFieldUpdateOperationsInput | $Enums.ContentType
+    role?: EnumContentRoleFieldUpdateOperationsInput | $Enums.ContentRole
     displayOrder?: IntFieldUpdateOperationsInput | number
     isPublished?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
@@ -33992,6 +44925,16 @@ export namespace Prisma {
     iconColor?: NullableStringFieldUpdateOperationsInput | string | null
     auditLogs?: AuditLogUpdateManyWithoutTargetContentNestedInput
     codePayload?: CodePayloadUpdateOneWithoutContentNestedInput
+    filePayload?: FilePayloadUpdateOneWithoutContentNestedInput
+    htmlPayload?: HtmlPayloadUpdateOneWithoutContentNestedInput
+    notePayload?: NotePayloadUpdateOneWithoutContentNestedInput
+    folderPayload?: FolderPayloadUpdateOneWithoutContentNestedInput
+    externalPayload?: ExternalPayloadUpdateOneWithoutContentNestedInput
+    chatPayload?: ChatPayloadUpdateOneWithoutContentNestedInput
+    visualizationPayload?: VisualizationPayloadUpdateOneWithoutContentNestedInput
+    dataPayload?: DataPayloadUpdateOneWithoutContentNestedInput
+    hopePayload?: HopePayloadUpdateOneWithoutContentNestedInput
+    workflowPayload?: WorkflowPayloadUpdateOneWithoutContentNestedInput
     history?: ContentHistoryUpdateManyWithoutContentNestedInput
     sourceLinks?: ContentLinkUpdateManyWithoutSourceNestedInput
     targetLinks?: ContentLinkUpdateManyWithoutTargetNestedInput
@@ -34001,9 +44944,6 @@ export namespace Prisma {
     children?: ContentNodeUpdateManyWithoutParentNestedInput
     contentPath?: ContentPathUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUpdateManyWithoutContentNestedInput
-    filePayload?: FilePayloadUpdateOneWithoutContentNestedInput
-    htmlPayload?: HtmlPayloadUpdateOneWithoutContentNestedInput
-    notePayload?: NotePayloadUpdateOneWithoutContentNestedInput
     trashBinEntry?: TrashBinUpdateOneWithoutContentNestedInput
   }
 
@@ -34012,6 +44952,8 @@ export namespace Prisma {
     ownerId?: StringFieldUpdateOperationsInput | string
     title?: StringFieldUpdateOperationsInput | string
     slug?: StringFieldUpdateOperationsInput | string
+    contentType?: EnumContentTypeFieldUpdateOperationsInput | $Enums.ContentType
+    role?: EnumContentRoleFieldUpdateOperationsInput | $Enums.ContentRole
     parentId?: NullableStringFieldUpdateOperationsInput | string | null
     displayOrder?: IntFieldUpdateOperationsInput | number
     categoryId?: NullableStringFieldUpdateOperationsInput | string | null
@@ -34024,15 +44966,22 @@ export namespace Prisma {
     iconColor?: NullableStringFieldUpdateOperationsInput | string | null
     auditLogs?: AuditLogUncheckedUpdateManyWithoutTargetContentNestedInput
     codePayload?: CodePayloadUncheckedUpdateOneWithoutContentNestedInput
+    filePayload?: FilePayloadUncheckedUpdateOneWithoutContentNestedInput
+    htmlPayload?: HtmlPayloadUncheckedUpdateOneWithoutContentNestedInput
+    notePayload?: NotePayloadUncheckedUpdateOneWithoutContentNestedInput
+    folderPayload?: FolderPayloadUncheckedUpdateOneWithoutContentNestedInput
+    externalPayload?: ExternalPayloadUncheckedUpdateOneWithoutContentNestedInput
+    chatPayload?: ChatPayloadUncheckedUpdateOneWithoutContentNestedInput
+    visualizationPayload?: VisualizationPayloadUncheckedUpdateOneWithoutContentNestedInput
+    dataPayload?: DataPayloadUncheckedUpdateOneWithoutContentNestedInput
+    hopePayload?: HopePayloadUncheckedUpdateOneWithoutContentNestedInput
+    workflowPayload?: WorkflowPayloadUncheckedUpdateOneWithoutContentNestedInput
     history?: ContentHistoryUncheckedUpdateManyWithoutContentNestedInput
     sourceLinks?: ContentLinkUncheckedUpdateManyWithoutSourceNestedInput
     targetLinks?: ContentLinkUncheckedUpdateManyWithoutTargetNestedInput
     children?: ContentNodeUncheckedUpdateManyWithoutParentNestedInput
     contentPath?: ContentPathUncheckedUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUncheckedUpdateManyWithoutContentNestedInput
-    filePayload?: FilePayloadUncheckedUpdateOneWithoutContentNestedInput
-    htmlPayload?: HtmlPayloadUncheckedUpdateOneWithoutContentNestedInput
-    notePayload?: NotePayloadUncheckedUpdateOneWithoutContentNestedInput
     trashBinEntry?: TrashBinUncheckedUpdateOneWithoutContentNestedInput
   }
 
@@ -34053,13 +45002,13 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
-    settings?: NullableJsonNullValueInput | InputJsonValue
-    settingsVersion?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: IntFieldUpdateOperationsInput | number
     accounts?: AccountUpdateManyWithoutUserNestedInput
-    adminActions?: AuditLogUpdateManyWithoutUserNestedInput
     auditTargets?: AuditLogUpdateManyWithoutTargetUserNestedInput
+    adminActions?: AuditLogUpdateManyWithoutUserNestedInput
     categories?: CategoryUpdateManyWithoutOwnerNestedInput
     contentHistory?: ContentHistoryUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUpdateManyWithoutOwnerNestedInput
@@ -34075,13 +45024,13 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
-    settings?: NullableJsonNullValueInput | InputJsonValue
-    settingsVersion?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: IntFieldUpdateOperationsInput | number
     accounts?: AccountUncheckedUpdateManyWithoutUserNestedInput
-    adminActions?: AuditLogUncheckedUpdateManyWithoutUserNestedInput
     auditTargets?: AuditLogUncheckedUpdateManyWithoutTargetUserNestedInput
+    adminActions?: AuditLogUncheckedUpdateManyWithoutUserNestedInput
     categories?: CategoryUncheckedUpdateManyWithoutOwnerNestedInput
     contentHistory?: ContentHistoryUncheckedUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUncheckedUpdateManyWithoutOwnerNestedInput
@@ -34097,13 +45046,13 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
-    settings?: NullableJsonNullValueInput | InputJsonValue
-    settingsVersion?: number
     createdAt?: Date | string
     updatedAt?: Date | string
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: number
     accounts?: AccountCreateNestedManyWithoutUserInput
-    adminActions?: AuditLogCreateNestedManyWithoutUserInput
     auditTargets?: AuditLogCreateNestedManyWithoutTargetUserInput
+    adminActions?: AuditLogCreateNestedManyWithoutUserInput
     categories?: CategoryCreateNestedManyWithoutOwnerInput
     contentHistory?: ContentHistoryCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeCreateNestedManyWithoutOwnerInput
@@ -34119,13 +45068,13 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
-    settings?: NullableJsonNullValueInput | InputJsonValue
-    settingsVersion?: number
     createdAt?: Date | string
     updatedAt?: Date | string
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: number
     accounts?: AccountUncheckedCreateNestedManyWithoutUserInput
-    adminActions?: AuditLogUncheckedCreateNestedManyWithoutUserInput
     auditTargets?: AuditLogUncheckedCreateNestedManyWithoutTargetUserInput
+    adminActions?: AuditLogUncheckedCreateNestedManyWithoutUserInput
     categories?: CategoryUncheckedCreateNestedManyWithoutOwnerInput
     contentHistory?: ContentHistoryUncheckedCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeUncheckedCreateNestedManyWithoutOwnerInput
@@ -34157,13 +45106,13 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
-    settings?: NullableJsonNullValueInput | InputJsonValue
-    settingsVersion?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: IntFieldUpdateOperationsInput | number
     accounts?: AccountUpdateManyWithoutUserNestedInput
-    adminActions?: AuditLogUpdateManyWithoutUserNestedInput
     auditTargets?: AuditLogUpdateManyWithoutTargetUserNestedInput
+    adminActions?: AuditLogUpdateManyWithoutUserNestedInput
     categories?: CategoryUpdateManyWithoutOwnerNestedInput
     contentHistory?: ContentHistoryUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUpdateManyWithoutOwnerNestedInput
@@ -34179,13 +45128,13 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
-    settings?: NullableJsonNullValueInput | InputJsonValue
-    settingsVersion?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: IntFieldUpdateOperationsInput | number
     accounts?: AccountUncheckedUpdateManyWithoutUserNestedInput
-    adminActions?: AuditLogUncheckedUpdateManyWithoutUserNestedInput
     auditTargets?: AuditLogUncheckedUpdateManyWithoutTargetUserNestedInput
+    adminActions?: AuditLogUncheckedUpdateManyWithoutUserNestedInput
     categories?: CategoryUncheckedUpdateManyWithoutOwnerNestedInput
     contentHistory?: ContentHistoryUncheckedUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUncheckedUpdateManyWithoutOwnerNestedInput
@@ -34201,12 +45150,12 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
-    settings?: NullableJsonNullValueInput | InputJsonValue
-    settingsVersion?: number
     createdAt?: Date | string
     updatedAt?: Date | string
-    adminActions?: AuditLogCreateNestedManyWithoutUserInput
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: number
     auditTargets?: AuditLogCreateNestedManyWithoutTargetUserInput
+    adminActions?: AuditLogCreateNestedManyWithoutUserInput
     categories?: CategoryCreateNestedManyWithoutOwnerInput
     contentHistory?: ContentHistoryCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeCreateNestedManyWithoutOwnerInput
@@ -34223,12 +45172,12 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
-    settings?: NullableJsonNullValueInput | InputJsonValue
-    settingsVersion?: number
     createdAt?: Date | string
     updatedAt?: Date | string
-    adminActions?: AuditLogUncheckedCreateNestedManyWithoutUserInput
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: number
     auditTargets?: AuditLogUncheckedCreateNestedManyWithoutTargetUserInput
+    adminActions?: AuditLogUncheckedCreateNestedManyWithoutUserInput
     categories?: CategoryUncheckedCreateNestedManyWithoutOwnerInput
     contentHistory?: ContentHistoryUncheckedCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeUncheckedCreateNestedManyWithoutOwnerInput
@@ -34261,12 +45210,12 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
-    settings?: NullableJsonNullValueInput | InputJsonValue
-    settingsVersion?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    adminActions?: AuditLogUpdateManyWithoutUserNestedInput
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: IntFieldUpdateOperationsInput | number
     auditTargets?: AuditLogUpdateManyWithoutTargetUserNestedInput
+    adminActions?: AuditLogUpdateManyWithoutUserNestedInput
     categories?: CategoryUpdateManyWithoutOwnerNestedInput
     contentHistory?: ContentHistoryUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUpdateManyWithoutOwnerNestedInput
@@ -34283,12 +45232,12 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
-    settings?: NullableJsonNullValueInput | InputJsonValue
-    settingsVersion?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    adminActions?: AuditLogUncheckedUpdateManyWithoutUserNestedInput
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: IntFieldUpdateOperationsInput | number
     auditTargets?: AuditLogUncheckedUpdateManyWithoutTargetUserNestedInput
+    adminActions?: AuditLogUncheckedUpdateManyWithoutUserNestedInput
     categories?: CategoryUncheckedUpdateManyWithoutOwnerNestedInput
     contentHistory?: ContentHistoryUncheckedUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUncheckedUpdateManyWithoutOwnerNestedInput
@@ -34299,53 +45248,85 @@ export namespace Prisma {
     viewGrants?: ViewGrantUncheckedUpdateManyWithoutUserNestedInput
   }
 
-  export type UserCreateWithoutAdminActionsInput = {
+  export type ContentNodeCreateWithoutAuditLogsInput = {
     id?: string
-    username: string
-    passwordHash?: string | null
-    email: string
-    role?: $Enums.UserRole
-    settings?: NullableJsonNullValueInput | InputJsonValue
-    settingsVersion?: number
+    title: string
+    slug: string
+    contentType: $Enums.ContentType
+    role?: $Enums.ContentRole
+    displayOrder?: number
+    isPublished?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
-    accounts?: AccountCreateNestedManyWithoutUserInput
-    auditTargets?: AuditLogCreateNestedManyWithoutTargetUserInput
-    categories?: CategoryCreateNestedManyWithoutOwnerInput
-    contentHistory?: ContentHistoryCreateNestedManyWithoutUserInput
-    contentNodes?: ContentNodeCreateNestedManyWithoutOwnerInput
-    sessions?: SessionCreateNestedManyWithoutUserInput
-    storageConfigs?: StorageProviderConfigCreateNestedManyWithoutUserInput
-    tags?: TagCreateNestedManyWithoutUserInput
-    trashedContent?: TrashBinCreateNestedManyWithoutDeletedByUserInput
-    viewGrants?: ViewGrantCreateNestedManyWithoutUserInput
+    deletedAt?: Date | string | null
+    deletedBy?: string | null
+    customIcon?: string | null
+    iconColor?: string | null
+    codePayload?: CodePayloadCreateNestedOneWithoutContentInput
+    filePayload?: FilePayloadCreateNestedOneWithoutContentInput
+    htmlPayload?: HtmlPayloadCreateNestedOneWithoutContentInput
+    notePayload?: NotePayloadCreateNestedOneWithoutContentInput
+    folderPayload?: FolderPayloadCreateNestedOneWithoutContentInput
+    externalPayload?: ExternalPayloadCreateNestedOneWithoutContentInput
+    chatPayload?: ChatPayloadCreateNestedOneWithoutContentInput
+    visualizationPayload?: VisualizationPayloadCreateNestedOneWithoutContentInput
+    dataPayload?: DataPayloadCreateNestedOneWithoutContentInput
+    hopePayload?: HopePayloadCreateNestedOneWithoutContentInput
+    workflowPayload?: WorkflowPayloadCreateNestedOneWithoutContentInput
+    history?: ContentHistoryCreateNestedManyWithoutContentInput
+    sourceLinks?: ContentLinkCreateNestedManyWithoutSourceInput
+    targetLinks?: ContentLinkCreateNestedManyWithoutTargetInput
+    category?: CategoryCreateNestedOneWithoutContentNodesInput
+    owner: UserCreateNestedOneWithoutContentNodesInput
+    parent?: ContentNodeCreateNestedOneWithoutChildrenInput
+    children?: ContentNodeCreateNestedManyWithoutParentInput
+    contentPath?: ContentPathCreateNestedOneWithoutContentInput
+    contentTags?: ContentTagCreateNestedManyWithoutContentInput
+    trashBinEntry?: TrashBinCreateNestedOneWithoutContentInput
+    viewGrants?: ViewGrantCreateNestedManyWithoutContentInput
   }
 
-  export type UserUncheckedCreateWithoutAdminActionsInput = {
+  export type ContentNodeUncheckedCreateWithoutAuditLogsInput = {
     id?: string
-    username: string
-    passwordHash?: string | null
-    email: string
-    role?: $Enums.UserRole
-    settings?: NullableJsonNullValueInput | InputJsonValue
-    settingsVersion?: number
+    ownerId: string
+    title: string
+    slug: string
+    contentType: $Enums.ContentType
+    role?: $Enums.ContentRole
+    parentId?: string | null
+    displayOrder?: number
+    categoryId?: string | null
+    isPublished?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
-    accounts?: AccountUncheckedCreateNestedManyWithoutUserInput
-    auditTargets?: AuditLogUncheckedCreateNestedManyWithoutTargetUserInput
-    categories?: CategoryUncheckedCreateNestedManyWithoutOwnerInput
-    contentHistory?: ContentHistoryUncheckedCreateNestedManyWithoutUserInput
-    contentNodes?: ContentNodeUncheckedCreateNestedManyWithoutOwnerInput
-    sessions?: SessionUncheckedCreateNestedManyWithoutUserInput
-    storageConfigs?: StorageProviderConfigUncheckedCreateNestedManyWithoutUserInput
-    tags?: TagUncheckedCreateNestedManyWithoutUserInput
-    trashedContent?: TrashBinUncheckedCreateNestedManyWithoutDeletedByUserInput
-    viewGrants?: ViewGrantUncheckedCreateNestedManyWithoutUserInput
+    deletedAt?: Date | string | null
+    deletedBy?: string | null
+    customIcon?: string | null
+    iconColor?: string | null
+    codePayload?: CodePayloadUncheckedCreateNestedOneWithoutContentInput
+    filePayload?: FilePayloadUncheckedCreateNestedOneWithoutContentInput
+    htmlPayload?: HtmlPayloadUncheckedCreateNestedOneWithoutContentInput
+    notePayload?: NotePayloadUncheckedCreateNestedOneWithoutContentInput
+    folderPayload?: FolderPayloadUncheckedCreateNestedOneWithoutContentInput
+    externalPayload?: ExternalPayloadUncheckedCreateNestedOneWithoutContentInput
+    chatPayload?: ChatPayloadUncheckedCreateNestedOneWithoutContentInput
+    visualizationPayload?: VisualizationPayloadUncheckedCreateNestedOneWithoutContentInput
+    dataPayload?: DataPayloadUncheckedCreateNestedOneWithoutContentInput
+    hopePayload?: HopePayloadUncheckedCreateNestedOneWithoutContentInput
+    workflowPayload?: WorkflowPayloadUncheckedCreateNestedOneWithoutContentInput
+    history?: ContentHistoryUncheckedCreateNestedManyWithoutContentInput
+    sourceLinks?: ContentLinkUncheckedCreateNestedManyWithoutSourceInput
+    targetLinks?: ContentLinkUncheckedCreateNestedManyWithoutTargetInput
+    children?: ContentNodeUncheckedCreateNestedManyWithoutParentInput
+    contentPath?: ContentPathUncheckedCreateNestedOneWithoutContentInput
+    contentTags?: ContentTagUncheckedCreateNestedManyWithoutContentInput
+    trashBinEntry?: TrashBinUncheckedCreateNestedOneWithoutContentInput
+    viewGrants?: ViewGrantUncheckedCreateNestedManyWithoutContentInput
   }
 
-  export type UserCreateOrConnectWithoutAdminActionsInput = {
-    where: UserWhereUniqueInput
-    create: XOR<UserCreateWithoutAdminActionsInput, UserUncheckedCreateWithoutAdminActionsInput>
+  export type ContentNodeCreateOrConnectWithoutAuditLogsInput = {
+    where: ContentNodeWhereUniqueInput
+    create: XOR<ContentNodeCreateWithoutAuditLogsInput, ContentNodeUncheckedCreateWithoutAuditLogsInput>
   }
 
   export type UserCreateWithoutAuditTargetsInput = {
@@ -34354,10 +45335,10 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
-    settings?: NullableJsonNullValueInput | InputJsonValue
-    settingsVersion?: number
     createdAt?: Date | string
     updatedAt?: Date | string
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: number
     accounts?: AccountCreateNestedManyWithoutUserInput
     adminActions?: AuditLogCreateNestedManyWithoutUserInput
     categories?: CategoryCreateNestedManyWithoutOwnerInput
@@ -34376,10 +45357,10 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
-    settings?: NullableJsonNullValueInput | InputJsonValue
-    settingsVersion?: number
     createdAt?: Date | string
     updatedAt?: Date | string
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: number
     accounts?: AccountUncheckedCreateNestedManyWithoutUserInput
     adminActions?: AuditLogUncheckedCreateNestedManyWithoutUserInput
     categories?: CategoryUncheckedCreateNestedManyWithoutOwnerInput
@@ -34397,122 +45378,140 @@ export namespace Prisma {
     create: XOR<UserCreateWithoutAuditTargetsInput, UserUncheckedCreateWithoutAuditTargetsInput>
   }
 
-  export type ContentNodeCreateWithoutAuditLogsInput = {
+  export type UserCreateWithoutAdminActionsInput = {
     id?: string
-    title: string
-    slug: string
-    displayOrder?: number
-    isPublished?: boolean
+    username: string
+    passwordHash?: string | null
+    email: string
+    role?: $Enums.UserRole
     createdAt?: Date | string
     updatedAt?: Date | string
-    deletedAt?: Date | string | null
-    deletedBy?: string | null
-    customIcon?: string | null
-    iconColor?: string | null
-    codePayload?: CodePayloadCreateNestedOneWithoutContentInput
-    history?: ContentHistoryCreateNestedManyWithoutContentInput
-    sourceLinks?: ContentLinkCreateNestedManyWithoutSourceInput
-    targetLinks?: ContentLinkCreateNestedManyWithoutTargetInput
-    category?: CategoryCreateNestedOneWithoutContentNodesInput
-    owner: UserCreateNestedOneWithoutContentNodesInput
-    parent?: ContentNodeCreateNestedOneWithoutChildrenInput
-    children?: ContentNodeCreateNestedManyWithoutParentInput
-    contentPath?: ContentPathCreateNestedOneWithoutContentInput
-    contentTags?: ContentTagCreateNestedManyWithoutContentInput
-    filePayload?: FilePayloadCreateNestedOneWithoutContentInput
-    htmlPayload?: HtmlPayloadCreateNestedOneWithoutContentInput
-    notePayload?: NotePayloadCreateNestedOneWithoutContentInput
-    trashBinEntry?: TrashBinCreateNestedOneWithoutContentInput
-    viewGrants?: ViewGrantCreateNestedManyWithoutContentInput
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: number
+    accounts?: AccountCreateNestedManyWithoutUserInput
+    auditTargets?: AuditLogCreateNestedManyWithoutTargetUserInput
+    categories?: CategoryCreateNestedManyWithoutOwnerInput
+    contentHistory?: ContentHistoryCreateNestedManyWithoutUserInput
+    contentNodes?: ContentNodeCreateNestedManyWithoutOwnerInput
+    sessions?: SessionCreateNestedManyWithoutUserInput
+    storageConfigs?: StorageProviderConfigCreateNestedManyWithoutUserInput
+    tags?: TagCreateNestedManyWithoutUserInput
+    trashedContent?: TrashBinCreateNestedManyWithoutDeletedByUserInput
+    viewGrants?: ViewGrantCreateNestedManyWithoutUserInput
   }
 
-  export type ContentNodeUncheckedCreateWithoutAuditLogsInput = {
+  export type UserUncheckedCreateWithoutAdminActionsInput = {
     id?: string
-    ownerId: string
-    title: string
-    slug: string
-    parentId?: string | null
-    displayOrder?: number
-    categoryId?: string | null
-    isPublished?: boolean
+    username: string
+    passwordHash?: string | null
+    email: string
+    role?: $Enums.UserRole
     createdAt?: Date | string
     updatedAt?: Date | string
-    deletedAt?: Date | string | null
-    deletedBy?: string | null
-    customIcon?: string | null
-    iconColor?: string | null
-    codePayload?: CodePayloadUncheckedCreateNestedOneWithoutContentInput
-    history?: ContentHistoryUncheckedCreateNestedManyWithoutContentInput
-    sourceLinks?: ContentLinkUncheckedCreateNestedManyWithoutSourceInput
-    targetLinks?: ContentLinkUncheckedCreateNestedManyWithoutTargetInput
-    children?: ContentNodeUncheckedCreateNestedManyWithoutParentInput
-    contentPath?: ContentPathUncheckedCreateNestedOneWithoutContentInput
-    contentTags?: ContentTagUncheckedCreateNestedManyWithoutContentInput
-    filePayload?: FilePayloadUncheckedCreateNestedOneWithoutContentInput
-    htmlPayload?: HtmlPayloadUncheckedCreateNestedOneWithoutContentInput
-    notePayload?: NotePayloadUncheckedCreateNestedOneWithoutContentInput
-    trashBinEntry?: TrashBinUncheckedCreateNestedOneWithoutContentInput
-    viewGrants?: ViewGrantUncheckedCreateNestedManyWithoutContentInput
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: number
+    accounts?: AccountUncheckedCreateNestedManyWithoutUserInput
+    auditTargets?: AuditLogUncheckedCreateNestedManyWithoutTargetUserInput
+    categories?: CategoryUncheckedCreateNestedManyWithoutOwnerInput
+    contentHistory?: ContentHistoryUncheckedCreateNestedManyWithoutUserInput
+    contentNodes?: ContentNodeUncheckedCreateNestedManyWithoutOwnerInput
+    sessions?: SessionUncheckedCreateNestedManyWithoutUserInput
+    storageConfigs?: StorageProviderConfigUncheckedCreateNestedManyWithoutUserInput
+    tags?: TagUncheckedCreateNestedManyWithoutUserInput
+    trashedContent?: TrashBinUncheckedCreateNestedManyWithoutDeletedByUserInput
+    viewGrants?: ViewGrantUncheckedCreateNestedManyWithoutUserInput
   }
 
-  export type ContentNodeCreateOrConnectWithoutAuditLogsInput = {
-    where: ContentNodeWhereUniqueInput
-    create: XOR<ContentNodeCreateWithoutAuditLogsInput, ContentNodeUncheckedCreateWithoutAuditLogsInput>
-  }
-
-  export type UserUpsertWithoutAdminActionsInput = {
-    update: XOR<UserUpdateWithoutAdminActionsInput, UserUncheckedUpdateWithoutAdminActionsInput>
+  export type UserCreateOrConnectWithoutAdminActionsInput = {
+    where: UserWhereUniqueInput
     create: XOR<UserCreateWithoutAdminActionsInput, UserUncheckedCreateWithoutAdminActionsInput>
-    where?: UserWhereInput
   }
 
-  export type UserUpdateToOneWithWhereWithoutAdminActionsInput = {
-    where?: UserWhereInput
-    data: XOR<UserUpdateWithoutAdminActionsInput, UserUncheckedUpdateWithoutAdminActionsInput>
+  export type ContentNodeUpsertWithoutAuditLogsInput = {
+    update: XOR<ContentNodeUpdateWithoutAuditLogsInput, ContentNodeUncheckedUpdateWithoutAuditLogsInput>
+    create: XOR<ContentNodeCreateWithoutAuditLogsInput, ContentNodeUncheckedCreateWithoutAuditLogsInput>
+    where?: ContentNodeWhereInput
   }
 
-  export type UserUpdateWithoutAdminActionsInput = {
+  export type ContentNodeUpdateToOneWithWhereWithoutAuditLogsInput = {
+    where?: ContentNodeWhereInput
+    data: XOR<ContentNodeUpdateWithoutAuditLogsInput, ContentNodeUncheckedUpdateWithoutAuditLogsInput>
+  }
+
+  export type ContentNodeUpdateWithoutAuditLogsInput = {
     id?: StringFieldUpdateOperationsInput | string
-    username?: StringFieldUpdateOperationsInput | string
-    passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
-    email?: StringFieldUpdateOperationsInput | string
-    role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
-    settings?: NullableJsonNullValueInput | InputJsonValue
-    settingsVersion?: IntFieldUpdateOperationsInput | number
+    title?: StringFieldUpdateOperationsInput | string
+    slug?: StringFieldUpdateOperationsInput | string
+    contentType?: EnumContentTypeFieldUpdateOperationsInput | $Enums.ContentType
+    role?: EnumContentRoleFieldUpdateOperationsInput | $Enums.ContentRole
+    displayOrder?: IntFieldUpdateOperationsInput | number
+    isPublished?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    accounts?: AccountUpdateManyWithoutUserNestedInput
-    auditTargets?: AuditLogUpdateManyWithoutTargetUserNestedInput
-    categories?: CategoryUpdateManyWithoutOwnerNestedInput
-    contentHistory?: ContentHistoryUpdateManyWithoutUserNestedInput
-    contentNodes?: ContentNodeUpdateManyWithoutOwnerNestedInput
-    sessions?: SessionUpdateManyWithoutUserNestedInput
-    storageConfigs?: StorageProviderConfigUpdateManyWithoutUserNestedInput
-    tags?: TagUpdateManyWithoutUserNestedInput
-    trashedContent?: TrashBinUpdateManyWithoutDeletedByUserNestedInput
-    viewGrants?: ViewGrantUpdateManyWithoutUserNestedInput
+    deletedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    deletedBy?: NullableStringFieldUpdateOperationsInput | string | null
+    customIcon?: NullableStringFieldUpdateOperationsInput | string | null
+    iconColor?: NullableStringFieldUpdateOperationsInput | string | null
+    codePayload?: CodePayloadUpdateOneWithoutContentNestedInput
+    filePayload?: FilePayloadUpdateOneWithoutContentNestedInput
+    htmlPayload?: HtmlPayloadUpdateOneWithoutContentNestedInput
+    notePayload?: NotePayloadUpdateOneWithoutContentNestedInput
+    folderPayload?: FolderPayloadUpdateOneWithoutContentNestedInput
+    externalPayload?: ExternalPayloadUpdateOneWithoutContentNestedInput
+    chatPayload?: ChatPayloadUpdateOneWithoutContentNestedInput
+    visualizationPayload?: VisualizationPayloadUpdateOneWithoutContentNestedInput
+    dataPayload?: DataPayloadUpdateOneWithoutContentNestedInput
+    hopePayload?: HopePayloadUpdateOneWithoutContentNestedInput
+    workflowPayload?: WorkflowPayloadUpdateOneWithoutContentNestedInput
+    history?: ContentHistoryUpdateManyWithoutContentNestedInput
+    sourceLinks?: ContentLinkUpdateManyWithoutSourceNestedInput
+    targetLinks?: ContentLinkUpdateManyWithoutTargetNestedInput
+    category?: CategoryUpdateOneWithoutContentNodesNestedInput
+    owner?: UserUpdateOneRequiredWithoutContentNodesNestedInput
+    parent?: ContentNodeUpdateOneWithoutChildrenNestedInput
+    children?: ContentNodeUpdateManyWithoutParentNestedInput
+    contentPath?: ContentPathUpdateOneWithoutContentNestedInput
+    contentTags?: ContentTagUpdateManyWithoutContentNestedInput
+    trashBinEntry?: TrashBinUpdateOneWithoutContentNestedInput
+    viewGrants?: ViewGrantUpdateManyWithoutContentNestedInput
   }
 
-  export type UserUncheckedUpdateWithoutAdminActionsInput = {
+  export type ContentNodeUncheckedUpdateWithoutAuditLogsInput = {
     id?: StringFieldUpdateOperationsInput | string
-    username?: StringFieldUpdateOperationsInput | string
-    passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
-    email?: StringFieldUpdateOperationsInput | string
-    role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
-    settings?: NullableJsonNullValueInput | InputJsonValue
-    settingsVersion?: IntFieldUpdateOperationsInput | number
+    ownerId?: StringFieldUpdateOperationsInput | string
+    title?: StringFieldUpdateOperationsInput | string
+    slug?: StringFieldUpdateOperationsInput | string
+    contentType?: EnumContentTypeFieldUpdateOperationsInput | $Enums.ContentType
+    role?: EnumContentRoleFieldUpdateOperationsInput | $Enums.ContentRole
+    parentId?: NullableStringFieldUpdateOperationsInput | string | null
+    displayOrder?: IntFieldUpdateOperationsInput | number
+    categoryId?: NullableStringFieldUpdateOperationsInput | string | null
+    isPublished?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    accounts?: AccountUncheckedUpdateManyWithoutUserNestedInput
-    auditTargets?: AuditLogUncheckedUpdateManyWithoutTargetUserNestedInput
-    categories?: CategoryUncheckedUpdateManyWithoutOwnerNestedInput
-    contentHistory?: ContentHistoryUncheckedUpdateManyWithoutUserNestedInput
-    contentNodes?: ContentNodeUncheckedUpdateManyWithoutOwnerNestedInput
-    sessions?: SessionUncheckedUpdateManyWithoutUserNestedInput
-    storageConfigs?: StorageProviderConfigUncheckedUpdateManyWithoutUserNestedInput
-    tags?: TagUncheckedUpdateManyWithoutUserNestedInput
-    trashedContent?: TrashBinUncheckedUpdateManyWithoutDeletedByUserNestedInput
-    viewGrants?: ViewGrantUncheckedUpdateManyWithoutUserNestedInput
+    deletedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    deletedBy?: NullableStringFieldUpdateOperationsInput | string | null
+    customIcon?: NullableStringFieldUpdateOperationsInput | string | null
+    iconColor?: NullableStringFieldUpdateOperationsInput | string | null
+    codePayload?: CodePayloadUncheckedUpdateOneWithoutContentNestedInput
+    filePayload?: FilePayloadUncheckedUpdateOneWithoutContentNestedInput
+    htmlPayload?: HtmlPayloadUncheckedUpdateOneWithoutContentNestedInput
+    notePayload?: NotePayloadUncheckedUpdateOneWithoutContentNestedInput
+    folderPayload?: FolderPayloadUncheckedUpdateOneWithoutContentNestedInput
+    externalPayload?: ExternalPayloadUncheckedUpdateOneWithoutContentNestedInput
+    chatPayload?: ChatPayloadUncheckedUpdateOneWithoutContentNestedInput
+    visualizationPayload?: VisualizationPayloadUncheckedUpdateOneWithoutContentNestedInput
+    dataPayload?: DataPayloadUncheckedUpdateOneWithoutContentNestedInput
+    hopePayload?: HopePayloadUncheckedUpdateOneWithoutContentNestedInput
+    workflowPayload?: WorkflowPayloadUncheckedUpdateOneWithoutContentNestedInput
+    history?: ContentHistoryUncheckedUpdateManyWithoutContentNestedInput
+    sourceLinks?: ContentLinkUncheckedUpdateManyWithoutSourceNestedInput
+    targetLinks?: ContentLinkUncheckedUpdateManyWithoutTargetNestedInput
+    children?: ContentNodeUncheckedUpdateManyWithoutParentNestedInput
+    contentPath?: ContentPathUncheckedUpdateOneWithoutContentNestedInput
+    contentTags?: ContentTagUncheckedUpdateManyWithoutContentNestedInput
+    trashBinEntry?: TrashBinUncheckedUpdateOneWithoutContentNestedInput
+    viewGrants?: ViewGrantUncheckedUpdateManyWithoutContentNestedInput
   }
 
   export type UserUpsertWithoutAuditTargetsInput = {
@@ -34532,10 +45531,10 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
-    settings?: NullableJsonNullValueInput | InputJsonValue
-    settingsVersion?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: IntFieldUpdateOperationsInput | number
     accounts?: AccountUpdateManyWithoutUserNestedInput
     adminActions?: AuditLogUpdateManyWithoutUserNestedInput
     categories?: CategoryUpdateManyWithoutOwnerNestedInput
@@ -34554,10 +45553,10 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
-    settings?: NullableJsonNullValueInput | InputJsonValue
-    settingsVersion?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: IntFieldUpdateOperationsInput | number
     accounts?: AccountUncheckedUpdateManyWithoutUserNestedInput
     adminActions?: AuditLogUncheckedUpdateManyWithoutUserNestedInput
     categories?: CategoryUncheckedUpdateManyWithoutOwnerNestedInput
@@ -34570,21 +45569,159 @@ export namespace Prisma {
     viewGrants?: ViewGrantUncheckedUpdateManyWithoutUserNestedInput
   }
 
-  export type ContentNodeUpsertWithoutAuditLogsInput = {
-    update: XOR<ContentNodeUpdateWithoutAuditLogsInput, ContentNodeUncheckedUpdateWithoutAuditLogsInput>
-    create: XOR<ContentNodeCreateWithoutAuditLogsInput, ContentNodeUncheckedCreateWithoutAuditLogsInput>
+  export type UserUpsertWithoutAdminActionsInput = {
+    update: XOR<UserUpdateWithoutAdminActionsInput, UserUncheckedUpdateWithoutAdminActionsInput>
+    create: XOR<UserCreateWithoutAdminActionsInput, UserUncheckedCreateWithoutAdminActionsInput>
+    where?: UserWhereInput
+  }
+
+  export type UserUpdateToOneWithWhereWithoutAdminActionsInput = {
+    where?: UserWhereInput
+    data: XOR<UserUpdateWithoutAdminActionsInput, UserUncheckedUpdateWithoutAdminActionsInput>
+  }
+
+  export type UserUpdateWithoutAdminActionsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    username?: StringFieldUpdateOperationsInput | string
+    passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
+    email?: StringFieldUpdateOperationsInput | string
+    role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: IntFieldUpdateOperationsInput | number
+    accounts?: AccountUpdateManyWithoutUserNestedInput
+    auditTargets?: AuditLogUpdateManyWithoutTargetUserNestedInput
+    categories?: CategoryUpdateManyWithoutOwnerNestedInput
+    contentHistory?: ContentHistoryUpdateManyWithoutUserNestedInput
+    contentNodes?: ContentNodeUpdateManyWithoutOwnerNestedInput
+    sessions?: SessionUpdateManyWithoutUserNestedInput
+    storageConfigs?: StorageProviderConfigUpdateManyWithoutUserNestedInput
+    tags?: TagUpdateManyWithoutUserNestedInput
+    trashedContent?: TrashBinUpdateManyWithoutDeletedByUserNestedInput
+    viewGrants?: ViewGrantUpdateManyWithoutUserNestedInput
+  }
+
+  export type UserUncheckedUpdateWithoutAdminActionsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    username?: StringFieldUpdateOperationsInput | string
+    passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
+    email?: StringFieldUpdateOperationsInput | string
+    role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: IntFieldUpdateOperationsInput | number
+    accounts?: AccountUncheckedUpdateManyWithoutUserNestedInput
+    auditTargets?: AuditLogUncheckedUpdateManyWithoutTargetUserNestedInput
+    categories?: CategoryUncheckedUpdateManyWithoutOwnerNestedInput
+    contentHistory?: ContentHistoryUncheckedUpdateManyWithoutUserNestedInput
+    contentNodes?: ContentNodeUncheckedUpdateManyWithoutOwnerNestedInput
+    sessions?: SessionUncheckedUpdateManyWithoutUserNestedInput
+    storageConfigs?: StorageProviderConfigUncheckedUpdateManyWithoutUserNestedInput
+    tags?: TagUncheckedUpdateManyWithoutUserNestedInput
+    trashedContent?: TrashBinUncheckedUpdateManyWithoutDeletedByUserNestedInput
+    viewGrants?: ViewGrantUncheckedUpdateManyWithoutUserNestedInput
+  }
+
+  export type ContentNodeCreateWithoutFolderPayloadInput = {
+    id?: string
+    title: string
+    slug: string
+    contentType: $Enums.ContentType
+    role?: $Enums.ContentRole
+    displayOrder?: number
+    isPublished?: boolean
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    deletedAt?: Date | string | null
+    deletedBy?: string | null
+    customIcon?: string | null
+    iconColor?: string | null
+    auditLogs?: AuditLogCreateNestedManyWithoutTargetContentInput
+    codePayload?: CodePayloadCreateNestedOneWithoutContentInput
+    filePayload?: FilePayloadCreateNestedOneWithoutContentInput
+    htmlPayload?: HtmlPayloadCreateNestedOneWithoutContentInput
+    notePayload?: NotePayloadCreateNestedOneWithoutContentInput
+    externalPayload?: ExternalPayloadCreateNestedOneWithoutContentInput
+    chatPayload?: ChatPayloadCreateNestedOneWithoutContentInput
+    visualizationPayload?: VisualizationPayloadCreateNestedOneWithoutContentInput
+    dataPayload?: DataPayloadCreateNestedOneWithoutContentInput
+    hopePayload?: HopePayloadCreateNestedOneWithoutContentInput
+    workflowPayload?: WorkflowPayloadCreateNestedOneWithoutContentInput
+    history?: ContentHistoryCreateNestedManyWithoutContentInput
+    sourceLinks?: ContentLinkCreateNestedManyWithoutSourceInput
+    targetLinks?: ContentLinkCreateNestedManyWithoutTargetInput
+    category?: CategoryCreateNestedOneWithoutContentNodesInput
+    owner: UserCreateNestedOneWithoutContentNodesInput
+    parent?: ContentNodeCreateNestedOneWithoutChildrenInput
+    children?: ContentNodeCreateNestedManyWithoutParentInput
+    contentPath?: ContentPathCreateNestedOneWithoutContentInput
+    contentTags?: ContentTagCreateNestedManyWithoutContentInput
+    trashBinEntry?: TrashBinCreateNestedOneWithoutContentInput
+    viewGrants?: ViewGrantCreateNestedManyWithoutContentInput
+  }
+
+  export type ContentNodeUncheckedCreateWithoutFolderPayloadInput = {
+    id?: string
+    ownerId: string
+    title: string
+    slug: string
+    contentType: $Enums.ContentType
+    role?: $Enums.ContentRole
+    parentId?: string | null
+    displayOrder?: number
+    categoryId?: string | null
+    isPublished?: boolean
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    deletedAt?: Date | string | null
+    deletedBy?: string | null
+    customIcon?: string | null
+    iconColor?: string | null
+    auditLogs?: AuditLogUncheckedCreateNestedManyWithoutTargetContentInput
+    codePayload?: CodePayloadUncheckedCreateNestedOneWithoutContentInput
+    filePayload?: FilePayloadUncheckedCreateNestedOneWithoutContentInput
+    htmlPayload?: HtmlPayloadUncheckedCreateNestedOneWithoutContentInput
+    notePayload?: NotePayloadUncheckedCreateNestedOneWithoutContentInput
+    externalPayload?: ExternalPayloadUncheckedCreateNestedOneWithoutContentInput
+    chatPayload?: ChatPayloadUncheckedCreateNestedOneWithoutContentInput
+    visualizationPayload?: VisualizationPayloadUncheckedCreateNestedOneWithoutContentInput
+    dataPayload?: DataPayloadUncheckedCreateNestedOneWithoutContentInput
+    hopePayload?: HopePayloadUncheckedCreateNestedOneWithoutContentInput
+    workflowPayload?: WorkflowPayloadUncheckedCreateNestedOneWithoutContentInput
+    history?: ContentHistoryUncheckedCreateNestedManyWithoutContentInput
+    sourceLinks?: ContentLinkUncheckedCreateNestedManyWithoutSourceInput
+    targetLinks?: ContentLinkUncheckedCreateNestedManyWithoutTargetInput
+    children?: ContentNodeUncheckedCreateNestedManyWithoutParentInput
+    contentPath?: ContentPathUncheckedCreateNestedOneWithoutContentInput
+    contentTags?: ContentTagUncheckedCreateNestedManyWithoutContentInput
+    trashBinEntry?: TrashBinUncheckedCreateNestedOneWithoutContentInput
+    viewGrants?: ViewGrantUncheckedCreateNestedManyWithoutContentInput
+  }
+
+  export type ContentNodeCreateOrConnectWithoutFolderPayloadInput = {
+    where: ContentNodeWhereUniqueInput
+    create: XOR<ContentNodeCreateWithoutFolderPayloadInput, ContentNodeUncheckedCreateWithoutFolderPayloadInput>
+  }
+
+  export type ContentNodeUpsertWithoutFolderPayloadInput = {
+    update: XOR<ContentNodeUpdateWithoutFolderPayloadInput, ContentNodeUncheckedUpdateWithoutFolderPayloadInput>
+    create: XOR<ContentNodeCreateWithoutFolderPayloadInput, ContentNodeUncheckedCreateWithoutFolderPayloadInput>
     where?: ContentNodeWhereInput
   }
 
-  export type ContentNodeUpdateToOneWithWhereWithoutAuditLogsInput = {
+  export type ContentNodeUpdateToOneWithWhereWithoutFolderPayloadInput = {
     where?: ContentNodeWhereInput
-    data: XOR<ContentNodeUpdateWithoutAuditLogsInput, ContentNodeUncheckedUpdateWithoutAuditLogsInput>
+    data: XOR<ContentNodeUpdateWithoutFolderPayloadInput, ContentNodeUncheckedUpdateWithoutFolderPayloadInput>
   }
 
-  export type ContentNodeUpdateWithoutAuditLogsInput = {
+  export type ContentNodeUpdateWithoutFolderPayloadInput = {
     id?: StringFieldUpdateOperationsInput | string
     title?: StringFieldUpdateOperationsInput | string
     slug?: StringFieldUpdateOperationsInput | string
+    contentType?: EnumContentTypeFieldUpdateOperationsInput | $Enums.ContentType
+    role?: EnumContentRoleFieldUpdateOperationsInput | $Enums.ContentRole
     displayOrder?: IntFieldUpdateOperationsInput | number
     isPublished?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
@@ -34593,7 +45730,17 @@ export namespace Prisma {
     deletedBy?: NullableStringFieldUpdateOperationsInput | string | null
     customIcon?: NullableStringFieldUpdateOperationsInput | string | null
     iconColor?: NullableStringFieldUpdateOperationsInput | string | null
+    auditLogs?: AuditLogUpdateManyWithoutTargetContentNestedInput
     codePayload?: CodePayloadUpdateOneWithoutContentNestedInput
+    filePayload?: FilePayloadUpdateOneWithoutContentNestedInput
+    htmlPayload?: HtmlPayloadUpdateOneWithoutContentNestedInput
+    notePayload?: NotePayloadUpdateOneWithoutContentNestedInput
+    externalPayload?: ExternalPayloadUpdateOneWithoutContentNestedInput
+    chatPayload?: ChatPayloadUpdateOneWithoutContentNestedInput
+    visualizationPayload?: VisualizationPayloadUpdateOneWithoutContentNestedInput
+    dataPayload?: DataPayloadUpdateOneWithoutContentNestedInput
+    hopePayload?: HopePayloadUpdateOneWithoutContentNestedInput
+    workflowPayload?: WorkflowPayloadUpdateOneWithoutContentNestedInput
     history?: ContentHistoryUpdateManyWithoutContentNestedInput
     sourceLinks?: ContentLinkUpdateManyWithoutSourceNestedInput
     targetLinks?: ContentLinkUpdateManyWithoutTargetNestedInput
@@ -34603,18 +45750,17 @@ export namespace Prisma {
     children?: ContentNodeUpdateManyWithoutParentNestedInput
     contentPath?: ContentPathUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUpdateManyWithoutContentNestedInput
-    filePayload?: FilePayloadUpdateOneWithoutContentNestedInput
-    htmlPayload?: HtmlPayloadUpdateOneWithoutContentNestedInput
-    notePayload?: NotePayloadUpdateOneWithoutContentNestedInput
     trashBinEntry?: TrashBinUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUpdateManyWithoutContentNestedInput
   }
 
-  export type ContentNodeUncheckedUpdateWithoutAuditLogsInput = {
+  export type ContentNodeUncheckedUpdateWithoutFolderPayloadInput = {
     id?: StringFieldUpdateOperationsInput | string
     ownerId?: StringFieldUpdateOperationsInput | string
     title?: StringFieldUpdateOperationsInput | string
     slug?: StringFieldUpdateOperationsInput | string
+    contentType?: EnumContentTypeFieldUpdateOperationsInput | $Enums.ContentType
+    role?: EnumContentRoleFieldUpdateOperationsInput | $Enums.ContentRole
     parentId?: NullableStringFieldUpdateOperationsInput | string | null
     displayOrder?: IntFieldUpdateOperationsInput | number
     categoryId?: NullableStringFieldUpdateOperationsInput | string | null
@@ -34625,16 +45771,1031 @@ export namespace Prisma {
     deletedBy?: NullableStringFieldUpdateOperationsInput | string | null
     customIcon?: NullableStringFieldUpdateOperationsInput | string | null
     iconColor?: NullableStringFieldUpdateOperationsInput | string | null
+    auditLogs?: AuditLogUncheckedUpdateManyWithoutTargetContentNestedInput
     codePayload?: CodePayloadUncheckedUpdateOneWithoutContentNestedInput
+    filePayload?: FilePayloadUncheckedUpdateOneWithoutContentNestedInput
+    htmlPayload?: HtmlPayloadUncheckedUpdateOneWithoutContentNestedInput
+    notePayload?: NotePayloadUncheckedUpdateOneWithoutContentNestedInput
+    externalPayload?: ExternalPayloadUncheckedUpdateOneWithoutContentNestedInput
+    chatPayload?: ChatPayloadUncheckedUpdateOneWithoutContentNestedInput
+    visualizationPayload?: VisualizationPayloadUncheckedUpdateOneWithoutContentNestedInput
+    dataPayload?: DataPayloadUncheckedUpdateOneWithoutContentNestedInput
+    hopePayload?: HopePayloadUncheckedUpdateOneWithoutContentNestedInput
+    workflowPayload?: WorkflowPayloadUncheckedUpdateOneWithoutContentNestedInput
     history?: ContentHistoryUncheckedUpdateManyWithoutContentNestedInput
     sourceLinks?: ContentLinkUncheckedUpdateManyWithoutSourceNestedInput
     targetLinks?: ContentLinkUncheckedUpdateManyWithoutTargetNestedInput
     children?: ContentNodeUncheckedUpdateManyWithoutParentNestedInput
     contentPath?: ContentPathUncheckedUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUncheckedUpdateManyWithoutContentNestedInput
+    trashBinEntry?: TrashBinUncheckedUpdateOneWithoutContentNestedInput
+    viewGrants?: ViewGrantUncheckedUpdateManyWithoutContentNestedInput
+  }
+
+  export type ContentNodeCreateWithoutExternalPayloadInput = {
+    id?: string
+    title: string
+    slug: string
+    contentType: $Enums.ContentType
+    role?: $Enums.ContentRole
+    displayOrder?: number
+    isPublished?: boolean
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    deletedAt?: Date | string | null
+    deletedBy?: string | null
+    customIcon?: string | null
+    iconColor?: string | null
+    auditLogs?: AuditLogCreateNestedManyWithoutTargetContentInput
+    codePayload?: CodePayloadCreateNestedOneWithoutContentInput
+    filePayload?: FilePayloadCreateNestedOneWithoutContentInput
+    htmlPayload?: HtmlPayloadCreateNestedOneWithoutContentInput
+    notePayload?: NotePayloadCreateNestedOneWithoutContentInput
+    folderPayload?: FolderPayloadCreateNestedOneWithoutContentInput
+    chatPayload?: ChatPayloadCreateNestedOneWithoutContentInput
+    visualizationPayload?: VisualizationPayloadCreateNestedOneWithoutContentInput
+    dataPayload?: DataPayloadCreateNestedOneWithoutContentInput
+    hopePayload?: HopePayloadCreateNestedOneWithoutContentInput
+    workflowPayload?: WorkflowPayloadCreateNestedOneWithoutContentInput
+    history?: ContentHistoryCreateNestedManyWithoutContentInput
+    sourceLinks?: ContentLinkCreateNestedManyWithoutSourceInput
+    targetLinks?: ContentLinkCreateNestedManyWithoutTargetInput
+    category?: CategoryCreateNestedOneWithoutContentNodesInput
+    owner: UserCreateNestedOneWithoutContentNodesInput
+    parent?: ContentNodeCreateNestedOneWithoutChildrenInput
+    children?: ContentNodeCreateNestedManyWithoutParentInput
+    contentPath?: ContentPathCreateNestedOneWithoutContentInput
+    contentTags?: ContentTagCreateNestedManyWithoutContentInput
+    trashBinEntry?: TrashBinCreateNestedOneWithoutContentInput
+    viewGrants?: ViewGrantCreateNestedManyWithoutContentInput
+  }
+
+  export type ContentNodeUncheckedCreateWithoutExternalPayloadInput = {
+    id?: string
+    ownerId: string
+    title: string
+    slug: string
+    contentType: $Enums.ContentType
+    role?: $Enums.ContentRole
+    parentId?: string | null
+    displayOrder?: number
+    categoryId?: string | null
+    isPublished?: boolean
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    deletedAt?: Date | string | null
+    deletedBy?: string | null
+    customIcon?: string | null
+    iconColor?: string | null
+    auditLogs?: AuditLogUncheckedCreateNestedManyWithoutTargetContentInput
+    codePayload?: CodePayloadUncheckedCreateNestedOneWithoutContentInput
+    filePayload?: FilePayloadUncheckedCreateNestedOneWithoutContentInput
+    htmlPayload?: HtmlPayloadUncheckedCreateNestedOneWithoutContentInput
+    notePayload?: NotePayloadUncheckedCreateNestedOneWithoutContentInput
+    folderPayload?: FolderPayloadUncheckedCreateNestedOneWithoutContentInput
+    chatPayload?: ChatPayloadUncheckedCreateNestedOneWithoutContentInput
+    visualizationPayload?: VisualizationPayloadUncheckedCreateNestedOneWithoutContentInput
+    dataPayload?: DataPayloadUncheckedCreateNestedOneWithoutContentInput
+    hopePayload?: HopePayloadUncheckedCreateNestedOneWithoutContentInput
+    workflowPayload?: WorkflowPayloadUncheckedCreateNestedOneWithoutContentInput
+    history?: ContentHistoryUncheckedCreateNestedManyWithoutContentInput
+    sourceLinks?: ContentLinkUncheckedCreateNestedManyWithoutSourceInput
+    targetLinks?: ContentLinkUncheckedCreateNestedManyWithoutTargetInput
+    children?: ContentNodeUncheckedCreateNestedManyWithoutParentInput
+    contentPath?: ContentPathUncheckedCreateNestedOneWithoutContentInput
+    contentTags?: ContentTagUncheckedCreateNestedManyWithoutContentInput
+    trashBinEntry?: TrashBinUncheckedCreateNestedOneWithoutContentInput
+    viewGrants?: ViewGrantUncheckedCreateNestedManyWithoutContentInput
+  }
+
+  export type ContentNodeCreateOrConnectWithoutExternalPayloadInput = {
+    where: ContentNodeWhereUniqueInput
+    create: XOR<ContentNodeCreateWithoutExternalPayloadInput, ContentNodeUncheckedCreateWithoutExternalPayloadInput>
+  }
+
+  export type ContentNodeUpsertWithoutExternalPayloadInput = {
+    update: XOR<ContentNodeUpdateWithoutExternalPayloadInput, ContentNodeUncheckedUpdateWithoutExternalPayloadInput>
+    create: XOR<ContentNodeCreateWithoutExternalPayloadInput, ContentNodeUncheckedCreateWithoutExternalPayloadInput>
+    where?: ContentNodeWhereInput
+  }
+
+  export type ContentNodeUpdateToOneWithWhereWithoutExternalPayloadInput = {
+    where?: ContentNodeWhereInput
+    data: XOR<ContentNodeUpdateWithoutExternalPayloadInput, ContentNodeUncheckedUpdateWithoutExternalPayloadInput>
+  }
+
+  export type ContentNodeUpdateWithoutExternalPayloadInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    title?: StringFieldUpdateOperationsInput | string
+    slug?: StringFieldUpdateOperationsInput | string
+    contentType?: EnumContentTypeFieldUpdateOperationsInput | $Enums.ContentType
+    role?: EnumContentRoleFieldUpdateOperationsInput | $Enums.ContentRole
+    displayOrder?: IntFieldUpdateOperationsInput | number
+    isPublished?: BoolFieldUpdateOperationsInput | boolean
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    deletedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    deletedBy?: NullableStringFieldUpdateOperationsInput | string | null
+    customIcon?: NullableStringFieldUpdateOperationsInput | string | null
+    iconColor?: NullableStringFieldUpdateOperationsInput | string | null
+    auditLogs?: AuditLogUpdateManyWithoutTargetContentNestedInput
+    codePayload?: CodePayloadUpdateOneWithoutContentNestedInput
+    filePayload?: FilePayloadUpdateOneWithoutContentNestedInput
+    htmlPayload?: HtmlPayloadUpdateOneWithoutContentNestedInput
+    notePayload?: NotePayloadUpdateOneWithoutContentNestedInput
+    folderPayload?: FolderPayloadUpdateOneWithoutContentNestedInput
+    chatPayload?: ChatPayloadUpdateOneWithoutContentNestedInput
+    visualizationPayload?: VisualizationPayloadUpdateOneWithoutContentNestedInput
+    dataPayload?: DataPayloadUpdateOneWithoutContentNestedInput
+    hopePayload?: HopePayloadUpdateOneWithoutContentNestedInput
+    workflowPayload?: WorkflowPayloadUpdateOneWithoutContentNestedInput
+    history?: ContentHistoryUpdateManyWithoutContentNestedInput
+    sourceLinks?: ContentLinkUpdateManyWithoutSourceNestedInput
+    targetLinks?: ContentLinkUpdateManyWithoutTargetNestedInput
+    category?: CategoryUpdateOneWithoutContentNodesNestedInput
+    owner?: UserUpdateOneRequiredWithoutContentNodesNestedInput
+    parent?: ContentNodeUpdateOneWithoutChildrenNestedInput
+    children?: ContentNodeUpdateManyWithoutParentNestedInput
+    contentPath?: ContentPathUpdateOneWithoutContentNestedInput
+    contentTags?: ContentTagUpdateManyWithoutContentNestedInput
+    trashBinEntry?: TrashBinUpdateOneWithoutContentNestedInput
+    viewGrants?: ViewGrantUpdateManyWithoutContentNestedInput
+  }
+
+  export type ContentNodeUncheckedUpdateWithoutExternalPayloadInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    ownerId?: StringFieldUpdateOperationsInput | string
+    title?: StringFieldUpdateOperationsInput | string
+    slug?: StringFieldUpdateOperationsInput | string
+    contentType?: EnumContentTypeFieldUpdateOperationsInput | $Enums.ContentType
+    role?: EnumContentRoleFieldUpdateOperationsInput | $Enums.ContentRole
+    parentId?: NullableStringFieldUpdateOperationsInput | string | null
+    displayOrder?: IntFieldUpdateOperationsInput | number
+    categoryId?: NullableStringFieldUpdateOperationsInput | string | null
+    isPublished?: BoolFieldUpdateOperationsInput | boolean
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    deletedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    deletedBy?: NullableStringFieldUpdateOperationsInput | string | null
+    customIcon?: NullableStringFieldUpdateOperationsInput | string | null
+    iconColor?: NullableStringFieldUpdateOperationsInput | string | null
+    auditLogs?: AuditLogUncheckedUpdateManyWithoutTargetContentNestedInput
+    codePayload?: CodePayloadUncheckedUpdateOneWithoutContentNestedInput
     filePayload?: FilePayloadUncheckedUpdateOneWithoutContentNestedInput
     htmlPayload?: HtmlPayloadUncheckedUpdateOneWithoutContentNestedInput
     notePayload?: NotePayloadUncheckedUpdateOneWithoutContentNestedInput
+    folderPayload?: FolderPayloadUncheckedUpdateOneWithoutContentNestedInput
+    chatPayload?: ChatPayloadUncheckedUpdateOneWithoutContentNestedInput
+    visualizationPayload?: VisualizationPayloadUncheckedUpdateOneWithoutContentNestedInput
+    dataPayload?: DataPayloadUncheckedUpdateOneWithoutContentNestedInput
+    hopePayload?: HopePayloadUncheckedUpdateOneWithoutContentNestedInput
+    workflowPayload?: WorkflowPayloadUncheckedUpdateOneWithoutContentNestedInput
+    history?: ContentHistoryUncheckedUpdateManyWithoutContentNestedInput
+    sourceLinks?: ContentLinkUncheckedUpdateManyWithoutSourceNestedInput
+    targetLinks?: ContentLinkUncheckedUpdateManyWithoutTargetNestedInput
+    children?: ContentNodeUncheckedUpdateManyWithoutParentNestedInput
+    contentPath?: ContentPathUncheckedUpdateOneWithoutContentNestedInput
+    contentTags?: ContentTagUncheckedUpdateManyWithoutContentNestedInput
+    trashBinEntry?: TrashBinUncheckedUpdateOneWithoutContentNestedInput
+    viewGrants?: ViewGrantUncheckedUpdateManyWithoutContentNestedInput
+  }
+
+  export type ContentNodeCreateWithoutChatPayloadInput = {
+    id?: string
+    title: string
+    slug: string
+    contentType: $Enums.ContentType
+    role?: $Enums.ContentRole
+    displayOrder?: number
+    isPublished?: boolean
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    deletedAt?: Date | string | null
+    deletedBy?: string | null
+    customIcon?: string | null
+    iconColor?: string | null
+    auditLogs?: AuditLogCreateNestedManyWithoutTargetContentInput
+    codePayload?: CodePayloadCreateNestedOneWithoutContentInput
+    filePayload?: FilePayloadCreateNestedOneWithoutContentInput
+    htmlPayload?: HtmlPayloadCreateNestedOneWithoutContentInput
+    notePayload?: NotePayloadCreateNestedOneWithoutContentInput
+    folderPayload?: FolderPayloadCreateNestedOneWithoutContentInput
+    externalPayload?: ExternalPayloadCreateNestedOneWithoutContentInput
+    visualizationPayload?: VisualizationPayloadCreateNestedOneWithoutContentInput
+    dataPayload?: DataPayloadCreateNestedOneWithoutContentInput
+    hopePayload?: HopePayloadCreateNestedOneWithoutContentInput
+    workflowPayload?: WorkflowPayloadCreateNestedOneWithoutContentInput
+    history?: ContentHistoryCreateNestedManyWithoutContentInput
+    sourceLinks?: ContentLinkCreateNestedManyWithoutSourceInput
+    targetLinks?: ContentLinkCreateNestedManyWithoutTargetInput
+    category?: CategoryCreateNestedOneWithoutContentNodesInput
+    owner: UserCreateNestedOneWithoutContentNodesInput
+    parent?: ContentNodeCreateNestedOneWithoutChildrenInput
+    children?: ContentNodeCreateNestedManyWithoutParentInput
+    contentPath?: ContentPathCreateNestedOneWithoutContentInput
+    contentTags?: ContentTagCreateNestedManyWithoutContentInput
+    trashBinEntry?: TrashBinCreateNestedOneWithoutContentInput
+    viewGrants?: ViewGrantCreateNestedManyWithoutContentInput
+  }
+
+  export type ContentNodeUncheckedCreateWithoutChatPayloadInput = {
+    id?: string
+    ownerId: string
+    title: string
+    slug: string
+    contentType: $Enums.ContentType
+    role?: $Enums.ContentRole
+    parentId?: string | null
+    displayOrder?: number
+    categoryId?: string | null
+    isPublished?: boolean
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    deletedAt?: Date | string | null
+    deletedBy?: string | null
+    customIcon?: string | null
+    iconColor?: string | null
+    auditLogs?: AuditLogUncheckedCreateNestedManyWithoutTargetContentInput
+    codePayload?: CodePayloadUncheckedCreateNestedOneWithoutContentInput
+    filePayload?: FilePayloadUncheckedCreateNestedOneWithoutContentInput
+    htmlPayload?: HtmlPayloadUncheckedCreateNestedOneWithoutContentInput
+    notePayload?: NotePayloadUncheckedCreateNestedOneWithoutContentInput
+    folderPayload?: FolderPayloadUncheckedCreateNestedOneWithoutContentInput
+    externalPayload?: ExternalPayloadUncheckedCreateNestedOneWithoutContentInput
+    visualizationPayload?: VisualizationPayloadUncheckedCreateNestedOneWithoutContentInput
+    dataPayload?: DataPayloadUncheckedCreateNestedOneWithoutContentInput
+    hopePayload?: HopePayloadUncheckedCreateNestedOneWithoutContentInput
+    workflowPayload?: WorkflowPayloadUncheckedCreateNestedOneWithoutContentInput
+    history?: ContentHistoryUncheckedCreateNestedManyWithoutContentInput
+    sourceLinks?: ContentLinkUncheckedCreateNestedManyWithoutSourceInput
+    targetLinks?: ContentLinkUncheckedCreateNestedManyWithoutTargetInput
+    children?: ContentNodeUncheckedCreateNestedManyWithoutParentInput
+    contentPath?: ContentPathUncheckedCreateNestedOneWithoutContentInput
+    contentTags?: ContentTagUncheckedCreateNestedManyWithoutContentInput
+    trashBinEntry?: TrashBinUncheckedCreateNestedOneWithoutContentInput
+    viewGrants?: ViewGrantUncheckedCreateNestedManyWithoutContentInput
+  }
+
+  export type ContentNodeCreateOrConnectWithoutChatPayloadInput = {
+    where: ContentNodeWhereUniqueInput
+    create: XOR<ContentNodeCreateWithoutChatPayloadInput, ContentNodeUncheckedCreateWithoutChatPayloadInput>
+  }
+
+  export type ContentNodeUpsertWithoutChatPayloadInput = {
+    update: XOR<ContentNodeUpdateWithoutChatPayloadInput, ContentNodeUncheckedUpdateWithoutChatPayloadInput>
+    create: XOR<ContentNodeCreateWithoutChatPayloadInput, ContentNodeUncheckedCreateWithoutChatPayloadInput>
+    where?: ContentNodeWhereInput
+  }
+
+  export type ContentNodeUpdateToOneWithWhereWithoutChatPayloadInput = {
+    where?: ContentNodeWhereInput
+    data: XOR<ContentNodeUpdateWithoutChatPayloadInput, ContentNodeUncheckedUpdateWithoutChatPayloadInput>
+  }
+
+  export type ContentNodeUpdateWithoutChatPayloadInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    title?: StringFieldUpdateOperationsInput | string
+    slug?: StringFieldUpdateOperationsInput | string
+    contentType?: EnumContentTypeFieldUpdateOperationsInput | $Enums.ContentType
+    role?: EnumContentRoleFieldUpdateOperationsInput | $Enums.ContentRole
+    displayOrder?: IntFieldUpdateOperationsInput | number
+    isPublished?: BoolFieldUpdateOperationsInput | boolean
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    deletedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    deletedBy?: NullableStringFieldUpdateOperationsInput | string | null
+    customIcon?: NullableStringFieldUpdateOperationsInput | string | null
+    iconColor?: NullableStringFieldUpdateOperationsInput | string | null
+    auditLogs?: AuditLogUpdateManyWithoutTargetContentNestedInput
+    codePayload?: CodePayloadUpdateOneWithoutContentNestedInput
+    filePayload?: FilePayloadUpdateOneWithoutContentNestedInput
+    htmlPayload?: HtmlPayloadUpdateOneWithoutContentNestedInput
+    notePayload?: NotePayloadUpdateOneWithoutContentNestedInput
+    folderPayload?: FolderPayloadUpdateOneWithoutContentNestedInput
+    externalPayload?: ExternalPayloadUpdateOneWithoutContentNestedInput
+    visualizationPayload?: VisualizationPayloadUpdateOneWithoutContentNestedInput
+    dataPayload?: DataPayloadUpdateOneWithoutContentNestedInput
+    hopePayload?: HopePayloadUpdateOneWithoutContentNestedInput
+    workflowPayload?: WorkflowPayloadUpdateOneWithoutContentNestedInput
+    history?: ContentHistoryUpdateManyWithoutContentNestedInput
+    sourceLinks?: ContentLinkUpdateManyWithoutSourceNestedInput
+    targetLinks?: ContentLinkUpdateManyWithoutTargetNestedInput
+    category?: CategoryUpdateOneWithoutContentNodesNestedInput
+    owner?: UserUpdateOneRequiredWithoutContentNodesNestedInput
+    parent?: ContentNodeUpdateOneWithoutChildrenNestedInput
+    children?: ContentNodeUpdateManyWithoutParentNestedInput
+    contentPath?: ContentPathUpdateOneWithoutContentNestedInput
+    contentTags?: ContentTagUpdateManyWithoutContentNestedInput
+    trashBinEntry?: TrashBinUpdateOneWithoutContentNestedInput
+    viewGrants?: ViewGrantUpdateManyWithoutContentNestedInput
+  }
+
+  export type ContentNodeUncheckedUpdateWithoutChatPayloadInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    ownerId?: StringFieldUpdateOperationsInput | string
+    title?: StringFieldUpdateOperationsInput | string
+    slug?: StringFieldUpdateOperationsInput | string
+    contentType?: EnumContentTypeFieldUpdateOperationsInput | $Enums.ContentType
+    role?: EnumContentRoleFieldUpdateOperationsInput | $Enums.ContentRole
+    parentId?: NullableStringFieldUpdateOperationsInput | string | null
+    displayOrder?: IntFieldUpdateOperationsInput | number
+    categoryId?: NullableStringFieldUpdateOperationsInput | string | null
+    isPublished?: BoolFieldUpdateOperationsInput | boolean
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    deletedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    deletedBy?: NullableStringFieldUpdateOperationsInput | string | null
+    customIcon?: NullableStringFieldUpdateOperationsInput | string | null
+    iconColor?: NullableStringFieldUpdateOperationsInput | string | null
+    auditLogs?: AuditLogUncheckedUpdateManyWithoutTargetContentNestedInput
+    codePayload?: CodePayloadUncheckedUpdateOneWithoutContentNestedInput
+    filePayload?: FilePayloadUncheckedUpdateOneWithoutContentNestedInput
+    htmlPayload?: HtmlPayloadUncheckedUpdateOneWithoutContentNestedInput
+    notePayload?: NotePayloadUncheckedUpdateOneWithoutContentNestedInput
+    folderPayload?: FolderPayloadUncheckedUpdateOneWithoutContentNestedInput
+    externalPayload?: ExternalPayloadUncheckedUpdateOneWithoutContentNestedInput
+    visualizationPayload?: VisualizationPayloadUncheckedUpdateOneWithoutContentNestedInput
+    dataPayload?: DataPayloadUncheckedUpdateOneWithoutContentNestedInput
+    hopePayload?: HopePayloadUncheckedUpdateOneWithoutContentNestedInput
+    workflowPayload?: WorkflowPayloadUncheckedUpdateOneWithoutContentNestedInput
+    history?: ContentHistoryUncheckedUpdateManyWithoutContentNestedInput
+    sourceLinks?: ContentLinkUncheckedUpdateManyWithoutSourceNestedInput
+    targetLinks?: ContentLinkUncheckedUpdateManyWithoutTargetNestedInput
+    children?: ContentNodeUncheckedUpdateManyWithoutParentNestedInput
+    contentPath?: ContentPathUncheckedUpdateOneWithoutContentNestedInput
+    contentTags?: ContentTagUncheckedUpdateManyWithoutContentNestedInput
+    trashBinEntry?: TrashBinUncheckedUpdateOneWithoutContentNestedInput
+    viewGrants?: ViewGrantUncheckedUpdateManyWithoutContentNestedInput
+  }
+
+  export type ContentNodeCreateWithoutVisualizationPayloadInput = {
+    id?: string
+    title: string
+    slug: string
+    contentType: $Enums.ContentType
+    role?: $Enums.ContentRole
+    displayOrder?: number
+    isPublished?: boolean
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    deletedAt?: Date | string | null
+    deletedBy?: string | null
+    customIcon?: string | null
+    iconColor?: string | null
+    auditLogs?: AuditLogCreateNestedManyWithoutTargetContentInput
+    codePayload?: CodePayloadCreateNestedOneWithoutContentInput
+    filePayload?: FilePayloadCreateNestedOneWithoutContentInput
+    htmlPayload?: HtmlPayloadCreateNestedOneWithoutContentInput
+    notePayload?: NotePayloadCreateNestedOneWithoutContentInput
+    folderPayload?: FolderPayloadCreateNestedOneWithoutContentInput
+    externalPayload?: ExternalPayloadCreateNestedOneWithoutContentInput
+    chatPayload?: ChatPayloadCreateNestedOneWithoutContentInput
+    dataPayload?: DataPayloadCreateNestedOneWithoutContentInput
+    hopePayload?: HopePayloadCreateNestedOneWithoutContentInput
+    workflowPayload?: WorkflowPayloadCreateNestedOneWithoutContentInput
+    history?: ContentHistoryCreateNestedManyWithoutContentInput
+    sourceLinks?: ContentLinkCreateNestedManyWithoutSourceInput
+    targetLinks?: ContentLinkCreateNestedManyWithoutTargetInput
+    category?: CategoryCreateNestedOneWithoutContentNodesInput
+    owner: UserCreateNestedOneWithoutContentNodesInput
+    parent?: ContentNodeCreateNestedOneWithoutChildrenInput
+    children?: ContentNodeCreateNestedManyWithoutParentInput
+    contentPath?: ContentPathCreateNestedOneWithoutContentInput
+    contentTags?: ContentTagCreateNestedManyWithoutContentInput
+    trashBinEntry?: TrashBinCreateNestedOneWithoutContentInput
+    viewGrants?: ViewGrantCreateNestedManyWithoutContentInput
+  }
+
+  export type ContentNodeUncheckedCreateWithoutVisualizationPayloadInput = {
+    id?: string
+    ownerId: string
+    title: string
+    slug: string
+    contentType: $Enums.ContentType
+    role?: $Enums.ContentRole
+    parentId?: string | null
+    displayOrder?: number
+    categoryId?: string | null
+    isPublished?: boolean
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    deletedAt?: Date | string | null
+    deletedBy?: string | null
+    customIcon?: string | null
+    iconColor?: string | null
+    auditLogs?: AuditLogUncheckedCreateNestedManyWithoutTargetContentInput
+    codePayload?: CodePayloadUncheckedCreateNestedOneWithoutContentInput
+    filePayload?: FilePayloadUncheckedCreateNestedOneWithoutContentInput
+    htmlPayload?: HtmlPayloadUncheckedCreateNestedOneWithoutContentInput
+    notePayload?: NotePayloadUncheckedCreateNestedOneWithoutContentInput
+    folderPayload?: FolderPayloadUncheckedCreateNestedOneWithoutContentInput
+    externalPayload?: ExternalPayloadUncheckedCreateNestedOneWithoutContentInput
+    chatPayload?: ChatPayloadUncheckedCreateNestedOneWithoutContentInput
+    dataPayload?: DataPayloadUncheckedCreateNestedOneWithoutContentInput
+    hopePayload?: HopePayloadUncheckedCreateNestedOneWithoutContentInput
+    workflowPayload?: WorkflowPayloadUncheckedCreateNestedOneWithoutContentInput
+    history?: ContentHistoryUncheckedCreateNestedManyWithoutContentInput
+    sourceLinks?: ContentLinkUncheckedCreateNestedManyWithoutSourceInput
+    targetLinks?: ContentLinkUncheckedCreateNestedManyWithoutTargetInput
+    children?: ContentNodeUncheckedCreateNestedManyWithoutParentInput
+    contentPath?: ContentPathUncheckedCreateNestedOneWithoutContentInput
+    contentTags?: ContentTagUncheckedCreateNestedManyWithoutContentInput
+    trashBinEntry?: TrashBinUncheckedCreateNestedOneWithoutContentInput
+    viewGrants?: ViewGrantUncheckedCreateNestedManyWithoutContentInput
+  }
+
+  export type ContentNodeCreateOrConnectWithoutVisualizationPayloadInput = {
+    where: ContentNodeWhereUniqueInput
+    create: XOR<ContentNodeCreateWithoutVisualizationPayloadInput, ContentNodeUncheckedCreateWithoutVisualizationPayloadInput>
+  }
+
+  export type ContentNodeUpsertWithoutVisualizationPayloadInput = {
+    update: XOR<ContentNodeUpdateWithoutVisualizationPayloadInput, ContentNodeUncheckedUpdateWithoutVisualizationPayloadInput>
+    create: XOR<ContentNodeCreateWithoutVisualizationPayloadInput, ContentNodeUncheckedCreateWithoutVisualizationPayloadInput>
+    where?: ContentNodeWhereInput
+  }
+
+  export type ContentNodeUpdateToOneWithWhereWithoutVisualizationPayloadInput = {
+    where?: ContentNodeWhereInput
+    data: XOR<ContentNodeUpdateWithoutVisualizationPayloadInput, ContentNodeUncheckedUpdateWithoutVisualizationPayloadInput>
+  }
+
+  export type ContentNodeUpdateWithoutVisualizationPayloadInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    title?: StringFieldUpdateOperationsInput | string
+    slug?: StringFieldUpdateOperationsInput | string
+    contentType?: EnumContentTypeFieldUpdateOperationsInput | $Enums.ContentType
+    role?: EnumContentRoleFieldUpdateOperationsInput | $Enums.ContentRole
+    displayOrder?: IntFieldUpdateOperationsInput | number
+    isPublished?: BoolFieldUpdateOperationsInput | boolean
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    deletedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    deletedBy?: NullableStringFieldUpdateOperationsInput | string | null
+    customIcon?: NullableStringFieldUpdateOperationsInput | string | null
+    iconColor?: NullableStringFieldUpdateOperationsInput | string | null
+    auditLogs?: AuditLogUpdateManyWithoutTargetContentNestedInput
+    codePayload?: CodePayloadUpdateOneWithoutContentNestedInput
+    filePayload?: FilePayloadUpdateOneWithoutContentNestedInput
+    htmlPayload?: HtmlPayloadUpdateOneWithoutContentNestedInput
+    notePayload?: NotePayloadUpdateOneWithoutContentNestedInput
+    folderPayload?: FolderPayloadUpdateOneWithoutContentNestedInput
+    externalPayload?: ExternalPayloadUpdateOneWithoutContentNestedInput
+    chatPayload?: ChatPayloadUpdateOneWithoutContentNestedInput
+    dataPayload?: DataPayloadUpdateOneWithoutContentNestedInput
+    hopePayload?: HopePayloadUpdateOneWithoutContentNestedInput
+    workflowPayload?: WorkflowPayloadUpdateOneWithoutContentNestedInput
+    history?: ContentHistoryUpdateManyWithoutContentNestedInput
+    sourceLinks?: ContentLinkUpdateManyWithoutSourceNestedInput
+    targetLinks?: ContentLinkUpdateManyWithoutTargetNestedInput
+    category?: CategoryUpdateOneWithoutContentNodesNestedInput
+    owner?: UserUpdateOneRequiredWithoutContentNodesNestedInput
+    parent?: ContentNodeUpdateOneWithoutChildrenNestedInput
+    children?: ContentNodeUpdateManyWithoutParentNestedInput
+    contentPath?: ContentPathUpdateOneWithoutContentNestedInput
+    contentTags?: ContentTagUpdateManyWithoutContentNestedInput
+    trashBinEntry?: TrashBinUpdateOneWithoutContentNestedInput
+    viewGrants?: ViewGrantUpdateManyWithoutContentNestedInput
+  }
+
+  export type ContentNodeUncheckedUpdateWithoutVisualizationPayloadInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    ownerId?: StringFieldUpdateOperationsInput | string
+    title?: StringFieldUpdateOperationsInput | string
+    slug?: StringFieldUpdateOperationsInput | string
+    contentType?: EnumContentTypeFieldUpdateOperationsInput | $Enums.ContentType
+    role?: EnumContentRoleFieldUpdateOperationsInput | $Enums.ContentRole
+    parentId?: NullableStringFieldUpdateOperationsInput | string | null
+    displayOrder?: IntFieldUpdateOperationsInput | number
+    categoryId?: NullableStringFieldUpdateOperationsInput | string | null
+    isPublished?: BoolFieldUpdateOperationsInput | boolean
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    deletedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    deletedBy?: NullableStringFieldUpdateOperationsInput | string | null
+    customIcon?: NullableStringFieldUpdateOperationsInput | string | null
+    iconColor?: NullableStringFieldUpdateOperationsInput | string | null
+    auditLogs?: AuditLogUncheckedUpdateManyWithoutTargetContentNestedInput
+    codePayload?: CodePayloadUncheckedUpdateOneWithoutContentNestedInput
+    filePayload?: FilePayloadUncheckedUpdateOneWithoutContentNestedInput
+    htmlPayload?: HtmlPayloadUncheckedUpdateOneWithoutContentNestedInput
+    notePayload?: NotePayloadUncheckedUpdateOneWithoutContentNestedInput
+    folderPayload?: FolderPayloadUncheckedUpdateOneWithoutContentNestedInput
+    externalPayload?: ExternalPayloadUncheckedUpdateOneWithoutContentNestedInput
+    chatPayload?: ChatPayloadUncheckedUpdateOneWithoutContentNestedInput
+    dataPayload?: DataPayloadUncheckedUpdateOneWithoutContentNestedInput
+    hopePayload?: HopePayloadUncheckedUpdateOneWithoutContentNestedInput
+    workflowPayload?: WorkflowPayloadUncheckedUpdateOneWithoutContentNestedInput
+    history?: ContentHistoryUncheckedUpdateManyWithoutContentNestedInput
+    sourceLinks?: ContentLinkUncheckedUpdateManyWithoutSourceNestedInput
+    targetLinks?: ContentLinkUncheckedUpdateManyWithoutTargetNestedInput
+    children?: ContentNodeUncheckedUpdateManyWithoutParentNestedInput
+    contentPath?: ContentPathUncheckedUpdateOneWithoutContentNestedInput
+    contentTags?: ContentTagUncheckedUpdateManyWithoutContentNestedInput
+    trashBinEntry?: TrashBinUncheckedUpdateOneWithoutContentNestedInput
+    viewGrants?: ViewGrantUncheckedUpdateManyWithoutContentNestedInput
+  }
+
+  export type ContentNodeCreateWithoutDataPayloadInput = {
+    id?: string
+    title: string
+    slug: string
+    contentType: $Enums.ContentType
+    role?: $Enums.ContentRole
+    displayOrder?: number
+    isPublished?: boolean
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    deletedAt?: Date | string | null
+    deletedBy?: string | null
+    customIcon?: string | null
+    iconColor?: string | null
+    auditLogs?: AuditLogCreateNestedManyWithoutTargetContentInput
+    codePayload?: CodePayloadCreateNestedOneWithoutContentInput
+    filePayload?: FilePayloadCreateNestedOneWithoutContentInput
+    htmlPayload?: HtmlPayloadCreateNestedOneWithoutContentInput
+    notePayload?: NotePayloadCreateNestedOneWithoutContentInput
+    folderPayload?: FolderPayloadCreateNestedOneWithoutContentInput
+    externalPayload?: ExternalPayloadCreateNestedOneWithoutContentInput
+    chatPayload?: ChatPayloadCreateNestedOneWithoutContentInput
+    visualizationPayload?: VisualizationPayloadCreateNestedOneWithoutContentInput
+    hopePayload?: HopePayloadCreateNestedOneWithoutContentInput
+    workflowPayload?: WorkflowPayloadCreateNestedOneWithoutContentInput
+    history?: ContentHistoryCreateNestedManyWithoutContentInput
+    sourceLinks?: ContentLinkCreateNestedManyWithoutSourceInput
+    targetLinks?: ContentLinkCreateNestedManyWithoutTargetInput
+    category?: CategoryCreateNestedOneWithoutContentNodesInput
+    owner: UserCreateNestedOneWithoutContentNodesInput
+    parent?: ContentNodeCreateNestedOneWithoutChildrenInput
+    children?: ContentNodeCreateNestedManyWithoutParentInput
+    contentPath?: ContentPathCreateNestedOneWithoutContentInput
+    contentTags?: ContentTagCreateNestedManyWithoutContentInput
+    trashBinEntry?: TrashBinCreateNestedOneWithoutContentInput
+    viewGrants?: ViewGrantCreateNestedManyWithoutContentInput
+  }
+
+  export type ContentNodeUncheckedCreateWithoutDataPayloadInput = {
+    id?: string
+    ownerId: string
+    title: string
+    slug: string
+    contentType: $Enums.ContentType
+    role?: $Enums.ContentRole
+    parentId?: string | null
+    displayOrder?: number
+    categoryId?: string | null
+    isPublished?: boolean
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    deletedAt?: Date | string | null
+    deletedBy?: string | null
+    customIcon?: string | null
+    iconColor?: string | null
+    auditLogs?: AuditLogUncheckedCreateNestedManyWithoutTargetContentInput
+    codePayload?: CodePayloadUncheckedCreateNestedOneWithoutContentInput
+    filePayload?: FilePayloadUncheckedCreateNestedOneWithoutContentInput
+    htmlPayload?: HtmlPayloadUncheckedCreateNestedOneWithoutContentInput
+    notePayload?: NotePayloadUncheckedCreateNestedOneWithoutContentInput
+    folderPayload?: FolderPayloadUncheckedCreateNestedOneWithoutContentInput
+    externalPayload?: ExternalPayloadUncheckedCreateNestedOneWithoutContentInput
+    chatPayload?: ChatPayloadUncheckedCreateNestedOneWithoutContentInput
+    visualizationPayload?: VisualizationPayloadUncheckedCreateNestedOneWithoutContentInput
+    hopePayload?: HopePayloadUncheckedCreateNestedOneWithoutContentInput
+    workflowPayload?: WorkflowPayloadUncheckedCreateNestedOneWithoutContentInput
+    history?: ContentHistoryUncheckedCreateNestedManyWithoutContentInput
+    sourceLinks?: ContentLinkUncheckedCreateNestedManyWithoutSourceInput
+    targetLinks?: ContentLinkUncheckedCreateNestedManyWithoutTargetInput
+    children?: ContentNodeUncheckedCreateNestedManyWithoutParentInput
+    contentPath?: ContentPathUncheckedCreateNestedOneWithoutContentInput
+    contentTags?: ContentTagUncheckedCreateNestedManyWithoutContentInput
+    trashBinEntry?: TrashBinUncheckedCreateNestedOneWithoutContentInput
+    viewGrants?: ViewGrantUncheckedCreateNestedManyWithoutContentInput
+  }
+
+  export type ContentNodeCreateOrConnectWithoutDataPayloadInput = {
+    where: ContentNodeWhereUniqueInput
+    create: XOR<ContentNodeCreateWithoutDataPayloadInput, ContentNodeUncheckedCreateWithoutDataPayloadInput>
+  }
+
+  export type ContentNodeUpsertWithoutDataPayloadInput = {
+    update: XOR<ContentNodeUpdateWithoutDataPayloadInput, ContentNodeUncheckedUpdateWithoutDataPayloadInput>
+    create: XOR<ContentNodeCreateWithoutDataPayloadInput, ContentNodeUncheckedCreateWithoutDataPayloadInput>
+    where?: ContentNodeWhereInput
+  }
+
+  export type ContentNodeUpdateToOneWithWhereWithoutDataPayloadInput = {
+    where?: ContentNodeWhereInput
+    data: XOR<ContentNodeUpdateWithoutDataPayloadInput, ContentNodeUncheckedUpdateWithoutDataPayloadInput>
+  }
+
+  export type ContentNodeUpdateWithoutDataPayloadInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    title?: StringFieldUpdateOperationsInput | string
+    slug?: StringFieldUpdateOperationsInput | string
+    contentType?: EnumContentTypeFieldUpdateOperationsInput | $Enums.ContentType
+    role?: EnumContentRoleFieldUpdateOperationsInput | $Enums.ContentRole
+    displayOrder?: IntFieldUpdateOperationsInput | number
+    isPublished?: BoolFieldUpdateOperationsInput | boolean
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    deletedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    deletedBy?: NullableStringFieldUpdateOperationsInput | string | null
+    customIcon?: NullableStringFieldUpdateOperationsInput | string | null
+    iconColor?: NullableStringFieldUpdateOperationsInput | string | null
+    auditLogs?: AuditLogUpdateManyWithoutTargetContentNestedInput
+    codePayload?: CodePayloadUpdateOneWithoutContentNestedInput
+    filePayload?: FilePayloadUpdateOneWithoutContentNestedInput
+    htmlPayload?: HtmlPayloadUpdateOneWithoutContentNestedInput
+    notePayload?: NotePayloadUpdateOneWithoutContentNestedInput
+    folderPayload?: FolderPayloadUpdateOneWithoutContentNestedInput
+    externalPayload?: ExternalPayloadUpdateOneWithoutContentNestedInput
+    chatPayload?: ChatPayloadUpdateOneWithoutContentNestedInput
+    visualizationPayload?: VisualizationPayloadUpdateOneWithoutContentNestedInput
+    hopePayload?: HopePayloadUpdateOneWithoutContentNestedInput
+    workflowPayload?: WorkflowPayloadUpdateOneWithoutContentNestedInput
+    history?: ContentHistoryUpdateManyWithoutContentNestedInput
+    sourceLinks?: ContentLinkUpdateManyWithoutSourceNestedInput
+    targetLinks?: ContentLinkUpdateManyWithoutTargetNestedInput
+    category?: CategoryUpdateOneWithoutContentNodesNestedInput
+    owner?: UserUpdateOneRequiredWithoutContentNodesNestedInput
+    parent?: ContentNodeUpdateOneWithoutChildrenNestedInput
+    children?: ContentNodeUpdateManyWithoutParentNestedInput
+    contentPath?: ContentPathUpdateOneWithoutContentNestedInput
+    contentTags?: ContentTagUpdateManyWithoutContentNestedInput
+    trashBinEntry?: TrashBinUpdateOneWithoutContentNestedInput
+    viewGrants?: ViewGrantUpdateManyWithoutContentNestedInput
+  }
+
+  export type ContentNodeUncheckedUpdateWithoutDataPayloadInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    ownerId?: StringFieldUpdateOperationsInput | string
+    title?: StringFieldUpdateOperationsInput | string
+    slug?: StringFieldUpdateOperationsInput | string
+    contentType?: EnumContentTypeFieldUpdateOperationsInput | $Enums.ContentType
+    role?: EnumContentRoleFieldUpdateOperationsInput | $Enums.ContentRole
+    parentId?: NullableStringFieldUpdateOperationsInput | string | null
+    displayOrder?: IntFieldUpdateOperationsInput | number
+    categoryId?: NullableStringFieldUpdateOperationsInput | string | null
+    isPublished?: BoolFieldUpdateOperationsInput | boolean
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    deletedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    deletedBy?: NullableStringFieldUpdateOperationsInput | string | null
+    customIcon?: NullableStringFieldUpdateOperationsInput | string | null
+    iconColor?: NullableStringFieldUpdateOperationsInput | string | null
+    auditLogs?: AuditLogUncheckedUpdateManyWithoutTargetContentNestedInput
+    codePayload?: CodePayloadUncheckedUpdateOneWithoutContentNestedInput
+    filePayload?: FilePayloadUncheckedUpdateOneWithoutContentNestedInput
+    htmlPayload?: HtmlPayloadUncheckedUpdateOneWithoutContentNestedInput
+    notePayload?: NotePayloadUncheckedUpdateOneWithoutContentNestedInput
+    folderPayload?: FolderPayloadUncheckedUpdateOneWithoutContentNestedInput
+    externalPayload?: ExternalPayloadUncheckedUpdateOneWithoutContentNestedInput
+    chatPayload?: ChatPayloadUncheckedUpdateOneWithoutContentNestedInput
+    visualizationPayload?: VisualizationPayloadUncheckedUpdateOneWithoutContentNestedInput
+    hopePayload?: HopePayloadUncheckedUpdateOneWithoutContentNestedInput
+    workflowPayload?: WorkflowPayloadUncheckedUpdateOneWithoutContentNestedInput
+    history?: ContentHistoryUncheckedUpdateManyWithoutContentNestedInput
+    sourceLinks?: ContentLinkUncheckedUpdateManyWithoutSourceNestedInput
+    targetLinks?: ContentLinkUncheckedUpdateManyWithoutTargetNestedInput
+    children?: ContentNodeUncheckedUpdateManyWithoutParentNestedInput
+    contentPath?: ContentPathUncheckedUpdateOneWithoutContentNestedInput
+    contentTags?: ContentTagUncheckedUpdateManyWithoutContentNestedInput
+    trashBinEntry?: TrashBinUncheckedUpdateOneWithoutContentNestedInput
+    viewGrants?: ViewGrantUncheckedUpdateManyWithoutContentNestedInput
+  }
+
+  export type ContentNodeCreateWithoutHopePayloadInput = {
+    id?: string
+    title: string
+    slug: string
+    contentType: $Enums.ContentType
+    role?: $Enums.ContentRole
+    displayOrder?: number
+    isPublished?: boolean
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    deletedAt?: Date | string | null
+    deletedBy?: string | null
+    customIcon?: string | null
+    iconColor?: string | null
+    auditLogs?: AuditLogCreateNestedManyWithoutTargetContentInput
+    codePayload?: CodePayloadCreateNestedOneWithoutContentInput
+    filePayload?: FilePayloadCreateNestedOneWithoutContentInput
+    htmlPayload?: HtmlPayloadCreateNestedOneWithoutContentInput
+    notePayload?: NotePayloadCreateNestedOneWithoutContentInput
+    folderPayload?: FolderPayloadCreateNestedOneWithoutContentInput
+    externalPayload?: ExternalPayloadCreateNestedOneWithoutContentInput
+    chatPayload?: ChatPayloadCreateNestedOneWithoutContentInput
+    visualizationPayload?: VisualizationPayloadCreateNestedOneWithoutContentInput
+    dataPayload?: DataPayloadCreateNestedOneWithoutContentInput
+    workflowPayload?: WorkflowPayloadCreateNestedOneWithoutContentInput
+    history?: ContentHistoryCreateNestedManyWithoutContentInput
+    sourceLinks?: ContentLinkCreateNestedManyWithoutSourceInput
+    targetLinks?: ContentLinkCreateNestedManyWithoutTargetInput
+    category?: CategoryCreateNestedOneWithoutContentNodesInput
+    owner: UserCreateNestedOneWithoutContentNodesInput
+    parent?: ContentNodeCreateNestedOneWithoutChildrenInput
+    children?: ContentNodeCreateNestedManyWithoutParentInput
+    contentPath?: ContentPathCreateNestedOneWithoutContentInput
+    contentTags?: ContentTagCreateNestedManyWithoutContentInput
+    trashBinEntry?: TrashBinCreateNestedOneWithoutContentInput
+    viewGrants?: ViewGrantCreateNestedManyWithoutContentInput
+  }
+
+  export type ContentNodeUncheckedCreateWithoutHopePayloadInput = {
+    id?: string
+    ownerId: string
+    title: string
+    slug: string
+    contentType: $Enums.ContentType
+    role?: $Enums.ContentRole
+    parentId?: string | null
+    displayOrder?: number
+    categoryId?: string | null
+    isPublished?: boolean
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    deletedAt?: Date | string | null
+    deletedBy?: string | null
+    customIcon?: string | null
+    iconColor?: string | null
+    auditLogs?: AuditLogUncheckedCreateNestedManyWithoutTargetContentInput
+    codePayload?: CodePayloadUncheckedCreateNestedOneWithoutContentInput
+    filePayload?: FilePayloadUncheckedCreateNestedOneWithoutContentInput
+    htmlPayload?: HtmlPayloadUncheckedCreateNestedOneWithoutContentInput
+    notePayload?: NotePayloadUncheckedCreateNestedOneWithoutContentInput
+    folderPayload?: FolderPayloadUncheckedCreateNestedOneWithoutContentInput
+    externalPayload?: ExternalPayloadUncheckedCreateNestedOneWithoutContentInput
+    chatPayload?: ChatPayloadUncheckedCreateNestedOneWithoutContentInput
+    visualizationPayload?: VisualizationPayloadUncheckedCreateNestedOneWithoutContentInput
+    dataPayload?: DataPayloadUncheckedCreateNestedOneWithoutContentInput
+    workflowPayload?: WorkflowPayloadUncheckedCreateNestedOneWithoutContentInput
+    history?: ContentHistoryUncheckedCreateNestedManyWithoutContentInput
+    sourceLinks?: ContentLinkUncheckedCreateNestedManyWithoutSourceInput
+    targetLinks?: ContentLinkUncheckedCreateNestedManyWithoutTargetInput
+    children?: ContentNodeUncheckedCreateNestedManyWithoutParentInput
+    contentPath?: ContentPathUncheckedCreateNestedOneWithoutContentInput
+    contentTags?: ContentTagUncheckedCreateNestedManyWithoutContentInput
+    trashBinEntry?: TrashBinUncheckedCreateNestedOneWithoutContentInput
+    viewGrants?: ViewGrantUncheckedCreateNestedManyWithoutContentInput
+  }
+
+  export type ContentNodeCreateOrConnectWithoutHopePayloadInput = {
+    where: ContentNodeWhereUniqueInput
+    create: XOR<ContentNodeCreateWithoutHopePayloadInput, ContentNodeUncheckedCreateWithoutHopePayloadInput>
+  }
+
+  export type ContentNodeUpsertWithoutHopePayloadInput = {
+    update: XOR<ContentNodeUpdateWithoutHopePayloadInput, ContentNodeUncheckedUpdateWithoutHopePayloadInput>
+    create: XOR<ContentNodeCreateWithoutHopePayloadInput, ContentNodeUncheckedCreateWithoutHopePayloadInput>
+    where?: ContentNodeWhereInput
+  }
+
+  export type ContentNodeUpdateToOneWithWhereWithoutHopePayloadInput = {
+    where?: ContentNodeWhereInput
+    data: XOR<ContentNodeUpdateWithoutHopePayloadInput, ContentNodeUncheckedUpdateWithoutHopePayloadInput>
+  }
+
+  export type ContentNodeUpdateWithoutHopePayloadInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    title?: StringFieldUpdateOperationsInput | string
+    slug?: StringFieldUpdateOperationsInput | string
+    contentType?: EnumContentTypeFieldUpdateOperationsInput | $Enums.ContentType
+    role?: EnumContentRoleFieldUpdateOperationsInput | $Enums.ContentRole
+    displayOrder?: IntFieldUpdateOperationsInput | number
+    isPublished?: BoolFieldUpdateOperationsInput | boolean
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    deletedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    deletedBy?: NullableStringFieldUpdateOperationsInput | string | null
+    customIcon?: NullableStringFieldUpdateOperationsInput | string | null
+    iconColor?: NullableStringFieldUpdateOperationsInput | string | null
+    auditLogs?: AuditLogUpdateManyWithoutTargetContentNestedInput
+    codePayload?: CodePayloadUpdateOneWithoutContentNestedInput
+    filePayload?: FilePayloadUpdateOneWithoutContentNestedInput
+    htmlPayload?: HtmlPayloadUpdateOneWithoutContentNestedInput
+    notePayload?: NotePayloadUpdateOneWithoutContentNestedInput
+    folderPayload?: FolderPayloadUpdateOneWithoutContentNestedInput
+    externalPayload?: ExternalPayloadUpdateOneWithoutContentNestedInput
+    chatPayload?: ChatPayloadUpdateOneWithoutContentNestedInput
+    visualizationPayload?: VisualizationPayloadUpdateOneWithoutContentNestedInput
+    dataPayload?: DataPayloadUpdateOneWithoutContentNestedInput
+    workflowPayload?: WorkflowPayloadUpdateOneWithoutContentNestedInput
+    history?: ContentHistoryUpdateManyWithoutContentNestedInput
+    sourceLinks?: ContentLinkUpdateManyWithoutSourceNestedInput
+    targetLinks?: ContentLinkUpdateManyWithoutTargetNestedInput
+    category?: CategoryUpdateOneWithoutContentNodesNestedInput
+    owner?: UserUpdateOneRequiredWithoutContentNodesNestedInput
+    parent?: ContentNodeUpdateOneWithoutChildrenNestedInput
+    children?: ContentNodeUpdateManyWithoutParentNestedInput
+    contentPath?: ContentPathUpdateOneWithoutContentNestedInput
+    contentTags?: ContentTagUpdateManyWithoutContentNestedInput
+    trashBinEntry?: TrashBinUpdateOneWithoutContentNestedInput
+    viewGrants?: ViewGrantUpdateManyWithoutContentNestedInput
+  }
+
+  export type ContentNodeUncheckedUpdateWithoutHopePayloadInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    ownerId?: StringFieldUpdateOperationsInput | string
+    title?: StringFieldUpdateOperationsInput | string
+    slug?: StringFieldUpdateOperationsInput | string
+    contentType?: EnumContentTypeFieldUpdateOperationsInput | $Enums.ContentType
+    role?: EnumContentRoleFieldUpdateOperationsInput | $Enums.ContentRole
+    parentId?: NullableStringFieldUpdateOperationsInput | string | null
+    displayOrder?: IntFieldUpdateOperationsInput | number
+    categoryId?: NullableStringFieldUpdateOperationsInput | string | null
+    isPublished?: BoolFieldUpdateOperationsInput | boolean
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    deletedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    deletedBy?: NullableStringFieldUpdateOperationsInput | string | null
+    customIcon?: NullableStringFieldUpdateOperationsInput | string | null
+    iconColor?: NullableStringFieldUpdateOperationsInput | string | null
+    auditLogs?: AuditLogUncheckedUpdateManyWithoutTargetContentNestedInput
+    codePayload?: CodePayloadUncheckedUpdateOneWithoutContentNestedInput
+    filePayload?: FilePayloadUncheckedUpdateOneWithoutContentNestedInput
+    htmlPayload?: HtmlPayloadUncheckedUpdateOneWithoutContentNestedInput
+    notePayload?: NotePayloadUncheckedUpdateOneWithoutContentNestedInput
+    folderPayload?: FolderPayloadUncheckedUpdateOneWithoutContentNestedInput
+    externalPayload?: ExternalPayloadUncheckedUpdateOneWithoutContentNestedInput
+    chatPayload?: ChatPayloadUncheckedUpdateOneWithoutContentNestedInput
+    visualizationPayload?: VisualizationPayloadUncheckedUpdateOneWithoutContentNestedInput
+    dataPayload?: DataPayloadUncheckedUpdateOneWithoutContentNestedInput
+    workflowPayload?: WorkflowPayloadUncheckedUpdateOneWithoutContentNestedInput
+    history?: ContentHistoryUncheckedUpdateManyWithoutContentNestedInput
+    sourceLinks?: ContentLinkUncheckedUpdateManyWithoutSourceNestedInput
+    targetLinks?: ContentLinkUncheckedUpdateManyWithoutTargetNestedInput
+    children?: ContentNodeUncheckedUpdateManyWithoutParentNestedInput
+    contentPath?: ContentPathUncheckedUpdateOneWithoutContentNestedInput
+    contentTags?: ContentTagUncheckedUpdateManyWithoutContentNestedInput
+    trashBinEntry?: TrashBinUncheckedUpdateOneWithoutContentNestedInput
+    viewGrants?: ViewGrantUncheckedUpdateManyWithoutContentNestedInput
+  }
+
+  export type ContentNodeCreateWithoutWorkflowPayloadInput = {
+    id?: string
+    title: string
+    slug: string
+    contentType: $Enums.ContentType
+    role?: $Enums.ContentRole
+    displayOrder?: number
+    isPublished?: boolean
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    deletedAt?: Date | string | null
+    deletedBy?: string | null
+    customIcon?: string | null
+    iconColor?: string | null
+    auditLogs?: AuditLogCreateNestedManyWithoutTargetContentInput
+    codePayload?: CodePayloadCreateNestedOneWithoutContentInput
+    filePayload?: FilePayloadCreateNestedOneWithoutContentInput
+    htmlPayload?: HtmlPayloadCreateNestedOneWithoutContentInput
+    notePayload?: NotePayloadCreateNestedOneWithoutContentInput
+    folderPayload?: FolderPayloadCreateNestedOneWithoutContentInput
+    externalPayload?: ExternalPayloadCreateNestedOneWithoutContentInput
+    chatPayload?: ChatPayloadCreateNestedOneWithoutContentInput
+    visualizationPayload?: VisualizationPayloadCreateNestedOneWithoutContentInput
+    dataPayload?: DataPayloadCreateNestedOneWithoutContentInput
+    hopePayload?: HopePayloadCreateNestedOneWithoutContentInput
+    history?: ContentHistoryCreateNestedManyWithoutContentInput
+    sourceLinks?: ContentLinkCreateNestedManyWithoutSourceInput
+    targetLinks?: ContentLinkCreateNestedManyWithoutTargetInput
+    category?: CategoryCreateNestedOneWithoutContentNodesInput
+    owner: UserCreateNestedOneWithoutContentNodesInput
+    parent?: ContentNodeCreateNestedOneWithoutChildrenInput
+    children?: ContentNodeCreateNestedManyWithoutParentInput
+    contentPath?: ContentPathCreateNestedOneWithoutContentInput
+    contentTags?: ContentTagCreateNestedManyWithoutContentInput
+    trashBinEntry?: TrashBinCreateNestedOneWithoutContentInput
+    viewGrants?: ViewGrantCreateNestedManyWithoutContentInput
+  }
+
+  export type ContentNodeUncheckedCreateWithoutWorkflowPayloadInput = {
+    id?: string
+    ownerId: string
+    title: string
+    slug: string
+    contentType: $Enums.ContentType
+    role?: $Enums.ContentRole
+    parentId?: string | null
+    displayOrder?: number
+    categoryId?: string | null
+    isPublished?: boolean
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    deletedAt?: Date | string | null
+    deletedBy?: string | null
+    customIcon?: string | null
+    iconColor?: string | null
+    auditLogs?: AuditLogUncheckedCreateNestedManyWithoutTargetContentInput
+    codePayload?: CodePayloadUncheckedCreateNestedOneWithoutContentInput
+    filePayload?: FilePayloadUncheckedCreateNestedOneWithoutContentInput
+    htmlPayload?: HtmlPayloadUncheckedCreateNestedOneWithoutContentInput
+    notePayload?: NotePayloadUncheckedCreateNestedOneWithoutContentInput
+    folderPayload?: FolderPayloadUncheckedCreateNestedOneWithoutContentInput
+    externalPayload?: ExternalPayloadUncheckedCreateNestedOneWithoutContentInput
+    chatPayload?: ChatPayloadUncheckedCreateNestedOneWithoutContentInput
+    visualizationPayload?: VisualizationPayloadUncheckedCreateNestedOneWithoutContentInput
+    dataPayload?: DataPayloadUncheckedCreateNestedOneWithoutContentInput
+    hopePayload?: HopePayloadUncheckedCreateNestedOneWithoutContentInput
+    history?: ContentHistoryUncheckedCreateNestedManyWithoutContentInput
+    sourceLinks?: ContentLinkUncheckedCreateNestedManyWithoutSourceInput
+    targetLinks?: ContentLinkUncheckedCreateNestedManyWithoutTargetInput
+    children?: ContentNodeUncheckedCreateNestedManyWithoutParentInput
+    contentPath?: ContentPathUncheckedCreateNestedOneWithoutContentInput
+    contentTags?: ContentTagUncheckedCreateNestedManyWithoutContentInput
+    trashBinEntry?: TrashBinUncheckedCreateNestedOneWithoutContentInput
+    viewGrants?: ViewGrantUncheckedCreateNestedManyWithoutContentInput
+  }
+
+  export type ContentNodeCreateOrConnectWithoutWorkflowPayloadInput = {
+    where: ContentNodeWhereUniqueInput
+    create: XOR<ContentNodeCreateWithoutWorkflowPayloadInput, ContentNodeUncheckedCreateWithoutWorkflowPayloadInput>
+  }
+
+  export type ContentNodeUpsertWithoutWorkflowPayloadInput = {
+    update: XOR<ContentNodeUpdateWithoutWorkflowPayloadInput, ContentNodeUncheckedUpdateWithoutWorkflowPayloadInput>
+    create: XOR<ContentNodeCreateWithoutWorkflowPayloadInput, ContentNodeUncheckedCreateWithoutWorkflowPayloadInput>
+    where?: ContentNodeWhereInput
+  }
+
+  export type ContentNodeUpdateToOneWithWhereWithoutWorkflowPayloadInput = {
+    where?: ContentNodeWhereInput
+    data: XOR<ContentNodeUpdateWithoutWorkflowPayloadInput, ContentNodeUncheckedUpdateWithoutWorkflowPayloadInput>
+  }
+
+  export type ContentNodeUpdateWithoutWorkflowPayloadInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    title?: StringFieldUpdateOperationsInput | string
+    slug?: StringFieldUpdateOperationsInput | string
+    contentType?: EnumContentTypeFieldUpdateOperationsInput | $Enums.ContentType
+    role?: EnumContentRoleFieldUpdateOperationsInput | $Enums.ContentRole
+    displayOrder?: IntFieldUpdateOperationsInput | number
+    isPublished?: BoolFieldUpdateOperationsInput | boolean
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    deletedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    deletedBy?: NullableStringFieldUpdateOperationsInput | string | null
+    customIcon?: NullableStringFieldUpdateOperationsInput | string | null
+    iconColor?: NullableStringFieldUpdateOperationsInput | string | null
+    auditLogs?: AuditLogUpdateManyWithoutTargetContentNestedInput
+    codePayload?: CodePayloadUpdateOneWithoutContentNestedInput
+    filePayload?: FilePayloadUpdateOneWithoutContentNestedInput
+    htmlPayload?: HtmlPayloadUpdateOneWithoutContentNestedInput
+    notePayload?: NotePayloadUpdateOneWithoutContentNestedInput
+    folderPayload?: FolderPayloadUpdateOneWithoutContentNestedInput
+    externalPayload?: ExternalPayloadUpdateOneWithoutContentNestedInput
+    chatPayload?: ChatPayloadUpdateOneWithoutContentNestedInput
+    visualizationPayload?: VisualizationPayloadUpdateOneWithoutContentNestedInput
+    dataPayload?: DataPayloadUpdateOneWithoutContentNestedInput
+    hopePayload?: HopePayloadUpdateOneWithoutContentNestedInput
+    history?: ContentHistoryUpdateManyWithoutContentNestedInput
+    sourceLinks?: ContentLinkUpdateManyWithoutSourceNestedInput
+    targetLinks?: ContentLinkUpdateManyWithoutTargetNestedInput
+    category?: CategoryUpdateOneWithoutContentNodesNestedInput
+    owner?: UserUpdateOneRequiredWithoutContentNodesNestedInput
+    parent?: ContentNodeUpdateOneWithoutChildrenNestedInput
+    children?: ContentNodeUpdateManyWithoutParentNestedInput
+    contentPath?: ContentPathUpdateOneWithoutContentNestedInput
+    contentTags?: ContentTagUpdateManyWithoutContentNestedInput
+    trashBinEntry?: TrashBinUpdateOneWithoutContentNestedInput
+    viewGrants?: ViewGrantUpdateManyWithoutContentNestedInput
+  }
+
+  export type ContentNodeUncheckedUpdateWithoutWorkflowPayloadInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    ownerId?: StringFieldUpdateOperationsInput | string
+    title?: StringFieldUpdateOperationsInput | string
+    slug?: StringFieldUpdateOperationsInput | string
+    contentType?: EnumContentTypeFieldUpdateOperationsInput | $Enums.ContentType
+    role?: EnumContentRoleFieldUpdateOperationsInput | $Enums.ContentRole
+    parentId?: NullableStringFieldUpdateOperationsInput | string | null
+    displayOrder?: IntFieldUpdateOperationsInput | number
+    categoryId?: NullableStringFieldUpdateOperationsInput | string | null
+    isPublished?: BoolFieldUpdateOperationsInput | boolean
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    deletedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    deletedBy?: NullableStringFieldUpdateOperationsInput | string | null
+    customIcon?: NullableStringFieldUpdateOperationsInput | string | null
+    iconColor?: NullableStringFieldUpdateOperationsInput | string | null
+    auditLogs?: AuditLogUncheckedUpdateManyWithoutTargetContentNestedInput
+    codePayload?: CodePayloadUncheckedUpdateOneWithoutContentNestedInput
+    filePayload?: FilePayloadUncheckedUpdateOneWithoutContentNestedInput
+    htmlPayload?: HtmlPayloadUncheckedUpdateOneWithoutContentNestedInput
+    notePayload?: NotePayloadUncheckedUpdateOneWithoutContentNestedInput
+    folderPayload?: FolderPayloadUncheckedUpdateOneWithoutContentNestedInput
+    externalPayload?: ExternalPayloadUncheckedUpdateOneWithoutContentNestedInput
+    chatPayload?: ChatPayloadUncheckedUpdateOneWithoutContentNestedInput
+    visualizationPayload?: VisualizationPayloadUncheckedUpdateOneWithoutContentNestedInput
+    dataPayload?: DataPayloadUncheckedUpdateOneWithoutContentNestedInput
+    hopePayload?: HopePayloadUncheckedUpdateOneWithoutContentNestedInput
+    history?: ContentHistoryUncheckedUpdateManyWithoutContentNestedInput
+    sourceLinks?: ContentLinkUncheckedUpdateManyWithoutSourceNestedInput
+    targetLinks?: ContentLinkUncheckedUpdateManyWithoutTargetNestedInput
+    children?: ContentNodeUncheckedUpdateManyWithoutParentNestedInput
+    contentPath?: ContentPathUncheckedUpdateOneWithoutContentNestedInput
+    contentTags?: ContentTagUncheckedUpdateManyWithoutContentNestedInput
     trashBinEntry?: TrashBinUncheckedUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUncheckedUpdateManyWithoutContentNestedInput
   }
@@ -34681,6 +46842,8 @@ export namespace Prisma {
     ownerId: string
     title: string
     slug: string
+    contentType: $Enums.ContentType
+    role?: $Enums.ContentRole
     displayOrder?: number
     categoryId?: string | null
     isPublished?: boolean
@@ -34714,8 +46877,8 @@ export namespace Prisma {
     ipAddress?: NullableStringFieldUpdateOperationsInput | string | null
     userAgent?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    user?: UserUpdateOneRequiredWithoutAdminActionsNestedInput
     targetUser?: UserUpdateOneWithoutAuditTargetsNestedInput
+    user?: UserUpdateOneRequiredWithoutAdminActionsNestedInput
   }
 
   export type AuditLogUncheckedUpdateWithoutTargetContentInput = {
@@ -34822,6 +46985,8 @@ export namespace Prisma {
     id?: StringFieldUpdateOperationsInput | string
     title?: StringFieldUpdateOperationsInput | string
     slug?: StringFieldUpdateOperationsInput | string
+    contentType?: EnumContentTypeFieldUpdateOperationsInput | $Enums.ContentType
+    role?: EnumContentRoleFieldUpdateOperationsInput | $Enums.ContentRole
     displayOrder?: IntFieldUpdateOperationsInput | number
     isPublished?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
@@ -34832,6 +46997,16 @@ export namespace Prisma {
     iconColor?: NullableStringFieldUpdateOperationsInput | string | null
     auditLogs?: AuditLogUpdateManyWithoutTargetContentNestedInput
     codePayload?: CodePayloadUpdateOneWithoutContentNestedInput
+    filePayload?: FilePayloadUpdateOneWithoutContentNestedInput
+    htmlPayload?: HtmlPayloadUpdateOneWithoutContentNestedInput
+    notePayload?: NotePayloadUpdateOneWithoutContentNestedInput
+    folderPayload?: FolderPayloadUpdateOneWithoutContentNestedInput
+    externalPayload?: ExternalPayloadUpdateOneWithoutContentNestedInput
+    chatPayload?: ChatPayloadUpdateOneWithoutContentNestedInput
+    visualizationPayload?: VisualizationPayloadUpdateOneWithoutContentNestedInput
+    dataPayload?: DataPayloadUpdateOneWithoutContentNestedInput
+    hopePayload?: HopePayloadUpdateOneWithoutContentNestedInput
+    workflowPayload?: WorkflowPayloadUpdateOneWithoutContentNestedInput
     history?: ContentHistoryUpdateManyWithoutContentNestedInput
     sourceLinks?: ContentLinkUpdateManyWithoutSourceNestedInput
     targetLinks?: ContentLinkUpdateManyWithoutTargetNestedInput
@@ -34840,9 +47015,6 @@ export namespace Prisma {
     children?: ContentNodeUpdateManyWithoutParentNestedInput
     contentPath?: ContentPathUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUpdateManyWithoutContentNestedInput
-    filePayload?: FilePayloadUpdateOneWithoutContentNestedInput
-    htmlPayload?: HtmlPayloadUpdateOneWithoutContentNestedInput
-    notePayload?: NotePayloadUpdateOneWithoutContentNestedInput
     trashBinEntry?: TrashBinUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUpdateManyWithoutContentNestedInput
   }
@@ -34852,6 +47024,8 @@ export namespace Prisma {
     ownerId?: StringFieldUpdateOperationsInput | string
     title?: StringFieldUpdateOperationsInput | string
     slug?: StringFieldUpdateOperationsInput | string
+    contentType?: EnumContentTypeFieldUpdateOperationsInput | $Enums.ContentType
+    role?: EnumContentRoleFieldUpdateOperationsInput | $Enums.ContentRole
     displayOrder?: IntFieldUpdateOperationsInput | number
     categoryId?: NullableStringFieldUpdateOperationsInput | string | null
     isPublished?: BoolFieldUpdateOperationsInput | boolean
@@ -34863,15 +47037,22 @@ export namespace Prisma {
     iconColor?: NullableStringFieldUpdateOperationsInput | string | null
     auditLogs?: AuditLogUncheckedUpdateManyWithoutTargetContentNestedInput
     codePayload?: CodePayloadUncheckedUpdateOneWithoutContentNestedInput
+    filePayload?: FilePayloadUncheckedUpdateOneWithoutContentNestedInput
+    htmlPayload?: HtmlPayloadUncheckedUpdateOneWithoutContentNestedInput
+    notePayload?: NotePayloadUncheckedUpdateOneWithoutContentNestedInput
+    folderPayload?: FolderPayloadUncheckedUpdateOneWithoutContentNestedInput
+    externalPayload?: ExternalPayloadUncheckedUpdateOneWithoutContentNestedInput
+    chatPayload?: ChatPayloadUncheckedUpdateOneWithoutContentNestedInput
+    visualizationPayload?: VisualizationPayloadUncheckedUpdateOneWithoutContentNestedInput
+    dataPayload?: DataPayloadUncheckedUpdateOneWithoutContentNestedInput
+    hopePayload?: HopePayloadUncheckedUpdateOneWithoutContentNestedInput
+    workflowPayload?: WorkflowPayloadUncheckedUpdateOneWithoutContentNestedInput
     history?: ContentHistoryUncheckedUpdateManyWithoutContentNestedInput
     sourceLinks?: ContentLinkUncheckedUpdateManyWithoutSourceNestedInput
     targetLinks?: ContentLinkUncheckedUpdateManyWithoutTargetNestedInput
     children?: ContentNodeUncheckedUpdateManyWithoutParentNestedInput
     contentPath?: ContentPathUncheckedUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUncheckedUpdateManyWithoutContentNestedInput
-    filePayload?: FilePayloadUncheckedUpdateOneWithoutContentNestedInput
-    htmlPayload?: HtmlPayloadUncheckedUpdateOneWithoutContentNestedInput
-    notePayload?: NotePayloadUncheckedUpdateOneWithoutContentNestedInput
     trashBinEntry?: TrashBinUncheckedUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUncheckedUpdateManyWithoutContentNestedInput
   }
@@ -34881,6 +47062,8 @@ export namespace Prisma {
     ownerId?: StringFieldUpdateOperationsInput | string
     title?: StringFieldUpdateOperationsInput | string
     slug?: StringFieldUpdateOperationsInput | string
+    contentType?: EnumContentTypeFieldUpdateOperationsInput | $Enums.ContentType
+    role?: EnumContentRoleFieldUpdateOperationsInput | $Enums.ContentRole
     displayOrder?: IntFieldUpdateOperationsInput | number
     categoryId?: NullableStringFieldUpdateOperationsInput | string | null
     isPublished?: BoolFieldUpdateOperationsInput | boolean
@@ -34947,10 +47130,10 @@ export namespace Prisma {
     createdAt?: Date | string
   }
 
-  export type AuditLogCreateManyUserInput = {
+  export type AuditLogCreateManyTargetUserInput = {
     id?: string
+    userId: string
     action: string
-    targetUserId?: string | null
     targetContentId?: string | null
     details?: JsonNullValueInput | InputJsonValue
     ipAddress?: string | null
@@ -34958,10 +47141,10 @@ export namespace Prisma {
     createdAt?: Date | string
   }
 
-  export type AuditLogCreateManyTargetUserInput = {
+  export type AuditLogCreateManyUserInput = {
     id?: string
-    userId: string
     action: string
+    targetUserId?: string | null
     targetContentId?: string | null
     details?: JsonNullValueInput | InputJsonValue
     ipAddress?: string | null
@@ -34992,6 +47175,8 @@ export namespace Prisma {
     id?: string
     title: string
     slug: string
+    contentType: $Enums.ContentType
+    role?: $Enums.ContentRole
     parentId?: string | null
     displayOrder?: number
     categoryId?: string | null
@@ -35078,39 +47263,6 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
-  export type AuditLogUpdateWithoutUserInput = {
-    id?: StringFieldUpdateOperationsInput | string
-    action?: StringFieldUpdateOperationsInput | string
-    details?: JsonNullValueInput | InputJsonValue
-    ipAddress?: NullableStringFieldUpdateOperationsInput | string | null
-    userAgent?: NullableStringFieldUpdateOperationsInput | string | null
-    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    targetUser?: UserUpdateOneWithoutAuditTargetsNestedInput
-    targetContent?: ContentNodeUpdateOneWithoutAuditLogsNestedInput
-  }
-
-  export type AuditLogUncheckedUpdateWithoutUserInput = {
-    id?: StringFieldUpdateOperationsInput | string
-    action?: StringFieldUpdateOperationsInput | string
-    targetUserId?: NullableStringFieldUpdateOperationsInput | string | null
-    targetContentId?: NullableStringFieldUpdateOperationsInput | string | null
-    details?: JsonNullValueInput | InputJsonValue
-    ipAddress?: NullableStringFieldUpdateOperationsInput | string | null
-    userAgent?: NullableStringFieldUpdateOperationsInput | string | null
-    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
-  }
-
-  export type AuditLogUncheckedUpdateManyWithoutUserInput = {
-    id?: StringFieldUpdateOperationsInput | string
-    action?: StringFieldUpdateOperationsInput | string
-    targetUserId?: NullableStringFieldUpdateOperationsInput | string | null
-    targetContentId?: NullableStringFieldUpdateOperationsInput | string | null
-    details?: JsonNullValueInput | InputJsonValue
-    ipAddress?: NullableStringFieldUpdateOperationsInput | string | null
-    userAgent?: NullableStringFieldUpdateOperationsInput | string | null
-    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
-  }
-
   export type AuditLogUpdateWithoutTargetUserInput = {
     id?: StringFieldUpdateOperationsInput | string
     action?: StringFieldUpdateOperationsInput | string
@@ -35118,8 +47270,8 @@ export namespace Prisma {
     ipAddress?: NullableStringFieldUpdateOperationsInput | string | null
     userAgent?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    user?: UserUpdateOneRequiredWithoutAdminActionsNestedInput
     targetContent?: ContentNodeUpdateOneWithoutAuditLogsNestedInput
+    user?: UserUpdateOneRequiredWithoutAdminActionsNestedInput
   }
 
   export type AuditLogUncheckedUpdateWithoutTargetUserInput = {
@@ -35137,6 +47289,39 @@ export namespace Prisma {
     id?: StringFieldUpdateOperationsInput | string
     userId?: StringFieldUpdateOperationsInput | string
     action?: StringFieldUpdateOperationsInput | string
+    targetContentId?: NullableStringFieldUpdateOperationsInput | string | null
+    details?: JsonNullValueInput | InputJsonValue
+    ipAddress?: NullableStringFieldUpdateOperationsInput | string | null
+    userAgent?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type AuditLogUpdateWithoutUserInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    action?: StringFieldUpdateOperationsInput | string
+    details?: JsonNullValueInput | InputJsonValue
+    ipAddress?: NullableStringFieldUpdateOperationsInput | string | null
+    userAgent?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    targetContent?: ContentNodeUpdateOneWithoutAuditLogsNestedInput
+    targetUser?: UserUpdateOneWithoutAuditTargetsNestedInput
+  }
+
+  export type AuditLogUncheckedUpdateWithoutUserInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    action?: StringFieldUpdateOperationsInput | string
+    targetUserId?: NullableStringFieldUpdateOperationsInput | string | null
+    targetContentId?: NullableStringFieldUpdateOperationsInput | string | null
+    details?: JsonNullValueInput | InputJsonValue
+    ipAddress?: NullableStringFieldUpdateOperationsInput | string | null
+    userAgent?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type AuditLogUncheckedUpdateManyWithoutUserInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    action?: StringFieldUpdateOperationsInput | string
+    targetUserId?: NullableStringFieldUpdateOperationsInput | string | null
     targetContentId?: NullableStringFieldUpdateOperationsInput | string | null
     details?: JsonNullValueInput | InputJsonValue
     ipAddress?: NullableStringFieldUpdateOperationsInput | string | null
@@ -35207,6 +47392,8 @@ export namespace Prisma {
     id?: StringFieldUpdateOperationsInput | string
     title?: StringFieldUpdateOperationsInput | string
     slug?: StringFieldUpdateOperationsInput | string
+    contentType?: EnumContentTypeFieldUpdateOperationsInput | $Enums.ContentType
+    role?: EnumContentRoleFieldUpdateOperationsInput | $Enums.ContentRole
     displayOrder?: IntFieldUpdateOperationsInput | number
     isPublished?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
@@ -35217,6 +47404,16 @@ export namespace Prisma {
     iconColor?: NullableStringFieldUpdateOperationsInput | string | null
     auditLogs?: AuditLogUpdateManyWithoutTargetContentNestedInput
     codePayload?: CodePayloadUpdateOneWithoutContentNestedInput
+    filePayload?: FilePayloadUpdateOneWithoutContentNestedInput
+    htmlPayload?: HtmlPayloadUpdateOneWithoutContentNestedInput
+    notePayload?: NotePayloadUpdateOneWithoutContentNestedInput
+    folderPayload?: FolderPayloadUpdateOneWithoutContentNestedInput
+    externalPayload?: ExternalPayloadUpdateOneWithoutContentNestedInput
+    chatPayload?: ChatPayloadUpdateOneWithoutContentNestedInput
+    visualizationPayload?: VisualizationPayloadUpdateOneWithoutContentNestedInput
+    dataPayload?: DataPayloadUpdateOneWithoutContentNestedInput
+    hopePayload?: HopePayloadUpdateOneWithoutContentNestedInput
+    workflowPayload?: WorkflowPayloadUpdateOneWithoutContentNestedInput
     history?: ContentHistoryUpdateManyWithoutContentNestedInput
     sourceLinks?: ContentLinkUpdateManyWithoutSourceNestedInput
     targetLinks?: ContentLinkUpdateManyWithoutTargetNestedInput
@@ -35225,9 +47422,6 @@ export namespace Prisma {
     children?: ContentNodeUpdateManyWithoutParentNestedInput
     contentPath?: ContentPathUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUpdateManyWithoutContentNestedInput
-    filePayload?: FilePayloadUpdateOneWithoutContentNestedInput
-    htmlPayload?: HtmlPayloadUpdateOneWithoutContentNestedInput
-    notePayload?: NotePayloadUpdateOneWithoutContentNestedInput
     trashBinEntry?: TrashBinUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUpdateManyWithoutContentNestedInput
   }
@@ -35236,6 +47430,8 @@ export namespace Prisma {
     id?: StringFieldUpdateOperationsInput | string
     title?: StringFieldUpdateOperationsInput | string
     slug?: StringFieldUpdateOperationsInput | string
+    contentType?: EnumContentTypeFieldUpdateOperationsInput | $Enums.ContentType
+    role?: EnumContentRoleFieldUpdateOperationsInput | $Enums.ContentRole
     parentId?: NullableStringFieldUpdateOperationsInput | string | null
     displayOrder?: IntFieldUpdateOperationsInput | number
     categoryId?: NullableStringFieldUpdateOperationsInput | string | null
@@ -35248,15 +47444,22 @@ export namespace Prisma {
     iconColor?: NullableStringFieldUpdateOperationsInput | string | null
     auditLogs?: AuditLogUncheckedUpdateManyWithoutTargetContentNestedInput
     codePayload?: CodePayloadUncheckedUpdateOneWithoutContentNestedInput
+    filePayload?: FilePayloadUncheckedUpdateOneWithoutContentNestedInput
+    htmlPayload?: HtmlPayloadUncheckedUpdateOneWithoutContentNestedInput
+    notePayload?: NotePayloadUncheckedUpdateOneWithoutContentNestedInput
+    folderPayload?: FolderPayloadUncheckedUpdateOneWithoutContentNestedInput
+    externalPayload?: ExternalPayloadUncheckedUpdateOneWithoutContentNestedInput
+    chatPayload?: ChatPayloadUncheckedUpdateOneWithoutContentNestedInput
+    visualizationPayload?: VisualizationPayloadUncheckedUpdateOneWithoutContentNestedInput
+    dataPayload?: DataPayloadUncheckedUpdateOneWithoutContentNestedInput
+    hopePayload?: HopePayloadUncheckedUpdateOneWithoutContentNestedInput
+    workflowPayload?: WorkflowPayloadUncheckedUpdateOneWithoutContentNestedInput
     history?: ContentHistoryUncheckedUpdateManyWithoutContentNestedInput
     sourceLinks?: ContentLinkUncheckedUpdateManyWithoutSourceNestedInput
     targetLinks?: ContentLinkUncheckedUpdateManyWithoutTargetNestedInput
     children?: ContentNodeUncheckedUpdateManyWithoutParentNestedInput
     contentPath?: ContentPathUncheckedUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUncheckedUpdateManyWithoutContentNestedInput
-    filePayload?: FilePayloadUncheckedUpdateOneWithoutContentNestedInput
-    htmlPayload?: HtmlPayloadUncheckedUpdateOneWithoutContentNestedInput
-    notePayload?: NotePayloadUncheckedUpdateOneWithoutContentNestedInput
     trashBinEntry?: TrashBinUncheckedUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUncheckedUpdateManyWithoutContentNestedInput
   }
@@ -35265,6 +47468,8 @@ export namespace Prisma {
     id?: StringFieldUpdateOperationsInput | string
     title?: StringFieldUpdateOperationsInput | string
     slug?: StringFieldUpdateOperationsInput | string
+    contentType?: EnumContentTypeFieldUpdateOperationsInput | $Enums.ContentType
+    role?: EnumContentRoleFieldUpdateOperationsInput | $Enums.ContentRole
     parentId?: NullableStringFieldUpdateOperationsInput | string | null
     displayOrder?: IntFieldUpdateOperationsInput | number
     categoryId?: NullableStringFieldUpdateOperationsInput | string | null
@@ -35416,6 +47621,8 @@ export namespace Prisma {
     ownerId: string
     title: string
     slug: string
+    contentType: $Enums.ContentType
+    role?: $Enums.ContentRole
     parentId?: string | null
     displayOrder?: number
     isPublished?: boolean
@@ -35431,6 +47638,8 @@ export namespace Prisma {
     id?: StringFieldUpdateOperationsInput | string
     title?: StringFieldUpdateOperationsInput | string
     slug?: StringFieldUpdateOperationsInput | string
+    contentType?: EnumContentTypeFieldUpdateOperationsInput | $Enums.ContentType
+    role?: EnumContentRoleFieldUpdateOperationsInput | $Enums.ContentRole
     displayOrder?: IntFieldUpdateOperationsInput | number
     isPublished?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
@@ -35441,6 +47650,16 @@ export namespace Prisma {
     iconColor?: NullableStringFieldUpdateOperationsInput | string | null
     auditLogs?: AuditLogUpdateManyWithoutTargetContentNestedInput
     codePayload?: CodePayloadUpdateOneWithoutContentNestedInput
+    filePayload?: FilePayloadUpdateOneWithoutContentNestedInput
+    htmlPayload?: HtmlPayloadUpdateOneWithoutContentNestedInput
+    notePayload?: NotePayloadUpdateOneWithoutContentNestedInput
+    folderPayload?: FolderPayloadUpdateOneWithoutContentNestedInput
+    externalPayload?: ExternalPayloadUpdateOneWithoutContentNestedInput
+    chatPayload?: ChatPayloadUpdateOneWithoutContentNestedInput
+    visualizationPayload?: VisualizationPayloadUpdateOneWithoutContentNestedInput
+    dataPayload?: DataPayloadUpdateOneWithoutContentNestedInput
+    hopePayload?: HopePayloadUpdateOneWithoutContentNestedInput
+    workflowPayload?: WorkflowPayloadUpdateOneWithoutContentNestedInput
     history?: ContentHistoryUpdateManyWithoutContentNestedInput
     sourceLinks?: ContentLinkUpdateManyWithoutSourceNestedInput
     targetLinks?: ContentLinkUpdateManyWithoutTargetNestedInput
@@ -35449,9 +47668,6 @@ export namespace Prisma {
     children?: ContentNodeUpdateManyWithoutParentNestedInput
     contentPath?: ContentPathUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUpdateManyWithoutContentNestedInput
-    filePayload?: FilePayloadUpdateOneWithoutContentNestedInput
-    htmlPayload?: HtmlPayloadUpdateOneWithoutContentNestedInput
-    notePayload?: NotePayloadUpdateOneWithoutContentNestedInput
     trashBinEntry?: TrashBinUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUpdateManyWithoutContentNestedInput
   }
@@ -35461,6 +47677,8 @@ export namespace Prisma {
     ownerId?: StringFieldUpdateOperationsInput | string
     title?: StringFieldUpdateOperationsInput | string
     slug?: StringFieldUpdateOperationsInput | string
+    contentType?: EnumContentTypeFieldUpdateOperationsInput | $Enums.ContentType
+    role?: EnumContentRoleFieldUpdateOperationsInput | $Enums.ContentRole
     parentId?: NullableStringFieldUpdateOperationsInput | string | null
     displayOrder?: IntFieldUpdateOperationsInput | number
     isPublished?: BoolFieldUpdateOperationsInput | boolean
@@ -35472,15 +47690,22 @@ export namespace Prisma {
     iconColor?: NullableStringFieldUpdateOperationsInput | string | null
     auditLogs?: AuditLogUncheckedUpdateManyWithoutTargetContentNestedInput
     codePayload?: CodePayloadUncheckedUpdateOneWithoutContentNestedInput
+    filePayload?: FilePayloadUncheckedUpdateOneWithoutContentNestedInput
+    htmlPayload?: HtmlPayloadUncheckedUpdateOneWithoutContentNestedInput
+    notePayload?: NotePayloadUncheckedUpdateOneWithoutContentNestedInput
+    folderPayload?: FolderPayloadUncheckedUpdateOneWithoutContentNestedInput
+    externalPayload?: ExternalPayloadUncheckedUpdateOneWithoutContentNestedInput
+    chatPayload?: ChatPayloadUncheckedUpdateOneWithoutContentNestedInput
+    visualizationPayload?: VisualizationPayloadUncheckedUpdateOneWithoutContentNestedInput
+    dataPayload?: DataPayloadUncheckedUpdateOneWithoutContentNestedInput
+    hopePayload?: HopePayloadUncheckedUpdateOneWithoutContentNestedInput
+    workflowPayload?: WorkflowPayloadUncheckedUpdateOneWithoutContentNestedInput
     history?: ContentHistoryUncheckedUpdateManyWithoutContentNestedInput
     sourceLinks?: ContentLinkUncheckedUpdateManyWithoutSourceNestedInput
     targetLinks?: ContentLinkUncheckedUpdateManyWithoutTargetNestedInput
     children?: ContentNodeUncheckedUpdateManyWithoutParentNestedInput
     contentPath?: ContentPathUncheckedUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUncheckedUpdateManyWithoutContentNestedInput
-    filePayload?: FilePayloadUncheckedUpdateOneWithoutContentNestedInput
-    htmlPayload?: HtmlPayloadUncheckedUpdateOneWithoutContentNestedInput
-    notePayload?: NotePayloadUncheckedUpdateOneWithoutContentNestedInput
     trashBinEntry?: TrashBinUncheckedUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUncheckedUpdateManyWithoutContentNestedInput
   }
@@ -35490,6 +47715,8 @@ export namespace Prisma {
     ownerId?: StringFieldUpdateOperationsInput | string
     title?: StringFieldUpdateOperationsInput | string
     slug?: StringFieldUpdateOperationsInput | string
+    contentType?: EnumContentTypeFieldUpdateOperationsInput | $Enums.ContentType
+    role?: EnumContentRoleFieldUpdateOperationsInput | $Enums.ContentRole
     parentId?: NullableStringFieldUpdateOperationsInput | string | null
     displayOrder?: IntFieldUpdateOperationsInput | number
     isPublished?: BoolFieldUpdateOperationsInput | boolean

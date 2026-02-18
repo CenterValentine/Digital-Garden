@@ -9,7 +9,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/database/client";
 import { requireAuth } from "@/lib/infrastructure/auth/middleware";
 import {
-  deriveContentType,
   generateUniqueSlug,
   extractSearchTextFromTipTap,
   extractSearchTextFromHtml,
@@ -18,6 +17,7 @@ import {
   CONTENT_WITH_PAYLOADS,
 } from "@/lib/domain/content";
 import type { JSONContent } from "@tiptap/core";
+import type { ContentType } from "@/lib/database/generated/prisma";
 import type {
   ContentWhereInput,
   ContentListItem,
@@ -62,25 +62,9 @@ export async function GET(request: NextRequest) {
       whereClause.parentId = parentId === "null" ? null : parentId;
     }
 
-    // Type filtering (by payload presence)
+    // Type filtering (by contentType field)
     if (type !== "all") {
-      if (type === "note") {
-        whereClause.notePayload = { isNot: null };
-      } else if (type === "file") {
-        whereClause.filePayload = { isNot: null };
-      } else if (type === "html") {
-        whereClause.htmlPayload = { isNot: null, is: { isTemplate: false } };
-      } else if (type === "template") {
-        whereClause.htmlPayload = { isNot: null, is: { isTemplate: true } };
-      } else if (type === "code") {
-        whereClause.codePayload = { isNot: null };
-      } else if (type === "folder") {
-        // Folder: no payload
-        whereClause.notePayload = null;
-        whereClause.filePayload = null;
-        whereClause.htmlPayload = null;
-        whereClause.codePayload = null;
-      }
+      whereClause.contentType = type as ContentType;
     }
 
     // Search filtering
@@ -126,6 +110,13 @@ export async function GET(request: NextRequest) {
       prisma.contentNode.findMany({
         where: whereClause,
         include: {
+          folderPayload: {
+            select: {
+              viewMode: true,
+              sortMode: true,
+              includeReferencedContent: true,
+            },
+          },
           notePayload: {
             select: {
               metadata: true,
@@ -138,6 +129,7 @@ export async function GET(request: NextRequest) {
               mimeType: true,
               fileSize: true,
               uploadStatus: true,
+              storageUrl: true,
               thumbnailUrl: true,
               width: true,
               height: true,
@@ -170,8 +162,6 @@ export async function GET(request: NextRequest) {
 
     // Format response
     const formattedItems: ContentListItem[] = items.map((item) => {
-      const contentType = deriveContentType(item as any);
-
       const formatted: ContentListItem = {
         id: item.id,
         ownerId: item.ownerId,
@@ -186,10 +176,17 @@ export async function GET(request: NextRequest) {
         deletedAt: item.deletedAt,
         customIcon: item.customIcon,
         iconColor: item.iconColor,
-        contentType,
+        contentType: item.contentType,
       };
 
       // Add payload summaries
+      if (item.folderPayload) {
+        formatted.folder = {
+          viewMode: item.folderPayload.viewMode,
+          sortMode: item.folderPayload.sortMode,
+          includeReferencedContent: item.folderPayload.includeReferencedContent,
+        };
+      }
       if (item.notePayload) {
         formatted.note = {
           ...(item.notePayload.metadata as any),
@@ -202,6 +199,7 @@ export async function GET(request: NextRequest) {
           mimeType: item.filePayload.mimeType,
           fileSize: item.filePayload.fileSize.toString(),
           uploadStatus: item.filePayload.uploadStatus,
+          url: item.filePayload.storageUrl,
           thumbnailUrl: item.filePayload.thumbnailUrl,
           width: item.filePayload.width,
           height: item.filePayload.height,
@@ -220,7 +218,7 @@ export async function GET(request: NextRequest) {
         } as any;
       }
 
-      if (contentType === "folder") {
+      if (item.contentType === "folder") {
         formatted.childCount = item._count.children;
       }
 
@@ -271,9 +269,17 @@ export async function POST(request: NextRequest) {
       templateMetadata,
       code,
       language,
+      url,
+      subtype,
+      engine,
+      chartConfig,
+      chartData,
       isFolder,
       customIcon,
       iconColor,
+      viewMode,
+      sortMode,
+      includeReferencedContent,
     } = body;
 
     // Validation
@@ -340,12 +346,24 @@ export async function POST(request: NextRequest) {
     const slug = await generateUniqueSlug(title, session.user.id);
 
     // Determine content type and prepare payload data
-    let payloadData: CreatePayloadData = {};
+    let contentType: ContentType;
+    let payloadData: CreatePayloadData;
 
     if (isFolder) {
-      // Folder: no payload
-      payloadData = {};
+      // Folder: create FolderPayload with view configuration
+      contentType = "folder";
+      payloadData = {
+        folderPayload: {
+          create: {
+            viewMode: viewMode || "list",
+            sortMode: sortMode !== undefined ? sortMode : null,
+            viewPrefs: {},
+            includeReferencedContent: includeReferencedContent ?? false,
+          },
+        },
+      };
     } else if (tiptapJson || markdown) {
+      contentType = "note";
       // Note payload
       const json: JSONContent = markdown
         ? markdownToTiptap(markdown)
@@ -370,6 +388,7 @@ export async function POST(request: NextRequest) {
       };
     } else if (html !== undefined) {
       // HTML payload
+      contentType = isTemplate ? "template" : "html";
       const searchText = extractSearchTextFromHtml(html);
 
       payloadData = {
@@ -387,6 +406,7 @@ export async function POST(request: NextRequest) {
       };
     } else if (code !== undefined) {
       // Code payload
+      contentType = "code";
       const searchText = extractSearchTextFromCode(code, language || "text");
 
       payloadData = {
@@ -399,6 +419,32 @@ export async function POST(request: NextRequest) {
           },
         },
       };
+    } else if (url !== undefined) {
+      // External payload (Phase 2)
+      contentType = "external";
+
+      payloadData = {
+        externalPayload: {
+          create: {
+            url,
+            subtype: subtype || "website",
+            preview: {}, // Will be populated by preview fetch
+          },
+        },
+      };
+    } else if (engine !== undefined) {
+      // Visualization payload
+      contentType = "visualization";
+
+      payloadData = {
+        visualizationPayload: {
+          create: {
+            engine,
+            config: chartConfig || {},
+            data: chartData || {},
+          },
+        },
+      } as CreatePayloadData;
     } else {
       return NextResponse.json(
         {
@@ -406,7 +452,7 @@ export async function POST(request: NextRequest) {
           error: {
             code: "VALIDATION_ERROR",
             message:
-              "Must specify one of: isFolder, tiptapJson, markdown, html, or code",
+              "Must specify one of: isFolder, tiptapJson, markdown, html, code, url, or engine",
           },
         },
         { status: 400 }
@@ -419,6 +465,7 @@ export async function POST(request: NextRequest) {
         ownerId: session.user.id,
         title,
         slug,
+        contentType,
         parentId: parentId || null,
         categoryId: categoryId || null,
         customIcon: customIcon || null,
@@ -429,7 +476,6 @@ export async function POST(request: NextRequest) {
     });
 
     // Format response
-    const contentType = deriveContentType(content as any);
     const response: ContentDetailResponse = {
       id: content.id,
       ownerId: content.ownerId,
@@ -441,13 +487,21 @@ export async function POST(request: NextRequest) {
       isPublished: content.isPublished,
       customIcon: content.customIcon,
       iconColor: content.iconColor,
-      contentType,
+      contentType: content.contentType,
       createdAt: content.createdAt,
       updatedAt: content.updatedAt,
       deletedAt: content.deletedAt,
     };
 
     // Add full payload data in response
+    if (content.folderPayload) {
+      response.folder = {
+        viewMode: content.folderPayload.viewMode,
+        sortMode: content.folderPayload.sortMode,
+        viewPrefs: content.folderPayload.viewPrefs as any,
+        includeReferencedContent: content.folderPayload.includeReferencedContent,
+      };
+    }
     if (content.notePayload) {
       response.note = {
         tiptapJson: content.notePayload.tiptapJson as any,
@@ -470,6 +524,13 @@ export async function POST(request: NextRequest) {
         code: content.codePayload.code,
         language: content.codePayload.language,
         metadata: content.codePayload.metadata as any,
+      };
+    }
+    if (content.externalPayload) {
+      response.external = {
+        url: content.externalPayload.url,
+        subtype: content.externalPayload.subtype || "website",
+        preview: content.externalPayload.preview as any,
       };
     }
 

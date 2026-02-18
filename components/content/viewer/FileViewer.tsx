@@ -389,7 +389,7 @@ export function FileViewer({ contentId, title }: FileViewerProps) {
       )}
 
       {/* File content/preview */}
-      <div className="flex-1 overflow-hidden">{renderFileContent()}</div>
+      <div className="flex-1 overflow-auto">{renderFileContent()}</div>
     </div>
   );
 }

@@ -3,23 +3,39 @@
  *
  * Shows editor for selected note or welcome screen.
  * M5: TipTap editor integration with auto-save.
+ * M9: Debug panel for TipTap document inspection (development mode only)
  */
 
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
+import { Allotment } from "allotment";
 import { useContentStore } from "@/state/content-store";
 import { useEditorStatsStore } from "@/state/editor-stats-store";
 import { useOutlineStore } from "@/state/outline-store";
+import { useDebugViewStore } from "@/state/debug-view-store";
 import { MarkdownEditor } from "../editor/MarkdownEditor";
 import { FileViewer } from "../viewer/FileViewer";
+import { FolderViewer } from "../viewer/FolderViewer";
+import { ExternalViewer } from "../viewer/ExternalViewer";
+import { ChatViewer } from "../viewer/ChatViewer";
+import { VisualizationViewer } from "../viewer/VisualizationViewer";
+import { DataViewer } from "../viewer/DataViewer";
+import { HopeViewer } from "../viewer/HopeViewer";
+import { WorkflowViewer } from "../viewer/WorkflowViewer";
+import { MainPanelNavigation } from "../MainPanelNavigation";
+import { DebugViewToggle } from "../viewer/DebugViewToggle";
+import { JSONDebugView } from "../viewer/debug/JSONDebugView";
+import { TreeDebugView } from "../viewer/debug/TreeDebugView";
+import { MarkdownDebugView } from "../viewer/debug/MarkdownDebugView";
+import { MetadataDebugView } from "../viewer/debug/MetadataDebugView";
 import type { JSONContent } from "@tiptap/core";
 import type { EditorStats } from "../editor/MarkdownEditor";
 import type { OutlineHeading } from "@/lib/domain/content/outline-extractor";
 import { extractOutline } from "@/lib/domain/content/outline-extractor";
 
-interface NoteResponse {
+interface ContentResponse {
   success: boolean;
   data: {
     id: string;
@@ -30,6 +46,40 @@ interface NoteResponse {
       tiptapJson: any; // Prisma Json type
       searchText: string;
       metadata: Record<string, unknown>;
+    };
+    folder?: {
+      viewMode: string;
+      sortMode: string | null;
+      viewPrefs: Record<string, unknown>;
+      includeReferencedContent: boolean;
+    };
+    external?: {
+      url: string;
+      subtype: string | null;
+      preview: Record<string, unknown>;
+    };
+    chat?: {
+      messages: Array<{ role: string; content: string; timestamp: string }>;
+    };
+    visualization?: {
+      engine: string;
+      config: Record<string, unknown>;
+      data: Record<string, unknown>;
+    };
+    data?: {
+      mode: string;
+      source: Record<string, unknown>;
+      schema: Record<string, unknown>;
+    };
+    hope?: {
+      kind: string;
+      status: string;
+      description: string | null;
+    };
+    workflow?: {
+      engine: string;
+      definition: Record<string, unknown>;
+      enabled: boolean;
     };
   };
   error?: {
@@ -44,9 +94,11 @@ export function MainPanelContent() {
   const clearSelection = useContentStore((state) => state.clearSelection);
   const { setStats, setLastSaved, setIsSaving, setHasUnsavedChanges, reset: resetStats } = useEditorStatsStore();
   const { setOutline, clearOutline } = useOutlineStore();
+  const { isDebugPanelVisible, toggleDebugPanel, viewMode } = useDebugViewStore();
   const [noteContent, setNoteContent] = useState<JSONContent | null>(null);
   const [noteTitle, setNoteTitle] = useState<string>("");
   const [contentType, setContentType] = useState<string | null>(null);
+  const [contentData, setContentData] = useState<any>(null); // Phase 2: Store payload data
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0); // Used to force refetch
@@ -80,6 +132,7 @@ export function MainPanelContent() {
     if (!selectedContentId) {
       setNoteContent(null);
       setNoteTitle("");
+      setContentData(null); // Clear Phase 2 payload data
       resetStats(); // Reset stats when no note selected
       clearOutline(); // Clear outline when no note selected
       return;
@@ -114,7 +167,7 @@ export function MainPanelContent() {
           return;
         }
 
-        const result: NoteResponse = await response.json();
+        const result: ContentResponse = await response.json();
         console.log('API Response data:', result);
         console.log('Content type:', result.data?.contentType);
         console.log('Has note payload?', !!result.data?.note);
@@ -127,6 +180,33 @@ export function MainPanelContent() {
 
         setNoteTitle(result.data.title);
         setContentType(result.data.contentType);
+
+        // Store payload data for Phase 2 content types
+        switch (result.data.contentType) {
+          case "folder":
+            setContentData(result.data.folder);
+            break;
+          case "external":
+            setContentData(result.data.external);
+            break;
+          case "chat":
+            setContentData(result.data.chat);
+            break;
+          case "visualization":
+            setContentData(result.data.visualization);
+            break;
+          case "data":
+            setContentData(result.data.data);
+            break;
+          case "hope":
+            setContentData(result.data.hope);
+            break;
+          case "workflow":
+            setContentData(result.data.workflow);
+            break;
+          default:
+            setContentData(null);
+        }
 
         // Load note content (or empty document if no payload)
         if (result.data.note?.tiptapJson) {
@@ -427,6 +507,23 @@ export function MainPanelContent() {
     []
   );
 
+  // Debug panel keyboard shortcut (Cmd+Shift+D)
+  useEffect(() => {
+    // Only in development mode
+    if (process.env.NODE_ENV !== "development") return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Cmd+Shift+D (Mac) or Ctrl+Shift+D (Windows/Linux)
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === "D") {
+        e.preventDefault();
+        toggleDebugPanel();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [toggleDebugPanel]);
+
   // Welcome screen when no note selected
   if (!selectedContentId) {
     return (
@@ -447,9 +544,11 @@ export function MainPanelContent() {
     );
   }
 
-  // Error state
+  // Render content based on type
+  let contentElement: React.ReactNode;
+
   if (error) {
-    return (
+    contentElement = (
       <div className="flex-1 flex items-center justify-center">
         <div className="text-center">
           <div className="text-sm text-red-400 mb-2">Failed to load content</div>
@@ -457,20 +556,99 @@ export function MainPanelContent() {
         </div>
       </div>
     );
+  } else if (contentType === "file" && selectedContentId) {
+    contentElement = <FileViewer contentId={selectedContentId} title={noteTitle} />;
   }
 
-  // File viewer for uploaded files
-  if (contentType === "file" && selectedContentId) {
-    return <FileViewer contentId={selectedContentId} title={noteTitle} />;
-  }
+  else if (contentType === "folder" && selectedContentId) {
+    contentElement = (
+      <FolderViewer
+        contentId={selectedContentId}
+        title={noteTitle}
+        viewMode={contentData?.viewMode || "list"}
+        sortMode={contentData?.sortMode || null}
+        viewPrefs={contentData?.viewPrefs || {}}
+        includeReferencedContent={contentData?.includeReferencedContent || false}
+      />
+    );
+  } else if (contentType === "external" && contentData) {
+    contentElement = (
+      <ExternalViewer
+        contentId={selectedContentId}
+        title={noteTitle}
+        url={contentData.url}
+        subtype={contentData.subtype}
+        preview={contentData.preview}
+      />
+    );
+  } else if (contentType === "chat") {
+    contentElement = (
+      <ChatViewer
+        title={noteTitle}
+        messages={contentData?.messages || []}
+      />
+    );
+  } else if (contentType === "visualization") {
+    contentElement = (
+      <VisualizationViewer
+        contentId={selectedContentId}
+        title={noteTitle}
+        engine={contentData?.engine}
+        config={contentData?.config}
+        data={contentData?.data}
+      />
+    );
+  } else if (contentType === "data") {
+    contentElement = (
+      <DataViewer
+        title={noteTitle}
+        mode={contentData?.mode}
+        source={contentData?.source}
+        schema={contentData?.schema}
+      />
+    );
+  } else if (contentType === "hope") {
+    contentElement = (
+      <HopeViewer
+        title={noteTitle}
+        kind={contentData?.kind}
+        status={contentData?.status}
+        description={contentData?.description}
+      />
+    );
+  } else if (contentType === "workflow") {
+    contentElement = (
+      <WorkflowViewer
+        title={noteTitle}
+        engine={contentData?.engine}
+        definition={contentData?.definition}
+        enabled={contentData?.enabled}
+      />
+    );
+  } else if (noteContent) {
+    // Render debug view based on selected mode
+    const renderDebugView = () => {
+      switch (viewMode) {
+        case "json":
+          return <JSONDebugView content={noteContent} title={noteTitle} />;
+        case "tree":
+          return <TreeDebugView content={noteContent} title={noteTitle} />;
+        case "markdown":
+          return <MarkdownDebugView content={noteContent} title={noteTitle} />;
+        case "metadata":
+          return <MetadataDebugView content={noteContent} title={noteTitle} />;
+        default:
+          return <JSONDebugView content={noteContent} title={noteTitle} />;
+      }
+    };
 
-  // Editor for notes
-  if (noteContent) {
-    return (
+    // Main editor component
+    const editorElement = (
       <div className="flex flex-col h-full">
-        {/* Note title header */}
-        <div className="flex-none px-6 pt-6 pb-2">
+        {/* Note title header with debug toggle */}
+        <div className="flex-none px-6 pt-6 pb-2 flex items-start justify-between">
           <h1 className="text-3xl font-semibold text-foreground mb-0">{noteTitle}</h1>
+          {process.env.NODE_ENV === "development" && <DebugViewToggle />}
         </div>
 
         {/* Editor */}
@@ -489,8 +667,28 @@ export function MainPanelContent() {
         </div>
       </div>
     );
+
+    // Wrap in split pane if debug panel is visible
+    if (isDebugPanelVisible && process.env.NODE_ENV === "development") {
+      contentElement = (
+        <Allotment defaultSizes={[60, 40]}>
+          <Allotment.Pane minSize={300}>{editorElement}</Allotment.Pane>
+          <Allotment.Pane minSize={300}>{renderDebugView()}</Allotment.Pane>
+        </Allotment>
+      );
+    } else {
+      contentElement = editorElement;
+    }
+  } else {
+    contentElement = null;
   }
 
-  return null;
+  // Render navigation once, then content below
+  return (
+    <>
+      {selectedContentId && <MainPanelNavigation />}
+      {contentElement}
+    </>
+  );
 }
 

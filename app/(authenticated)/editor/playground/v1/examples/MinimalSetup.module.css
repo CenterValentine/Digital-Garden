@@ -1,0 +1,115 @@
+.container {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+.header {
+  margin-bottom: 2rem;
+}
+
+.title {
+  font-size: 2rem;
+  font-weight: bold;
+  color: #c9a86c;
+  margin: 0 0 0.5rem 0;
+}
+
+.subtitle {
+  color: rgba(229, 212, 176, 0.7);
+  margin: 0;
+}
+
+.editorWrapper {
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0.5rem;
+  padding: 1rem;
+  margin-bottom: 2rem;
+}
+
+.editor {
+  min-height: 300px;
+}
+
+.proseMirror {
+  outline: none;
+  color: #e5d4b0;
+  font-size: 1rem;
+  line-height: 1.6;
+}
+
+.proseMirror p {
+  margin: 0.75rem 0;
+}
+
+.proseMirror p:first-child {
+  margin-top: 0;
+}
+
+.proseMirror p:last-child {
+  margin-bottom: 0;
+}
+
+.info {
+  padding: 1.5rem;
+  background: rgba(201, 168, 108, 0.1);
+  border-left: 4px solid #c9a86c;
+  border-radius: 0.25rem;
+}
+
+.info h3 {
+  color: #c9a86c;
+  margin: 0 0 1rem 0;
+  font-size: 1.25rem;
+}
+
+.info p {
+  color: rgba(229, 212, 176, 0.8);
+  margin: 0 0 1rem 0;
+  line-height: 1.6;
+}
+
+.info ul {
+  margin: 0.5rem 0 1rem 1.5rem;
+  color: rgba(229, 212, 176, 0.8);
+}
+
+.info li {
+  margin: 0.5rem 0;
+}
+
+.info code {
+  background: rgba(0, 0, 0, 0.3);
+  padding: 0.125rem 0.375rem;
+  border-radius: 0.25rem;
+  font-family: 'Courier New', monospace;
+  color: #82aaff;
+  font-size: 0.9em;
+}
+
+.info strong {
+  color: #ffd700;
+}
+
+.docLink {
+  display: inline-block;
+  color: #82aaff;
+  text-decoration: none;
+  font-weight: 500;
+  margin-top: 0.5rem;
+}
+
+.docLink:hover {
+  text-decoration: underline;
+}
+
+.loading {
+  padding: 3rem;
+  text-align: center;
+  color: #e5d4b0;
+}
+
+.loading p {
+  margin: 0;
+}

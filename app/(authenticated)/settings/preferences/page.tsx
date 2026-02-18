@@ -4,7 +4,7 @@
 
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { getSurfaceStyles } from "@/lib/design/system";
 import { useUploadSettingsStore } from "@/state/upload-settings-store";
 import { Button } from "@/components/ui/glass/button";
@@ -24,8 +24,24 @@ export default function PreferencesSettingsPage() {
 
   const [serverUrlInput, setServerUrlInput] = useState(onlyofficeServerUrl || "");
   const [isSaving, setIsSaving] = useState(false);
+  const isSavingRef = useRef(false); // Synchronous flag to prevent double-clicks
   const [hasGoogleAuth, setHasGoogleAuth] = useState(false);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+
+  // File tree settings
+  const [defaultFolderViewMode, setDefaultFolderViewMode] = useState<"list" | "gallery" | "kanban" | "dashboard" | "canvas">("list");
+  const [defaultFolderSortMode, setDefaultFolderSortMode] = useState<"asc" | "desc" | "manual">("manual");
+  const [showFileExtensions, setShowFileExtensions] = useState(false);
+  const [compactMode, setCompactMode] = useState(false);
+  const [isLoadingFileTree, setIsLoadingFileTree] = useState(true);
+
+  // External link settings
+  const [previewsEnabled, setPreviewsEnabled] = useState(false);
+  const [allowAllDomains, setAllowAllDomains] = useState(false);
+  const [allowlistedHosts, setAllowlistedHosts] = useState<string[]>([]);
+  const [allowHttp, setAllowHttp] = useState(false);
+  const [newHost, setNewHost] = useState("");
+  const [isLoadingExternal, setIsLoadingExternal] = useState(true);
 
   // Check if user has Google authentication
   useEffect(() => {
@@ -46,6 +62,171 @@ export default function PreferencesSettingsPage() {
 
     checkGoogleAuth();
   }, []);
+
+  // Load file tree settings from user settings
+  useEffect(() => {
+    async function loadFileTreeSettings() {
+      try {
+        const response = await fetch("/api/user/settings");
+        const data = await response.json();
+
+        console.log("[Preferences] API response:", data);
+        console.log("[Preferences] Settings data:", data.data);
+
+        if (data.success && data.data?.fileTree) {
+          const { fileTree } = data.data;
+          console.log("[Preferences] Loaded file tree settings:", fileTree);
+          if (fileTree.defaultFolderViewMode) setDefaultFolderViewMode(fileTree.defaultFolderViewMode);
+          if (fileTree.defaultFolderSortMode) setDefaultFolderSortMode(fileTree.defaultFolderSortMode);
+          if (fileTree.showFileExtensions !== undefined) setShowFileExtensions(fileTree.showFileExtensions);
+          if (fileTree.compactMode !== undefined) setCompactMode(fileTree.compactMode);
+        }
+      } catch (err) {
+        console.error("Failed to load file tree settings:", err);
+      } finally {
+        setIsLoadingFileTree(false);
+      }
+    }
+
+    loadFileTreeSettings();
+  }, []);
+
+  // Load external link settings from user settings
+  useEffect(() => {
+    async function loadExternalSettings() {
+      try {
+        const response = await fetch("/api/user/settings");
+        const data = await response.json();
+
+        console.log("[Preferences] External settings response:", data);
+
+        if (data.success && data.data?.external) {
+          const { external } = data.data;
+          console.log("[Preferences] Loaded external settings:", external);
+          if (external.previewsEnabled !== undefined) setPreviewsEnabled(external.previewsEnabled);
+          if (external.allowAllDomains !== undefined) setAllowAllDomains(external.allowAllDomains);
+          if (external.allowlistedHosts) setAllowlistedHosts(external.allowlistedHosts);
+          if (external.allowHttp !== undefined) setAllowHttp(external.allowHttp);
+        } else {
+          console.log("[Preferences] No external settings found in response");
+        }
+      } catch (err) {
+        console.error("Failed to load external settings:", err);
+      } finally {
+        setIsLoadingExternal(false);
+      }
+    }
+
+    loadExternalSettings();
+  }, []);
+
+  // Save file tree settings
+  const saveFileTreeSettings = async () => {
+    // Prevent double-click saves with synchronous ref check
+    if (isSavingRef.current) {
+      console.log("[Preferences] Save already in progress, ignoring");
+      return;
+    }
+
+    isSavingRef.current = true;
+    setIsSaving(true);
+
+    try {
+      const response = await fetch("/api/user/settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fileTree: {
+            defaultFolderViewMode,
+            defaultFolderSortMode,
+            showFileExtensions,
+            compactMode,
+          },
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to save settings");
+      }
+
+      toast.success("File tree settings saved", {
+        icon: <Check className="h-4 w-4" />,
+      });
+    } catch (err) {
+      console.error("Failed to save file tree settings:", err);
+      toast.error("Failed to save settings", {
+        description: err instanceof Error ? err.message : "Please try again",
+      });
+    } finally {
+      isSavingRef.current = false;
+      setIsSaving(false);
+    }
+  };
+
+  // Save external settings
+  const saveExternalSettings = async () => {
+    // Prevent double-click saves with synchronous ref check
+    if (isSavingRef.current) {
+      console.log("[Preferences] Save already in progress, ignoring");
+      return;
+    }
+
+    isSavingRef.current = true;
+    setIsSaving(true);
+
+    try {
+      console.log("[Preferences] Saving external settings:", {
+        previewsEnabled,
+        allowAllDomains,
+        allowlistedHosts,
+        allowHttp,
+      });
+
+      const response = await fetch("/api/user/settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          external: {
+            previewsEnabled,
+            allowAllDomains,
+            allowlistedHosts,
+            allowHttp,
+          },
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to save settings");
+      }
+
+      console.log("[Preferences] External settings saved successfully");
+      toast.success("External link settings saved", {
+        icon: <Check className="h-4 w-4" />,
+      });
+    } catch (err) {
+      console.error("Failed to save external settings:", err);
+      toast.error("Failed to save settings", {
+        description: err instanceof Error ? err.message : "Please try again",
+      });
+    } finally {
+      isSavingRef.current = false;
+      setIsSaving(false);
+    }
+  };
+
+  // Add host to allowlist
+  const handleAddHost = () => {
+    const trimmed = newHost.trim();
+    if (trimmed && !allowlistedHosts.includes(trimmed)) {
+      setAllowlistedHosts([...allowlistedHosts, trimmed]);
+      setNewHost("");
+    }
+  };
+
+  // Remove host from allowlist
+  const handleRemoveHost = (host: string) => {
+    setAllowlistedHosts(allowlistedHosts.filter(h => h !== host));
+  };
 
   return (
     <div className="space-y-6">
@@ -287,6 +468,274 @@ export default function PreferencesSettingsPage() {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* File Tree Display Settings */}
+      <div
+        className="border border-white/10 rounded-lg p-6"
+        style={{
+          background: glass0.background,
+          backdropFilter: glass0.backdropFilter,
+        }}
+      >
+        <h3 className="text-lg font-semibold mb-4">File Tree Display</h3>
+
+        {isLoadingFileTree ? (
+          <div className="text-sm text-gray-400">Loading preferences...</div>
+        ) : (
+          <div className="space-y-6">
+            {/* Default Folder View Mode */}
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-3">
+                Default Folder View
+              </label>
+              <p className="text-xs text-gray-500 mb-3">
+                Choose the default view mode for new folders
+              </p>
+              <div className="space-y-2">
+                {[
+                  { value: "list", label: "List View", description: "Traditional file tree layout" },
+                  { value: "gallery", label: "Gallery View", description: "Visual grid for media files" },
+                  { value: "kanban", label: "Kanban View", description: "Drag-and-drop cards" },
+                  { value: "dashboard", label: "Dashboard View", description: "Rearrangeable tiles" },
+                  { value: "canvas", label: "Canvas View", description: "Visual graph layout" },
+                ].map((mode) => (
+                  <label
+                    key={mode.value}
+                    className="flex items-start gap-3 p-2.5 rounded-lg border border-white/10 hover:bg-white/5 cursor-pointer transition-colors"
+                  >
+                    <input
+                      type="radio"
+                      name="defaultFolderViewMode"
+                      value={mode.value}
+                      checked={defaultFolderViewMode === mode.value}
+                      onChange={(e) => setDefaultFolderViewMode(e.target.value as any)}
+                      className="mt-0.5"
+                    />
+                    <div className="flex-1">
+                      <div className="font-medium text-sm">{mode.label}</div>
+                      <div className="text-sm text-gray-400">{mode.description}</div>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* Default Sort Mode */}
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-3">
+                Default Sort Order
+              </label>
+              <div className="space-y-2">
+                {[
+                  { value: "manual", label: "Manual Order", description: "Drag and drop to reorder (default)" },
+                  { value: "asc", label: "Alphabetical (A-Z)", description: "Sort by name ascending" },
+                  { value: "desc", label: "Alphabetical (Z-A)", description: "Sort by name descending" },
+                ].map((mode) => (
+                  <label
+                    key={mode.value}
+                    className="flex items-start gap-3 p-2.5 rounded-lg border border-white/10 hover:bg-white/5 cursor-pointer transition-colors"
+                  >
+                    <input
+                      type="radio"
+                      name="defaultFolderSortMode"
+                      value={mode.value}
+                      checked={defaultFolderSortMode === mode.value}
+                      onChange={(e) => setDefaultFolderSortMode(e.target.value as any)}
+                      className="mt-0.5"
+                    />
+                    <div className="flex-1">
+                      <div className="font-medium text-sm">{mode.label}</div>
+                      <div className="text-sm text-gray-400">{mode.description}</div>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* Display Options */}
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-3">
+                Display Options
+              </label>
+              <div className="space-y-2">
+                {/* Show File Extensions */}
+                <label className="flex items-center gap-3 p-2.5 rounded-lg border border-white/10 hover:bg-white/5 cursor-pointer transition-colors">
+                  <input
+                    type="checkbox"
+                    checked={showFileExtensions}
+                    onChange={(e) => setShowFileExtensions(e.target.checked)}
+                    className="mt-0.5"
+                  />
+                  <div className="flex-1">
+                    <div className="font-medium text-sm">Show File Extensions</div>
+                    <div className="text-sm text-gray-400">
+                      Display file extensions (.md, .pdf, etc.) in tree view
+                    </div>
+                  </div>
+                </label>
+
+                {/* Compact Mode */}
+                <label className="flex items-center gap-3 p-2.5 rounded-lg border border-white/10 hover:bg-white/5 cursor-pointer transition-colors">
+                  <input
+                    type="checkbox"
+                    checked={compactMode}
+                    onChange={(e) => setCompactMode(e.target.checked)}
+                    className="mt-0.5"
+                  />
+                  <div className="flex-1">
+                    <div className="font-medium text-sm">Compact Mode</div>
+                    <div className="text-sm text-gray-400">
+                      Reduce spacing for more visible files
+                    </div>
+                  </div>
+                </label>
+              </div>
+            </div>
+
+            {/* Save Button */}
+            <div className="pt-4 border-t border-white/10">
+              <Button onClick={saveFileTreeSettings} disabled={isSaving}>
+                {isSaving ? "Saving..." : "Save File Tree Settings"}
+              </Button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* External Links Settings */}
+      <div
+        className="border border-white/10 rounded-lg p-6"
+        style={{
+          background: glass0.background,
+          backdropFilter: glass0.backdropFilter,
+        }}
+      >
+        <h3 className="text-lg font-semibold mb-4">External Links</h3>
+
+        {isLoadingExternal ? (
+          <div className="text-sm text-gray-400">Loading preferences...</div>
+        ) : (
+          <div className="space-y-6">
+            {/* Enable Previews Toggle */}
+            <div>
+              <label className="flex items-center gap-3 p-2.5 rounded-lg border border-white/10 hover:bg-white/5 cursor-pointer transition-colors">
+                <input
+                  type="checkbox"
+                  checked={previewsEnabled}
+                  onChange={(e) => setPreviewsEnabled(e.target.checked)}
+                  className="mt-0.5"
+                />
+                <div className="flex-1">
+                  <div className="font-medium text-sm">Enable Open Graph Previews</div>
+                  <div className="text-sm text-gray-400">
+                    Fetch and display Open Graph metadata from external URLs
+                  </div>
+                </div>
+              </label>
+            </div>
+
+            {/* Allow All Domains Toggle */}
+            <div>
+              <label className="flex items-center gap-3 p-2.5 rounded-lg border border-yellow-500/30 bg-yellow-500/5 cursor-pointer transition-colors">
+                <input
+                  type="checkbox"
+                  checked={allowAllDomains}
+                  onChange={(e) => setAllowAllDomains(e.target.checked)}
+                  className="mt-0.5"
+                />
+                <div className="flex-1">
+                  <div className="font-medium text-sm">Allow All Domains</div>
+                  <div className="text-sm text-gray-400">
+                    ⚠️ Bypass allowlist and fetch previews from any domain (less secure)
+                  </div>
+                </div>
+              </label>
+            </div>
+
+            {/* Allowlisted Hosts */}
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-3">
+                Allowed Hostnames {allowAllDomains && <span className="text-xs text-yellow-400">(Currently bypassed)</span>}
+              </label>
+              <p className="text-xs text-gray-500 mb-3">
+                Only URLs from these hostnames can have previews fetched. Supports wildcards (e.g., *.example.com)
+              </p>
+
+              {/* Add host input */}
+              <div className="flex gap-2 mb-3">
+                <input
+                  type="text"
+                  placeholder="github.com or *.wikipedia.org"
+                  value={newHost}
+                  onChange={(e) => setNewHost(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      handleAddHost();
+                    }
+                  }}
+                  className="flex-1 px-3 py-2 bg-black/20 border border-white/10 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <button
+                  onClick={handleAddHost}
+                  className="px-4 py-2 bg-primary/20 hover:bg-primary/30 border border-primary/30 rounded-lg text-sm font-medium text-primary transition-colors"
+                >
+                  Add
+                </button>
+              </div>
+
+              {/* Host list */}
+              <div className="space-y-2">
+                {allowlistedHosts.length === 0 ? (
+                  <div className="text-sm text-gray-500 italic">
+                    No hosts allowed. Previews will not work.
+                  </div>
+                ) : (
+                  allowlistedHosts.map((host) => (
+                    <div
+                      key={host}
+                      className="flex items-center justify-between p-2 rounded-lg border border-white/10 bg-white/5"
+                    >
+                      <span className="text-sm text-gray-300">{host}</span>
+                      <button
+                        onClick={() => handleRemoveHost(host)}
+                        className="text-xs text-red-400 hover:text-red-300 px-2 py-1 rounded hover:bg-red-500/10 transition-colors"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            {/* Allow HTTP Toggle */}
+            <div>
+              <label className="flex items-center gap-3 p-2.5 rounded-lg border border-yellow-500/30 bg-yellow-500/5 cursor-pointer transition-colors">
+                <input
+                  type="checkbox"
+                  checked={allowHttp}
+                  onChange={(e) => setAllowHttp(e.target.checked)}
+                  className="mt-0.5"
+                />
+                <div className="flex-1">
+                  <div className="font-medium text-sm">Allow HTTP URLs</div>
+                  <div className="text-sm text-gray-400">
+                    ⚠️ HTTP connections are not secure. Only enable if necessary.
+                  </div>
+                </div>
+              </label>
+            </div>
+
+            {/* Save Button */}
+            <div className="pt-4 border-t border-white/10">
+              <Button onClick={saveExternalSettings} disabled={isSaving}>
+                {isSaving ? "Saving..." : "Save External Link Settings"}
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Future Settings Placeholder */}

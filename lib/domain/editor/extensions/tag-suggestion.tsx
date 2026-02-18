@@ -7,6 +7,8 @@
  * M6: Search & Knowledge Features - Tags
  */
 
+"use client";
+
 import { ReactRenderer } from "@tiptap/react";
 import { SuggestionOptions } from "@tiptap/suggestion";
 import { PluginKey } from "@tiptap/pm/state";

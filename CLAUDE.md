@@ -70,9 +70,17 @@ pnpm build:tokens # Generate CSS variables from design tokens (style-dictionary)
 
 The Content IDE is an Obsidian-inspired knowledge management system with a panel-based layout, file tree navigation, rich text editing, and multi-cloud storage support.
 
-**Current Status:** See [IMPLEMENTATION-STATUS.md](docs/notes-feature/IMPLEMENTATION-STATUS.md) for detailed progress.
-- ✅ M1-M6: Database, API, UI foundation, file tree, editor, search, tags (complete)
-- 🚀 M7: File management & media (active)
+**Current Status:** See [STATUS.md](docs/notes-feature/STATUS.md) for real-time status.
+- ✅ Epoch 1-4: Foundation complete (Database, API, UI, Editor, Storage, Export - Oct 2025-Feb 2026)
+- 🎯 **Active: Sprint 27** (Feb 18 - Mar 3, 2026) - FolderPayload implementation (5 view modes)
+- 🚀 **Active: Epoch 5** - Advanced Content Types (Feb-Mar 2026)
+  - ✅ ExternalPayload with Open Graph preview (complete)
+  - ✅ ContentRole visibility system (complete)
+  - ⏳ FolderPayload: List, Grid, Kanban, Table, Timeline views (in progress)
+  - 📋 Next: New payload types (Excalidraw, Mermaid, Canvas, etc.)
+- 📋 Epoch 6-7: Collaboration & AI Integration (planned)
+
+**Sprint/Epoch Model:** We use a sprint/epoch development model (2-week sprints within 8-12 week strategic epochs).
 
 ### Database: ContentNode v2.0 (Hybrid Type-Safe Polymorphism)
 
@@ -84,6 +92,7 @@ A single `ContentNode` table acts as a universal container for all content types
 - `FilePayload` - Binary files with storage metadata (images, PDFs, etc.)
 - `HtmlPayload` - Rendered HTML content
 - `CodePayload` - Code snippets with syntax highlighting
+- `ExternalPayload` - External URL bookmarks with Open Graph preview (Phase 2)
 
 **Key Features:**
 - Hierarchical structure via `parentId` with `displayOrder` for ordering
@@ -121,6 +130,111 @@ bucket/
 
 **Configuration:** `StorageProviderConfig` model splits metadata (bucket, region) from encrypted credentials (access keys)
 
+### Export & Backup System
+
+**Location:** `lib/domain/export/`
+
+**Core Pattern:** TipTap-to-multi-format converter with metadata preservation via sidecar files.
+
+**Supported Formats:**
+- **Markdown** - Obsidian-compatible with wiki-links `[[Note]]`, callouts `> [!type]`, YAML frontmatter
+- **HTML** - Standalone with embedded CSS, light/dark themes, syntax highlighting
+- **JSON** - Lossless TipTap export for re-import (no data loss)
+- **Plain Text** - Simple text extraction for search indexing
+- **PDF/DOCX** - Stub implementations ready for integration
+
+**Metadata Sidecar System:**
+- Preserves semantic information lost in format conversion
+- Stores: content ID, tags with colors, wiki-links with target IDs, callout types, timestamps
+- Format: `.meta.json` files alongside exports
+- Enables accurate re-import with full context restoration
+
+**Bulk Export Features:**
+- Export entire vault or filtered subset as ZIP archive
+- Preserves folder hierarchy
+- Auto-generated README in exports
+- Configurable file naming (slug/title/ID)
+- Batch processing for performance
+
+**Key Files:**
+- `lib/domain/export/converters/` - Format-specific converters
+- `lib/domain/export/metadata.ts` - Metadata sidecar generation
+- `lib/domain/export/bulk-export.ts` - ZIP archive creation
+
+**Documentation:** `EXPORT-SYSTEM-IMPLEMENTATION.md`, `EXPORT-BACKUP-ARCHITECTURE.md`, `EXPORT-MARKDOWN-SOLUTION.md`
+
+### External Link/Bookmark System (Phase 2)
+
+**Location:** `lib/domain/content/`, `components/content/external/`
+
+**Core Pattern:** Bookmark external URLs with optional Open Graph metadata preview, similar to iMessage/WhatsApp/Slack link previews.
+
+**Key Features:**
+- **ExternalPayload** - Stores URL, subtype (website/application), and cached preview metadata
+- **Open Graph Fetcher** - Fetches `og:title`, `og:description`, `og:image`, `og:site_name` from external sites
+- **Security Controls** - HTTPS-only by default, domain allowlist, "Allow All Domains" override, SSL error handling
+- **Smart URL Handling** - Auto-prepends `https://`, allows www redirects (example.com ↔ www.example.com)
+- **Preview States** - Full preview (image + metadata), partial preview (metadata only with placeholder), error state
+- **Settings Integration** - User-configurable allowlist, preview toggle, HTTP allowance (dev only)
+
+**Open Graph Fetcher (`lib/domain/content/open-graph-fetcher.ts`):**
+- Fetches HTML from external URLs with timeout (5s) and size limits (256KB)
+- Parses `<meta property="og:*">` tags via regex
+- Falls back to standard `<meta name="title">` and `<title>` tags
+- Blocks cross-domain redirects (except www variants)
+- Handles SSL certificate errors with helpful dev-mode bypass instructions
+- Returns `null` on failure (no metadata, timeout, network error)
+
+**Security & Validation:**
+- `validateExternalUrl()` - HTTPS-only enforcement (bypass via `allowHttp` setting)
+- `isHostnameAllowed()` - Wildcard domain matching (`*.github.io`, `google.com`)
+- Default allowlist: 50+ popular domains (Google, GitHub, social media, dev resources, news)
+- `allowAllDomains` override for power users (bypasses allowlist entirely)
+
+**UI Components:**
+- **ExternalLinkDialog** - Create/edit external links with name and URL fields
+- **ExternalLinkViewer** - Display preview card with OG metadata, URL card, action buttons
+- **ExternalViewer** - Wrapper for MainPanelContent integration
+- **Placeholder Image** - Gradient background with subtle pattern when no OG image available
+
+**API Endpoint:**
+```
+POST /api/content/external/preview       # Fetch Open Graph metadata
+  - Validates user settings (previewsEnabled, allowlist)
+  - Fetches OG data with security checks
+  - Returns cached metadata or error
+```
+
+**Context Menu Integration:**
+- "New → External → Website" creates external link
+- "New → External → Application" creates external link with subtype
+- Edit external link via inline rename (triggers dialog, not text edit)
+
+**Settings Schema (`lib/features/settings/validation.ts`):**
+```typescript
+external: {
+  previewsEnabled: boolean          // Master toggle (default: false)
+  allowAllDomains: boolean          // Bypass allowlist (default: false)
+  allowlistedHosts: string[]        // Wildcard-supported domains
+  allowHttp: boolean                // Allow HTTP URLs (default: false, dev only)
+}
+```
+
+**Key Implementation Details:**
+- Double-click prevention with `useRef` for save button (prevents duplicate toasts)
+- Deep merge strategy for partial settings updates
+- URL change detection with `useEffect` to refresh preview on edit
+- Event-driven architecture: `content-updated` event dispatches preview refetch
+- SSL bypass: `NODE_TLS_REJECT_UNAUTHORIZED=0` in `.env.local` for dev (NEVER in production)
+
+**Known Limitations:**
+- No iframe embedding (security risk, performance concern)
+- No link mutation/workflow integration (simple bookmark only)
+- Some sites don't provide OG metadata (shows placeholder)
+- SSL certificate errors require dev-mode bypass (some sites have misconfigured certs)
+
+**Documentation:** See plan file at `~/.claude/plans/declarative-seeking-ocean.md` for Phase 2 implementation details
+
 ### Authentication System
 
 **Provider:** Custom OAuth implementation with Google Sign-In
@@ -144,7 +258,7 @@ bucket/
 
 **Note:** Google Drive integration planned but not yet implemented (see M7+ roadmap)
 
-### API Architecture (14+ Endpoints)
+### API Architecture (20+ Endpoints)
 
 All endpoints are in `app/api/content/`:
 
@@ -171,10 +285,24 @@ GET/PATCH/DELETE /api/content/storage/[id]     # Individual config operations
 **Search, Backlinks & Tags:**
 ```
 GET /api/content/search                        # Full-text search with filters
-GET /api/content/backlinks                     # Get backlinks for a note
+GET /api/content/backlinks?contentId={id}      # Get backlinks for a note
 GET /api/content/tags                          # List all tags with usage counts
 GET /api/content/tags/content/[id]             # Get tags for specific content
 POST /api/content/tags                         # Create new tag
+```
+
+**Export & Backup:**
+```
+POST /api/content/export/[id]                  # Single document export (markdown/HTML/JSON/text)
+POST /api/content/export/vault                 # Bulk vault export as ZIP
+GET  /api/content/export/health                # Export system health check
+```
+
+**External Links (Phase 2):**
+```
+POST /api/content/external/preview             # Fetch Open Graph metadata for URL
+  - Security: HTTPS-only, domain allowlist, timeout/size limits
+  - Returns: { success, data: { url, metadata, fetchedAt } }
 ```
 
 **Type Definitions:** `lib/domain/content/api-types.ts`
@@ -298,6 +426,28 @@ const glass0 = getSurfaceStyles("glass-0");
 - Hierarchical heading structure extracted from TipTap JSON
 - Active heading tracking
 - Click-to-scroll support
+
+**Search State** (`search-store.ts`):
+- Search query and filters
+- Search results caching
+- Filter state (tags, content type, date range)
+- Recent searches tracking
+
+**Settings State** (`settings-store.ts`):
+- User preferences
+- Storage provider configuration
+- Export settings
+- Editor preferences
+
+**Upload Settings** (`upload-settings-store.ts`):
+- Upload preferences (folder destination, naming)
+- Default file type handling
+- Auto-upload behavior
+
+**Left Panel State** (`left-panel-view-store.ts`, `left-panel-collapse-store.ts`):
+- Active view (tree/search/tags)
+- Collapse/expand state per section
+- View history and navigation
 
 **Pattern:**
 ```tsx
@@ -487,7 +637,7 @@ npx prisma studio  # Open database GUI to debug
 
 ### Zustand Store Patterns
 
-**Location:** All stores in `stores/`
+**Location:** All stores in `state/`
 
 **Standard Pattern:**
 ```tsx
@@ -600,41 +750,71 @@ const editor = useEditor({
 
 ## Documentation
 
-**Start Here:** `docs/notes-feature/00-index.md` - Master documentation index
+**Start Here:** `docs/notes-feature/00-START-HERE.md` - Task-oriented documentation index
 
-**Critical Architecture:**
-- `IMPLEMENTATION-STATUS.md` - Current progress and milestone tracking
-- `01-architecture.md` - System architecture overview
-- `03-database-design.md` - Complete Prisma v2.0 schema
-- `04-api-specification.md` - All 14+ REST endpoints
-- `LIQUID-GLASS-DESIGN-SYSTEM.md` - Design system strategy
-- `ARCHITECTURE-RIGHT-SIDEBAR-REFACTOR.md` - Component architecture patterns
+**Current Work (Sprint/Epoch):**
+- `STATUS.md` - Single source of truth for current status
+- `work-tracking/CURRENT-SPRINT.md` - Sprint 27 details
+- `work-tracking/BACKLOG.md` - Prioritized work items
+- `work-tracking/epochs/epoch-5-advanced-content-types.md` - Active epoch plan
+
+**Core Architecture (Timeless):**
+- `core/01-architecture.md` - System architecture overview
+- `core/03-database-design.md` - Complete Prisma v2.0 schema
+- `core/04-api-specification.md` - All 20+ REST endpoints
+- `core/05-security-model.md` - Authentication and authorization
+- `core/06-ui-components.md` - Component specifications
+
+**Features (What Exists):**
+- `features/README.md` - Feature catalog by capability
+- `features/database/` - ContentNode system, typed payloads
+- `features/editor/` - TipTap extensions, wiki-links, callouts
+- `features/storage/` - Multi-cloud, two-phase upload
+- `features/export/` - Format conversion, metadata sidecars
+- `features/content-types/` - Notes, files, external links, folders
 
 **Implementation Guides:**
-- `M1-FOUNDATION-README.md` - Database & utilities setup
-- `M2-CORE-API-README.md` - API routes implementation
-- `M3-UI-FOUNDATION-LIQUID-GLASS.md` - Panel layout & design system
-- `M4-FILE-TREE-IMPLEMENTATION.md` - File tree with drag-and-drop
-- `M5-EDITOR-TEST-PLAN.md` - TipTap editor integration
-- `M6-FINAL-SCOPE.md` - Search, backlinks, editor extensions
-- `M6-EXTENSION-RECOMMENDATIONS.md` - Custom TipTap extensions
-- `M7-STORAGE-ARCHITECTURE-V2.md` - Multi-cloud storage system architecture
-- `M7-DRAG-DROP-UPLOAD.md` - File upload with drag-and-drop
-- `M7-MEDIA-VIEWERS-IMPLEMENTATION.md` - Image/video/audio viewers
-- `M7-OFFICE-DOCUMENTS-IMPLEMENTATION.md` - PDF, Word, Excel support
+- `guides/database/` - Prisma workflows, migrations, checklists
+- `guides/editor/` - TipTap extensions, schema evolution
+- `guides/ui/` - Liquid Glass design, React DND integration
+- `guides/storage/` - File storage, config examples
 
-**Additional docs:** See `00-index.md` for complete catalog of 30+ documents.
+**Patterns & Troubleshooting:**
+- `patterns/` - Architectural patterns and best practices
+- `troubleshooting/` - Problem-solution guides
+- `reference/` - Quick lookup references
+
+**Historical Context:**
+- `work-tracking/history/epoch-1-foundation.md` - Database, API, UI (Oct-Dec 2025)
+- `work-tracking/history/epoch-2-content-experience.md` - Editor, navigation (Dec 2025-Jan 2026)
+- `work-tracking/history/epoch-3-media-storage.md` - File management, multi-cloud (Jan-Feb 2026)
+- `work-tracking/history/epoch-4-export-extensibility.md` - Data portability (Feb 2026)
+
+**Archived Milestones:**
+- `archive/milestones/M1-M5/` - Foundation, API, UI, File Tree, Editor
+- `archive/milestones/M6/` - Search, Tags, Extensions
+- `archive/milestones/M7/` - Storage, Media Viewers, Office Docs
+- `archive/milestones/M8/` - Export System
+
+**Documentation Organization:**
+- Reorganized from 92 milestone-based docs → ~60 capability-based docs
+- Sprint/epoch model replaces milestone-centric tracking
+- Features documented by capability (what exists) not timeline (when built)
+- Clear entry points for different tasks and audiences
 
 ## Critical Files Reference
 
 **Quick Navigation:**
-- **Docs:** `docs/notes-feature/` - Start with 00-index.md
+- **Docs:** `docs/notes-feature/00-START-HERE.md` - Task-oriented documentation index
+- **Current Work:** `docs/notes-feature/STATUS.md` - Single source of truth for status
 - **Database:** `prisma/schema.prisma` - ContentNode v2.0 schema
-- **API Routes:** `app/api/content/` - 14+ REST endpoints
-- **Components:** `components/content/` - UI components (tree, editor, panels)
-- **State Stores:** `state/` - Zustand stores (renamed from `stores/`)
+- **API Routes:** `app/api/content/` - 20+ REST endpoints
+- **Components:** `components/content/` - UI components (tree, editor, panels, external)
+- **State Stores:** `state/` - 15 Zustand stores (renamed from `stores/`)
 - **Design System:** `lib/design/system/` - Liquid Glass tokens
 - **Editor Extensions:** `lib/domain/editor/` - TipTap custom extensions
+- **Export System:** `lib/domain/export/` - Multi-format converters
+- **External Links:** `lib/domain/content/` - Open Graph fetcher, validation
 - **Type Definitions:** `lib/domain/content/api-types.ts` - API interfaces
 
 **Key Directories:**
@@ -665,12 +845,18 @@ lib/
 ├── domain/                      # Business logic modules
 │   ├── admin/                   # Admin panel utilities
 │   ├── content/                 # ContentNode v2.0 utilities (31 imports)
+│   │   ├── open-graph-fetcher.ts    # Open Graph metadata fetcher
+│   │   └── external-validation.ts   # URL validation for external links
 │   ├── editor/                  # TipTap extensions (2 imports)
 │   │   ├── index.ts             # Barrel export
 │   │   ├── extensions-client.ts # Client-side extensions
 │   │   ├── extensions-server.ts # Server-side extensions
 │   │   ├── extensions/          # Individual extension files
 │   │   └── commands/            # Slash commands
+│   ├── export/                  # Multi-format export system
+│   │   ├── converters/          # Format-specific converters
+│   │   ├── metadata.ts          # Metadata sidecar generation
+│   │   └── bulk-export.ts       # ZIP archive creation
 │   └── search/                  # Search filters (4 imports)
 ├── infrastructure/              # External service integrations
 │   ├── auth/                    # OAuth, sessions, middleware (55 imports)
@@ -691,11 +877,148 @@ lib/
 ## Development Workflow
 
 **Before Implementing:**
-1. Check `docs/notes-feature/IMPLEMENTATION-STATUS.md` for current milestone status
-2. Read relevant milestone documentation (e.g., `M4-FILE-TREE-IMPLEMENTATION.md`)
-3. Review architecture docs (`01-architecture.md`, `03-database-design.md`)
-4. Understand the ContentNode v2.0 polymorph pattern
-5. Review existing similar implementations for patterns
+1. Check `docs/notes-feature/STATUS.md` for current sprint/epoch status
+2. Read `docs/notes-feature/work-tracking/CURRENT-SPRINT.md` for active work items
+3. Review relevant feature docs in `docs/notes-feature/features/`
+4. Check architecture docs in `docs/notes-feature/core/`
+5. Understand the ContentNode v2.0 polymorph pattern
+6. Review existing similar implementations for patterns
+
+**Maintaining STATUS.md (Critical for Sprint/Epoch Tracking):**
+
+AI assistants MUST update `docs/notes-feature/STATUS.md` when work is completed or status changes. This is the **single source of truth** for current development status.
+
+**When to Update:**
+- ✅ After completing a work item or feature
+- ✅ When starting new work (move from Planned → In Progress)
+- ✅ When encountering blockers
+- ✅ At the end of a sprint (archive to history)
+- ✅ When significant progress is made (update percentages)
+
+**What to Update:**
+
+1. **Frontmatter** (always update `last_updated`):
+```yaml
+---
+last_updated: 2026-02-19  # ← Update to current date
+current_epoch: 5
+current_sprint: 27
+---
+```
+
+2. **Current Work Section**:
+```markdown
+**Progress**: 25% complete (Day 3 of 14)  # ← Update progress
+
+**Work Items**:
+- ✅ Completed: List view component      # ← Change 🟡 to ✅
+- 🟡 In Progress: Grid view component (70% complete)  # ← Update %
+- ⚪ Planned: Kanban view component      # ← Keep until started
+```
+
+3. **Recent Completions** (add new entries at the top):
+```markdown
+**Feb 19, 2026**: List View Component Complete
+- ✅ Sort controls (name, date, type)
+- ✅ File type icons
+- ✅ Context menu integration
+- ✅ Keyboard navigation
+
+**Feb 16, 2026**: M9 Phase 2 Complete  # ← Keep last 30 days only
+```
+
+4. **Known Issues & Blockers** (add/remove as needed):
+```markdown
+### Active Blockers
+- **Grid layout issues** (High priority)
+  - Problem: Responsive grid breaks on mobile
+  - Mitigation: Investigating CSS Grid vs Flexbox approach
+  - ETA: Feb 20, 2026
+```
+
+**What NOT to Change:**
+- ❌ Don't modify historical epoch sections
+- ❌ Don't remove "Recent Completions" less than 30 days old
+- ❌ Don't change sprint duration or goals mid-sprint
+- ❌ Don't update CURRENT-SPRINT.md from STATUS.md (they sync separately)
+
+**Update Pattern:**
+```bash
+# 1. Read current STATUS.md
+# 2. Update relevant sections (frontmatter, work items, completions)
+# 3. Keep format consistent (emojis: ✅ 🟡 ⚪)
+# 4. Add to Recent Completions (top of list)
+# 5. Preserve all other content unchanged
+```
+
+**Example Update** (after completing work):
+```markdown
+# Before
+**Work Items**:
+- 🟡 In Progress: List view component (60% complete)
+
+# After
+**Work Items**:
+- ✅ Completed: List view component
+
+## Recent Completions (add new entry)
+**Feb 19, 2026**: List View Component Complete
+- ✅ Sort controls implemented
+- ✅ File type icons rendered
+- ✅ Context menu integrated
+```
+
+**Sync with CURRENT-SPRINT.md:**
+- STATUS.md shows **summary** of current work
+- CURRENT-SPRINT.md shows **detailed** work item tracking
+- Update BOTH when work items change status
+- CURRENT-SPRINT.md has daily standup notes; STATUS.md does not
+
+**Backlog Management (Sprint Workflow):**
+
+When a sprint ends or work items aren't completed, AI assistants must properly backlog incomplete work:
+
+**When to Backlog:**
+- ✅ Sprint completes with core goals met but advanced features incomplete
+- ✅ Scope reduction mid-sprint (simpler solution found)
+- ✅ Work items no longer align with sprint goals
+- ⚠️ **Don't backlog** if core sprint goal unmet (carry forward as high priority)
+
+**How to Backlog (4-Step Process):**
+
+1. **Update CURRENT-SPRINT.md**:
+   - Mark completed items with ✅ in "Completed Work Items" section
+   - Move incomplete items to "Backlogged to Sprint X" section
+   - Add context explaining why work was backlogged (e.g., "Core views delivered, advanced features deferred as nice-to-have")
+   - Update sprint status to "complete" if core goals met
+   - Document in retrospective (what went well, what could improve)
+
+2. **Update BACKLOG.md**:
+   - Add backlogged items to **top** of next sprint section
+   - Include "Backlogged from Sprint X" subsection with context
+   - Preserve original story point estimates
+   - Use labels: `advanced feature`, `enhancement`, `nice-to-have`, `blocked`
+
+3. **Update STATUS.md**:
+   - Add completed work to "Recent Completions" (top of list)
+   - Update "Active Sprint" section to show "✅ COMPLETE" status
+   - List backlogged items under sprint summary with ⚪ emoji
+   - Update frontmatter `last_updated` date
+
+4. **Document Retrospective**:
+   - Explain why work was backlogged (over-commitment, scope change, etc.)
+   - Identify what went well vs what could improve
+   - Create action items for next sprint planning
+
+**Philosophy**: Ship working core features over incomplete comprehensive features. It's better to deliver 3 working folder views than 5 half-baked views.
+
+**Example** (Sprint 27):
+- **Core Goal**: Implement folder views ✅ Achieved
+- **Completed**: List, Grid, Kanban views (11 pts)
+- **Backlogged**: Table, Timeline, Persistence, Switcher (12 pts) → Sprint 28
+- **Decision**: Mark sprint COMPLETE, backlog advanced features
+
+**See Full Guide**: `docs/notes-feature/work-tracking/SPRINT-BACKLOG-GUIDE.md`
 
 **Code Standards:**
 - TypeScript strict mode, no `any` types
@@ -705,7 +1028,7 @@ lib/
 - Follow server/client component split strictly
 - Test that server components render without JavaScript
 - Import from barrel exports when available (`lib/domain/editor`, `lib/infrastructure/auth`, `lib/features/settings`)
-- Update documentation as you implement
+- Update documentation as you implement (including STATUS.md for work items)
 
 **Editor Extension Guidelines:**
 - Client-only extensions go in `getEditorExtensions()` (React components, DOM manipulation)
@@ -715,8 +1038,18 @@ lib/
 - Use keyboard shortcuts sparingly (Cmd+B, Cmd+I, Cmd+K only)
 - Avoid conflicting with browser shortcuts
 
-**Known Issues & Next Steps:**
-- See `IMPLEMENTATION-STATUS.md` for detailed known limitations per milestone
-- ✅ M6 is 100% complete (tags system finished Jan 20, 2026)
-- Minor TODOs: scroll-to-heading (needs editor ref), active heading auto-detection (intersection observer)
-- 🚀 M7 (File management & media) is now active priority
+**Current Status & Next Steps:**
+- See `docs/notes-feature/STATUS.md` for real-time status and known limitations
+- ✅ **Sprint 27 COMPLETE** (Feb 18, 2026 - Completed early)
+  - ✅ Core folder views: List, Grid, Kanban (shipped)
+  - 📦 Advanced features backlogged to Sprint 28: Table, Timeline, Persistence, Switcher
+  - Keyboard shortcuts for view switching
+- 🚀 **Epoch 5** (Feb-Mar 2026): Advanced Content Types
+  - ⏳ FolderPayload with 5 views (Sprint 27 - active)
+  - 📋 New payload types (Sprint 28 - planned): Excalidraw, Mermaid, Canvas, Whiteboard, PDF
+- 📋 **Epoch 6-7** (Planned): Collaboration & AI Integration
+- **Known Limitations:**
+  - PDF/DOCX Export: Stub implementations (need Puppeteer/docx library)
+  - External Links: Some SSL certificate errors (dev bypass available)
+  - Outline Panel: Active heading detection needs intersection observer
+  - Editor: Scroll-to-heading needs editor ref implementation

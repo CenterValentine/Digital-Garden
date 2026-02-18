@@ -371,6 +371,7 @@ async function seedTemplates(userId: string) {
       ownerId: userId,
       title: "Email Newsletter Template",
       slug: "template-email-newsletter",
+      contentType: "template",
       isPublished: false,
       htmlPayload: {
         create: {
@@ -420,6 +421,7 @@ async function seedStarterContent(userId: string) {
       ownerId: userId,
       title: "Welcome to Digital Garden",
       slug: "welcome",
+      contentType: "note",
       isPublished: true,
       notePayload: {
         create: {

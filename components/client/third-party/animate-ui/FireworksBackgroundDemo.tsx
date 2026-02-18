@@ -15,7 +15,7 @@ import {
 } from "@/lib/design/integrations/colors";
 import { useMemo } from "react";
 
-export interface FireworksBackgroundDemoProps extends React.ComponentProps<"div"> {
+export interface FireworksBackgroundDemoProps extends Omit<React.ComponentProps<"div">, "ref"> {
   className?: string;
   color?: DigitalGardenColor;
   colorVariant?: ColorVariant;

@@ -6,6 +6,8 @@
  * M6: Search & Knowledge Features - Wiki Links
  */
 
+"use client";
+
 import { ReactRenderer } from "@tiptap/react";
 import { SuggestionOptions } from "@tiptap/suggestion";
 import tippy, { Instance as TippyInstance } from "tippy.js";

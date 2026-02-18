@@ -147,6 +147,7 @@ export async function POST(request: NextRequest) {
             ownerId: session.user.id,
             title: finalFileName,
             slug,
+            contentType: "file",
             parentId: parentId || null,
             displayOrder: 0,
             filePayload: {

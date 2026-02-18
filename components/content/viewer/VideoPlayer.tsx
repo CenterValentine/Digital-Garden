@@ -246,12 +246,12 @@ export function VideoPlayer({ downloadUrl, fileName, mimeType, title, onDownload
   return (
     <div
       ref={containerRef}
-      className="h-full flex flex-col bg-black"
+      className="flex flex-col bg-black min-h-full"
       onMouseMove={resetControlsTimeout}
       onMouseEnter={() => setShowControls(true)}
     >
       {/* Video element */}
-      <div className="flex-1 relative flex items-center justify-center">
+      <div className="flex-shrink-0 relative flex items-center justify-center p-4">
         <video
           ref={videoRef}
           src={downloadUrl}

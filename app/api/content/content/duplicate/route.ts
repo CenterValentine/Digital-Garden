@@ -57,10 +57,12 @@ export async function POST(request: NextRequest) {
       const original = await prisma.contentNode.findUnique({
         where: { id },
         include: {
+          folderPayload: true,
           notePayload: true,
           filePayload: true,
           htmlPayload: true,
           codePayload: true,
+          externalPayload: true,
         },
       });
 
@@ -133,6 +135,17 @@ async function duplicateNode(
       publishedAt: null,
 
       // Duplicate payload based on type
+      ...(original.folderPayload && {
+        folderPayload: {
+          create: {
+            viewMode: original.folderPayload.viewMode,
+            sortMode: original.folderPayload.sortMode,
+            viewPrefs: original.folderPayload.viewPrefs || {},
+            includeReferencedContent: original.folderPayload.includeReferencedContent,
+          },
+        },
+      }),
+
       ...(original.notePayload && {
         notePayload: {
           create: {
@@ -182,6 +195,16 @@ async function duplicateNode(
           },
         },
       }),
+
+      ...(original.externalPayload && {
+        externalPayload: {
+          create: {
+            url: original.externalPayload.url,
+            subtype: original.externalPayload.subtype,
+            preview: original.externalPayload.preview || {},
+          },
+        },
+      }),
     },
   });
 
@@ -190,10 +213,12 @@ async function duplicateNode(
     const children = await prisma.contentNode.findMany({
       where: { parentId: original.id },
       include: {
+        folderPayload: true,
         notePayload: true,
         filePayload: true,
         htmlPayload: true,
         codePayload: true,
+        externalPayload: true,
       },
     });
 

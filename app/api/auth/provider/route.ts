@@ -6,8 +6,7 @@
  */
 
 import { NextResponse } from "next/server";
-import { getSession } from "@/lib/infrastructure/auth/session";
-import { prisma } from "@/lib/database/client";
+import { getSession, getValidGoogleAccessToken } from "@/lib/infrastructure/auth";
 
 export async function GET() {
   try {
@@ -20,26 +19,24 @@ export async function GET() {
       );
     }
 
-    // Check if user has a Google OAuth account
-    const account = await prisma.account.findFirst({
-      where: {
-        userId: session.user.id,
-        provider: "google",
-      },
-      select: {
-        provider: true,
-        accessToken: true,
-        refreshToken: true,
-        expiresAt: true,
-      },
-    });
+    // Proactively refresh Google access token if expired
+    // This ensures the user has a valid token for subsequent API calls
+    let hasValidToken = false;
+    try {
+      await getValidGoogleAccessToken(session.user.id);
+      hasValidToken = true;
+    } catch (error) {
+      // No Google account or refresh failed
+      // This is not an error - just means user doesn't have Google auth
+      hasValidToken = false;
+    }
 
     return NextResponse.json({
       success: true,
       data: {
-        hasGoogleAuth: !!account,
-        provider: account?.provider || null,
-        hasValidToken: account?.accessToken ? true : false,
+        hasGoogleAuth: hasValidToken,
+        provider: hasValidToken ? "google" : null,
+        hasValidToken,
       },
     });
   } catch (error) {
