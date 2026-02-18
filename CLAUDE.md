@@ -70,15 +70,17 @@ pnpm build:tokens # Generate CSS variables from design tokens (style-dictionary)
 
 The Content IDE is an Obsidian-inspired knowledge management system with a panel-based layout, file tree navigation, rich text editing, and multi-cloud storage support.
 
-**Current Status:** See [IMPLEMENTATION-STATUS.md](docs/notes-feature/IMPLEMENTATION-STATUS.md) for detailed progress.
-- ✅ M1-M8: Database, API, UI foundation, file tree, editor, search, tags, file management & media, export & backup (complete)
-- 🚀 M9: Type System Refactor + New Content Types (active - 40% Phase 2)
-  - ✅ Phase 1: ContentType discriminant refactor (complete)
-  - ✅ Phase 2: ExternalPayload with Open Graph preview (complete)
-  - ✅ Menu consolidation: Shared "New" menu configuration (complete)
-  - ✅ ContentRole: Per-folder referenced content toggle (complete)
-  - ⏳ Remaining: FolderPayload (5 views), 5 stub payloads (~3 weeks)
-- 📋 M10-M15: Advanced features (pending)
+**Current Status:** See [STATUS.md](docs/notes-feature/STATUS.md) for real-time status.
+- ✅ Epoch 1-4: Foundation complete (Database, API, UI, Editor, Storage, Export - Oct 2025-Feb 2026)
+- 🎯 **Active: Sprint 27** (Feb 18 - Mar 3, 2026) - FolderPayload implementation (5 view modes)
+- 🚀 **Active: Epoch 5** - Advanced Content Types (Feb-Mar 2026)
+  - ✅ ExternalPayload with Open Graph preview (complete)
+  - ✅ ContentRole visibility system (complete)
+  - ⏳ FolderPayload: List, Grid, Kanban, Table, Timeline views (in progress)
+  - 📋 Next: New payload types (Excalidraw, Mermaid, Canvas, etc.)
+- 📋 Epoch 6-7: Collaboration & AI Integration (planned)
+
+**Sprint/Epoch Model:** We use a sprint/epoch development model (2-week sprints within 8-12 week strategic epochs).
 
 ### Database: ContentNode v2.0 (Hybrid Type-Safe Polymorphism)
 
@@ -748,45 +750,67 @@ const editor = useEditor({
 
 ## Documentation
 
-**Start Here:** `docs/notes-feature/00-index.md` - Master documentation index
+**Start Here:** `docs/notes-feature/00-START-HERE.md` - Task-oriented documentation index
 
-**Critical Architecture:**
-- `IMPLEMENTATION-STATUS.md` - Current progress and milestone tracking
-- `01-architecture.md` - System architecture overview
-- `03-database-design.md` - Complete Prisma v2.0 schema
-- `04-api-specification.md` - All 20+ REST endpoints
-- `LIQUID-GLASS-DESIGN-SYSTEM.md` - Design system strategy
-- `ARCHITECTURE-RIGHT-SIDEBAR-REFACTOR.md` - Component architecture patterns
-- `EXPORT-SYSTEM-IMPLEMENTATION.md` - Multi-format export architecture
-- `EXPORT-BACKUP-ARCHITECTURE.md` - Backup strategy and metadata sidecars
-- `EXPORT-MARKDOWN-SOLUTION.md` - Markdown conversion specifics
+**Current Work (Sprint/Epoch):**
+- `STATUS.md` - Single source of truth for current status
+- `work-tracking/CURRENT-SPRINT.md` - Sprint 27 details
+- `work-tracking/BACKLOG.md` - Prioritized work items
+- `work-tracking/epochs/epoch-5-advanced-content-types.md` - Active epoch plan
+
+**Core Architecture (Timeless):**
+- `core/01-architecture.md` - System architecture overview
+- `core/03-database-design.md` - Complete Prisma v2.0 schema
+- `core/04-api-specification.md` - All 20+ REST endpoints
+- `core/05-security-model.md` - Authentication and authorization
+- `core/06-ui-components.md` - Component specifications
+
+**Features (What Exists):**
+- `features/README.md` - Feature catalog by capability
+- `features/database/` - ContentNode system, typed payloads
+- `features/editor/` - TipTap extensions, wiki-links, callouts
+- `features/storage/` - Multi-cloud, two-phase upload
+- `features/export/` - Format conversion, metadata sidecars
+- `features/content-types/` - Notes, files, external links, folders
 
 **Implementation Guides:**
-- `M1-FOUNDATION-README.md` - Database & utilities setup
-- `M2-CORE-API-README.md` - API routes implementation
-- `M3-UI-FOUNDATION-LIQUID-GLASS.md` - Panel layout & design system
-- `M4-FILE-TREE-IMPLEMENTATION.md` - File tree with drag-and-drop
-- `M5-EDITOR-TEST-PLAN.md` - TipTap editor integration
-- `M6-FINAL-SCOPE.md` - Search, backlinks, editor extensions
-- `M6-EXTENSION-RECOMMENDATIONS.md` - Custom TipTap extensions
-- `M7-STORAGE-ARCHITECTURE-V2.md` - Multi-cloud storage system architecture
-- `M7-DRAG-DROP-UPLOAD.md` - File upload with drag-and-drop
-- `M7-MEDIA-VIEWERS-IMPLEMENTATION.md` - Image/video/audio viewers
-- `M7-OFFICE-DOCUMENTS-IMPLEMENTATION.md` - PDF, Word, Excel support
-- `EXPORT-SYSTEM-IMPLEMENTATION.md` - Multi-format export & backup (M8)
-- `EXPORT-MARKDOWN-SOLUTION.md` - Obsidian-compatible markdown export
-- `EXPORT-BACKUP-ARCHITECTURE.md` - Metadata sidecar system
+- `guides/database/` - Prisma workflows, migrations, checklists
+- `guides/editor/` - TipTap extensions, schema evolution
+- `guides/ui/` - Liquid Glass design, React DND integration
+- `guides/storage/` - File storage, config examples
 
-**Additional docs:** See `00-index.md` for complete catalog of 90+ documents.
+**Patterns & Troubleshooting:**
+- `patterns/` - Architectural patterns and best practices
+- `troubleshooting/` - Problem-solution guides
+- `reference/` - Quick lookup references
+
+**Historical Context:**
+- `work-tracking/history/epoch-1-foundation.md` - Database, API, UI (Oct-Dec 2025)
+- `work-tracking/history/epoch-2-content-experience.md` - Editor, navigation (Dec 2025-Jan 2026)
+- `work-tracking/history/epoch-3-media-storage.md` - File management, multi-cloud (Jan-Feb 2026)
+- `work-tracking/history/epoch-4-export-extensibility.md` - Data portability (Feb 2026)
+
+**Archived Milestones:**
+- `archive/milestones/M1-M5/` - Foundation, API, UI, File Tree, Editor
+- `archive/milestones/M6/` - Search, Tags, Extensions
+- `archive/milestones/M7/` - Storage, Media Viewers, Office Docs
+- `archive/milestones/M8/` - Export System
+
+**Documentation Organization:**
+- Reorganized from 92 milestone-based docs → ~60 capability-based docs
+- Sprint/epoch model replaces milestone-centric tracking
+- Features documented by capability (what exists) not timeline (when built)
+- Clear entry points for different tasks and audiences
 
 ## Critical Files Reference
 
 **Quick Navigation:**
-- **Docs:** `docs/notes-feature/` - Start with 00-index.md
+- **Docs:** `docs/notes-feature/00-START-HERE.md` - Task-oriented documentation index
+- **Current Work:** `docs/notes-feature/STATUS.md` - Single source of truth for status
 - **Database:** `prisma/schema.prisma` - ContentNode v2.0 schema
 - **API Routes:** `app/api/content/` - 20+ REST endpoints
 - **Components:** `components/content/` - UI components (tree, editor, panels, external)
-- **State Stores:** `state/` - 12 Zustand stores (renamed from `stores/`)
+- **State Stores:** `state/` - 15 Zustand stores (renamed from `stores/`)
 - **Design System:** `lib/design/system/` - Liquid Glass tokens
 - **Editor Extensions:** `lib/domain/editor/` - TipTap custom extensions
 - **Export System:** `lib/domain/export/` - Multi-format converters
@@ -853,11 +877,148 @@ lib/
 ## Development Workflow
 
 **Before Implementing:**
-1. Check `docs/notes-feature/IMPLEMENTATION-STATUS.md` for current milestone status
-2. Read relevant milestone documentation (e.g., `M4-FILE-TREE-IMPLEMENTATION.md`)
-3. Review architecture docs (`01-architecture.md`, `03-database-design.md`)
-4. Understand the ContentNode v2.0 polymorph pattern
-5. Review existing similar implementations for patterns
+1. Check `docs/notes-feature/STATUS.md` for current sprint/epoch status
+2. Read `docs/notes-feature/work-tracking/CURRENT-SPRINT.md` for active work items
+3. Review relevant feature docs in `docs/notes-feature/features/`
+4. Check architecture docs in `docs/notes-feature/core/`
+5. Understand the ContentNode v2.0 polymorph pattern
+6. Review existing similar implementations for patterns
+
+**Maintaining STATUS.md (Critical for Sprint/Epoch Tracking):**
+
+AI assistants MUST update `docs/notes-feature/STATUS.md` when work is completed or status changes. This is the **single source of truth** for current development status.
+
+**When to Update:**
+- ✅ After completing a work item or feature
+- ✅ When starting new work (move from Planned → In Progress)
+- ✅ When encountering blockers
+- ✅ At the end of a sprint (archive to history)
+- ✅ When significant progress is made (update percentages)
+
+**What to Update:**
+
+1. **Frontmatter** (always update `last_updated`):
+```yaml
+---
+last_updated: 2026-02-19  # ← Update to current date
+current_epoch: 5
+current_sprint: 27
+---
+```
+
+2. **Current Work Section**:
+```markdown
+**Progress**: 25% complete (Day 3 of 14)  # ← Update progress
+
+**Work Items**:
+- ✅ Completed: List view component      # ← Change 🟡 to ✅
+- 🟡 In Progress: Grid view component (70% complete)  # ← Update %
+- ⚪ Planned: Kanban view component      # ← Keep until started
+```
+
+3. **Recent Completions** (add new entries at the top):
+```markdown
+**Feb 19, 2026**: List View Component Complete
+- ✅ Sort controls (name, date, type)
+- ✅ File type icons
+- ✅ Context menu integration
+- ✅ Keyboard navigation
+
+**Feb 16, 2026**: M9 Phase 2 Complete  # ← Keep last 30 days only
+```
+
+4. **Known Issues & Blockers** (add/remove as needed):
+```markdown
+### Active Blockers
+- **Grid layout issues** (High priority)
+  - Problem: Responsive grid breaks on mobile
+  - Mitigation: Investigating CSS Grid vs Flexbox approach
+  - ETA: Feb 20, 2026
+```
+
+**What NOT to Change:**
+- ❌ Don't modify historical epoch sections
+- ❌ Don't remove "Recent Completions" less than 30 days old
+- ❌ Don't change sprint duration or goals mid-sprint
+- ❌ Don't update CURRENT-SPRINT.md from STATUS.md (they sync separately)
+
+**Update Pattern:**
+```bash
+# 1. Read current STATUS.md
+# 2. Update relevant sections (frontmatter, work items, completions)
+# 3. Keep format consistent (emojis: ✅ 🟡 ⚪)
+# 4. Add to Recent Completions (top of list)
+# 5. Preserve all other content unchanged
+```
+
+**Example Update** (after completing work):
+```markdown
+# Before
+**Work Items**:
+- 🟡 In Progress: List view component (60% complete)
+
+# After
+**Work Items**:
+- ✅ Completed: List view component
+
+## Recent Completions (add new entry)
+**Feb 19, 2026**: List View Component Complete
+- ✅ Sort controls implemented
+- ✅ File type icons rendered
+- ✅ Context menu integrated
+```
+
+**Sync with CURRENT-SPRINT.md:**
+- STATUS.md shows **summary** of current work
+- CURRENT-SPRINT.md shows **detailed** work item tracking
+- Update BOTH when work items change status
+- CURRENT-SPRINT.md has daily standup notes; STATUS.md does not
+
+**Backlog Management (Sprint Workflow):**
+
+When a sprint ends or work items aren't completed, AI assistants must properly backlog incomplete work:
+
+**When to Backlog:**
+- ✅ Sprint completes with core goals met but advanced features incomplete
+- ✅ Scope reduction mid-sprint (simpler solution found)
+- ✅ Work items no longer align with sprint goals
+- ⚠️ **Don't backlog** if core sprint goal unmet (carry forward as high priority)
+
+**How to Backlog (4-Step Process):**
+
+1. **Update CURRENT-SPRINT.md**:
+   - Mark completed items with ✅ in "Completed Work Items" section
+   - Move incomplete items to "Backlogged to Sprint X" section
+   - Add context explaining why work was backlogged (e.g., "Core views delivered, advanced features deferred as nice-to-have")
+   - Update sprint status to "complete" if core goals met
+   - Document in retrospective (what went well, what could improve)
+
+2. **Update BACKLOG.md**:
+   - Add backlogged items to **top** of next sprint section
+   - Include "Backlogged from Sprint X" subsection with context
+   - Preserve original story point estimates
+   - Use labels: `advanced feature`, `enhancement`, `nice-to-have`, `blocked`
+
+3. **Update STATUS.md**:
+   - Add completed work to "Recent Completions" (top of list)
+   - Update "Active Sprint" section to show "✅ COMPLETE" status
+   - List backlogged items under sprint summary with ⚪ emoji
+   - Update frontmatter `last_updated` date
+
+4. **Document Retrospective**:
+   - Explain why work was backlogged (over-commitment, scope change, etc.)
+   - Identify what went well vs what could improve
+   - Create action items for next sprint planning
+
+**Philosophy**: Ship working core features over incomplete comprehensive features. It's better to deliver 3 working folder views than 5 half-baked views.
+
+**Example** (Sprint 27):
+- **Core Goal**: Implement folder views ✅ Achieved
+- **Completed**: List, Grid, Kanban views (11 pts)
+- **Backlogged**: Table, Timeline, Persistence, Switcher (12 pts) → Sprint 28
+- **Decision**: Mark sprint COMPLETE, backlog advanced features
+
+**See Full Guide**: `docs/notes-feature/work-tracking/SPRINT-BACKLOG-GUIDE.md`
 
 **Code Standards:**
 - TypeScript strict mode, no `any` types
@@ -867,7 +1028,7 @@ lib/
 - Follow server/client component split strictly
 - Test that server components render without JavaScript
 - Import from barrel exports when available (`lib/domain/editor`, `lib/infrastructure/auth`, `lib/features/settings`)
-- Update documentation as you implement
+- Update documentation as you implement (including STATUS.md for work items)
 
 **Editor Extension Guidelines:**
 - Client-only extensions go in `getEditorExtensions()` (React components, DOM manipulation)
@@ -877,16 +1038,18 @@ lib/
 - Use keyboard shortcuts sparingly (Cmd+B, Cmd+I, Cmd+K only)
 - Avoid conflicting with browser shortcuts
 
-**Known Issues & Next Steps:**
-- See `IMPLEMENTATION-STATUS.md` for detailed known limitations per milestone
-- ✅ M1-M8: Database, API, UI, file tree, editor, search, tags, file management, export & backup (complete)
-- 🚀 M9: Type System Refactor + New Content Types (active - Jan 28, 2026, 40% Phase 2)
-  - ✅ Phase 1: ContentType discriminant refactor (complete)
-  - ✅ ExternalPayload: External link bookmarks with Open Graph preview (complete)
-  - ✅ Menu consolidation: Shared configuration prevents duplication (complete)
-  - ✅ ContentRole: Per-folder referenced content toggle (complete)
-  - ⏳ Remaining: FolderPayload (5 view modes), 5 stub payload viewers (~3 weeks)
-- Minor TODOs: scroll-to-heading (needs editor ref), active heading auto-detection (intersection observer)
-- 🚀 M9-M14: Advanced features (collaboration, plugins, mobile, AI) pending
-- **PDF/DOCX Export:** Stub implementations ready for Puppeteer/docx library integration
-- **External Links:** SSL certificate errors may require `NODE_TLS_REJECT_UNAUTHORIZED=0` in dev for misconfigured sites
+**Current Status & Next Steps:**
+- See `docs/notes-feature/STATUS.md` for real-time status and known limitations
+- ✅ **Sprint 27 COMPLETE** (Feb 18, 2026 - Completed early)
+  - ✅ Core folder views: List, Grid, Kanban (shipped)
+  - 📦 Advanced features backlogged to Sprint 28: Table, Timeline, Persistence, Switcher
+  - Keyboard shortcuts for view switching
+- 🚀 **Epoch 5** (Feb-Mar 2026): Advanced Content Types
+  - ⏳ FolderPayload with 5 views (Sprint 27 - active)
+  - 📋 New payload types (Sprint 28 - planned): Excalidraw, Mermaid, Canvas, Whiteboard, PDF
+- 📋 **Epoch 6-7** (Planned): Collaboration & AI Integration
+- **Known Limitations:**
+  - PDF/DOCX Export: Stub implementations (need Puppeteer/docx library)
+  - External Links: Some SSL certificate errors (dev bypass available)
+  - Outline Panel: Active heading detection needs intersection observer
+  - Editor: Scroll-to-heading needs editor ref implementation
