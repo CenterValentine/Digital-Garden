@@ -540,7 +540,16 @@ export function MainPanelContent() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ format: "markdown" }),
       });
-      if (!response.ok) throw new Error("Export failed");
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        const code = errorData?.error?.code;
+        if (code === "SETTINGS_NOT_FOUND") {
+          toast.error("Configure export settings in Settings → Export first");
+        } else {
+          toast.error("Export failed");
+        }
+        return;
+      }
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
