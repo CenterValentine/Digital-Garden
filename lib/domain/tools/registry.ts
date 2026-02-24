@@ -9,6 +9,26 @@ import type { ToolDefinition, ToolQuery, ToolSurface } from "./types";
 
 /** All registered tools */
 const TOOL_REGISTRY: ToolDefinition[] = [
+  // ─── TOOLBAR: Content header actions ───
+  {
+    id: "export-markdown",
+    label: "Export",
+    iconName: "Download",
+    surfaces: ["toolbar"],
+    contentTypes: ["note"],
+    order: 100,
+    group: "export",
+  },
+  {
+    id: "copy-link",
+    label: "Copy Link",
+    iconName: "Link2",
+    surfaces: ["toolbar"],
+    contentTypes: "all",
+    order: 200,
+    group: "share",
+  },
+
   // ─── TOOLBELT: Text formatting (matches current BubbleMenu) ───
   {
     id: "bold",

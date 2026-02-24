@@ -11,6 +11,7 @@ import {
   createContext,
   useContext,
   useRef,
+  useEffect,
   useMemo,
   type ReactNode,
 } from "react";
@@ -81,4 +82,25 @@ export function ToolSurfaceProvider({
  */
 export function useToolSurface(): ToolSurfaceContextValue | null {
   return useContext(ToolSurfaceContext);
+}
+
+/**
+ * Hook for components to register handlers for specific tools.
+ * Automatically cleans up on unmount or when handler changes.
+ */
+export function useRegisterToolHandler(
+  toolId: string,
+  handler: (() => void) | undefined
+) {
+  const ctx = useToolSurface();
+  useEffect(() => {
+    if (ctx && handler) {
+      ctx.registerHandler(toolId, handler);
+    }
+    return () => {
+      if (ctx) {
+        ctx.registerHandler(toolId, () => {});
+      }
+    };
+  }, [ctx, toolId, handler]);
 }

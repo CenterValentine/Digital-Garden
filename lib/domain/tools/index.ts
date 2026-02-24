@@ -14,4 +14,8 @@ export type {
 
 export { queryTools, getToolById, getToolGroups } from "./registry";
 
-export { ToolSurfaceProvider, useToolSurface } from "./context";
+export {
+  ToolSurfaceProvider,
+  useToolSurface,
+  useRegisterToolHandler,
+} from "./context";

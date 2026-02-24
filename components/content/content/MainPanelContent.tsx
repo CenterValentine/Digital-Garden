@@ -9,7 +9,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { ToolSurfaceProvider } from "@/lib/domain/tools";
+import { ToolSurfaceProvider, useRegisterToolHandler } from "@/lib/domain/tools";
 import { ContentToolbar } from "../toolbar";
 import type { ContentType as ToolContentType } from "@/lib/domain/tools";
 import { toast } from "sonner";
@@ -526,6 +526,39 @@ export function MainPanelContent() {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [toggleDebugPanel]);
+
+  // ─── Tool Surface Handlers ───
+  const handleExportMarkdown = useCallback(async () => {
+    if (!selectedContentId) return;
+    try {
+      const response = await fetch(`/api/content/export/${selectedContentId}`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ format: "markdown" }),
+      });
+      if (!response.ok) throw new Error("Export failed");
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${noteTitle || "export"}.md`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success("Exported as Markdown");
+    } catch {
+      toast.error("Export failed");
+    }
+  }, [selectedContentId, noteTitle]);
+
+  const handleCopyLink = useCallback(() => {
+    const url = window.location.href;
+    navigator.clipboard.writeText(url);
+    toast.success("Link copied to clipboard");
+  }, []);
+
+  useRegisterToolHandler("export-markdown", handleExportMarkdown);
+  useRegisterToolHandler("copy-link", handleCopyLink);
 
   // Welcome screen when no note selected
   if (!selectedContentId) {
