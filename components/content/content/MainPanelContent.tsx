@@ -10,6 +10,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { ToolSurfaceProvider } from "@/lib/domain/tools";
+import { ContentToolbar } from "../toolbar";
 import type { ContentType as ToolContentType } from "@/lib/domain/tools";
 import { toast } from "sonner";
 import { Allotment } from "allotment";
@@ -689,6 +690,7 @@ export function MainPanelContent() {
   return (
     <ToolSurfaceProvider contentType={(contentType as ToolContentType) ?? null}>
       {selectedContentId && <MainPanelNavigation />}
+      {selectedContentId && <ContentToolbar />}
       {contentElement}
     </ToolSurfaceProvider>
   );
