@@ -2,15 +2,20 @@
  * BubbleMenu Component
  *
  * Floating toolbar that appears when text is selected.
- * Reads tool definitions from the Tool Surfaces registry for ordering
- * and grouping, while keeping editor commands local.
+ * Uses tool definitions from the registry for ordering and grouping,
+ * but reads them statically (no React hooks) to avoid interfering
+ * with TipTap's internal ProseMirror plugin lifecycle.
  *
- * Fallback: renders original hardcoded buttons if registry is unavailable.
+ * Editor commands and active-state checks remain local.
+ *
+ * Note: All buttons use onMouseDown={e => e.preventDefault()} to prevent
+ * the browser from stealing focus from the editor, which would collapse
+ * the selection and permanently hide the bubble menu.
  */
 
 "use client";
 
-import { useMemo, type ComponentType } from "react";
+import type { ComponentType } from "react";
 import { BubbleMenu as TipTapBubbleMenu } from "@tiptap/react/menus";
 import type { Editor } from "@tiptap/core";
 import { PluginKey } from "@tiptap/pm/state";
@@ -24,13 +29,34 @@ import {
   Heading2,
   Heading3,
 } from "lucide-react";
-import { useToolSurface } from "@/lib/domain/tools";
-import type { ToolInstance } from "@/lib/domain/tools";
+import { queryTools } from "@/lib/domain/tools";
+import type { ToolDefinition } from "@/lib/domain/tools";
 
 // Create unique plugin key for this bubble menu
 const textFormattingBubbleMenuKey = new PluginKey("textFormattingBubbleMenu");
 
-/** Map tool IDs to lucide icons (local to BubbleMenu) */
+/** Prevent focus theft — keeps editor selection alive when clicking toolbar buttons */
+const preventFocusLoss = (e: React.MouseEvent) => e.preventDefault();
+
+// ─── Static registry data (computed once at module load, no hooks) ───
+
+const TOOLBELT_TOOLS = queryTools({ surface: "toolbelt", contentType: "note" });
+
+/** Pre-computed groups for divider placement */
+const TOOLBELT_GROUPS: { groupId: string; tools: ToolDefinition[] }[] = [];
+{
+  let currentGroup = "";
+  for (const tool of TOOLBELT_TOOLS) {
+    const group = tool.group ?? "";
+    if (group !== currentGroup) {
+      TOOLBELT_GROUPS.push({ groupId: group, tools: [] });
+      currentGroup = group;
+    }
+    TOOLBELT_GROUPS[TOOLBELT_GROUPS.length - 1].tools.push(tool);
+  }
+}
+
+/** Map tool IDs to lucide icons */
 const TOOLBELT_ICONS: Record<string, ComponentType<{ className?: string }>> = {
   bold: Bold,
   italic: Italic,
@@ -42,7 +68,7 @@ const TOOLBELT_ICONS: Record<string, ComponentType<{ className?: string }>> = {
   "heading-3": Heading3,
 };
 
-/** Map tool IDs to editor commands (local to BubbleMenu) */
+/** Map tool IDs to editor commands */
 function getEditorCommand(
   toolId: string,
   editor: Editor,
@@ -102,29 +128,11 @@ export interface BubbleMenuProps {
 }
 
 export function BubbleMenu({ editor, onLinkClick }: BubbleMenuProps) {
-  const toolSurface = useToolSurface();
-
-  // Get toolbelt tools from registry, sorted by order
-  const tools = useMemo(() => {
-    return toolSurface?.getToolsForSurface("toolbelt") ?? [];
-  }, [toolSurface]);
-
-  if (!editor) return null;
-
-  // Group tools by group ID for visual separation (dividers between groups)
-  const groups: { groupId: string; tools: ToolInstance[] }[] = [];
-  let currentGroup = "";
-  for (const tool of tools) {
-    const group = tool.definition.group ?? "";
-    if (group !== currentGroup) {
-      groups.push({ groupId: group, tools: [] });
-      currentGroup = group;
-    }
-    groups[groups.length - 1].tools.push(tool);
+  if (!editor) {
+    return null;
   }
 
-  // Shared TipTap BubbleMenu wrapper (same for both paths)
-  const menuWrapper = (children: React.ReactNode) => (
+  return (
     <TipTapBubbleMenu
       editor={editor}
       pluginKey={textFormattingBubbleMenuKey}
@@ -138,142 +146,32 @@ export function BubbleMenu({ editor, onLinkClick }: BubbleMenuProps) {
       }}
       className="flex items-center gap-1 rounded-lg border border-white/10 bg-black/80 p-1 shadow-lg backdrop-blur-md"
     >
-      {children}
+      {TOOLBELT_GROUPS.map((group, groupIdx) => (
+        <div key={group.groupId} className="flex items-center gap-1">
+          {groupIdx > 0 && <div className="mx-1 h-6 w-px bg-white/10" />}
+
+          {group.tools.map((tool) => {
+            const IconComponent = TOOLBELT_ICONS[tool.id];
+            const active = isToolActive(tool.id, editor);
+            const command = getEditorCommand(tool.id, editor, onLinkClick);
+
+            return (
+              <button
+                key={tool.id}
+                onMouseDown={preventFocusLoss}
+                onClick={() => command?.()}
+                className={`rounded p-1.5 transition-colors hover:bg-white/10 ${
+                  active ? "bg-white/20 text-white" : "text-gray-400"
+                }`}
+                title={getToolTitle(tool.id, editor, tool.shortcut)}
+                type="button"
+              >
+                {IconComponent && <IconComponent className="h-4 w-4" />}
+              </button>
+            );
+          })}
+        </div>
+      ))}
     </TipTapBubbleMenu>
-  );
-
-  // ─── Registry-driven path ───
-  if (groups.length > 0) {
-    return menuWrapper(
-      <>
-        {groups.map((group, groupIdx) => (
-          <div key={group.groupId} className="flex items-center gap-1">
-            {groupIdx > 0 && <div className="mx-1 h-6 w-px bg-white/10" />}
-
-            {group.tools.map((tool) => {
-              const IconComponent = TOOLBELT_ICONS[tool.definition.id];
-              const active = isToolActive(tool.definition.id, editor);
-              const command = getEditorCommand(
-                tool.definition.id,
-                editor,
-                onLinkClick
-              );
-
-              return (
-                <button
-                  key={tool.definition.id}
-                  onClick={() => command?.()}
-                  className={`rounded p-1.5 transition-colors hover:bg-white/10 ${
-                    active ? "bg-white/20 text-white" : "text-gray-400"
-                  }`}
-                  title={getToolTitle(
-                    tool.definition.id,
-                    editor,
-                    tool.definition.shortcut
-                  )}
-                  type="button"
-                >
-                  {IconComponent && <IconComponent className="h-4 w-4" />}
-                </button>
-              );
-            })}
-          </div>
-        ))}
-      </>
-    );
-  }
-
-  // ─── Fallback: original hardcoded buttons (safety net) ───
-  return menuWrapper(
-    <>
-      <button
-        onClick={() => editor.chain().focus().toggleBold().run()}
-        className={`rounded p-1.5 transition-colors hover:bg-white/10 ${
-          editor.isActive("bold") ? "bg-white/20 text-white" : "text-gray-400"
-        }`}
-        title="Bold (Cmd+B)"
-        type="button"
-      >
-        <Bold className="h-4 w-4" />
-      </button>
-      <button
-        onClick={() => editor.chain().focus().toggleItalic().run()}
-        className={`rounded p-1.5 transition-colors hover:bg-white/10 ${
-          editor.isActive("italic") ? "bg-white/20 text-white" : "text-gray-400"
-        }`}
-        title="Italic (Cmd+I)"
-        type="button"
-      >
-        <Italic className="h-4 w-4" />
-      </button>
-      <button
-        onClick={() => editor.chain().focus().toggleStrike().run()}
-        className={`rounded p-1.5 transition-colors hover:bg-white/10 ${
-          editor.isActive("strike") ? "bg-white/20 text-white" : "text-gray-400"
-        }`}
-        title="Strikethrough"
-        type="button"
-      >
-        <Strikethrough className="h-4 w-4" />
-      </button>
-      <button
-        onClick={() => editor.chain().focus().toggleCode().run()}
-        className={`rounded p-1.5 transition-colors hover:bg-white/10 ${
-          editor.isActive("code") ? "bg-white/20 text-white" : "text-gray-400"
-        }`}
-        title="Inline Code (Cmd+E)"
-        type="button"
-      >
-        <Code className="h-4 w-4" />
-      </button>
-      <div className="mx-1 h-6 w-px bg-white/10" />
-      <button
-        onClick={() => {
-          if (editor.isActive("link")) {
-            editor.chain().focus().unsetLink().run();
-          } else {
-            onLinkClick?.();
-          }
-        }}
-        className={`rounded p-1.5 transition-colors hover:bg-white/10 ${
-          editor.isActive("link") ? "bg-white/20 text-white" : "text-gray-400"
-        }`}
-        title={editor.isActive("link") ? "Remove Link" : "Add Link (Cmd+K)"}
-        type="button"
-      >
-        <LinkIcon className="h-4 w-4" />
-      </button>
-      <div className="mx-1 h-6 w-px bg-white/10" />
-      <button
-        onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
-        className={`rounded p-1.5 transition-colors hover:bg-white/10 ${
-          editor.isActive("heading", { level: 1 }) ? "bg-white/20 text-white" : "text-gray-400"
-        }`}
-        title="Heading 1"
-        type="button"
-      >
-        <Heading1 className="h-4 w-4" />
-      </button>
-      <button
-        onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
-        className={`rounded p-1.5 transition-colors hover:bg-white/10 ${
-          editor.isActive("heading", { level: 2 }) ? "bg-white/20 text-white" : "text-gray-400"
-        }`}
-        title="Heading 2"
-        type="button"
-      >
-        <Heading2 className="h-4 w-4" />
-      </button>
-      <button
-        onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
-        className={`rounded p-1.5 transition-colors hover:bg-white/10 ${
-          editor.isActive("heading", { level: 3 }) ? "bg-white/20 text-white" : "text-gray-400"
-        }`}
-        title="Heading 3"
-        type="button"
-      >
-        <Heading3 className="h-4 w-4" />
-      </button>
-    </>
   );
 }
