@@ -8,8 +8,8 @@
 
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { ToolSurfaceProvider, useRegisterToolHandler } from "@/lib/domain/tools";
+import { useState, useEffect, useCallback, useMemo } from "react";
+import { ToolSurfaceProvider } from "@/lib/domain/tools";
 import { ContentToolbar } from "../toolbar";
 import { ToolDebugPanel } from "../toolbar/ToolDebugPanel";
 import type { ContentType as ToolContentType } from "@/lib/domain/tools";
@@ -569,8 +569,12 @@ export function MainPanelContent() {
     toast.success("Link copied to clipboard");
   }, []);
 
-  useRegisterToolHandler("export-markdown", handleExportMarkdown);
-  useRegisterToolHandler("copy-link", handleCopyLink);
+  // Handlers passed as prop to ToolSurfaceProvider (can't use useRegisterToolHandler
+  // here because this component renders the provider — useContext sees the parent, not self)
+  const toolHandlers = useMemo(() => ({
+    "export-markdown": handleExportMarkdown,
+    "copy-link": handleCopyLink,
+  }), [handleExportMarkdown, handleCopyLink]);
 
   // Welcome screen when no note selected
   if (!selectedContentId) {
@@ -733,7 +737,7 @@ export function MainPanelContent() {
 
   // Render navigation once, then content below
   return (
-    <ToolSurfaceProvider contentType={(contentType as ToolContentType) ?? null}>
+    <ToolSurfaceProvider contentType={(contentType as ToolContentType) ?? null} handlers={toolHandlers}>
       {selectedContentId && <MainPanelNavigation />}
       {selectedContentId && <ContentToolbar />}
       {contentElement}

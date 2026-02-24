@@ -31,15 +31,27 @@ const ToolSurfaceContext = createContext<ToolSurfaceContextValue | null>(null);
 
 interface ToolSurfaceProviderProps {
   contentType: ContentType | null;
+  /** Handlers registered by the parent component (which can't use useRegisterToolHandler since it renders the provider) */
+  handlers?: Record<string, () => void>;
   children: ReactNode;
 }
 
 export function ToolSurfaceProvider({
   contentType,
+  handlers,
   children,
 }: ToolSurfaceProviderProps) {
   // Handlers stored in ref to avoid re-renders when they register/unregister
   const handlersRef = useRef<Map<string, () => void>>(new Map());
+
+  // Sync prop-level handlers into the ref (for the parent component that renders us)
+  useEffect(() => {
+    if (handlers) {
+      for (const [toolId, handler] of Object.entries(handlers)) {
+        handlersRef.current.set(toolId, handler);
+      }
+    }
+  }, [handlers]);
 
   const value = useMemo<ToolSurfaceContextValue>(
     () => ({
