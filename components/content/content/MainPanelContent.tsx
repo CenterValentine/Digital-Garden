@@ -9,6 +9,8 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { ToolSurfaceProvider } from "@/lib/domain/tools";
+import type { ContentType as ToolContentType } from "@/lib/domain/tools";
 import { toast } from "sonner";
 import { Allotment } from "allotment";
 import { useContentStore } from "@/state/content-store";
@@ -685,10 +687,10 @@ export function MainPanelContent() {
 
   // Render navigation once, then content below
   return (
-    <>
+    <ToolSurfaceProvider contentType={(contentType as ToolContentType) ?? null}>
       {selectedContentId && <MainPanelNavigation />}
       {contentElement}
-    </>
+    </ToolSurfaceProvider>
   );
 }
 

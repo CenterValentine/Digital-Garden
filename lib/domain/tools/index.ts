@@ -13,3 +13,5 @@ export type {
 } from "./types";
 
 export { queryTools, getToolById, getToolGroups } from "./registry";
+
+export { ToolSurfaceProvider, useToolSurface } from "./context";
