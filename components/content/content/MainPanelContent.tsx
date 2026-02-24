@@ -94,6 +94,7 @@ interface ContentResponse {
 export function MainPanelContent() {
   const selectedContentId = useContentStore((state) => state.selectedContentId);
   const setSelectedContentId = useContentStore((state) => state.setSelectedContentId);
+  const setSelectedContentType = useContentStore((state) => state.setSelectedContentType);
   const clearSelection = useContentStore((state) => state.clearSelection);
   const { setStats, setLastSaved, setIsSaving, setHasUnsavedChanges, reset: resetStats } = useEditorStatsStore();
   const { setOutline, clearOutline } = useOutlineStore();
@@ -183,6 +184,7 @@ export function MainPanelContent() {
 
         setNoteTitle(result.data.title);
         setContentType(result.data.contentType);
+        setSelectedContentType(result.data.contentType);
 
         // Store payload data for Phase 2 content types
         switch (result.data.contentType) {

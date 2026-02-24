@@ -12,12 +12,16 @@ import { create } from "zustand";
 export interface ContentState {
   /** Currently selected content ID (for editor) */
   selectedContentId: string | null;
+  /** Content type of the currently selected item (note, folder, external, etc.) */
+  selectedContentType: string | null;
   /** Multi-selected IDs (for batch operations) */
   multiSelectedIds: string[];
   /** Last clicked ID (for shift-click range selection) */
   lastClickedId: string | null;
   /** Set selected content */
   setSelectedContentId: (id: string | null) => void;
+  /** Set the content type of the selected item */
+  setSelectedContentType: (type: string | null) => void;
   /** Clear selection */
   clearSelection: () => void;
   /** Toggle multi-selection (Cmd+Click) */
@@ -32,11 +36,16 @@ export interface ContentState {
 
 export const useContentStore = create<ContentState>((set, get) => ({
   selectedContentId: null,
+  selectedContentType: null,
   multiSelectedIds: [],
   lastClickedId: null,
 
+  setSelectedContentType: (type) => {
+    set({ selectedContentType: type });
+  },
+
   setSelectedContentId: (id) => {
-    set({ selectedContentId: id });
+    set({ selectedContentId: id, selectedContentType: id ? get().selectedContentType : null });
 
     // Only run persistence in browser environment
     if (typeof window === "undefined") return;
