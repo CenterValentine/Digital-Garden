@@ -27,7 +27,7 @@ export function ContentToolbar() {
   }
 
   return (
-    <div className="flex items-center gap-1 border-b border-white/10 px-3 py-1.5">
+    <div className="flex items-center gap-1 border-b border-white/10 bg-white/[0.02] px-4 py-1">
       {tools.map((tool) => {
         const Icon = ICON_MAP[tool.definition.iconName];
         return (
@@ -35,7 +35,7 @@ export function ContentToolbar() {
             key={tool.definition.id}
             onClick={tool.execute}
             disabled={tool.isDisabled}
-            className="flex items-center gap-1.5 rounded px-2 py-1 text-xs text-gray-400 transition-colors hover:bg-white/10 hover:text-gray-200 disabled:opacity-50"
+            className="flex items-center gap-1.5 rounded px-2.5 py-1 text-xs font-medium text-gray-300 transition-colors hover:bg-white/10 hover:text-white disabled:opacity-50"
             title={tool.definition.label}
             type="button"
           >
