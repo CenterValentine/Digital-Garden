@@ -11,6 +11,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { ToolSurfaceProvider, useRegisterToolHandler } from "@/lib/domain/tools";
 import { ContentToolbar } from "../toolbar";
+import { ToolDebugPanel } from "../toolbar/ToolDebugPanel";
 import type { ContentType as ToolContentType } from "@/lib/domain/tools";
 import { toast } from "sonner";
 import { Allotment } from "allotment";
@@ -727,6 +728,7 @@ export function MainPanelContent() {
       {selectedContentId && <MainPanelNavigation />}
       {selectedContentId && <ContentToolbar />}
       {contentElement}
+      {process.env.NODE_ENV === "development" && <ToolDebugPanel />}
     </ToolSurfaceProvider>
   );
 }
