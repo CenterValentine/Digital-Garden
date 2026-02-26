@@ -56,6 +56,9 @@ export {
 } from "./checksum";
 export type { IntegrityCheckResult } from "./checksum";
 
+// Tag sync
+export { syncContentTags } from "./tag-sync";
+
 // Markdown conversion
 export {
   markdownToTiptap,

@@ -20,6 +20,7 @@ import { useEditorStatsStore } from "@/state/editor-stats-store";
 import { useOutlineStore } from "@/state/outline-store";
 import { useDebugViewStore } from "@/state/debug-view-store";
 import { MarkdownEditor } from "../editor/MarkdownEditor";
+import { ExpandableEditor } from "../editor/ExpandableEditor";
 import { FileViewer } from "../viewer/FileViewer";
 import { FolderViewer } from "../viewer/FolderViewer";
 import { ExternalViewer } from "../viewer/ExternalViewer";
@@ -569,12 +570,66 @@ export function MainPanelContent() {
     toast.success("Link copied to clipboard");
   }, []);
 
+  const handleImportMarkdown = useCallback(() => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".md,.json";
+    input.multiple = true; // Allow .md + .meta.json together
+
+    input.onchange = async (e) => {
+      const files = (e.target as HTMLInputElement).files;
+      if (!files || files.length === 0) return;
+
+      const formData = new FormData();
+      for (const file of Array.from(files)) {
+        if (file.name.endsWith(".meta.json")) {
+          formData.append("sidecar", file);
+        } else {
+          formData.append("file", file);
+        }
+      }
+
+      // Use current selection as parentId if it's a folder
+      if (contentType === "folder" && selectedContentId) {
+        formData.append("parentId", selectedContentId);
+      }
+
+      try {
+        const response = await fetch("/api/content/import", {
+          method: "POST",
+          credentials: "include",
+          body: formData,
+        });
+        const result = await response.json();
+
+        if (result.success) {
+          toast.success(`Imported "${result.data.title}"`);
+          if (result.data.warnings?.length > 0) {
+            toast.warning(`${result.data.warnings.length} import warnings`);
+          }
+          // Navigate to the imported note
+          if (result.data.contentId) {
+            setSelectedContentId(result.data.contentId);
+            setSelectedContentType("note");
+          }
+        } else {
+          toast.error(result.error?.message || "Import failed");
+        }
+      } catch {
+        toast.error("Import failed");
+      }
+    };
+
+    input.click();
+  }, [contentType, selectedContentId, setSelectedContentId, setSelectedContentType]);
+
   // Handlers passed as prop to ToolSurfaceProvider (can't use useRegisterToolHandler
   // here because this component renders the provider — useContext sees the parent, not self)
   const toolHandlers = useMemo(() => ({
+    "import-markdown": handleImportMarkdown,
     "export-markdown": handleExportMarkdown,
     "copy-link": handleCopyLink,
-  }), [handleExportMarkdown, handleCopyLink]);
+  }), [handleImportMarkdown, handleExportMarkdown, handleCopyLink]);
 
   // Welcome screen when no note selected
   if (!selectedContentId) {
@@ -735,12 +790,28 @@ export function MainPanelContent() {
     contentElement = null;
   }
 
+  // For non-note content types, append the expandable notes editor
+  // This lets any content type (file, folder, external, etc.) have attached notes
+  const isNonNoteContent = contentType && contentType !== "note" && selectedContentId && !error;
+
   // Render navigation once, then content below
   return (
     <ToolSurfaceProvider contentType={(contentType as ToolContentType) ?? null} handlers={toolHandlers}>
       {selectedContentId && <MainPanelNavigation />}
       {selectedContentId && <ContentToolbar />}
-      {contentElement}
+      {isNonNoteContent ? (
+        <div className="flex-1 flex flex-col overflow-y-auto">
+          <div className="flex-1">{contentElement}</div>
+          <ExpandableEditor
+            contentId={selectedContentId}
+            contentType={contentType}
+            noteContent={noteContent}
+            onSave={handleSave}
+          />
+        </div>
+      ) : (
+        contentElement
+      )}
       {process.env.NODE_ENV === "development" && <ToolDebugPanel />}
     </ToolSurfaceProvider>
   );

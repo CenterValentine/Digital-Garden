@@ -11,6 +11,15 @@ import type { ToolDefinition, ToolQuery, ToolSurface } from "./types";
 const TOOL_REGISTRY: ToolDefinition[] = [
   // ─── TOOLBAR: Content header actions ───
   {
+    id: "import-markdown",
+    label: "Import",
+    iconName: "Upload",
+    surfaces: ["toolbar"],
+    contentTypes: "all",
+    order: 90,
+    group: "import",
+  },
+  {
     id: "export-markdown",
     label: "Export",
     iconName: "Download",
