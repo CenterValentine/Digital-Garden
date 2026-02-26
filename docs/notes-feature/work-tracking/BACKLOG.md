@@ -1,5 +1,5 @@
 ---
-last_updated: 2026-02-18
+last_updated: 2026-02-24
 ---
 
 # Sprint Backlog
@@ -102,8 +102,66 @@ last_updated: 2026-02-18
   - Validation for each payload type
   - Error handling
 
-## Sprint 29-30: TBD
-**Duration**: Mar 18-31, 2026 (Planned)
+## Sprint 29: Tool Surfaces Architecture ✅ COMPLETE
+**Duration**: Feb 19-24, 2026 (Completed)
+**Branch**: `content/tool-surfaces`
+**Plan**: `~/.claude/plans/breezy-doodling-babbage.md`
+
+Declarative tool registry mapping tools to UI surfaces (toolbar, toolbelt, sidebar-tab) with content-type filtering. See `lib/domain/tools/`.
+
+- [x] Pure types (ToolSurface, ToolDefinition, ToolInstance, ToolQuery)
+- [x] Static registry + queryTools() filter/sort
+- [x] ToolSurfaceProvider context + handler registration
+- [x] ContentToolbar component (export, copy link)
+- [x] BubbleMenu wired to registry (module-level, no hooks) + focus fix
+- [x] RightSidebarHeader wired to registry (dynamic tabs by content type)
+- [x] ToolDebugPanel (dev-only, Cmd+Shift+T)
+
+## Sprint 30: Universal Expandable TipTap Editor ✅ COMPLETE
+**Duration**: Feb 25, 2026
+**Branch**: `content/universal-notes`
+**Plan**: `~/.claude/plans/sleepy-jingling-quiche.md` (Sprint 30 section)
+
+Every content type gets a collapsible TipTap editor for annotations/notes. Centralized integration in MainPanelContent (not per-viewer).
+
+- [x] **UE-001**: ExpandableEditor component (5 pts)
+  - `components/content/editor/ExpandableEditor.tsx`
+  - Reuses MarkdownEditor with compact mode
+  - Per-node expansion state in localStorage
+  - Word count badge when content exists
+
+- [x] **UE-002**: Integrate into MainPanelContent (5 pts)
+  - Centralized: wraps all non-note viewers with ExpandableEditor
+  - No per-viewer modifications needed
+  - Uses existing noteContent + handleSave from MainPanelContent
+
+- [x] **UE-003**: MarkdownEditor compact mode (3 pts)
+  - `compact` prop: smaller prose, compact padding (120px min-height)
+  - `placeholder` prop accepted (not yet wired through extension factory)
+
+- [x] **UE-004**: API upsert for notePayload (2 pts)
+  - PATCH uses `prisma.notePayload.upsert()` (was conditional update)
+  - Any content type can now create/update notes via API
+
+**Known Issues**:
+- BubbleMenu focus-theft regression (pre-existing, not caused by Sprint 30)
+
+## Sprint 31: Lossless Export/Import Round-Trip ✅ COMPLETE
+**Duration**: Feb 25-26, 2026 (Completed)
+**Branch**: `content/universal-notes`
+
+Lossless export/import round-trip. Custom two-pass parser, sidecar consumption, toolbar integration.
+
+- [x] **IM-001**: Markdown→TipTap parser — core syntax (5 pts)
+- [x] **IM-002**: Markdown→TipTap parser — semantic extensions (5 pts)
+- [x] **IM-003**: Sidecar reader — metadata restoration (3 pts)
+- [x] **IM-004**: Import API endpoint (3 pts)
+- [x] **IM-005**: Import button in ContentToolbar (2 pts)
+- [x] **IM-006**: Round-trip verification utility (2 pts)
+
+**Pending**: Manual testing (macOS Finder file picker not working)
+
+## Sprint 32+: TBD
 **Estimated**: 18-22 story points
 
 ### Potential Work Items
@@ -187,5 +245,5 @@ last_updated: 2026-02-18
 
 ---
 
-**Last Updated**: Feb 18, 2026
-**Next Review**: Mar 3, 2026 (Sprint 27 retrospective)
+**Last Updated**: Feb 24, 2026
+**Next Review**: After Sprint 30 completion
