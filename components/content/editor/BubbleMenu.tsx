@@ -35,8 +35,16 @@ import type { ToolDefinition } from "@/lib/domain/tools";
 // Create unique plugin key for this bubble menu
 const textFormattingBubbleMenuKey = new PluginKey("textFormattingBubbleMenu");
 
-/** Prevent focus theft — keeps editor selection alive when clicking toolbar buttons */
-const preventFocusLoss = (e: React.MouseEvent) => e.preventDefault();
+/**
+ * Prevent focus theft — keeps editor selection alive when clicking toolbar buttons.
+ * Must preventDefault AND stopPropagation to prevent both:
+ * 1. Browser default: moving focus to the clicked button
+ * 2. ProseMirror: processing mousedown as an editor interaction
+ */
+const preventFocusLoss = (e: React.MouseEvent) => {
+  e.preventDefault();
+  e.stopPropagation();
+};
 
 // ─── Static registry data (computed once at module load, no hooks) ───
 
