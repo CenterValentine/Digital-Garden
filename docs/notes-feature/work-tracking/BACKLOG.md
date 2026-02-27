@@ -1,5 +1,5 @@
 ---
-last_updated: 2026-02-24
+last_updated: 2026-02-27
 ---
 
 # Sprint Backlog
@@ -143,8 +143,7 @@ Every content type gets a collapsible TipTap editor for annotations/notes. Centr
   - PATCH uses `prisma.notePayload.upsert()` (was conditional update)
   - Any content type can now create/update notes via API
 
-**Known Issues**:
-- BubbleMenu focus-theft regression (pre-existing, not caused by Sprint 30)
+**Known Issues**: None remaining (BubbleMenu regression fixed in Sprint 32)
 
 ## Sprint 31: Lossless Export/Import Round-Trip ✅ COMPLETE
 **Duration**: Feb 25-26, 2026 (Completed)
@@ -161,7 +160,32 @@ Lossless export/import round-trip. Custom two-pass parser, sidecar consumption, 
 
 **Pending**: Manual testing (macOS Finder file picker not working)
 
-## Sprint 32+: TBD
+## Sprint 32: Editor Stability & Polish ✅ COMPLETE
+**Duration**: Feb 26-27, 2026 (Completed)
+**Branch**: `content/sprint-32`
+**Plan**: `~/.claude/plans/breezy-doodling-babbage.md`
+
+Post-feature stability sprint. Fixed regressions from Sprints 29-31.
+
+- [x] **BM-001**: BubbleMenu cross-contamination fix (5 pts)
+  - Root cause: TipTap React wrapper uses shared `"bubbleMenu"` meta key for all instances
+  - TableBubbleMenu's inline `shouldShow` overwrote text BubbleMenu's `shouldShow` on every re-render
+  - Fix: Stable module-level `shouldShow` for both menus; removed `.focus()` from commands; removed invalid `tippyOptions`
+- [x] **OL-001**: Outline click-to-scroll (3 pts)
+  - CustomEvent bridge (`scroll-to-heading`) from RightSidebarContent to MarkdownEditor
+  - Text+level matching via `editor.state.doc.descendants()`
+  - `activeHeadingId` state in outline store for highlight sync
+- [x] **BF-001**: ExpandableEditor tag/wiki-link threading (3 pts)
+  - Threaded `fetchTags`, `createTag`, `fetchNotesForWikiLink`, `onWikiLinkClick` from MainPanelContent → ExpandableEditor → MarkdownEditor
+- [x] **BF-002**: Keyboard event scoping (1 pt)
+  - `onKeyDown` stopPropagation on ExpandableEditor container
+- [x] **BF-003**: Tag/heading `# ` input rule conflict (2 pts)
+  - Space with empty query propagates to ProseMirror heading input rule
+  - Space with non-empty query + items selects tag
+- [x] **BF-004**: tag-suggestion runtime error guard (1 pt)
+  - Guard `component?.ref` against undefined in `onKeyDown`
+
+## Sprint 33+: TBD
 **Estimated**: 18-22 story points
 
 ### Potential Work Items

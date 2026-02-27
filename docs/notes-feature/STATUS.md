@@ -1,8 +1,8 @@
 ---
-last_updated: 2026-02-26
+last_updated: 2026-02-27
 current_epoch: 5
 current_sprint: 32
-sprint_status: in_progress
+sprint_status: complete
 ---
 
 # Digital Garden Content IDE - Status
@@ -33,10 +33,10 @@ Emojis: ✅ Completed | 🟡 In Progress | ⚪ Planned | 🚫 Blocked
 
 ## 🎯 Current Work
 
-### Active Sprint: Sprint 32
-**Duration**: Feb 26, 2026
-**Goal**: TBD (planning in progress)
-**Branch**: TBD
+### Active Sprint: Sprint 32 ✅ COMPLETE
+**Duration**: Feb 26-27, 2026
+**Goal**: Editor stability & polish — fix regressions from Sprints 29-31
+**Branch**: `content/sprint-32`
 
 ### Active Epoch: Epoch 5 - Advanced Content Types
 **Duration**: Feb-Mar 2026 (8 weeks)
@@ -50,6 +50,16 @@ Emojis: ✅ Completed | 🟡 In Progress | ⚪ Planned | 🚫 Blocked
 **See**: [Epoch 5 Details](work-tracking/epochs/epoch-5-advanced-content-types.md)
 
 ## ✅ Recent Completions (Last 30 Days)
+
+**Feb 27, 2026**: Sprint 32 Editor Stability & Polish Complete
+- ✅ BubbleMenu persistence fix — root cause was TipTap React wrapper's shared `"bubbleMenu"` meta key causing cross-contamination between text and table BubbleMenu instances; stabilized shouldShow callbacks to module-level functions
+- ✅ Removed `.focus()` from BubbleMenu command chains (prevents focus/blur cycle exhausting preventHide flag)
+- ✅ Removed invalid `tippyOptions` prop (TipTap v3 uses Floating UI, not tippy.js)
+- ✅ Outline click-to-scroll via CustomEvent bridge pattern (text+level matching)
+- ✅ ExpandableEditor tag/wiki-link callback threading (fetchTags, createTag, fetchNotesForWikiLink, onWikiLinkClick)
+- ✅ Keyboard event scoping — `stopPropagation` on ExpandableEditor container
+- ✅ Tag/heading `# ` conflict fix — Space with empty query propagates to ProseMirror heading input rule
+- ✅ tag-suggestion `component.ref` runtime error guard
 
 **Feb 26, 2026**: Sprint 31 Lossless Export/Import Round-Trip Complete
 - ✅ Custom two-pass markdown parser (block + inline) → TipTap JSON
@@ -95,9 +105,9 @@ Emojis: ✅ Completed | 🟡 In Progress | ⚪ Planned | 🚫 Blocked
 - ✅ Bulk vault export as ZIP
 - ✅ Obsidian-compatible Markdown export
 
-## 📋 Up Next (Sprint 32)
+## 📋 Up Next (Sprint 33)
 
-Planning in progress. See [Backlog](work-tracking/BACKLOG.md) for candidates.
+Planning not started. See [Backlog](work-tracking/BACKLOG.md) for candidates.
 
 ## 🚧 Known Issues & Blockers
 
@@ -105,11 +115,10 @@ Planning in progress. See [Backlog](work-tracking/BACKLOG.md) for candidates.
 - **macOS Finder**: File picker not opening on dev machine — blocks manual testing of import feature
 
 ### Known Limitations
-- **BubbleMenu**: Focus-theft regression — disappears after one button click, requires page refresh (pre-existing, not caused by Sprint 30)
 - **Sprint 31 Import**: Untested pending Finder fix — parser, API, and toolbar button built but not manually verified
 - **PDF/DOCX Export**: Stub implementations (need Puppeteer/docx library integration)
 - **External Links**: Some sites have SSL certificate errors (require dev-mode bypass)
-- **Outline Panel**: Active heading auto-detection needs intersection observer
+- **Outline Panel**: Auto-scroll on editor scroll needs intersection observer (click-to-scroll works)
 
 ### Technical Debt
 - [ ] Migrate remaining M9-M11 docs to archive
@@ -122,12 +131,13 @@ Planning in progress. See [Backlog](work-tracking/BACKLOG.md) for candidates.
 - Sprint 29: ~20 points (Tool Surfaces)
 - Sprint 30: ~15 points (Universal Editor)
 - Sprint 31: ~20 points (Import System)
+- Sprint 32: ~15 points (Editor Stability & Polish)
 - **Average**: ~18 points/sprint
 
 ### Cumulative Progress (Epoch 5)
 - **Total Estimated**: 50-60 story points
-- **Completed**: ~78 points (Sprints 27-31)
-- **In Progress**: Sprint 32
+- **Completed**: ~93 points (Sprints 27-32)
+- **In Progress**: Sprint 33 (not started)
 - **Projected Completion**: Late February 2026
 
 ## 🗺️ Roadmap
@@ -163,5 +173,5 @@ Planning in progress. See [Backlog](work-tracking/BACKLOG.md) for candidates.
 
 ---
 
-**Last Updated**: Feb 18, 2026
-**Next Review**: Feb 19, 2026 (Daily standup)
+**Last Updated**: Feb 27, 2026
+**Next Review**: Sprint 33 planning
