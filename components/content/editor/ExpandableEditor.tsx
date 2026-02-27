@@ -31,6 +31,14 @@ interface ExpandableEditorProps {
   onSave: (content: JSONContent) => Promise<void>;
   /** Read-only mode */
   readOnly?: boolean;
+  /** Callback when a wiki-link is clicked */
+  onWikiLinkClick?: (targetTitle: string) => void;
+  /** Fetch notes for wiki-link autocomplete */
+  fetchNotesForWikiLink?: (query: string) => Promise<Array<{ id: string; title: string; slug: string }>>;
+  /** Fetch tags for tag autocomplete */
+  fetchTags?: (query: string) => Promise<Array<{ id: string; name: string; slug: string; color: string | null; usageCount: number }>>;
+  /** Create a new tag */
+  createTag?: (tagName: string) => Promise<{ id: string; name: string; slug: string; color: string | null; usageCount: number }>;
 }
 
 /**
@@ -83,6 +91,10 @@ export function ExpandableEditor({
   noteContent,
   onSave,
   readOnly = false,
+  onWikiLinkClick,
+  fetchNotesForWikiLink,
+  fetchTags,
+  createTag,
 }: ExpandableEditorProps) {
   const [isExpanded, setIsExpanded] = useExpandedState(contentId);
   const hasContent = hasNonEmptyContent(noteContent);
@@ -130,13 +142,20 @@ export function ExpandableEditor({
 
       {/* Expandable Editor */}
       {isExpanded && (
-        <div className="px-2 py-1">
+        <div
+          className="px-2 py-1"
+          onKeyDown={(e) => e.stopPropagation()}
+        >
           <MarkdownEditor
             content={editorContent}
             onSave={handleSave}
             editable={!readOnly}
             compact
             placeholder={`Add notes about this ${contentType}...`}
+            onWikiLinkClick={onWikiLinkClick}
+            fetchNotesForWikiLink={fetchNotesForWikiLink}
+            fetchTags={fetchTags}
+            createTag={createTag}
           />
         </div>
       )}

@@ -37,13 +37,13 @@ const textFormattingBubbleMenuKey = new PluginKey("textFormattingBubbleMenu");
 
 /**
  * Prevent focus theft — keeps editor selection alive when clicking toolbar buttons.
- * Must preventDefault AND stopPropagation to prevent both:
- * 1. Browser default: moving focus to the clicked button
- * 2. ProseMirror: processing mousedown as an editor interaction
+ * Only preventDefault is needed — this stops the browser from moving focus to the
+ * clicked button. Do NOT use stopPropagation here: TipTap's BubbleMenu plugin
+ * needs the mousedown event to propagate so it can track that an interaction
+ * occurred within the menu and keep it visible.
  */
 const preventFocusLoss = (e: React.MouseEvent) => {
   e.preventDefault();
-  e.stopPropagation();
 };
 
 // ─── Static registry data (computed once at module load, no hooks) ───
@@ -76,27 +76,36 @@ const TOOLBELT_ICONS: Record<string, ComponentType<{ className?: string }>> = {
   "heading-3": Heading3,
 };
 
-/** Map tool IDs to editor commands */
+/**
+ * Map tool IDs to editor commands.
+ *
+ * NOTE: We intentionally omit .focus() from the chain. The editor already
+ * has focus because preventFocusLoss() calls e.preventDefault() on mousedown,
+ * which stops the browser from moving focus to the clicked button. Adding
+ * .focus() is not only redundant but harmful — it can trigger a focus→blur→focus
+ * cycle that exhausts the plugin's one-shot `preventHide` flag, causing the
+ * BubbleMenu to hide itself on the subsequent blur.
+ */
 function getEditorCommand(
   toolId: string,
   editor: Editor,
   onLinkClick?: () => void
 ): (() => void) | undefined {
   const commands: Record<string, () => void> = {
-    bold: () => editor.chain().focus().toggleBold().run(),
-    italic: () => editor.chain().focus().toggleItalic().run(),
-    strikethrough: () => editor.chain().focus().toggleStrike().run(),
-    "code-inline": () => editor.chain().focus().toggleCode().run(),
+    bold: () => editor.chain().toggleBold().run(),
+    italic: () => editor.chain().toggleItalic().run(),
+    strikethrough: () => editor.chain().toggleStrike().run(),
+    "code-inline": () => editor.chain().toggleCode().run(),
     link: () => {
       if (editor.isActive("link")) {
-        editor.chain().focus().unsetLink().run();
+        editor.chain().unsetLink().run();
       } else {
         onLinkClick?.();
       }
     },
-    "heading-1": () => editor.chain().focus().toggleHeading({ level: 1 }).run(),
-    "heading-2": () => editor.chain().focus().toggleHeading({ level: 2 }).run(),
-    "heading-3": () => editor.chain().focus().toggleHeading({ level: 3 }).run(),
+    "heading-1": () => editor.chain().toggleHeading({ level: 1 }).run(),
+    "heading-2": () => editor.chain().toggleHeading({ level: 2 }).run(),
+    "heading-3": () => editor.chain().toggleHeading({ level: 3 }).run(),
   };
   return commands[toolId];
 }
@@ -130,6 +139,32 @@ function getToolTitle(toolId: string, editor: Editor, shortcut?: string): string
   return shortcut ? `${label} (${shortcut})` : label;
 }
 
+/**
+ * Stable shouldShow callback — defined at module level to avoid creating
+ * a new function reference on every render. The TipTap React BubbleMenu
+ * wrapper includes `shouldShow` in its useEffect dependency array; an
+ * inline arrow function creates a new reference each render, triggering
+ * constant `updateOptions` transaction dispatches.
+ */
+const bubbleMenuShouldShow = ({
+  state,
+  editor: ed,
+}: {
+  editor: Editor;
+  element: HTMLElement;
+  view: import("@tiptap/pm/view").EditorView;
+  state: import("@tiptap/pm/state").EditorState;
+  oldState?: import("@tiptap/pm/state").EditorState;
+  from: number;
+  to: number;
+}): boolean => {
+  const { selection } = state;
+  const { empty } = selection;
+  if (empty) return false;
+  if (ed.isActive("table")) return false;
+  return true;
+};
+
 export interface BubbleMenuProps {
   editor: Editor | null;
   onLinkClick?: () => void;
@@ -145,13 +180,7 @@ export function BubbleMenu({ editor, onLinkClick }: BubbleMenuProps) {
       editor={editor}
       pluginKey={textFormattingBubbleMenuKey}
       updateDelay={100}
-      shouldShow={({ state, editor: ed }) => {
-        const { selection } = state;
-        const { empty } = selection;
-        if (empty) return false;
-        if (ed.isActive("table")) return false;
-        return true;
-      }}
+      shouldShow={bubbleMenuShouldShow}
       className="flex items-center gap-1 rounded-lg border border-white/10 bg-black/80 p-1 shadow-lg backdrop-blur-md"
     >
       {TOOLBELT_GROUPS.map((group, groupIdx) => (

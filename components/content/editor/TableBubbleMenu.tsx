@@ -26,6 +26,20 @@ import {
 // Create unique plugin key for this bubble menu
 const tableBubbleMenuKey = new PluginKey("tableBubbleMenu");
 
+/**
+ * Stable shouldShow callback — defined at module level to prevent
+ * cross-contamination between BubbleMenu instances.
+ *
+ * CRITICAL: TipTap's React BubbleMenu wrapper uses a shared meta key
+ * ("bubbleMenu") for ALL instances. When shouldShow is an inline function,
+ * every re-render triggers an updateOptions transaction that overwrites
+ * OTHER BubbleMenu instances' shouldShow. By stabilizing the reference,
+ * the useEffect never fires, preventing this cross-contamination.
+ */
+const tableShouldShow = ({ editor }: { editor: Editor; [key: string]: any }): boolean => {
+  return editor.isActive("table");
+};
+
 export interface TableBubbleMenuProps {
   editor: Editor | null;
 }
@@ -40,10 +54,7 @@ export function TableBubbleMenu({ editor }: TableBubbleMenuProps) {
       editor={editor}
       pluginKey={tableBubbleMenuKey}
       updateDelay={100}
-      shouldShow={({ editor }) => {
-        // Only show when cursor is inside a table
-        return editor.isActive("table");
-      }}
+      shouldShow={tableShouldShow}
       className="flex items-center gap-1 rounded-lg border border-white/10 bg-black/80 p-1 shadow-lg backdrop-blur-md"
     >
       {/* Add Row Above */}

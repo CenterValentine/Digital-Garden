@@ -807,6 +807,10 @@ export function MainPanelContent() {
             contentType={contentType}
             noteContent={noteContent}
             onSave={handleSave}
+            onWikiLinkClick={handleWikiLinkClick}
+            fetchNotesForWikiLink={fetchNotesForWikiLink}
+            fetchTags={fetchTags}
+            createTag={createTag}
           />
         </div>
       ) : (

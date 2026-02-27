@@ -194,6 +194,36 @@ export function MarkdownEditor({
     };
   }, [editor]);
 
+  // Listen for scroll-to-heading events from the outline panel
+  useEffect(() => {
+    if (!editor) return;
+
+    const handleScrollToHeading = (e: Event) => {
+      const { text, level } = (e as CustomEvent).detail;
+
+      // Search for the heading by text + level (more reliable than position counter)
+      let targetPos: number | null = null;
+      editor.state.doc.descendants((node, pos) => {
+        if (targetPos !== null) return false; // Stop after first match
+        if (
+          node.type.name === "heading" &&
+          node.attrs.level === level &&
+          node.textContent.trim() === text.trim()
+        ) {
+          targetPos = pos;
+          return false;
+        }
+      });
+
+      if (targetPos !== null) {
+        editor.chain().setTextSelection(targetPos).scrollIntoView().run();
+      }
+    };
+
+    window.addEventListener("scroll-to-heading", handleScrollToHeading);
+    return () => window.removeEventListener("scroll-to-heading", handleScrollToHeading);
+  }, [editor]);
+
   // Cleanup timeout on unmount
   useEffect(() => {
     return () => {

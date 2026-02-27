@@ -55,11 +55,15 @@ export const TagList = forwardRef((props: TagListProps, ref) => {
     // If items exist, select the current item
     if (props.items.length > 0) {
       selectItem(selectedIndex);
+      return true;
     }
     // If no items and query exists, create new tag
-    else if (props.query.trim() && props.createNewTag) {
+    if (props.query.trim() && props.createNewTag) {
       props.createNewTag(props.query.trim());
+      return true;
     }
+    // Nothing actionable — let the event propagate
+    return false;
   };
 
   useEffect(() => setSelectedIndex(0), [props.items]);
@@ -76,9 +80,20 @@ export const TagList = forwardRef((props: TagListProps, ref) => {
         return true;
       }
 
-      if (event.key === "Enter" || event.key === " ") {
-        enterHandler();
-        return true;
+      if (event.key === "Enter") {
+        return enterHandler();
+      }
+
+      // Space: only select a tag if the user has typed a non-empty query.
+      // When the query is empty (user just typed `#`), Space must propagate
+      // to ProseMirror so `# ` triggers the heading input rule.
+      if (event.key === " ") {
+        if (props.query.trim() && props.items.length > 0) {
+          selectItem(selectedIndex);
+          return true;
+        }
+        // Empty query or no items: let space propagate
+        return false;
       }
 
       return false;
@@ -229,11 +244,14 @@ export function createTagSuggestion(
 
         onKeyDown(props) {
           if (props.event.key === "Escape") {
-            popup[0].hide();
+            popup?.[0]?.hide();
             return true;
           }
 
-          return (component.ref as any)?.onKeyDown(props) ?? false;
+          // Guard: component may not be initialized if onKeyDown fires
+          // before onStart completes (race condition in Suggestion plugin)
+          if (!component?.ref) return false;
+          return (component.ref as any).onKeyDown(props) ?? false;
         },
 
         onExit() {
