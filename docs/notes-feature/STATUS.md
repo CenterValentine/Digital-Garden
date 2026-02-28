@@ -1,8 +1,8 @@
 ---
-last_updated: 2026-02-18
-current_epoch: 5
-current_sprint: 27
-sprint_status: complete
+last_updated: 2026-02-27
+current_epoch: 7
+current_sprint: 33
+sprint_status: in_progress
 ---
 
 # Digital Garden Content IDE - Status
@@ -13,160 +13,140 @@ sprint_status: complete
 MAINTENANCE INSTRUCTIONS (for AI assistants & developers):
 
 ALWAYS UPDATE when:
-- ✅ Completing a work item → Move to "Recent Completions"
-- ✅ Starting work → Change ⚪ Planned to 🟡 In Progress
-- ✅ Significant progress → Update percentages
-- ✅ Encountering blockers → Add to "Active Blockers"
+- Completing a work item -> Move to "Recent Completions"
+- Starting work -> Change Planned to In Progress
+- Significant progress -> Update percentages
+- Encountering blockers -> Add to "Active Blockers"
 
 WHAT TO UPDATE:
 1. Frontmatter: Change `last_updated` to current date (YYYY-MM-DD)
-2. Work Items: Update status emoji (✅ 🟡 ⚪ 🚫) and percentages
+2. Work Items: Update status emoji
 3. Recent Completions: Add new entry at TOP (keep last 30 days)
 4. Progress: Recalculate (Completed Points / Total Points) * 100
 5. Known Issues: Add/remove/update blockers
 
 SYNC WITH: work-tracking/CURRENT-SPRINT.md (detailed tracking)
 FULL GUIDE: STATUS-MAINTENANCE-GUIDE.md
-
-Emojis: ✅ Completed | 🟡 In Progress | ⚪ Planned | 🚫 Blocked
 -->
 
-## 🎯 Current Work
+## Current Work
 
-### Active Sprint: Sprint 27 ✅ COMPLETE
-**Duration**: Feb 18 - Mar 3, 2026 (Completed early)
-**Goal**: Implement core folder view modes
+### Active Sprint: Sprint 33 - AI Foundation + Settings UI
+**Duration**: Feb 27 - Mar 12, 2026
+**Branch**: `epoch-7/sprint-33`
+**Goal**: Install AI SDK, create provider registry, build streaming chat API route, expand settings schema, and ship `/settings/ai` page.
 
-**Progress**: 100% complete (Core views delivered)
+**Progress**: 95% (build gate passed, docs in progress)
 
 **Completed Work Items**:
-- ✅ List view component
-- ✅ Grid view component
-- ✅ Kanban view component
-- ✅ Folder organization system
+- AI SDK dependencies installed (ai@6, @ai-sdk/react, @ai-sdk/anthropic, @ai-sdk/openai)
+- `lib/domain/ai/` directory structure (types, providers, middleware)
+- Provider registry with dynamic imports (`resolveChatModel`)
+- Provider catalog (`PROVIDER_CATALOG` for settings UI)
+- Middleware system (`applyMiddleware` + `defaultSettingsMiddleware`)
+- Streaming chat API route (`POST /api/ai/chat`)
+- AI chat Zustand store (`state/ai-chat-store.ts`)
+- AI settings schema expanded in `validation.ts`
+- `/settings/ai` page with 4 sections (Provider & Model, Generation Parameters, Feature Toggles, Usage)
+- AI nav item added to SettingsSidebar with Brain icon
+- `pnpm build` passes (Sprint 33 gate verified)
 
-**Backlogged to Sprint 28** (Nice-to-have features):
-- ⚪ Table view component (advanced feature)
-- ⚪ Timeline view component (advanced feature)
-- ⚪ View preference persistence (enhancement)
-- ⚪ View switcher UI (enhancement)
+**Remaining**:
+- Browser smoke test (settings page, chat API)
 
 **See**: [Current Sprint Details](work-tracking/CURRENT-SPRINT.md)
 
-### Active Epoch: Epoch 5 - Advanced Content Types
-**Duration**: Feb-Mar 2026 (8 weeks)
-**Theme**: Folder views, New payload types
+### Active Epoch: Epoch 7 - AI Integration
+**Duration**: Feb-Apr 2026 (8 weeks, 4 sprints)
+**Theme**: AI chat, AI tools, agents, speech, BYOK, RAG
 
-**Goals**:
-- 5 folder view modes (list, grid, kanban, table, timeline)
-- 8+ new payload types with stub viewers
-- <100ms view switching latency
+**Sprint Plan**:
+- Sprint 33: AI Foundation + Settings UI (current)
+- Sprint 34: Chat UI & AI Tools + Tool Settings
+- Sprint 35: BYOK, Speech & Agent + Key/Speech Settings
+- Sprint 36: RAG, Integration & Polish
 
-**See**: [Epoch 5 Details](work-tracking/epochs/epoch-5-advanced-content-types.md)
+## Recent Completions (Last 30 Days)
 
-## ✅ Recent Completions (Last 30 Days)
+**Feb 27, 2026**: Sprint 33 AI Foundation
+- AI SDK v6 installed and Zod v4 compatibility confirmed
+- Provider registry with dynamic imports (Anthropic + OpenAI)
+- Streaming chat API route with auth + middleware
+- `/settings/ai` page: provider selection, generation params, feature toggles, usage tracking
+- Build gate passed
 
-**Feb 18, 2026**: Sprint 27 Core Folder Views Complete
-- ✅ List view component (sort controls, file type icons, keyboard navigation)
-- ✅ Grid view component (responsive layout, thumbnails, hover effects)
-- ✅ Kanban view component (drag-and-drop, status columns)
-- ✅ Folder organization system operational
+**Feb 25, 2026**: Sprint 32 - BubbleMenu, Tag Autocomplete, Outline Scroll
+- BubbleMenu persistence fixes
+- Tag autocomplete improvements
+- Outline scroll behavior
 
-**Feb 16, 2026**: M9 Phase 2 Complete
-- ✅ ExternalPayload with Open Graph preview
-- ✅ URL validation and security controls (HTTPS, allowlist)
-- ✅ External link dialog and viewer components
-- ✅ ContentRole visibility system (show/hide referenced content)
-- ✅ File tree filter integration
+**Feb 22, 2026**: Sprint 31 - Lossless Export/Import
+- Lossless export/import round-trip system
 
-**Feb 3, 2026**: M8 Export System Complete
-- ✅ Multi-format export (Markdown, HTML, JSON, plain text)
-- ✅ Metadata sidecar system (`.meta.json` files)
-- ✅ Bulk vault export as ZIP
-- ✅ Obsidian-compatible Markdown export
+**Feb 20, 2026**: Sprint 30 - Universal Expandable Editor
+- Universal expandable editor for all content types
 
-**Jan 28, 2026**: M9 Phase 1 Complete
-- ✅ ContentType discriminant refactor
-- ✅ Type-safe payload access via discriminated unions
-- ✅ Database migration for new content types
+**Feb 18, 2026**: Sprint 29 - Tool Surfaces
+- Tool Surfaces architecture (toolbar, toolbelt, sidebar-tab registry)
+- Toolbar handler prop pattern for ToolSurfaceProvider
 
-## 📋 Up Next (Sprint 28)
+## Up Next (Sprint 34)
 
-**Duration**: Mar 4-17, 2026
-**Goal**: Stub implementations for new payload types
-
+**Goal**: Chat UI & AI Tools + Tool Settings
 **Planned Deliverables**:
-- ExcalidrawPayload (whiteboard/diagrams)
-- MermaidPayload (diagrams as code)
-- CanvasPayload (infinite canvas workspace)
-- WhiteboardPayload (collaborative whiteboard)
-- PdfPayload (dedicated PDF with annotations)
+- Right sidebar ChatPanel with streaming responses
+- Full ChatViewer for persistent chat ContentNodes
+- "Save conversation" feature (sidebar -> ChatPayload)
+- Base AI tools (searchNotes, getCurrentNote, createNote)
+- Tool management section in AI settings
+- Message persistence (ChatPayload CRUD)
 
-**See**: [Backlog](work-tracking/BACKLOG.md)
-
-## 🚧 Known Issues & Blockers
+## Known Issues & Blockers
 
 ### Active Blockers
 None
 
 ### Known Limitations
-- **PDF/DOCX Export**: Stub implementations (need Puppeteer/docx library integration)
-- **External Links**: Some sites have SSL certificate errors (require dev-mode bypass)
+- **PDF/DOCX Export**: Stub implementations (need Puppeteer/docx library)
+- **AI Chat**: No API keys configured by default (BYOK coming Sprint 35)
 - **Outline Panel**: Active heading auto-detection needs intersection observer
-- **Editor**: Scroll-to-heading functionality needs editor ref implementation
 
 ### Technical Debt
-- [ ] Migrate remaining M9-M11 docs to archive
-- [ ] Update cross-references in moved documentation
-- [ ] Complete feature documentation extraction
+- [ ] Server-side TipTap extensions missing WikiLink and Tag parsers
+- [ ] Metadata sidecar import consumer not yet implemented
 
-## 📊 Metrics
+## Metrics
 
 ### Velocity (Last 3 Sprints)
-- Sprint 24: 18 points
-- Sprint 25: 22 points
-- Sprint 26: 20 points
-- **Average**: 20 points/sprint
+- Sprint 30: Universal Expandable Editor
+- Sprint 31: Lossless Export/Import
+- Sprint 32: BubbleMenu, Tag, Outline fixes
 
-### Cumulative Progress (Epoch 5)
-- **Total Estimated**: 50-60 story points
-- **Completed**: 0 points
-- **In Progress**: 23 points (Sprint 27)
-- **Remaining**: ~30-40 points
-- **Projected Completion**: Mid-March 2026
+### Epoch 7 Progress
+- **Sprint 33**: 95% complete (AI Foundation)
+- **Sprint 34**: Planned (Chat UI & Tools)
+- **Sprint 35**: Planned (BYOK, Speech, Agent)
+- **Sprint 36**: Planned (RAG, Polish)
 
-## 🗺️ Roadmap
+## Roadmap
 
-### Epoch 6: Collaboration (Planned)
-**Duration**: Apr-May 2026 (8 weeks)
+### Epoch 6: Collaboration (Future)
 **Theme**: Real-time collaboration, sharing, permissions
 
-**Planned Features**:
-- Real-time multiplayer editing
-- Share links with granular permissions
-- Collaborative cursors and presence
-- Comment threads on content
+### Epoch 7: AI Integration (Active)
+**Theme**: AI chat, embeddings, semantic search, BYOK, tools, agents, speech
 
-### Epoch 7: AI Integration (Planned)
-**Duration**: Jun-Jul 2026 (8 weeks)
-**Theme**: AI chat, embeddings, semantic search
+### Epoch 8: Mobile & Performance (Future)
+**Theme**: PWA, offline support, performance optimization
 
-**Planned Features**:
-- AI chat interface within IDE
-- Semantic search with embeddings
-- AI-powered suggestions and autocomplete
-- Content summarization
+## Quick Links
 
-## 📚 Quick Links
-
-- [Current Sprint](work-tracking/CURRENT-SPRINT.md) - Sprint 27 details
+- [Current Sprint](work-tracking/CURRENT-SPRINT.md) - Sprint 33 details
 - [Backlog](work-tracking/BACKLOG.md) - Prioritized work items
-- [Epoch 5](work-tracking/epochs/epoch-5-advanced-content-types.md) - Current epoch plan
-- [Milestone Progress](MILESTONE-PROGRESS.md) - Long-term tracking
 - [AI Development Guide](../CLAUDE.md) - For AI assistants
 - [Start Here](00-START-HERE.md) - Documentation index
 
 ---
 
-**Last Updated**: Feb 18, 2026
-**Next Review**: Feb 19, 2026 (Daily standup)
+**Last Updated**: Feb 27, 2026
+**Next Review**: Mar 3, 2026

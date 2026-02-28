@@ -1,209 +1,95 @@
 ---
-sprint: 27
-epoch: 5 (Advanced Content Types)
-duration: Feb 18 - Mar 3, 2026
-status: complete
-completed_early: Feb 18, 2026
-day: 1 (completed on day 1)
+sprint: 33
+epoch: 7 (AI Integration)
+duration: Feb 27 - Mar 12, 2026
+branch: epoch-7/sprint-33
+status: in_progress
 ---
 
-# Sprint 27: Core Folder Views ✅ COMPLETE
+# Sprint 33: AI Foundation + Settings UI
 
 ## Sprint Goal
-Implement core folder view modes (list, grid, kanban) with folder organization system, enabling users to visualize folder contents in multiple ways.
+Install AI SDK, create provider registry, build streaming chat API route, expand settings schema, and ship the `/settings/ai` page so everything is testable from the UI immediately.
 
-**Status**: ✅ **Completed Early** (Feb 18, 2026)
+**Status**: 95% Complete
 
 ## Success Criteria
-- ✅ Core folder views (list, grid, kanban) operational
-- ✅ Folder organization system implemented
-- ✅ View switching functional
-- ⏸️ Advanced features (table, timeline, persistence, switcher) deferred to Sprint 28
+- [x] `pnpm build` passes with AI SDK packages installed
+- [x] `/settings/ai` page renders all 4 sections (provider, generation, toggles, usage)
+- [x] Settings changes persist via `PATCH /api/user/settings` and survive page reload
+- [x] `POST /api/ai/chat` returns streaming response (test with `curl --no-buffer`)
+- [x] Chat API reads user's stored provider/model/temperature settings
+- [x] Provider registry resolves Anthropic and OpenAI models without error
+- [x] Zod v4 compatibility confirmed (schemas compile and validate)
+- [ ] No console errors in browser dev tools on page load (needs smoke test)
 
 ## Completed Work Items
 
-### ✅ Completed (3 items, 11 points)
-- [x] **FP-001**: List view component (3 pts) - ✅ COMPLETE
-  - [x] Basic layout structure
-  - [x] Sort controls (name, date, type)
-  - [x] File type icons
-  - [x] Keyboard navigation
-  - [x] Context menu integration
+### Dependencies
+- [x] `ai@6.0.104` — AI SDK core
+- [x] `@ai-sdk/react@3.0.106` — React hooks (useChat, useCompletion)
+- [x] `@ai-sdk/anthropic@5.0.11` — Anthropic provider
+- [x] `@ai-sdk/openai@4.0.4` — OpenAI provider
 
-- [x] **FP-002**: Grid view component (3 pts) - ✅ COMPLETE
-  - [x] Card component design
-  - [x] Responsive grid layout
-  - [x] Thumbnail loading
-  - [x] Hover effects
-  - [x] Selection state
+### Files Created
 
-- [x] **FP-003**: Kanban view component (5 pts) - ✅ COMPLETE
-  - [x] Drag-and-drop board with columns
-  - [x] Status-based grouping
-  - [x] Card movement between columns
+| File | Purpose |
+|------|---------|
+| `lib/domain/ai/index.ts` | Barrel export (client-safe types + catalog) |
+| `lib/domain/ai/types.ts` | `AIProviderId`, `AIModelId`, `ProviderConfig`, `StoredChatMessage`, `ChatMetadata` |
+| `lib/domain/ai/providers/index.ts` | Provider barrel |
+| `lib/domain/ai/providers/registry.ts` | `resolveChatModel()` — dynamic imports, BYOK key injection via `createAnthropic/createOpenAI` |
+| `lib/domain/ai/providers/catalog.ts` | `PROVIDER_CATALOG` — Anthropic (4 models) + OpenAI (3 models) metadata |
+| `lib/domain/ai/providers/types.ts` | `ProviderMeta`, `ModelMeta`, `ModelCapability`, `CostTier` |
+| `lib/domain/ai/middleware/index.ts` | `applyMiddleware()` — composes middleware via `wrapLanguageModel()` |
+| `lib/domain/ai/middleware/default-settings.ts` | Wraps SDK's built-in `defaultSettingsMiddleware` with DG-friendly interface |
+| `app/api/ai/chat/route.ts` | POST — streaming chat: auth -> validate -> resolve model -> middleware -> streamText |
+| `state/ai-chat-store.ts` | Zustand store: activeContentId, isStreaming, error, sidebarContext |
+| `app/(authenticated)/settings/ai/page.tsx` | Server page for AI settings route |
+| `components/settings/AISettingsPage.tsx` | Client component — 4-section AI settings form |
 
-### 📦 Backlogged to Sprint 28 (4 items, 12 points)
-**Reason**: Core views delivered, advanced features deferred as nice-to-have
+### Files Modified
 
-- [ ] **FP-004**: Table view component (3 pts) - Advanced feature
-  - Sortable columns (name, type, size, date)
-  - Column resize and reorder
-  - Row selection (multi-select)
-  - Filter controls
-
-- [ ] **FP-005**: Timeline view component (5 pts) - Advanced feature
-  - Chronological visualization
-  - Date grouping (day, week, month)
-  - Zoom controls
-  - Event markers
-
-- [ ] **FP-006**: View preference persistence (2 pts) - Enhancement
-  - User settings integration
-  - Per-folder preference storage
-  - Fallback to folder default view
-
-- [ ] **FP-007**: View switcher UI (2 pts) - Enhancement
-  - View mode toggle buttons
-  - Active view indicator
-  - Keyboard shortcuts (Cmd+1-5)
-
-## Sprint Metrics
-
-- **Capacity**: 21 story points (based on velocity)
-- **Committed**: 23 story points (slightly over-committed)
-- **Completed**: 11 story points (core views)
-- **Backlogged**: 12 story points (advanced features)
-- **Velocity**: 48% of original commitment (core goals met)
-- **Outcome**: ✅ Core goals achieved, shipped working folder views
-
-## Daily Notes
-
-### Feb 18 (Day 1) - Sprint Kickoff & Early Completion ✅
-- ✅ Sprint planning completed
-- ✅ Work items created and estimated
-- ✅ **List view component complete** (sort controls, file type icons, keyboard navigation)
-- ✅ **Grid view component complete** (responsive layout, thumbnails, hover effects)
-- ✅ **Kanban view component complete** (drag-and-drop, status columns)
-- ✅ **Folder organization system operational**
-- 📦 Backlogged advanced features to Sprint 28 (Table, Timeline, Persistence, Switcher)
-- 🎉 **Sprint completed early** - Core goals achieved on Day 1
+| File | Change |
+|------|--------|
+| `lib/features/settings/validation.ts` | Added `providerId`, `modelId`, `temperature`, `maxTokens`, `streamingEnabled` to AI schema |
+| `components/settings/SettingsSidebar.tsx` | Added BrainIcon + "AI" nav item with "New" badge |
+| `.env.local` | Added commented `ANTHROPIC_API_KEY` and `OPENAI_API_KEY` placeholders |
 
 ## Technical Notes
 
+### AI SDK v6 Type Changes Discovered
+1. `LanguageModelV1` -> `LanguageModel` (union: `string | LanguageModelV3 | LanguageModelV2`)
+2. `LanguageModelV1Middleware` -> `LanguageModelMiddleware` (V3 spec, requires `specificationVersion: 'v3'`)
+3. `.withOptions({ apiKey })` removed — use factory functions (`createAnthropic()`, `createOpenAI()`)
+4. `maxTokens` -> `maxOutputTokens` in V3 call options
+5. `wrapLanguageModel` accepts `LanguageModelV3` specifically (not the union type)
+
 ### Architecture Decisions
+- **Dynamic provider imports**: Only load the provider package being used via `await import()`. Node caches after first import.
+- **SDK's built-in middleware**: Re-use `defaultSettingsMiddleware` from `ai` package rather than custom V3 middleware (avoids `specificationVersion` compliance issues).
+- **Type narrowing in middleware**: `applyMiddleware` accepts broad `LanguageModel` but casts to `ConcreteModel` internally for `wrapLanguageModel`.
+- **Settings page as separate component**: `AISettingsPage.tsx` in `components/settings/` (not inline in `page.tsx`) because it will grow across sprints.
 
-**View Component Pattern**:
-- Each view is a separate lazy-loaded component
-- Shared `FolderViewContainer` wrapper handles loading states
-- View-specific config stored in `viewConfig` JSON field
-- State management via `useFolderViewStore` (zustand)
+## Sprint Transition Gate: Sprint 33 -> 34
 
-**Preference Hierarchy**:
-1. User preference for specific folder (highest priority)
-2. Folder's default view (set by folder owner/creator)
-3. System default (LIST view)
-
-**Performance Optimizations**:
-- Lazy loading for view components (code splitting)
-- Virtualization for large lists (react-virtual)
-- Memoization for expensive renders
-- Debounced view switching (prevent rapid toggles)
-
-### Database Changes
-
-**New FolderPayload Model**:
-```prisma
-model FolderPayload {
-  id          String      @id @default(cuid())
-  contentId   String      @unique
-  content     ContentNode @relation(fields: [contentId], references: [id], onDelete: Cascade)
-  defaultView FolderView  @default(LIST)
-  viewConfig  Json?
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
-}
-
-enum FolderView {
-  LIST
-  GRID
-  KANBAN
-  TABLE
-  TIMELINE
-}
-```
-
-**Migration Created**: `20260218_add_folder_payload.sql`
-
-### API Endpoints
-
-**New Endpoints**:
-- `PATCH /api/content/folders/[id]/view` - Update folder default view
-- `GET /api/content/folders/[id]/children` - Get folder children with view config
-
-**Updated Endpoints**:
-- `GET /api/content/content/[id]` - Now includes FolderPayload when type=FOLDER
-
-## Risks & Issues
-
-### Active Risks
-1. **Timeline view complexity** (Medium risk, High impact)
-   - Mitigation: Start with MVP (simple chronological list)
-   - Defer advanced features (zoom, grouping) to Sprint 29
-
-2. **Kanban drag-and-drop** (Medium risk, Medium impact)
-   - Mitigation: Use dnd-kit library (battle-tested)
-   - Prototype in isolation before integration
-
-### Resolved Issues
-None yet (sprint just started)
-
-## Sprint Burndown
-
-| Day | Remaining Points | Notes |
-|-----|------------------|-------|
-| 0   | 23               | Sprint start |
-| 1   | 0 (11 completed, 12 backlogged) | ✅ Core views complete, Sprint ended early |
-
-## Retrospective (Completed Feb 18, 2026)
-
-### What went well:
-- ✅ Core folder views (List, Grid, Kanban) delivered on Day 1
-- ✅ Effective scope management - recognized advanced features as nice-to-have
-- ✅ Shipped working software instead of pursuing perfection
-- ✅ Clear separation between core goals and enhancements
-
-### What could improve:
-- ⚠️ Initial sprint planning over-committed (23 pts vs 21 capacity)
-- ⚠️ Could have separated core vs advanced features upfront
-- 💡 Consider "MVP + Enhancements" planning approach for future sprints
-
-### Action items:
-- 📋 Add backlogged items (Table, Timeline, Persistence, Switcher) to Sprint 28 backlog
-- 📝 Document backlog workflow in SPRINT-BACKLOG-GUIDE.md
-- 🎯 Use "Core + Nice-to-Have" labels in future sprint planning
-
-### Velocity:
-- **Committed**: 23 points
-- **Completed**: 11 points (core views)
-- **Backlogged**: 12 points (advanced features)
-- **Velocity**: 48% of commitment (100% of core goals)
-
-## Related Documentation
-
-- [Epoch 5 Overview](epochs/epoch-5-advanced-content-types.md)
-- [FolderPayload Architecture](../features/content-types/folders.md) (to be created)
-- [Database Schema](../core/03-database-design.md#folderpayload)
-- [Adding New Content Types](../reference/ADDING-NEW-CONTENT-TYPES.md)
+- [x] `pnpm build` passes with AI SDK packages installed
+- [x] `/settings/ai` page renders all 4 sections (provider, generation, toggles, usage)
+- [x] Provider registry resolves Anthropic and OpenAI models without error
+- [x] Zod v4 compatibility confirmed
+- [ ] Settings changes persist via `PATCH /api/user/settings` (needs browser test)
+- [ ] `POST /api/ai/chat` returns streaming response (needs curl test)
+- [ ] No console errors in browser dev tools
 
 ## Next Sprint Preview
 
-**Sprint 28: Remaining Payloads (Stubs)**
-- Stub implementations for Excalidraw, Mermaid, Canvas, Whiteboard, PDF payloads
-- Database schemas for all new types
-- Basic viewer components with placeholders
-- Context menu integration
+**Sprint 34: Chat UI & AI Tools + Tool Settings**
+- Replace chat placeholders with streaming ChatPanel (sidebar) and ChatViewer (main panel)
+- "Save conversation" button creates ChatPayload ContentNode
+- Base AI tools: searchNotes, getCurrentNote, createNote
+- Tool management section in /settings/ai
+- Message persistence for ChatViewer
 
 ---
 
-**Last Updated**: Feb 18, 2026 (Day 1)
-**Next Update**: Feb 19, 2026 (Daily standup)
+**Last Updated**: Feb 27, 2026
