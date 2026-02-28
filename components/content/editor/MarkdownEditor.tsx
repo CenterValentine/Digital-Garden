@@ -56,6 +56,10 @@ export interface MarkdownEditorProps {
   autoSaveDelay?: number;
   /** Read-only mode */
   editable?: boolean;
+  /** Compact mode for secondary/embedded editors (less padding, smaller prose) */
+  compact?: boolean;
+  /** Placeholder text when editor is empty */
+  placeholder?: string;
   /** Custom class name */
   className?: string;
 }
@@ -74,6 +78,8 @@ export function MarkdownEditor({
   onTagSelect,
   autoSaveDelay = 2000,
   editable = true,
+  compact = false,
+  placeholder,
   className = "",
 }: MarkdownEditorProps) {
   const [isSaving, setIsSaving] = useState(false);
@@ -96,8 +102,9 @@ export function MarkdownEditor({
     immediatelyRender: false, // Prevent SSR hydration mismatch
     editorProps: {
       attributes: {
-        class:
-          "prose prose-sm sm:prose lg:prose-lg xl:prose-xl max-w-none focus:outline-none min-h-[500px] px-6 pt-3 pb-4",
+        class: compact
+          ? "prose prose-sm max-w-none focus:outline-none min-h-[120px] px-4 pt-2 pb-2"
+          : "prose prose-sm sm:prose lg:prose-lg xl:prose-xl max-w-none focus:outline-none min-h-[500px] px-6 pt-3 pb-4",
       },
     },
     onUpdate: ({ editor }) => {
@@ -185,6 +192,36 @@ export function MarkdownEditor({
     return () => {
       document.removeEventListener("keydown", handleKeyDown);
     };
+  }, [editor]);
+
+  // Listen for scroll-to-heading events from the outline panel
+  useEffect(() => {
+    if (!editor) return;
+
+    const handleScrollToHeading = (e: Event) => {
+      const { text, level } = (e as CustomEvent).detail;
+
+      // Search for the heading by text + level (more reliable than position counter)
+      let targetPos: number | null = null;
+      editor.state.doc.descendants((node, pos) => {
+        if (targetPos !== null) return false; // Stop after first match
+        if (
+          node.type.name === "heading" &&
+          node.attrs.level === level &&
+          node.textContent.trim() === text.trim()
+        ) {
+          targetPos = pos;
+          return false;
+        }
+      });
+
+      if (targetPos !== null) {
+        editor.chain().setTextSelection(targetPos).scrollIntoView().run();
+      }
+    };
+
+    window.addEventListener("scroll-to-heading", handleScrollToHeading);
+    return () => window.removeEventListener("scroll-to-heading", handleScrollToHeading);
   }, [editor]);
 
   // Cleanup timeout on unmount

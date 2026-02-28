@@ -36,7 +36,7 @@ FULL GUIDE: STATUS-MAINTENANCE-GUIDE.md
 **Branch**: `epoch-7/sprint-33`
 **Goal**: Install AI SDK, create provider registry, build streaming chat API route, expand settings schema, and ship `/settings/ai` page.
 
-**Progress**: 95% (build gate passed, docs in progress)
+**Progress**: 95% (build gate passed, smoke testing remaining)
 
 **Completed Work Items**:
 - AI SDK dependencies installed (ai@6, @ai-sdk/react, @ai-sdk/anthropic, @ai-sdk/openai)
@@ -75,20 +75,46 @@ FULL GUIDE: STATUS-MAINTENANCE-GUIDE.md
 - `/settings/ai` page: provider selection, generation params, feature toggles, usage tracking
 - Build gate passed
 
-**Feb 25, 2026**: Sprint 32 - BubbleMenu, Tag Autocomplete, Outline Scroll
-- BubbleMenu persistence fixes
-- Tag autocomplete improvements
-- Outline scroll behavior
+**Feb 27, 2026**: Sprint 32 Editor Stability & Polish Complete
+- ✅ BubbleMenu persistence fix — root cause was TipTap React wrapper's shared `"bubbleMenu"` meta key causing cross-contamination between text and table BubbleMenu instances; stabilized shouldShow callbacks to module-level functions
+- ✅ Removed `.focus()` from BubbleMenu command chains (prevents focus/blur cycle exhausting preventHide flag)
+- ✅ Removed invalid `tippyOptions` prop (TipTap v3 uses Floating UI, not tippy.js)
+- ✅ Outline click-to-scroll via CustomEvent bridge pattern (text+level matching)
+- ✅ ExpandableEditor tag/wiki-link callback threading (fetchTags, createTag, fetchNotesForWikiLink, onWikiLinkClick)
+- ✅ Keyboard event scoping — `stopPropagation` on ExpandableEditor container
+- ✅ Tag/heading `# ` conflict fix — Space with empty query propagates to ProseMirror heading input rule
+- ✅ tag-suggestion `component.ref` runtime error guard
 
-**Feb 22, 2026**: Sprint 31 - Lossless Export/Import
-- Lossless export/import round-trip system
+**Feb 26, 2026**: Sprint 31 Lossless Export/Import Round-Trip Complete
+- ✅ Custom two-pass markdown parser (block + inline) → TipTap JSON
+- ✅ Semantic extensions: tags, wiki-links, callouts, task lists, tables
+- ✅ Sidecar reader (.meta.json consumption for lossless restoration)
+- ✅ Import API endpoint (POST /api/content/import, multipart/form-data)
+- ✅ Import button in toolbar (Tool Surfaces registry)
+- ✅ Round-trip verification utility (dev console tool)
+- ✅ syncContentTags extracted to shared module
+- **Pending manual testing** (macOS Finder issue blocking file picker)
 
-**Feb 20, 2026**: Sprint 30 - Universal Expandable Editor
-- Universal expandable editor for all content types
+**Feb 25, 2026**: Sprint 30 Universal Expandable Editor Complete
+- ✅ ExpandableEditor component (collapsible TipTap for all content types)
+- ✅ Centralized integration in MainPanelContent
+- ✅ MarkdownEditor compact mode
+- ✅ API upsert for notePayload (any content type can now have notes)
+- **Known issue**: BubbleMenu focus-theft regression (pre-existing)
 
-**Feb 18, 2026**: Sprint 29 - Tool Surfaces
-- Tool Surfaces architecture (toolbar, toolbelt, sidebar-tab registry)
-- Toolbar handler prop pattern for ToolSurfaceProvider
+**Feb 24, 2026**: Sprint 29 Tool Surfaces Architecture Complete
+- ✅ Declarative tool registry (ToolDefinition, queryTools)
+- ✅ ToolSurfaceProvider context + handler registration
+- ✅ ContentToolbar component (toolbar surface)
+- ✅ BubbleMenu wired to registry (module-level, no hooks)
+- ✅ RightSidebarHeader wired to registry (dynamic tabs)
+- ✅ ToolDebugPanel (dev-only, Cmd+Shift+T)
+
+**Feb 18, 2026**: Sprint 27 Core Folder Views Complete
+- ✅ List view component (sort controls, file type icons, keyboard navigation)
+- ✅ Grid view component (responsive layout, thumbnails, hover effects)
+- ✅ Kanban view component (drag-and-drop, status columns)
+- ✅ Folder organization system operational
 
 ## Up Next (Sprint 34)
 
@@ -104,12 +130,14 @@ FULL GUIDE: STATUS-MAINTENANCE-GUIDE.md
 ## Known Issues & Blockers
 
 ### Active Blockers
-None
+- **macOS Finder**: File picker not opening on dev machine — blocks manual testing of import feature
 
 ### Known Limitations
-- **PDF/DOCX Export**: Stub implementations (need Puppeteer/docx library)
+- **Sprint 31 Import**: Untested pending Finder fix — parser, API, and toolbar button built but not manually verified
+- **PDF/DOCX Export**: Stub implementations (need Puppeteer/docx library integration)
 - **AI Chat**: No API keys configured by default (BYOK coming Sprint 35)
-- **Outline Panel**: Active heading auto-detection needs intersection observer
+- **External Links**: Some sites have SSL certificate errors (require dev-mode bypass)
+- **Outline Panel**: Auto-scroll on editor scroll needs intersection observer (click-to-scroll works)
 
 ### Technical Debt
 - [ ] Server-side TipTap extensions missing WikiLink and Tag parsers
@@ -117,10 +145,12 @@ None
 
 ## Metrics
 
-### Velocity (Last 3 Sprints)
-- Sprint 30: Universal Expandable Editor
-- Sprint 31: Lossless Export/Import
-- Sprint 32: BubbleMenu, Tag, Outline fixes
+### Velocity (Last 4 Sprints)
+- Sprint 29: ~20 points (Tool Surfaces)
+- Sprint 30: ~15 points (Universal Editor)
+- Sprint 31: ~20 points (Import System)
+- Sprint 32: ~15 points (Editor Stability & Polish)
+- **Average**: ~18 points/sprint
 
 ### Epoch 7 Progress
 - **Sprint 33**: 95% complete (AI Foundation)

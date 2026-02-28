@@ -17,7 +17,7 @@ import {
   markdownToTiptap,
   CONTENT_WITH_PAYLOADS,
 } from "@/lib/domain/content";
-import { extractTags } from "@/lib/domain/content/tag-extractor";
+import { syncContentTags } from "@/lib/domain/content/tag-sync";
 import type { JSONContent } from "@tiptap/core";
 import type {
   ContentDetailResponse,
@@ -300,8 +300,8 @@ export async function PATCH(
       updateData.displayOrder = displayOrder;
     }
 
-    // Update payload data
-    if (existing.notePayload && (tiptapJson || markdown)) {
+    // Update payload data (upsert: create NotePayload if it doesn't exist)
+    if (tiptapJson || markdown) {
       const json: JSONContent = markdown
         ? markdownToTiptap(markdown)
         : (tiptapJson as JSONContent);
@@ -310,9 +310,19 @@ export async function PATCH(
       const wordCount = searchText.split(/\s+/).filter(Boolean).length;
       const readingTime = Math.ceil(wordCount / 200);
 
-      await prisma.notePayload.update({
+      await prisma.notePayload.upsert({
         where: { contentId: id },
-        data: {
+        update: {
+          tiptapJson: json,
+          searchText,
+          metadata: {
+            wordCount,
+            characterCount: searchText.length,
+            readingTime,
+          },
+        },
+        create: {
+          contentId: id,
           tiptapJson: json,
           searchText,
           metadata: {
@@ -631,104 +641,4 @@ export async function DELETE(
   }
 }
 
-// ============================================================
-// Helper: Sync Content Tags
-// ============================================================
-
-/**
- * Extract tags from content and sync with database
- *
- * - Extracts tags from TipTap JSON (tag nodes)
- * - Creates missing tags for the user
- * - Updates ContentTag associations with positions
- * - Removes tags no longer in content
- */
-async function syncContentTags(
-  contentId: string,
-  tiptapJson: JSONContent,
-  userId: string
-): Promise<void> {
-  try {
-    // Extract tags from content
-    const extractedTags = extractTags(tiptapJson);
-
-    // Get existing ContentTag associations for this content
-    const existingContentTags = await prisma.contentTag.findMany({
-      where: { contentId },
-      include: { tag: true },
-    });
-
-    // Build set of tag slugs from extracted tags
-    const extractedSlugs = new Set(extractedTags.map((t) => t.slug));
-
-    // Determine which tags to remove (no longer in content)
-    const tagsToRemove = existingContentTags.filter(
-      (ct) => !extractedSlugs.has(ct.tag.slug)
-    );
-
-    // Delete removed tags
-    if (tagsToRemove.length > 0) {
-      await prisma.contentTag.deleteMany({
-        where: {
-          id: { in: tagsToRemove.map((ct) => ct.id) },
-        },
-      });
-    }
-
-    // Process each extracted tag
-    for (const extractedTag of extractedTags) {
-      // Find or create tag
-      let tag = await prisma.tag.findUnique({
-        where: {
-          userId_slug: {
-            userId,
-            slug: extractedTag.slug,
-          },
-        },
-      });
-
-      if (!tag) {
-        // Create new tag
-        tag = await prisma.tag.create({
-          data: {
-            userId,
-            name: extractedTag.name,
-            slug: extractedTag.slug,
-            color: extractedTag.color || null,
-          },
-        });
-      }
-
-      // Find existing ContentTag association
-      const existingLink = existingContentTags.find(
-        (ct) => ct.tag.slug === extractedTag.slug
-      );
-
-      if (existingLink) {
-        // Update positions
-        await prisma.contentTag.update({
-          where: { id: existingLink.id },
-          data: {
-            positions: extractedTag.positions as any,
-          },
-        });
-      } else {
-        // Create new association
-        await prisma.contentTag.create({
-          data: {
-            contentId,
-            tagId: tag.id,
-            positions: extractedTag.positions as any,
-          },
-        });
-      }
-    }
-
-    console.log(
-      `[syncContentTags] Synced ${extractedTags.length} tags for content ${contentId}`
-    );
-  } catch (error) {
-    console.error("[syncContentTags] Error:", error);
-    // Don't throw - tag syncing is not critical enough to fail the entire save
-  }
-}
+// syncContentTags extracted to lib/domain/content/tag-sync.ts for reuse by import service
