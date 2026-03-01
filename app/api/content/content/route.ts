@@ -147,6 +147,11 @@ export async function GET(request: NextRequest) {
               searchText: true, // Include for search excerpts
             },
           },
+          chatPayload: {
+            select: {
+              messages: true,
+            },
+          },
           _count: {
             select: {
               children: true,
@@ -217,6 +222,15 @@ export async function GET(request: NextRequest) {
           searchText: item.codePayload.searchText,
         } as any;
       }
+      if (item.chatPayload) {
+        const msgs = Array.isArray(item.chatPayload.messages)
+          ? (item.chatPayload.messages as any[])
+          : [];
+        formatted.chat = {
+          messageCount: msgs.length,
+          lastMessage: msgs.length > 0 ? String(msgs[msgs.length - 1]?.content ?? "") : undefined,
+        };
+      }
 
       if (item.contentType === "folder") {
         formatted.childCount = item._count.children;
@@ -280,6 +294,9 @@ export async function POST(request: NextRequest) {
       viewMode,
       sortMode,
       includeReferencedContent,
+      contentType: requestedContentType,
+      chatMessages,
+      chatMetadata,
     } = body;
 
     // Validation
@@ -445,6 +462,17 @@ export async function POST(request: NextRequest) {
           },
         },
       } as CreatePayloadData;
+    } else if (requestedContentType === "chat") {
+      // Chat payload
+      contentType = "chat";
+      payloadData = {
+        chatPayload: {
+          create: {
+            messages: (chatMessages ?? []) as any,
+            metadata: (chatMetadata ?? {}) as any,
+          },
+        },
+      };
     } else {
       return NextResponse.json(
         {
@@ -452,7 +480,7 @@ export async function POST(request: NextRequest) {
           error: {
             code: "VALIDATION_ERROR",
             message:
-              "Must specify one of: isFolder, tiptapJson, markdown, html, code, url, or engine",
+              "Must specify one of: isFolder, tiptapJson, markdown, html, code, url, engine, or contentType: 'chat'",
           },
         },
         { status: 400 }
@@ -531,6 +559,12 @@ export async function POST(request: NextRequest) {
         url: content.externalPayload.url,
         subtype: content.externalPayload.subtype || "website",
         preview: content.externalPayload.preview as any,
+      };
+    }
+    if (content.chatPayload) {
+      response.chat = {
+        messages: (content.chatPayload.messages ?? []) as any,
+        metadata: (content.chatPayload.metadata ?? {}) as any,
       };
     }
 

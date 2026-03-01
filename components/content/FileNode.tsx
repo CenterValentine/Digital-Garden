@@ -41,6 +41,7 @@ import {
   Pencil,
   GitBranch,
   BarChart3,
+  MessageCircle,
 } from "lucide-react";
 import { useContextMenuStore } from "@/state/context-menu-store";
 import { useContentStore } from "@/state/content-store";
@@ -216,6 +217,8 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
         return <Code className={`${iconSize} ${iconColor}`} />;
       case "external":
         return <ExternalLink className={`${iconSize} ${iconColor}`} />;
+      case "chat":
+        return <MessageCircle className={`${iconSize} ${iconColor}`} />;
       case "visualization":
         // Show engine-specific icon
         const engine = data.visualization?.engine;

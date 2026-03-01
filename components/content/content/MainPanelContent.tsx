@@ -353,6 +353,9 @@ export function MainPanelContent() {
 
         console.log("Note saved successfully");
         setLastSaved(new Date());
+        // Keep parent state in sync so re-mounts (e.g., ExpandableEditor
+        // collapse/reopen) receive the latest persisted content
+        setNoteContent(content);
       } catch (err) {
         console.error("Failed to save note:", err);
         throw err; // Re-throw so editor knows save failed
@@ -623,13 +626,37 @@ export function MainPanelContent() {
     input.click();
   }, [contentType, selectedContentId, setSelectedContentId, setSelectedContentType]);
 
+  // Export chat conversation as markdown transcript
+  const handleExportChat = useCallback(() => {
+    if (!contentData?.messages || contentData.messages.length === 0) {
+      toast.error("No messages to export");
+      return;
+    }
+
+    const lines: string[] = [`# ${noteTitle}`, ""];
+    for (const msg of contentData.messages) {
+      const role = msg.role === "user" ? "User" : "Assistant";
+      lines.push(`### ${role}`, "", msg.content, "");
+    }
+
+    const blob = new Blob([lines.join("\n")], { type: "text/markdown" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${noteTitle || "chat-export"}.md`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success("Chat exported as Markdown");
+  }, [contentData, noteTitle]);
+
   // Handlers passed as prop to ToolSurfaceProvider (can't use useRegisterToolHandler
   // here because this component renders the provider — useContext sees the parent, not self)
   const toolHandlers = useMemo(() => ({
     "import-markdown": handleImportMarkdown,
     "export-markdown": handleExportMarkdown,
+    "export-chat": handleExportChat,
     "copy-link": handleCopyLink,
-  }), [handleImportMarkdown, handleExportMarkdown, handleCopyLink]);
+  }), [handleImportMarkdown, handleExportMarkdown, handleExportChat, handleCopyLink]);
 
   // Welcome screen when no note selected
   if (!selectedContentId) {
@@ -691,8 +718,10 @@ export function MainPanelContent() {
   } else if (contentType === "chat") {
     contentElement = (
       <ChatViewer
+        contentId={selectedContentId}
         title={noteTitle}
         messages={contentData?.messages || []}
+        metadata={contentData?.metadata}
       />
     );
   } else if (contentType === "visualization") {

@@ -102,6 +102,9 @@ const aiSettingsSchema = z
     // Feature toggles
     autoSuggest: z.boolean().optional(),
     privacyMode: z.enum(["full", "minimal", "none"]).optional(),
+    // Tool settings (Sprint 34)
+    toolChoice: z.enum(["auto", "none"]).optional(),
+    enabledTools: z.array(z.string()).optional(),
   })
   .optional();
 
@@ -299,6 +302,8 @@ export const DEFAULT_SETTINGS: UserSettings = {
     tokensUsedThisMonth: 0,
     autoSuggest: true,
     privacyMode: "full",
+    toolChoice: "auto",
+    enabledTools: ["searchNotes", "getCurrentNote", "createNote"],
   },
   exportBackup: {
     defaultFormat: "markdown",

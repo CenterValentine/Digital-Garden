@@ -34,7 +34,9 @@ export interface StoredChatMessage {
   role: "user" | "assistant" | "system";
   content: string;
   parts?: unknown[];
-  timestamp: string;
+  createdAt?: string;
+  /** @deprecated Use createdAt instead */
+  timestamp?: string;
   model?: string;
   tokenCount?: number;
   metadata?: Record<string, unknown>;
@@ -44,8 +46,11 @@ export interface StoredChatMessage {
 export interface ChatMetadata {
   providerId?: AIProviderId;
   modelId?: string;
-  totalTokens: number;
-  messageCount: number;
-  lastUpdated: string;
+  totalTokens?: number;
+  messageCount?: number;
+  lastUpdated?: string;
   title?: string;
+  savedFrom?: string;
+  savedAt?: string;
+  [key: string]: unknown;
 }

@@ -6,6 +6,7 @@
 
 import type { Prisma } from "@/lib/database/generated/prisma";
 import type { JSONContent } from "@tiptap/core";
+import type { StoredChatMessage, ChatMetadata } from "@/lib/domain/ai/types";
 
 // ============================================================
 // CONTENT RESPONSE TYPES
@@ -69,6 +70,10 @@ export interface ContentListItem {
   external?: {
     url: string;
     subtype: string;
+  };
+  chat?: {
+    messageCount: number;
+    lastMessage?: string;
   };
   childCount?: number;
 }
@@ -157,6 +162,11 @@ export interface ContentDetailResponse {
     config: Record<string, unknown>;
     data: Record<string, unknown>;
   };
+  // Chat payload
+  chat?: {
+    messages: StoredChatMessage[];
+    metadata: ChatMetadata;
+  };
 }
 
 // ============================================================
@@ -187,6 +197,11 @@ export interface CreateContentRequest {
   engine?: string; // "diagrams-net" | "excalidraw" | "mermaid"
   chartConfig?: Record<string, unknown>; // Engine-specific configuration
   chartData?: Record<string, unknown>; // Engine-specific data
+
+  // Chat fields
+  contentType?: string;
+  chatMessages?: StoredChatMessage[];
+  chatMetadata?: ChatMetadata;
 
   // Phase 2: Folder-specific options (optional)
   viewMode?: "list" | "gallery" | "kanban" | "dashboard" | "canvas";
@@ -219,6 +234,10 @@ export interface UpdateContentRequest {
 
   // Visualization payload updates
   visualizationData?: Record<string, unknown>; // Engine-specific data (contains xml, elements, or source)
+
+  // Chat payload updates
+  chatMessages?: StoredChatMessage[];
+  chatMetadata?: ChatMetadata;
 }
 
 export interface MoveContentRequest {
@@ -312,5 +331,6 @@ export type CreatePayloadData =
   | { codePayload: { create: Prisma.CodePayloadCreateWithoutContentInput } }
   | { externalPayload: { create: Prisma.ExternalPayloadCreateWithoutContentInput } }
   | { visualizationPayload: { create: Prisma.VisualizationPayloadCreateWithoutContentInput } }
+  | { chatPayload: { create: Prisma.ChatPayloadCreateWithoutContentInput } }
   | Record<string, never>; // Empty object for backward compatibility only
 

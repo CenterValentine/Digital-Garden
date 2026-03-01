@@ -10,6 +10,9 @@
 import { useState, useEffect } from "react";
 import { RightSidebarHeader } from "./headers/RightSidebarHeader";
 import { RightSidebarContent } from "./content/RightSidebarContent";
+import { useContentStore } from "@/state/content-store";
+import { queryTools } from "@/lib/domain/tools";
+import type { ContentType } from "@/lib/domain/tools";
 
 export type RightSidebarTab = "backlinks" | "outline" | "tags" | "chat";
 
@@ -35,6 +38,22 @@ export function RightSidebar() {
       localStorage.setItem(TAB_STORAGE_KEY, activeTab);
     }
   }, [activeTab, mounted]);
+
+  // Auto-switch tab when content type changes and current tab is unavailable
+  const selectedContentType = useContentStore((state) => state.selectedContentType);
+  useEffect(() => {
+    if (!mounted) return;
+    const availableTabs = queryTools({
+      surface: "sidebar-tab",
+      contentType: (selectedContentType as ContentType) ?? undefined,
+    })
+      .map((t) => t.tabKey)
+      .filter(Boolean) as RightSidebarTab[];
+
+    if (availableTabs.length > 0 && !availableTabs.includes(activeTab)) {
+      setActiveTab(availableTabs[0]);
+    }
+  }, [selectedContentType, mounted, activeTab]);
 
   return (
     <div className="flex h-full flex-col">

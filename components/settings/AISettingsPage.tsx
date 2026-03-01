@@ -18,8 +18,9 @@ import { getSurfaceStyles } from "@/lib/design/system";
 import { PROVIDER_CATALOG, getModelMeta } from "@/lib/domain/ai";
 import type { AIProviderId } from "@/lib/domain/ai";
 import { Button } from "@/components/ui/glass/button";
-import { Check, AlertCircle } from "lucide-react";
+import { Check, AlertCircle, Wrench } from "lucide-react";
 import { toast } from "sonner";
+import { BASE_TOOL_IDS, BASE_TOOL_METADATA } from "@/lib/domain/ai/tools/metadata";
 
 /** Shape of ai settings as stored in User.settings.ai */
 interface AISettings {
@@ -34,6 +35,8 @@ interface AISettings {
   privacyMode?: "full" | "minimal" | "none";
   monthlyTokenQuota?: number;
   tokensUsedThisMonth?: number;
+  toolChoice?: "auto" | "none";
+  enabledTools?: string[];
 }
 
 const DEFAULTS: Required<AISettings> = {
@@ -48,6 +51,8 @@ const DEFAULTS: Required<AISettings> = {
   privacyMode: "full",
   monthlyTokenQuota: 100_000,
   tokensUsedThisMonth: 0,
+  toolChoice: "auto",
+  enabledTools: [...BASE_TOOL_IDS],
 };
 
 export default function AISettingsPage() {
@@ -65,6 +70,8 @@ export default function AISettingsPage() {
   const [privacyMode, setPrivacyMode] = useState<"full" | "minimal" | "none">(DEFAULTS.privacyMode);
   const [monthlyTokenQuota, setMonthlyTokenQuota] = useState(DEFAULTS.monthlyTokenQuota);
   const [tokensUsedThisMonth, setTokensUsedThisMonth] = useState(DEFAULTS.tokensUsedThisMonth);
+  const [toolChoice, setToolChoice] = useState<"auto" | "none">(DEFAULTS.toolChoice);
+  const [enabledTools, setEnabledTools] = useState<string[]>(DEFAULTS.enabledTools);
 
   // UI state
   const [isLoading, setIsLoading] = useState(true);
@@ -91,6 +98,8 @@ export default function AISettingsPage() {
           if (ai.privacyMode) setPrivacyMode(ai.privacyMode);
           if (ai.monthlyTokenQuota !== undefined) setMonthlyTokenQuota(ai.monthlyTokenQuota);
           if (ai.tokensUsedThisMonth !== undefined) setTokensUsedThisMonth(ai.tokensUsedThisMonth);
+          if (ai.toolChoice) setToolChoice(ai.toolChoice);
+          if (ai.enabledTools) setEnabledTools(ai.enabledTools);
         }
       } catch (err) {
         console.error("Failed to load AI settings:", err);
@@ -137,6 +146,8 @@ export default function AISettingsPage() {
             privacyMode,
             monthlyTokenQuota,
             tokensUsedThisMonth,
+            toolChoice,
+            enabledTools,
           },
         }),
       });
@@ -502,6 +513,106 @@ export default function AISettingsPage() {
               ))}
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* ─── Section 5: AI Tools ─── */}
+      <div
+        className="border border-white/10 rounded-lg p-6"
+        style={{ background: glass0.background, backdropFilter: glass0.backdropFilter }}
+      >
+        <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+          <Wrench className="h-5 w-5 text-gray-400" />
+          AI Tools
+        </h3>
+
+        <div className="space-y-4">
+          {/* Tool Choice */}
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-3">
+              Tool Choice
+            </label>
+            <p className="text-xs text-gray-500 mb-3">
+              Controls whether the AI can use tools to search, read, and create notes.
+            </p>
+            <div className="space-y-2">
+              {[
+                {
+                  value: "auto" as const,
+                  label: "Auto",
+                  description: "Let the AI decide when to use tools based on the conversation.",
+                },
+                {
+                  value: "none" as const,
+                  label: "None",
+                  description: "Disable all tools. The AI will only respond with text.",
+                },
+              ].map((mode) => (
+                <label
+                  key={mode.value}
+                  className={`flex items-start gap-3 p-2.5 rounded-lg border cursor-pointer transition-colors ${
+                    toolChoice === mode.value
+                      ? "border-primary/40 bg-primary/5"
+                      : "border-white/10 hover:bg-white/5"
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="toolChoice"
+                    value={mode.value}
+                    checked={toolChoice === mode.value}
+                    onChange={() => setToolChoice(mode.value)}
+                    className="mt-0.5"
+                  />
+                  <div className="flex-1">
+                    <div className="font-medium text-sm">{mode.label}</div>
+                    <div className="text-sm text-gray-400">{mode.description}</div>
+                  </div>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          {/* Individual Tool Toggles */}
+          {toolChoice === "auto" && (
+            <div className="pt-4 border-t border-white/10">
+              <label className="block text-sm font-medium text-gray-300 mb-3">
+                Available Tools
+              </label>
+              <div className="space-y-2">
+                {BASE_TOOL_IDS.map((toolId) => {
+                  const meta = BASE_TOOL_METADATA[toolId];
+                  const isEnabled = enabledTools.includes(toolId);
+                  return (
+                    <label
+                      key={toolId}
+                      className={`flex items-center gap-3 p-2.5 rounded-lg border cursor-pointer transition-colors ${
+                        isEnabled
+                          ? "border-green-500/20 bg-green-500/5 hover:bg-green-500/10"
+                          : "border-white/10 hover:bg-white/5"
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isEnabled}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setEnabledTools([...enabledTools, toolId]);
+                          } else {
+                            setEnabledTools(enabledTools.filter((t) => t !== toolId));
+                          }
+                        }}
+                      />
+                      <div className="flex-1">
+                        <div className="font-medium text-sm">{meta.name}</div>
+                        <div className="text-sm text-gray-400">{meta.description}</div>
+                      </div>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

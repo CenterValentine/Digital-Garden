@@ -178,7 +178,7 @@ export function getNewContentMenuItems(
     label: "Chat Conversation",
     icon: <MessageSquare className="h-4 w-4" />,
     onClick: () => callbacks.onCreateChat?.(normalizedParentId),
-    disabled: true, // M9 Phase 2: Not implemented yet
+    disabled: !callbacks.onCreateChat,
   });
 
   // Visualization submenu with 3 engine choices

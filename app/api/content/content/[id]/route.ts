@@ -158,6 +158,13 @@ export async function GET(
         data: content.visualizationPayload.data as any,
       };
     }
+    // Chat payload
+    if (content.chatPayload) {
+      response.chat = {
+        messages: (content.chatPayload.messages ?? []) as any,
+        metadata: (content.chatPayload.metadata ?? {}) as any,
+      };
+    }
 
     return NextResponse.json({
       success: true,
@@ -243,6 +250,8 @@ export async function PATCH(
       includeReferencedContent, // Phase 2: Folder referenced content
       viewPrefs, // Phase 2: Folder view preferences
       visualizationData, // Visualization payload data (engine-specific)
+      chatMessages, // Chat payload messages
+      chatMetadata, // Chat payload metadata
     } = body;
 
     // Prepare update data
@@ -409,6 +418,22 @@ export async function PATCH(
       });
     }
 
+    // Update chat payload (upsert: create if it doesn't exist)
+    if (chatMessages !== undefined || chatMetadata !== undefined) {
+      await prisma.chatPayload.upsert({
+        where: { contentId: id },
+        update: {
+          ...(chatMessages !== undefined && { messages: chatMessages as any }),
+          ...(chatMetadata !== undefined && { metadata: chatMetadata as any }),
+        },
+        create: {
+          contentId: id,
+          messages: (chatMessages ?? []) as any,
+          metadata: (chatMetadata ?? {}) as any,
+        },
+      });
+    }
+
     // Update content node
     const updated = await prisma.contentNode.update({
       where: { id },
@@ -513,6 +538,12 @@ export async function PATCH(
         url: updated.externalPayload.url,
         subtype: updated.externalPayload.subtype || "website",
         preview: updated.externalPayload.preview as any,
+      };
+    }
+    if (updated.chatPayload) {
+      response.chat = {
+        messages: (updated.chatPayload.messages ?? []) as any,
+        metadata: (updated.chatPayload.metadata ?? {}) as any,
       };
     }
 

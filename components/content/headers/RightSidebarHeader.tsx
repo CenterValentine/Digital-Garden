@@ -32,7 +32,7 @@ const TAB_TITLES: Record<string, string> = {
   backlinks: "Backlinks",
   outline: "Outline",
   tags: "Tags",
-  chat: "AI Chat (Coming Soon)",
+  chat: "AI Chat",
 };
 
 interface RightSidebarHeaderProps {

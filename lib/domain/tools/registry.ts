@@ -29,6 +29,15 @@ const TOOL_REGISTRY: ToolDefinition[] = [
     group: "export",
   },
   {
+    id: "export-chat",
+    label: "Export Chat",
+    iconName: "Download",
+    surfaces: ["toolbar"],
+    contentTypes: ["chat"],
+    order: 100,
+    group: "export",
+  },
+  {
     id: "copy-link",
     label: "Copy Link",
     iconName: "Link2",
@@ -156,7 +165,8 @@ const TOOL_REGISTRY: ToolDefinition[] = [
     label: "AI Chat",
     iconName: "MessageCircle",
     surfaces: ["sidebar-tab"],
-    contentTypes: "all",
+    // Exclude "chat" content type — ChatViewer IS the chat; sidebar chat would be redundant
+    contentTypes: ["folder", "note", "file", "html", "template", "code", "external", "visualization", "data", "hope", "workflow"],
     order: 40,
     tabKey: "chat",
   },
