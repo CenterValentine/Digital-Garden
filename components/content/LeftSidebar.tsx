@@ -52,6 +52,13 @@ export function LeftSidebar() {
     setRefreshTrigger((prev) => prev + 1);
   }, []);
 
+  // Listen for cross-component tree refresh events (e.g. from ChatPanel save)
+  useEffect(() => {
+    const handler = () => setRefreshTrigger((prev) => prev + 1);
+    window.addEventListener("dg:tree-refresh", handler);
+    return () => window.removeEventListener("dg:tree-refresh", handler);
+  }, []);
+
   // Callback to receive selection state from content
   const handleSelectionChange = useCallback((hasMultipleSelections: boolean) => {
     setIsCreateDisabled(hasMultipleSelections);
@@ -110,10 +117,10 @@ export function LeftSidebar() {
     setCreateTrigger({ type: "visualization", engine: "diagrams-net", timestamp: Date.now() });
   }, []);
 
-  // Phase 2: Stub types - Disabled until implemented
-  // const handleCreateChat = useCallback(() => {
-  //   setCreateTrigger({ type: "chat", timestamp: Date.now() });
-  // }, []);
+  // Chat creation — now active (Sprint 34)
+  const handleCreateChat = useCallback(() => {
+    setCreateTrigger({ type: "chat", timestamp: Date.now() });
+  }, []);
 
   // const handleCreateData = useCallback(() => {
   //   setCreateTrigger({ type: "data", timestamp: Date.now() });
@@ -172,6 +179,7 @@ export function LeftSidebar() {
           onCreateVisualizationMermaid={handleCreateVisualizationMermaid}
           onCreateVisualizationExcalidraw={handleCreateVisualizationExcalidraw}
           onCreateVisualizationDiagramsNet={handleCreateVisualizationDiagramsNet}
+          onCreateChat={handleCreateChat}
           isCreateDisabled={isCreateDisabled}
         />
 

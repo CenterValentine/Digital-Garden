@@ -77,19 +77,34 @@ const externalSettingsSchema = z
   })
   .optional();
 
-// AI Settings Schema (for M8 Phase 2)
+// AI Settings Schema (Epoch 7: AI Integration)
 const aiSettingsSchema = z
   .object({
+    // Master switch
     enabled: z.boolean().optional(),
+    // Provider & model selection
+    providerId: z.enum(["anthropic", "openai"]).optional(),
+    modelId: z.string().optional(),
+    // Legacy field (kept for backward compat, prefer providerId + modelId)
     model: z
       .enum(["claude-opus-4", "claude-sonnet-3-5", "gpt-4"])
       .optional(),
+    // Generation parameters
+    temperature: z.number().min(0).max(2).optional(),
+    maxTokens: z.number().min(1).max(200_000).optional(),
+    streamingEnabled: z.boolean().optional(),
+    // Conversation behavior
     conversationHistory: z.boolean().optional(),
     contextWindow: z.number().optional(),
+    // Usage tracking
     monthlyTokenQuota: z.number().optional(),
     tokensUsedThisMonth: z.number().optional(),
+    // Feature toggles
     autoSuggest: z.boolean().optional(),
     privacyMode: z.enum(["full", "minimal", "none"]).optional(),
+    // Tool settings (Sprint 34)
+    toolChoice: z.enum(["auto", "none"]).optional(),
+    enabledTools: z.array(z.string()).optional(),
   })
   .optional();
 
@@ -275,13 +290,20 @@ export const DEFAULT_SETTINGS: UserSettings = {
   },
   ai: {
     enabled: true,
-    model: "claude-sonnet-3-5",
+    providerId: "anthropic",
+    modelId: "claude-sonnet-3-5",
+    model: "claude-sonnet-3-5", // Legacy
+    temperature: 0.7,
+    maxTokens: 4096,
+    streamingEnabled: true,
     conversationHistory: true,
     contextWindow: 4096,
-    monthlyTokenQuota: 100000, // 100k tokens/month for free tier
+    monthlyTokenQuota: 100000,
     tokensUsedThisMonth: 0,
     autoSuggest: true,
     privacyMode: "full",
+    toolChoice: "auto",
+    enabledTools: ["searchNotes", "getCurrentNote", "createNote"],
   },
   exportBackup: {
     defaultFormat: "markdown",

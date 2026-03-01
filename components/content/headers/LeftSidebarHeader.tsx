@@ -27,8 +27,8 @@ interface LeftSidebarHeaderProps {
   onCreateVisualizationMermaid?: () => void;
   onCreateVisualizationExcalidraw?: () => void;
   onCreateVisualizationDiagramsNet?: () => void;
+  onCreateChat?: () => void;
   // Stub types disabled until implemented:
-  // onCreateChat?: () => void;
   // onCreateData?: () => void;
   // onCreateHope?: () => void;
   // onCreateWorkflow?: () => void;
@@ -48,6 +48,7 @@ export function LeftSidebarHeader({
   onCreateVisualizationMermaid,
   onCreateVisualizationExcalidraw,
   onCreateVisualizationDiagramsNet,
+  onCreateChat,
   isCreateDisabled = false,
 }: LeftSidebarHeaderProps) {
   const { isSearchOpen, toggleSearch } = useSearchStore();
@@ -145,6 +146,7 @@ export function LeftSidebarHeader({
           onCreateVisualizationMermaid={onCreateVisualizationMermaid ? () => onCreateVisualizationMermaid() : undefined}
           onCreateVisualizationExcalidraw={onCreateVisualizationExcalidraw ? () => onCreateVisualizationExcalidraw() : undefined}
           onCreateVisualizationDiagramsNet={onCreateVisualizationDiagramsNet ? () => onCreateVisualizationDiagramsNet() : undefined}
+          onCreateChat={onCreateChat ? () => onCreateChat() : undefined}
           disabled={isCreateDisabled}
         />
 

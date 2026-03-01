@@ -757,6 +757,10 @@ export function LeftSidebarContent({
         requestBody.language = config.payload?.language;
       } else if (type === "html") {
         requestBody.html = config.payload?.html;
+      } else if (type === "chat") {
+        requestBody.contentType = "chat";
+        requestBody.chatMessages = config.payload?.messages || [];
+        requestBody.chatMetadata = {};
       } else if (type === "visualization") {
         requestBody.engine = config.payload?.engine;
         requestBody.chartConfig = config.payload?.config || {};

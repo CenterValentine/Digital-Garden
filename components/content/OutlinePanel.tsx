@@ -14,8 +14,9 @@
 
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect } from "react";
 import { useContentStore } from "@/state/content-store";
+import { useOutlineStore } from "@/state/outline-store";
 import type { OutlineHeading } from "@/lib/domain/content/outline-extractor";
 
 interface OutlinePanelProps {
@@ -27,12 +28,13 @@ interface OutlinePanelProps {
 
 export function OutlinePanel({ outline = [], onHeadingClick }: OutlinePanelProps) {
   const selectedContentId = useContentStore((state) => state.selectedContentId);
-  const [activeHeadingId, setActiveHeadingId] = useState<string | null>(null);
+  const activeHeadingId = useOutlineStore((state) => state.activeHeadingId);
+  const setActiveHeadingId = useOutlineStore((state) => state.setActiveHeadingId);
 
   // Reset active heading when switching notes
   useEffect(() => {
     setActiveHeadingId(null);
-  }, [selectedContentId]);
+  }, [selectedContentId, setActiveHeadingId]);
 
   // Handle heading click
   const handleHeadingClick = (heading: OutlineHeading) => {
