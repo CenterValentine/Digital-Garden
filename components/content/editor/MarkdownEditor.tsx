@@ -86,6 +86,10 @@ export function MarkdownEditor({
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [isLinkDialogOpen, setIsLinkDialogOpen] = useState(false);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  // Track the last content we saved so we can distinguish save-echoes
+  // (parent updating state after our save) from genuine external updates
+  // (navigation, refetch). Prevents cursor-jump-on-autosave bug.
+  const lastSavedContentRef = useRef<JSONContent | null>(null);
 
   // Initialize editor
   const editor = useEditor({
@@ -142,10 +146,15 @@ export function MarkdownEditor({
         saveTimeoutRef.current = setTimeout(async () => {
           setIsSaving(true);
           try {
+            // Track the content object we're about to save. When the parent
+            // calls setNoteContent(content) after save, it echoes back as a
+            // prop change. The ref lets us skip the setContent call for that echo.
+            lastSavedContentRef.current = json;
             await onSave(json);
             setHasUnsavedChanges(false);
           } catch (error) {
             console.error("Failed to save:", error);
+            lastSavedContentRef.current = null;
             // Keep hasUnsavedChanges=true on error
           } finally {
             setIsSaving(false);
@@ -155,11 +164,22 @@ export function MarkdownEditor({
     },
   });
 
-  // Update editor content when prop changes (external updates)
+  // Sync editor content when the prop changes from an EXTERNAL source
+  // (navigation to a different note, refetch after rename).
+  // Skip when the change is a save-echo: the parent updating state after
+  // our own autosave — applying that would reset the cursor and lose
+  // any content the user typed during the save round-trip.
   useEffect(() => {
-    if (editor && content !== editor.getJSON()) {
-      editor.commands.setContent(content);
+    if (!editor || !content) return;
+
+    // If this content matches what we just saved, it's a save-echo — skip it
+    if (content === lastSavedContentRef.current) {
+      lastSavedContentRef.current = null;
+      return;
     }
+
+    // Genuine external update — apply it
+    editor.commands.setContent(content);
   }, [content, editor]);
 
   // Initial stats update when editor is created
