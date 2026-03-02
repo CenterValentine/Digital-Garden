@@ -1,13 +1,13 @@
 ---
-last_updated: 2026-02-27
+last_updated: 2026-03-01
 ---
 
 # Sprint Backlog
 
 **Prioritized work items for upcoming sprints**
 
-## Sprint 28: Advanced Folder Views + Payload Stubs
-**Duration**: Mar 4-17, 2026 (Planned)
+## Sprint 28: Advanced Folder Views + Payload Stubs (Deferred)
+**Status**: Deferred — deprioritized in favor of Epoch 7 AI work
 **Estimated**: 20-25 story points
 
 ### Backlogged from Sprint 27 (4 items, 12 points)
@@ -185,30 +185,60 @@ Post-feature stability sprint. Fixed regressions from Sprints 29-31.
 - [x] **BF-004**: tag-suggestion runtime error guard (1 pt)
   - Guard `component?.ref` against undefined in `onKeyDown`
 
-## Sprint 33+: TBD
-**Estimated**: 18-22 story points
+## Sprint 33: AI Foundation + Settings UI ✅ COMPLETE
+**Duration**: Feb 27, 2026
+**Branch**: `epoch-7/sprint-33`
 
-### Potential Work Items
+- [x] AI SDK v6 installed (ai@6, @ai-sdk/react, @ai-sdk/anthropic, @ai-sdk/openai)
+- [x] Provider registry with dynamic imports (`resolveChatModel`)
+- [x] Streaming chat API route (`POST /api/ai/chat`)
+- [x] `/settings/ai` page (provider, generation, toggles, usage)
+- [x] AI chat Zustand store, middleware system
+
+## Sprint 34: Chat UI, AI Tools, @ Mentions ✅ COMPLETE
+**Duration**: Feb 28 - Mar 1, 2026
+**Branch**: `epoch-7/sprint-34`
+
+- [x] ChatPanel (sidebar) + ChatViewer (main panel) with streaming
+- [x] ChatPayload CRUD (save/load conversations)
+- [x] AI tools: searchNotes, getCurrentNote, createNote
+- [x] @ file mentions with system prompt injection
+- [x] / tool commands with prompt hints
+- [x] ModelPicker, ChatSuggestionMenu, chat export
+- [x] Sidebar tab auto-switch, chat icon in file tree
+- [x] Tool settings UI
+
+## Sprint 35+: Planning
+
+### Original Epoch 7 Plan (may be redirected)
+
+**Sprint 35 — BYOK, Speech & Agent** (originally planned):
+- [ ] BYOK key management UI (secure entry, validation, per-provider)
+- [ ] Speech-to-text input (Web Speech API or Whisper)
+- [ ] Text-to-speech output (Web Speech Synthesis)
+- [ ] Agent mode (multi-step tool use with user confirmation)
+- [ ] Key management + speech settings pages
+
+**Sprint 36 — RAG, Integration & Polish** (originally planned):
+- [ ] Embeddings generation for content nodes
+- [ ] Vector similarity search (pgvector or external)
+- [ ] RAG context injection into chat
+- [ ] Chat history search
+- [ ] Cross-sprint polish and bug fixes
+
+### Deferred Work Items
 
 **Performance & Optimization**:
 - [ ] Folder view performance tuning for large folders (5 pts)
 - [ ] Virtualization for grid and kanban views (3 pts)
-- [ ] Lazy loading for timeline view (3 pts)
 
 **UX Refinements**:
 - [ ] Folder view keyboard shortcuts (Cmd+1-5) (2 pts)
-- [ ] View transition animations (2 pts)
 - [ ] Empty state designs for all views (2 pts)
 
 **Advanced Features**:
 - [ ] Folder sorting and filtering UI (3 pts)
 - [ ] Custom kanban columns (5 pts)
-- [ ] Timeline zoom controls (3 pts)
-
-**Documentation**:
-- [ ] Feature documentation for folder views (2 pts)
-- [ ] User guide for new content types (2 pts)
-- [ ] API documentation updates (1 pt)
 
 ## Future Backlog (Epoch 6+)
 
@@ -219,12 +249,17 @@ Post-feature stability sprint. Fixed regressions from Sprints 29-31.
 - [ ] Comment threads on content
 - [ ] Activity feed and notifications
 
-### AI Integration
-- [ ] AI chat interface within IDE
-- [ ] Semantic search with embeddings
+### AI Integration (Partially Shipped)
+- [x] AI chat interface within IDE (Sprint 34)
+- [x] AI tools: search, read, create notes (Sprint 34)
+- [x] @ mentions with context injection (Sprint 34)
+- [ ] Semantic search with embeddings (RAG)
 - [ ] AI-powered autocomplete and suggestions
 - [ ] Content summarization
 - [ ] Smart tagging and categorization
+- [ ] BYOK key management UI
+- [ ] Speech input/output
+- [ ] Agent mode (multi-step reasoning)
 
 ### Advanced Editor Features
 - [ ] Inline code execution (JavaScript, Python)
@@ -269,5 +304,5 @@ Post-feature stability sprint. Fixed regressions from Sprints 29-31.
 
 ---
 
-**Last Updated**: Feb 24, 2026
-**Next Review**: After Sprint 30 completion
+**Last Updated**: Mar 1, 2026
+**Next Review**: Sprint 35 planning
