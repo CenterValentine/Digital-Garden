@@ -147,6 +147,7 @@ export function ExpandableEditor({
           onKeyDown={(e) => e.stopPropagation()}
         >
           <MarkdownEditor
+            contentId={contentId}
             content={editorContent}
             onSave={handleSave}
             editable={!readOnly}

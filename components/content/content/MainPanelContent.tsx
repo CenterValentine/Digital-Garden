@@ -8,7 +8,7 @@
 
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { ToolSurfaceProvider } from "@/lib/domain/tools";
 import { ContentToolbar } from "../toolbar";
 import { ToolDebugPanel } from "../toolbar/ToolDebugPanel";
@@ -108,6 +108,21 @@ export function MainPanelContent() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0); // Used to force refetch
+
+  // AbortController for in-flight save requests. When the user navigates to
+  // a different document, we abort any pending fetch to prevent Doc A's content
+  // from being written to Doc B's API endpoint.
+  const saveAbortControllerRef = useRef<AbortController | null>(null);
+
+  // Cancel in-flight saves whenever selectedContentId changes
+  useEffect(() => {
+    return () => {
+      if (saveAbortControllerRef.current) {
+        saveAbortControllerRef.current.abort();
+        saveAbortControllerRef.current = null;
+      }
+    };
+  }, [selectedContentId]);
 
   // Restore selection from URL or localStorage on mount
   useEffect(() => {
@@ -325,10 +340,31 @@ export function MainPanelContent() {
     [setOutline]
   );
 
-  // Auto-save handler
+  // Auto-save handler — hardened against cross-document race conditions.
+  // The contentId is captured in the closure at creation time. Before making
+  // the API call, we verify it still matches the currently-viewed document.
+  // An AbortController cancels any in-flight fetch if the user navigates away.
   const handleSave = useCallback(
     async (content: JSONContent) => {
       if (!selectedContentId) return;
+
+      // GUARD: Read the live selectedContentId from the store at save-time.
+      // If it no longer matches the closure's value, the user navigated away
+      // and this save targets a stale document — discard it.
+      const currentId = useContentStore.getState().selectedContentId;
+      if (currentId !== selectedContentId) {
+        console.warn(
+          `[MainPanelContent] Blocked cross-document save: handleSave targets ${selectedContentId}, but store has ${currentId}`
+        );
+        return;
+      }
+
+      // Cancel any previous in-flight save
+      if (saveAbortControllerRef.current) {
+        saveAbortControllerRef.current.abort();
+      }
+      const abortController = new AbortController();
+      saveAbortControllerRef.current = abortController;
 
       setIsSaving(true);
       setHasUnsavedChanges(true);
@@ -343,6 +379,7 @@ export function MainPanelContent() {
           body: JSON.stringify({
             tiptapJson: content,
           }),
+          signal: abortController.signal,
         });
 
         const result = await response.json();
@@ -351,12 +388,28 @@ export function MainPanelContent() {
           throw new Error(result.error?.message || "Failed to save note");
         }
 
+        // Final guard: verify we're still on the same document before
+        // updating parent state. This catches the edge case where the user
+        // navigated during the network round-trip.
+        const postSaveId = useContentStore.getState().selectedContentId;
+        if (postSaveId !== selectedContentId) {
+          console.warn(
+            `[MainPanelContent] User navigated during save — skipping state update for ${selectedContentId}`
+          );
+          return;
+        }
+
         console.log("Note saved successfully");
         setLastSaved(new Date());
         // Keep parent state in sync so re-mounts (e.g., ExpandableEditor
         // collapse/reopen) receive the latest persisted content
         setNoteContent(content);
-      } catch (err) {
+      } catch (err: unknown) {
+        // AbortError is expected when we cancel a save due to navigation
+        if (err instanceof DOMException && err.name === "AbortError") {
+          console.log(`[MainPanelContent] Save aborted for ${selectedContentId} (navigation)`);
+          return;
+        }
         console.error("Failed to save note:", err);
         throw err; // Re-throw so editor knows save failed
       } finally {
@@ -790,6 +843,7 @@ export function MainPanelContent() {
         {/* Editor */}
         <div className="flex-1 overflow-hidden">
           <MarkdownEditor
+            contentId={selectedContentId ?? undefined}
             content={noteContent}
             onSave={handleSave}
             onStatsChange={handleStatsChange}
