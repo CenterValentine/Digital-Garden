@@ -30,6 +30,8 @@ export interface EditorStats {
 }
 
 export interface MarkdownEditorProps {
+  /** Content ID this editor is bound to — used to prevent cross-document saves */
+  contentId?: string;
   /** Initial content in TipTap JSON format */
   content: JSONContent;
   /** Callback when content changes */
@@ -65,6 +67,7 @@ export interface MarkdownEditorProps {
 }
 
 export function MarkdownEditor({
+  contentId,
   content,
   onChange,
   onSave,
@@ -90,6 +93,15 @@ export function MarkdownEditor({
   // (parent updating state after our save) from genuine external updates
   // (navigation, refetch). Prevents cursor-jump-on-autosave bug.
   const lastSavedContentRef = useRef<JSONContent | null>(null);
+  // Snapshot the onSave callback in a ref so the timeout always uses the
+  // version that was current when the edit happened — not a stale or
+  // re-created callback that might target a different document.
+  const onSaveRef = useRef(onSave);
+  onSaveRef.current = onSave;
+  // Track which contentId this editor instance is bound to, so we can
+  // discard saves that fire after the user navigated away.
+  const contentIdRef = useRef(contentId);
+  contentIdRef.current = contentId;
 
   // Initialize editor
   const editor = useEditor({
@@ -141,16 +153,30 @@ export function MarkdownEditor({
         clearTimeout(saveTimeoutRef.current);
       }
 
-      // Schedule auto-save
-      if (onSave) {
+      // Schedule auto-save.
+      // IMPORTANT: Snapshot the save callback AND contentId at the moment the
+      // edit happens. This prevents the race condition where the user navigates
+      // to a different document during the debounce window — without this,
+      // React could give us a fresh handleSave targeting the NEW document,
+      // causing Doc A's content to overwrite Doc B.
+      const snapshotSave = onSaveRef.current;
+      const snapshotContentId = contentIdRef.current;
+      if (snapshotSave) {
         saveTimeoutRef.current = setTimeout(async () => {
+          // Guard: if contentId changed since the edit, discard this save
+          if (snapshotContentId && contentIdRef.current !== snapshotContentId) {
+            console.warn(
+              `[MarkdownEditor] Discarding stale save: edited ${snapshotContentId}, now viewing ${contentIdRef.current}`
+            );
+            return;
+          }
           setIsSaving(true);
           try {
             // Track the content object we're about to save. When the parent
             // calls setNoteContent(content) after save, it echoes back as a
             // prop change. The ref lets us skip the setContent call for that echo.
             lastSavedContentRef.current = json;
-            await onSave(json);
+            await snapshotSave(json);
             setHasUnsavedChanges(false);
           } catch (error) {
             console.error("Failed to save:", error);
@@ -244,14 +270,16 @@ export function MarkdownEditor({
     return () => window.removeEventListener("scroll-to-heading", handleScrollToHeading);
   }, [editor]);
 
-  // Cleanup timeout on unmount
+  // Cancel pending saves when contentId changes (user navigated away)
+  // or on unmount. This is the first line of defense against cross-document saves.
   useEffect(() => {
     return () => {
       if (saveTimeoutRef.current) {
         clearTimeout(saveTimeoutRef.current);
+        saveTimeoutRef.current = null;
       }
     };
-  }, []);
+  }, [contentId]);
 
   return (
     <div className={`flex flex-col h-full ${className}`}>
