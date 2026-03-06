@@ -1,7 +1,7 @@
 ---
-last_updated: 2026-03-01
-current_epoch: 7
-current_sprint: 34
+last_updated: 2026-03-06
+current_epoch: 8
+current_sprint: 35
 sprint_status: complete
 ---
 
@@ -27,26 +27,37 @@ WHAT TO UPDATE:
 
 SYNC WITH: work-tracking/CURRENT-SPRINT.md (detailed tracking)
 FULL GUIDE: STATUS-MAINTENANCE-GUIDE.md
+
+SPRINT EXECUTION PROTOCOL:
+Before commencing any sprint, always ask the user for input on the sprint plan
+before planning and executing. There may be additions or modifications.
 -->
 
 ## Current Work
 
-### Last Completed Sprint: Sprint 34 - Chat UI, AI Tools, @ Mentions
-**Duration**: Feb 28 - Mar 1, 2026
-**Branch**: `epoch-7/sprint-34`
-**Status**: ✅ COMPLETE — merged to main via PR
-
-### Active Epoch: Epoch 7 - AI Integration
-**Duration**: Feb-Apr 2026 (8 weeks, 4 sprints)
-**Theme**: AI chat, AI tools, agents, speech, BYOK, RAG
+### Active Epoch: Epoch 8 - Editor Stabilization
+**Duration**: 2 sprints (35-36)
+**Theme**: Bug fixes, TipTap rules, focus guardrails, table rebuild
 
 **Sprint Plan**:
-- Sprint 33: AI Foundation + Settings UI ✅
-- Sprint 34: Chat UI & AI Tools + Tool Settings ✅
-- Sprint 35: Planning (BYOK, Speech, Agent, or new priorities)
-- Sprint 36: Planning
+- Sprint 35: TipTap Rules Doc + Input Rule Bug Fixes (complete)
+- Sprint 36: Table Rebuild + Link Fix + Cleanup + Focus Guardrails (planned)
+
+### Next Sprint: Sprint 36 - Table Rebuild + Link Fix + Cleanup + Focus Guardrails
+**Status**: Planned — awaiting user input before commencing
 
 ## Recent Completions (Last 30 Days)
+
+**Mar 6, 2026**: Sprint 35 TipTap Rules Doc + Input Rule Bug Fixes — COMPLETE
+- TIPTAP-EDITOR-RULES.md created (living document — expand as features are added)
+- Tag autocomplete 2-second delay before popup appears (heading shortcuts get priority)
+- `##` in query immediately dismisses tag autocomplete via `allow()` guard
+- Space during delay propagates to ProseMirror for heading conversion (`# ` → H1)
+- Slash command restricted to first character of empty lines only
+- HeadingBackspace extension: empty H1→`#`, H2→`##`, H3→`###` in paragraph
+- Removed macOS Finder duplicate `index.d 2.ts` from Prisma generated output
+- Build gate passed
+- 4 files changed, 1 new extension file
 
 **Mar 1, 2026**: Sprint 34 Chat UI, AI Tools, @ Mentions — COMPLETE
 - ChatPanel (right sidebar): transient streaming chat with "Save conversation" to file tree
@@ -75,52 +86,32 @@ FULL GUIDE: STATUS-MAINTENANCE-GUIDE.md
 - Build gate passed
 
 **Feb 27, 2026**: Sprint 32 Editor Stability & Polish Complete
-- ✅ BubbleMenu persistence fix — root cause was TipTap React wrapper's shared `"bubbleMenu"` meta key causing cross-contamination between text and table BubbleMenu instances; stabilized shouldShow callbacks to module-level functions
-- ✅ Removed `.focus()` from BubbleMenu command chains (prevents focus/blur cycle exhausting preventHide flag)
-- ✅ Removed invalid `tippyOptions` prop (TipTap v3 uses Floating UI, not tippy.js)
-- ✅ Outline click-to-scroll via CustomEvent bridge pattern (text+level matching)
-- ✅ ExpandableEditor tag/wiki-link callback threading (fetchTags, createTag, fetchNotesForWikiLink, onWikiLinkClick)
-- ✅ Keyboard event scoping — `stopPropagation` on ExpandableEditor container
-- ✅ Tag/heading `# ` conflict fix — Space with empty query propagates to ProseMirror heading input rule
-- ✅ tag-suggestion `component.ref` runtime error guard
+- BubbleMenu persistence fix (root cause: shared meta key cross-contamination)
+- Outline click-to-scroll via CustomEvent bridge
+- ExpandableEditor tag/wiki-link callback threading
+- Tag/heading `# ` conflict fix
+- Build gate passed
 
 **Feb 26, 2026**: Sprint 31 Lossless Export/Import Round-Trip Complete
-- ✅ Custom two-pass markdown parser (block + inline) → TipTap JSON
-- ✅ Semantic extensions: tags, wiki-links, callouts, task lists, tables
-- ✅ Sidecar reader (.meta.json consumption for lossless restoration)
-- ✅ Import API endpoint (POST /api/content/import, multipart/form-data)
-- ✅ Import button in toolbar (Tool Surfaces registry)
-- ✅ Round-trip verification utility (dev console tool)
-- ✅ syncContentTags extracted to shared module
-- **Pending manual testing** (macOS Finder issue blocking file picker)
+- Custom two-pass markdown parser → TipTap JSON
+- Sidecar reader, Import API, toolbar button
+- Pending manual testing (macOS Finder issue)
 
 **Feb 25, 2026**: Sprint 30 Universal Expandable Editor Complete
-- ✅ ExpandableEditor component (collapsible TipTap for all content types)
-- ✅ Centralized integration in MainPanelContent
-- ✅ MarkdownEditor compact mode
-- ✅ API upsert for notePayload (any content type can now have notes)
-- **Known issue**: BubbleMenu focus-theft regression (pre-existing)
-
 **Feb 24, 2026**: Sprint 29 Tool Surfaces Architecture Complete
-- ✅ Declarative tool registry (ToolDefinition, queryTools)
-- ✅ ToolSurfaceProvider context + handler registration
-- ✅ ContentToolbar component (toolbar surface)
-- ✅ BubbleMenu wired to registry (module-level, no hooks)
-- ✅ RightSidebarHeader wired to registry (dynamic tabs)
-- ✅ ToolDebugPanel (dev-only, Cmd+Shift+T)
 
-**Feb 18, 2026**: Sprint 27 Core Folder Views Complete
-- ✅ List view component (sort controls, file type icons, keyboard navigation)
-- ✅ Grid view component (responsive layout, thumbnails, hover effects)
-- ✅ Kanban view component (drag-and-drop, status columns)
-- ✅ Folder organization system operational
+## Up Next
 
-## Up Next (Sprint 35+)
+### Epoch 8: Editor Stabilization (Sprints 35-36)
+Fix all known editor bugs, establish TipTap rules, implement focus guardrails.
 
-**Planning in progress** — original Epoch 7 plan had BYOK/Speech/Agent for Sprint 35
-and RAG/Polish for Sprint 36, but new priorities may redirect.
+### Epoch 9: Editor Enhancements (Sprints 37-42)
+Images, URL/OG embeds, YouTube, drag/reorder, templates, snapshots, context menu.
 
-**See**: [Backlog](work-tracking/BACKLOG.md) for prioritized items
+### Epoch 10: AI TipTap (Sprints 43-47)
+Pretty AI responses, agent editing tools, AI edit highlighting, chat outlines, AI image generation.
+
+**See**: [Epoch Plans](work-tracking/epochs/) for detailed sprint breakdowns
 
 ## Known Issues & Blockers
 
@@ -128,12 +119,18 @@ and RAG/Polish for Sprint 36, but new priorities may redirect.
 - **macOS Finder**: File picker not opening on dev machine — blocks manual testing of import feature
 - **macOS mmap**: `mmap failed: Operation timed out` on `git push` from main working directory — workaround: git bundle → fresh clone → push from /tmp
 
+### Known Editor Bugs (Sprint 36 targets)
+- `>` blockquote affects child content
+- Cursor adjacent to URL inherits link formatting
+- Header conversion in paragraph with `hardBreak` converts all text
+- Table extra column visual bug
+- Old console.log statements throughout editor code
+
 ### Known Limitations
-- **Sprint 31 Import**: Untested pending Finder fix — parser, API, and toolbar button built but not manually verified
-- **PDF/DOCX Export**: Stub implementations (need Puppeteer/docx library integration)
+- **Sprint 31 Import**: Untested pending Finder fix
+- **PDF/DOCX Export**: Stub implementations
 - **AI Chat**: Requires user-provided API keys (BYOK configured in /settings/ai)
-- **External Links**: Some sites have SSL certificate errors (require dev-mode bypass)
-- **Outline Panel**: Auto-scroll on editor scroll needs intersection observer (click-to-scroll works)
+- **Outline Panel**: Auto-scroll on editor scroll needs intersection observer
 - **Chat mentions**: Only injects note `searchText` (max 2000 chars), not full TipTap JSON
 
 ### Technical Debt
@@ -152,31 +149,39 @@ and RAG/Polish for Sprint 36, but new priorities may redirect.
 - Sprint 34: ~25 points (Chat UI + Tools + Mentions)
 - **Average**: ~19 points/sprint
 
-### Epoch 7 Progress
-- **Sprint 33**: ✅ Complete (AI Foundation)
-- **Sprint 34**: ✅ Complete (Chat UI & Tools)
-- **Sprint 35**: Planning
-- **Sprint 36**: Planning
+### Epoch Progress
+- **Epoch 7** (AI Integration): ✅ Sprints 33-34 complete; Sprints 35-36 redirected to Epoch 8
+- **Epoch 8** (Editor Stabilization): In Progress — Sprint 35 complete, Sprint 36 planned
+- **Epoch 9** (Editor Enhancements): Planned (Sprints 37-42)
+- **Epoch 10** (AI TipTap): Planned (Sprints 43-47)
 
 ## Roadmap
 
-### Epoch 6: Collaboration (Future)
-**Theme**: Real-time collaboration, sharing, permissions
+### Epoch 8: Editor Stabilization (Active)
+**Theme**: Bug fixes, TipTap rules, focus guardrails, table rebuild
 
-### Epoch 7: AI Integration (Active)
-**Theme**: AI chat, embeddings, semantic search, BYOK, tools, agents, speech
+### Epoch 9: Editor Enhancements (Planned)
+**Theme**: Images, embeds, templates, snapshots, context menu, drag/reorder
 
-### Epoch 8: Mobile & Performance (Future)
-**Theme**: PWA, offline support, performance optimization
+### Epoch 10: AI TipTap (Planned)
+**Theme**: AI responses, agent tools, edit highlighting, chat outlines, image generation
+
+### Future (Unplanned)
+- **Collaboration & Sharing** — real-time editing, sharing, security review
+- **UI Revisions** — theming, custom styles
+- **Main Panel Multiple Tabs** — multi-document editing
+- **YouTube Playlists & Summarizing** — video content management
 
 ## Quick Links
 
-- [Current Sprint](work-tracking/CURRENT-SPRINT.md) - Sprint 34 details
+- [Current Sprint](work-tracking/CURRENT-SPRINT.md) - Sprint 35 details
 - [Backlog](work-tracking/BACKLOG.md) - Prioritized work items
+- [Epoch Plans](work-tracking/epochs/) - Epoch 8, 9, 10, future stubs
+- [TipTap Editor Rules](guides/editor/TIPTAP-EDITOR-RULES.md) - Editor behavior rules
 - [AI Development Guide](../CLAUDE.md) - For AI assistants
 - [Start Here](00-START-HERE.md) - Documentation index
 
 ---
 
-**Last Updated**: Mar 1, 2026
-**Next Review**: Sprint 35 planning
+**Last Updated**: Mar 6, 2026
+**Next Review**: Sprint 36 kickoff (user input required before commencing)

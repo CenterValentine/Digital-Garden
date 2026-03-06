@@ -1,294 +1,201 @@
 ---
-last_updated: 2026-03-01
+last_updated: 2026-03-05
 ---
 
 # Sprint Backlog
 
-**Prioritized work items for upcoming sprints**
+**Prioritized work items for upcoming sprints, organized by epoch.**
 
-## Sprint 28: Advanced Folder Views + Payload Stubs (Deferred)
-**Status**: Deferred — deprioritized in favor of Epoch 7 AI work
-**Estimated**: 20-25 story points
+**Sprint Execution Protocol**: Before commencing any sprint, always ask the user for input before planning and executing — there may be additions or modifications.
 
-### Backlogged from Sprint 27 (4 items, 12 points)
-**Context**: Core folder views (List, Grid, Kanban) shipped in Sprint 27. These advanced features deferred as nice-to-have.
+---
 
-- [ ] **FP-004**: Table view component (3 pts) - Advanced folder view
-  - Sortable columns (name, type, size, date)
-  - Column resize and reorder
-  - Row selection (multi-select)
-  - Filter controls
+## Epoch 8: Editor Stabilization (Sprints 35-36)
 
-- [ ] **FP-005**: Timeline view component (5 pts) - Advanced folder view
-  - Chronological visualization
-  - Date grouping (day, week, month)
-  - Zoom controls
-  - Event markers
+**Goal**: Fix all known editor bugs, establish rules, implement focus guardrails.
+**Detailed plan**: [epoch-8-editor-stabilization.md](epochs/epoch-8-editor-stabilization.md)
 
-- [ ] **FP-006**: View preference persistence (2 pts) - Enhancement
-  - User settings integration
-  - Per-folder preference storage
-  - Fallback to folder default view
+### Sprint 35: TipTap Rules Doc + Input Rule Bug Fixes
+- [ ] Create TIPTAP-EDITOR-RULES.md (focus rules, input priorities, autocomplete conventions)
+- [ ] Tag/heading conflict: `#` triggers tag autocomplete instead of heading
+- [ ] `## ` triggers tag autocomplete, sometimes fails to convert to H2
+- [ ] `##` shows persistent tag autocomplete after continued typing
+- [ ] Tag autocomplete: 2-second delay, space breaks autocomplete
+- [ ] Slash command: only on first character of empty line
+- [ ] Header escape: backspace on empty header → `#` chain
+- [ ] `# ` (H1 with space) must never trigger tag autocomplete
 
-- [ ] **FP-007**: View switcher UI (2 pts) - Enhancement
-  - View mode toggle buttons
-  - Active view indicator
-  - Keyboard shortcuts (Cmd+1-5)
+### Sprint 36: Table Rebuild + Link Fix + Cleanup + Focus Guardrails
+- [ ] **Table rebuild**: remove ALL CSS + logic, rebuild from TipTap docs (user approves before moving on)
+- [ ] URL/link escape: cursor adjacent to link must not inherit formatting; lightweight URL dialog
+- [ ] `>` blockquote: only affects current line, never child content
+- [ ] Header in paragraph with `hardBreak`: only convert text before hardBreak
+- [ ] Remove old console.log/console.warn from editor code
+- [ ] Implement focus guardrails per approved rules doc
 
-### High Priority (Payload Stubs)
+---
 
-- [ ] **EX-001**: ExcalidrawPayload schema and model (2 pts)
-  - Database model with Prisma schema
-  - JSON storage for drawing data
-  - Basic CRUD operations
+## Epoch 9: Editor Enhancements (Sprints 37-42)
 
-- [ ] **EX-002**: Excalidraw stub viewer component (3 pts)
-  - Placeholder UI with "Coming Soon" message
-  - Preview thumbnail (if available)
-  - Action buttons (edit, delete, export)
+**Goal**: Full-featured content editor with images, embeds, templates, snapshots, rich interactions.
+**Detailed plan**: [epoch-9-editor-enhancements.md](epochs/epoch-9-editor-enhancements.md)
 
-- [ ] **MR-001**: MermaidPayload schema and model (2 pts)
-  - Database model for diagram-as-code
-  - Text storage for Mermaid syntax
-  - Basic CRUD operations
+### Sprint 37: Images in TipTap + Referenced Content Lifecycle
+- [ ] Enable `@tiptap/extension-image` (installed, not configured)
+- [ ] Image upload via slash command + bubble menu
+- [ ] Image paste → FilePayload REFERENCED content in same folder
+- [ ] Image URL paste → ExternalPayload REFERENCED content
+- [ ] Image resize (drag handles or bubble menu)
+- [ ] Lazy loading
+- [ ] Move API: REFERENCED content follows parent on move
+- [ ] Delete REFERENCED content when removed from document
+- [ ] Image caption (custom figure node)
+- [ ] Image node `source` attribute prep for AI image generation (Sprint 45/47)
 
-- [ ] **MR-002**: Mermaid stub viewer component (3 pts)
-  - Placeholder UI
-  - Code preview (read-only)
-  - Future: Live rendering with mermaid.js
+### Sprint 38: URL/OG Embeds + YouTube + Bubble Menu
+- [ ] URL paste with OG metadata: 3 display modes (inline, small card, full preview)
+- [ ] YouTube auto-embed with fullscreen (custom iframe node)
+- [ ] Bubble menu: text color, highlight, subscript, superscript, strikethrough, text alignment
 
-- [ ] **CV-001**: CanvasPayload schema and model (2 pts)
-  - Database model for infinite canvas
-  - JSON storage for canvas state
-  - Basic CRUD operations
+### Sprint 39: Gated Autofocus + Outline + Drag/Reorder
+- [ ] Outline click → autofocus with CSS flash animation
+- [ ] Tasks in outline sidebar panel
+- [ ] Agentic edits update outlines in real-time
+- [ ] Notion-style drag/reorder: whole blocks only (paragraphs, headings, lists, images, code, callouts, tables)
+- [ ] List items reorderable within parent list
+- [ ] UI: grip icon on hover, ghost preview, drop indicator line
 
-- [ ] **CV-002**: Canvas stub viewer component (3 pts)
-  - Placeholder UI
-  - Thumbnail preview
-  - Future: Integration with tldraw or react-flow
+### Sprint 40: Templates / Forced Content Structure (full sprint)
+- [ ] Template builder UI in settings (full TipTap editor instance)
+- [ ] All TipTap features supported; wiki-links become `[[Untitled]]` placeholders
+- [ ] No templates within templates (hard rule)
+- [ ] Apply: replace on new notes, insert at cursor on existing
+- [ ] App-wide templates (pre-built) + user-created templates
+- [ ] Block forced content with "x" delete button
+- [ ] "Save selection as template" from any editor
+- [ ] "Recommend a template" → repo feedback link
 
-### Medium Priority
+### Sprint 41: Snapshots / Document History (full sprint, may expand)
+- [ ] Research spike: diff-based vs full snapshot, compression, retention
+- [ ] 30-day retention with auto-prune; user can pin snapshots
+- [ ] Document history: rollback, audit, branch
+- [ ] AI/agentic changes tracked
+- [ ] Safe DB migration (additive only, no data loss)
+- [ ] Guard regressions: save perf, DB bloat, ID conflicts, restore warnings
+- [ ] UI: snapshot browser in content toolbar + universal editor toolbar
 
-- [ ] **WB-001**: WhiteboardPayload schema and model (2 pts)
-  - Database model for whiteboard
-  - JSON storage for whiteboard data
-  - Basic CRUD operations
+### Sprint 42: Editor Context Menu + Syntax Highlighting + Drawing
+- [ ] Editor context menu: inspect, select all, copy, paste, image insert, AI tools, autocorrect
+- [ ] Explore wrapping browser context menu (app items above browser items)
+- [ ] Spell check: browser spellcheck + AI proofreader approach
+- [ ] Enhanced syntax highlighting (more languages via lowlight)
+- [ ] Drawing: Excalidraw integration (not TipTap's experimental Vue drawing)
 
-- [ ] **WB-002**: Whiteboard stub viewer component (3 pts)
-  - Placeholder UI
-  - Future: Real-time collaboration support
+---
 
-- [ ] **PDF-001**: Dedicated PdfPayload schema (2 pts)
-  - Separate from FilePayload
-  - Annotation storage support
-  - Metadata extraction
+## Epoch 10: AI TipTap (Sprints 43-47)
 
-- [ ] **PDF-002**: PDF stub viewer with annotations (5 pts)
-  - Enhanced viewer beyond basic FilePayload
-  - Annotation UI (placeholder)
-  - Future: PDF.js with annotation layer
+**Goal**: Deep AI integration into the editor experience.
+**Detailed plan**: [epoch-10-ai-tiptap.md](epochs/epoch-10-ai-tiptap.md)
 
-### Context Menu Integration
+### Sprint 43: Pretty Bot Response Enhancements
+- [ ] Visual parity with OpenAI/Claude across ALL AI experiences (chat, side panel, inline)
+- [ ] Rich rendering: headers, code blocks with syntax highlighting, lists, tables, inline code
+- [ ] Model-agnostic formatting
 
-- [ ] **CM-001**: Add "New → Excalidraw" menu item (1 pt)
-- [ ] **CM-002**: Add "New → Mermaid Diagram" menu item (1 pt)
-- [ ] **CM-003**: Add "New → Canvas" menu item (1 pt)
-- [ ] **CM-004**: Add "New → Whiteboard" menu item (1 pt)
+### Sprint 44: AI Text-Editing Tools — GATED BUILD
+- [ ] 8 tools, each built and tested individually before proceeding:
+  - Gate 1: `read_first_chunk`, Gate 2: `read_next_chunk`, Gate 3: `read_previous_chunk`
+  - Gate 4: `apply_diff`, Gate 5: `replace_document`
+  - Gate 6: `plan`, Gate 7: `ask_user`, Gate 8: `finish_with_summary`
+- [ ] Built-in commands: summarize, rephrase, translate (streaming)
+- [ ] Tab-triggered autocompletion
+- [ ] Bubble menu AI tools button
+- [ ] Meld with existing `lib/domain/ai/` — no duplication
 
-### API Endpoints
+### Sprint 45: AI Edit Highlighting + AI Image Insert
+- [ ] Human vs machine content marking (background/highlighting)
+- [ ] Copy outside app: AI formatting stripped; within app: preserved (if enabled)
+- [ ] Settings toggle + CSS retroactive enable/disable
+- [ ] "Paste as AI" special paste
+- [ ] No overlap: typing in AI paragraph = human content
+- [ ] AI image icon flag
+- [ ] Insert AI-generated images into TipTap (uses Sprint 37 infra + `source: 'ai-generated'`)
 
-- [ ] **API-001**: Create payload endpoints for all new types (3 pts)
-  - POST /api/content/content (update to support new types)
-  - Validation for each payload type
-  - Error handling
+### Sprint 46: Chat Content Outlines
+- [ ] Outline sidebar for ChatPayload nodes
+- [ ] Compact prompt outline (first line + "...")
+- [ ] Agent content: header/list previews
+- [ ] Click → autofocus with Sprint 39 animations
 
-## Sprint 29: Tool Surfaces Architecture ✅ COMPLETE
-**Duration**: Feb 19-24, 2026 (Completed)
-**Branch**: `content/tool-surfaces`
-**Plan**: `~/.claude/plans/breezy-doodling-babbage.md`
+### Sprint 47: AI Image Generation
+- [ ] AI image generation in chat + side panel
+- [ ] Generated images → REFERENCED FilePayload
+- [ ] Referenced content follows parent (Sprint 37)
+- [ ] Drag AI content to file tree (new copy) or TipTap note (referenced)
 
-Declarative tool registry mapping tools to UI surfaces (toolbar, toolbelt, sidebar-tab) with content-type filtering. See `lib/domain/tools/`.
+---
 
-- [x] Pure types (ToolSurface, ToolDefinition, ToolInstance, ToolQuery)
-- [x] Static registry + queryTools() filter/sort
-- [x] ToolSurfaceProvider context + handler registration
-- [x] ContentToolbar component (export, copy link)
-- [x] BubbleMenu wired to registry (module-level, no hooks) + focus fix
-- [x] RightSidebarHeader wired to registry (dynamic tabs by content type)
-- [x] ToolDebugPanel (dev-only, Cmd+Shift+T)
+## Future Epochs (Unplanned)
 
-## Sprint 30: Universal Expandable TipTap Editor ✅ COMPLETE
-**Duration**: Feb 25, 2026
-**Branch**: `content/universal-notes`
-**Plan**: `~/.claude/plans/sleepy-jingling-quiche.md` (Sprint 30 section)
+**Detailed stubs**: [future-epochs.md](epochs/future-epochs.md)
 
-Every content type gets a collapsible TipTap editor for annotations/notes. Centralized integration in MainPanelContent (not per-viewer).
+### Collaboration & Sharing
+- Real-time editing (TipTap collaboration), content sharing, security review required
+- Mentions, annotations, commenting layers
+- Session validation for AI features, editor session limits
 
-- [x] **UE-001**: ExpandableEditor component (5 pts)
-  - `components/content/editor/ExpandableEditor.tsx`
-  - Reuses MarkdownEditor with compact mode
-  - Per-node expansion state in localStorage
-  - Word count badge when content exists
+### UI Revisions
+- Default themes + custom user themes, editor styling, font/color customization
 
-- [x] **UE-002**: Integrate into MainPanelContent (5 pts)
-  - Centralized: wraps all non-note viewers with ExpandableEditor
-  - No per-viewer modifications needed
-  - Uses existing noteContent + handleSave from MainPanelContent
+### Main Panel Multiple Tabs
+- Multi-document editing, Obsidian-like tabs, collaboration-friendly
 
-- [x] **UE-003**: MarkdownEditor compact mode (3 pts)
-  - `compact` prop: smaller prose, compact padding (120px min-height)
-  - `placeholder` prop accepted (not yet wired through extension factory)
+### YouTube Playlists & Summarizing (much later)
+- Playlist support, AI video summarization, transcript indexing
 
-- [x] **UE-004**: API upsert for notePayload (2 pts)
-  - PATCH uses `prisma.notePayload.upsert()` (was conditional update)
-  - Any content type can now create/update notes via API
+---
 
-**Known Issues**: None remaining (BubbleMenu regression fixed in Sprint 32)
+## Deferred Items (Icebox)
 
-## Sprint 31: Lossless Export/Import Round-Trip ✅ COMPLETE
-**Duration**: Feb 25-26, 2026 (Completed)
-**Branch**: `content/universal-notes`
+### From Sprint 28 Backlog (Epoch 5-6)
+- [ ] Table view component for folders (3 pts)
+- [ ] Timeline view component for folders (5 pts)
+- [ ] View preference persistence (2 pts)
+- [ ] View switcher UI with keyboard shortcuts (2 pts)
 
-Lossless export/import round-trip. Custom two-pass parser, sidecar consumption, toolbar integration.
+### Payload Stubs
+- [ ] ExcalidrawPayload schema + stub viewer
+- [ ] MermaidPayload schema + stub viewer (includes Mermaid in TipTap — deferred from earlier work)
+- [ ] CanvasPayload schema + stub viewer
+- [ ] WhiteboardPayload schema + stub viewer
+- [ ] Dedicated PdfPayload with annotations
 
-- [x] **IM-001**: Markdown→TipTap parser — core syntax (5 pts)
-- [x] **IM-002**: Markdown→TipTap parser — semantic extensions (5 pts)
-- [x] **IM-003**: Sidecar reader — metadata restoration (3 pts)
-- [x] **IM-004**: Import API endpoint (3 pts)
-- [x] **IM-005**: Import button in ContentToolbar (2 pts)
-- [x] **IM-006**: Round-trip verification utility (2 pts)
-
-**Pending**: Manual testing (macOS Finder file picker not working)
-
-## Sprint 32: Editor Stability & Polish ✅ COMPLETE
-**Duration**: Feb 26-27, 2026 (Completed)
-**Branch**: `content/sprint-32`
-**Plan**: `~/.claude/plans/breezy-doodling-babbage.md`
-
-Post-feature stability sprint. Fixed regressions from Sprints 29-31.
-
-- [x] **BM-001**: BubbleMenu cross-contamination fix (5 pts)
-  - Root cause: TipTap React wrapper uses shared `"bubbleMenu"` meta key for all instances
-  - TableBubbleMenu's inline `shouldShow` overwrote text BubbleMenu's `shouldShow` on every re-render
-  - Fix: Stable module-level `shouldShow` for both menus; removed `.focus()` from commands; removed invalid `tippyOptions`
-- [x] **OL-001**: Outline click-to-scroll (3 pts)
-  - CustomEvent bridge (`scroll-to-heading`) from RightSidebarContent to MarkdownEditor
-  - Text+level matching via `editor.state.doc.descendants()`
-  - `activeHeadingId` state in outline store for highlight sync
-- [x] **BF-001**: ExpandableEditor tag/wiki-link threading (3 pts)
-  - Threaded `fetchTags`, `createTag`, `fetchNotesForWikiLink`, `onWikiLinkClick` from MainPanelContent → ExpandableEditor → MarkdownEditor
-- [x] **BF-002**: Keyboard event scoping (1 pt)
-  - `onKeyDown` stopPropagation on ExpandableEditor container
-- [x] **BF-003**: Tag/heading `# ` input rule conflict (2 pts)
-  - Space with empty query propagates to ProseMirror heading input rule
-  - Space with non-empty query + items selects tag
-- [x] **BF-004**: tag-suggestion runtime error guard (1 pt)
-  - Guard `component?.ref` against undefined in `onKeyDown`
-
-## Sprint 33: AI Foundation + Settings UI ✅ COMPLETE
-**Duration**: Feb 27, 2026
-**Branch**: `epoch-7/sprint-33`
-
-- [x] AI SDK v6 installed (ai@6, @ai-sdk/react, @ai-sdk/anthropic, @ai-sdk/openai)
-- [x] Provider registry with dynamic imports (`resolveChatModel`)
-- [x] Streaming chat API route (`POST /api/ai/chat`)
-- [x] `/settings/ai` page (provider, generation, toggles, usage)
-- [x] AI chat Zustand store, middleware system
-
-## Sprint 34: Chat UI, AI Tools, @ Mentions ✅ COMPLETE
-**Duration**: Feb 28 - Mar 1, 2026
-**Branch**: `epoch-7/sprint-34`
-
-- [x] ChatPanel (sidebar) + ChatViewer (main panel) with streaming
-- [x] ChatPayload CRUD (save/load conversations)
-- [x] AI tools: searchNotes, getCurrentNote, createNote
-- [x] @ file mentions with system prompt injection
-- [x] / tool commands with prompt hints
-- [x] ModelPicker, ChatSuggestionMenu, chat export
-- [x] Sidebar tab auto-switch, chat icon in file tree
-- [x] Tool settings UI
-
-## Sprint 35+: Planning
-
-### Original Epoch 7 Plan (may be redirected)
-
-**Sprint 35 — BYOK, Speech & Agent** (originally planned):
-- [ ] BYOK key management UI (secure entry, validation, per-provider)
-- [ ] Speech-to-text input (Web Speech API or Whisper)
-- [ ] Text-to-speech output (Web Speech Synthesis)
-- [ ] Agent mode (multi-step tool use with user confirmation)
-- [ ] Key management + speech settings pages
-
-**Sprint 36 — RAG, Integration & Polish** (originally planned):
-- [ ] Embeddings generation for content nodes
-- [ ] Vector similarity search (pgvector or external)
-- [ ] RAG context injection into chat
-- [ ] Chat history search
-- [ ] Cross-sprint polish and bug fixes
-
-### Deferred Work Items
-
-**Performance & Optimization**:
-- [ ] Folder view performance tuning for large folders (5 pts)
-- [ ] Virtualization for grid and kanban views (3 pts)
-
-**UX Refinements**:
-- [ ] Folder view keyboard shortcuts (Cmd+1-5) (2 pts)
-- [ ] Empty state designs for all views (2 pts)
-
-**Advanced Features**:
-- [ ] Folder sorting and filtering UI (3 pts)
-- [ ] Custom kanban columns (5 pts)
-
-## Future Backlog (Epoch 6+)
-
-### Collaboration Features
-- [ ] Real-time multiplayer editing (Yjs integration)
-- [ ] Share links with permissions (view, edit, comment)
-- [ ] Collaborative cursors and presence indicators
-- [ ] Comment threads on content
-- [ ] Activity feed and notifications
-
-### AI Integration (Partially Shipped)
-- [x] AI chat interface within IDE (Sprint 34)
-- [x] AI tools: search, read, create notes (Sprint 34)
-- [x] @ mentions with context injection (Sprint 34)
-- [ ] Semantic search with embeddings (RAG)
-- [ ] AI-powered autocomplete and suggestions
-- [ ] Content summarization
-- [ ] Smart tagging and categorization
+### From Epoch 7 (AI — partially shipped, rest deferred)
 - [ ] BYOK key management UI
-- [ ] Speech input/output
-- [ ] Agent mode (multi-step reasoning)
+- [ ] Speech-to-text / text-to-speech
+- [ ] RAG / embeddings / semantic search
+- [ ] Agent mode (may be addressed in Sprint 44)
+- [ ] Chat history search
 
-### Advanced Editor Features
-- [ ] Inline code execution (JavaScript, Python)
-- [ ] Embed external content (tweets, GitHub gists, CodePen)
-- [ ] Version history with diff view
-- [ ] Advanced table features (formulas, charts)
-- [ ] Handwriting/drawing support
+### Performance & UX
+- [ ] Folder view performance tuning for large folders
+- [ ] Virtualization for grid and kanban views
+- [ ] Empty state designs for all views
+- [ ] Folder sorting and filtering UI
+- [ ] Custom kanban columns
 
 ### Mobile & PWA
 - [ ] Mobile-responsive layout
 - [ ] Touch gesture support
 - [ ] Offline mode with service workers
-- [ ] Native mobile apps (React Native)
 
 ### Integrations
 - [ ] Google Drive sync
-- [ ] Dropbox integration
 - [ ] GitHub repository sync
 - [ ] Notion import/export
-- [ ] Slack notifications
 
-## Deferred / Icebox
-
-**Low Priority**:
-- Calendar view for folders (nice-to-have)
-- Advanced search filters (beyond current implementation)
-- Bulk operations (multi-select + batch actions)
-- Custom themes (beyond Liquid Glass)
-- Plugin system for community extensions
+---
 
 ## Estimation Reference
 
@@ -304,5 +211,5 @@ Post-feature stability sprint. Fixed regressions from Sprints 29-31.
 
 ---
 
-**Last Updated**: Mar 1, 2026
-**Next Review**: Sprint 35 planning
+**Last Updated**: Mar 5, 2026
+**Next Review**: Sprint 35 kickoff

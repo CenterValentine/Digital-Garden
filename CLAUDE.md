@@ -26,12 +26,12 @@ npx prisma studio     # Database GUI (http://localhost:5555)
 
 **Build pipeline:** `pnpm build` runs three steps sequentially: `prisma generate` → `pnpm build:tokens` (style-dictionary) → `next build`.
 
-**Vercel build** uses `--webpack` flag explicitly. Local dev uses Next.js default (Turbopack).
+**Vercel build** runs `prisma migrate deploy` → `prisma generate` → `build:tokens` → `next build --webpack`. Local dev uses Turbopack (no webpack flag).
 
 ## Environment Setup
 
 ```bash
-cp .env.example .env.local    # Then edit with your values
+# Create .env.local with required vars (see below)
 npx prisma generate           # Generate Prisma client
 npx prisma migrate reset --force  # Dev only! Creates tables + seeds
 pnpm dev
@@ -120,6 +120,7 @@ All stores in `state/`. Pattern: `create<T>()(persist((set, get) => ({...}), { n
 - `left-panel-view-store.ts` / `left-panel-collapse-store.ts` — Left sidebar view/collapse
 - `upload-settings-store.ts` — Upload preferences
 - `file-tree-filter-store.ts` — File tree filtering
+- `ai-chat-store.ts` — AI chat panel state
 - `debug-view-store.ts` — Dev debug toggles
 
 ### TipTap Editor
@@ -165,6 +166,26 @@ Collaboration hooks for Excalidraw, Mermaid diagrams, and diagrams.net. Security
 
 Custom OAuth with Google Sign-In. `lib/infrastructure/auth/` (barrel export via `index.ts`). Role hierarchy: owner > admin > member > guest. Admin endpoints require `requireRole("owner")`.
 
+### AI Integration
+
+**Location:** `lib/domain/ai/`
+
+AI SDK v6 integration with BYOK (Bring Your Own Key) support.
+
+- `types.ts` — Chat types, model configuration
+- `providers/` — Model provider factories (Anthropic, OpenAI) using `createAnthropic()` / `createOpenAI()`
+- `middleware/` — `defaultSettingsMiddleware` for model defaults
+- `tools/` — AI tool definitions: `metadata.ts` (client-safe, no Prisma), `registry.ts` (server-only, has Prisma)
+
+**AI SDK v6 conventions:**
+- `useChat()`: Use `transport: new DefaultChatTransport({ api, body })` — no `api`/`body` props directly
+- `useChat()`: No `initialMessages` — use `messages` field. No `input`/`setInput`/`handleSubmit` — use `sendMessage({ text })`
+- `tool()`: Uses `inputSchema` (not `parameters`), import `z` from `zod/v4`
+- `maxTokens` → `maxOutputTokens` in V3 call options
+- `ChatStatus`: `'ready' | 'submitted' | 'streaming' | 'error'`
+
+**AI tools ≠ Tool Surfaces** — separate directories (`lib/domain/ai/tools/` vs `lib/domain/tools/`), separate registries.
+
 ## API Routes
 
 All content endpoints under `app/api/content/`:
@@ -206,6 +227,7 @@ app/
 └── globals.css                 # Global styles + generated design tokens
 
 components/content/
+├── ai/                         # AI chat panel components
 ├── editor/                     # TipTap editor + BubbleMenu
 ├── toolbar/                    # ContentToolbar, ToolDebugPanel (Tool Surfaces)
 ├── tool-belt/                  # Tool management providers
@@ -227,6 +249,7 @@ lib/
 │   ├── editor/                 # TipTap extensions (extensions/, commands/)
 │   ├── export/                 # Converters, metadata sidecars, bulk export, validation
 │   ├── search/                 # Search filters
+│   ├── ai/                     # AI SDK v6 integration (providers, middleware, tools)
 │   ├── tools/                  # Tool Surfaces registry + context provider
 │   └── visualization/          # Excalidraw, Mermaid, diagrams.net collaboration
 ├── infrastructure/
@@ -242,7 +265,7 @@ lib/
     ├── system/                 # Liquid Glass tokens (surfaces, intents, motion)
     └── integrations/           # Third-party UI utilities
 
-state/                          # 15 Zustand stores (see State Management above)
+state/                          # 16 Zustand stores (see State Management above)
 prisma/                         # schema.prisma, migrations/, seed.ts
 ```
 
@@ -262,6 +285,7 @@ const glass0 = getSurfaceStyles("glass-0");
 
 ### Code Standards
 - TypeScript strict mode, no `any` types
+- Ignore directories with " 2" suffix (e.g., `content 2`, `editor 2`) — these are filesystem artifacts, not part of the build
 - Inline SVG for server component icons; `lucide-react` OK in client components only
 - Import from barrel exports: `lib/domain/editor`, `lib/infrastructure/auth`, `lib/features/settings`, `lib/domain/tools`
 - Use `lib/design/system/` tokens for styling
@@ -312,8 +336,3 @@ Portal rendering + boundary detection in `lib/core/menu-positioning.ts`. Two-pha
 
 **History:** `docs/notes-feature/work-tracking/history/` (Epoch 1-4 archives)
 
-## Active Plan Files
-
-Sprint plans are stored in `~/.claude/plans/`:
-- `sleepy-jingling-quiche.md` — Sprint 29 (Tool Surfaces, complete) + Sprint 30 (Universal Expandable Editor, planned)
-- `breezy-doodling-babbage.md` — Sprint 29 incremental reattempt plan (the version that was actually executed)

@@ -153,7 +153,7 @@ export function createTagSuggestion(
 
     allowSpaces: false, // Tags don't allow spaces
 
-    // Prevent tag suggestion in headings and when preceded by #
+    // Prevent tag suggestion in headings, heading syntax (##), and when preceded by #
     allow: ({ state, range }) => {
       const $from = state.doc.resolve(range.from);
 
@@ -162,15 +162,22 @@ export function createTagSuggestion(
         return false;
       }
 
+      // If query portion starts with # (user typed ##, ###, etc.), it's heading syntax.
+      // range.from is the trigger #, range.to is end of typed text.
+      // This causes the Suggestion plugin to call onExit(), dismissing the popup.
+      if (range.to > range.from + 1) {
+        const afterTrigger = state.doc.textBetween(range.from + 1, range.to, "");
+        if (afterTrigger.startsWith("#")) {
+          return false;
+        }
+      }
+
       // Check if preceded by another # (heading syntax)
-      // Look at position BEFORE the trigger # character (range.from is where # was typed)
       const charBefore = state.doc.textBetween(
         Math.max(0, range.from - 1),
         range.from,
         ""
       );
-
-      // If the character immediately before the # is also a #, don't trigger
       if (charBefore === "#") {
         return false;
       }
@@ -187,6 +194,8 @@ export function createTagSuggestion(
       let component: ReactRenderer;
       let popup: TippyInstance[];
       let currentQuery = "";
+      let delayTimer: ReturnType<typeof setTimeout> | null = null;
+      let isVisible = false;
 
       return {
         onStart: (props) => {
@@ -214,15 +223,37 @@ export function createTagSuggestion(
             getReferenceClientRect: props.clientRect as any,
             appendTo: () => document.body,
             content: component.element,
-            showOnCreate: true,
+            showOnCreate: false, // Don't show immediately — wait for 2s delay
             interactive: true,
             trigger: "manual",
             placement: "bottom-start",
           });
+
+          // 2-second delay before showing tag autocomplete popup.
+          // Gives heading input rules priority (# → H1, ## → H2, etc.)
+          delayTimer = setTimeout(() => {
+            delayTimer = null;
+            if (popup?.[0]) {
+              popup[0].show();
+              isVisible = true;
+            }
+          }, 2000);
         },
 
         onUpdate(props) {
           currentQuery = props.query || "";
+
+          // Safety: if query starts with # (user typed ##), cancel delay and hide.
+          // Normally the allow() guard catches this, but this is defense in depth.
+          if (currentQuery.startsWith("#")) {
+            if (delayTimer) {
+              clearTimeout(delayTimer);
+              delayTimer = null;
+            }
+            popup?.[0]?.hide();
+            isVisible = false;
+            return;
+          }
 
           component.updateProps({
             ...props,
@@ -244,17 +275,33 @@ export function createTagSuggestion(
 
         onKeyDown(props) {
           if (props.event.key === "Escape") {
+            if (delayTimer) {
+              clearTimeout(delayTimer);
+              delayTimer = null;
+            }
             popup?.[0]?.hide();
+            isVisible = false;
             return true;
           }
 
-          // Guard: component may not be initialized if onKeyDown fires
-          // before onStart completes (race condition in Suggestion plugin)
+          // During the 2-second delay, don't intercept any keys.
+          // This lets ProseMirror handle heading input rules (# → H1, ## → H2)
+          // and space propagation normally.
+          if (!isVisible) {
+            return false;
+          }
+
+          // Guard: component may not be initialized
           if (!component?.ref) return false;
           return (component.ref as any).onKeyDown(props) ?? false;
         },
 
         onExit() {
+          if (delayTimer) {
+            clearTimeout(delayTimer);
+            delayTimer = null;
+          }
+          isVisible = false;
           if (popup && popup[0]) {
             popup[0].destroy();
           }

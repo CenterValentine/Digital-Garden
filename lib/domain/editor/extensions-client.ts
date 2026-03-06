@@ -23,6 +23,7 @@ import { common, createLowlight } from "lowlight";
 import { SlashCommands } from "./commands/slash-commands";
 import { TaskListInputRule } from "./extensions/task-list";
 import { BulletListBackspace } from "./extensions/bullet-list";
+import { HeadingBackspace } from "./extensions/heading-backspace";
 import { Callout } from "./extensions/callout";
 import { WikiLink } from "./extensions/wiki-link";
 import { createWikiLinkSuggestion } from "./extensions/wiki-link-suggestion";
@@ -117,6 +118,7 @@ export function getEditorExtensions(options?: EditorExtensionsOptions): Extensio
 
     // M6: Bullet list backspace behavior (Obsidian-style)
     BulletListBackspace, // Backspace in empty bullet → plain text "-"
+    HeadingBackspace, // Backspace in empty heading → paragraph with # chain
 
     // M6: External links
     Link.configure({
