@@ -386,6 +386,20 @@ export const SlashCommands = Extension.create({
       suggestion: {
         char: "/",
         pluginKey: slashCommandsPluginKey,
+        // Only trigger on first character of an empty line
+        allow: ({ state, range }: any) => {
+          const $from = state.doc.resolve(range.from);
+          // Trigger must be at the beginning of the parent node
+          if ($from.parentOffset !== 0) {
+            return false;
+          }
+          // Parent must only contain the suggestion text (was empty before /)
+          const suggestionText = state.doc.textBetween(range.from, range.to, "");
+          if ($from.parent.textContent !== suggestionText) {
+            return false;
+          }
+          return true;
+        },
         command: ({ editor, range, props }: any) => {
           props.command({ editor, range });
         },

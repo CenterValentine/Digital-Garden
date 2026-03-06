@@ -1,114 +1,87 @@
 ---
-sprint: 34
-epoch: 7 (AI Integration)
-duration: Feb 28 - Mar 1, 2026
-branch: epoch-7/sprint-34
+sprint: 35
+epoch: 8 (Editor Stabilization)
+duration: 1 session
+branch: fix/cross-document-save-race
 status: complete
 ---
 
-# Sprint 34: Chat UI, AI Tools, @ Mentions
+# Sprint 35: TipTap Rules Doc + Input Rule Bug Fixes
 
 ## Sprint Goal
-Ship the full AI chat experience: streaming ChatPanel in the right sidebar, persistent ChatViewer in the main panel, AI tools with Prisma execution, @ file mentions for context injection, and / tool commands.
+Establish canonical editor behavior rules (TIPTAP-EDITOR-RULES.md) and fix all input rule conflicts between tag autocomplete and heading conversion. The rules document must be reviewed and approved before Sprint 36 implements focus guardrails.
 
-**Status**: ✅ COMPLETE — merged to main via PR
+**Status**: ✅ Complete
 
 ## Success Criteria
 - [x] `pnpm build` passes
-- [x] ChatPanel in right sidebar streams responses
-- [x] "Save conversation" creates ChatPayload ContentNode in file tree
-- [x] ChatViewer loads saved conversations with full history
-- [x] AI tools (searchNotes, getCurrentNote, createNote) execute via tool registry
-- [x] Tool settings section in `/settings/ai`
-- [x] @ mentions search content nodes and inject into system prompt
-- [x] / commands show available AI tools with prompt hints
-- [x] Chat icon (MessageCircle) appears for chat nodes in file tree
-- [x] Sidebar tabs auto-switch when content type changes
-- [x] Chat export as Markdown from toolbar
+- [x] TIPTAP-EDITOR-RULES.md created (living document — expand as features are added)
+- [x] Tag autocomplete does not trigger when typing heading syntax (`#`, `##`, `###`).  It only triggers when typing `#` followed by text without a space.
+- [x] Tag autocomplete has 2-second delay before appearing
+- [x] Space after `#` cancels any prior tag autocomplete and triggers heading conversion
+- [x] `##` cancels any tag autocomplete from the first `#`
+- [x] Slash command only triggers on first character of an empty line
+- [x] Backspace on empty header reverts to `#` chain in paragraph
 
-## Completed Work Items
+## Work Items
 
-### Sprint 34 Core — Chat UI & Persistence
+### Documentation
+- [x] **DOC-001**: Create TIPTAP-EDITOR-RULES.md (3 pts) ✅
+  - Living document — expand as new TipTap features are added
+  - **File**: `docs/notes-feature/guides/editor/TIPTAP-EDITOR-RULES.md`
 
-| File | Purpose |
-|------|---------|
-| `components/content/ai/ChatPanel.tsx` | Right sidebar streaming chat with save-to-tree |
-| `components/content/ai/ChatViewer.tsx` | Full ChatViewer rewrite with auto-save to ChatPayload |
-| `components/content/ai/ChatInput.tsx` | Shared input with @ mention and / command detection |
-| `components/content/ai/ChatMessage.tsx` | Message rendering with mention pills, code blocks, inline formatting |
-| `components/content/ai/ModelPicker.tsx` | Per-session provider/model override dropdown |
-| `components/content/ai/ChatSuggestionMenu.tsx` | Shared keyboard-navigable dropdown for mentions + commands |
-| `lib/domain/ai/tools/registry.ts` | AI tool definitions (searchNotes, getCurrentNote, createNote) with Prisma |
-| `lib/domain/ai/tools/metadata.ts` | Client-safe tool metadata (no Prisma imports) |
-| `lib/domain/ai/tools/types.ts` | BaseToolId, BaseToolMetadata types |
-| `lib/domain/ai/tools/index.ts` | Barrel export |
+### Bug Fixes
+- [x] **BF-035-001**: Tag/heading conflict fix (5 pts) ✅
+  - **Fix**: 2-second `setTimeout` delay in `onStart`; popup hidden via `showOnCreate: false`
+  - **Files**: `lib/domain/editor/extensions/tag-suggestion.tsx`
 
-### Sprint 34 Core — API & Data Layer
+- [x] **BF-035-002**: `## ` triggers tag autocomplete instead of H2 (3 pts) ✅
+  - **Fix**: `allow()` guard checks query for `#` prefix → returns false → `onExit()` fires
+  - **Files**: `lib/domain/editor/extensions/tag-suggestion.tsx`
 
-| File | Change |
-|------|--------|
-| `app/api/ai/chat/route.ts` | Added AI tools execution, mentioned content injection |
-| `app/api/content/content/[id]/route.ts` | ChatPayload GET + PATCH (messages, metadata) |
-| `app/api/content/content/route.ts` | ChatPayload POST support |
-| `lib/domain/content/api-types.ts` | ChatPayload API types |
-| `lib/domain/ai/types.ts` | StoredChatMessage, ChatMetadata updates |
-| `components/settings/AISettingsPage.tsx` | Tool settings section (tool choice, enabled tools) |
-| `lib/features/settings/validation.ts` | toolChoice, enabledTools schema fields |
+- [x] **BF-035-003**: Persistent tag autocomplete on `##` (2 pts) ✅
+  - **Fix**: Same `allow()` guard + defense-in-depth `onUpdate` `##` check
+  - **Files**: `lib/domain/editor/extensions/tag-suggestion.tsx`
 
-### Sprint 34 Core — UI Integration
+- [x] **BF-035-004**: Tag autocomplete delay + space-break (3 pts) ✅
+  - **Fix**: During 2s delay, `isVisible=false` → `onKeyDown` returns false for all keys → ProseMirror handles space normally → `allowSpaces: false` causes suggestion exit
+  - **Files**: `lib/domain/editor/extensions/tag-suggestion.tsx`
 
-| File | Change |
-|------|--------|
-| `components/content/LeftSidebar.tsx` | Tree refresh event listener, chat creation handler |
-| `components/content/content/LeftSidebarContent.tsx` | Chat content type in create request |
-| `components/content/headers/LeftSidebarHeader.tsx` | onCreateChat prop |
-| `components/content/menu-items/new-content-menu.tsx` | Chat in new content menu |
-| `components/content/content/RightSidebarContent.tsx` | ChatPanel replaces placeholder |
-| `app/page.tsx` | Session-based redirect (replaces legacy AppNav) |
-| `app/global-error.tsx` | Global error boundary |
+- [x] **BF-035-005**: Slash command empty line restriction (2 pts) ✅
+  - **Fix**: `allow()` guard checks `$from.parentOffset !== 0` and `parent.textContent !== suggestionText`
+  - **Files**: `lib/domain/editor/commands/slash-commands.tsx`
 
-### Sprint 34B — Polish & Mentions
+- [x] **BF-035-006**: Header backspace escape (3 pts) ✅
+  - **Fix**: New `HeadingBackspace` extension: empty heading → paragraph with `#` chain
+  - **Files**: `lib/domain/editor/extensions/heading-backspace.ts` (new), `lib/domain/editor/extensions-client.ts`
 
-| File | Change |
-|------|--------|
-| `components/content/RightSidebar.tsx` | Tab auto-switch on content type change |
-| `components/content/FileNode.tsx` | MessageCircle icon for chat content type |
-| `components/content/content/MainPanelContent.tsx` | Editor state persistence fix + chat export handler |
-| `components/content/headers/RightSidebarHeader.tsx` | "AI Chat" tab title (was "Coming Soon") |
-| `lib/domain/tools/registry.ts` | export-chat toolbar tool registration |
+- [x] **BF-035-007**: H1 space must not trigger tag autocomplete (1 pt) ✅
+  - **Fix**: Covered by 2-second delay — popup never shown before space causes suggestion exit
+  - **Files**: `lib/domain/editor/extensions/tag-suggestion.tsx`
+
+## Estimated Points: ~22 pts
 
 ## Technical Notes
 
-### AI SDK v6 useChat + tool() API Discoveries
-1. `useChat()`: NO `api`/`body` props — use `transport: new DefaultChatTransport({ api, body })` from `ai`
-2. `useChat()`: NO `initialMessages` — field is just `messages` in `ChatInit`
-3. `useChat()`: NO `input`/`setInput`/`handleSubmit` — use `sendMessage({ text })`, manage input via local `useState`
-4. `ChatStatus` type: `'ready' | 'submitted' | 'streaming' | 'error'` (replaces boolean `isLoading`)
-5. `UIMessage` has `parts[]` array, not `content` string
-6. `tool()`: uses `inputSchema` (NOT `parameters`), import `z` from `zod/v4` for type compat
-7. Dynamic `body` in transport: use function `body: () => ({ key: ref.current })` + ref pattern
+### Root Cause Analysis
+The tag autocomplete trigger (`#`) at `tag-suggestion.tsx` fires on a single character with no delay, racing against StarterKit's heading input rules (`## `). This is an architectural overlap — two features competing for the same keystrokes.
 
-### @ Mention Architecture
-- ChatInput inserts clean `@Title` in textarea (user-friendly display)
-- Parent (ChatPanel/ChatViewer) tracks mentions in `trackedMentionsRef`
-- On send: reconstructs `@[Title](id)` tokens for API + ChatMessage rendering
-- Server: fetches mentioned ContentNodes, injects searchText (max 2000 chars) into system prompt
-- ChatMessage: parses `@[Title](id)` tokens → renders as clickable `MentionPill` components
-
-## Stats
-- **29 files** changed | **+2,237** | **-141**
-- 1 commit (Sprint 34 + 34B combined)
-- New directory: `components/content/ai/` (5 components)
-- New directory: `lib/domain/ai/tools/` (4 files)
+### Fix Strategy
+1. Add 2-second `setTimeout` delay to tag suggestion's `onStart` handler
+2. In tag suggestion's `allow` guard (lines 157-179): reject when preceded by additional `#` chars
+3. In tag suggestion's space handler: dismiss suggestion and let event propagate to heading input rules
+4. Slash commands: check `$from.parentOffset === 0 && $from.parent.textContent === '/'` in allow guard
 
 ---
 
-**Last Updated**: Mar 1, 2026
+## Previous Sprint: Sprint 34 (✅ Complete)
 
-## Previous Sprint: Sprint 33 (✅ Complete)
+See [Sprint 34 archive](history/) for details. Key deliverables:
+- ChatPanel + ChatViewer with streaming
+- AI tools (searchNotes, getCurrentNote, createNote)
+- @ mentions, / commands, ModelPicker
+- Chat export, sidebar auto-switch, chat icon
 
-See [Sprint 33 archive](history/) for details. Key deliverables:
-- AI SDK v6 installed (ai@6, @ai-sdk/react, @ai-sdk/anthropic, @ai-sdk/openai)
-- Provider registry with dynamic imports (`resolveChatModel`)
-- Streaming chat API route (`POST /api/ai/chat`)
-- `/settings/ai` page (provider, generation, toggles, usage)
+---
+
+**Last Updated**: Mar 6, 2026
