@@ -1,7 +1,7 @@
 ---
 last_updated: 2026-03-06
 current_epoch: 8
-current_sprint: 35
+current_sprint: 36
 sprint_status: complete
 ---
 
@@ -41,12 +41,21 @@ before planning and executing. There may be additions or modifications.
 
 **Sprint Plan**:
 - Sprint 35: TipTap Rules Doc + Input Rule Bug Fixes (complete)
-- Sprint 36: Table Rebuild + Link Fix + Cleanup + Focus Guardrails (planned)
-
-### Next Sprint: Sprint 36 - Table Rebuild + Link Fix + Cleanup + Focus Guardrails
-**Status**: Planned — awaiting user input before commencing
+- Sprint 36: Table Rebuild + Link Fix + Cleanup + Focus Guardrails (complete)
 
 ## Recent Completions (Last 30 Days)
+
+**Mar 6, 2026**: Sprint 36 Table Rebuild + Link Fix + Cleanup + Focus Guardrails — COMPLETE
+- Console cleanup: removed console.log/console.warn from editor code (kept console.error)
+- Focus guardrails: removed `.focus()` from TableBubbleMenu chains, added `preventFocusLoss`
+- Focus guardrails: removed `setTimeout` focus hack from slash command table insertion
+- Link: documented `inclusive: false` default (cursor adjacent to links doesn't inherit formatting)
+- HeadingHardbreakSplit extension: `## ` in paragraph with hardBreak only converts text before break
+- BlockquoteLineOnly extension: `> ` in paragraph with hardBreak only quotes text before break
+- Table rebuild: removed old CSS, added minimal TipTap-docs-based styles, enabled `resizable: true`
+- Registered new extensions in both client and server extension sets
+- Build gate passed
+- 8 files changed, 2 new extension files
 
 **Mar 6, 2026**: Sprint 35 TipTap Rules Doc + Input Rule Bug Fixes — COMPLETE
 - TIPTAP-EDITOR-RULES.md created (living document — expand as features are added)
@@ -119,12 +128,8 @@ Pretty AI responses, agent editing tools, AI edit highlighting, chat outlines, A
 - **macOS Finder**: File picker not opening on dev machine — blocks manual testing of import feature
 - **macOS mmap**: `mmap failed: Operation timed out` on `git push` from main working directory — workaround: git bundle → fresh clone → push from /tmp
 
-### Known Editor Bugs (Sprint 36 targets)
-- `>` blockquote affects child content
-- Cursor adjacent to URL inherits link formatting
-- Header conversion in paragraph with `hardBreak` converts all text
-- Table extra column visual bug
-- Old console.log statements throughout editor code
+### Known Editor Bugs
+- *(All Sprint 36 targets resolved — see Recent Completions)*
 
 ### Known Limitations
 - **Sprint 31 Import**: Untested pending Finder fix
@@ -151,7 +156,7 @@ Pretty AI responses, agent editing tools, AI edit highlighting, chat outlines, A
 
 ### Epoch Progress
 - **Epoch 7** (AI Integration): ✅ Sprints 33-34 complete; Sprints 35-36 redirected to Epoch 8
-- **Epoch 8** (Editor Stabilization): In Progress — Sprint 35 complete, Sprint 36 planned
+- **Epoch 8** (Editor Stabilization): ✅ Complete — Sprints 35-36 complete
 - **Epoch 9** (Editor Enhancements): Planned (Sprints 37-42)
 - **Epoch 10** (AI TipTap): Planned (Sprints 43-47)
 
@@ -174,7 +179,7 @@ Pretty AI responses, agent editing tools, AI edit highlighting, chat outlines, A
 
 ## Quick Links
 
-- [Current Sprint](work-tracking/CURRENT-SPRINT.md) - Sprint 35 details
+- [Current Sprint](work-tracking/CURRENT-SPRINT.md) - Sprint 36 details
 - [Backlog](work-tracking/BACKLOG.md) - Prioritized work items
 - [Epoch Plans](work-tracking/epochs/) - Epoch 8, 9, 10, future stubs
 - [TipTap Editor Rules](guides/editor/TIPTAP-EDITOR-RULES.md) - Editor behavior rules
@@ -184,4 +189,4 @@ Pretty AI responses, agent editing tools, AI edit highlighting, chat outlines, A
 ---
 
 **Last Updated**: Mar 6, 2026
-**Next Review**: Sprint 36 kickoff (user input required before commencing)
+**Next Review**: Epoch 9 planning (Sprint 37 kickoff — user input required before commencing)

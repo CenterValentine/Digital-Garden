@@ -1,86 +1,117 @@
 ---
-sprint: 35
+sprint: 36
 epoch: 8 (Editor Stabilization)
 duration: 1 session
-branch: fix/cross-document-save-race
+branch: epoch-8/sprint-36
 status: complete
 ---
 
-# Sprint 35: TipTap Rules Doc + Input Rule Bug Fixes
+# Sprint 36: Table Rebuild + Link Fix + Cleanup + Focus Guardrails
 
 ## Sprint Goal
-Establish canonical editor behavior rules (TIPTAP-EDITOR-RULES.md) and fix all input rule conflicts between tag autocomplete and heading conversion. The rules document must be reviewed and approved before Sprint 36 implements focus guardrails.
+Fix remaining editor bugs, remove debug logging, implement focus guardrails, and rebuild the table from TipTap documentation. This is the second and final sprint of Epoch 8 (Editor Stabilization).
 
 **Status**: ✅ Complete
 
 ## Success Criteria
 - [x] `pnpm build` passes
-- [x] TIPTAP-EDITOR-RULES.md created (living document — expand as features are added)
-- [x] Tag autocomplete does not trigger when typing heading syntax (`#`, `##`, `###`).  It only triggers when typing `#` followed by text without a space.
-- [x] Tag autocomplete has 2-second delay before appearing
-- [x] Space after `#` cancels any prior tag autocomplete and triggers heading conversion
-- [x] `##` cancels any tag autocomplete from the first `#`
-- [x] Slash command only triggers on first character of an empty line
-- [x] Backspace on empty header reverts to `#` chain in paragraph
+- [x] Console.log/console.warn removed from editor code (console.error kept)
+- [x] TableBubbleMenu buttons don't call `.focus()` — use `preventFocusLoss` pattern
+- [x] Slash command table insert has no `setTimeout` focus hack
+- [x] Link extension documents `inclusive: false` default behavior
+- [x] `## ` in paragraph with hardBreak only converts text before break to heading
+- [x] `> ` in paragraph with hardBreak only quotes text before break
+- [x] Table CSS rebuilt from TipTap docs (minimal, clean)
+- [x] Table configured with `resizable: true`
+- [x] New extensions registered in both client and server extension sets
 
 ## Work Items
 
-### Documentation
-- [x] **DOC-001**: Create TIPTAP-EDITOR-RULES.md (3 pts) ✅
-  - Living document — expand as new TipTap features are added
-  - **File**: `docs/notes-feature/guides/editor/TIPTAP-EDITOR-RULES.md`
+### Console Cleanup (~1pt)
+- [x] **CL-036-001**: Remove WikiLink console.log fallback (1 pt) ✅
+  - **Fix**: Changed fallback handler to no-op `() => {}`
+  - **File**: `lib/domain/editor/extensions-client.ts`
 
-### Bug Fixes
-- [x] **BF-035-001**: Tag/heading conflict fix (5 pts) ✅
-  - **Fix**: 2-second `setTimeout` delay in `onStart`; popup hidden via `showOnCreate: false`
-  - **Files**: `lib/domain/editor/extensions/tag-suggestion.tsx`
+- [x] **CL-036-002**: Remove MarkdownEditor console.warn (0.5 pt) ✅
+  - **Fix**: Removed `console.warn` from cross-document save guard; kept guard logic
+  - **File**: `components/content/editor/MarkdownEditor.tsx`
 
-- [x] **BF-035-002**: `## ` triggers tag autocomplete instead of H2 (3 pts) ✅
-  - **Fix**: `allow()` guard checks query for `#` prefix → returns false → `onExit()` fires
-  - **Files**: `lib/domain/editor/extensions/tag-suggestion.tsx`
+### Focus Guardrails (~3pts)
+- [x] **FG-036-001**: TableBubbleMenu focus violation (2 pts) ✅
+  - **Fix**: Removed `.focus()` from all 7 button chains, added `preventFocusLoss` (`onMouseDown={e => e.preventDefault()}`)
+  - **File**: `components/content/editor/TableBubbleMenu.tsx`
 
-- [x] **BF-035-003**: Persistent tag autocomplete on `##` (2 pts) ✅
-  - **Fix**: Same `allow()` guard + defense-in-depth `onUpdate` `##` check
-  - **Files**: `lib/domain/editor/extensions/tag-suggestion.tsx`
+- [x] **FG-036-002**: Slash command setTimeout focus hack (1 pt) ✅
+  - **Fix**: Removed `setTimeout(() => { editor.chain().focus().run() }, 0)` after table insertion
+  - **File**: `lib/domain/editor/commands/slash-commands.tsx`
 
-- [x] **BF-035-004**: Tag autocomplete delay + space-break (3 pts) ✅
-  - **Fix**: During 2s delay, `isVisible=false` → `onKeyDown` returns false for all keys → ProseMirror handles space normally → `allowSpaces: false` causes suggestion exit
-  - **Files**: `lib/domain/editor/extensions/tag-suggestion.tsx`
+### Link Configuration (~1pt)
+- [x] **LK-036-001**: Document Link `inclusive: false` default (1 pt) ✅
+  - **Fix**: TipTap's Link mark already defaults to `inclusive: false` — added comment documenting this. The `inclusive` option is a ProseMirror Mark schema property, not a TipTap extension config option.
+  - **File**: `lib/domain/editor/extensions-client.ts`
 
-- [x] **BF-035-005**: Slash command empty line restriction (2 pts) ✅
-  - **Fix**: `allow()` guard checks `$from.parentOffset !== 0` and `parent.textContent !== suggestionText`
-  - **Files**: `lib/domain/editor/commands/slash-commands.tsx`
+### Heading + HardBreak Split (~3pts)
+- [x] **HB-036-001**: HeadingHardbreakSplit extension (3 pts) ✅
+  - **Fix**: New `appendTransaction` plugin that splits heading nodes at hardBreaks. Content before the break stays as heading; content after becomes a new paragraph.
+  - **File**: `lib/domain/editor/extensions/heading-hardbreak-split.ts` (new)
 
-- [x] **BF-035-006**: Header backspace escape (3 pts) ✅
-  - **Fix**: New `HeadingBackspace` extension: empty heading → paragraph with `#` chain
-  - **Files**: `lib/domain/editor/extensions/heading-backspace.ts` (new), `lib/domain/editor/extensions-client.ts`
+### Blockquote Line-Only (~3pts)
+- [x] **BQ-036-001**: BlockquoteLineOnly extension (3 pts) ✅
+  - **Fix**: New `appendTransaction` plugin that splits blockquotes at hardBreaks. Content before the break stays in blockquote; content after becomes a sibling paragraph outside the blockquote.
+  - **File**: `lib/domain/editor/extensions/blockquote-line-only.ts` (new)
 
-- [x] **BF-035-007**: H1 space must not trigger tag autocomplete (1 pt) ✅
-  - **Fix**: Covered by 2-second delay — popup never shown before space causes suggestion exit
-  - **Files**: `lib/domain/editor/extensions/tag-suggestion.tsx`
+### Table Rebuild (~5pts)
+- [x] **TB-036-001**: Remove old table CSS (1 pt) ✅
+  - **Fix**: Deleted existing gold-tinted table styles from `globals.css`
+  - **File**: `app/globals.css`
 
-## Estimated Points: ~22 pts
+- [x] **TB-036-002**: Write new minimal table CSS (2 pts) ✅
+  - **Fix**: New styles based on TipTap docs — neutral borders, subtle header bg, gold accent for selection/resize only, `.tableWrapper` overflow, resize cursor
+  - **File**: `app/globals.css`
+
+- [x] **TB-036-003**: Configure Table extension (1 pt) ✅
+  - **Fix**: `Table.configure({ resizable: true })`
+  - **File**: `lib/domain/editor/extensions-client.ts`
+
+- [x] **TB-036-004**: Register new extensions (1 pt) ✅
+  - **Fix**: Added HeadingHardbreakSplit and BlockquoteLineOnly to both client and server extension sets
+  - **Files**: `lib/domain/editor/extensions-client.ts`, `lib/domain/editor/extensions-server.ts`
+
+## Estimated Points: ~17 pts
 
 ## Technical Notes
 
-### Root Cause Analysis
-The tag autocomplete trigger (`#`) at `tag-suggestion.tsx` fires on a single character with no delay, racing against StarterKit's heading input rules (`## `). This is an architectural overlap — two features competing for the same keystrokes.
+### appendTransaction Pattern
+Both HeadingHardbreakSplit and BlockquoteLineOnly use ProseMirror's `appendTransaction` hook. This fires after every transaction (including input rule conversions from StarterKit). The plugins scan the document for heading/blockquote nodes containing hardBreaks and split them reactively. This approach avoids overriding StarterKit's deeply integrated input rules.
 
-### Fix Strategy
-1. Add 2-second `setTimeout` delay to tag suggestion's `onStart` handler
-2. In tag suggestion's `allow` guard (lines 157-179): reject when preceded by additional `#` chars
-3. In tag suggestion's space handler: dismiss suggestion and let event propagate to heading input rules
-4. Slash commands: check `$from.parentOffset === 0 && $from.parent.textContent === '/'` in allow guard
+### Focus Guardrails (Single-Gate Principle)
+Per TIPTAP-EDITOR-RULES.md section 1, only user-initiated actions should cause focus changes. BubbleMenu/toolbar buttons are NOT user-initiated focus events — they supplement an existing focus. The `preventFocusLoss` pattern (`onMouseDown={e => e.preventDefault()}`) prevents the browser from shifting focus to the button before the click handler runs.
+
+### Link `inclusive` Property
+TipTap v3's Link extension TypeScript types don't expose `inclusive` as a config option — it's a ProseMirror Mark schema property set internally. The extension already defaults to `inclusive: false`, which means cursor at a link boundary won't extend the link mark to new text.
+
+## Files Changed
+
+| File | Action |
+|------|--------|
+| `app/globals.css` | Removed old table CSS, added new minimal table CSS |
+| `lib/domain/editor/extensions-client.ts` | Link docs, Table config, imports, WikiLink no-op |
+| `lib/domain/editor/extensions-server.ts` | Added imports for new extensions |
+| `components/content/editor/TableBubbleMenu.tsx` | Focus guardrails |
+| `components/content/editor/MarkdownEditor.tsx` | Console cleanup |
+| `lib/domain/editor/commands/slash-commands.tsx` | Removed setTimeout focus hack |
+| `lib/domain/editor/extensions/heading-hardbreak-split.ts` | **New** |
+| `lib/domain/editor/extensions/blockquote-line-only.ts` | **New** |
 
 ---
 
-## Previous Sprint: Sprint 34 (✅ Complete)
+## Previous Sprint: Sprint 35 (✅ Complete)
 
-See [Sprint 34 archive](history/) for details. Key deliverables:
-- ChatPanel + ChatViewer with streaming
-- AI tools (searchNotes, getCurrentNote, createNote)
-- @ mentions, / commands, ModelPicker
-- Chat export, sidebar auto-switch, chat icon
+See Sprint 35 details. Key deliverables:
+- TIPTAP-EDITOR-RULES.md (living document)
+- Tag/heading conflict fixes (2-second delay, allow() guards)
+- Slash command empty-line restriction
+- HeadingBackspace extension
 
 ---
 

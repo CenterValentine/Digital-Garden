@@ -80,111 +80,17 @@ export function getSlashCommands(editor: Editor): SlashCommand[] {
     },
     {
       title: "Table",
-      description: "Insert a 3x3 table with header row",
+      description: "Insert a 3×3 table with header row",
       icon: "⊞",
       command: ({ editor, range }) => {
-        // Manually construct a proper 3x3 table with header row
-        const tableContent = {
-          type: "table",
-          content: [
-            // Header row
-            {
-              type: "tableRow",
-              content: [
-                { type: "tableHeader", content: [{ type: "paragraph" }] },
-                { type: "tableHeader", content: [{ type: "paragraph" }] },
-                { type: "tableHeader", content: [{ type: "paragraph" }] },
-              ],
-            },
-            // Data row 1
-            {
-              type: "tableRow",
-              content: [
-                { type: "tableCell", content: [{ type: "paragraph" }] },
-                { type: "tableCell", content: [{ type: "paragraph" }] },
-                { type: "tableCell", content: [{ type: "paragraph" }] },
-              ],
-            },
-            // Data row 2
-            {
-              type: "tableRow",
-              content: [
-                { type: "tableCell", content: [{ type: "paragraph" }] },
-                { type: "tableCell", content: [{ type: "paragraph" }] },
-                { type: "tableCell", content: [{ type: "paragraph" }] },
-              ],
-            },
-          ],
-        };
-
-        // Delete slash command first
-        editor.chain().focus().deleteRange(range).run();
-
-        // Insert table
-        editor.chain().insertContent(tableContent).run();
-
-        // Try to focus first cell to stabilize rendering
-        setTimeout(() => {
-          editor.chain().focus().run();
-        }, 0);
+        editor
+          .chain()
+          .focus()
+          .deleteRange(range)
+          .insertTable({ rows: 3, cols: 3, withHeaderRow: true })
+          .run();
       },
       aliases: ["grid"],
-    },
-    {
-      title: "Add Row Below",
-      description: "Add a row below current cell",
-      icon: "↓",
-      command: ({ editor, range }) => {
-        // Only work if inside a table
-        if (!editor.isActive("table")) {
-          editor.chain().focus().deleteRange(range).run();
-          return;
-        }
-        editor.chain().focus().deleteRange(range).addRowAfter().run();
-      },
-      aliases: ["row", "addrow"],
-    },
-    {
-      title: "Add Column Right",
-      description: "Add a column to the right",
-      icon: "→",
-      command: ({ editor, range }) => {
-        // Only work if inside a table
-        if (!editor.isActive("table")) {
-          editor.chain().focus().deleteRange(range).run();
-          return;
-        }
-        editor.chain().focus().deleteRange(range).addColumnAfter().run();
-      },
-      aliases: ["column", "addcol"],
-    },
-    {
-      title: "Delete Row",
-      description: "Delete current row",
-      icon: "⌫",
-      command: ({ editor, range }) => {
-        // Only work if inside a table
-        if (!editor.isActive("table")) {
-          editor.chain().focus().deleteRange(range).run();
-          return;
-        }
-        editor.chain().focus().deleteRange(range).deleteRow().run();
-      },
-      aliases: ["removerow", "delrow"],
-    },
-    {
-      title: "Delete Column",
-      description: "Delete current column",
-      icon: "⌦",
-      command: ({ editor, range }) => {
-        // Only work if inside a table
-        if (!editor.isActive("table")) {
-          editor.chain().focus().deleteRange(range).run();
-          return;
-        }
-        editor.chain().focus().deleteRange(range).deleteColumn().run();
-      },
-      aliases: ["removecol", "delcol"],
     },
     {
       title: "Task List",
@@ -340,6 +246,17 @@ export function getSlashCommands(editor: Editor): SlashCommand[] {
           .run();
       },
       aliases: ["information", "details"],
+    },
+    // Sprint 37: Image insert
+    {
+      title: "Image",
+      description: "Upload or insert an image",
+      icon: "🖼",
+      command: ({ editor, range }) => {
+        editor.chain().focus().deleteRange(range).run();
+        window.dispatchEvent(new CustomEvent("editor-image-upload"));
+      },
+      aliases: ["img", "picture", "photo"],
     },
     // M6: Tag insertion
     {
