@@ -19,6 +19,9 @@ import TableCell from "@tiptap/extension-table-cell";
 import CharacterCount from "@tiptap/extension-character-count";
 import { common, createLowlight } from "lowlight";
 import { Callout } from "./extensions/callout";
+import { HeadingHardbreakSplit } from "./extensions/heading-hardbreak-split";
+import { BlockquoteLineOnly } from "./extensions/blockquote-line-only";
+import { ServerImage } from "./extensions/image";
 
 // Create lowlight instance with common languages
 const lowlight = createLowlight(common);
@@ -90,6 +93,15 @@ export function getServerExtensions(): Extensions {
 
     // M7: Callouts (server-side markdown parsing)
     Callout,
+
+    // Heading + hardBreak split (only text before break becomes heading)
+    HeadingHardbreakSplit,
+
+    // Blockquote line-only (only current line becomes quoted)
+    BlockquoteLineOnly,
+
+    // Sprint 37: Server-safe image extension (no React NodeView)
+    ServerImage,
 
     // Note: SlashCommands excluded - it uses React components
   ];

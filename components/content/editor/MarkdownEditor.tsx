@@ -12,13 +12,16 @@
 "use client";
 
 import { useEditor, EditorContent } from "@tiptap/react";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { getEditorExtensions } from "@/lib/domain/editor/extensions-client";
 import type { JSONContent } from "@tiptap/core";
 import { LinkDialog } from "./LinkDialog";
 import { BubbleMenu } from "./BubbleMenu";
 import { TableBubbleMenu } from "./TableBubbleMenu";
 import { extractOutline, type OutlineHeading } from "@/lib/domain/content/outline-extractor";
+import { uploadImage } from "@/lib/domain/editor/hooks/use-image-upload";
+import { isImageUrl } from "@/lib/domain/editor/utils/image-url";
+import { toast } from "sonner";
 
 export interface EditorStats {
   /** Word count */
@@ -32,6 +35,8 @@ export interface EditorStats {
 export interface MarkdownEditorProps {
   /** Content ID this editor is bound to — used to prevent cross-document saves */
   contentId?: string;
+  /** Parent folder ID — used for referenced content (image uploads) placement */
+  parentId?: string | null;
   /** Initial content in TipTap JSON format */
   content: JSONContent;
   /** Callback when content changes */
@@ -68,6 +73,7 @@ export interface MarkdownEditorProps {
 
 export function MarkdownEditor({
   contentId,
+  parentId,
   content,
   onChange,
   onSave,
@@ -102,6 +108,12 @@ export function MarkdownEditor({
   // discard saves that fire after the user navigated away.
   const contentIdRef = useRef(contentId);
   contentIdRef.current = contentId;
+  // Sprint 37: File input for image upload via slash command
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  // Ref for insertImageFromFile — editorProps closures are frozen at first render
+  // (useEditor doesn't re-apply editorProps on re-renders), so they'd capture a
+  // stale version where editor=null. Same pattern as onSaveRef/contentIdRef.
+  const insertImageFromFileRef = useRef<(file: File) => void>(() => {});
 
   // Initialize editor
   const editor = useEditor({
@@ -121,6 +133,72 @@ export function MarkdownEditor({
         class: compact
           ? "prose prose-sm max-w-none focus:outline-none min-h-[120px] px-4 pt-2 pb-2"
           : "prose prose-sm sm:prose lg:prose-lg xl:prose-xl max-w-none focus:outline-none min-h-[500px] px-6 pt-3 pb-4",
+      },
+      // Sprint 37: Allow external file drops (Finder, desktop, etc.)
+      // Both dragenter AND dragover must call preventDefault for the browser
+      // to accept the drop (WebKit/Safari requires both).
+      handleDOMEvents: {
+        dragenter: (_view, event) => {
+          if (event.dataTransfer?.types.includes("Files")) {
+            event.preventDefault();
+            event.dataTransfer.dropEffect = "copy";
+          }
+          return false;
+        },
+        dragover: (_view, event) => {
+          if (event.dataTransfer?.types.includes("Files")) {
+            event.preventDefault();
+            event.dataTransfer.dropEffect = "copy";
+          }
+          return false;
+        },
+      },
+      // Sprint 37: Image paste handler
+      // Uses insertImageFromFileRef to avoid stale closure (see ref declaration)
+      handlePaste: (view, event) => {
+        const files = Array.from(event.clipboardData?.files || []);
+        const imageFiles = files.filter((f) => f.type.startsWith("image/"));
+
+        if (imageFiles.length > 0) {
+          event.preventDefault();
+          for (const file of imageFiles) {
+            insertImageFromFileRef.current(file);
+          }
+          return true;
+        }
+
+        // Check for image URL paste
+        const text = event.clipboardData?.getData("text/plain");
+        if (text && isImageUrl(text)) {
+          event.preventDefault();
+          const { state, dispatch } = view;
+          const node = state.schema.nodes.image.create({
+            src: text,
+            source: "url",
+          });
+          const tr = state.tr.replaceSelectionWith(node);
+          dispatch(tr);
+          return true;
+        }
+
+        return false;
+      },
+      // Sprint 37: Image drop handler (ProseMirror-level)
+      // Uses insertImageFromFileRef to avoid stale closure (see ref declaration)
+      handleDrop: (view, event, _slice, moved) => {
+        if (moved) return false; // Internal drag — let ProseMirror handle it
+
+        const files = Array.from(event.dataTransfer?.files || []);
+        const imageFiles = files.filter((f) => f.type.startsWith("image/"));
+
+        if (imageFiles.length > 0) {
+          event.preventDefault();
+          for (const file of imageFiles) {
+            insertImageFromFileRef.current(file);
+          }
+          return true;
+        }
+        return false;
       },
     },
     onUpdate: ({ editor }) => {
@@ -165,9 +243,6 @@ export function MarkdownEditor({
         saveTimeoutRef.current = setTimeout(async () => {
           // Guard: if contentId changed since the edit, discard this save
           if (snapshotContentId && contentIdRef.current !== snapshotContentId) {
-            console.warn(
-              `[MarkdownEditor] Discarding stale save: edited ${snapshotContentId}, now viewing ${contentIdRef.current}`
-            );
             return;
           }
           setIsSaving(true);
@@ -270,6 +345,86 @@ export function MarkdownEditor({
     return () => window.removeEventListener("scroll-to-heading", handleScrollToHeading);
   }, [editor]);
 
+  // Sprint 37: Listen for image upload trigger from slash command
+  useEffect(() => {
+    const handleImageUpload = () => {
+      fileInputRef.current?.click();
+    };
+    window.addEventListener("editor-image-upload", handleImageUpload);
+    return () => window.removeEventListener("editor-image-upload", handleImageUpload);
+  }, []);
+
+  // Sprint 37: Insert image from file — shared by paste, drop, and file input.
+  // Immediately shows a blob URL placeholder, uploads async, then swaps src.
+  // NOTE: editorProps handlers use insertImageFromFileRef (not this directly)
+  // because useEditor freezes editorProps at first render when editor is null.
+  const insertImageFromFile = useCallback(
+    (file: File) => {
+      if (!editor) return;
+
+      const blobUrl = URL.createObjectURL(file);
+
+      // Insert placeholder image immediately for instant feedback
+      editor
+        .chain()
+        .focus()
+        .setImage({
+          src: blobUrl,
+          alt: file.name,
+          uploading: true,
+          source: "user-uploaded",
+        } as any)
+        .run();
+
+      // Upload in the background
+      uploadImage(file, parentId ?? null)
+        .then(({ contentId: imgContentId, downloadUrl }) => {
+          // Find the placeholder node by its blob URL and update it
+          editor.state.doc.descendants((node, pos) => {
+            if (node.type.name === "image" && node.attrs.src === blobUrl) {
+              editor.view.dispatch(
+                editor.state.tr.setNodeMarkup(pos, undefined, {
+                  ...node.attrs,
+                  src: downloadUrl,
+                  contentId: imgContentId,
+                  uploading: false,
+                })
+              );
+              return false; // stop traversal
+            }
+          });
+          URL.revokeObjectURL(blobUrl);
+        })
+        .catch((err) => {
+          // Remove the placeholder node on failure
+          editor.state.doc.descendants((node, pos) => {
+            if (node.type.name === "image" && node.attrs.src === blobUrl) {
+              editor.view.dispatch(
+                editor.state.tr.delete(pos, pos + node.nodeSize)
+              );
+              return false;
+            }
+          });
+          URL.revokeObjectURL(blobUrl);
+          toast.error(`Image upload failed: ${err.message}`);
+        });
+    },
+    [editor, parentId]
+  );
+  insertImageFromFileRef.current = insertImageFromFile;
+
+  // Sprint 37: Handle file input change (image selected from file picker)
+  const handleFileInputChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      insertImageFromFile(file);
+      // Reset file input so the same file can be selected again
+      e.target.value = "";
+    },
+    [insertImageFromFile]
+  );
+
   // Cancel pending saves when contentId changes (user navigated away)
   // or on unmount. This is the first line of defense against cross-document saves.
   useEffect(() => {
@@ -283,8 +438,45 @@ export function MarkdownEditor({
 
   return (
     <div className={`flex flex-col h-full ${className}`}>
-      {/* Editor */}
-      <div className="flex-1 overflow-y-auto">
+      {/* Sprint 37: Hidden file input for image upload */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={handleFileInputChange}
+      />
+
+      {/* Editor — React-level drag handlers as primary drop zone for external files.
+          ProseMirror's handleDrop doesn't always receive external file drops (browser
+          may not fire 'drop' on the contenteditable). React handlers on the wrapper
+          catch drops reliably regardless of where they land in the editor area. */}
+      <div
+        className="flex-1 overflow-y-auto"
+        onDragOver={(e) => {
+          if (e.dataTransfer.types.includes("Files")) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = "copy";
+          }
+        }}
+        onDragEnter={(e) => {
+          if (e.dataTransfer.types.includes("Files")) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = "copy";
+          }
+        }}
+        onDrop={(e) => {
+          const files = Array.from(e.dataTransfer.files);
+          const imageFiles = files.filter((f) => f.type.startsWith("image/"));
+          if (imageFiles.length > 0) {
+            e.preventDefault();
+            e.stopPropagation();
+            for (const file of imageFiles) {
+              insertImageFromFile(file);
+            }
+          }
+        }}
+      >
         <EditorContent editor={editor} />
       </div>
 

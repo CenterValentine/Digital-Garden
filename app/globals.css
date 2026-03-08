@@ -80,8 +80,8 @@ body:has(.notes-layout-page) .toaster {
   --intent-danger: #E57373;
   --intent-neutral: #6E869D;
 
-  /* ProseMirror Table Settings */
-  --default-cell-min-width: 100px;
+  /* ProseMirror Table Settings — keep low so colgroup doesn't fight width:100% */
+  --default-cell-min-width: 25px;
 
   /* Default Tailwind Tokens */
   --background: #ffffff;
@@ -269,7 +269,7 @@ nav[class*="fixed"] {
 /* TipTap Editor Styles */
 .ProseMirror {
   outline: none;
-  color: #E5D4B0;
+  color: #1a1a1a;
 }
 
 /* Placeholder text for empty editor */
@@ -311,6 +311,15 @@ nav[class*="fixed"] {
   float: left !important;
   height: 0 !important;
   pointer-events: none !important;
+}
+
+/* Suppress placeholder inside tables — float:left ::before on tr/th/td breaks row layout */
+.ProseMirror table tr.is-empty::before,
+.ProseMirror table th.is-empty::before,
+.ProseMirror table td.is-empty::before,
+.ProseMirror table td p.is-empty::before,
+.ProseMirror table th p.is-empty::before {
+  content: none !important;
 }
 
 /* Headings */
@@ -564,53 +573,91 @@ nav[class*="fixed"] {
   font-size: 13px;
 }
 
-/* M6: Table Styling */
+/* Table — bare minimum from TipTap docs (Sprint 36 rebuild) */
 .ProseMirror table {
   border-collapse: collapse;
   table-layout: fixed;
   width: 100%;
-  margin: 16px 0;
+  margin: 1rem 0;
   overflow: hidden;
-  background: rgba(255, 215, 0, 0.02);
-  border: 1px solid rgba(255, 215, 0, 0.2);
-  border-radius: 6px;
 }
 
-.ProseMirror table td,
-.ProseMirror table th {
+.ProseMirror td,
+.ProseMirror th {
   min-width: 1em;
-  min-height: 40px;
-  border: 1px solid rgba(255, 215, 0, 0.15);
-  padding: 8px 12px;
+  border: 1px solid #555;
+  padding: 0.5rem 0.75rem;
   vertical-align: top;
   box-sizing: border-box;
   position: relative;
-  background: transparent;
 }
 
-.ProseMirror table th {
-  background-color: rgba(255, 215, 0, 0.1);
-  font-weight: bold;
+.ProseMirror th {
+  font-weight: 600;
   text-align: left;
-  color: #FFD700;
+  background-color: rgba(100, 100, 100, 0.3);
 }
 
-.ProseMirror table .selectedCell {
-  background: rgba(255, 215, 0, 0.1);
+.ProseMirror tr:nth-child(even) td {
+  background-color: rgba(100, 100, 100, 0.1);
 }
 
-.ProseMirror table .column-resize-handle {
+.ProseMirror td > p,
+.ProseMirror th > p {
+  margin: 0;
+}
+
+.ProseMirror .tableWrapper {
+  overflow-x: auto;
+}
+
+.ProseMirror .column-resize-handle {
   position: absolute;
   right: -2px;
   top: 0;
   bottom: -2px;
   width: 4px;
-  background-color: rgba(255, 215, 0, 0.3);
+  background-color: #888;
   pointer-events: none;
 }
 
-.ProseMirror table p {
-  margin: 0;
+.ProseMirror.resize-cursor {
+  cursor: col-resize;
+}
+
+.ProseMirror .selectedCell::after {
+  content: "";
+  position: absolute;
+  left: 0; right: 0; top: 0; bottom: 0;
+  background: rgba(100, 100, 255, 0.2);
+  pointer-events: none;
+}
+
+/* Sprint 37: Image Styles */
+.ProseMirror img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 4px;
+  cursor: default;
+}
+
+.ProseMirror img.ProseMirror-selectednode {
+  /* box-shadow is more reliable than outline on replaced elements (<img>) */
+  outline: 2px solid #4a9eff !important;
+  outline-offset: 2px !important;
+  box-shadow: 0 0 0 2px #4a9eff !important;
+  border-radius: 4px;
+}
+
+/* Upload placeholder animation */
+.ProseMirror img[data-uploading="true"] {
+  opacity: 0.6;
+  animation: image-upload-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes image-upload-pulse {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 0.3; }
 }
 
 /* M6: Search Match Highlighting */
