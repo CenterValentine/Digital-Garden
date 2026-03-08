@@ -162,6 +162,7 @@ const bubbleMenuShouldShow = ({
   const { empty } = selection;
   if (empty) return false;
   if (ed.isActive("table")) return false;
+  if (ed.isActive("image")) return false;
   return true;
 };
 

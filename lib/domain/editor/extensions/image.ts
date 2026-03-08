@@ -44,6 +44,14 @@ export const EditorImage = Image.extend({
           return { "data-uploading": "true" };
         },
       },
+      width: {
+        default: null, // null = auto (100% from CSS max-width)
+        parseHTML: (element) => element.style.width || null,
+        renderHTML: (attributes) => {
+          if (!attributes.width) return {};
+          return { style: `width: ${attributes.width}` };
+        },
+      },
     };
   },
 });
@@ -70,6 +78,14 @@ export const ServerImage = Image.extend({
         renderHTML: (attributes) => {
           if (!attributes.source || attributes.source === "user-uploaded") return {};
           return { "data-source": attributes.source };
+        },
+      },
+      width: {
+        default: null,
+        parseHTML: (element) => element.style.width || null,
+        renderHTML: (attributes) => {
+          if (!attributes.width) return {};
+          return { style: `width: ${attributes.width}` };
         },
       },
     };

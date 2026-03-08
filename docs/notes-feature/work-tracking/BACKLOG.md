@@ -52,6 +52,10 @@ last_updated: 2026-03-05
 - [ ] Image caption (custom figure node)
 - [ ] Image node `source` attribute prep for AI image generation (Sprint 45/47)
 
+#### Known Bugs (backlogged from Sprint 37 Phase 5)
+- [ ] **Image bubble menu: viewport positioning** — When a large image is selected and its top is above the viewport, the menu isn't visible. Adding Floating UI `options` (`flip`, `shift`) caused cross-contamination with the table bubble menu. Needs investigation into why `options` prop disrupts other BubbleMenu instances.
+- [ ] **Image bubble menu: stale size indicator** — When clicking between two images of different sizes, the S/M/L buttons briefly show the prior image's size before updating. `editor.getAttributes("image")` lags behind the selection change. Reading from `NodeSelection.node.attrs` directly also caused regressions. May need a different approach (e.g., `useEffect` on selection change).
+
 ### Sprint 38: URL/OG Embeds + YouTube + Bubble Menu
 - [ ] URL paste with OG metadata: 3 display modes (inline, small card, full preview)
 - [ ] YouTube auto-embed with fullscreen (custom iframe node)

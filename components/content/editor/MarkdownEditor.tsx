@@ -18,6 +18,7 @@ import type { JSONContent } from "@tiptap/core";
 import { LinkDialog } from "./LinkDialog";
 import { BubbleMenu } from "./BubbleMenu";
 import { TableBubbleMenu } from "./TableBubbleMenu";
+import { ImageBubbleMenu } from "./ImageBubbleMenu";
 import { extractOutline, type OutlineHeading } from "@/lib/domain/content/outline-extractor";
 import { uploadImage } from "@/lib/domain/editor/hooks/use-image-upload";
 import { isImageUrl } from "@/lib/domain/editor/utils/image-url";
@@ -488,6 +489,9 @@ export function MarkdownEditor({
 
       {/* Table Bubble Menu - floating toolbar for table editing */}
       <TableBubbleMenu editor={editor} />
+
+      {/* Image Bubble Menu - size presets, alt text, delete */}
+      <ImageBubbleMenu editor={editor} />
 
       {/* Link Dialog (Cmd+K) */}
       <LinkDialog
