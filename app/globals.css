@@ -634,23 +634,47 @@ nav[class*="fixed"] {
 }
 
 /* Sprint 37: Image Styles */
-.ProseMirror img {
+.ProseMirror .image-resize-wrapper {
+  line-height: 0; /* Remove inline-block gap below image */
+}
+
+.ProseMirror .image-resize-wrapper img {
   max-width: 100%;
   height: auto;
   border-radius: 4px;
   cursor: default;
+  display: block;
 }
 
-.ProseMirror img.ProseMirror-selectednode {
-  /* box-shadow is more reliable than outline on replaced elements (<img>) */
-  outline: 2px solid #4a9eff !important;
-  outline-offset: 2px !important;
-  box-shadow: 0 0 0 2px #4a9eff !important;
+/* Selection ring — on the wrapper itself so it's always visible */
+.ProseMirror .image-resize-wrapper.ProseMirror-selectednode {
+  outline: 2px solid #4a9eff;
+  outline-offset: 2px;
   border-radius: 4px;
 }
 
+/* Resize handle — bottom-right corner, only visible on selection */
+.ProseMirror .image-resize-handle {
+  position: absolute;
+  bottom: 4px;
+  right: 4px;
+  width: 12px;
+  height: 12px;
+  background: #4a9eff;
+  border: 2px solid white;
+  border-radius: 2px;
+  cursor: nwse-resize;
+  opacity: 0;
+  transition: opacity 0.15s;
+  z-index: 1;
+}
+
+.ProseMirror .image-resize-wrapper.ProseMirror-selectednode .image-resize-handle {
+  opacity: 1;
+}
+
 /* Upload placeholder animation */
-.ProseMirror img[data-uploading="true"] {
+.ProseMirror .image-resize-wrapper img[data-uploading="true"] {
   opacity: 0.6;
   animation: image-upload-pulse 1.5s ease-in-out infinite;
 }
