@@ -178,6 +178,35 @@ export async function POST(request: NextRequest) {
       await updateChildrenPaths(contentId);
     }
 
+    // Sprint 37: Cascade move for referenced images.
+    // When a note moves to a different folder, its referenced images follow.
+    if (finalParentId !== content.parentId) {
+      const imageLinks = await prisma.contentLink.findMany({
+        where: {
+          sourceId: contentId,
+          linkType: "image-ref",
+        },
+        select: { targetId: true },
+      });
+
+      if (imageLinks.length > 0) {
+        const imageIds = imageLinks.map((l) => l.targetId);
+        await prisma.contentNode.updateMany({
+          where: {
+            id: { in: imageIds },
+            role: "referenced",
+          },
+          data: {
+            parentId: finalParentId,
+          },
+        });
+        // Update materialized paths for moved images
+        for (const imageId of imageIds) {
+          await updateMaterializedPath(imageId);
+        }
+      }
+    }
+
     return NextResponse.json({
       success: true,
       data: {
