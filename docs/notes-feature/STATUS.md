@@ -1,7 +1,7 @@
 ---
-last_updated: 2026-03-06
-current_epoch: 8
-current_sprint: 36
+last_updated: 2026-03-08
+current_epoch: 9
+current_sprint: 37
 sprint_status: complete
 ---
 
@@ -35,15 +35,22 @@ before planning and executing. There may be additions or modifications.
 
 ## Current Work
 
-### Active Epoch: Epoch 8 - Editor Stabilization
-**Duration**: 2 sprints (35-36)
-**Theme**: Bug fixes, TipTap rules, focus guardrails, table rebuild
+### Active Epoch: Epoch 9 - Editor Enhancements
+**Duration**: 6 sprints (37-42)
+**Theme**: Full-featured content editor with images, embeds, templates, snapshots
 
 **Sprint Plan**:
-- Sprint 35: TipTap Rules Doc + Input Rule Bug Fixes (complete)
-- Sprint 36: Table Rebuild + Link Fix + Cleanup + Focus Guardrails (complete)
+- Sprint 37: Images in TipTap + Referenced Content Lifecycle (complete)
 
 ## Recent Completions (Last 30 Days)
+
+**Mar 8, 2026**: Sprint 37 Images in TipTap + Referenced Content Lifecycle — COMPLETE
+- Image extension with contentId, source, uploading, width attributes
+- Upload via slash command (/image), paste (files + image URLs), drag-and-drop from Finder
+- Referenced content lifecycle: ContentLink sync on save, orphan soft-delete, cascade move
+- Image bubble menu with size presets (S/M/L), alt text, delete
+- Vanilla DOM NodeView with drag-to-resize handle
+- Deferred: figure/caption, markdown export, lazy loading
 
 **Mar 6, 2026**: Sprint 36 Table Rebuild + Link Fix + Cleanup + Focus Guardrails — COMPLETE
 - Console cleanup: removed console.log/console.warn from editor code (kept console.error)

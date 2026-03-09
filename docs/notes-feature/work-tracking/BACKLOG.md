@@ -40,19 +40,20 @@ last_updated: 2026-03-05
 **Goal**: Full-featured content editor with images, embeds, templates, snapshots, rich interactions.
 **Detailed plan**: [epoch-9-editor-enhancements.md](epochs/epoch-9-editor-enhancements.md)
 
-### Sprint 37: Images in TipTap + Referenced Content Lifecycle
-- [ ] Enable `@tiptap/extension-image` (installed, not configured)
-- [ ] Image upload via slash command + bubble menu
-- [ ] Image paste → FilePayload REFERENCED content in same folder
-- [ ] Image URL paste → ExternalPayload REFERENCED content
-- [ ] Image resize (drag handles or bubble menu)
-- [ ] Lazy loading
-- [ ] Move API: REFERENCED content follows parent on move
-- [ ] Delete REFERENCED content when removed from document
-- [ ] Image caption (custom figure node)
+### Sprint 37: Images in TipTap + Referenced Content Lifecycle ✅
+- [x] Enable `@tiptap/extension-image` with custom EditorImage/ServerImage extensions
+- [x] Image upload via slash command + bubble menu
+- [x] Image paste → FilePayload REFERENCED content in same folder
+- [x] Image URL paste → inline image with source tracking
+- [x] Image resize (drag handles + bubble menu size presets)
+- [x] Move API: REFERENCED content follows parent on move
+- [x] Delete REFERENCED content when removed from document (orphan detection on save)
+- [ ] **Deferred:** Image caption (custom figure/figcaption node) → future sprint
+- [ ] **Deferred:** Image export to markdown (`![alt](src)`) → future sprint
+- [ ] **Deferred:** Lazy loading → future sprint
 - [ ] Image node `source` attribute prep for AI image generation (Sprint 45/47)
 
-#### Known Bugs (backlogged from Sprint 37 Phase 5)
+#### Known Bugs (backlogged from Sprint 37)
 - [ ] **Image bubble menu: viewport positioning** — When a large image is selected and its top is above the viewport, the menu isn't visible. Adding Floating UI `options` (`flip`, `shift`) caused cross-contamination with the table bubble menu. Needs investigation into why `options` prop disrupts other BubbleMenu instances.
 - [ ] **Image bubble menu: stale size indicator** — When clicking between two images of different sizes, the S/M/L buttons briefly show the prior image's size before updating. `editor.getAttributes("image")` lags behind the selection change. Reading from `NodeSelection.node.attrs` directly also caused regressions. May need a different approach (e.g., `useEffect` on selection change).
 
