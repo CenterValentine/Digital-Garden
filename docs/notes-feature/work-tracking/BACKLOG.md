@@ -15,23 +15,23 @@ last_updated: 2026-03-05
 **Goal**: Fix all known editor bugs, establish rules, implement focus guardrails.
 **Detailed plan**: [epoch-8-editor-stabilization.md](epochs/epoch-8-editor-stabilization.md)
 
-### Sprint 35: TipTap Rules Doc + Input Rule Bug Fixes
-- [ ] Create TIPTAP-EDITOR-RULES.md (focus rules, input priorities, autocomplete conventions)
-- [ ] Tag/heading conflict: `#` triggers tag autocomplete instead of heading
-- [ ] `## ` triggers tag autocomplete, sometimes fails to convert to H2
-- [ ] `##` shows persistent tag autocomplete after continued typing
-- [ ] Tag autocomplete: 2-second delay, space breaks autocomplete
-- [ ] Slash command: only on first character of empty line
-- [ ] Header escape: backspace on empty header → `#` chain
-- [ ] `# ` (H1 with space) must never trigger tag autocomplete
+### Sprint 35: TipTap Rules Doc + Input Rule Bug Fixes ✅
+- [x] Create TIPTAP-EDITOR-RULES.md (focus rules, input priorities, autocomplete conventions)
+- [x] Tag/heading conflict: `#` triggers tag autocomplete instead of heading
+- [x] `## ` triggers tag autocomplete, sometimes fails to convert to H2
+- [x] `##` shows persistent tag autocomplete after continued typing
+- [x] Tag autocomplete: 2-second delay, space breaks autocomplete
+- [x] Slash command: only on first character of empty line
+- [x] Header escape: backspace on empty header → `#` chain
+- [x] `# ` (H1 with space) must never trigger tag autocomplete
 
-### Sprint 36: Table Rebuild + Link Fix + Cleanup + Focus Guardrails
-- [ ] **Table rebuild**: remove ALL CSS + logic, rebuild from TipTap docs (user approves before moving on)
-- [ ] URL/link escape: cursor adjacent to link must not inherit formatting; lightweight URL dialog
-- [ ] `>` blockquote: only affects current line, never child content
-- [ ] Header in paragraph with `hardBreak`: only convert text before hardBreak
-- [ ] Remove old console.log/console.warn from editor code
-- [ ] Implement focus guardrails per approved rules doc
+### Sprint 36: Table Rebuild + Link Fix + Cleanup + Focus Guardrails ✅
+- [x] **Table rebuild**: remove ALL CSS + logic, rebuild from TipTap docs (user approves before moving on)
+- [x] URL/link escape: cursor adjacent to link must not inherit formatting; lightweight URL dialog
+- [x] `>` blockquote: only affects current line, never child content
+- [x] Header in paragraph with `hardBreak`: only convert text before hardBreak
+- [x] Remove old console.log/console.warn from editor code
+- [x] Implement focus guardrails per approved rules doc
 
 ---
 
