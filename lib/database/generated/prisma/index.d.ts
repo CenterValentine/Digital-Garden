@@ -69,6 +69,11 @@ export type TrashBin = $Result.DefaultSelection<Prisma.$TrashBinPayload>
  */
 export type StorageProviderConfig = $Result.DefaultSelection<Prisma.$StorageProviderConfigPayload>
 /**
+ * Model AIProviderKey
+ * 
+ */
+export type AIProviderKey = $Result.DefaultSelection<Prisma.$AIProviderKeyPayload>
+/**
  * Model User
  * 
  */
@@ -460,6 +465,16 @@ export class PrismaClient<
     * ```
     */
   get storageProviderConfig(): Prisma.StorageProviderConfigDelegate<ExtArgs, ClientOptions>;
+
+  /**
+   * `prisma.aIProviderKey`: Exposes CRUD operations for the **AIProviderKey** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more AIProviderKeys
+    * const aIProviderKeys = await prisma.aIProviderKey.findMany()
+    * ```
+    */
+  get aIProviderKey(): Prisma.AIProviderKeyDelegate<ExtArgs, ClientOptions>;
 
   /**
    * `prisma.user`: Exposes CRUD operations for the **User** model.
@@ -1045,6 +1060,7 @@ export namespace Prisma {
     ContentTag: 'ContentTag',
     TrashBin: 'TrashBin',
     StorageProviderConfig: 'StorageProviderConfig',
+    AIProviderKey: 'AIProviderKey',
     User: 'User',
     Category: 'Category',
     Tag: 'Tag',
@@ -1074,7 +1090,7 @@ export namespace Prisma {
       omit: GlobalOmitOptions
     }
     meta: {
-      modelProps: "contentNode" | "notePayload" | "filePayload" | "htmlPayload" | "codePayload" | "contentHistory" | "contentPath" | "contentLink" | "contentTag" | "trashBin" | "storageProviderConfig" | "user" | "category" | "tag" | "viewGrant" | "session" | "account" | "auditLog" | "folderPayload" | "externalPayload" | "chatPayload" | "visualizationPayload" | "dataPayload" | "hopePayload" | "workflowPayload"
+      modelProps: "contentNode" | "notePayload" | "filePayload" | "htmlPayload" | "codePayload" | "contentHistory" | "contentPath" | "contentLink" | "contentTag" | "trashBin" | "storageProviderConfig" | "aIProviderKey" | "user" | "category" | "tag" | "viewGrant" | "session" | "account" | "auditLog" | "folderPayload" | "externalPayload" | "chatPayload" | "visualizationPayload" | "dataPayload" | "hopePayload" | "workflowPayload"
       txIsolationLevel: Prisma.TransactionIsolationLevel
     }
     model: {
@@ -1889,6 +1905,80 @@ export namespace Prisma {
           count: {
             args: Prisma.StorageProviderConfigCountArgs<ExtArgs>
             result: $Utils.Optional<StorageProviderConfigCountAggregateOutputType> | number
+          }
+        }
+      }
+      AIProviderKey: {
+        payload: Prisma.$AIProviderKeyPayload<ExtArgs>
+        fields: Prisma.AIProviderKeyFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.AIProviderKeyFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$AIProviderKeyPayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.AIProviderKeyFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$AIProviderKeyPayload>
+          }
+          findFirst: {
+            args: Prisma.AIProviderKeyFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$AIProviderKeyPayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.AIProviderKeyFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$AIProviderKeyPayload>
+          }
+          findMany: {
+            args: Prisma.AIProviderKeyFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$AIProviderKeyPayload>[]
+          }
+          create: {
+            args: Prisma.AIProviderKeyCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$AIProviderKeyPayload>
+          }
+          createMany: {
+            args: Prisma.AIProviderKeyCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          createManyAndReturn: {
+            args: Prisma.AIProviderKeyCreateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$AIProviderKeyPayload>[]
+          }
+          delete: {
+            args: Prisma.AIProviderKeyDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$AIProviderKeyPayload>
+          }
+          update: {
+            args: Prisma.AIProviderKeyUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$AIProviderKeyPayload>
+          }
+          deleteMany: {
+            args: Prisma.AIProviderKeyDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.AIProviderKeyUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateManyAndReturn: {
+            args: Prisma.AIProviderKeyUpdateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$AIProviderKeyPayload>[]
+          }
+          upsert: {
+            args: Prisma.AIProviderKeyUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$AIProviderKeyPayload>
+          }
+          aggregate: {
+            args: Prisma.AIProviderKeyAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregateAIProviderKey>
+          }
+          groupBy: {
+            args: Prisma.AIProviderKeyGroupByArgs<ExtArgs>
+            result: $Utils.Optional<AIProviderKeyGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.AIProviderKeyCountArgs<ExtArgs>
+            result: $Utils.Optional<AIProviderKeyCountAggregateOutputType> | number
           }
         }
       }
@@ -3047,6 +3137,7 @@ export namespace Prisma {
     contentTag?: ContentTagOmit
     trashBin?: TrashBinOmit
     storageProviderConfig?: StorageProviderConfigOmit
+    aIProviderKey?: AIProviderKeyOmit
     user?: UserOmit
     category?: CategoryOmit
     tag?: TagOmit
@@ -3227,6 +3318,7 @@ export namespace Prisma {
 
   export type UserCountOutputType = {
     accounts: number
+    aiProviderKeys: number
     auditTargets: number
     adminActions: number
     categories: number
@@ -3241,6 +3333,7 @@ export namespace Prisma {
 
   export type UserCountOutputTypeSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     accounts?: boolean | UserCountOutputTypeCountAccountsArgs
+    aiProviderKeys?: boolean | UserCountOutputTypeCountAiProviderKeysArgs
     auditTargets?: boolean | UserCountOutputTypeCountAuditTargetsArgs
     adminActions?: boolean | UserCountOutputTypeCountAdminActionsArgs
     categories?: boolean | UserCountOutputTypeCountCategoriesArgs
@@ -3269,6 +3362,13 @@ export namespace Prisma {
    */
   export type UserCountOutputTypeCountAccountsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     where?: AccountWhereInput
+  }
+
+  /**
+   * UserCountOutputType without action
+   */
+  export type UserCountOutputTypeCountAiProviderKeysArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: AIProviderKeyWhereInput
   }
 
   /**
@@ -16345,6 +16445,1116 @@ export namespace Prisma {
 
 
   /**
+   * Model AIProviderKey
+   */
+
+  export type AggregateAIProviderKey = {
+    _count: AIProviderKeyCountAggregateOutputType | null
+    _min: AIProviderKeyMinAggregateOutputType | null
+    _max: AIProviderKeyMaxAggregateOutputType | null
+  }
+
+  export type AIProviderKeyMinAggregateOutputType = {
+    id: string | null
+    userId: string | null
+    providerId: string | null
+    encryptedKey: string | null
+    label: string | null
+    isActive: boolean | null
+    lastUsedAt: Date | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type AIProviderKeyMaxAggregateOutputType = {
+    id: string | null
+    userId: string | null
+    providerId: string | null
+    encryptedKey: string | null
+    label: string | null
+    isActive: boolean | null
+    lastUsedAt: Date | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type AIProviderKeyCountAggregateOutputType = {
+    id: number
+    userId: number
+    providerId: number
+    encryptedKey: number
+    label: number
+    isActive: number
+    lastUsedAt: number
+    createdAt: number
+    updatedAt: number
+    _all: number
+  }
+
+
+  export type AIProviderKeyMinAggregateInputType = {
+    id?: true
+    userId?: true
+    providerId?: true
+    encryptedKey?: true
+    label?: true
+    isActive?: true
+    lastUsedAt?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type AIProviderKeyMaxAggregateInputType = {
+    id?: true
+    userId?: true
+    providerId?: true
+    encryptedKey?: true
+    label?: true
+    isActive?: true
+    lastUsedAt?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type AIProviderKeyCountAggregateInputType = {
+    id?: true
+    userId?: true
+    providerId?: true
+    encryptedKey?: true
+    label?: true
+    isActive?: true
+    lastUsedAt?: true
+    createdAt?: true
+    updatedAt?: true
+    _all?: true
+  }
+
+  export type AIProviderKeyAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which AIProviderKey to aggregate.
+     */
+    where?: AIProviderKeyWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of AIProviderKeys to fetch.
+     */
+    orderBy?: AIProviderKeyOrderByWithRelationInput | AIProviderKeyOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: AIProviderKeyWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` AIProviderKeys from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` AIProviderKeys.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned AIProviderKeys
+    **/
+    _count?: true | AIProviderKeyCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: AIProviderKeyMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: AIProviderKeyMaxAggregateInputType
+  }
+
+  export type GetAIProviderKeyAggregateType<T extends AIProviderKeyAggregateArgs> = {
+        [P in keyof T & keyof AggregateAIProviderKey]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateAIProviderKey[P]>
+      : GetScalarType<T[P], AggregateAIProviderKey[P]>
+  }
+
+
+
+
+  export type AIProviderKeyGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: AIProviderKeyWhereInput
+    orderBy?: AIProviderKeyOrderByWithAggregationInput | AIProviderKeyOrderByWithAggregationInput[]
+    by: AIProviderKeyScalarFieldEnum[] | AIProviderKeyScalarFieldEnum
+    having?: AIProviderKeyScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: AIProviderKeyCountAggregateInputType | true
+    _min?: AIProviderKeyMinAggregateInputType
+    _max?: AIProviderKeyMaxAggregateInputType
+  }
+
+  export type AIProviderKeyGroupByOutputType = {
+    id: string
+    userId: string
+    providerId: string
+    encryptedKey: string
+    label: string
+    isActive: boolean
+    lastUsedAt: Date | null
+    createdAt: Date
+    updatedAt: Date
+    _count: AIProviderKeyCountAggregateOutputType | null
+    _min: AIProviderKeyMinAggregateOutputType | null
+    _max: AIProviderKeyMaxAggregateOutputType | null
+  }
+
+  type GetAIProviderKeyGroupByPayload<T extends AIProviderKeyGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<AIProviderKeyGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof AIProviderKeyGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], AIProviderKeyGroupByOutputType[P]>
+            : GetScalarType<T[P], AIProviderKeyGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type AIProviderKeySelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    userId?: boolean
+    providerId?: boolean
+    encryptedKey?: boolean
+    label?: boolean
+    isActive?: boolean
+    lastUsedAt?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    user?: boolean | UserDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["aIProviderKey"]>
+
+  export type AIProviderKeySelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    userId?: boolean
+    providerId?: boolean
+    encryptedKey?: boolean
+    label?: boolean
+    isActive?: boolean
+    lastUsedAt?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    user?: boolean | UserDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["aIProviderKey"]>
+
+  export type AIProviderKeySelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    userId?: boolean
+    providerId?: boolean
+    encryptedKey?: boolean
+    label?: boolean
+    isActive?: boolean
+    lastUsedAt?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    user?: boolean | UserDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["aIProviderKey"]>
+
+  export type AIProviderKeySelectScalar = {
+    id?: boolean
+    userId?: boolean
+    providerId?: boolean
+    encryptedKey?: boolean
+    label?: boolean
+    isActive?: boolean
+    lastUsedAt?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+  }
+
+  export type AIProviderKeyOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "userId" | "providerId" | "encryptedKey" | "label" | "isActive" | "lastUsedAt" | "createdAt" | "updatedAt", ExtArgs["result"]["aIProviderKey"]>
+  export type AIProviderKeyInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    user?: boolean | UserDefaultArgs<ExtArgs>
+  }
+  export type AIProviderKeyIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    user?: boolean | UserDefaultArgs<ExtArgs>
+  }
+  export type AIProviderKeyIncludeUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    user?: boolean | UserDefaultArgs<ExtArgs>
+  }
+
+  export type $AIProviderKeyPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "AIProviderKey"
+    objects: {
+      user: Prisma.$UserPayload<ExtArgs>
+    }
+    scalars: $Extensions.GetPayloadResult<{
+      id: string
+      userId: string
+      providerId: string
+      encryptedKey: string
+      label: string
+      isActive: boolean
+      lastUsedAt: Date | null
+      createdAt: Date
+      updatedAt: Date
+    }, ExtArgs["result"]["aIProviderKey"]>
+    composites: {}
+  }
+
+  type AIProviderKeyGetPayload<S extends boolean | null | undefined | AIProviderKeyDefaultArgs> = $Result.GetResult<Prisma.$AIProviderKeyPayload, S>
+
+  type AIProviderKeyCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> =
+    Omit<AIProviderKeyFindManyArgs, 'select' | 'include' | 'distinct' | 'omit'> & {
+      select?: AIProviderKeyCountAggregateInputType | true
+    }
+
+  export interface AIProviderKeyDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['AIProviderKey'], meta: { name: 'AIProviderKey' } }
+    /**
+     * Find zero or one AIProviderKey that matches the filter.
+     * @param {AIProviderKeyFindUniqueArgs} args - Arguments to find a AIProviderKey
+     * @example
+     * // Get one AIProviderKey
+     * const aIProviderKey = await prisma.aIProviderKey.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends AIProviderKeyFindUniqueArgs>(args: SelectSubset<T, AIProviderKeyFindUniqueArgs<ExtArgs>>): Prisma__AIProviderKeyClient<$Result.GetResult<Prisma.$AIProviderKeyPayload<ExtArgs>, T, "findUnique", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find one AIProviderKey that matches the filter or throw an error with `error.code='P2025'`
+     * if no matches were found.
+     * @param {AIProviderKeyFindUniqueOrThrowArgs} args - Arguments to find a AIProviderKey
+     * @example
+     * // Get one AIProviderKey
+     * const aIProviderKey = await prisma.aIProviderKey.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends AIProviderKeyFindUniqueOrThrowArgs>(args: SelectSubset<T, AIProviderKeyFindUniqueOrThrowArgs<ExtArgs>>): Prisma__AIProviderKeyClient<$Result.GetResult<Prisma.$AIProviderKeyPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first AIProviderKey that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {AIProviderKeyFindFirstArgs} args - Arguments to find a AIProviderKey
+     * @example
+     * // Get one AIProviderKey
+     * const aIProviderKey = await prisma.aIProviderKey.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends AIProviderKeyFindFirstArgs>(args?: SelectSubset<T, AIProviderKeyFindFirstArgs<ExtArgs>>): Prisma__AIProviderKeyClient<$Result.GetResult<Prisma.$AIProviderKeyPayload<ExtArgs>, T, "findFirst", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first AIProviderKey that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {AIProviderKeyFindFirstOrThrowArgs} args - Arguments to find a AIProviderKey
+     * @example
+     * // Get one AIProviderKey
+     * const aIProviderKey = await prisma.aIProviderKey.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends AIProviderKeyFindFirstOrThrowArgs>(args?: SelectSubset<T, AIProviderKeyFindFirstOrThrowArgs<ExtArgs>>): Prisma__AIProviderKeyClient<$Result.GetResult<Prisma.$AIProviderKeyPayload<ExtArgs>, T, "findFirstOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find zero or more AIProviderKeys that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {AIProviderKeyFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all AIProviderKeys
+     * const aIProviderKeys = await prisma.aIProviderKey.findMany()
+     * 
+     * // Get first 10 AIProviderKeys
+     * const aIProviderKeys = await prisma.aIProviderKey.findMany({ take: 10 })
+     * 
+     * // Only select the `id`
+     * const aIProviderKeyWithIdOnly = await prisma.aIProviderKey.findMany({ select: { id: true } })
+     * 
+     */
+    findMany<T extends AIProviderKeyFindManyArgs>(args?: SelectSubset<T, AIProviderKeyFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$AIProviderKeyPayload<ExtArgs>, T, "findMany", GlobalOmitOptions>>
+
+    /**
+     * Create a AIProviderKey.
+     * @param {AIProviderKeyCreateArgs} args - Arguments to create a AIProviderKey.
+     * @example
+     * // Create one AIProviderKey
+     * const AIProviderKey = await prisma.aIProviderKey.create({
+     *   data: {
+     *     // ... data to create a AIProviderKey
+     *   }
+     * })
+     * 
+     */
+    create<T extends AIProviderKeyCreateArgs>(args: SelectSubset<T, AIProviderKeyCreateArgs<ExtArgs>>): Prisma__AIProviderKeyClient<$Result.GetResult<Prisma.$AIProviderKeyPayload<ExtArgs>, T, "create", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Create many AIProviderKeys.
+     * @param {AIProviderKeyCreateManyArgs} args - Arguments to create many AIProviderKeys.
+     * @example
+     * // Create many AIProviderKeys
+     * const aIProviderKey = await prisma.aIProviderKey.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *     
+     */
+    createMany<T extends AIProviderKeyCreateManyArgs>(args?: SelectSubset<T, AIProviderKeyCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create many AIProviderKeys and returns the data saved in the database.
+     * @param {AIProviderKeyCreateManyAndReturnArgs} args - Arguments to create many AIProviderKeys.
+     * @example
+     * // Create many AIProviderKeys
+     * const aIProviderKey = await prisma.aIProviderKey.createManyAndReturn({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Create many AIProviderKeys and only return the `id`
+     * const aIProviderKeyWithIdOnly = await prisma.aIProviderKey.createManyAndReturn({
+     *   select: { id: true },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    createManyAndReturn<T extends AIProviderKeyCreateManyAndReturnArgs>(args?: SelectSubset<T, AIProviderKeyCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$AIProviderKeyPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Delete a AIProviderKey.
+     * @param {AIProviderKeyDeleteArgs} args - Arguments to delete one AIProviderKey.
+     * @example
+     * // Delete one AIProviderKey
+     * const AIProviderKey = await prisma.aIProviderKey.delete({
+     *   where: {
+     *     // ... filter to delete one AIProviderKey
+     *   }
+     * })
+     * 
+     */
+    delete<T extends AIProviderKeyDeleteArgs>(args: SelectSubset<T, AIProviderKeyDeleteArgs<ExtArgs>>): Prisma__AIProviderKeyClient<$Result.GetResult<Prisma.$AIProviderKeyPayload<ExtArgs>, T, "delete", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Update one AIProviderKey.
+     * @param {AIProviderKeyUpdateArgs} args - Arguments to update one AIProviderKey.
+     * @example
+     * // Update one AIProviderKey
+     * const aIProviderKey = await prisma.aIProviderKey.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    update<T extends AIProviderKeyUpdateArgs>(args: SelectSubset<T, AIProviderKeyUpdateArgs<ExtArgs>>): Prisma__AIProviderKeyClient<$Result.GetResult<Prisma.$AIProviderKeyPayload<ExtArgs>, T, "update", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Delete zero or more AIProviderKeys.
+     * @param {AIProviderKeyDeleteManyArgs} args - Arguments to filter AIProviderKeys to delete.
+     * @example
+     * // Delete a few AIProviderKeys
+     * const { count } = await prisma.aIProviderKey.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+     */
+    deleteMany<T extends AIProviderKeyDeleteManyArgs>(args?: SelectSubset<T, AIProviderKeyDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more AIProviderKeys.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {AIProviderKeyUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many AIProviderKeys
+     * const aIProviderKey = await prisma.aIProviderKey.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    updateMany<T extends AIProviderKeyUpdateManyArgs>(args: SelectSubset<T, AIProviderKeyUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more AIProviderKeys and returns the data updated in the database.
+     * @param {AIProviderKeyUpdateManyAndReturnArgs} args - Arguments to update many AIProviderKeys.
+     * @example
+     * // Update many AIProviderKeys
+     * const aIProviderKey = await prisma.aIProviderKey.updateManyAndReturn({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Update zero or more AIProviderKeys and only return the `id`
+     * const aIProviderKeyWithIdOnly = await prisma.aIProviderKey.updateManyAndReturn({
+     *   select: { id: true },
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    updateManyAndReturn<T extends AIProviderKeyUpdateManyAndReturnArgs>(args: SelectSubset<T, AIProviderKeyUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$AIProviderKeyPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Create or update one AIProviderKey.
+     * @param {AIProviderKeyUpsertArgs} args - Arguments to update or create a AIProviderKey.
+     * @example
+     * // Update or create a AIProviderKey
+     * const aIProviderKey = await prisma.aIProviderKey.upsert({
+     *   create: {
+     *     // ... data to create a AIProviderKey
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the AIProviderKey we want to update
+     *   }
+     * })
+     */
+    upsert<T extends AIProviderKeyUpsertArgs>(args: SelectSubset<T, AIProviderKeyUpsertArgs<ExtArgs>>): Prisma__AIProviderKeyClient<$Result.GetResult<Prisma.$AIProviderKeyPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+
+    /**
+     * Count the number of AIProviderKeys.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {AIProviderKeyCountArgs} args - Arguments to filter AIProviderKeys to count.
+     * @example
+     * // Count the number of AIProviderKeys
+     * const count = await prisma.aIProviderKey.count({
+     *   where: {
+     *     // ... the filter for the AIProviderKeys we want to count
+     *   }
+     * })
+    **/
+    count<T extends AIProviderKeyCountArgs>(
+      args?: Subset<T, AIProviderKeyCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], AIProviderKeyCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a AIProviderKey.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {AIProviderKeyAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends AIProviderKeyAggregateArgs>(args: Subset<T, AIProviderKeyAggregateArgs>): Prisma.PrismaPromise<GetAIProviderKeyAggregateType<T>>
+
+    /**
+     * Group by AIProviderKey.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {AIProviderKeyGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends AIProviderKeyGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: AIProviderKeyGroupByArgs['orderBy'] }
+        : { orderBy?: AIProviderKeyGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, AIProviderKeyGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetAIProviderKeyGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the AIProviderKey model
+   */
+  readonly fields: AIProviderKeyFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for AIProviderKey.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__AIProviderKeyClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    user<T extends UserDefaultArgs<ExtArgs> = {}>(args?: Subset<T, UserDefaultArgs<ExtArgs>>): Prisma__UserClient<$Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the AIProviderKey model
+   */
+  interface AIProviderKeyFieldRefs {
+    readonly id: FieldRef<"AIProviderKey", 'String'>
+    readonly userId: FieldRef<"AIProviderKey", 'String'>
+    readonly providerId: FieldRef<"AIProviderKey", 'String'>
+    readonly encryptedKey: FieldRef<"AIProviderKey", 'String'>
+    readonly label: FieldRef<"AIProviderKey", 'String'>
+    readonly isActive: FieldRef<"AIProviderKey", 'Boolean'>
+    readonly lastUsedAt: FieldRef<"AIProviderKey", 'DateTime'>
+    readonly createdAt: FieldRef<"AIProviderKey", 'DateTime'>
+    readonly updatedAt: FieldRef<"AIProviderKey", 'DateTime'>
+  }
+    
+
+  // Custom InputTypes
+  /**
+   * AIProviderKey findUnique
+   */
+  export type AIProviderKeyFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the AIProviderKey
+     */
+    select?: AIProviderKeySelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the AIProviderKey
+     */
+    omit?: AIProviderKeyOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: AIProviderKeyInclude<ExtArgs> | null
+    /**
+     * Filter, which AIProviderKey to fetch.
+     */
+    where: AIProviderKeyWhereUniqueInput
+  }
+
+  /**
+   * AIProviderKey findUniqueOrThrow
+   */
+  export type AIProviderKeyFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the AIProviderKey
+     */
+    select?: AIProviderKeySelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the AIProviderKey
+     */
+    omit?: AIProviderKeyOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: AIProviderKeyInclude<ExtArgs> | null
+    /**
+     * Filter, which AIProviderKey to fetch.
+     */
+    where: AIProviderKeyWhereUniqueInput
+  }
+
+  /**
+   * AIProviderKey findFirst
+   */
+  export type AIProviderKeyFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the AIProviderKey
+     */
+    select?: AIProviderKeySelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the AIProviderKey
+     */
+    omit?: AIProviderKeyOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: AIProviderKeyInclude<ExtArgs> | null
+    /**
+     * Filter, which AIProviderKey to fetch.
+     */
+    where?: AIProviderKeyWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of AIProviderKeys to fetch.
+     */
+    orderBy?: AIProviderKeyOrderByWithRelationInput | AIProviderKeyOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for AIProviderKeys.
+     */
+    cursor?: AIProviderKeyWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` AIProviderKeys from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` AIProviderKeys.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of AIProviderKeys.
+     */
+    distinct?: AIProviderKeyScalarFieldEnum | AIProviderKeyScalarFieldEnum[]
+  }
+
+  /**
+   * AIProviderKey findFirstOrThrow
+   */
+  export type AIProviderKeyFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the AIProviderKey
+     */
+    select?: AIProviderKeySelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the AIProviderKey
+     */
+    omit?: AIProviderKeyOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: AIProviderKeyInclude<ExtArgs> | null
+    /**
+     * Filter, which AIProviderKey to fetch.
+     */
+    where?: AIProviderKeyWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of AIProviderKeys to fetch.
+     */
+    orderBy?: AIProviderKeyOrderByWithRelationInput | AIProviderKeyOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for AIProviderKeys.
+     */
+    cursor?: AIProviderKeyWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` AIProviderKeys from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` AIProviderKeys.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of AIProviderKeys.
+     */
+    distinct?: AIProviderKeyScalarFieldEnum | AIProviderKeyScalarFieldEnum[]
+  }
+
+  /**
+   * AIProviderKey findMany
+   */
+  export type AIProviderKeyFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the AIProviderKey
+     */
+    select?: AIProviderKeySelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the AIProviderKey
+     */
+    omit?: AIProviderKeyOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: AIProviderKeyInclude<ExtArgs> | null
+    /**
+     * Filter, which AIProviderKeys to fetch.
+     */
+    where?: AIProviderKeyWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of AIProviderKeys to fetch.
+     */
+    orderBy?: AIProviderKeyOrderByWithRelationInput | AIProviderKeyOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing AIProviderKeys.
+     */
+    cursor?: AIProviderKeyWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` AIProviderKeys from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` AIProviderKeys.
+     */
+    skip?: number
+    distinct?: AIProviderKeyScalarFieldEnum | AIProviderKeyScalarFieldEnum[]
+  }
+
+  /**
+   * AIProviderKey create
+   */
+  export type AIProviderKeyCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the AIProviderKey
+     */
+    select?: AIProviderKeySelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the AIProviderKey
+     */
+    omit?: AIProviderKeyOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: AIProviderKeyInclude<ExtArgs> | null
+    /**
+     * The data needed to create a AIProviderKey.
+     */
+    data: XOR<AIProviderKeyCreateInput, AIProviderKeyUncheckedCreateInput>
+  }
+
+  /**
+   * AIProviderKey createMany
+   */
+  export type AIProviderKeyCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many AIProviderKeys.
+     */
+    data: AIProviderKeyCreateManyInput | AIProviderKeyCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * AIProviderKey createManyAndReturn
+   */
+  export type AIProviderKeyCreateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the AIProviderKey
+     */
+    select?: AIProviderKeySelectCreateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the AIProviderKey
+     */
+    omit?: AIProviderKeyOmit<ExtArgs> | null
+    /**
+     * The data used to create many AIProviderKeys.
+     */
+    data: AIProviderKeyCreateManyInput | AIProviderKeyCreateManyInput[]
+    skipDuplicates?: boolean
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: AIProviderKeyIncludeCreateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * AIProviderKey update
+   */
+  export type AIProviderKeyUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the AIProviderKey
+     */
+    select?: AIProviderKeySelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the AIProviderKey
+     */
+    omit?: AIProviderKeyOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: AIProviderKeyInclude<ExtArgs> | null
+    /**
+     * The data needed to update a AIProviderKey.
+     */
+    data: XOR<AIProviderKeyUpdateInput, AIProviderKeyUncheckedUpdateInput>
+    /**
+     * Choose, which AIProviderKey to update.
+     */
+    where: AIProviderKeyWhereUniqueInput
+  }
+
+  /**
+   * AIProviderKey updateMany
+   */
+  export type AIProviderKeyUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update AIProviderKeys.
+     */
+    data: XOR<AIProviderKeyUpdateManyMutationInput, AIProviderKeyUncheckedUpdateManyInput>
+    /**
+     * Filter which AIProviderKeys to update
+     */
+    where?: AIProviderKeyWhereInput
+    /**
+     * Limit how many AIProviderKeys to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * AIProviderKey updateManyAndReturn
+   */
+  export type AIProviderKeyUpdateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the AIProviderKey
+     */
+    select?: AIProviderKeySelectUpdateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the AIProviderKey
+     */
+    omit?: AIProviderKeyOmit<ExtArgs> | null
+    /**
+     * The data used to update AIProviderKeys.
+     */
+    data: XOR<AIProviderKeyUpdateManyMutationInput, AIProviderKeyUncheckedUpdateManyInput>
+    /**
+     * Filter which AIProviderKeys to update
+     */
+    where?: AIProviderKeyWhereInput
+    /**
+     * Limit how many AIProviderKeys to update.
+     */
+    limit?: number
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: AIProviderKeyIncludeUpdateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * AIProviderKey upsert
+   */
+  export type AIProviderKeyUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the AIProviderKey
+     */
+    select?: AIProviderKeySelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the AIProviderKey
+     */
+    omit?: AIProviderKeyOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: AIProviderKeyInclude<ExtArgs> | null
+    /**
+     * The filter to search for the AIProviderKey to update in case it exists.
+     */
+    where: AIProviderKeyWhereUniqueInput
+    /**
+     * In case the AIProviderKey found by the `where` argument doesn't exist, create a new AIProviderKey with this data.
+     */
+    create: XOR<AIProviderKeyCreateInput, AIProviderKeyUncheckedCreateInput>
+    /**
+     * In case the AIProviderKey was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<AIProviderKeyUpdateInput, AIProviderKeyUncheckedUpdateInput>
+  }
+
+  /**
+   * AIProviderKey delete
+   */
+  export type AIProviderKeyDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the AIProviderKey
+     */
+    select?: AIProviderKeySelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the AIProviderKey
+     */
+    omit?: AIProviderKeyOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: AIProviderKeyInclude<ExtArgs> | null
+    /**
+     * Filter which AIProviderKey to delete.
+     */
+    where: AIProviderKeyWhereUniqueInput
+  }
+
+  /**
+   * AIProviderKey deleteMany
+   */
+  export type AIProviderKeyDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which AIProviderKeys to delete
+     */
+    where?: AIProviderKeyWhereInput
+    /**
+     * Limit how many AIProviderKeys to delete.
+     */
+    limit?: number
+  }
+
+  /**
+   * AIProviderKey without action
+   */
+  export type AIProviderKeyDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the AIProviderKey
+     */
+    select?: AIProviderKeySelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the AIProviderKey
+     */
+    omit?: AIProviderKeyOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: AIProviderKeyInclude<ExtArgs> | null
+  }
+
+
+  /**
    * Model User
    */
 
@@ -16571,6 +17781,7 @@ export namespace Prisma {
     settings?: boolean
     settingsVersion?: boolean
     accounts?: boolean | User$accountsArgs<ExtArgs>
+    aiProviderKeys?: boolean | User$aiProviderKeysArgs<ExtArgs>
     auditTargets?: boolean | User$auditTargetsArgs<ExtArgs>
     adminActions?: boolean | User$adminActionsArgs<ExtArgs>
     categories?: boolean | User$categoriesArgs<ExtArgs>
@@ -16623,6 +17834,7 @@ export namespace Prisma {
   export type UserOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "username" | "passwordHash" | "email" | "role" | "createdAt" | "updatedAt" | "settings" | "settingsVersion", ExtArgs["result"]["user"]>
   export type UserInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     accounts?: boolean | User$accountsArgs<ExtArgs>
+    aiProviderKeys?: boolean | User$aiProviderKeysArgs<ExtArgs>
     auditTargets?: boolean | User$auditTargetsArgs<ExtArgs>
     adminActions?: boolean | User$adminActionsArgs<ExtArgs>
     categories?: boolean | User$categoriesArgs<ExtArgs>
@@ -16642,6 +17854,7 @@ export namespace Prisma {
     name: "User"
     objects: {
       accounts: Prisma.$AccountPayload<ExtArgs>[]
+      aiProviderKeys: Prisma.$AIProviderKeyPayload<ExtArgs>[]
       auditTargets: Prisma.$AuditLogPayload<ExtArgs>[]
       adminActions: Prisma.$AuditLogPayload<ExtArgs>[]
       categories: Prisma.$CategoryPayload<ExtArgs>[]
@@ -17058,6 +18271,7 @@ export namespace Prisma {
   export interface Prisma__UserClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
     readonly [Symbol.toStringTag]: "PrismaPromise"
     accounts<T extends User$accountsArgs<ExtArgs> = {}>(args?: Subset<T, User$accountsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$AccountPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+    aiProviderKeys<T extends User$aiProviderKeysArgs<ExtArgs> = {}>(args?: Subset<T, User$aiProviderKeysArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$AIProviderKeyPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     auditTargets<T extends User$auditTargetsArgs<ExtArgs> = {}>(args?: Subset<T, User$auditTargetsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$AuditLogPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     adminActions<T extends User$adminActionsArgs<ExtArgs> = {}>(args?: Subset<T, User$adminActionsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$AuditLogPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     categories<T extends User$categoriesArgs<ExtArgs> = {}>(args?: Subset<T, User$categoriesArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$CategoryPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
@@ -17515,6 +18729,30 @@ export namespace Prisma {
     take?: number
     skip?: number
     distinct?: AccountScalarFieldEnum | AccountScalarFieldEnum[]
+  }
+
+  /**
+   * User.aiProviderKeys
+   */
+  export type User$aiProviderKeysArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the AIProviderKey
+     */
+    select?: AIProviderKeySelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the AIProviderKey
+     */
+    omit?: AIProviderKeyOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: AIProviderKeyInclude<ExtArgs> | null
+    where?: AIProviderKeyWhereInput
+    orderBy?: AIProviderKeyOrderByWithRelationInput | AIProviderKeyOrderByWithRelationInput[]
+    cursor?: AIProviderKeyWhereUniqueInput
+    take?: number
+    skip?: number
+    distinct?: AIProviderKeyScalarFieldEnum | AIProviderKeyScalarFieldEnum[]
   }
 
   /**
@@ -32119,6 +33357,21 @@ export namespace Prisma {
   export type StorageProviderConfigScalarFieldEnum = (typeof StorageProviderConfigScalarFieldEnum)[keyof typeof StorageProviderConfigScalarFieldEnum]
 
 
+  export const AIProviderKeyScalarFieldEnum: {
+    id: 'id',
+    userId: 'userId',
+    providerId: 'providerId',
+    encryptedKey: 'encryptedKey',
+    label: 'label',
+    isActive: 'isActive',
+    lastUsedAt: 'lastUsedAt',
+    createdAt: 'createdAt',
+    updatedAt: 'updatedAt'
+  };
+
+  export type AIProviderKeyScalarFieldEnum = (typeof AIProviderKeyScalarFieldEnum)[keyof typeof AIProviderKeyScalarFieldEnum]
+
+
   export const UserScalarFieldEnum: {
     id: 'id',
     username: 'username',
@@ -33462,6 +34715,82 @@ export namespace Prisma {
     updatedAt?: DateTimeWithAggregatesFilter<"StorageProviderConfig"> | Date | string
   }
 
+  export type AIProviderKeyWhereInput = {
+    AND?: AIProviderKeyWhereInput | AIProviderKeyWhereInput[]
+    OR?: AIProviderKeyWhereInput[]
+    NOT?: AIProviderKeyWhereInput | AIProviderKeyWhereInput[]
+    id?: UuidFilter<"AIProviderKey"> | string
+    userId?: UuidFilter<"AIProviderKey"> | string
+    providerId?: StringFilter<"AIProviderKey"> | string
+    encryptedKey?: StringFilter<"AIProviderKey"> | string
+    label?: StringFilter<"AIProviderKey"> | string
+    isActive?: BoolFilter<"AIProviderKey"> | boolean
+    lastUsedAt?: DateTimeNullableFilter<"AIProviderKey"> | Date | string | null
+    createdAt?: DateTimeFilter<"AIProviderKey"> | Date | string
+    updatedAt?: DateTimeFilter<"AIProviderKey"> | Date | string
+    user?: XOR<UserScalarRelationFilter, UserWhereInput>
+  }
+
+  export type AIProviderKeyOrderByWithRelationInput = {
+    id?: SortOrder
+    userId?: SortOrder
+    providerId?: SortOrder
+    encryptedKey?: SortOrder
+    label?: SortOrder
+    isActive?: SortOrder
+    lastUsedAt?: SortOrderInput | SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+    user?: UserOrderByWithRelationInput
+  }
+
+  export type AIProviderKeyWhereUniqueInput = Prisma.AtLeast<{
+    id?: string
+    userId_providerId?: AIProviderKeyUserIdProviderIdCompoundUniqueInput
+    AND?: AIProviderKeyWhereInput | AIProviderKeyWhereInput[]
+    OR?: AIProviderKeyWhereInput[]
+    NOT?: AIProviderKeyWhereInput | AIProviderKeyWhereInput[]
+    userId?: UuidFilter<"AIProviderKey"> | string
+    providerId?: StringFilter<"AIProviderKey"> | string
+    encryptedKey?: StringFilter<"AIProviderKey"> | string
+    label?: StringFilter<"AIProviderKey"> | string
+    isActive?: BoolFilter<"AIProviderKey"> | boolean
+    lastUsedAt?: DateTimeNullableFilter<"AIProviderKey"> | Date | string | null
+    createdAt?: DateTimeFilter<"AIProviderKey"> | Date | string
+    updatedAt?: DateTimeFilter<"AIProviderKey"> | Date | string
+    user?: XOR<UserScalarRelationFilter, UserWhereInput>
+  }, "id" | "userId_providerId">
+
+  export type AIProviderKeyOrderByWithAggregationInput = {
+    id?: SortOrder
+    userId?: SortOrder
+    providerId?: SortOrder
+    encryptedKey?: SortOrder
+    label?: SortOrder
+    isActive?: SortOrder
+    lastUsedAt?: SortOrderInput | SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+    _count?: AIProviderKeyCountOrderByAggregateInput
+    _max?: AIProviderKeyMaxOrderByAggregateInput
+    _min?: AIProviderKeyMinOrderByAggregateInput
+  }
+
+  export type AIProviderKeyScalarWhereWithAggregatesInput = {
+    AND?: AIProviderKeyScalarWhereWithAggregatesInput | AIProviderKeyScalarWhereWithAggregatesInput[]
+    OR?: AIProviderKeyScalarWhereWithAggregatesInput[]
+    NOT?: AIProviderKeyScalarWhereWithAggregatesInput | AIProviderKeyScalarWhereWithAggregatesInput[]
+    id?: UuidWithAggregatesFilter<"AIProviderKey"> | string
+    userId?: UuidWithAggregatesFilter<"AIProviderKey"> | string
+    providerId?: StringWithAggregatesFilter<"AIProviderKey"> | string
+    encryptedKey?: StringWithAggregatesFilter<"AIProviderKey"> | string
+    label?: StringWithAggregatesFilter<"AIProviderKey"> | string
+    isActive?: BoolWithAggregatesFilter<"AIProviderKey"> | boolean
+    lastUsedAt?: DateTimeNullableWithAggregatesFilter<"AIProviderKey"> | Date | string | null
+    createdAt?: DateTimeWithAggregatesFilter<"AIProviderKey"> | Date | string
+    updatedAt?: DateTimeWithAggregatesFilter<"AIProviderKey"> | Date | string
+  }
+
   export type UserWhereInput = {
     AND?: UserWhereInput | UserWhereInput[]
     OR?: UserWhereInput[]
@@ -33476,6 +34805,7 @@ export namespace Prisma {
     settings?: JsonNullableFilter<"User">
     settingsVersion?: IntFilter<"User"> | number
     accounts?: AccountListRelationFilter
+    aiProviderKeys?: AIProviderKeyListRelationFilter
     auditTargets?: AuditLogListRelationFilter
     adminActions?: AuditLogListRelationFilter
     categories?: CategoryListRelationFilter
@@ -33499,6 +34829,7 @@ export namespace Prisma {
     settings?: SortOrderInput | SortOrder
     settingsVersion?: SortOrder
     accounts?: AccountOrderByRelationAggregateInput
+    aiProviderKeys?: AIProviderKeyOrderByRelationAggregateInput
     auditTargets?: AuditLogOrderByRelationAggregateInput
     adminActions?: AuditLogOrderByRelationAggregateInput
     categories?: CategoryOrderByRelationAggregateInput
@@ -33525,6 +34856,7 @@ export namespace Prisma {
     settings?: JsonNullableFilter<"User">
     settingsVersion?: IntFilter<"User"> | number
     accounts?: AccountListRelationFilter
+    aiProviderKeys?: AIProviderKeyListRelationFilter
     auditTargets?: AuditLogListRelationFilter
     adminActions?: AuditLogListRelationFilter
     categories?: CategoryListRelationFilter
@@ -35427,6 +36759,89 @@ export namespace Prisma {
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
+  export type AIProviderKeyCreateInput = {
+    id?: string
+    providerId: string
+    encryptedKey: string
+    label?: string
+    isActive?: boolean
+    lastUsedAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    user: UserCreateNestedOneWithoutAiProviderKeysInput
+  }
+
+  export type AIProviderKeyUncheckedCreateInput = {
+    id?: string
+    userId: string
+    providerId: string
+    encryptedKey: string
+    label?: string
+    isActive?: boolean
+    lastUsedAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type AIProviderKeyUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    providerId?: StringFieldUpdateOperationsInput | string
+    encryptedKey?: StringFieldUpdateOperationsInput | string
+    label?: StringFieldUpdateOperationsInput | string
+    isActive?: BoolFieldUpdateOperationsInput | boolean
+    lastUsedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    user?: UserUpdateOneRequiredWithoutAiProviderKeysNestedInput
+  }
+
+  export type AIProviderKeyUncheckedUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    userId?: StringFieldUpdateOperationsInput | string
+    providerId?: StringFieldUpdateOperationsInput | string
+    encryptedKey?: StringFieldUpdateOperationsInput | string
+    label?: StringFieldUpdateOperationsInput | string
+    isActive?: BoolFieldUpdateOperationsInput | boolean
+    lastUsedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type AIProviderKeyCreateManyInput = {
+    id?: string
+    userId: string
+    providerId: string
+    encryptedKey: string
+    label?: string
+    isActive?: boolean
+    lastUsedAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type AIProviderKeyUpdateManyMutationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    providerId?: StringFieldUpdateOperationsInput | string
+    encryptedKey?: StringFieldUpdateOperationsInput | string
+    label?: StringFieldUpdateOperationsInput | string
+    isActive?: BoolFieldUpdateOperationsInput | boolean
+    lastUsedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type AIProviderKeyUncheckedUpdateManyInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    userId?: StringFieldUpdateOperationsInput | string
+    providerId?: StringFieldUpdateOperationsInput | string
+    encryptedKey?: StringFieldUpdateOperationsInput | string
+    label?: StringFieldUpdateOperationsInput | string
+    isActive?: BoolFieldUpdateOperationsInput | boolean
+    lastUsedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
   export type UserCreateInput = {
     id?: string
     username: string
@@ -35438,6 +36853,7 @@ export namespace Prisma {
     settings?: NullableJsonNullValueInput | InputJsonValue
     settingsVersion?: number
     accounts?: AccountCreateNestedManyWithoutUserInput
+    aiProviderKeys?: AIProviderKeyCreateNestedManyWithoutUserInput
     auditTargets?: AuditLogCreateNestedManyWithoutTargetUserInput
     adminActions?: AuditLogCreateNestedManyWithoutUserInput
     categories?: CategoryCreateNestedManyWithoutOwnerInput
@@ -35461,6 +36877,7 @@ export namespace Prisma {
     settings?: NullableJsonNullValueInput | InputJsonValue
     settingsVersion?: number
     accounts?: AccountUncheckedCreateNestedManyWithoutUserInput
+    aiProviderKeys?: AIProviderKeyUncheckedCreateNestedManyWithoutUserInput
     auditTargets?: AuditLogUncheckedCreateNestedManyWithoutTargetUserInput
     adminActions?: AuditLogUncheckedCreateNestedManyWithoutUserInput
     categories?: CategoryUncheckedCreateNestedManyWithoutOwnerInput
@@ -35484,6 +36901,7 @@ export namespace Prisma {
     settings?: NullableJsonNullValueInput | InputJsonValue
     settingsVersion?: IntFieldUpdateOperationsInput | number
     accounts?: AccountUpdateManyWithoutUserNestedInput
+    aiProviderKeys?: AIProviderKeyUpdateManyWithoutUserNestedInput
     auditTargets?: AuditLogUpdateManyWithoutTargetUserNestedInput
     adminActions?: AuditLogUpdateManyWithoutUserNestedInput
     categories?: CategoryUpdateManyWithoutOwnerNestedInput
@@ -35507,6 +36925,7 @@ export namespace Prisma {
     settings?: NullableJsonNullValueInput | InputJsonValue
     settingsVersion?: IntFieldUpdateOperationsInput | number
     accounts?: AccountUncheckedUpdateManyWithoutUserNestedInput
+    aiProviderKeys?: AIProviderKeyUncheckedUpdateManyWithoutUserNestedInput
     auditTargets?: AuditLogUncheckedUpdateManyWithoutTargetUserNestedInput
     adminActions?: AuditLogUncheckedUpdateManyWithoutUserNestedInput
     categories?: CategoryUncheckedUpdateManyWithoutOwnerNestedInput
@@ -37476,6 +38895,47 @@ export namespace Prisma {
     updatedAt?: SortOrder
   }
 
+  export type AIProviderKeyUserIdProviderIdCompoundUniqueInput = {
+    userId: string
+    providerId: string
+  }
+
+  export type AIProviderKeyCountOrderByAggregateInput = {
+    id?: SortOrder
+    userId?: SortOrder
+    providerId?: SortOrder
+    encryptedKey?: SortOrder
+    label?: SortOrder
+    isActive?: SortOrder
+    lastUsedAt?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type AIProviderKeyMaxOrderByAggregateInput = {
+    id?: SortOrder
+    userId?: SortOrder
+    providerId?: SortOrder
+    encryptedKey?: SortOrder
+    label?: SortOrder
+    isActive?: SortOrder
+    lastUsedAt?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type AIProviderKeyMinOrderByAggregateInput = {
+    id?: SortOrder
+    userId?: SortOrder
+    providerId?: SortOrder
+    encryptedKey?: SortOrder
+    label?: SortOrder
+    isActive?: SortOrder
+    lastUsedAt?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
   export type EnumUserRoleFilter<$PrismaModel = never> = {
     equals?: $Enums.UserRole | EnumUserRoleFieldRefInput<$PrismaModel>
     in?: $Enums.UserRole[] | ListEnumUserRoleFieldRefInput<$PrismaModel>
@@ -37487,6 +38947,12 @@ export namespace Prisma {
     every?: AccountWhereInput
     some?: AccountWhereInput
     none?: AccountWhereInput
+  }
+
+  export type AIProviderKeyListRelationFilter = {
+    every?: AIProviderKeyWhereInput
+    some?: AIProviderKeyWhereInput
+    none?: AIProviderKeyWhereInput
   }
 
   export type CategoryListRelationFilter = {
@@ -37520,6 +38986,10 @@ export namespace Prisma {
   }
 
   export type AccountOrderByRelationAggregateInput = {
+    _count?: SortOrder
+  }
+
+  export type AIProviderKeyOrderByRelationAggregateInput = {
     _count?: SortOrder
   }
 
@@ -39018,11 +40488,32 @@ export namespace Prisma {
     update?: XOR<XOR<UserUpdateToOneWithWhereWithoutStorageConfigsInput, UserUpdateWithoutStorageConfigsInput>, UserUncheckedUpdateWithoutStorageConfigsInput>
   }
 
+  export type UserCreateNestedOneWithoutAiProviderKeysInput = {
+    create?: XOR<UserCreateWithoutAiProviderKeysInput, UserUncheckedCreateWithoutAiProviderKeysInput>
+    connectOrCreate?: UserCreateOrConnectWithoutAiProviderKeysInput
+    connect?: UserWhereUniqueInput
+  }
+
+  export type UserUpdateOneRequiredWithoutAiProviderKeysNestedInput = {
+    create?: XOR<UserCreateWithoutAiProviderKeysInput, UserUncheckedCreateWithoutAiProviderKeysInput>
+    connectOrCreate?: UserCreateOrConnectWithoutAiProviderKeysInput
+    upsert?: UserUpsertWithoutAiProviderKeysInput
+    connect?: UserWhereUniqueInput
+    update?: XOR<XOR<UserUpdateToOneWithWhereWithoutAiProviderKeysInput, UserUpdateWithoutAiProviderKeysInput>, UserUncheckedUpdateWithoutAiProviderKeysInput>
+  }
+
   export type AccountCreateNestedManyWithoutUserInput = {
     create?: XOR<AccountCreateWithoutUserInput, AccountUncheckedCreateWithoutUserInput> | AccountCreateWithoutUserInput[] | AccountUncheckedCreateWithoutUserInput[]
     connectOrCreate?: AccountCreateOrConnectWithoutUserInput | AccountCreateOrConnectWithoutUserInput[]
     createMany?: AccountCreateManyUserInputEnvelope
     connect?: AccountWhereUniqueInput | AccountWhereUniqueInput[]
+  }
+
+  export type AIProviderKeyCreateNestedManyWithoutUserInput = {
+    create?: XOR<AIProviderKeyCreateWithoutUserInput, AIProviderKeyUncheckedCreateWithoutUserInput> | AIProviderKeyCreateWithoutUserInput[] | AIProviderKeyUncheckedCreateWithoutUserInput[]
+    connectOrCreate?: AIProviderKeyCreateOrConnectWithoutUserInput | AIProviderKeyCreateOrConnectWithoutUserInput[]
+    createMany?: AIProviderKeyCreateManyUserInputEnvelope
+    connect?: AIProviderKeyWhereUniqueInput | AIProviderKeyWhereUniqueInput[]
   }
 
   export type AuditLogCreateNestedManyWithoutTargetUserInput = {
@@ -39100,6 +40591,13 @@ export namespace Prisma {
     connectOrCreate?: AccountCreateOrConnectWithoutUserInput | AccountCreateOrConnectWithoutUserInput[]
     createMany?: AccountCreateManyUserInputEnvelope
     connect?: AccountWhereUniqueInput | AccountWhereUniqueInput[]
+  }
+
+  export type AIProviderKeyUncheckedCreateNestedManyWithoutUserInput = {
+    create?: XOR<AIProviderKeyCreateWithoutUserInput, AIProviderKeyUncheckedCreateWithoutUserInput> | AIProviderKeyCreateWithoutUserInput[] | AIProviderKeyUncheckedCreateWithoutUserInput[]
+    connectOrCreate?: AIProviderKeyCreateOrConnectWithoutUserInput | AIProviderKeyCreateOrConnectWithoutUserInput[]
+    createMany?: AIProviderKeyCreateManyUserInputEnvelope
+    connect?: AIProviderKeyWhereUniqueInput | AIProviderKeyWhereUniqueInput[]
   }
 
   export type AuditLogUncheckedCreateNestedManyWithoutTargetUserInput = {
@@ -39188,6 +40686,20 @@ export namespace Prisma {
     update?: AccountUpdateWithWhereUniqueWithoutUserInput | AccountUpdateWithWhereUniqueWithoutUserInput[]
     updateMany?: AccountUpdateManyWithWhereWithoutUserInput | AccountUpdateManyWithWhereWithoutUserInput[]
     deleteMany?: AccountScalarWhereInput | AccountScalarWhereInput[]
+  }
+
+  export type AIProviderKeyUpdateManyWithoutUserNestedInput = {
+    create?: XOR<AIProviderKeyCreateWithoutUserInput, AIProviderKeyUncheckedCreateWithoutUserInput> | AIProviderKeyCreateWithoutUserInput[] | AIProviderKeyUncheckedCreateWithoutUserInput[]
+    connectOrCreate?: AIProviderKeyCreateOrConnectWithoutUserInput | AIProviderKeyCreateOrConnectWithoutUserInput[]
+    upsert?: AIProviderKeyUpsertWithWhereUniqueWithoutUserInput | AIProviderKeyUpsertWithWhereUniqueWithoutUserInput[]
+    createMany?: AIProviderKeyCreateManyUserInputEnvelope
+    set?: AIProviderKeyWhereUniqueInput | AIProviderKeyWhereUniqueInput[]
+    disconnect?: AIProviderKeyWhereUniqueInput | AIProviderKeyWhereUniqueInput[]
+    delete?: AIProviderKeyWhereUniqueInput | AIProviderKeyWhereUniqueInput[]
+    connect?: AIProviderKeyWhereUniqueInput | AIProviderKeyWhereUniqueInput[]
+    update?: AIProviderKeyUpdateWithWhereUniqueWithoutUserInput | AIProviderKeyUpdateWithWhereUniqueWithoutUserInput[]
+    updateMany?: AIProviderKeyUpdateManyWithWhereWithoutUserInput | AIProviderKeyUpdateManyWithWhereWithoutUserInput[]
+    deleteMany?: AIProviderKeyScalarWhereInput | AIProviderKeyScalarWhereInput[]
   }
 
   export type AuditLogUpdateManyWithoutTargetUserNestedInput = {
@@ -39342,6 +40854,20 @@ export namespace Prisma {
     update?: AccountUpdateWithWhereUniqueWithoutUserInput | AccountUpdateWithWhereUniqueWithoutUserInput[]
     updateMany?: AccountUpdateManyWithWhereWithoutUserInput | AccountUpdateManyWithWhereWithoutUserInput[]
     deleteMany?: AccountScalarWhereInput | AccountScalarWhereInput[]
+  }
+
+  export type AIProviderKeyUncheckedUpdateManyWithoutUserNestedInput = {
+    create?: XOR<AIProviderKeyCreateWithoutUserInput, AIProviderKeyUncheckedCreateWithoutUserInput> | AIProviderKeyCreateWithoutUserInput[] | AIProviderKeyUncheckedCreateWithoutUserInput[]
+    connectOrCreate?: AIProviderKeyCreateOrConnectWithoutUserInput | AIProviderKeyCreateOrConnectWithoutUserInput[]
+    upsert?: AIProviderKeyUpsertWithWhereUniqueWithoutUserInput | AIProviderKeyUpsertWithWhereUniqueWithoutUserInput[]
+    createMany?: AIProviderKeyCreateManyUserInputEnvelope
+    set?: AIProviderKeyWhereUniqueInput | AIProviderKeyWhereUniqueInput[]
+    disconnect?: AIProviderKeyWhereUniqueInput | AIProviderKeyWhereUniqueInput[]
+    delete?: AIProviderKeyWhereUniqueInput | AIProviderKeyWhereUniqueInput[]
+    connect?: AIProviderKeyWhereUniqueInput | AIProviderKeyWhereUniqueInput[]
+    update?: AIProviderKeyUpdateWithWhereUniqueWithoutUserInput | AIProviderKeyUpdateWithWhereUniqueWithoutUserInput[]
+    updateMany?: AIProviderKeyUpdateManyWithWhereWithoutUserInput | AIProviderKeyUpdateManyWithWhereWithoutUserInput[]
+    deleteMany?: AIProviderKeyScalarWhereInput | AIProviderKeyScalarWhereInput[]
   }
 
   export type AuditLogUncheckedUpdateManyWithoutTargetUserNestedInput = {
@@ -40661,6 +42187,7 @@ export namespace Prisma {
     settings?: NullableJsonNullValueInput | InputJsonValue
     settingsVersion?: number
     accounts?: AccountCreateNestedManyWithoutUserInput
+    aiProviderKeys?: AIProviderKeyCreateNestedManyWithoutUserInput
     auditTargets?: AuditLogCreateNestedManyWithoutTargetUserInput
     adminActions?: AuditLogCreateNestedManyWithoutUserInput
     categories?: CategoryCreateNestedManyWithoutOwnerInput
@@ -40683,6 +42210,7 @@ export namespace Prisma {
     settings?: NullableJsonNullValueInput | InputJsonValue
     settingsVersion?: number
     accounts?: AccountUncheckedCreateNestedManyWithoutUserInput
+    aiProviderKeys?: AIProviderKeyUncheckedCreateNestedManyWithoutUserInput
     auditTargets?: AuditLogUncheckedCreateNestedManyWithoutTargetUserInput
     adminActions?: AuditLogUncheckedCreateNestedManyWithoutUserInput
     categories?: CategoryUncheckedCreateNestedManyWithoutOwnerInput
@@ -41468,6 +42996,7 @@ export namespace Prisma {
     settings?: NullableJsonNullValueInput | InputJsonValue
     settingsVersion?: IntFieldUpdateOperationsInput | number
     accounts?: AccountUpdateManyWithoutUserNestedInput
+    aiProviderKeys?: AIProviderKeyUpdateManyWithoutUserNestedInput
     auditTargets?: AuditLogUpdateManyWithoutTargetUserNestedInput
     adminActions?: AuditLogUpdateManyWithoutUserNestedInput
     categories?: CategoryUpdateManyWithoutOwnerNestedInput
@@ -41490,6 +43019,7 @@ export namespace Prisma {
     settings?: NullableJsonNullValueInput | InputJsonValue
     settingsVersion?: IntFieldUpdateOperationsInput | number
     accounts?: AccountUncheckedUpdateManyWithoutUserNestedInput
+    aiProviderKeys?: AIProviderKeyUncheckedUpdateManyWithoutUserNestedInput
     auditTargets?: AuditLogUncheckedUpdateManyWithoutTargetUserNestedInput
     adminActions?: AuditLogUncheckedUpdateManyWithoutUserNestedInput
     categories?: CategoryUncheckedUpdateManyWithoutOwnerNestedInput
@@ -42420,6 +43950,7 @@ export namespace Prisma {
     settings?: NullableJsonNullValueInput | InputJsonValue
     settingsVersion?: number
     accounts?: AccountCreateNestedManyWithoutUserInput
+    aiProviderKeys?: AIProviderKeyCreateNestedManyWithoutUserInput
     auditTargets?: AuditLogCreateNestedManyWithoutTargetUserInput
     adminActions?: AuditLogCreateNestedManyWithoutUserInput
     categories?: CategoryCreateNestedManyWithoutOwnerInput
@@ -42442,6 +43973,7 @@ export namespace Prisma {
     settings?: NullableJsonNullValueInput | InputJsonValue
     settingsVersion?: number
     accounts?: AccountUncheckedCreateNestedManyWithoutUserInput
+    aiProviderKeys?: AIProviderKeyUncheckedCreateNestedManyWithoutUserInput
     auditTargets?: AuditLogUncheckedCreateNestedManyWithoutTargetUserInput
     adminActions?: AuditLogUncheckedCreateNestedManyWithoutUserInput
     categories?: CategoryUncheckedCreateNestedManyWithoutOwnerInput
@@ -42561,6 +44093,7 @@ export namespace Prisma {
     settings?: NullableJsonNullValueInput | InputJsonValue
     settingsVersion?: IntFieldUpdateOperationsInput | number
     accounts?: AccountUpdateManyWithoutUserNestedInput
+    aiProviderKeys?: AIProviderKeyUpdateManyWithoutUserNestedInput
     auditTargets?: AuditLogUpdateManyWithoutTargetUserNestedInput
     adminActions?: AuditLogUpdateManyWithoutUserNestedInput
     categories?: CategoryUpdateManyWithoutOwnerNestedInput
@@ -42583,6 +44116,7 @@ export namespace Prisma {
     settings?: NullableJsonNullValueInput | InputJsonValue
     settingsVersion?: IntFieldUpdateOperationsInput | number
     accounts?: AccountUncheckedUpdateManyWithoutUserNestedInput
+    aiProviderKeys?: AIProviderKeyUncheckedUpdateManyWithoutUserNestedInput
     auditTargets?: AuditLogUncheckedUpdateManyWithoutTargetUserNestedInput
     adminActions?: AuditLogUncheckedUpdateManyWithoutUserNestedInput
     categories?: CategoryUncheckedUpdateManyWithoutOwnerNestedInput
@@ -43497,6 +45031,7 @@ export namespace Prisma {
     settings?: NullableJsonNullValueInput | InputJsonValue
     settingsVersion?: number
     accounts?: AccountCreateNestedManyWithoutUserInput
+    aiProviderKeys?: AIProviderKeyCreateNestedManyWithoutUserInput
     auditTargets?: AuditLogCreateNestedManyWithoutTargetUserInput
     adminActions?: AuditLogCreateNestedManyWithoutUserInput
     categories?: CategoryCreateNestedManyWithoutOwnerInput
@@ -43519,6 +45054,7 @@ export namespace Prisma {
     settings?: NullableJsonNullValueInput | InputJsonValue
     settingsVersion?: number
     accounts?: AccountUncheckedCreateNestedManyWithoutUserInput
+    aiProviderKeys?: AIProviderKeyUncheckedCreateNestedManyWithoutUserInput
     auditTargets?: AuditLogUncheckedCreateNestedManyWithoutTargetUserInput
     adminActions?: AuditLogUncheckedCreateNestedManyWithoutUserInput
     categories?: CategoryUncheckedCreateNestedManyWithoutOwnerInput
@@ -43644,6 +45180,7 @@ export namespace Prisma {
     settings?: NullableJsonNullValueInput | InputJsonValue
     settingsVersion?: IntFieldUpdateOperationsInput | number
     accounts?: AccountUpdateManyWithoutUserNestedInput
+    aiProviderKeys?: AIProviderKeyUpdateManyWithoutUserNestedInput
     auditTargets?: AuditLogUpdateManyWithoutTargetUserNestedInput
     adminActions?: AuditLogUpdateManyWithoutUserNestedInput
     categories?: CategoryUpdateManyWithoutOwnerNestedInput
@@ -43666,6 +45203,7 @@ export namespace Prisma {
     settings?: NullableJsonNullValueInput | InputJsonValue
     settingsVersion?: IntFieldUpdateOperationsInput | number
     accounts?: AccountUncheckedUpdateManyWithoutUserNestedInput
+    aiProviderKeys?: AIProviderKeyUncheckedUpdateManyWithoutUserNestedInput
     auditTargets?: AuditLogUncheckedUpdateManyWithoutTargetUserNestedInput
     adminActions?: AuditLogUncheckedUpdateManyWithoutUserNestedInput
     categories?: CategoryUncheckedUpdateManyWithoutOwnerNestedInput
@@ -43688,6 +45226,7 @@ export namespace Prisma {
     settings?: NullableJsonNullValueInput | InputJsonValue
     settingsVersion?: number
     accounts?: AccountCreateNestedManyWithoutUserInput
+    aiProviderKeys?: AIProviderKeyCreateNestedManyWithoutUserInput
     auditTargets?: AuditLogCreateNestedManyWithoutTargetUserInput
     adminActions?: AuditLogCreateNestedManyWithoutUserInput
     categories?: CategoryCreateNestedManyWithoutOwnerInput
@@ -43710,6 +45249,7 @@ export namespace Prisma {
     settings?: NullableJsonNullValueInput | InputJsonValue
     settingsVersion?: number
     accounts?: AccountUncheckedCreateNestedManyWithoutUserInput
+    aiProviderKeys?: AIProviderKeyUncheckedCreateNestedManyWithoutUserInput
     auditTargets?: AuditLogUncheckedCreateNestedManyWithoutTargetUserInput
     adminActions?: AuditLogUncheckedCreateNestedManyWithoutUserInput
     categories?: CategoryUncheckedCreateNestedManyWithoutOwnerInput
@@ -43748,6 +45288,7 @@ export namespace Prisma {
     settings?: NullableJsonNullValueInput | InputJsonValue
     settingsVersion?: IntFieldUpdateOperationsInput | number
     accounts?: AccountUpdateManyWithoutUserNestedInput
+    aiProviderKeys?: AIProviderKeyUpdateManyWithoutUserNestedInput
     auditTargets?: AuditLogUpdateManyWithoutTargetUserNestedInput
     adminActions?: AuditLogUpdateManyWithoutUserNestedInput
     categories?: CategoryUpdateManyWithoutOwnerNestedInput
@@ -43770,12 +45311,121 @@ export namespace Prisma {
     settings?: NullableJsonNullValueInput | InputJsonValue
     settingsVersion?: IntFieldUpdateOperationsInput | number
     accounts?: AccountUncheckedUpdateManyWithoutUserNestedInput
+    aiProviderKeys?: AIProviderKeyUncheckedUpdateManyWithoutUserNestedInput
     auditTargets?: AuditLogUncheckedUpdateManyWithoutTargetUserNestedInput
     adminActions?: AuditLogUncheckedUpdateManyWithoutUserNestedInput
     categories?: CategoryUncheckedUpdateManyWithoutOwnerNestedInput
     contentHistory?: ContentHistoryUncheckedUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUncheckedUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUncheckedUpdateManyWithoutUserNestedInput
+    tags?: TagUncheckedUpdateManyWithoutUserNestedInput
+    trashedContent?: TrashBinUncheckedUpdateManyWithoutDeletedByUserNestedInput
+    viewGrants?: ViewGrantUncheckedUpdateManyWithoutUserNestedInput
+  }
+
+  export type UserCreateWithoutAiProviderKeysInput = {
+    id?: string
+    username: string
+    passwordHash?: string | null
+    email: string
+    role?: $Enums.UserRole
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: number
+    accounts?: AccountCreateNestedManyWithoutUserInput
+    auditTargets?: AuditLogCreateNestedManyWithoutTargetUserInput
+    adminActions?: AuditLogCreateNestedManyWithoutUserInput
+    categories?: CategoryCreateNestedManyWithoutOwnerInput
+    contentHistory?: ContentHistoryCreateNestedManyWithoutUserInput
+    contentNodes?: ContentNodeCreateNestedManyWithoutOwnerInput
+    sessions?: SessionCreateNestedManyWithoutUserInput
+    storageConfigs?: StorageProviderConfigCreateNestedManyWithoutUserInput
+    tags?: TagCreateNestedManyWithoutUserInput
+    trashedContent?: TrashBinCreateNestedManyWithoutDeletedByUserInput
+    viewGrants?: ViewGrantCreateNestedManyWithoutUserInput
+  }
+
+  export type UserUncheckedCreateWithoutAiProviderKeysInput = {
+    id?: string
+    username: string
+    passwordHash?: string | null
+    email: string
+    role?: $Enums.UserRole
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: number
+    accounts?: AccountUncheckedCreateNestedManyWithoutUserInput
+    auditTargets?: AuditLogUncheckedCreateNestedManyWithoutTargetUserInput
+    adminActions?: AuditLogUncheckedCreateNestedManyWithoutUserInput
+    categories?: CategoryUncheckedCreateNestedManyWithoutOwnerInput
+    contentHistory?: ContentHistoryUncheckedCreateNestedManyWithoutUserInput
+    contentNodes?: ContentNodeUncheckedCreateNestedManyWithoutOwnerInput
+    sessions?: SessionUncheckedCreateNestedManyWithoutUserInput
+    storageConfigs?: StorageProviderConfigUncheckedCreateNestedManyWithoutUserInput
+    tags?: TagUncheckedCreateNestedManyWithoutUserInput
+    trashedContent?: TrashBinUncheckedCreateNestedManyWithoutDeletedByUserInput
+    viewGrants?: ViewGrantUncheckedCreateNestedManyWithoutUserInput
+  }
+
+  export type UserCreateOrConnectWithoutAiProviderKeysInput = {
+    where: UserWhereUniqueInput
+    create: XOR<UserCreateWithoutAiProviderKeysInput, UserUncheckedCreateWithoutAiProviderKeysInput>
+  }
+
+  export type UserUpsertWithoutAiProviderKeysInput = {
+    update: XOR<UserUpdateWithoutAiProviderKeysInput, UserUncheckedUpdateWithoutAiProviderKeysInput>
+    create: XOR<UserCreateWithoutAiProviderKeysInput, UserUncheckedCreateWithoutAiProviderKeysInput>
+    where?: UserWhereInput
+  }
+
+  export type UserUpdateToOneWithWhereWithoutAiProviderKeysInput = {
+    where?: UserWhereInput
+    data: XOR<UserUpdateWithoutAiProviderKeysInput, UserUncheckedUpdateWithoutAiProviderKeysInput>
+  }
+
+  export type UserUpdateWithoutAiProviderKeysInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    username?: StringFieldUpdateOperationsInput | string
+    passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
+    email?: StringFieldUpdateOperationsInput | string
+    role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: IntFieldUpdateOperationsInput | number
+    accounts?: AccountUpdateManyWithoutUserNestedInput
+    auditTargets?: AuditLogUpdateManyWithoutTargetUserNestedInput
+    adminActions?: AuditLogUpdateManyWithoutUserNestedInput
+    categories?: CategoryUpdateManyWithoutOwnerNestedInput
+    contentHistory?: ContentHistoryUpdateManyWithoutUserNestedInput
+    contentNodes?: ContentNodeUpdateManyWithoutOwnerNestedInput
+    sessions?: SessionUpdateManyWithoutUserNestedInput
+    storageConfigs?: StorageProviderConfigUpdateManyWithoutUserNestedInput
+    tags?: TagUpdateManyWithoutUserNestedInput
+    trashedContent?: TrashBinUpdateManyWithoutDeletedByUserNestedInput
+    viewGrants?: ViewGrantUpdateManyWithoutUserNestedInput
+  }
+
+  export type UserUncheckedUpdateWithoutAiProviderKeysInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    username?: StringFieldUpdateOperationsInput | string
+    passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
+    email?: StringFieldUpdateOperationsInput | string
+    role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: IntFieldUpdateOperationsInput | number
+    accounts?: AccountUncheckedUpdateManyWithoutUserNestedInput
+    auditTargets?: AuditLogUncheckedUpdateManyWithoutTargetUserNestedInput
+    adminActions?: AuditLogUncheckedUpdateManyWithoutUserNestedInput
+    categories?: CategoryUncheckedUpdateManyWithoutOwnerNestedInput
+    contentHistory?: ContentHistoryUncheckedUpdateManyWithoutUserNestedInput
+    contentNodes?: ContentNodeUncheckedUpdateManyWithoutOwnerNestedInput
+    sessions?: SessionUncheckedUpdateManyWithoutUserNestedInput
+    storageConfigs?: StorageProviderConfigUncheckedUpdateManyWithoutUserNestedInput
     tags?: TagUncheckedUpdateManyWithoutUserNestedInput
     trashedContent?: TrashBinUncheckedUpdateManyWithoutDeletedByUserNestedInput
     viewGrants?: ViewGrantUncheckedUpdateManyWithoutUserNestedInput
@@ -43808,6 +45458,38 @@ export namespace Prisma {
 
   export type AccountCreateManyUserInputEnvelope = {
     data: AccountCreateManyUserInput | AccountCreateManyUserInput[]
+    skipDuplicates?: boolean
+  }
+
+  export type AIProviderKeyCreateWithoutUserInput = {
+    id?: string
+    providerId: string
+    encryptedKey: string
+    label?: string
+    isActive?: boolean
+    lastUsedAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type AIProviderKeyUncheckedCreateWithoutUserInput = {
+    id?: string
+    providerId: string
+    encryptedKey: string
+    label?: string
+    isActive?: boolean
+    lastUsedAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type AIProviderKeyCreateOrConnectWithoutUserInput = {
+    where: AIProviderKeyWhereUniqueInput
+    create: XOR<AIProviderKeyCreateWithoutUserInput, AIProviderKeyUncheckedCreateWithoutUserInput>
+  }
+
+  export type AIProviderKeyCreateManyUserInputEnvelope = {
+    data: AIProviderKeyCreateManyUserInput | AIProviderKeyCreateManyUserInput[]
     skipDuplicates?: boolean
   }
 
@@ -44191,6 +45873,37 @@ export namespace Prisma {
     createdAt?: DateTimeFilter<"Account"> | Date | string
   }
 
+  export type AIProviderKeyUpsertWithWhereUniqueWithoutUserInput = {
+    where: AIProviderKeyWhereUniqueInput
+    update: XOR<AIProviderKeyUpdateWithoutUserInput, AIProviderKeyUncheckedUpdateWithoutUserInput>
+    create: XOR<AIProviderKeyCreateWithoutUserInput, AIProviderKeyUncheckedCreateWithoutUserInput>
+  }
+
+  export type AIProviderKeyUpdateWithWhereUniqueWithoutUserInput = {
+    where: AIProviderKeyWhereUniqueInput
+    data: XOR<AIProviderKeyUpdateWithoutUserInput, AIProviderKeyUncheckedUpdateWithoutUserInput>
+  }
+
+  export type AIProviderKeyUpdateManyWithWhereWithoutUserInput = {
+    where: AIProviderKeyScalarWhereInput
+    data: XOR<AIProviderKeyUpdateManyMutationInput, AIProviderKeyUncheckedUpdateManyWithoutUserInput>
+  }
+
+  export type AIProviderKeyScalarWhereInput = {
+    AND?: AIProviderKeyScalarWhereInput | AIProviderKeyScalarWhereInput[]
+    OR?: AIProviderKeyScalarWhereInput[]
+    NOT?: AIProviderKeyScalarWhereInput | AIProviderKeyScalarWhereInput[]
+    id?: UuidFilter<"AIProviderKey"> | string
+    userId?: UuidFilter<"AIProviderKey"> | string
+    providerId?: StringFilter<"AIProviderKey"> | string
+    encryptedKey?: StringFilter<"AIProviderKey"> | string
+    label?: StringFilter<"AIProviderKey"> | string
+    isActive?: BoolFilter<"AIProviderKey"> | boolean
+    lastUsedAt?: DateTimeNullableFilter<"AIProviderKey"> | Date | string | null
+    createdAt?: DateTimeFilter<"AIProviderKey"> | Date | string
+    updatedAt?: DateTimeFilter<"AIProviderKey"> | Date | string
+  }
+
   export type AuditLogUpsertWithWhereUniqueWithoutTargetUserInput = {
     where: AuditLogWhereUniqueInput
     update: XOR<AuditLogUpdateWithoutTargetUserInput, AuditLogUncheckedUpdateWithoutTargetUserInput>
@@ -44429,6 +46142,7 @@ export namespace Prisma {
     settings?: NullableJsonNullValueInput | InputJsonValue
     settingsVersion?: number
     accounts?: AccountCreateNestedManyWithoutUserInput
+    aiProviderKeys?: AIProviderKeyCreateNestedManyWithoutUserInput
     auditTargets?: AuditLogCreateNestedManyWithoutTargetUserInput
     adminActions?: AuditLogCreateNestedManyWithoutUserInput
     contentHistory?: ContentHistoryCreateNestedManyWithoutUserInput
@@ -44451,6 +46165,7 @@ export namespace Prisma {
     settings?: NullableJsonNullValueInput | InputJsonValue
     settingsVersion?: number
     accounts?: AccountUncheckedCreateNestedManyWithoutUserInput
+    aiProviderKeys?: AIProviderKeyUncheckedCreateNestedManyWithoutUserInput
     auditTargets?: AuditLogUncheckedCreateNestedManyWithoutTargetUserInput
     adminActions?: AuditLogUncheckedCreateNestedManyWithoutUserInput
     contentHistory?: ContentHistoryUncheckedCreateNestedManyWithoutUserInput
@@ -44575,6 +46290,7 @@ export namespace Prisma {
     settings?: NullableJsonNullValueInput | InputJsonValue
     settingsVersion?: IntFieldUpdateOperationsInput | number
     accounts?: AccountUpdateManyWithoutUserNestedInput
+    aiProviderKeys?: AIProviderKeyUpdateManyWithoutUserNestedInput
     auditTargets?: AuditLogUpdateManyWithoutTargetUserNestedInput
     adminActions?: AuditLogUpdateManyWithoutUserNestedInput
     contentHistory?: ContentHistoryUpdateManyWithoutUserNestedInput
@@ -44597,6 +46313,7 @@ export namespace Prisma {
     settings?: NullableJsonNullValueInput | InputJsonValue
     settingsVersion?: IntFieldUpdateOperationsInput | number
     accounts?: AccountUncheckedUpdateManyWithoutUserNestedInput
+    aiProviderKeys?: AIProviderKeyUncheckedUpdateManyWithoutUserNestedInput
     auditTargets?: AuditLogUncheckedUpdateManyWithoutTargetUserNestedInput
     adminActions?: AuditLogUncheckedUpdateManyWithoutUserNestedInput
     contentHistory?: ContentHistoryUncheckedUpdateManyWithoutUserNestedInput
@@ -44659,6 +46376,7 @@ export namespace Prisma {
     settings?: NullableJsonNullValueInput | InputJsonValue
     settingsVersion?: number
     accounts?: AccountCreateNestedManyWithoutUserInput
+    aiProviderKeys?: AIProviderKeyCreateNestedManyWithoutUserInput
     auditTargets?: AuditLogCreateNestedManyWithoutTargetUserInput
     adminActions?: AuditLogCreateNestedManyWithoutUserInput
     categories?: CategoryCreateNestedManyWithoutOwnerInput
@@ -44681,6 +46399,7 @@ export namespace Prisma {
     settings?: NullableJsonNullValueInput | InputJsonValue
     settingsVersion?: number
     accounts?: AccountUncheckedCreateNestedManyWithoutUserInput
+    aiProviderKeys?: AIProviderKeyUncheckedCreateNestedManyWithoutUserInput
     auditTargets?: AuditLogUncheckedCreateNestedManyWithoutTargetUserInput
     adminActions?: AuditLogUncheckedCreateNestedManyWithoutUserInput
     categories?: CategoryUncheckedCreateNestedManyWithoutOwnerInput
@@ -44735,6 +46454,7 @@ export namespace Prisma {
     settings?: NullableJsonNullValueInput | InputJsonValue
     settingsVersion?: IntFieldUpdateOperationsInput | number
     accounts?: AccountUpdateManyWithoutUserNestedInput
+    aiProviderKeys?: AIProviderKeyUpdateManyWithoutUserNestedInput
     auditTargets?: AuditLogUpdateManyWithoutTargetUserNestedInput
     adminActions?: AuditLogUpdateManyWithoutUserNestedInput
     categories?: CategoryUpdateManyWithoutOwnerNestedInput
@@ -44757,6 +46477,7 @@ export namespace Prisma {
     settings?: NullableJsonNullValueInput | InputJsonValue
     settingsVersion?: IntFieldUpdateOperationsInput | number
     accounts?: AccountUncheckedUpdateManyWithoutUserNestedInput
+    aiProviderKeys?: AIProviderKeyUncheckedUpdateManyWithoutUserNestedInput
     auditTargets?: AuditLogUncheckedUpdateManyWithoutTargetUserNestedInput
     adminActions?: AuditLogUncheckedUpdateManyWithoutUserNestedInput
     categories?: CategoryUncheckedUpdateManyWithoutOwnerNestedInput
@@ -44860,6 +46581,7 @@ export namespace Prisma {
     settings?: NullableJsonNullValueInput | InputJsonValue
     settingsVersion?: number
     accounts?: AccountCreateNestedManyWithoutUserInput
+    aiProviderKeys?: AIProviderKeyCreateNestedManyWithoutUserInput
     auditTargets?: AuditLogCreateNestedManyWithoutTargetUserInput
     adminActions?: AuditLogCreateNestedManyWithoutUserInput
     categories?: CategoryCreateNestedManyWithoutOwnerInput
@@ -44882,6 +46604,7 @@ export namespace Prisma {
     settings?: NullableJsonNullValueInput | InputJsonValue
     settingsVersion?: number
     accounts?: AccountUncheckedCreateNestedManyWithoutUserInput
+    aiProviderKeys?: AIProviderKeyUncheckedCreateNestedManyWithoutUserInput
     auditTargets?: AuditLogUncheckedCreateNestedManyWithoutTargetUserInput
     adminActions?: AuditLogUncheckedCreateNestedManyWithoutUserInput
     categories?: CategoryUncheckedCreateNestedManyWithoutOwnerInput
@@ -45007,6 +46730,7 @@ export namespace Prisma {
     settings?: NullableJsonNullValueInput | InputJsonValue
     settingsVersion?: IntFieldUpdateOperationsInput | number
     accounts?: AccountUpdateManyWithoutUserNestedInput
+    aiProviderKeys?: AIProviderKeyUpdateManyWithoutUserNestedInput
     auditTargets?: AuditLogUpdateManyWithoutTargetUserNestedInput
     adminActions?: AuditLogUpdateManyWithoutUserNestedInput
     categories?: CategoryUpdateManyWithoutOwnerNestedInput
@@ -45029,6 +46753,7 @@ export namespace Prisma {
     settings?: NullableJsonNullValueInput | InputJsonValue
     settingsVersion?: IntFieldUpdateOperationsInput | number
     accounts?: AccountUncheckedUpdateManyWithoutUserNestedInput
+    aiProviderKeys?: AIProviderKeyUncheckedUpdateManyWithoutUserNestedInput
     auditTargets?: AuditLogUncheckedUpdateManyWithoutTargetUserNestedInput
     adminActions?: AuditLogUncheckedUpdateManyWithoutUserNestedInput
     categories?: CategoryUncheckedUpdateManyWithoutOwnerNestedInput
@@ -45051,6 +46776,7 @@ export namespace Prisma {
     settings?: NullableJsonNullValueInput | InputJsonValue
     settingsVersion?: number
     accounts?: AccountCreateNestedManyWithoutUserInput
+    aiProviderKeys?: AIProviderKeyCreateNestedManyWithoutUserInput
     auditTargets?: AuditLogCreateNestedManyWithoutTargetUserInput
     adminActions?: AuditLogCreateNestedManyWithoutUserInput
     categories?: CategoryCreateNestedManyWithoutOwnerInput
@@ -45073,6 +46799,7 @@ export namespace Prisma {
     settings?: NullableJsonNullValueInput | InputJsonValue
     settingsVersion?: number
     accounts?: AccountUncheckedCreateNestedManyWithoutUserInput
+    aiProviderKeys?: AIProviderKeyUncheckedCreateNestedManyWithoutUserInput
     auditTargets?: AuditLogUncheckedCreateNestedManyWithoutTargetUserInput
     adminActions?: AuditLogUncheckedCreateNestedManyWithoutUserInput
     categories?: CategoryUncheckedCreateNestedManyWithoutOwnerInput
@@ -45111,6 +46838,7 @@ export namespace Prisma {
     settings?: NullableJsonNullValueInput | InputJsonValue
     settingsVersion?: IntFieldUpdateOperationsInput | number
     accounts?: AccountUpdateManyWithoutUserNestedInput
+    aiProviderKeys?: AIProviderKeyUpdateManyWithoutUserNestedInput
     auditTargets?: AuditLogUpdateManyWithoutTargetUserNestedInput
     adminActions?: AuditLogUpdateManyWithoutUserNestedInput
     categories?: CategoryUpdateManyWithoutOwnerNestedInput
@@ -45133,6 +46861,7 @@ export namespace Prisma {
     settings?: NullableJsonNullValueInput | InputJsonValue
     settingsVersion?: IntFieldUpdateOperationsInput | number
     accounts?: AccountUncheckedUpdateManyWithoutUserNestedInput
+    aiProviderKeys?: AIProviderKeyUncheckedUpdateManyWithoutUserNestedInput
     auditTargets?: AuditLogUncheckedUpdateManyWithoutTargetUserNestedInput
     adminActions?: AuditLogUncheckedUpdateManyWithoutUserNestedInput
     categories?: CategoryUncheckedUpdateManyWithoutOwnerNestedInput
@@ -45154,6 +46883,7 @@ export namespace Prisma {
     updatedAt?: Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
     settingsVersion?: number
+    aiProviderKeys?: AIProviderKeyCreateNestedManyWithoutUserInput
     auditTargets?: AuditLogCreateNestedManyWithoutTargetUserInput
     adminActions?: AuditLogCreateNestedManyWithoutUserInput
     categories?: CategoryCreateNestedManyWithoutOwnerInput
@@ -45176,6 +46906,7 @@ export namespace Prisma {
     updatedAt?: Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
     settingsVersion?: number
+    aiProviderKeys?: AIProviderKeyUncheckedCreateNestedManyWithoutUserInput
     auditTargets?: AuditLogUncheckedCreateNestedManyWithoutTargetUserInput
     adminActions?: AuditLogUncheckedCreateNestedManyWithoutUserInput
     categories?: CategoryUncheckedCreateNestedManyWithoutOwnerInput
@@ -45214,6 +46945,7 @@ export namespace Prisma {
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
     settingsVersion?: IntFieldUpdateOperationsInput | number
+    aiProviderKeys?: AIProviderKeyUpdateManyWithoutUserNestedInput
     auditTargets?: AuditLogUpdateManyWithoutTargetUserNestedInput
     adminActions?: AuditLogUpdateManyWithoutUserNestedInput
     categories?: CategoryUpdateManyWithoutOwnerNestedInput
@@ -45236,6 +46968,7 @@ export namespace Prisma {
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
     settingsVersion?: IntFieldUpdateOperationsInput | number
+    aiProviderKeys?: AIProviderKeyUncheckedUpdateManyWithoutUserNestedInput
     auditTargets?: AuditLogUncheckedUpdateManyWithoutTargetUserNestedInput
     adminActions?: AuditLogUncheckedUpdateManyWithoutUserNestedInput
     categories?: CategoryUncheckedUpdateManyWithoutOwnerNestedInput
@@ -45340,6 +47073,7 @@ export namespace Prisma {
     settings?: NullableJsonNullValueInput | InputJsonValue
     settingsVersion?: number
     accounts?: AccountCreateNestedManyWithoutUserInput
+    aiProviderKeys?: AIProviderKeyCreateNestedManyWithoutUserInput
     adminActions?: AuditLogCreateNestedManyWithoutUserInput
     categories?: CategoryCreateNestedManyWithoutOwnerInput
     contentHistory?: ContentHistoryCreateNestedManyWithoutUserInput
@@ -45362,6 +47096,7 @@ export namespace Prisma {
     settings?: NullableJsonNullValueInput | InputJsonValue
     settingsVersion?: number
     accounts?: AccountUncheckedCreateNestedManyWithoutUserInput
+    aiProviderKeys?: AIProviderKeyUncheckedCreateNestedManyWithoutUserInput
     adminActions?: AuditLogUncheckedCreateNestedManyWithoutUserInput
     categories?: CategoryUncheckedCreateNestedManyWithoutOwnerInput
     contentHistory?: ContentHistoryUncheckedCreateNestedManyWithoutUserInput
@@ -45389,6 +47124,7 @@ export namespace Prisma {
     settings?: NullableJsonNullValueInput | InputJsonValue
     settingsVersion?: number
     accounts?: AccountCreateNestedManyWithoutUserInput
+    aiProviderKeys?: AIProviderKeyCreateNestedManyWithoutUserInput
     auditTargets?: AuditLogCreateNestedManyWithoutTargetUserInput
     categories?: CategoryCreateNestedManyWithoutOwnerInput
     contentHistory?: ContentHistoryCreateNestedManyWithoutUserInput
@@ -45411,6 +47147,7 @@ export namespace Prisma {
     settings?: NullableJsonNullValueInput | InputJsonValue
     settingsVersion?: number
     accounts?: AccountUncheckedCreateNestedManyWithoutUserInput
+    aiProviderKeys?: AIProviderKeyUncheckedCreateNestedManyWithoutUserInput
     auditTargets?: AuditLogUncheckedCreateNestedManyWithoutTargetUserInput
     categories?: CategoryUncheckedCreateNestedManyWithoutOwnerInput
     contentHistory?: ContentHistoryUncheckedCreateNestedManyWithoutUserInput
@@ -45536,6 +47273,7 @@ export namespace Prisma {
     settings?: NullableJsonNullValueInput | InputJsonValue
     settingsVersion?: IntFieldUpdateOperationsInput | number
     accounts?: AccountUpdateManyWithoutUserNestedInput
+    aiProviderKeys?: AIProviderKeyUpdateManyWithoutUserNestedInput
     adminActions?: AuditLogUpdateManyWithoutUserNestedInput
     categories?: CategoryUpdateManyWithoutOwnerNestedInput
     contentHistory?: ContentHistoryUpdateManyWithoutUserNestedInput
@@ -45558,6 +47296,7 @@ export namespace Prisma {
     settings?: NullableJsonNullValueInput | InputJsonValue
     settingsVersion?: IntFieldUpdateOperationsInput | number
     accounts?: AccountUncheckedUpdateManyWithoutUserNestedInput
+    aiProviderKeys?: AIProviderKeyUncheckedUpdateManyWithoutUserNestedInput
     adminActions?: AuditLogUncheckedUpdateManyWithoutUserNestedInput
     categories?: CategoryUncheckedUpdateManyWithoutOwnerNestedInput
     contentHistory?: ContentHistoryUncheckedUpdateManyWithoutUserNestedInput
@@ -45591,6 +47330,7 @@ export namespace Prisma {
     settings?: NullableJsonNullValueInput | InputJsonValue
     settingsVersion?: IntFieldUpdateOperationsInput | number
     accounts?: AccountUpdateManyWithoutUserNestedInput
+    aiProviderKeys?: AIProviderKeyUpdateManyWithoutUserNestedInput
     auditTargets?: AuditLogUpdateManyWithoutTargetUserNestedInput
     categories?: CategoryUpdateManyWithoutOwnerNestedInput
     contentHistory?: ContentHistoryUpdateManyWithoutUserNestedInput
@@ -45613,6 +47353,7 @@ export namespace Prisma {
     settings?: NullableJsonNullValueInput | InputJsonValue
     settingsVersion?: IntFieldUpdateOperationsInput | number
     accounts?: AccountUncheckedUpdateManyWithoutUserNestedInput
+    aiProviderKeys?: AIProviderKeyUncheckedUpdateManyWithoutUserNestedInput
     auditTargets?: AuditLogUncheckedUpdateManyWithoutTargetUserNestedInput
     categories?: CategoryUncheckedUpdateManyWithoutOwnerNestedInput
     contentHistory?: ContentHistoryUncheckedUpdateManyWithoutUserNestedInput
@@ -47130,6 +48871,17 @@ export namespace Prisma {
     createdAt?: Date | string
   }
 
+  export type AIProviderKeyCreateManyUserInput = {
+    id?: string
+    providerId: string
+    encryptedKey: string
+    label?: string
+    isActive?: boolean
+    lastUsedAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
   export type AuditLogCreateManyTargetUserInput = {
     id?: string
     userId: string
@@ -47261,6 +49013,39 @@ export namespace Prisma {
     accessToken?: NullableStringFieldUpdateOperationsInput | string | null
     expiresAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type AIProviderKeyUpdateWithoutUserInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    providerId?: StringFieldUpdateOperationsInput | string
+    encryptedKey?: StringFieldUpdateOperationsInput | string
+    label?: StringFieldUpdateOperationsInput | string
+    isActive?: BoolFieldUpdateOperationsInput | boolean
+    lastUsedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type AIProviderKeyUncheckedUpdateWithoutUserInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    providerId?: StringFieldUpdateOperationsInput | string
+    encryptedKey?: StringFieldUpdateOperationsInput | string
+    label?: StringFieldUpdateOperationsInput | string
+    isActive?: BoolFieldUpdateOperationsInput | boolean
+    lastUsedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type AIProviderKeyUncheckedUpdateManyWithoutUserInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    providerId?: StringFieldUpdateOperationsInput | string
+    encryptedKey?: StringFieldUpdateOperationsInput | string
+    label?: StringFieldUpdateOperationsInput | string
+    isActive?: BoolFieldUpdateOperationsInput | boolean
+    lastUsedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
   export type AuditLogUpdateWithoutTargetUserInput = {

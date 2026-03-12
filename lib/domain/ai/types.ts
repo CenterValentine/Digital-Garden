@@ -6,7 +6,13 @@
  */
 
 /** Provider identifiers supported by DG */
-export type AIProviderId = "anthropic" | "openai";
+export type AIProviderId =
+  | "anthropic"
+  | "openai"
+  | "google"
+  | "xai"
+  | "mistral"
+  | "groq";
 
 /** Model identifiers — canonical DG model IDs mapped to provider strings in registry */
 export type AIModelId =
@@ -16,7 +22,15 @@ export type AIModelId =
   | "claude-haiku-3-5"
   | "gpt-4o"
   | "gpt-4o-mini"
-  | "gpt-4";
+  | "gpt-4"
+  | "gemini-2.5-pro"
+  | "gemini-2.0-flash"
+  | "grok-3"
+  | "grok-3-mini"
+  | "mistral-large"
+  | "codestral"
+  | "mixtral-8x7b"
+  | "llama-3.3-70b";
 
 /** Configuration passed to resolveChatModel() */
 export interface ProviderConfig {

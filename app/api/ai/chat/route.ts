@@ -25,6 +25,7 @@ import {
   defaultSettingsMiddleware,
 } from "@/lib/domain/ai/middleware";
 import { createBaseTools } from "@/lib/domain/ai/tools";
+import { getProviderKey } from "@/lib/domain/ai/keys";
 import { prisma } from "@/lib/database/client";
 
 export async function POST(request: Request) {
@@ -78,11 +79,18 @@ export async function POST(request: Request) {
       );
     }
 
+    // Resolve API key: request body > stored BYOK key > env var (default)
+    let apiKey: string | undefined = body.apiKey;
+    if (!apiKey) {
+      const storedKey = await getProviderKey(session.user.id, providerId);
+      if (storedKey) apiKey = storedKey;
+    }
+
     // Resolve model from provider registry
     const model = await resolveChatModel({
       providerId,
       modelId,
-      apiKey: body.apiKey,
+      apiKey,
     });
 
     // Apply middleware stack

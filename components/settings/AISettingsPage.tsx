@@ -18,9 +18,10 @@ import { getSurfaceStyles } from "@/lib/design/system";
 import { PROVIDER_CATALOG, getModelMeta } from "@/lib/domain/ai";
 import type { AIProviderId } from "@/lib/domain/ai";
 import { Button } from "@/components/ui/glass/button";
-import { Check, AlertCircle, Wrench } from "lucide-react";
+import { Check, AlertCircle, Wrench, Key } from "lucide-react";
 import { toast } from "sonner";
 import { BASE_TOOL_IDS, BASE_TOOL_METADATA } from "@/lib/domain/ai/tools/metadata";
+import { AIKeyManager } from "@/components/settings/AIKeyManager";
 
 /** Shape of ai settings as stored in User.settings.ai */
 interface AISettings {
@@ -614,6 +615,22 @@ export default function AISettingsPage() {
             </div>
           )}
         </div>
+      </div>
+
+      {/* ─── Section: API Keys (BYOK) ─── */}
+      <div
+        className="border border-white/10 rounded-lg p-6"
+        style={{ background: glass0.background, backdropFilter: glass0.backdropFilter }}
+      >
+        <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+          <Key className="h-5 w-5 text-gray-400" />
+          API Keys
+        </h3>
+        <p className="text-sm text-gray-400 mb-4">
+          Bring your own API keys to use your provider accounts directly.
+          Keys are encrypted at rest and never leave the server.
+        </p>
+        <AIKeyManager />
       </div>
 
       {/* ─── Section 4: Usage (read-only) ─── */}

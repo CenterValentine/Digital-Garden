@@ -83,7 +83,9 @@ const aiSettingsSchema = z
     // Master switch
     enabled: z.boolean().optional(),
     // Provider & model selection
-    providerId: z.enum(["anthropic", "openai"]).optional(),
+    providerId: z
+      .enum(["anthropic", "openai", "google", "xai", "mistral", "groq"])
+      .optional(),
     modelId: z.string().optional(),
     // Legacy field (kept for backward compat, prefer providerId + modelId)
     model: z
