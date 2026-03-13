@@ -36,11 +36,41 @@ interface ChatViewerProps {
 function toUIMessages(stored: StoredChatMessage[]): UIMessage[] {
   return stored
     .filter((m) => m.role === "user" || m.role === "assistant")
-    .map((m) => ({
-      id: m.id || crypto.randomUUID(),
-      role: m.role as "user" | "assistant",
-      parts: [{ type: "text" as const, text: m.content }],
-    }));
+    .map((m) => {
+      const parts: UIMessage["parts"] = [
+        { type: "text" as const, text: m.content },
+      ];
+
+      // Reconstruct image payload tool parts from stored data.
+      // These are saved as lightweight __imagePayload objects in `parts`.
+      if (m.parts && Array.isArray(m.parts)) {
+        for (const stored of m.parts) {
+          if (
+            stored &&
+            typeof stored === "object" &&
+            (stored as Record<string, unknown>).__imagePayload
+          ) {
+            // Reconstruct a synthetic tool part that ChatMessage can detect
+            // via its structural typing check ("toolCallId" in part && "toolName" in part)
+            const syntheticToolPart = {
+              type: "tool-generate_image" as const,
+              toolCallId: `restored-${(stored as Record<string, unknown>).contentId}`,
+              toolName: "generate_image",
+              state: "output-available",
+              input: {},
+              output: JSON.stringify(stored),
+            };
+            parts.push(syntheticToolPart as unknown as UIMessage["parts"][number]);
+          }
+        }
+      }
+
+      return {
+        id: m.id || crypto.randomUUID(),
+        role: m.role as "user" | "assistant",
+        parts,
+      };
+    });
 }
 
 export function ChatViewer({
@@ -182,15 +212,44 @@ export function ChatViewer({
   const persistMessages = useCallback(async () => {
     if (messages.length === 0) return;
 
-    const storedMessages: StoredChatMessage[] = messages.map((m) => ({
-      id: m.id,
-      role: m.role,
-      content: m.parts
+    const storedMessages: StoredChatMessage[] = messages.map((m) => {
+      // Extract text content
+      const content = m.parts
         .filter((p) => p.type === "text")
         .map((p) => (p as { text: string }).text)
-        .join(""),
-      createdAt: new Date().toISOString(),
-    }));
+        .join("");
+
+      // Preserve tool parts with image payloads so image cards survive refresh.
+      // We save a lightweight representation — just enough to reconstruct the card.
+      const imagePayloads: unknown[] = [];
+      for (const part of m.parts) {
+        if (
+          "toolCallId" in part &&
+          "toolName" in part &&
+          (part as { state: string }).state === "output-available" &&
+          "output" in part
+        ) {
+          const output = (part as { output: unknown }).output;
+          const str = typeof output === "string" ? output : JSON.stringify(output);
+          if (str.includes('"__imagePayload"')) {
+            try {
+              const parsed = typeof output === "string" ? JSON.parse(output) : output;
+              if (parsed?.__imagePayload) {
+                imagePayloads.push(parsed);
+              }
+            } catch { /* skip */ }
+          }
+        }
+      }
+
+      return {
+        id: m.id,
+        role: m.role,
+        content,
+        createdAt: new Date().toISOString(),
+        ...(imagePayloads.length > 0 ? { parts: imagePayloads } : {}),
+      };
+    });
 
     try {
       const res = await fetch(`/api/content/content/${contentId}`, {

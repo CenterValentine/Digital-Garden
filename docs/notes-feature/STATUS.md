@@ -1,7 +1,7 @@
 ---
-last_updated: 2026-03-12
+last_updated: 2026-03-13
 current_epoch: 10
-current_sprint: 41
+current_sprint: 42
 sprint_status: complete
 ---
 
@@ -44,9 +44,21 @@ before planning and executing. There may be additions or modifications.
 - Sprint 39: AI Text-Editing Tools — Client-Side Architecture (complete)
 - Sprint 40: AI Edit Highlighting + AI Image Insert (complete)
 - Sprint 41: Chat Content Outlines (complete)
-- Sprint 42: AI Image Generation (next)
+- Sprint 42: AI Image Generation (complete)
 
 ## Recent Completions (Last 30 Days)
+
+**Mar 13, 2026**: Sprint 42 AI Image Generation — COMPLETE
+- 8-provider image generation system: OpenAI (DALL·E 3, GPT Image 1), Google (Imagen 3), DeepAI, fal.ai (FLUX.1 Dev/Schnell), Together AI (FLUX/SDXL), Fireworks AI, RunwayML (Gen-3), Artbreeder
+- `generate_image` chat tool: LLM generates images from text prompts, auto-uploads to storage, creates referenced FilePayload
+- GeneratedImageCard in ChatMessage: rendered image with AI badge, provider info, prompt display
+- "Insert into document" button: dispatches `insert-ai-image` CustomEvent, MarkdownEditor inserts at cursor
+- Drag-and-drop: draggable images from chat to TipTap editor via `application/x-dg-ai-image` data transfer
+- Image generation API route: `/api/ai/image` — standalone endpoint for direct generation
+- Provider catalog with model metadata (sizes, quality/style support)
+- Works in both ChatPanel (side chat) and ChatViewer (content node chat)
+- 10 files changed, 5 new files
+- Build gate passed
 
 **Mar 12, 2026**: Sprint 41 Chat Content Outlines — COMPLETE
 - Chat outline extractor: parses UIMessage[] into navigable entries (user prompts, assistant summaries, tool calls)
@@ -170,9 +182,6 @@ before planning and executing. There may be additions or modifications.
 
 ## Up Next
 
-### Sprint 42: AI Image Generation
-Generate images via AI, insert into chat or notes as referenced content.
-
 ### Epoch 11: Editor Enhancements (Remaining Epoch 9)
 URL/OG embeds, YouTube, drag/reorder, templates, snapshots, context menu.
 
@@ -214,13 +223,13 @@ URL/OG embeds, YouTube, drag/reorder, templates, snapshots, context menu.
 - **Epoch 7** (AI Integration): ✅ Sprints 33-34 complete; Sprints 35-36 redirected to Epoch 8
 - **Epoch 8** (Editor Stabilization): ✅ Complete — Sprints 35-36 complete
 - **Epoch 9** (Editor Enhancements): Sprint 37 complete; remaining sprints deferred to Epoch 11
-- **Epoch 10** (AI TipTap): Sprints 38-41 complete, Sprint 42 next
+- **Epoch 10** (AI TipTap): ✅ Complete — Sprints 38-42 complete
 
 ## Roadmap
 
-### Epoch 10: AI TipTap (Active — Sprints 38-42)
+### Epoch 10: AI TipTap (✅ Complete — Sprints 38-42)
 **Theme**: AI providers, BYOK, agent editing tools, edit highlighting, chat outlines, image generation
-**Status**: 4/5 sprints complete (38-41 ✅, 42 remaining)
+**Status**: 5/5 sprints complete ✅
 
 ### Epoch 11: Editor Enhancements (Planned — Remaining Epoch 9)
 **Theme**: URL/OG embeds, YouTube, drag/reorder, templates, snapshots, context menu
@@ -233,7 +242,7 @@ URL/OG embeds, YouTube, drag/reorder, templates, snapshots, context menu.
 
 ## Quick Links
 
-- [Current Sprint](work-tracking/CURRENT-SPRINT.md) - Sprint 41 details
+- [Current Sprint](work-tracking/CURRENT-SPRINT.md) - Sprint 42 details
 - [Backlog](work-tracking/BACKLOG.md) - Prioritized work items
 - [Epoch Plans](work-tracking/epochs/) - Epoch 8, 9, 10, future stubs
 - [TipTap Editor Rules](guides/editor/TIPTAP-EDITOR-RULES.md) - Editor behavior rules

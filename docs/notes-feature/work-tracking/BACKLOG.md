@@ -116,12 +116,15 @@ The following sprints were originally 38-42 in Epoch 9 but are deferred to Epoch
 - [x] Click-to-scroll with gold flash animation via `scroll-to-chat-message` CustomEvent
 - [x] Expanded mode: dot-and-indent sub-items for headers, lists, images in assistant responses
 
-### Sprint 42: AI Image Generation
-- [ ] AI image generation in chat + side panel
-- [ ] Generated images → REFERENCED FilePayload
-- [ ] Referenced content follows parent (Sprint 37 infra)
-- [ ] Drag AI content to file tree (new copy) or TipTap note (referenced)
-- [ ] Clarify behavior/actions when an provider does not support image generation when a user requests one from the agent.
+### Sprint 42: AI Image Generation ✅
+- [x] 8-provider image generation (OpenAI DALL·E 3/GPT Image 1, Google Imagen 3, DeepAI, fal.ai FLUX, Together AI, Fireworks, RunwayML, Artbreeder)
+- [x] `generate_image` chat tool: LLM calls providers, auto-uploads to storage, creates referenced FilePayload
+- [x] GeneratedImageCard component: image preview, AI badge, prompt display, provider info
+- [x] "Insert into document" button: `insert-ai-image` CustomEvent → MarkdownEditor at cursor
+- [x] Drag-and-drop: chat images draggable to TipTap editor via `application/x-dg-ai-image`
+- [x] `/api/ai/image` standalone endpoint for direct generation + storage upload
+- [x] Image provider catalog with model metadata (sizes, quality/style support)
+- [x] Works in both ChatPanel and ChatViewer
 
 ---
 

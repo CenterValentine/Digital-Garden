@@ -138,18 +138,48 @@ This epoch was injected after Sprint 37, taking sprint slots 38-42 (originally n
 
 ---
 
-## Sprint 42: AI Image Generation
+## Sprint 42: AI Image Generation ✅ COMPLETE
 
-- [ ] AI image generation inside chat content nodes and side panel chats
-- [ ] Generated images → REFERENCED FilePayload content (visible in parent folder)
-- [ ] Referenced content follows parent on move (Sprint 37 infrastructure)
-- [ ] Drag AI content from chat → file tree (new copy, non-referenced) or → TipTap note (as referenced content)
+**Completed**: Mar 13, 2026
+
+- [x] 8-provider image generation system (OpenAI, Google, DeepAI, fal.ai, Together AI, Fireworks, RunwayML, Artbreeder)
+- [x] `generate_image` chat tool: LLM generates images, auto-uploads to storage, creates referenced FilePayload
+- [x] GeneratedImageCard in ChatMessage: rendered image with AI badge, provider info, prompt display
+- [x] "Insert into document" button: `insert-ai-image` CustomEvent → MarkdownEditor at cursor position
+- [x] Drag-and-drop: draggable chat images → TipTap editor via `application/x-dg-ai-image` data transfer
+- [x] `/api/ai/image` standalone API endpoint
+- [x] Image provider catalog with model metadata (sizes, quality/style support)
+- [x] Works in both ChatPanel and ChatViewer
 
 ### Key Files
-- `lib/domain/ai/tools/registry.ts` — image generation tool
-- `components/content/ai/ChatMessage.tsx` — image rendering in chat
-- `app/api/content/content/move/route.ts` — referenced content follow (Sprint 37)
+- `lib/domain/ai/image/types.ts` — ImageProviderId, ImageModelId, ImageGenRequest/Response (new)
+- `lib/domain/ai/image/catalog.ts` — Image provider catalog with model metadata (new)
+- `lib/domain/ai/image/generate.ts` — Multi-provider image generation dispatch (new)
+- `lib/domain/ai/image/index.ts` — Barrel export (new)
+- `app/api/ai/image/route.ts` — Image generation API route (new)
+- `lib/domain/ai/tools/registry.ts` — Added `generate_image` tool
+- `lib/domain/ai/tools/metadata.ts` — Added tool metadata
+- `components/content/ai/ChatMessage.tsx` — GeneratedImageCard component
+- `components/content/editor/MarkdownEditor.tsx` — `insert-ai-image` listener + AI image drop handler
+- `lib/domain/ai/index.ts` — Extended barrel with image exports
+- `lib/domain/ai/providers/types.ts` — Added `image-generation` capability
+- `app/api/ai/chat/route.ts` — Updated system prompt + step count
 
 ---
 
-**Last Updated**: Mar 12, 2026
+## Epoch 10 Summary
+
+**Duration**: Sprints 38-42 (5 sprints)
+**Status**: ✅ Complete
+**Theme**: AI-powered document editing, provider expansion, rich chat rendering
+
+### Deliverables
+- **Sprint 38**: 6 AI providers, BYOK key management, rich bot responses (markdown, code blocks, mentions)
+- **Sprint 39**: 8 agentic editor tools, client-side editing architecture, edit orchestrator with 4-phase animation
+- **Sprint 40**: AI edit highlighting (indigo tint marks), `insert_image` tool, AI badge on image bubble menu
+- **Sprint 41**: Chat content outlines (compact/expanded), real-time sync, role-based icons, click-to-scroll
+- **Sprint 42**: 8-provider AI image generation, `generate_image` tool, insert-to-document, drag-and-drop
+
+---
+
+**Last Updated**: Mar 13, 2026

@@ -29,7 +29,25 @@ export type {
   CostTier,
 } from "./providers/types";
 
-// Note: resolveChatModel and middleware are server-only.
+// Image generation (client-safe catalog + types)
+export {
+  IMAGE_PROVIDER_CATALOG,
+  getImageProviderMeta,
+  getImageModelMeta,
+} from "./image/catalog";
+
+export type {
+  ImageProviderId,
+  ImageModelId,
+  ImageSize,
+  ImageGenRequest,
+  ImageGenResult,
+  ImageModelMeta,
+  ImageProviderMeta,
+} from "./image/types";
+
+// Note: resolveChatModel, middleware, and generateImage are server-only.
 // Import directly from their modules in API routes:
 //   import { resolveChatModel } from "@/lib/domain/ai/providers/registry";
 //   import { applyMiddleware, defaultSettingsMiddleware } from "@/lib/domain/ai/middleware";
+//   import { generateImage } from "@/lib/domain/ai/image/generate";

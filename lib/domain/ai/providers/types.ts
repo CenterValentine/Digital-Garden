@@ -7,7 +7,7 @@
 import type { AIProviderId, AIModelId } from "../types";
 
 /** Capabilities a model may support */
-export type ModelCapability = "text" | "vision" | "tools" | "streaming";
+export type ModelCapability = "text" | "vision" | "tools" | "streaming" | "image-generation";
 
 /** Cost tier for display in settings */
 export type CostTier = "low" | "medium" | "high";

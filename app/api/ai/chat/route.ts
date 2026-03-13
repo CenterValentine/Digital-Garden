@@ -148,10 +148,20 @@ export async function POST(request: Request) {
       // Allow up to 8 model turns for multi-step tool workflows.
       // Editor tools may need: read → plan → diff → diff → diff → finish + final text.
       // Base chat tools typically need 2-3 steps.
-      stopWhen: stepCountIs(contentId ? 8 : 3),
-      system: `You are a helpful AI assistant in Digital Garden, a knowledge management application. Help the user with their notes, writing, and research. Be concise and helpful.${
+      stopWhen: stepCountIs(contentId ? 8 : 5),
+      system: `You are a helpful AI assistant in Digital Garden, a knowledge management application. Help the user with their notes, writing, and research. Be concise and helpful.
+
+You have a generate_image tool that creates AI images from text prompts. When asked to generate, create, or draw an image, use this tool. Available providers: DALL·E 3, GPT Image 1, Imagen 3, FLUX (fal.ai/Together/Fireworks), DeepAI, RunwayML, Artbreeder. Default to DALL·E 3 unless specified. Write detailed prompts for best results.${
         contentId
-          ? `\n\nThe user is currently viewing a document (ID: ${contentId}). You have editor tools available to read and edit this document. When asked to edit, always: 1) Read the document first with read_first_chunk, 2) Plan your approach if the edit is complex, 3) Apply changes with apply_diff for targeted edits or replace_document for rewrites, 4) Call finish_with_summary when done.`
+          ? `\n\nThe user is currently viewing a document (ID: ${contentId}). You have editor tools available to read and edit this document.
+
+IMPORTANT EDITING RULES:
+- When the document has existing content, ALWAYS use apply_diff to make targeted changes or APPEND new content. NEVER use replace_document unless the user explicitly asks you overwrite the entire document.
+- To add content (descriptions, text, images), APPEND it after the existing content using apply_diff. Do NOT overwrite what is already there.
+- When asked to edit, always: 1) Read the document first with read_first_chunk, 2) Plan your approach if the edit is complex, 3) Apply changes with apply_diff for targeted edits, 4) Call finish_with_summary when done.
+- Only use replace_document for blank/empty documents or when the user explicitly requests a full rewrite.
+
+When you generate an image, the user can insert it into the document at their cursor position.`
           : ""
       }${mentionedContext}`,
     });

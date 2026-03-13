@@ -273,13 +273,36 @@ export function ChatPanel() {
       // Convert UIMessages to StoredChatMessage format
       const storedMessages = messages
         .filter((m) => m.role === "user" || m.role === "assistant")
-        .map((m) => ({
-          id: m.id,
-          role: m.role,
-          content: getMessageText(m),
-          createdAt: new Date().toISOString(),
-        }))
-        .filter((m) => m.content); // Skip empty messages (tool-only turns)
+        .map((m) => {
+          // Preserve image payloads so they survive when saved to a chat node
+          const imagePayloads: unknown[] = [];
+          for (const part of m.parts) {
+            if (
+              "toolCallId" in part &&
+              "toolName" in part &&
+              (part as { state: string }).state === "output-available" &&
+              "output" in part
+            ) {
+              const output = (part as { output: unknown }).output;
+              const str = typeof output === "string" ? output : JSON.stringify(output);
+              if (str.includes('"__imagePayload"')) {
+                try {
+                  const parsed = typeof output === "string" ? JSON.parse(output) : output;
+                  if (parsed?.__imagePayload) imagePayloads.push(parsed);
+                } catch { /* skip */ }
+              }
+            }
+          }
+
+          return {
+            id: m.id,
+            role: m.role,
+            content: getMessageText(m),
+            createdAt: new Date().toISOString(),
+            ...(imagePayloads.length > 0 ? { parts: imagePayloads } : {}),
+          };
+        })
+        .filter((m) => m.content || (m.parts && (m.parts as unknown[]).length > 0)); // Keep messages with content or image payloads
 
       const res = await fetch("/api/content/content", {
         method: "POST",

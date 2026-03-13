@@ -367,6 +367,29 @@ export function MarkdownEditor({
     return () => window.removeEventListener("editor-image-upload", handleImageUpload);
   }, []);
 
+  // Sprint 42: Listen for AI-generated image insertion at cursor position
+  useEffect(() => {
+    if (!editor) return;
+
+    const handleInsertAiImage = (e: Event) => {
+      const { src, alt, contentId: imgContentId, source } = (e as CustomEvent).detail;
+
+      editor
+        .chain()
+        .focus()
+        .setImage({
+          src,
+          alt: alt || "AI generated image",
+          contentId: imgContentId || null,
+          source: source || "ai-generated",
+        } as any)
+        .run();
+    };
+
+    window.addEventListener("insert-ai-image", handleInsertAiImage);
+    return () => window.removeEventListener("insert-ai-image", handleInsertAiImage);
+  }, [editor]);
+
   // Sprint 37: Insert image from file — shared by paste, drop, and file input.
   // Immediately shows a blob URL placeholder, uploads async, then swaps src.
   // NOTE: editorProps handlers use insertImageFromFileRef (not this directly)
@@ -470,18 +493,47 @@ export function MarkdownEditor({
       <div
         className="flex-1 overflow-y-auto"
         onDragOver={(e) => {
-          if (e.dataTransfer.types.includes("Files")) {
+          if (
+            e.dataTransfer.types.includes("Files") ||
+            e.dataTransfer.types.includes("application/x-dg-ai-image")
+          ) {
             e.preventDefault();
             e.dataTransfer.dropEffect = "copy";
           }
         }}
         onDragEnter={(e) => {
-          if (e.dataTransfer.types.includes("Files")) {
+          if (
+            e.dataTransfer.types.includes("Files") ||
+            e.dataTransfer.types.includes("application/x-dg-ai-image")
+          ) {
             e.preventDefault();
             e.dataTransfer.dropEffect = "copy";
           }
         }}
         onDrop={(e) => {
+          // Sprint 42: Handle AI image drop from chat
+          const aiImageData = e.dataTransfer.getData("application/x-dg-ai-image");
+          if (aiImageData && editor) {
+            e.preventDefault();
+            e.stopPropagation();
+            try {
+              const { src, alt, contentId: imgContentId, source } = JSON.parse(aiImageData);
+              editor
+                .chain()
+                .focus()
+                .setImage({
+                  src,
+                  alt: alt || "AI generated image",
+                  contentId: imgContentId || null,
+                  source: source || "ai-generated",
+                } as any)
+                .run();
+            } catch {
+              // Fall through to file handling
+            }
+            return;
+          }
+
           const files = Array.from(e.dataTransfer.files);
           const imageFiles = files.filter((f) => f.type.startsWith("image/"));
           if (imageFiles.length > 0) {

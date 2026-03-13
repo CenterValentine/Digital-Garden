@@ -1,110 +1,134 @@
 ---
-sprint: 41
+sprint: 42
 epoch: 10 (AI TipTap)
 duration: 1 session
-branch: epoch-8/sprint-36
+branch: epoch-10/sprint-38
 status: complete
 ---
 
-# Sprint 41: Chat Content Outlines
+# Sprint 42: AI Image Generation
 
 ## Sprint Goal
-Add a navigable outline sidebar for chat conversations in ChatViewer (persistent chat nodes). Compact and expanded views with role-based icons and click-to-scroll.
+Multi-provider AI image generation with chat integration, document insertion, and drag-and-drop.
 
 **Status**: ✅ Complete
 
 ## Success Criteria
 - [x] `pnpm build` passes
-- [x] Outline tab appears when viewing a chat content node
-- [x] Compact mode: one entry per message (user prompt summary, assistant summary, tool name)
-- [x] Expanded mode: assistant sub-items (headers, lists, images) with dot-and-indent
-- [x] Granularity toggle between compact and expanded
-- [x] Click outline entry → scroll to message with animation
-- [x] Real-time outline updates as messages stream in
-- [x] Role-based icons (user, assistant sparkle, tool wrench)
+- [x] 8 image generation providers configured with unified interface
+- [x] `generate_image` tool available in chat (both ChatPanel and ChatViewer)
+- [x] Generated images rendered in chat with AI badge and prompt info
+- [x] "Insert into document" button inserts at cursor position
+- [x] Drag-and-drop from chat image to TipTap editor
+- [x] Generated images stored as referenced FilePayload content nodes
+- [x] Image provider catalog with model metadata
 
 ## Work Items
 
-### Chat Outline Extractor (~3pts)
-- [x] **CO-041-001**: `extractChatOutline()` utility (2 pts) ✅
-  - Parses `UIMessage[]` into `ChatOutlineEntry[]`
-  - Two modes: `"compact"` (messages only) and `"expanded"` (with sub-items)
-  - User entries: first line truncated to 60 chars
-  - Assistant entries: summary from first heading or first line
-  - Tool entries: tool name from `dynamic-tool` parts
-  - Sub-item extraction: headings (with level), list items (max 8), images
-  - **File**: `lib/domain/ai/chat-outline.ts` (new)
+### Image Generation Infrastructure (~6pts)
+- [x] **IG-042-001**: Image generation types (2 pts) ✅
+  - `ImageProviderId` union type (8 providers)
+  - `ImageModelId` union type (12 models)
+  - `ImageGenRequest` / `ImageGenResult` interfaces
+  - `ImageSize`, `ImageModelMeta`, `ImageProviderMeta` types
+  - **File**: `lib/domain/ai/image/types.ts` (new)
 
-- [x] **CO-041-002**: Outline store extension (1 pt) ✅
-  - Added `chatOutline`, `activeChatEntryId`, `chatOutlineGranularity` to store
-  - `toggleChatOutlineGranularity()` toggles between compact/expanded
-  - `clearOutline()` now clears both note and chat outline state
-  - **File**: `state/outline-store.ts`
+- [x] **IG-042-002**: Image provider catalog (1 pt) ✅
+  - Static metadata for all 8 providers with model info
+  - Supported sizes, quality/style flags per model
+  - `getImageProviderMeta()`, `getImageModelMeta()` lookup helpers
+  - **File**: `lib/domain/ai/image/catalog.ts` (new)
 
-### ChatOutlinePanel Component (~5pts)
-- [x] **CO-041-003**: ChatOutlinePanel with role icons (3 pts) ✅
-  - Role-based SVG icons: user (person), assistant (sparkle), tool (wrench)
-  - Granularity toggle button in header ("Expand" / "Compact")
-  - Active entry highlighted with gold accent (matches note outline)
-  - Empty states for no content selected and no messages
-  - **File**: `components/content/ChatOutlinePanel.tsx` (new)
+- [x] **IG-042-003**: Multi-provider generation engine (3 pts) ✅
+  - `generateImage()` main entry point with BYOK key resolution
+  - Provider dispatch: OpenAI, Google, DeepAI, fal.ai, Together, Fireworks, RunwayML, Artbreeder
+  - Each provider's unique REST API normalized into `ImageGenResult`
+  - Environment variable fallbacks for all 8 providers
+  - RunwayML async task polling (30 attempts × 2s)
+  - **File**: `lib/domain/ai/image/generate.ts` (new)
 
-- [x] **CO-041-004**: Expanded mode sub-items (2 pts) ✅
-  - Heading sub-items: dot-and-indent with size based on level (same as note outline)
-  - List sub-items: bullet indicator, indented under parent
-  - Image sub-items: image icon with caption text
-  - Indentation: `24 + (level - 1) * 12` px padding-left
-  - **File**: `components/content/ChatOutlinePanel.tsx`
+### API + Tool Integration (~4pts)
+- [x] **IG-042-004**: Image generation API route (2 pts) ✅
+  - `POST /api/ai/image` — standalone endpoint
+  - Full pipeline: generate → download/decode → upload to storage → create ContentNode
+  - Returns contentId, URL, prompt, dimensions, provider info
+  - **File**: `app/api/ai/image/route.ts` (new)
 
-### Integration (~4pts)
-- [x] **CO-041-005**: Tool registry update (0.5 pt) ✅
-  - Outline tab `contentTypes` expanded from `["note"]` to `["note", "chat"]`
-  - Tab automatically appears when viewing chat nodes
-  - **File**: `lib/domain/tools/registry.ts`
+- [x] **IG-042-005**: `generate_image` chat tool (2 pts) ✅
+  - Added to base tools (works in both chat surfaces)
+  - LLM can specify provider, model, size, quality, style
+  - Defaults to DALL·E 3 when provider not specified
+  - Returns `__imagePayload` JSON for client-side rendering
+  - Auto-uploads to storage, creates referenced FilePayload
+  - Tool metadata registered in `metadata.ts`
+  - System prompt updated with image generation instructions
+  - Step count bumped from 3 to 5 for base chat
+  - **Files**: `lib/domain/ai/tools/registry.ts`, `lib/domain/ai/tools/metadata.ts`, `app/api/ai/chat/route.ts`
 
-- [x] **CO-041-006**: RightSidebarContent conditional rendering (0.5 pt) ✅
-  - Checks `selectedContentType` — renders ChatOutlinePanel for chat, OutlinePanel for notes
-  - Dispatches `scroll-to-chat-message` CustomEvent on entry click
-  - **File**: `components/content/content/RightSidebarContent.tsx`
+### Chat UI Integration (~3pts)
+- [x] **IG-042-006**: GeneratedImageCard component (2 pts) ✅
+  - Detects `__imagePayload` in tool results
+  - Renders image with AI badge, prompt summary, provider/model badge
+  - "Insert into document" button (blue → green transition)
+  - Drag handle overlay on hover
+  - Dimensions display when available
+  - **File**: `components/content/ai/ChatMessage.tsx`
 
-- [x] **CO-041-007**: ChatViewer outline sync (2 pts) ✅
-  - Feeds messages into outline store via `extractChatOutline()` on every messages/granularity change
-  - Clears chat outline on unmount
-  - Listens for `scroll-to-chat-message` event — finds `data-message-index` element, smooth scrolls
-  - Gold flash animation on scroll target (1.5s ease-out)
-  - Added `data-message-index` wrapper divs around ChatMessage components
-  - **File**: `components/content/viewer/ChatViewer.tsx`
+- [x] **IG-042-007**: Insert + drag-and-drop (1 pt) ✅
+  - `insert-ai-image` CustomEvent → MarkdownEditor listener at cursor
+  - `application/x-dg-ai-image` data transfer type for structured drag data
+  - Drop handler in MarkdownEditor accepts AI image drags
+  - `text/uri-list` fallback for basic drag compatibility
+  - **File**: `components/content/editor/MarkdownEditor.tsx`
 
-- [x] **CO-041-008**: Flash animation CSS (0.5 pt) ✅
-  - `@keyframes chat-outline-flash` — gold tint fading to transparent
-  - **File**: `app/globals.css`
+### Infrastructure Updates (~1pt)
+- [x] **IG-042-008**: Barrel exports + capability type (1 pt) ✅
+  - AI barrel export extended with image types and catalog
+  - `ModelCapability` type extended with `"image-generation"`
+  - **Files**: `lib/domain/ai/index.ts`, `lib/domain/ai/providers/types.ts`
 
-## Estimated Points: ~12 pts
+## Estimated Points: ~14 pts
 
 ## Technical Notes
 
-### Separate Store Slice
-Chat outline data lives in the same `outline-store.ts` but in separate fields (`chatOutline`, `activeChatEntryId`, `chatOutlineGranularity`). This avoids type conflicts with the existing `OutlineHeading[]` used for notes and keeps both systems independent.
+### Provider API Diversity
+Each image provider has a completely different REST API. OpenAI returns `{ data: [{ url }] }`, DeepAI returns `{ output_url }`, fal.ai returns `{ images: [{ url }] }`, Fireworks returns raw bytes. The `dispatchToProvider()` function normalizes all of these into a consistent `ImageGenResult` shape.
 
-### Real-Time vs Static
-Outline updates in real-time as messages stream — the `useEffect` watching `messages` re-extracts on every change. For the `experimental_throttle: 100` used in ChatViewer, this means outline refreshes at most every 100ms, which is smooth without being wasteful.
+### Tool-as-Internal-Client Pattern
+The `generate_image` tool doesn't call the `/api/ai/image` endpoint — it calls `generateImage()` directly since it's already server-side. This avoids unnecessary HTTP round-trips while keeping the standalone API route available for future use cases (batch generation, direct UI calls).
 
-### CustomEvent Pattern
-Follows the same `CustomEvent` bridge pattern used for note outline click-to-scroll (`scroll-to-heading`). The ChatViewer listens for `scroll-to-chat-message` and uses `data-message-index` attributes on wrapper divs to find the target element. This avoids tight coupling between the outline panel and the chat viewer.
+### CustomEvent Bridge (Same Pattern as Sprint 41)
+Image insertion uses the same cross-component communication pattern as chat outline click-to-scroll. The ChatMessage dispatches `insert-ai-image`, the MarkdownEditor listens for it. No prop drilling, no shared state — just a DOM event bus.
+
+### Drag-and-Drop Compatibility
+The drag sets three data transfer types: `application/x-dg-ai-image` (structured JSON with contentId), `text/uri-list` (for standard drop targets), and `text/plain` (fallback). The MarkdownEditor's drop handler checks for the structured type first, falling back to file drops.
 
 ## Files Changed
 
 | File | Action |
 |------|--------|
-| `lib/domain/ai/chat-outline.ts` | **New** — Chat outline extraction utility |
-| `components/content/ChatOutlinePanel.tsx` | **New** — Chat outline panel component |
-| `state/outline-store.ts` | Extended with chat outline slice |
-| `components/content/viewer/ChatViewer.tsx` | Outline sync + scroll listener |
-| `components/content/content/RightSidebarContent.tsx` | Conditional panel rendering |
-| `lib/domain/tools/registry.ts` | Outline tab contentTypes expanded |
-| `app/globals.css` | `.chat-outline-flash` animation |
+| `lib/domain/ai/image/types.ts` | **New** — Image generation type definitions |
+| `lib/domain/ai/image/catalog.ts` | **New** — Provider catalog with model metadata |
+| `lib/domain/ai/image/generate.ts` | **New** — Multi-provider generation engine |
+| `lib/domain/ai/image/index.ts` | **New** — Barrel export |
+| `app/api/ai/image/route.ts` | **New** — Image generation API route |
+| `lib/domain/ai/tools/registry.ts` | Added `generate_image` tool |
+| `lib/domain/ai/tools/metadata.ts` | Added tool metadata entry |
+| `components/content/ai/ChatMessage.tsx` | GeneratedImageCard + image payload detection |
+| `components/content/editor/MarkdownEditor.tsx` | AI image insert listener + D&D handler |
+| `lib/domain/ai/index.ts` | Extended barrel with image exports |
+| `lib/domain/ai/providers/types.ts` | Added `image-generation` capability |
+| `app/api/ai/chat/route.ts` | Updated system prompt + step count |
 
 ---
+
+## Previous Sprint: Sprint 41 (✅ Complete)
+
+Key deliverables:
+- Chat outline extractor with compact/expanded modes
+- ChatOutlinePanel with role-based icons
+- Real-time outline sync in ChatViewer
+- Click-to-scroll with gold flash animation
 
 ## Previous Sprint: Sprint 40 (✅ Complete)
 
@@ -114,16 +138,7 @@ Key deliverables:
 - `insert_image` tool (9th editor tool)
 - AI badge on image bubble menu
 - "Show AI Content Highlights" settings toggle
-- Selection highlight regression fix (deferred lock)
-
-## Previous Sprint: Sprint 39 (✅ Complete)
-
-Key deliverables:
-- 8 agentic tools with client-side editing architecture
-- Edit orchestrator with 4-phase animation
-- ProseMirror text search utility
-- Editor instance Zustand store
 
 ---
 
-**Last Updated**: Mar 12, 2026
+**Last Updated**: Mar 13, 2026

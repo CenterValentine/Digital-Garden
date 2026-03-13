@@ -17,6 +17,7 @@ export const BASE_TOOL_IDS = [
   "searchNotes",
   "getCurrentNote",
   "createNote",
+  "generate_image",
 ] as const;
 
 export type BaseToolId = (typeof BASE_TOOL_IDS)[number];
@@ -37,6 +38,11 @@ export const BASE_TOOL_METADATA: Record<
   createNote: {
     name: "Create Note",
     description: "Create a new note with a title and optional content",
+  },
+  generate_image: {
+    name: "Generate Image",
+    description:
+      "Generate an AI image from a text prompt using DALL·E, Imagen, FLUX, and other providers",
   },
 };
 

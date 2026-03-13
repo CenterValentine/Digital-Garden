@@ -15,12 +15,26 @@ import { memo, useState, useCallback, useMemo } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { common, createLowlight } from "lowlight";
-import { Bot, User, Wrench, Loader2, Copy, Check, Code2 } from "lucide-react";
+import { Bot, User, Wrench, Loader2, Copy, Check, Code2, ImagePlus, GripVertical, BrainCircuit } from "lucide-react";
 import { cn } from "@/lib/core/utils";
 import { useContentStore } from "@/state/content-store";
 import type { UIMessage } from "ai";
 import type { Components } from "react-markdown";
 import type { ExtraProps } from "react-markdown";
+
+/** Shape of the image payload returned by generate_image tool */
+interface ImagePayload {
+  __imagePayload: true;
+  contentId: string;
+  url: string;
+  prompt: string;
+  revisedPrompt?: string | null;
+  providerId: string;
+  modelId: string;
+  width: number;
+  height: number;
+  fileName: string;
+}
 
 // Shared lowlight instance — same config as TipTap editor
 const lowlight = createLowlight(common);
@@ -36,6 +50,34 @@ export const ChatMessage = memo(function ChatMessage({
 }: ChatMessageProps) {
   const isUser = message.role === "user";
   const isAssistant = message.role === "assistant";
+
+  // Pre-scan: extract image payloads from ALL tool parts at message level.
+  // This is more reliable than detecting inside the parts loop because it
+  // handles streaming state transitions and part type variations.
+  const { imagePayloads, hasRunningTools } = useMemo(() => {
+    const payloads: ImagePayload[] = [];
+    let running = false;
+    const seenIds = new Set<string>();
+
+    for (const part of message.parts) {
+      if (!("toolCallId" in part && "toolName" in part)) continue;
+      const tp = part as { toolCallId: string; state: string; output?: unknown };
+
+      if (tp.state === "input-streaming" || tp.state === "input-available") {
+        running = true;
+      }
+
+      if (tp.state === "output-available" && tp.output !== undefined) {
+        const payload = parseImagePayload(tp.output);
+        if (payload && !seenIds.has(payload.contentId)) {
+          seenIds.add(payload.contentId);
+          payloads.push(payload);
+        }
+      }
+    }
+
+    return { imagePayloads: payloads, hasRunningTools: running };
+  }, [message.parts]);
 
   return (
     <div
@@ -100,20 +142,47 @@ export const ChatMessage = memo(function ChatMessage({
             );
           }
 
-          if (part.type === "dynamic-tool") {
+          // Tool parts: AI SDK v6 uses type "tool-${toolName}" for statically-typed tools
+          // and "dynamic-tool" for dynamic tools. Detect both via structural typing.
+          // Image generation tool results render as GeneratedImageCard at message level below.
+          if ("toolCallId" in part && "toolName" in part) {
+            const toolPart = part as {
+              toolName: string;
+              toolCallId: string;
+              state: string;
+              input?: unknown;
+              output?: unknown;
+            };
+
+            // Skip rendering image tool results here — they render at message level
+            if (toolPart.state === "output-available") {
+              const isImageResult = parseImagePayload(toolPart.output) !== null;
+              if (isImageResult) return null;
+            }
+
             return (
               <ToolCallBubble
                 key={i}
-                toolName={part.toolName}
-                state={part.state}
-                args={"input" in part ? part.input : undefined}
-                result={"output" in part ? part.output : undefined}
+                toolName={toolPart.toolName}
+                state={toolPart.state}
+                args={toolPart.input}
+                result={toolPart.output}
               />
             );
           }
 
           return null;
         })}
+
+        {/* Image cards — rendered at message level for reliability */}
+        {imagePayloads.map((payload) => (
+          <GeneratedImageCard key={payload.contentId} payload={payload} />
+        ))}
+
+        {/* Thinking indicator — shows during tool execution */}
+        {isStreaming && isAssistant && hasRunningTools && (
+          <ThinkingIndicator />
+        )}
 
         {/* Fallback: streaming indicator when parts is empty */}
         {isStreaming &&
@@ -419,6 +488,20 @@ function MentionPill({ title, contentId }: { title: string; contentId: string })
   );
 }
 
+/** Parse an image payload from a tool result string */
+function parseImagePayload(result: unknown): ImagePayload | null {
+  if (result === undefined) return null;
+  const str = typeof result === "string" ? result : JSON.stringify(result);
+  if (!str.includes('"__imagePayload"')) return null;
+  try {
+    const parsed = JSON.parse(str);
+    if (parsed.__imagePayload) return parsed as ImagePayload;
+  } catch {
+    // not valid JSON
+  }
+  return null;
+}
+
 /** Tool call indicator bubble */
 function ToolCallBubble({
   toolName,
@@ -499,6 +582,134 @@ function ToolCallBubble({
   );
 }
 
+// ─── Generated Image Card ─────────────────────────────────────
+
+/**
+ * Renders an AI-generated image with insert + drag actions.
+ *
+ * - "Insert into document" dispatches a CustomEvent that the
+ *   MarkdownEditor listens for and inserts at cursor position.
+ * - Draggable via HTML5 drag with image URL in dataTransfer,
+ *   compatible with TipTap's image drop handler.
+ */
+function GeneratedImageCard({ payload }: { payload: ImagePayload }) {
+  const [inserted, setInserted] = useState(false);
+  const selectedContentType = useContentStore((s) => s.selectedContentType);
+  const isNote = selectedContentType === "note";
+
+  const handleInsertIntoDocument = useCallback(() => {
+    // Dispatch CustomEvent for the editor to handle
+    window.dispatchEvent(
+      new CustomEvent("insert-ai-image", {
+        detail: {
+          src: payload.url,
+          alt: payload.revisedPrompt || payload.prompt,
+          contentId: payload.contentId,
+          source: "ai-generated",
+        },
+      })
+    );
+    setInserted(true);
+    setTimeout(() => setInserted(false), 3000);
+  }, [payload]);
+
+  const handleDragStart = useCallback(
+    (e: React.DragEvent) => {
+      // Set image URL for TipTap drop handler
+      e.dataTransfer.setData("text/uri-list", payload.url);
+      e.dataTransfer.setData("text/plain", payload.url);
+      // Also pass structured data for richer handling
+      e.dataTransfer.setData(
+        "application/x-dg-ai-image",
+        JSON.stringify({
+          src: payload.url,
+          alt: payload.revisedPrompt || payload.prompt,
+          contentId: payload.contentId,
+          source: "ai-generated",
+        })
+      );
+      e.dataTransfer.effectAllowed = "copy";
+    },
+    [payload]
+  );
+
+  return (
+    <div className="rounded-xl border border-white/10 bg-white/5 overflow-hidden max-w-sm">
+      {/* Image */}
+      <div
+        className="relative group cursor-grab active:cursor-grabbing"
+        draggable
+        onDragStart={handleDragStart}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={payload.url}
+          alt={payload.revisedPrompt || payload.prompt}
+          className="w-full h-auto"
+          loading="lazy"
+        />
+        {/* Drag handle overlay */}
+        <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+          <div className="rounded bg-black/60 p-1" title="Drag to editor">
+            <GripVertical className="h-4 w-4 text-white/70" />
+          </div>
+        </div>
+        {/* AI badge */}
+        <div className="absolute top-2 left-2">
+          <span className="rounded bg-indigo-500/80 px-1.5 py-0.5 text-[10px] font-medium text-white">
+            AI
+          </span>
+        </div>
+      </div>
+
+      {/* Info + Actions */}
+      <div className="px-3 py-2 space-y-2">
+        {/* Prompt summary */}
+        <p className="text-xs text-gray-400 line-clamp-2">
+          {payload.revisedPrompt || payload.prompt}
+        </p>
+
+        {/* Provider badge */}
+        <div className="flex items-center gap-2 text-[10px] text-gray-500">
+          <span className="rounded bg-white/5 px-1.5 py-0.5">
+            {payload.providerId}/{payload.modelId}
+          </span>
+          {payload.width > 0 && payload.height > 0 && (
+            <span>{payload.width}×{payload.height}</span>
+          )}
+        </div>
+
+        {/* Actions */}
+        {isNote && (
+          <button
+            type="button"
+            onClick={handleInsertIntoDocument}
+            disabled={inserted}
+            className={cn(
+              "flex items-center gap-1.5 w-full justify-center rounded-lg px-3 py-1.5 text-xs font-medium transition-colors",
+              inserted
+                ? "bg-green-500/20 text-green-300 border border-green-500/20"
+                : "bg-blue-500/20 text-blue-300 border border-blue-500/20 hover:bg-blue-500/30"
+            )}
+          >
+            {inserted ? (
+              <>
+                <Check className="h-3.5 w-3.5" />
+                Inserted
+              </>
+            ) : (
+              <>
+                <ImagePlus className="h-3.5 w-3.5" />
+                Insert into document
+              </>
+            )}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 /** Pulsing dots animation for streaming state */
 function StreamingIndicator() {
   return (
@@ -506,6 +717,21 @@ function StreamingIndicator() {
       <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-gray-400" />
       <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-gray-400 [animation-delay:150ms]" />
       <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-gray-400 [animation-delay:300ms]" />
+    </div>
+  );
+}
+
+/** Thinking indicator — shown while tools are executing */
+function ThinkingIndicator() {
+  return (
+    <div className="inline-flex items-center gap-2 rounded-xl bg-indigo-500/10 border border-indigo-500/20 px-3.5 py-2 text-xs text-indigo-300">
+      <BrainCircuit className="h-3.5 w-3.5 animate-pulse" />
+      <span>Thinking</span>
+      <span className="inline-flex gap-0.5">
+        <span className="animate-bounce [animation-delay:0ms]">.</span>
+        <span className="animate-bounce [animation-delay:150ms]">.</span>
+        <span className="animate-bounce [animation-delay:300ms]">.</span>
+      </span>
     </div>
   );
 }
