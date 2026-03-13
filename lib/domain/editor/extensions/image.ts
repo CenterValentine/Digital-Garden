@@ -159,6 +159,13 @@ export const EditorImage = Image.extend({
           }
           if (updatedNode.attrs.contentId) {
             img.setAttribute("data-content-id", updatedNode.attrs.contentId);
+          } else {
+            img.removeAttribute("data-content-id");
+          }
+          if (updatedNode.attrs.source && updatedNode.attrs.source !== "user-uploaded") {
+            img.setAttribute("data-source", updatedNode.attrs.source);
+          } else {
+            img.removeAttribute("data-source");
           }
           if (updatedNode.attrs.width) {
             wrapper.style.width = updatedNode.attrs.width;

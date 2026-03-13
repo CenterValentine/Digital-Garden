@@ -595,7 +595,7 @@ function ToolCallBubble({
 function GeneratedImageCard({ payload }: { payload: ImagePayload }) {
   const [inserted, setInserted] = useState(false);
   const selectedContentType = useContentStore((s) => s.selectedContentType);
-  const isNote = selectedContentType === "note";
+  const canInsert = selectedContentType === "note";
 
   const handleInsertIntoDocument = useCallback(() => {
     // Dispatch CustomEvent for the editor to handle
@@ -648,8 +648,8 @@ function GeneratedImageCard({ payload }: { payload: ImagePayload }) {
           className="w-full h-auto"
           loading="lazy"
         />
-        {/* Drag handle overlay */}
-        <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+        {/* Drag handle overlay — always visible for discoverability */}
+        <div className="absolute top-2 right-2">
           <div className="rounded bg-black/60 p-1" title="Drag to editor">
             <GripVertical className="h-4 w-4 text-white/70" />
           </div>
@@ -680,31 +680,32 @@ function GeneratedImageCard({ payload }: { payload: ImagePayload }) {
         </div>
 
         {/* Actions */}
-        {isNote && (
-          <button
-            type="button"
-            onClick={handleInsertIntoDocument}
-            disabled={inserted}
-            className={cn(
-              "flex items-center gap-1.5 w-full justify-center rounded-lg px-3 py-1.5 text-xs font-medium transition-colors",
-              inserted
-                ? "bg-green-500/20 text-green-300 border border-green-500/20"
-                : "bg-blue-500/20 text-blue-300 border border-blue-500/20 hover:bg-blue-500/30"
-            )}
-          >
-            {inserted ? (
-              <>
-                <Check className="h-3.5 w-3.5" />
-                Inserted
-              </>
-            ) : (
-              <>
-                <ImagePlus className="h-3.5 w-3.5" />
-                Insert into document
-              </>
-            )}
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={handleInsertIntoDocument}
+          disabled={inserted || !canInsert}
+          title={canInsert ? "Insert at cursor position" : "Open a note to insert images"}
+          className={cn(
+            "flex items-center gap-1.5 w-full justify-center rounded-lg px-3 py-1.5 text-xs font-medium transition-colors",
+            inserted
+              ? "bg-green-500/20 text-green-300 border border-green-500/20"
+              : canInsert
+                ? "bg-blue-500/20 text-blue-300 border border-blue-500/20 hover:bg-blue-500/30"
+                : "bg-white/5 text-gray-500 border border-white/5 cursor-not-allowed"
+          )}
+        >
+          {inserted ? (
+            <>
+              <Check className="h-3.5 w-3.5" />
+              Inserted
+            </>
+          ) : (
+            <>
+              <ImagePlus className="h-3.5 w-3.5" />
+              Insert into document
+            </>
+          )}
+        </button>
       </div>
     </div>
   );
