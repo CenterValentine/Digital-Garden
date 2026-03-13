@@ -372,7 +372,8 @@ export function MarkdownEditor({
     if (!editor) return;
 
     const handleInsertAiImage = (e: Event) => {
-      const { src, alt, contentId: imgContentId, source } = (e as CustomEvent).detail;
+      const detail = (e as CustomEvent).detail;
+      const { src, alt, contentId: imgContentId, source } = detail;
 
       editor
         .chain()
@@ -517,7 +518,8 @@ export function MarkdownEditor({
             e.preventDefault();
             e.stopPropagation();
             try {
-              const { src, alt, contentId: imgContentId, source } = JSON.parse(aiImageData);
+              const parsed = JSON.parse(aiImageData);
+              const { src, alt, contentId: imgContentId, source } = parsed;
               const imageAttrs = {
                 src,
                 alt: alt || "AI generated image",
@@ -526,7 +528,6 @@ export function MarkdownEditor({
               };
 
               // Convert drop coordinates to a ProseMirror document position
-              // so the image inserts WHERE the user dropped, not at the old cursor.
               const dropPos = editor.view.posAtCoords({
                 left: e.clientX,
                 top: e.clientY,

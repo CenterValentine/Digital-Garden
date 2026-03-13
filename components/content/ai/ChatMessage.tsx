@@ -22,6 +22,50 @@ import type { UIMessage } from "ai";
 import type { Components } from "react-markdown";
 import type { ExtraProps } from "react-markdown";
 
+/**
+ * Detect tool parts in AI SDK v6 UIMessage.
+ *
+ * Static tools have type "tool-{toolName}" with toolCallId, but NO toolName property.
+ * Dynamic tools have type "dynamic-tool" with both toolCallId and toolName.
+ * This helper detects both and extracts the tool name from wherever it lives.
+ */
+interface DetectedToolPart {
+  toolCallId: string;
+  toolName: string;
+  state: string;
+  input?: unknown;
+  output?: unknown;
+}
+
+function detectToolPart(part: unknown): DetectedToolPart | null {
+  const p = part as Record<string, unknown>;
+  if (!p || typeof p !== "object") return null;
+  if (!("toolCallId" in p)) return null;
+
+  const type = p.type as string | undefined;
+  let toolName: string | undefined;
+
+  // Static tools: type is "tool-{name}", no toolName property
+  if (type && typeof type === "string" && type.startsWith("tool-")) {
+    toolName = type.slice(5); // strip "tool-" prefix
+  }
+
+  // Dynamic tools: type is "dynamic-tool", has toolName property
+  if ("toolName" in p && typeof p.toolName === "string") {
+    toolName = p.toolName;
+  }
+
+  if (!toolName) return null;
+
+  return {
+    toolCallId: p.toolCallId as string,
+    toolName,
+    state: (p.state as string) || "unknown",
+    input: p.input,
+    output: p.output,
+  };
+}
+
 /** Shape of the image payload returned by generate_image tool */
 interface ImagePayload {
   __imagePayload: true;
@@ -60,8 +104,8 @@ export const ChatMessage = memo(function ChatMessage({
     const seenIds = new Set<string>();
 
     for (const part of message.parts) {
-      if (!("toolCallId" in part && "toolName" in part)) continue;
-      const tp = part as { toolCallId: string; state: string; output?: unknown };
+      const tp = detectToolPart(part);
+      if (!tp) continue;
 
       if (tp.state === "input-streaming" || tp.state === "input-available") {
         running = true;
@@ -142,19 +186,11 @@ export const ChatMessage = memo(function ChatMessage({
             );
           }
 
-          // Tool parts: AI SDK v6 uses type "tool-${toolName}" for statically-typed tools
-          // and "dynamic-tool" for dynamic tools. Detect both via structural typing.
+          // Tool parts: detect via detectToolPart helper (handles both static and dynamic)
           // Image generation tool results render as GeneratedImageCard at message level below.
-          if ("toolCallId" in part && "toolName" in part) {
-            const toolPart = part as {
-              toolName: string;
-              toolCallId: string;
-              state: string;
-              input?: unknown;
-              output?: unknown;
-            };
-
-            // Skip rendering image tool results here — they render at message level
+          const toolPart = detectToolPart(part);
+          if (toolPart) {
+            // Skip image tool results — they render at message level
             if (toolPart.state === "output-available") {
               const isImageResult = parseImagePayload(toolPart.output) !== null;
               if (isImageResult) return null;
@@ -253,6 +289,16 @@ const markdownComponents: Components = {
       {children}
     </h6>
   ),
+
+  // ── Images — suppress AI-generated images already shown as GeneratedImageCards ──
+  img: ({ src, alt }) => {
+    const srcStr = typeof src === "string" ? src : "";
+    if (srcStr && (srcStr.includes("r2.cloudflarestorage.com") || srcStr.includes("/ai-gen-"))) {
+      return null;
+    }
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img src={srcStr} alt={alt || ""} className="max-w-full rounded-lg my-2" />;
+  },
 
   // ── Paragraphs ──
   p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,

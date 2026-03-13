@@ -277,13 +277,15 @@ export function ChatPanel() {
           // Preserve image payloads so they survive when saved to a chat node
           const imagePayloads: unknown[] = [];
           for (const part of m.parts) {
+            // AI SDK v6: static tool parts have type "tool-{name}" (no toolName prop).
+            // Check for toolCallId (present on both static and dynamic parts).
+            const p = part as Record<string, unknown>;
             if (
-              "toolCallId" in part &&
-              "toolName" in part &&
-              (part as { state: string }).state === "output-available" &&
-              "output" in part
+              "toolCallId" in p &&
+              (p.state as string) === "output-available" &&
+              "output" in p
             ) {
-              const output = (part as { output: unknown }).output;
+              const output = p.output;
               const str = typeof output === "string" ? output : JSON.stringify(output);
               if (str.includes('"__imagePayload"')) {
                 try {

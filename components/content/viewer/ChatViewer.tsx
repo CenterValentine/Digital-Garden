@@ -223,13 +223,16 @@ export function ChatViewer({
       // We save a lightweight representation — just enough to reconstruct the card.
       const imagePayloads: unknown[] = [];
       for (const part of m.parts) {
+        // AI SDK v6: static tool parts have type "tool-{name}" with no toolName prop;
+        // dynamic tool parts have type "dynamic-tool" with toolName prop.
+        // Check for toolCallId (present on both) rather than toolName.
+        const p = part as Record<string, unknown>;
         if (
-          "toolCallId" in part &&
-          "toolName" in part &&
-          (part as { state: string }).state === "output-available" &&
-          "output" in part
+          "toolCallId" in p &&
+          (p.state as string) === "output-available" &&
+          "output" in p
         ) {
-          const output = (part as { output: unknown }).output;
+          const output = p.output;
           const str = typeof output === "string" ? output : JSON.stringify(output);
           if (str.includes('"__imagePayload"')) {
             try {
