@@ -701,6 +701,35 @@ nav[class*="fixed"] {
   50% { opacity: 0.3; }
 }
 
+/* Sprint 40: AI Content Highlighting */
+.ProseMirror .ai-highlight {
+  background-color: rgba(99, 101, 241, 0.06);
+  /* no border bottom - keep for potential future remodification */
+  /* border-bottom: 1px solid rgba(99, 102, 241, 0.25); */
+  border-radius: 2px;
+  padding: 0 1px;
+  transition: background-color 0.2s ease;
+}
+
+.ProseMirror .ai-highlight:hover {
+  background-color: rgba(99, 101, 241, 0.09);
+}
+
+/* When AI highlighting is disabled via settings */
+.ai-highlight-hidden .ProseMirror .ai-highlight {
+  background-color: transparent;
+  border-bottom: none;
+}
+
+/* Sprint 41: Chat outline scroll-to flash animation */
+@keyframes chat-outline-flash {
+  0% { background-color: rgba(255, 215, 0, 0.15); }
+  100% { background-color: transparent; }
+}
+.chat-outline-flash {
+  animation: chat-outline-flash 1.5s ease-out;
+}
+
 /* M6: Search Match Highlighting */
 mark {
   background-color: rgba(255, 215, 0, 0.3);

@@ -107,6 +107,8 @@ const aiSettingsSchema = z
     // Tool settings (Sprint 34)
     toolChoice: z.enum(["auto", "none"]).optional(),
     enabledTools: z.array(z.string()).optional(),
+    // AI content highlighting (Sprint 40)
+    showAiHighlight: z.boolean().optional(),
   })
   .optional();
 
@@ -306,6 +308,7 @@ export const DEFAULT_SETTINGS: UserSettings = {
     privacyMode: "full",
     toolChoice: "auto",
     enabledTools: ["searchNotes", "getCurrentNote", "createNote"],
+    showAiHighlight: true,
   },
   exportBackup: {
     defaultFormat: "markdown",

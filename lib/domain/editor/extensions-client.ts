@@ -31,6 +31,7 @@ import { WikiLink } from "./extensions/wiki-link";
 import { createWikiLinkSuggestion } from "./extensions/wiki-link-suggestion";
 import { Tag } from "./extensions/tag";
 import { EditorImage } from "./extensions/image";
+import { AiHighlight } from "./extensions/ai-highlight";
 
 // Create lowlight instance with common languages
 const lowlight = createLowlight(common);
@@ -171,6 +172,9 @@ export function getEditorExtensions(options?: EditorExtensionsOptions): Extensio
       inline: false,
       allowBase64: true, // Allow blob URLs during upload
     }),
+
+    // Sprint 40: AI content highlighting
+    AiHighlight,
 
     // M6: Tags with autocomplete
     Tag.configure({

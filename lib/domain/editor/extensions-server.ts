@@ -22,6 +22,7 @@ import { Callout } from "./extensions/callout";
 import { HeadingHardbreakSplit } from "./extensions/heading-hardbreak-split";
 import { BlockquoteLineOnly } from "./extensions/blockquote-line-only";
 import { ServerImage } from "./extensions/image";
+import { AiHighlight } from "./extensions/ai-highlight";
 
 // Create lowlight instance with common languages
 const lowlight = createLowlight(common);
@@ -102,6 +103,9 @@ export function getServerExtensions(): Extensions {
 
     // Sprint 37: Server-safe image extension (no React NodeView)
     ServerImage,
+
+    // Sprint 40: AI content highlighting
+    AiHighlight,
 
     // Note: SlashCommands excluded - it uses React components
   ];

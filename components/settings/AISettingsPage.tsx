@@ -20,7 +20,7 @@ import type { AIProviderId } from "@/lib/domain/ai";
 import { Button } from "@/components/ui/glass/button";
 import { Check, AlertCircle, Wrench, Key } from "lucide-react";
 import { toast } from "sonner";
-import { BASE_TOOL_IDS, BASE_TOOL_METADATA } from "@/lib/domain/ai/tools/metadata";
+import { ALL_TOOL_IDS, ALL_TOOL_METADATA } from "@/lib/domain/ai/tools/metadata";
 import { AIKeyManager } from "@/components/settings/AIKeyManager";
 
 /** Shape of ai settings as stored in User.settings.ai */
@@ -38,6 +38,7 @@ interface AISettings {
   tokensUsedThisMonth?: number;
   toolChoice?: "auto" | "none";
   enabledTools?: string[];
+  showAiHighlight?: boolean;
 }
 
 const DEFAULTS: Required<AISettings> = {
@@ -53,7 +54,8 @@ const DEFAULTS: Required<AISettings> = {
   monthlyTokenQuota: 100_000,
   tokensUsedThisMonth: 0,
   toolChoice: "auto",
-  enabledTools: [...BASE_TOOL_IDS],
+  enabledTools: [...ALL_TOOL_IDS],
+  showAiHighlight: true,
 };
 
 export default function AISettingsPage() {
@@ -73,6 +75,7 @@ export default function AISettingsPage() {
   const [tokensUsedThisMonth, setTokensUsedThisMonth] = useState(DEFAULTS.tokensUsedThisMonth);
   const [toolChoice, setToolChoice] = useState<"auto" | "none">(DEFAULTS.toolChoice);
   const [enabledTools, setEnabledTools] = useState<string[]>(DEFAULTS.enabledTools);
+  const [showAiHighlight, setShowAiHighlight] = useState(DEFAULTS.showAiHighlight);
 
   // UI state
   const [isLoading, setIsLoading] = useState(true);
@@ -101,6 +104,7 @@ export default function AISettingsPage() {
           if (ai.tokensUsedThisMonth !== undefined) setTokensUsedThisMonth(ai.tokensUsedThisMonth);
           if (ai.toolChoice) setToolChoice(ai.toolChoice);
           if (ai.enabledTools) setEnabledTools(ai.enabledTools);
+          if (ai.showAiHighlight !== undefined) setShowAiHighlight(ai.showAiHighlight);
         }
       } catch (err) {
         console.error("Failed to load AI settings:", err);
@@ -149,6 +153,7 @@ export default function AISettingsPage() {
             tokensUsedThisMonth,
             toolChoice,
             enabledTools,
+            showAiHighlight,
           },
         }),
       });
@@ -466,6 +471,21 @@ export default function AISettingsPage() {
             </div>
           </label>
 
+          {/* AI Content Highlighting */}
+          <label className="flex items-center gap-3 p-2.5 rounded-lg border border-white/10 hover:bg-white/5 cursor-pointer transition-colors">
+            <input
+              type="checkbox"
+              checked={showAiHighlight}
+              onChange={(e) => setShowAiHighlight(e.target.checked)}
+            />
+            <div className="flex-1">
+              <div className="font-medium text-sm">Show AI Content Highlights</div>
+              <div className="text-sm text-gray-400">
+                Subtly highlight text that was inserted or edited by AI with an indigo tint.
+              </div>
+            </div>
+          </label>
+
           {/* Privacy Mode */}
           <div className="pt-2">
             <label className="block text-sm font-medium text-gray-300 mb-3">Privacy Mode</label>
@@ -581,8 +601,8 @@ export default function AISettingsPage() {
                 Available Tools
               </label>
               <div className="space-y-2">
-                {BASE_TOOL_IDS.map((toolId) => {
-                  const meta = BASE_TOOL_METADATA[toolId];
+                {ALL_TOOL_IDS.map((toolId) => {
+                  const meta = ALL_TOOL_METADATA[toolId];
                   const isEnabled = enabledTools.includes(toolId);
                   return (
                     <label

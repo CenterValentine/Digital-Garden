@@ -22,6 +22,8 @@ import { ImageBubbleMenu } from "./ImageBubbleMenu";
 import { extractOutline, type OutlineHeading } from "@/lib/domain/content/outline-extractor";
 import { uploadImage } from "@/lib/domain/editor/hooks/use-image-upload";
 import { isImageUrl } from "@/lib/domain/editor/utils/image-url";
+import { useEditorInstanceStore } from "@/state/editor-instance-store";
+import { useSettingsStore } from "@/state/settings-store";
 import { toast } from "sonner";
 
 export interface EditorStats {
@@ -296,6 +298,16 @@ export function MarkdownEditor({
     }
   }, [editor, onStatsChange]);
 
+  // Register editor instance in global store for AI chat panel access
+  useEffect(() => {
+    if (editor) {
+      useEditorInstanceStore.getState().setEditor(editor);
+    }
+    return () => {
+      useEditorInstanceStore.getState().setEditor(null);
+    };
+  }, [editor]);
+
   // Handle Cmd+K / Ctrl+K keyboard shortcut for link dialog
   useEffect(() => {
     if (!editor) return;
@@ -437,8 +449,11 @@ export function MarkdownEditor({
     };
   }, [contentId]);
 
+  // AI highlight visibility — controlled by settings toggle
+  const showAiHighlight = useSettingsStore((s) => s.ai?.showAiHighlight ?? true);
+
   return (
-    <div className={`flex flex-col h-full ${className}`}>
+    <div className={`flex flex-col h-full ${className} ${showAiHighlight ? "" : "ai-highlight-hidden"}`}>
       {/* Sprint 37: Hidden file input for image upload */}
       <input
         ref={fileInputRef}

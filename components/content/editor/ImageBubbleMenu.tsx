@@ -48,7 +48,9 @@ export interface ImageBubbleMenuProps {
 export function ImageBubbleMenu({ editor }: ImageBubbleMenuProps) {
   if (!editor) return null;
 
-  const currentWidth = editor.getAttributes("image").width;
+  const imageAttrs = editor.getAttributes("image");
+  const currentWidth = imageAttrs.width;
+  const isAiGenerated = imageAttrs.source === "ai-generated";
 
   return (
     <TipTapBubbleMenu
@@ -58,6 +60,19 @@ export function ImageBubbleMenu({ editor }: ImageBubbleMenuProps) {
       shouldShow={imageShouldShow}
       className="flex items-center gap-1 rounded-lg border border-white/10 bg-black/80 p-1 shadow-lg backdrop-blur-md"
     >
+      {/* AI badge — shown for AI-generated images */}
+      {isAiGenerated && (
+        <>
+          <span
+            className="rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider bg-indigo-500/20 text-indigo-300 border border-indigo-500/30"
+            title="AI-generated image"
+          >
+            AI
+          </span>
+          <div className="mx-0.5 h-4 w-px bg-white/10" />
+        </>
+      )}
+
       {/* Size presets */}
       {SIZE_PRESETS.map((preset) => {
         const isActive =

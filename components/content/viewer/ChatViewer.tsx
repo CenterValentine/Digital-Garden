@@ -19,6 +19,8 @@ import { ChatMessage } from "../ai/ChatMessage";
 import { ChatInput } from "../ai/ChatInput";
 import { ModelPicker, useModelSelection } from "../ai/ModelPicker";
 import { BASE_TOOL_METADATA, BASE_TOOL_IDS } from "@/lib/domain/ai/tools/metadata";
+import { extractChatOutline } from "@/lib/domain/ai/chat-outline";
+import { useOutlineStore } from "@/state/outline-store";
 import type { SuggestionItem } from "../ai/ChatSuggestionMenu";
 import type { UIMessage } from "ai";
 import type { StoredChatMessage } from "@/lib/domain/ai/types";
@@ -240,6 +242,51 @@ export function ChatViewer({
     }
   }, [messages]);
 
+  // ─── Sprint 41: Chat outline sync ───
+  const setChatOutline = useOutlineStore((s) => s.setChatOutline);
+  const chatOutlineGranularity = useOutlineStore(
+    (s) => s.chatOutlineGranularity
+  );
+
+  // Update outline store when messages or granularity changes (real-time)
+  useEffect(() => {
+    const entries = extractChatOutline(messages, chatOutlineGranularity);
+    setChatOutline(entries);
+  }, [messages, chatOutlineGranularity, setChatOutline]);
+
+  // Clear chat outline on unmount
+  useEffect(() => {
+    return () => {
+      useOutlineStore.getState().setChatOutline([]);
+    };
+  }, []);
+
+  // ─── Sprint 41: Scroll-to-message from outline clicks ───
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail as {
+        messageIndex: number;
+        entryId: string;
+      };
+      const container = scrollRef.current;
+      if (!container) return;
+
+      // Find the message element by data attribute
+      const messageEl = container.querySelector(
+        `[data-message-index="${detail.messageIndex}"]`
+      );
+      if (messageEl) {
+        messageEl.scrollIntoView({ behavior: "smooth", block: "center" });
+        // Brief highlight flash
+        messageEl.classList.add("chat-outline-flash");
+        setTimeout(() => messageEl.classList.remove("chat-outline-flash"), 1500);
+      }
+    };
+
+    window.addEventListener("scroll-to-chat-message", handler);
+    return () => window.removeEventListener("scroll-to-chat-message", handler);
+  }, []);
+
   const isActive = status === "streaming" || status === "submitted";
   const hasMessages = messages.length > 0;
 
@@ -273,15 +320,16 @@ export function ChatViewer({
         {hasMessages ? (
           <div className="space-y-1 py-4">
             {messages.map((message, i) => (
-              <ChatMessage
-                key={message.id}
-                message={message}
-                isStreaming={
-                  isActive &&
-                  i === messages.length - 1 &&
-                  message.role === "assistant"
-                }
-              />
+              <div key={message.id} data-message-index={i}>
+                <ChatMessage
+                  message={message}
+                  isStreaming={
+                    isActive &&
+                    i === messages.length - 1 &&
+                    message.role === "assistant"
+                  }
+                />
+              </div>
             ))}
           </div>
         ) : (

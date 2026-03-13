@@ -25,6 +25,7 @@ import {
   defaultSettingsMiddleware,
 } from "@/lib/domain/ai/middleware";
 import { createBaseTools } from "@/lib/domain/ai/tools";
+import { createEditorTools } from "@/lib/domain/ai/tools";
 import { getProviderKey } from "@/lib/domain/ai/keys";
 import { prisma } from "@/lib/database/client";
 
@@ -101,9 +102,13 @@ export async function POST(request: Request) {
     // Create tools bound to the authenticated user
     const toolChoice =
       (aiSettings as Record<string, unknown>).toolChoice ?? "auto";
+    const toolCtx = { userId: session.user.id, contentId };
     const tools =
       toolChoice !== "none"
-        ? createBaseTools({ userId: session.user.id })
+        ? {
+            ...createBaseTools(toolCtx),
+            ...(contentId ? createEditorTools(toolCtx) : {}),
+          }
         : undefined;
 
     // Convert UIMessages to ModelMessages for streamText
@@ -140,13 +145,13 @@ export async function POST(request: Request) {
       messages: modelMessages,
       tools,
       toolChoice: toolChoice !== "none" ? "auto" : undefined,
-      // Allow up to 3 model turns so tool calls get a follow-up text response.
-      // Turn 1: model may call a tool. Turn 2: model processes tool result
-      // (may call another tool). Turn 3: final text response.
-      stopWhen: stepCountIs(3),
+      // Allow up to 8 model turns for multi-step tool workflows.
+      // Editor tools may need: read → plan → diff → diff → diff → finish + final text.
+      // Base chat tools typically need 2-3 steps.
+      stopWhen: stepCountIs(contentId ? 8 : 3),
       system: `You are a helpful AI assistant in Digital Garden, a knowledge management application. Help the user with their notes, writing, and research. Be concise and helpful.${
         contentId
-          ? `\n\nThe user is currently viewing content with ID: ${contentId}`
+          ? `\n\nThe user is currently viewing a document (ID: ${contentId}). You have editor tools available to read and edit this document. When asked to edit, always: 1) Read the document first with read_first_chunk, 2) Plan your approach if the edit is complex, 3) Apply changes with apply_diff for targeted edits or replace_document for rewrites, 4) Call finish_with_summary when done.`
           : ""
       }${mentionedContext}`,
     });

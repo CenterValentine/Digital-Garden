@@ -15,7 +15,7 @@ import { memo, useState, useCallback, useMemo } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { common, createLowlight } from "lowlight";
-import { Bot, User, Wrench, Loader2, Copy, Check } from "lucide-react";
+import { Bot, User, Wrench, Loader2, Copy, Check, Code2 } from "lucide-react";
 import { cn } from "@/lib/core/utils";
 import { useContentStore } from "@/state/content-store";
 import type { UIMessage } from "ai";
@@ -433,6 +433,24 @@ function ToolCallBubble({
 }) {
   const isRunning = state === "input-streaming" || state === "input-available";
   const hasResult = state === "output-available";
+  const [showRaw, setShowRaw] = useState(false);
+  const isDev = process.env.NODE_ENV === "development";
+
+  // Summarize result for display (hide JSON payloads from edit tools)
+  const displayResult = useMemo(() => {
+    if (!hasResult || result === undefined) return null;
+    const str = typeof result === "string" ? result : JSON.stringify(result, null, 2);
+    // If it's an edit payload JSON, show a short action summary instead
+    if (str.startsWith("{") && str.includes('"__editPayload"')) {
+      try {
+        const parsed = JSON.parse(str);
+        return parsed.action || "Edit applied";
+      } catch {
+        // fall through
+      }
+    }
+    return str.length > 200 ? str.slice(0, 200) + "..." : str;
+  }, [hasResult, result]);
 
   return (
     <div className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs">
@@ -448,14 +466,33 @@ function ToolCallBubble({
         {isRunning && (
           <span className="text-amber-400/70">running...</span>
         )}
+        {/* Dev-only: toggle raw response */}
+        {isDev && hasResult && (
+          <button
+            onClick={() => setShowRaw((v) => !v)}
+            className={cn(
+              "ml-auto p-0.5 rounded transition-colors",
+              showRaw
+                ? "text-amber-400 bg-amber-400/10"
+                : "text-gray-600 hover:text-gray-400"
+            )}
+            title="Toggle raw response (dev only)"
+          >
+            <Code2 className="h-3 w-3" />
+          </button>
+        )}
       </div>
-      {hasResult && result !== undefined && (
+      {hasResult && displayResult && !showRaw && (
         <div className="mt-1.5 border-t border-white/5 pt-1.5 text-gray-500">
-          {typeof result === "string"
-            ? result.length > 200
-              ? result.slice(0, 200) + "..."
-              : result
-            : JSON.stringify(result, null, 2).slice(0, 200)}
+          {displayResult}
+        </div>
+      )}
+      {/* Dev-only: full raw response */}
+      {isDev && showRaw && hasResult && result !== undefined && (
+        <div className="mt-1.5 border-t border-white/5 pt-1.5">
+          <pre className="overflow-x-auto text-[10px] font-mono text-gray-500 whitespace-pre-wrap break-all max-h-60 overflow-y-auto">
+            {typeof result === "string" ? result : JSON.stringify(result, null, 2)}
+          </pre>
         </div>
       )}
     </div>

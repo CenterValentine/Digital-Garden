@@ -1,19 +1,22 @@
 ---
 epoch: 9
 title: Editor Enhancements
-duration: 6 sprints (37-42)
-status: planned
+duration: 6 sprints (37-42) — Sprint 37 complete, Sprints 38-42 deferred to Epoch 11
+status: partially_complete
 theme: Images, embeds, templates, snapshots, context menu, drag/reorder
 ---
 
 # Epoch 9: Editor Enhancements
 
+> **Status**: Sprint 37 (Images) complete. Remaining sprints (38-42) deferred to Epoch 11
+> because Epoch 10 (AI TipTap) was injected after Sprint 37, taking sprint slots 38-42.
+
 ## Goal
 Transform the TipTap editor from a functional text editor into a full-featured content IDE with images, embeds, templates, document history, and rich interaction patterns.
 
 ## Prerequisites
-- Epoch 8 (Editor Stabilization) complete — all bugs fixed, rules documented
-- TIPTAP-EDITOR-RULES.md approved and implemented
+- Epoch 8 (Editor Stabilization) complete — all bugs fixed, rules documented ✅
+- TIPTAP-EDITOR-RULES.md approved and implemented ✅
 
 ## Key Decisions
 - **Images**: Reuse FilePayload with `contentRole=REFERENCED` (no schema migration)
