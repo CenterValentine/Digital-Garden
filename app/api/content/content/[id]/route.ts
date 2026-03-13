@@ -18,6 +18,7 @@ import {
   CONTENT_WITH_PAYLOADS,
 } from "@/lib/domain/content";
 import { syncContentTags } from "@/lib/domain/content/tag-sync";
+import { syncImageReferences } from "@/lib/domain/content/image-refs";
 import type { JSONContent } from "@tiptap/core";
 import type {
   ContentDetailResponse,
@@ -344,6 +345,9 @@ export async function PATCH(
 
       // M6: Extract and sync tags from content
       await syncContentTags(id, json, session.user.id);
+
+      // Sprint 37: Sync image references (ContentLink with linkType "image-ref")
+      await syncImageReferences(id, json, session.user.id);
     }
 
     if (existing.htmlPayload && html !== undefined) {

@@ -23,6 +23,7 @@ export async function POST(request: NextRequest) {
     const parentId = formData.get("parentId") as string | null;
     const provider = formData.get("provider") as "r2" | "s3" | "vercel" | null;
     const enableOCR = formData.get("enableOCR") === "true";
+    const role = formData.get("role") as "primary" | "referenced" | null;
 
     if (!file) {
       return NextResponse.json(
@@ -149,6 +150,7 @@ export async function POST(request: NextRequest) {
             slug,
             contentType: "file",
             parentId: parentId || null,
+            role: role || "primary",
             displayOrder: 0,
             filePayload: {
               create: {
@@ -203,6 +205,7 @@ export async function POST(request: NextRequest) {
       {
         success: true,
         data: {
+          contentId: content.id,
           fileName: finalFileName,
           fileSize: file.size,
           searchTextLength: searchText.length,

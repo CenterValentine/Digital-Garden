@@ -83,7 +83,9 @@ const aiSettingsSchema = z
     // Master switch
     enabled: z.boolean().optional(),
     // Provider & model selection
-    providerId: z.enum(["anthropic", "openai"]).optional(),
+    providerId: z
+      .enum(["anthropic", "openai", "google", "xai", "mistral", "groq"])
+      .optional(),
     modelId: z.string().optional(),
     // Legacy field (kept for backward compat, prefer providerId + modelId)
     model: z
@@ -105,6 +107,8 @@ const aiSettingsSchema = z
     // Tool settings (Sprint 34)
     toolChoice: z.enum(["auto", "none"]).optional(),
     enabledTools: z.array(z.string()).optional(),
+    // AI content highlighting (Sprint 40)
+    showAiHighlight: z.boolean().optional(),
   })
   .optional();
 
@@ -304,6 +308,7 @@ export const DEFAULT_SETTINGS: UserSettings = {
     privacyMode: "full",
     toolChoice: "auto",
     enabledTools: ["searchNotes", "getCurrentNote", "createNote"],
+    showAiHighlight: true,
   },
   exportBackup: {
     defaultFormat: "markdown",

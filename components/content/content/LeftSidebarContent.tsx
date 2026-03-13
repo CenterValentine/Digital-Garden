@@ -1756,7 +1756,7 @@ export function LeftSidebarContent({
     <>
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* File tree with drag-and-drop zone */}
-        <div className="flex-1 min-h-0 overflow-hidden">
+        <div className="flex-1 min-h-0 overflow-scroll scrollbar-hidden">
           <RootNodeHeader
             workspaceName="root"
             totalFiles={countTotalNodes(treeData)}
@@ -1785,10 +1785,10 @@ export function LeftSidebarContent({
         </div>
 
         {/* Status bar */}
-        <LeftSidebarStatusBar
+        {/* <LeftSidebarStatusBar
           selectedCount={selectedCount}
           totalCount={countTotalNodes(treeData)}
-        />
+        /> */}
       </div>
 
       {/* Delete confirmation dialog */}

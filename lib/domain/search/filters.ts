@@ -237,7 +237,7 @@ export function parseSearchResults(
       title: item.title || "Untitled",
       type: item.contentType,
       excerpt: highlightedExcerpt,
-      path: undefined, // TODO: Build breadcrumb path from parentId
+      path: item.path || undefined,
       updatedAt: new Date(item.updatedAt),
       matchCount: undefined, // Not provided by current API
     };

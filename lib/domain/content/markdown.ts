@@ -1,12 +1,15 @@
 /**
  * Markdown ↔ TipTap JSON Conversion
  *
- * Bidirectional conversion between markdown and TipTap JSON using
- * @tiptap/extension-markdown for consistent WYSIWYG/raw editing.
+ * Bidirectional conversion between markdown and TipTap JSON.
+ * Uses `marked` for markdown → HTML, then TipTap's `generateJSON`
+ * for HTML → TipTap JSON (which requires registered extensions
+ * to know which node types to produce).
  */
 
 import { generateJSON, generateHTML } from "@tiptap/core";
 import type { JSONContent, Extensions } from "@tiptap/core";
+import { marked } from "marked";
 import { extractSearchTextFromTipTap } from "./search-text";
 
 // Import TipTap extensions
@@ -33,7 +36,13 @@ export function markdownToTiptap(markdown: string): JSONContent {
 
   try {
     const extensions = getServerExtensions();
-    const json = generateJSON(markdown, extensions);
+
+    // Step 1: Convert markdown → HTML via `marked`
+    // `generateJSON` expects HTML input, not raw markdown.
+    const html = marked.parse(markdown, { async: false, gfm: true }) as string;
+
+    // Step 2: Convert HTML → TipTap JSON via registered extensions
+    const json = generateJSON(html, extensions);
     return json;
   } catch (error) {
     console.error("Failed to convert markdown to TipTap:", error);

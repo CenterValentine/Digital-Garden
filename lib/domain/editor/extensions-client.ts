@@ -24,10 +24,14 @@ import { SlashCommands } from "./commands/slash-commands";
 import { TaskListInputRule } from "./extensions/task-list";
 import { BulletListBackspace } from "./extensions/bullet-list";
 import { HeadingBackspace } from "./extensions/heading-backspace";
+import { HeadingHardbreakSplit } from "./extensions/heading-hardbreak-split";
+import { BlockquoteLineOnly } from "./extensions/blockquote-line-only";
 import { Callout } from "./extensions/callout";
 import { WikiLink } from "./extensions/wiki-link";
 import { createWikiLinkSuggestion } from "./extensions/wiki-link-suggestion";
 import { Tag } from "./extensions/tag";
+import { EditorImage } from "./extensions/image";
+import { AiHighlight } from "./extensions/ai-highlight";
 
 // Create lowlight instance with common languages
 const lowlight = createLowlight(common);
@@ -121,6 +125,8 @@ export function getEditorExtensions(options?: EditorExtensionsOptions): Extensio
     HeadingBackspace, // Backspace in empty heading → paragraph with # chain
 
     // M6: External links
+    // Note: Link mark is inclusive: false by default in TipTap —
+    // cursor adjacent to a link does not inherit link formatting.
     Link.configure({
       openOnClick: false, // Don't open links while editing
       HTMLAttributes: {
@@ -130,8 +136,10 @@ export function getEditorExtensions(options?: EditorExtensionsOptions): Extensio
       },
     }),
 
-    // M6: Tables (minimal configuration to prevent auto-row issues)
-    Table,
+    // Tables — rebuilt from TipTap docs (Sprint 36)
+    Table.configure({
+      resizable: true,
+    }),
     TableRow,
     TableHeader,
     TableCell,
@@ -147,14 +155,26 @@ export function getEditorExtensions(options?: EditorExtensionsOptions): Extensio
 
     // M6: Wiki-style links [[Note Title]]
     WikiLink.configure({
-      onClickLink: options?.onWikiLinkClick || ((targetTitle: string) => {
-        console.log('[WikiLink] Clicked link to:', targetTitle);
-        console.warn('[WikiLink] No onWikiLinkClick handler provided');
-      }),
+      onClickLink: options?.onWikiLinkClick || (() => {}),
       suggestion: options?.fetchNotesForWikiLink
         ? createWikiLinkSuggestion(options.fetchNotesForWikiLink)
         : undefined,
     }),
+
+    // Heading + hardBreak split (only text before break becomes heading)
+    HeadingHardbreakSplit,
+
+    // Blockquote line-only (only current line becomes quoted, not content after hardBreak)
+    BlockquoteLineOnly,
+
+    // Sprint 37: Images in TipTap
+    EditorImage.configure({
+      inline: false,
+      allowBase64: true, // Allow blob URLs during upload
+    }),
+
+    // Sprint 40: AI content highlighting
+    AiHighlight,
 
     // M6: Tags with autocomplete
     Tag.configure({

@@ -46,6 +46,7 @@ interface ContentResponse {
     id: string;
     title: string;
     slug: string;
+    parentId: string | null;
     contentType: string;
     note?: {
       tiptapJson: any; // Prisma Json type
@@ -104,6 +105,7 @@ export function MainPanelContent() {
   const [noteContent, setNoteContent] = useState<JSONContent | null>(null);
   const [noteTitle, setNoteTitle] = useState<string>("");
   const [contentType, setContentType] = useState<string | null>(null);
+  const [contentParentId, setContentParentId] = useState<string | null>(null);
   const [contentData, setContentData] = useState<any>(null); // Phase 2: Store payload data
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -200,6 +202,7 @@ export function MainPanelContent() {
         }
 
         setNoteTitle(result.data.title);
+        setContentParentId(result.data.parentId);
         setContentType(result.data.contentType);
         setSelectedContentType(result.data.contentType);
 
@@ -844,6 +847,7 @@ export function MainPanelContent() {
         <div className="flex-1 overflow-hidden">
           <MarkdownEditor
             contentId={selectedContentId ?? undefined}
+            parentId={contentParentId}
             content={noteContent}
             onSave={handleSave}
             onStatsChange={handleStatsChange}

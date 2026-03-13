@@ -212,6 +212,27 @@ export class MarkdownConverter implements DocumentConverter {
           .join("\n");
       }
 
+      case "image": {
+        const alt = node.attrs?.alt || "";
+        const src = node.attrs?.src || "";
+        const title = node.attrs?.title || "";
+
+        // Standard markdown image syntax
+        const titlePart = title ? ` "${title}"` : "";
+        const imgMarkdown = `![${alt}](${src}${titlePart})`;
+
+        if (settings.preserveSemantics) {
+          // Preserve contentId, source, and width in HTML comment for lossless round-trip
+          const contentId = node.attrs?.contentId || "";
+          const source = node.attrs?.source || "";
+          const width = node.attrs?.width || "";
+          const meta = [contentId, source, width].join(":");
+          return `<!-- image:${meta} -->\n${imgMarkdown}\n<!-- /image -->`;
+        }
+
+        return imgMarkdown;
+      }
+
       case "horizontalRule":
         return "---";
 

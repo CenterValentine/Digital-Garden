@@ -25,6 +25,8 @@ import {
   defaultSettingsMiddleware,
 } from "@/lib/domain/ai/middleware";
 import { createBaseTools } from "@/lib/domain/ai/tools";
+import { createEditorTools } from "@/lib/domain/ai/tools";
+import { getProviderKey } from "@/lib/domain/ai/keys";
 import { prisma } from "@/lib/database/client";
 
 export async function POST(request: Request) {
@@ -78,11 +80,18 @@ export async function POST(request: Request) {
       );
     }
 
+    // Resolve API key: request body > stored BYOK key > env var (default)
+    let apiKey: string | undefined = body.apiKey;
+    if (!apiKey) {
+      const storedKey = await getProviderKey(session.user.id, providerId);
+      if (storedKey) apiKey = storedKey;
+    }
+
     // Resolve model from provider registry
     const model = await resolveChatModel({
       providerId,
       modelId,
-      apiKey: body.apiKey,
+      apiKey,
     });
 
     // Apply middleware stack
@@ -93,9 +102,13 @@ export async function POST(request: Request) {
     // Create tools bound to the authenticated user
     const toolChoice =
       (aiSettings as Record<string, unknown>).toolChoice ?? "auto";
+    const toolCtx = { userId: session.user.id, contentId };
     const tools =
       toolChoice !== "none"
-        ? createBaseTools({ userId: session.user.id })
+        ? {
+            ...createBaseTools(toolCtx),
+            ...(contentId ? createEditorTools(toolCtx) : {}),
+          }
         : undefined;
 
     // Convert UIMessages to ModelMessages for streamText
@@ -132,13 +145,23 @@ export async function POST(request: Request) {
       messages: modelMessages,
       tools,
       toolChoice: toolChoice !== "none" ? "auto" : undefined,
-      // Allow up to 3 model turns so tool calls get a follow-up text response.
-      // Turn 1: model may call a tool. Turn 2: model processes tool result
-      // (may call another tool). Turn 3: final text response.
-      stopWhen: stepCountIs(3),
-      system: `You are a helpful AI assistant in Digital Garden, a knowledge management application. Help the user with their notes, writing, and research. Be concise and helpful.${
+      // Allow up to 8 model turns for multi-step tool workflows.
+      // Editor tools may need: read → plan → diff → diff → diff → finish + final text.
+      // Base chat tools typically need 2-3 steps.
+      stopWhen: stepCountIs(contentId ? 8 : 5),
+      system: `You are a helpful AI assistant in Digital Garden, a knowledge management application. Help the user with their notes, writing, and research. Be concise and helpful.
+
+You have a generate_image tool that creates AI images from text prompts. When asked to generate, create, or draw an image, use this tool. Available providers: DALL·E 3, GPT Image 1, Imagen 3, FLUX (fal.ai/Together/Fireworks), DeepAI, RunwayML, Artbreeder. Default to DALL·E 3 unless specified. Write detailed prompts for best results.${
         contentId
-          ? `\n\nThe user is currently viewing content with ID: ${contentId}`
+          ? `\n\nThe user is currently viewing a document (ID: ${contentId}). You have editor tools available to read and edit this document.
+
+IMPORTANT EDITING RULES:
+- When the document has existing content, ALWAYS use apply_diff to make targeted changes or APPEND new content. NEVER use replace_document unless the user explicitly asks you overwrite the entire document.
+- To add content (descriptions, text, images), APPEND it after the existing content using apply_diff. Do NOT overwrite what is already there.
+- When asked to edit, always: 1) Read the document first with read_first_chunk, 2) Plan your approach if the edit is complex, 3) Apply changes with apply_diff for targeted edits, 4) Call finish_with_summary when done.
+- Only use replace_document for blank/empty documents or when the user explicitly requests a full rewrite.
+
+When you generate an image, the user can insert it into the document at their cursor position.`
           : ""
       }${mentionedContext}`,
     });

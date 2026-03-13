@@ -257,6 +257,22 @@ model StorageProviderConfig {
   @@index([userId, isDefault])
 }
 
+model AIProviderKey {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId       String    @db.Uuid
+  providerId   String    @db.VarChar(50)
+  encryptedKey String
+  label        String    @default("") @db.VarChar(100)
+  isActive     Boolean   @default(true)
+  lastUsedAt   DateTime? @db.Timestamptz(6)
+  createdAt    DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt    DateTime  @updatedAt @db.Timestamptz(6)
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, providerId])
+  @@index([userId, isActive])
+}
+
 model User {
   id              String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   username        String                  @unique @db.VarChar(50)
@@ -268,6 +284,7 @@ model User {
   settings        Json?
   settingsVersion Int                     @default(1)
   accounts        Account[]
+  aiProviderKeys  AIProviderKey[]
   auditTargets    AuditLog[]              @relation("AuditTargets")
   adminActions    AuditLog[]              @relation("AdminActions")
   categories      Category[]

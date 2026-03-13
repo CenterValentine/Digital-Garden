@@ -161,6 +161,22 @@ export async function GET(request: NextRequest) {
         slug: true,
         contentType: true,
         updatedAt: true,
+        // Parent chain for breadcrumb path (up to 3 levels)
+        parent: {
+          select: {
+            title: true,
+            parent: {
+              select: {
+                title: true,
+                parent: {
+                  select: {
+                    title: true,
+                  },
+                },
+              },
+            },
+          },
+        },
         notePayload: {
           select: {
             searchText: true,
@@ -191,12 +207,22 @@ export async function GET(request: NextRequest) {
 
     // Transform results - use contentType from database (discriminant)
     const results = items.map((item) => {
+      // Build breadcrumb path from parent chain
+      const pathParts: string[] = [];
+      let current: { title: string; parent?: { title: string; parent?: { title: string } | null } | null } | null = item.parent;
+      while (current) {
+        pathParts.unshift(current.title);
+        current = (current as { parent?: typeof current }).parent ?? null;
+      }
+      const path = pathParts.length > 0 ? pathParts.join(" / ") : undefined;
+
       return {
         id: item.id,
         title: item.title,
         slug: item.slug,
         contentType: item.contentType,
         updatedAt: item.updatedAt.toISOString(),
+        path,
         note: item.notePayload
           ? {
               searchText: item.notePayload.searchText,

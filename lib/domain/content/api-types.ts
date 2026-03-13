@@ -255,6 +255,7 @@ export interface InitiateUploadRequest {
   title?: string;
   customIcon?: string | null;
   iconColor?: string | null;
+  role?: "primary" | "referenced";
 }
 
 export interface FinalizeUploadRequest {

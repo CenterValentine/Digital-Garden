@@ -32,6 +32,7 @@ export async function POST(request: NextRequest) {
       title,
       customIcon,
       iconColor,
+      role,
     } = body;
 
     // Validation
@@ -149,6 +150,7 @@ export async function POST(request: NextRequest) {
         slug,
         contentType: "file",
         parentId: parentId || null,
+        role: role || "primary",
         customIcon: customIcon || null,
         iconColor: iconColor || null,
         filePayload: {

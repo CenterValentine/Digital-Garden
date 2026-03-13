@@ -1,7 +1,7 @@
 ---
-last_updated: 2026-03-06
-current_epoch: 8
-current_sprint: 35
+last_updated: 2026-03-13
+current_epoch: 10
+current_sprint: 42
 sprint_status: complete
 ---
 
@@ -35,18 +35,98 @@ before planning and executing. There may be additions or modifications.
 
 ## Current Work
 
-### Active Epoch: Epoch 8 - Editor Stabilization
-**Duration**: 2 sprints (35-36)
-**Theme**: Bug fixes, TipTap rules, focus guardrails, table rebuild
+### Active Epoch: Epoch 10 - AI TipTap (Injected Before Remaining Epoch 9)
+**Duration**: 5 sprints (38-42)
+**Theme**: AI-powered document editing, provider expansion, edit highlighting
 
 **Sprint Plan**:
-- Sprint 35: TipTap Rules Doc + Input Rule Bug Fixes (complete)
-- Sprint 36: Table Rebuild + Link Fix + Cleanup + Focus Guardrails (planned)
-
-### Next Sprint: Sprint 36 - Table Rebuild + Link Fix + Cleanup + Focus Guardrails
-**Status**: Planned — awaiting user input before commencing
+- Sprint 38: Providers + BYOK Persistence + Rich Bot Responses (complete)
+- Sprint 39: AI Text-Editing Tools — Client-Side Architecture (complete)
+- Sprint 40: AI Edit Highlighting + AI Image Insert (complete)
+- Sprint 41: Chat Content Outlines (complete)
+- Sprint 42: AI Image Generation (complete)
 
 ## Recent Completions (Last 30 Days)
+
+**Mar 13, 2026**: Sprint 42 AI Image Generation — COMPLETE
+- 8-provider image generation system: OpenAI (DALL·E 3, GPT Image 1), Google (Imagen 3), DeepAI, fal.ai (FLUX.1 Dev/Schnell), Together AI (FLUX/SDXL), Fireworks AI, RunwayML (Gen-3), Artbreeder
+- `generate_image` chat tool: LLM generates images from text prompts, auto-uploads to storage, creates referenced FilePayload
+- GeneratedImageCard in ChatMessage: rendered image with AI badge, provider info, prompt display
+- "Insert into document" button: dispatches `insert-ai-image` CustomEvent, MarkdownEditor inserts at cursor
+- Drag-and-drop: draggable images from chat to TipTap editor via `application/x-dg-ai-image` data transfer
+- Image generation API route: `/api/ai/image` — standalone endpoint for direct generation
+- Provider catalog with model metadata (sizes, quality/style support)
+- Works in both ChatPanel (side chat) and ChatViewer (content node chat)
+- 10 files changed, 5 new files
+- Build gate passed
+
+**Mar 12, 2026**: Sprint 41 Chat Content Outlines — COMPLETE
+- Chat outline extractor: parses UIMessage[] into navigable entries (user prompts, assistant summaries, tool calls)
+- Granularity toggle: "compact" (messages only) vs "expanded" (headers, lists, images from assistant markdown)
+- ChatOutlinePanel component with role-based SVG icons (user, assistant, tool) and dot-and-indent sub-items
+- Outline tab now available for `chat` content type (tool registry expanded)
+- Real-time outline sync: ChatViewer feeds messages into outline store as they stream
+- Click-to-scroll: outline entries dispatch `scroll-to-chat-message` CustomEvent, ChatViewer scrolls with gold flash animation
+- Outline store extended with chat-specific slice (separate from note outline)
+- 6 files changed, 2 new files
+- Build gate passed
+
+**Mar 12, 2026**: Sprint 40 AI Edit Highlighting + AI Image Insert — COMPLETE
+- `aiHighlight` ProseMirror Mark extension: `inclusive: false`, `source` attribute, `<span class="ai-highlight" data-source="ai">`
+- Registered in both client and server extension sets
+- AI highlight CSS: indigo tint + bottom border, hover state, `.ai-highlight-hidden` toggle class
+- Orchestrator auto-marks all AI-inserted content (both `typeText` and `insertStructuredContent`)
+- `replace_document` marks entire document as AI content
+- `insert_image` tool (9th editor tool): inserts image from URL with `source: "ai-generated"`
+- AI badge on ImageBubbleMenu for AI-generated images
+- "Show AI Content Highlights" toggle in AI settings (validation schema + settings page)
+- CSS class toggle approach: hides highlights without removing marks from document
+- Fixed selection highlight regression: deferred `setEditable(false)` to Phase 3 so native selection renders in Phase 2
+- 8 files changed, 1 new extension file
+- Build gate passed
+
+**Mar 11, 2026**: Sprint 39 AI Text-Editing Tools — Client-Side Architecture — COMPLETE
+- 8 agentic tools: read_first_chunk, read_next_chunk, read_previous_chunk, apply_diff, replace_document, plan, ask_user, finish_with_summary
+- Client-side editing architecture: tools return structured payloads, frontend applies to live TipTap editor
+- Editor instance Zustand store: shares TipTap editor between editor component and chat panel
+- ProseMirror text search utility: finds exact text positions in document for AI edits
+- AI edit orchestrator: 4-phase animation (cursor arrival → selection → content insertion → settle)
+- Editor lock with 30s timeout failsafe, queued execution, abort on navigation
+- Dual insertion strategy: char-by-char typing for inline text, parsed node-by-node for structured content
+- Fixed `markdownToTiptap` — added `marked` for proper markdown → HTML → TipTap JSON pipeline
+- Dev-only debug toggle in chat tool call bubbles (raw response viewer)
+- "AI is editing..." indicator in chat panel
+- AI editor behaviors living document: docs/notes-feature/features/ai-editor-behaviors.md
+- 10 files changed, 4 new files
+- Build gate passed
+
+**Mar 11, 2026**: Sprint 38 Providers + BYOK Persistence + Rich Bot Responses — COMPLETE
+- 4 new AI providers: Google Gemini, xAI Grok, Mistral, Groq (6 total)
+- BYOK key persistence: encrypted DB storage, CRUD API, verify endpoint
+- AIKeyManager settings UI: per-provider key input, masked display, verify button
+- ChatMessage rich markdown rendering: react-markdown + remark-gfm + lowlight syntax highlighting
+- Code blocks with copy button, tables, lists, blockquotes, inline formatting
+- Build gate passed
+
+**Mar 8, 2026**: Sprint 37 Images in TipTap + Referenced Content Lifecycle — COMPLETE
+- Image extension with contentId, source, uploading, width attributes
+- Upload via slash command (/image), paste (files + image URLs), drag-and-drop from Finder
+- Referenced content lifecycle: ContentLink sync on save, orphan soft-delete, cascade move
+- Image bubble menu with size presets (S/M/L), alt text, delete
+- Vanilla DOM NodeView with drag-to-resize handle
+- Deferred: figure/caption, markdown export, lazy loading
+
+**Mar 6, 2026**: Sprint 36 Table Rebuild + Link Fix + Cleanup + Focus Guardrails — COMPLETE
+- Console cleanup: removed console.log/console.warn from editor code (kept console.error)
+- Focus guardrails: removed `.focus()` from TableBubbleMenu chains, added `preventFocusLoss`
+- Focus guardrails: removed `setTimeout` focus hack from slash command table insertion
+- Link: documented `inclusive: false` default (cursor adjacent to links doesn't inherit formatting)
+- HeadingHardbreakSplit extension: `## ` in paragraph with hardBreak only converts text before break
+- BlockquoteLineOnly extension: `> ` in paragraph with hardBreak only quotes text before break
+- Table rebuild: removed old CSS, added minimal TipTap-docs-based styles, enabled `resizable: true`
+- Registered new extensions in both client and server extension sets
+- Build gate passed
+- 8 files changed, 2 new extension files
 
 **Mar 6, 2026**: Sprint 35 TipTap Rules Doc + Input Rule Bug Fixes — COMPLETE
 - TIPTAP-EDITOR-RULES.md created (living document — expand as features are added)
@@ -102,14 +182,8 @@ before planning and executing. There may be additions or modifications.
 
 ## Up Next
 
-### Epoch 8: Editor Stabilization (Sprints 35-36)
-Fix all known editor bugs, establish TipTap rules, implement focus guardrails.
-
-### Epoch 9: Editor Enhancements (Sprints 37-42)
-Images, URL/OG embeds, YouTube, drag/reorder, templates, snapshots, context menu.
-
-### Epoch 10: AI TipTap (Sprints 43-47)
-Pretty AI responses, agent editing tools, AI edit highlighting, chat outlines, AI image generation.
+### Epoch 11: Editor Enhancements (Remaining Epoch 9)
+URL/OG embeds, YouTube, drag/reorder, templates, snapshots, context menu.
 
 **See**: [Epoch Plans](work-tracking/epochs/) for detailed sprint breakdowns
 
@@ -119,12 +193,8 @@ Pretty AI responses, agent editing tools, AI edit highlighting, chat outlines, A
 - **macOS Finder**: File picker not opening on dev machine — blocks manual testing of import feature
 - **macOS mmap**: `mmap failed: Operation timed out` on `git push` from main working directory — workaround: git bundle → fresh clone → push from /tmp
 
-### Known Editor Bugs (Sprint 36 targets)
-- `>` blockquote affects child content
-- Cursor adjacent to URL inherits link formatting
-- Header conversion in paragraph with `hardBreak` converts all text
-- Table extra column visual bug
-- Old console.log statements throughout editor code
+### Known Editor Bugs
+- *(All Sprint 36 targets resolved — see Recent Completions)*
 
 ### Known Limitations
 - **Sprint 31 Import**: Untested pending Finder fix
@@ -151,20 +221,18 @@ Pretty AI responses, agent editing tools, AI edit highlighting, chat outlines, A
 
 ### Epoch Progress
 - **Epoch 7** (AI Integration): ✅ Sprints 33-34 complete; Sprints 35-36 redirected to Epoch 8
-- **Epoch 8** (Editor Stabilization): In Progress — Sprint 35 complete, Sprint 36 planned
-- **Epoch 9** (Editor Enhancements): Planned (Sprints 37-42)
-- **Epoch 10** (AI TipTap): Planned (Sprints 43-47)
+- **Epoch 8** (Editor Stabilization): ✅ Complete — Sprints 35-36 complete
+- **Epoch 9** (Editor Enhancements): Sprint 37 complete; remaining sprints deferred to Epoch 11
+- **Epoch 10** (AI TipTap): ✅ Complete — Sprints 38-42 complete
 
 ## Roadmap
 
-### Epoch 8: Editor Stabilization (Active)
-**Theme**: Bug fixes, TipTap rules, focus guardrails, table rebuild
+### Epoch 10: AI TipTap (✅ Complete — Sprints 38-42)
+**Theme**: AI providers, BYOK, agent editing tools, edit highlighting, chat outlines, image generation
+**Status**: 5/5 sprints complete ✅
 
-### Epoch 9: Editor Enhancements (Planned)
-**Theme**: Images, embeds, templates, snapshots, context menu, drag/reorder
-
-### Epoch 10: AI TipTap (Planned)
-**Theme**: AI responses, agent tools, edit highlighting, chat outlines, image generation
+### Epoch 11: Editor Enhancements (Planned — Remaining Epoch 9)
+**Theme**: URL/OG embeds, YouTube, drag/reorder, templates, snapshots, context menu
 
 ### Future (Unplanned)
 - **Collaboration & Sharing** — real-time editing, sharing, security review
@@ -174,7 +242,7 @@ Pretty AI responses, agent editing tools, AI edit highlighting, chat outlines, A
 
 ## Quick Links
 
-- [Current Sprint](work-tracking/CURRENT-SPRINT.md) - Sprint 35 details
+- [Current Sprint](work-tracking/CURRENT-SPRINT.md) - Sprint 42 details
 - [Backlog](work-tracking/BACKLOG.md) - Prioritized work items
 - [Epoch Plans](work-tracking/epochs/) - Epoch 8, 9, 10, future stubs
 - [TipTap Editor Rules](guides/editor/TIPTAP-EDITOR-RULES.md) - Editor behavior rules
@@ -183,5 +251,5 @@ Pretty AI responses, agent editing tools, AI edit highlighting, chat outlines, A
 
 ---
 
-**Last Updated**: Mar 6, 2026
-**Next Review**: Sprint 36 kickoff (user input required before commencing)
+**Last Updated**: Mar 12, 2026
+**Next Review**: Sprint 42 kickoff (AI Image Generation)

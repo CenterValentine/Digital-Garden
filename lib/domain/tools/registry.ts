@@ -147,7 +147,7 @@ const TOOL_REGISTRY: ToolDefinition[] = [
     label: "Outline",
     iconName: "List",
     surfaces: ["sidebar-tab"],
-    contentTypes: ["note"],
+    contentTypes: ["note", "chat"],
     order: 20,
     tabKey: "outline",
   },

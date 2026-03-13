@@ -26,6 +26,18 @@ const MODEL_MAP: Record<string, { provider: string; modelString: string }> = {
   "gpt-4o": { provider: "openai", modelString: "gpt-4o" },
   "gpt-4o-mini": { provider: "openai", modelString: "gpt-4o-mini" },
   "gpt-4": { provider: "openai", modelString: "gpt-4" },
+  // Google models
+  "gemini-2.5-pro": { provider: "google", modelString: "gemini-2.5-pro-preview-05-06" },
+  "gemini-2.0-flash": { provider: "google", modelString: "gemini-2.0-flash" },
+  // xAI models
+  "grok-3": { provider: "xai", modelString: "grok-3" },
+  "grok-3-mini": { provider: "xai", modelString: "grok-3-mini" },
+  // Mistral models
+  "mistral-large": { provider: "mistral", modelString: "mistral-large-latest" },
+  "codestral": { provider: "mistral", modelString: "codestral-latest" },
+  // Groq models
+  "mixtral-8x7b": { provider: "groq", modelString: "mixtral-8x7b-32768" },
+  "llama-3.3-70b": { provider: "groq", modelString: "llama-3.3-70b-versatile" },
 };
 
 /**
@@ -63,6 +75,40 @@ export async function resolveChatModel(
       const provider = config.apiKey
         ? createOpenAI({ apiKey: config.apiKey })
         : openai;
+      return provider(mapping.modelString);
+    }
+
+    case "google": {
+      const { google, createGoogleGenerativeAI } = await import(
+        "@ai-sdk/google"
+      );
+      const provider = config.apiKey
+        ? createGoogleGenerativeAI({ apiKey: config.apiKey })
+        : google;
+      return provider(mapping.modelString);
+    }
+
+    case "xai": {
+      const { xai, createXai } = await import("@ai-sdk/xai");
+      const provider = config.apiKey
+        ? createXai({ apiKey: config.apiKey })
+        : xai;
+      return provider(mapping.modelString);
+    }
+
+    case "mistral": {
+      const { mistral, createMistral } = await import("@ai-sdk/mistral");
+      const provider = config.apiKey
+        ? createMistral({ apiKey: config.apiKey })
+        : mistral;
+      return provider(mapping.modelString);
+    }
+
+    case "groq": {
+      const { groq, createGroq } = await import("@ai-sdk/groq");
+      const provider = config.apiKey
+        ? createGroq({ apiKey: config.apiKey })
+        : groq;
       return provider(mapping.modelString);
     }
 

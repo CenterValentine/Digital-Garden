@@ -19,6 +19,8 @@ import { ChatMessage } from "../ai/ChatMessage";
 import { ChatInput } from "../ai/ChatInput";
 import { ModelPicker, useModelSelection } from "../ai/ModelPicker";
 import { BASE_TOOL_METADATA, BASE_TOOL_IDS } from "@/lib/domain/ai/tools/metadata";
+import { extractChatOutline } from "@/lib/domain/ai/chat-outline";
+import { useOutlineStore } from "@/state/outline-store";
 import type { SuggestionItem } from "../ai/ChatSuggestionMenu";
 import type { UIMessage } from "ai";
 import type { StoredChatMessage } from "@/lib/domain/ai/types";
@@ -34,11 +36,41 @@ interface ChatViewerProps {
 function toUIMessages(stored: StoredChatMessage[]): UIMessage[] {
   return stored
     .filter((m) => m.role === "user" || m.role === "assistant")
-    .map((m) => ({
-      id: m.id || crypto.randomUUID(),
-      role: m.role as "user" | "assistant",
-      parts: [{ type: "text" as const, text: m.content }],
-    }));
+    .map((m) => {
+      const parts: UIMessage["parts"] = [
+        { type: "text" as const, text: m.content },
+      ];
+
+      // Reconstruct image payload tool parts from stored data.
+      // These are saved as lightweight __imagePayload objects in `parts`.
+      if (m.parts && Array.isArray(m.parts)) {
+        for (const stored of m.parts) {
+          if (
+            stored &&
+            typeof stored === "object" &&
+            (stored as Record<string, unknown>).__imagePayload
+          ) {
+            // Reconstruct a synthetic tool part that ChatMessage can detect
+            // via its structural typing check ("toolCallId" in part && "toolName" in part)
+            const syntheticToolPart = {
+              type: "tool-generate_image" as const,
+              toolCallId: `restored-${(stored as Record<string, unknown>).contentId}`,
+              toolName: "generate_image",
+              state: "output-available",
+              input: {},
+              output: JSON.stringify(stored),
+            };
+            parts.push(syntheticToolPart as unknown as UIMessage["parts"][number]);
+          }
+        }
+      }
+
+      return {
+        id: m.id || crypto.randomUUID(),
+        role: m.role as "user" | "assistant",
+        parts,
+      };
+    });
 }
 
 export function ChatViewer({
@@ -180,15 +212,47 @@ export function ChatViewer({
   const persistMessages = useCallback(async () => {
     if (messages.length === 0) return;
 
-    const storedMessages: StoredChatMessage[] = messages.map((m) => ({
-      id: m.id,
-      role: m.role,
-      content: m.parts
+    const storedMessages: StoredChatMessage[] = messages.map((m) => {
+      // Extract text content
+      const content = m.parts
         .filter((p) => p.type === "text")
         .map((p) => (p as { text: string }).text)
-        .join(""),
-      createdAt: new Date().toISOString(),
-    }));
+        .join("");
+
+      // Preserve tool parts with image payloads so image cards survive refresh.
+      // We save a lightweight representation — just enough to reconstruct the card.
+      const imagePayloads: unknown[] = [];
+      for (const part of m.parts) {
+        // AI SDK v6: static tool parts have type "tool-{name}" with no toolName prop;
+        // dynamic tool parts have type "dynamic-tool" with toolName prop.
+        // Check for toolCallId (present on both) rather than toolName.
+        const p = part as Record<string, unknown>;
+        if (
+          "toolCallId" in p &&
+          (p.state as string) === "output-available" &&
+          "output" in p
+        ) {
+          const output = p.output;
+          const str = typeof output === "string" ? output : JSON.stringify(output);
+          if (str.includes('"__imagePayload"')) {
+            try {
+              const parsed = typeof output === "string" ? JSON.parse(output) : output;
+              if (parsed?.__imagePayload) {
+                imagePayloads.push(parsed);
+              }
+            } catch { /* skip */ }
+          }
+        }
+      }
+
+      return {
+        id: m.id,
+        role: m.role,
+        content,
+        createdAt: new Date().toISOString(),
+        ...(imagePayloads.length > 0 ? { parts: imagePayloads } : {}),
+      };
+    });
 
     try {
       const res = await fetch(`/api/content/content/${contentId}`, {
@@ -240,6 +304,51 @@ export function ChatViewer({
     }
   }, [messages]);
 
+  // ─── Sprint 41: Chat outline sync ───
+  const setChatOutline = useOutlineStore((s) => s.setChatOutline);
+  const chatOutlineGranularity = useOutlineStore(
+    (s) => s.chatOutlineGranularity
+  );
+
+  // Update outline store when messages or granularity changes (real-time)
+  useEffect(() => {
+    const entries = extractChatOutline(messages, chatOutlineGranularity);
+    setChatOutline(entries);
+  }, [messages, chatOutlineGranularity, setChatOutline]);
+
+  // Clear chat outline on unmount
+  useEffect(() => {
+    return () => {
+      useOutlineStore.getState().setChatOutline([]);
+    };
+  }, []);
+
+  // ─── Sprint 41: Scroll-to-message from outline clicks ───
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail as {
+        messageIndex: number;
+        entryId: string;
+      };
+      const container = scrollRef.current;
+      if (!container) return;
+
+      // Find the message element by data attribute
+      const messageEl = container.querySelector(
+        `[data-message-index="${detail.messageIndex}"]`
+      );
+      if (messageEl) {
+        messageEl.scrollIntoView({ behavior: "smooth", block: "center" });
+        // Brief highlight flash
+        messageEl.classList.add("chat-outline-flash");
+        setTimeout(() => messageEl.classList.remove("chat-outline-flash"), 1500);
+      }
+    };
+
+    window.addEventListener("scroll-to-chat-message", handler);
+    return () => window.removeEventListener("scroll-to-chat-message", handler);
+  }, []);
+
   const isActive = status === "streaming" || status === "submitted";
   const hasMessages = messages.length > 0;
 
@@ -273,15 +382,16 @@ export function ChatViewer({
         {hasMessages ? (
           <div className="space-y-1 py-4">
             {messages.map((message, i) => (
-              <ChatMessage
-                key={message.id}
-                message={message}
-                isStreaming={
-                  isActive &&
-                  i === messages.length - 1 &&
-                  message.role === "assistant"
-                }
-              />
+              <div key={message.id} data-message-index={i}>
+                <ChatMessage
+                  message={message}
+                  isStreaming={
+                    isActive &&
+                    i === messages.length - 1 &&
+                    message.role === "assistant"
+                  }
+                />
+              </div>
             ))}
           </div>
         ) : (

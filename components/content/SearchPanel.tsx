@@ -56,11 +56,27 @@ export function SearchPanel() {
   const [selectedTags, setSelectedTags] = useState<string[]>(filter.tags || []);
   const inputRef = useRef<HTMLInputElement>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
+  const typeFilterRef = useRef<HTMLDivElement>(null);
 
   // Focus input when panel opens
   useEffect(() => {
     inputRef.current?.focus();
   }, []);
+
+  // Close type filter dropdown when clicking outside
+  useEffect(() => {
+    if (!showTypeFilter) return;
+    const handler = (e: MouseEvent) => {
+      if (
+        typeFilterRef.current &&
+        !typeFilterRef.current.contains(e.target as Node)
+      ) {
+        setShowTypeFilter(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [showTypeFilter]);
 
   // Load cached search results on mount
   useEffect(() => {
@@ -399,50 +415,31 @@ export function SearchPanel() {
 
         {/* Type filter dropdown */}
         {showTypeFilter && (
-          <div className="relative mb-2">
+          <div className="relative mb-2" ref={typeFilterRef}>
             <div className="rounded-md border border-white/20 bg-white/5 backdrop-blur-md shadow-lg">
-              <button
-                onClick={() => setDocumentType("all")}
-                className="w-full px-3 py-2 text-left text-sm text-foreground hover:bg-white/10"
-                type="button"
-              >
-                {filter.type === "all" && "✓ "}All types
-              </button>
-              <button
-                onClick={() => setDocumentType("note")}
-                className="w-full px-3 py-2 text-left text-sm text-foreground hover:bg-white/10"
-                type="button"
-              >
-                {filter.type === "note" && "✓ "}Notes
-              </button>
-              <button
-                onClick={() => setDocumentType("folder")}
-                className="w-full px-3 py-2 text-left text-sm text-foreground hover:bg-white/10"
-                type="button"
-              >
-                {filter.type === "folder" && "✓ "}Folders
-              </button>
-              <button
-                onClick={() => setDocumentType("html")}
-                className="w-full px-3 py-2 text-left text-sm text-foreground hover:bg-white/10"
-                type="button"
-              >
-                {filter.type === "html" && "✓ "}HTML
-              </button>
-              <button
-                onClick={() => setDocumentType("code")}
-                className="w-full px-3 py-2 text-left text-sm text-foreground hover:bg-white/10"
-                type="button"
-              >
-                {filter.type === "code" && "✓ "}Code
-              </button>
-              <button
-                onClick={() => setDocumentType("file")}
-                className="w-full px-3 py-2 text-left text-sm text-foreground hover:bg-white/10"
-                type="button"
-              >
-                {filter.type === "file" && "✓ "}Files
-              </button>
+              {(
+                [
+                  ["all", "All types"],
+                  ["note", "Notes"],
+                  ["folder", "Folders"],
+                  ["chat", "Chats"],
+                  ["html", "HTML"],
+                  ["code", "Code"],
+                  ["file", "Files"],
+                  ["external", "External Links"],
+                  ["template", "Templates"],
+                  ["visualization", "Visualizations"],
+                ] as const
+              ).map(([type, label]) => (
+                <button
+                  key={type}
+                  onClick={() => setDocumentType(type as ContentType | "all")}
+                  className="w-full px-3 py-2 text-left text-sm text-foreground hover:bg-white/10"
+                  type="button"
+                >
+                  {filter.type === type && "✓ "}{label}
+                </button>
+              ))}
             </div>
           </div>
         )}
@@ -613,13 +610,18 @@ export function SearchPanel() {
                   />
                 )}
 
-                {/* Path */}
-                {result.path && <p className="mb-1 text-xs text-gray-600 dark:text-gray-400">{result.path}</p>}
-
-                {/* Metadata */}
+                {/* Path + Metadata row */}
                 <div className="flex items-center gap-3 text-xs text-gray-600 dark:text-gray-400">
-                  <span>{new Date(result.updatedAt).toLocaleDateString()}</span>
-                  {result.matchCount && result.matchCount > 1 && <span>{result.matchCount} matches</span>}
+                  {result.path && (
+                    <span className="flex items-center gap-1 truncate" title={result.path}>
+                      <svg className="h-3 w-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                      </svg>
+                      <span className="truncate">{result.path}</span>
+                    </span>
+                  )}
+                  <span className="shrink-0">{new Date(result.updatedAt).toLocaleDateString()}</span>
+                  {result.matchCount && result.matchCount > 1 && <span className="shrink-0">{result.matchCount} matches</span>}
                 </div>
               </button>
             ))}

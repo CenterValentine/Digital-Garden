@@ -14,9 +14,11 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
-import { Save, Trash2, AlertCircle, Bot } from "lucide-react";
+import { Save, Trash2, AlertCircle, Bot, Pencil } from "lucide-react";
 import { toast } from "sonner";
 import { useContentStore } from "@/state/content-store";
+import { useEditorInstanceStore } from "@/state/editor-instance-store";
+import { AiEditOrchestrator, parseEditPayload } from "@/lib/domain/editor/ai";
 import { ChatMessage } from "./ChatMessage";
 import { ChatInput } from "./ChatInput";
 import { ModelPicker, useModelSelection } from "./ModelPicker";
@@ -132,11 +134,81 @@ export function ChatPanel() {
     },
   });
 
+  // ─── AI Edit Orchestrator ───
+  const isAiEditing = useEditorInstanceStore((s) => s.isAiEditing);
+
+  const orchestratorRef = useRef<AiEditOrchestrator | null>(null);
+
+  // Create orchestrator on mount, destroy on unmount
+  useEffect(() => {
+    const orchestrator = new AiEditOrchestrator(
+      () => useEditorInstanceStore.getState().editor,
+      {
+        onStateChange: (editing) => {
+          useEditorInstanceStore.getState().setAiEditing(editing);
+        },
+        onEditResult: (result) => {
+          if (!result.success && result.error) {
+            toast.error(result.error);
+          }
+        },
+      }
+    );
+    orchestratorRef.current = orchestrator;
+
+    return () => {
+      orchestrator.destroy();
+      orchestratorRef.current = null;
+    };
+  }, []);
+
+  // Intercept tool results for edit payloads.
+  // AI SDK v6: tool results appear as DynamicToolUIPart with type 'dynamic-tool',
+  // state 'output-available', and output containing the tool's return value.
+  const processedToolIdsRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (!orchestratorRef.current) return;
+
+    for (const message of messages) {
+      if (message.role !== "assistant") continue;
+
+      for (const part of message.parts) {
+        // DynamicToolUIPart: type='dynamic-tool', toolCallId, state, output
+        if (
+          "toolCallId" in part &&
+          "state" in part &&
+          (part as { state: string }).state === "output-available" &&
+          "output" in part
+        ) {
+          const toolPart = part as { toolCallId: string; output: unknown };
+          const outputStr = typeof toolPart.output === "string"
+            ? toolPart.output
+            : null;
+
+          if (
+            outputStr &&
+            !processedToolIdsRef.current.has(toolPart.toolCallId)
+          ) {
+            const payload = parseEditPayload(outputStr);
+            if (payload) {
+              processedToolIdsRef.current.add(toolPart.toolCallId);
+              orchestratorRef.current.enqueue(payload);
+            }
+          }
+        }
+      }
+    }
+  }, [messages]);
+
   // Reset chat when switching content nodes
   const prevContentIdRef = useRef(selectedContentId);
   useEffect(() => {
     if (selectedContentId !== prevContentIdRef.current) {
       prevContentIdRef.current = selectedContentId;
+      // Abort any in-progress AI edits when switching documents
+      orchestratorRef.current?.abort();
+      processedToolIdsRef.current.clear();
       setMessages([]);
       setInput("");
     }
@@ -201,13 +273,38 @@ export function ChatPanel() {
       // Convert UIMessages to StoredChatMessage format
       const storedMessages = messages
         .filter((m) => m.role === "user" || m.role === "assistant")
-        .map((m) => ({
-          id: m.id,
-          role: m.role,
-          content: getMessageText(m),
-          createdAt: new Date().toISOString(),
-        }))
-        .filter((m) => m.content); // Skip empty messages (tool-only turns)
+        .map((m) => {
+          // Preserve image payloads so they survive when saved to a chat node
+          const imagePayloads: unknown[] = [];
+          for (const part of m.parts) {
+            // AI SDK v6: static tool parts have type "tool-{name}" (no toolName prop).
+            // Check for toolCallId (present on both static and dynamic parts).
+            const p = part as Record<string, unknown>;
+            if (
+              "toolCallId" in p &&
+              (p.state as string) === "output-available" &&
+              "output" in p
+            ) {
+              const output = p.output;
+              const str = typeof output === "string" ? output : JSON.stringify(output);
+              if (str.includes('"__imagePayload"')) {
+                try {
+                  const parsed = typeof output === "string" ? JSON.parse(output) : output;
+                  if (parsed?.__imagePayload) imagePayloads.push(parsed);
+                } catch { /* skip */ }
+              }
+            }
+          }
+
+          return {
+            id: m.id,
+            role: m.role,
+            content: getMessageText(m),
+            createdAt: new Date().toISOString(),
+            ...(imagePayloads.length > 0 ? { parts: imagePayloads } : {}),
+          };
+        })
+        .filter((m) => m.content || (m.parts && (m.parts as unknown[]).length > 0)); // Keep messages with content or image payloads
 
       const res = await fetch("/api/content/content", {
         method: "POST",
@@ -296,6 +393,14 @@ export function ChatPanel() {
         <div className="mx-3 mt-2 flex items-center gap-2 rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs text-red-300">
           <AlertCircle className="h-3.5 w-3.5 shrink-0" />
           <span className="truncate">{error.message}</span>
+        </div>
+      )}
+
+      {/* AI editing indicator */}
+      {isAiEditing && (
+        <div className="mx-3 mt-2 flex items-center gap-2 rounded-lg border border-blue-500/20 bg-blue-500/10 px-3 py-2 text-xs text-blue-300">
+          <Pencil className="h-3.5 w-3.5 shrink-0 animate-pulse" />
+          <span>AI is editing the document...</span>
         </div>
       )}
 

@@ -78,6 +78,98 @@ export const PROVIDER_CATALOG: ProviderMeta[] = [
       },
     ],
   },
+  {
+    id: "google",
+    name: "Google",
+    requiresApiKey: true,
+    models: [
+      {
+        id: "gemini-2.5-pro",
+        name: "Gemini 2.5 Pro",
+        contextWindow: 1_000_000,
+        maxOutput: 65_536,
+        capabilities: ["text", "vision", "tools", "streaming"],
+        costTier: "high",
+      },
+      {
+        id: "gemini-2.0-flash",
+        name: "Gemini 2.0 Flash",
+        contextWindow: 1_000_000,
+        maxOutput: 8_192,
+        capabilities: ["text", "vision", "tools", "streaming"],
+        costTier: "low",
+      },
+    ],
+  },
+  {
+    id: "xai",
+    name: "xAI",
+    requiresApiKey: true,
+    models: [
+      {
+        id: "grok-3",
+        name: "Grok 3",
+        contextWindow: 131_072,
+        maxOutput: 16_384,
+        capabilities: ["text", "tools", "streaming"],
+        costTier: "high",
+      },
+      {
+        id: "grok-3-mini",
+        name: "Grok 3 Mini",
+        contextWindow: 131_072,
+        maxOutput: 16_384,
+        capabilities: ["text", "tools", "streaming"],
+        costTier: "medium",
+      },
+    ],
+  },
+  {
+    id: "mistral",
+    name: "Mistral",
+    requiresApiKey: true,
+    models: [
+      {
+        id: "mistral-large",
+        name: "Mistral Large",
+        contextWindow: 128_000,
+        maxOutput: 8_192,
+        capabilities: ["text", "vision", "tools", "streaming"],
+        costTier: "medium",
+      },
+      {
+        id: "codestral",
+        name: "Codestral",
+        contextWindow: 32_000,
+        maxOutput: 8_192,
+        capabilities: ["text", "tools", "streaming"],
+        costTier: "medium",
+      },
+    ],
+  },
+  {
+    id: "groq",
+    name: "Groq",
+    requiresApiKey: true,
+    models: [
+      {
+        id: "mixtral-8x7b",
+        name: "Mixtral 8x7B",
+        contextWindow: 32_768,
+        maxOutput: 4_096,
+        capabilities: ["text", "tools", "streaming"],
+        costTier: "low",
+      },
+      {
+        id: "llama-3.3-70b",
+        name: "Llama 3.3 70B",
+        contextWindow: 128_000,
+        maxOutput: 8_192,
+        capabilities: ["text", "tools", "streaming"],
+        costTier: "low",
+      },
+    ],
+  },
 ];
 
 /** Look up a provider by ID */
