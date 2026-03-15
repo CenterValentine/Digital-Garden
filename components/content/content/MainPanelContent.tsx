@@ -30,6 +30,7 @@ import { DataViewer } from "../viewer/DataViewer";
 import { HopeViewer } from "../viewer/HopeViewer";
 import { WorkflowViewer } from "../viewer/WorkflowViewer";
 import { MainPanelNavigation } from "../MainPanelNavigation";
+import { CalendarWorkspace } from "@/components/calendar/CalendarWorkspace";
 import { DebugViewToggle } from "../viewer/DebugViewToggle";
 import { JSONDebugView } from "../viewer/debug/JSONDebugView";
 import { TreeDebugView } from "../viewer/debug/TreeDebugView";
@@ -39,6 +40,7 @@ import type { JSONContent } from "@tiptap/core";
 import type { EditorStats } from "../editor/MarkdownEditor";
 import type { OutlineHeading } from "@/lib/domain/content/outline-extractor";
 import { extractOutline } from "@/lib/domain/content/outline-extractor";
+import { useLeftPanelViewStore } from "@/state/left-panel-view-store";
 
 interface ContentResponse {
   success: boolean;
@@ -48,6 +50,8 @@ interface ContentResponse {
     slug: string;
     parentId: string | null;
     contentType: string;
+    createdAt: string;
+    updatedAt: string;
     note?: {
       tiptapJson: any; // Prisma Json type
       searchText: string;
@@ -102,8 +106,11 @@ export function MainPanelContent() {
   const { setStats, setLastSaved, setIsSaving, setHasUnsavedChanges, reset: resetStats } = useEditorStatsStore();
   const { setOutline, clearOutline } = useOutlineStore();
   const { isDebugPanelVisible, toggleDebugPanel, viewMode } = useDebugViewStore();
+  const { activeView } = useLeftPanelViewStore();
   const [noteContent, setNoteContent] = useState<JSONContent | null>(null);
   const [noteTitle, setNoteTitle] = useState<string>("");
+  const [contentCreatedAt, setContentCreatedAt] = useState<string | null>(null);
+  const [contentUpdatedAt, setContentUpdatedAt] = useState<string | null>(null);
   const [contentType, setContentType] = useState<string | null>(null);
   const [contentParentId, setContentParentId] = useState<string | null>(null);
   const [contentData, setContentData] = useState<any>(null); // Phase 2: Store payload data
@@ -155,6 +162,8 @@ export function MainPanelContent() {
     if (!selectedContentId) {
       setNoteContent(null);
       setNoteTitle("");
+      setContentCreatedAt(null);
+      setContentUpdatedAt(null);
       setContentData(null); // Clear Phase 2 payload data
       resetStats(); // Reset stats when no note selected
       clearOutline(); // Clear outline when no note selected
@@ -202,6 +211,8 @@ export function MainPanelContent() {
         }
 
         setNoteTitle(result.data.title);
+        setContentCreatedAt(result.data.createdAt);
+        setContentUpdatedAt(result.data.updatedAt);
         setContentParentId(result.data.parentId);
         setContentType(result.data.contentType);
         setSelectedContentType(result.data.contentType);
@@ -311,6 +322,9 @@ export function MainPanelContent() {
         // If only title changed, update it directly (faster than refetch)
         if (updates.title && Object.keys(updates).length === 1) {
           setNoteTitle(updates.title);
+          if (updates.updatedAt) {
+            setContentUpdatedAt(updates.updatedAt);
+          }
         } else {
           // Other changes, trigger full refetch
           setRefreshTrigger(prev => prev + 1);
@@ -404,6 +418,9 @@ export function MainPanelContent() {
 
         console.log("Note saved successfully");
         setLastSaved(new Date());
+        if (result.data?.updatedAt) {
+          setContentUpdatedAt(result.data.updatedAt);
+        }
         // Keep parent state in sync so re-mounts (e.g., ExpandableEditor
         // collapse/reopen) receive the latest persisted content
         setNoteContent(content);
@@ -714,6 +731,15 @@ export function MainPanelContent() {
     "copy-link": handleCopyLink,
   }), [handleImportMarkdown, handleExportMarkdown, handleExportChat, handleCopyLink]);
 
+  if (activeView === "calendar") {
+    return (
+      <ToolSurfaceProvider contentType={null} handlers={toolHandlers}>
+        <CalendarWorkspace />
+        {process.env.NODE_ENV === "development" && <ToolDebugPanel />}
+      </ToolSurfaceProvider>
+    );
+  }
+
   // Welcome screen when no note selected
   if (!selectedContentId) {
     return (
@@ -839,7 +865,19 @@ export function MainPanelContent() {
       <div className="flex flex-col h-full">
         {/* Note title header with debug toggle */}
         <div className="flex-none px-6 pt-6 pb-2 flex items-start justify-between">
-          <h1 className="text-3xl font-semibold text-foreground mb-0">{noteTitle}</h1>
+          <div>
+            <h1 className="text-3xl font-semibold text-foreground mb-0">{noteTitle}</h1>
+            {(contentCreatedAt || contentUpdatedAt) && (
+              <div className="mt-2 flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
+                {contentCreatedAt && (
+                  <span>Created {new Date(contentCreatedAt).toLocaleString()}</span>
+                )}
+                {contentUpdatedAt && (
+                  <span>Last updated {new Date(contentUpdatedAt).toLocaleString()}</span>
+                )}
+              </div>
+            )}
+          </div>
           {process.env.NODE_ENV === "development" && <DebugViewToggle />}
         </div>
 
@@ -907,4 +945,3 @@ export function MainPanelContent() {
     </ToolSurfaceProvider>
   );
 }
-

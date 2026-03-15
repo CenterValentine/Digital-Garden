@@ -104,6 +104,26 @@ export type Session = $Result.DefaultSelection<Prisma.$SessionPayload>
  */
 export type Account = $Result.DefaultSelection<Prisma.$AccountPayload>
 /**
+ * Model CalendarConnection
+ * 
+ */
+export type CalendarConnection = $Result.DefaultSelection<Prisma.$CalendarConnectionPayload>
+/**
+ * Model CalendarSource
+ * 
+ */
+export type CalendarSource = $Result.DefaultSelection<Prisma.$CalendarSourcePayload>
+/**
+ * Model CalendarEvent
+ * 
+ */
+export type CalendarEvent = $Result.DefaultSelection<Prisma.$CalendarEventPayload>
+/**
+ * Model CalendarEventAttendee
+ * 
+ */
+export type CalendarEventAttendee = $Result.DefaultSelection<Prisma.$CalendarEventAttendeePayload>
+/**
  * Model AuditLog
  * 
  */
@@ -186,6 +206,63 @@ export const FolderViewMode: {
 export type FolderViewMode = (typeof FolderViewMode)[keyof typeof FolderViewMode]
 
 
+export const CalendarProvider: {
+  local: 'local',
+  google: 'google',
+  ical: 'ical'
+};
+
+export type CalendarProvider = (typeof CalendarProvider)[keyof typeof CalendarProvider]
+
+
+export const CalendarConnectionStatus: {
+  active: 'active',
+  disconnected: 'disconnected',
+  error: 'error',
+  reconnect_required: 'reconnect_required'
+};
+
+export type CalendarConnectionStatus = (typeof CalendarConnectionStatus)[keyof typeof CalendarConnectionStatus]
+
+
+export const CalendarSyncStatus: {
+  idle: 'idle',
+  syncing: 'syncing',
+  success: 'success',
+  error: 'error'
+};
+
+export type CalendarSyncStatus = (typeof CalendarSyncStatus)[keyof typeof CalendarSyncStatus]
+
+
+export const CalendarSourceSyncMode: {
+  local: 'local',
+  imported: 'imported',
+  subscription: 'subscription'
+};
+
+export type CalendarSourceSyncMode = (typeof CalendarSourceSyncMode)[keyof typeof CalendarSourceSyncMode]
+
+
+export const CalendarEventStatus: {
+  confirmed: 'confirmed',
+  tentative: 'tentative',
+  cancelled: 'cancelled'
+};
+
+export type CalendarEventStatus = (typeof CalendarEventStatus)[keyof typeof CalendarEventStatus]
+
+
+export const CalendarAttendeeResponseStatus: {
+  needs_action: 'needs_action',
+  accepted: 'accepted',
+  tentative: 'tentative',
+  declined: 'declined'
+};
+
+export type CalendarAttendeeResponseStatus = (typeof CalendarAttendeeResponseStatus)[keyof typeof CalendarAttendeeResponseStatus]
+
+
 export const UserRole: {
   owner: 'owner',
   admin: 'admin',
@@ -226,6 +303,30 @@ export const ContentRole: typeof $Enums.ContentRole
 export type FolderViewMode = $Enums.FolderViewMode
 
 export const FolderViewMode: typeof $Enums.FolderViewMode
+
+export type CalendarProvider = $Enums.CalendarProvider
+
+export const CalendarProvider: typeof $Enums.CalendarProvider
+
+export type CalendarConnectionStatus = $Enums.CalendarConnectionStatus
+
+export const CalendarConnectionStatus: typeof $Enums.CalendarConnectionStatus
+
+export type CalendarSyncStatus = $Enums.CalendarSyncStatus
+
+export const CalendarSyncStatus: typeof $Enums.CalendarSyncStatus
+
+export type CalendarSourceSyncMode = $Enums.CalendarSourceSyncMode
+
+export const CalendarSourceSyncMode: typeof $Enums.CalendarSourceSyncMode
+
+export type CalendarEventStatus = $Enums.CalendarEventStatus
+
+export const CalendarEventStatus: typeof $Enums.CalendarEventStatus
+
+export type CalendarAttendeeResponseStatus = $Enums.CalendarAttendeeResponseStatus
+
+export const CalendarAttendeeResponseStatus: typeof $Enums.CalendarAttendeeResponseStatus
 
 export type UserRole = $Enums.UserRole
 
@@ -535,6 +636,46 @@ export class PrismaClient<
     * ```
     */
   get account(): Prisma.AccountDelegate<ExtArgs, ClientOptions>;
+
+  /**
+   * `prisma.calendarConnection`: Exposes CRUD operations for the **CalendarConnection** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more CalendarConnections
+    * const calendarConnections = await prisma.calendarConnection.findMany()
+    * ```
+    */
+  get calendarConnection(): Prisma.CalendarConnectionDelegate<ExtArgs, ClientOptions>;
+
+  /**
+   * `prisma.calendarSource`: Exposes CRUD operations for the **CalendarSource** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more CalendarSources
+    * const calendarSources = await prisma.calendarSource.findMany()
+    * ```
+    */
+  get calendarSource(): Prisma.CalendarSourceDelegate<ExtArgs, ClientOptions>;
+
+  /**
+   * `prisma.calendarEvent`: Exposes CRUD operations for the **CalendarEvent** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more CalendarEvents
+    * const calendarEvents = await prisma.calendarEvent.findMany()
+    * ```
+    */
+  get calendarEvent(): Prisma.CalendarEventDelegate<ExtArgs, ClientOptions>;
+
+  /**
+   * `prisma.calendarEventAttendee`: Exposes CRUD operations for the **CalendarEventAttendee** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more CalendarEventAttendees
+    * const calendarEventAttendees = await prisma.calendarEventAttendee.findMany()
+    * ```
+    */
+  get calendarEventAttendee(): Prisma.CalendarEventAttendeeDelegate<ExtArgs, ClientOptions>;
 
   /**
    * `prisma.auditLog`: Exposes CRUD operations for the **AuditLog** model.
@@ -1067,6 +1208,10 @@ export namespace Prisma {
     ViewGrant: 'ViewGrant',
     Session: 'Session',
     Account: 'Account',
+    CalendarConnection: 'CalendarConnection',
+    CalendarSource: 'CalendarSource',
+    CalendarEvent: 'CalendarEvent',
+    CalendarEventAttendee: 'CalendarEventAttendee',
     AuditLog: 'AuditLog',
     FolderPayload: 'FolderPayload',
     ExternalPayload: 'ExternalPayload',
@@ -1090,7 +1235,7 @@ export namespace Prisma {
       omit: GlobalOmitOptions
     }
     meta: {
-      modelProps: "contentNode" | "notePayload" | "filePayload" | "htmlPayload" | "codePayload" | "contentHistory" | "contentPath" | "contentLink" | "contentTag" | "trashBin" | "storageProviderConfig" | "aIProviderKey" | "user" | "category" | "tag" | "viewGrant" | "session" | "account" | "auditLog" | "folderPayload" | "externalPayload" | "chatPayload" | "visualizationPayload" | "dataPayload" | "hopePayload" | "workflowPayload"
+      modelProps: "contentNode" | "notePayload" | "filePayload" | "htmlPayload" | "codePayload" | "contentHistory" | "contentPath" | "contentLink" | "contentTag" | "trashBin" | "storageProviderConfig" | "aIProviderKey" | "user" | "category" | "tag" | "viewGrant" | "session" | "account" | "calendarConnection" | "calendarSource" | "calendarEvent" | "calendarEventAttendee" | "auditLog" | "folderPayload" | "externalPayload" | "chatPayload" | "visualizationPayload" | "dataPayload" | "hopePayload" | "workflowPayload"
       txIsolationLevel: Prisma.TransactionIsolationLevel
     }
     model: {
@@ -2426,6 +2571,302 @@ export namespace Prisma {
           }
         }
       }
+      CalendarConnection: {
+        payload: Prisma.$CalendarConnectionPayload<ExtArgs>
+        fields: Prisma.CalendarConnectionFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.CalendarConnectionFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CalendarConnectionPayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.CalendarConnectionFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CalendarConnectionPayload>
+          }
+          findFirst: {
+            args: Prisma.CalendarConnectionFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CalendarConnectionPayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.CalendarConnectionFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CalendarConnectionPayload>
+          }
+          findMany: {
+            args: Prisma.CalendarConnectionFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CalendarConnectionPayload>[]
+          }
+          create: {
+            args: Prisma.CalendarConnectionCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CalendarConnectionPayload>
+          }
+          createMany: {
+            args: Prisma.CalendarConnectionCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          createManyAndReturn: {
+            args: Prisma.CalendarConnectionCreateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CalendarConnectionPayload>[]
+          }
+          delete: {
+            args: Prisma.CalendarConnectionDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CalendarConnectionPayload>
+          }
+          update: {
+            args: Prisma.CalendarConnectionUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CalendarConnectionPayload>
+          }
+          deleteMany: {
+            args: Prisma.CalendarConnectionDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.CalendarConnectionUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateManyAndReturn: {
+            args: Prisma.CalendarConnectionUpdateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CalendarConnectionPayload>[]
+          }
+          upsert: {
+            args: Prisma.CalendarConnectionUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CalendarConnectionPayload>
+          }
+          aggregate: {
+            args: Prisma.CalendarConnectionAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregateCalendarConnection>
+          }
+          groupBy: {
+            args: Prisma.CalendarConnectionGroupByArgs<ExtArgs>
+            result: $Utils.Optional<CalendarConnectionGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.CalendarConnectionCountArgs<ExtArgs>
+            result: $Utils.Optional<CalendarConnectionCountAggregateOutputType> | number
+          }
+        }
+      }
+      CalendarSource: {
+        payload: Prisma.$CalendarSourcePayload<ExtArgs>
+        fields: Prisma.CalendarSourceFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.CalendarSourceFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CalendarSourcePayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.CalendarSourceFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CalendarSourcePayload>
+          }
+          findFirst: {
+            args: Prisma.CalendarSourceFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CalendarSourcePayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.CalendarSourceFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CalendarSourcePayload>
+          }
+          findMany: {
+            args: Prisma.CalendarSourceFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CalendarSourcePayload>[]
+          }
+          create: {
+            args: Prisma.CalendarSourceCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CalendarSourcePayload>
+          }
+          createMany: {
+            args: Prisma.CalendarSourceCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          createManyAndReturn: {
+            args: Prisma.CalendarSourceCreateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CalendarSourcePayload>[]
+          }
+          delete: {
+            args: Prisma.CalendarSourceDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CalendarSourcePayload>
+          }
+          update: {
+            args: Prisma.CalendarSourceUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CalendarSourcePayload>
+          }
+          deleteMany: {
+            args: Prisma.CalendarSourceDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.CalendarSourceUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateManyAndReturn: {
+            args: Prisma.CalendarSourceUpdateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CalendarSourcePayload>[]
+          }
+          upsert: {
+            args: Prisma.CalendarSourceUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CalendarSourcePayload>
+          }
+          aggregate: {
+            args: Prisma.CalendarSourceAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregateCalendarSource>
+          }
+          groupBy: {
+            args: Prisma.CalendarSourceGroupByArgs<ExtArgs>
+            result: $Utils.Optional<CalendarSourceGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.CalendarSourceCountArgs<ExtArgs>
+            result: $Utils.Optional<CalendarSourceCountAggregateOutputType> | number
+          }
+        }
+      }
+      CalendarEvent: {
+        payload: Prisma.$CalendarEventPayload<ExtArgs>
+        fields: Prisma.CalendarEventFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.CalendarEventFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CalendarEventPayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.CalendarEventFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CalendarEventPayload>
+          }
+          findFirst: {
+            args: Prisma.CalendarEventFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CalendarEventPayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.CalendarEventFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CalendarEventPayload>
+          }
+          findMany: {
+            args: Prisma.CalendarEventFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CalendarEventPayload>[]
+          }
+          create: {
+            args: Prisma.CalendarEventCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CalendarEventPayload>
+          }
+          createMany: {
+            args: Prisma.CalendarEventCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          createManyAndReturn: {
+            args: Prisma.CalendarEventCreateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CalendarEventPayload>[]
+          }
+          delete: {
+            args: Prisma.CalendarEventDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CalendarEventPayload>
+          }
+          update: {
+            args: Prisma.CalendarEventUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CalendarEventPayload>
+          }
+          deleteMany: {
+            args: Prisma.CalendarEventDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.CalendarEventUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateManyAndReturn: {
+            args: Prisma.CalendarEventUpdateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CalendarEventPayload>[]
+          }
+          upsert: {
+            args: Prisma.CalendarEventUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CalendarEventPayload>
+          }
+          aggregate: {
+            args: Prisma.CalendarEventAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregateCalendarEvent>
+          }
+          groupBy: {
+            args: Prisma.CalendarEventGroupByArgs<ExtArgs>
+            result: $Utils.Optional<CalendarEventGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.CalendarEventCountArgs<ExtArgs>
+            result: $Utils.Optional<CalendarEventCountAggregateOutputType> | number
+          }
+        }
+      }
+      CalendarEventAttendee: {
+        payload: Prisma.$CalendarEventAttendeePayload<ExtArgs>
+        fields: Prisma.CalendarEventAttendeeFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.CalendarEventAttendeeFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CalendarEventAttendeePayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.CalendarEventAttendeeFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CalendarEventAttendeePayload>
+          }
+          findFirst: {
+            args: Prisma.CalendarEventAttendeeFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CalendarEventAttendeePayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.CalendarEventAttendeeFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CalendarEventAttendeePayload>
+          }
+          findMany: {
+            args: Prisma.CalendarEventAttendeeFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CalendarEventAttendeePayload>[]
+          }
+          create: {
+            args: Prisma.CalendarEventAttendeeCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CalendarEventAttendeePayload>
+          }
+          createMany: {
+            args: Prisma.CalendarEventAttendeeCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          createManyAndReturn: {
+            args: Prisma.CalendarEventAttendeeCreateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CalendarEventAttendeePayload>[]
+          }
+          delete: {
+            args: Prisma.CalendarEventAttendeeDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CalendarEventAttendeePayload>
+          }
+          update: {
+            args: Prisma.CalendarEventAttendeeUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CalendarEventAttendeePayload>
+          }
+          deleteMany: {
+            args: Prisma.CalendarEventAttendeeDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.CalendarEventAttendeeUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateManyAndReturn: {
+            args: Prisma.CalendarEventAttendeeUpdateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CalendarEventAttendeePayload>[]
+          }
+          upsert: {
+            args: Prisma.CalendarEventAttendeeUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CalendarEventAttendeePayload>
+          }
+          aggregate: {
+            args: Prisma.CalendarEventAttendeeAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregateCalendarEventAttendee>
+          }
+          groupBy: {
+            args: Prisma.CalendarEventAttendeeGroupByArgs<ExtArgs>
+            result: $Utils.Optional<CalendarEventAttendeeGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.CalendarEventAttendeeCountArgs<ExtArgs>
+            result: $Utils.Optional<CalendarEventAttendeeCountAggregateOutputType> | number
+          }
+        }
+      }
       AuditLog: {
         payload: Prisma.$AuditLogPayload<ExtArgs>
         fields: Prisma.AuditLogFieldRefs
@@ -3144,6 +3585,10 @@ export namespace Prisma {
     viewGrant?: ViewGrantOmit
     session?: SessionOmit
     account?: AccountOmit
+    calendarConnection?: CalendarConnectionOmit
+    calendarSource?: CalendarSourceOmit
+    calendarEvent?: CalendarEventOmit
+    calendarEventAttendee?: CalendarEventAttendeeOmit
     auditLog?: AuditLogOmit
     folderPayload?: FolderPayloadOmit
     externalPayload?: ExternalPayloadOmit
@@ -3238,6 +3683,7 @@ export namespace Prisma {
     targetLinks: number
     children: number
     contentTags: number
+    linkedCalendarEvents: number
     viewGrants: number
   }
 
@@ -3248,6 +3694,7 @@ export namespace Prisma {
     targetLinks?: boolean | ContentNodeCountOutputTypeCountTargetLinksArgs
     children?: boolean | ContentNodeCountOutputTypeCountChildrenArgs
     contentTags?: boolean | ContentNodeCountOutputTypeCountContentTagsArgs
+    linkedCalendarEvents?: boolean | ContentNodeCountOutputTypeCountLinkedCalendarEventsArgs
     viewGrants?: boolean | ContentNodeCountOutputTypeCountViewGrantsArgs
   }
 
@@ -3307,6 +3754,13 @@ export namespace Prisma {
   /**
    * ContentNodeCountOutputType without action
    */
+  export type ContentNodeCountOutputTypeCountLinkedCalendarEventsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: CalendarEventWhereInput
+  }
+
+  /**
+   * ContentNodeCountOutputType without action
+   */
   export type ContentNodeCountOutputTypeCountViewGrantsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     where?: ViewGrantWhereInput
   }
@@ -3322,6 +3776,9 @@ export namespace Prisma {
     auditTargets: number
     adminActions: number
     categories: number
+    calendarConnections: number
+    calendarEvents: number
+    calendarSources: number
     contentHistory: number
     contentNodes: number
     sessions: number
@@ -3337,6 +3794,9 @@ export namespace Prisma {
     auditTargets?: boolean | UserCountOutputTypeCountAuditTargetsArgs
     adminActions?: boolean | UserCountOutputTypeCountAdminActionsArgs
     categories?: boolean | UserCountOutputTypeCountCategoriesArgs
+    calendarConnections?: boolean | UserCountOutputTypeCountCalendarConnectionsArgs
+    calendarEvents?: boolean | UserCountOutputTypeCountCalendarEventsArgs
+    calendarSources?: boolean | UserCountOutputTypeCountCalendarSourcesArgs
     contentHistory?: boolean | UserCountOutputTypeCountContentHistoryArgs
     contentNodes?: boolean | UserCountOutputTypeCountContentNodesArgs
     sessions?: boolean | UserCountOutputTypeCountSessionsArgs
@@ -3390,6 +3850,27 @@ export namespace Prisma {
    */
   export type UserCountOutputTypeCountCategoriesArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     where?: CategoryWhereInput
+  }
+
+  /**
+   * UserCountOutputType without action
+   */
+  export type UserCountOutputTypeCountCalendarConnectionsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: CalendarConnectionWhereInput
+  }
+
+  /**
+   * UserCountOutputType without action
+   */
+  export type UserCountOutputTypeCountCalendarEventsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: CalendarEventWhereInput
+  }
+
+  /**
+   * UserCountOutputType without action
+   */
+  export type UserCountOutputTypeCountCalendarSourcesArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: CalendarSourceWhereInput
   }
 
   /**
@@ -3501,6 +3982,99 @@ export namespace Prisma {
    */
   export type TagCountOutputTypeCountContentTagsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     where?: ContentTagWhereInput
+  }
+
+
+  /**
+   * Count Type CalendarConnectionCountOutputType
+   */
+
+  export type CalendarConnectionCountOutputType = {
+    sources: number
+  }
+
+  export type CalendarConnectionCountOutputTypeSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    sources?: boolean | CalendarConnectionCountOutputTypeCountSourcesArgs
+  }
+
+  // Custom InputTypes
+  /**
+   * CalendarConnectionCountOutputType without action
+   */
+  export type CalendarConnectionCountOutputTypeDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CalendarConnectionCountOutputType
+     */
+    select?: CalendarConnectionCountOutputTypeSelect<ExtArgs> | null
+  }
+
+  /**
+   * CalendarConnectionCountOutputType without action
+   */
+  export type CalendarConnectionCountOutputTypeCountSourcesArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: CalendarSourceWhereInput
+  }
+
+
+  /**
+   * Count Type CalendarSourceCountOutputType
+   */
+
+  export type CalendarSourceCountOutputType = {
+    events: number
+  }
+
+  export type CalendarSourceCountOutputTypeSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    events?: boolean | CalendarSourceCountOutputTypeCountEventsArgs
+  }
+
+  // Custom InputTypes
+  /**
+   * CalendarSourceCountOutputType without action
+   */
+  export type CalendarSourceCountOutputTypeDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CalendarSourceCountOutputType
+     */
+    select?: CalendarSourceCountOutputTypeSelect<ExtArgs> | null
+  }
+
+  /**
+   * CalendarSourceCountOutputType without action
+   */
+  export type CalendarSourceCountOutputTypeCountEventsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: CalendarEventWhereInput
+  }
+
+
+  /**
+   * Count Type CalendarEventCountOutputType
+   */
+
+  export type CalendarEventCountOutputType = {
+    attendees: number
+  }
+
+  export type CalendarEventCountOutputTypeSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    attendees?: boolean | CalendarEventCountOutputTypeCountAttendeesArgs
+  }
+
+  // Custom InputTypes
+  /**
+   * CalendarEventCountOutputType without action
+   */
+  export type CalendarEventCountOutputTypeDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CalendarEventCountOutputType
+     */
+    select?: CalendarEventCountOutputTypeSelect<ExtArgs> | null
+  }
+
+  /**
+   * CalendarEventCountOutputType without action
+   */
+  export type CalendarEventCountOutputTypeCountAttendeesArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: CalendarEventAttendeeWhereInput
   }
 
 
@@ -3815,6 +4389,7 @@ export namespace Prisma {
     children?: boolean | ContentNode$childrenArgs<ExtArgs>
     contentPath?: boolean | ContentNode$contentPathArgs<ExtArgs>
     contentTags?: boolean | ContentNode$contentTagsArgs<ExtArgs>
+    linkedCalendarEvents?: boolean | ContentNode$linkedCalendarEventsArgs<ExtArgs>
     trashBinEntry?: boolean | ContentNode$trashBinEntryArgs<ExtArgs>
     viewGrants?: boolean | ContentNode$viewGrantsArgs<ExtArgs>
     _count?: boolean | ContentNodeCountOutputTypeDefaultArgs<ExtArgs>
@@ -3906,6 +4481,7 @@ export namespace Prisma {
     children?: boolean | ContentNode$childrenArgs<ExtArgs>
     contentPath?: boolean | ContentNode$contentPathArgs<ExtArgs>
     contentTags?: boolean | ContentNode$contentTagsArgs<ExtArgs>
+    linkedCalendarEvents?: boolean | ContentNode$linkedCalendarEventsArgs<ExtArgs>
     trashBinEntry?: boolean | ContentNode$trashBinEntryArgs<ExtArgs>
     viewGrants?: boolean | ContentNode$viewGrantsArgs<ExtArgs>
     _count?: boolean | ContentNodeCountOutputTypeDefaultArgs<ExtArgs>
@@ -3945,6 +4521,7 @@ export namespace Prisma {
       children: Prisma.$ContentNodePayload<ExtArgs>[]
       contentPath: Prisma.$ContentPathPayload<ExtArgs> | null
       contentTags: Prisma.$ContentTagPayload<ExtArgs>[]
+      linkedCalendarEvents: Prisma.$CalendarEventPayload<ExtArgs>[]
       trashBinEntry: Prisma.$TrashBinPayload<ExtArgs> | null
       viewGrants: Prisma.$ViewGrantPayload<ExtArgs>[]
     }
@@ -4380,6 +4957,7 @@ export namespace Prisma {
     children<T extends ContentNode$childrenArgs<ExtArgs> = {}>(args?: Subset<T, ContentNode$childrenArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ContentNodePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     contentPath<T extends ContentNode$contentPathArgs<ExtArgs> = {}>(args?: Subset<T, ContentNode$contentPathArgs<ExtArgs>>): Prisma__ContentPathClient<$Result.GetResult<Prisma.$ContentPathPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
     contentTags<T extends ContentNode$contentTagsArgs<ExtArgs> = {}>(args?: Subset<T, ContentNode$contentTagsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ContentTagPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+    linkedCalendarEvents<T extends ContentNode$linkedCalendarEventsArgs<ExtArgs> = {}>(args?: Subset<T, ContentNode$linkedCalendarEventsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$CalendarEventPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     trashBinEntry<T extends ContentNode$trashBinEntryArgs<ExtArgs> = {}>(args?: Subset<T, ContentNode$trashBinEntryArgs<ExtArgs>>): Prisma__TrashBinClient<$Result.GetResult<Prisma.$TrashBinPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
     viewGrants<T extends ContentNode$viewGrantsArgs<ExtArgs> = {}>(args?: Subset<T, ContentNode$viewGrantsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ViewGrantPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     /**
@@ -5230,6 +5808,30 @@ export namespace Prisma {
     take?: number
     skip?: number
     distinct?: ContentTagScalarFieldEnum | ContentTagScalarFieldEnum[]
+  }
+
+  /**
+   * ContentNode.linkedCalendarEvents
+   */
+  export type ContentNode$linkedCalendarEventsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CalendarEvent
+     */
+    select?: CalendarEventSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CalendarEvent
+     */
+    omit?: CalendarEventOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CalendarEventInclude<ExtArgs> | null
+    where?: CalendarEventWhereInput
+    orderBy?: CalendarEventOrderByWithRelationInput | CalendarEventOrderByWithRelationInput[]
+    cursor?: CalendarEventWhereUniqueInput
+    take?: number
+    skip?: number
+    distinct?: CalendarEventScalarFieldEnum | CalendarEventScalarFieldEnum[]
   }
 
   /**
@@ -17785,6 +18387,9 @@ export namespace Prisma {
     auditTargets?: boolean | User$auditTargetsArgs<ExtArgs>
     adminActions?: boolean | User$adminActionsArgs<ExtArgs>
     categories?: boolean | User$categoriesArgs<ExtArgs>
+    calendarConnections?: boolean | User$calendarConnectionsArgs<ExtArgs>
+    calendarEvents?: boolean | User$calendarEventsArgs<ExtArgs>
+    calendarSources?: boolean | User$calendarSourcesArgs<ExtArgs>
     contentHistory?: boolean | User$contentHistoryArgs<ExtArgs>
     contentNodes?: boolean | User$contentNodesArgs<ExtArgs>
     sessions?: boolean | User$sessionsArgs<ExtArgs>
@@ -17838,6 +18443,9 @@ export namespace Prisma {
     auditTargets?: boolean | User$auditTargetsArgs<ExtArgs>
     adminActions?: boolean | User$adminActionsArgs<ExtArgs>
     categories?: boolean | User$categoriesArgs<ExtArgs>
+    calendarConnections?: boolean | User$calendarConnectionsArgs<ExtArgs>
+    calendarEvents?: boolean | User$calendarEventsArgs<ExtArgs>
+    calendarSources?: boolean | User$calendarSourcesArgs<ExtArgs>
     contentHistory?: boolean | User$contentHistoryArgs<ExtArgs>
     contentNodes?: boolean | User$contentNodesArgs<ExtArgs>
     sessions?: boolean | User$sessionsArgs<ExtArgs>
@@ -17858,6 +18466,9 @@ export namespace Prisma {
       auditTargets: Prisma.$AuditLogPayload<ExtArgs>[]
       adminActions: Prisma.$AuditLogPayload<ExtArgs>[]
       categories: Prisma.$CategoryPayload<ExtArgs>[]
+      calendarConnections: Prisma.$CalendarConnectionPayload<ExtArgs>[]
+      calendarEvents: Prisma.$CalendarEventPayload<ExtArgs>[]
+      calendarSources: Prisma.$CalendarSourcePayload<ExtArgs>[]
       contentHistory: Prisma.$ContentHistoryPayload<ExtArgs>[]
       contentNodes: Prisma.$ContentNodePayload<ExtArgs>[]
       sessions: Prisma.$SessionPayload<ExtArgs>[]
@@ -18275,6 +18886,9 @@ export namespace Prisma {
     auditTargets<T extends User$auditTargetsArgs<ExtArgs> = {}>(args?: Subset<T, User$auditTargetsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$AuditLogPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     adminActions<T extends User$adminActionsArgs<ExtArgs> = {}>(args?: Subset<T, User$adminActionsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$AuditLogPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     categories<T extends User$categoriesArgs<ExtArgs> = {}>(args?: Subset<T, User$categoriesArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$CategoryPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+    calendarConnections<T extends User$calendarConnectionsArgs<ExtArgs> = {}>(args?: Subset<T, User$calendarConnectionsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$CalendarConnectionPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+    calendarEvents<T extends User$calendarEventsArgs<ExtArgs> = {}>(args?: Subset<T, User$calendarEventsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$CalendarEventPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+    calendarSources<T extends User$calendarSourcesArgs<ExtArgs> = {}>(args?: Subset<T, User$calendarSourcesArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$CalendarSourcePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     contentHistory<T extends User$contentHistoryArgs<ExtArgs> = {}>(args?: Subset<T, User$contentHistoryArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ContentHistoryPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     contentNodes<T extends User$contentNodesArgs<ExtArgs> = {}>(args?: Subset<T, User$contentNodesArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ContentNodePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     sessions<T extends User$sessionsArgs<ExtArgs> = {}>(args?: Subset<T, User$sessionsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$SessionPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
@@ -18825,6 +19439,78 @@ export namespace Prisma {
     take?: number
     skip?: number
     distinct?: CategoryScalarFieldEnum | CategoryScalarFieldEnum[]
+  }
+
+  /**
+   * User.calendarConnections
+   */
+  export type User$calendarConnectionsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CalendarConnection
+     */
+    select?: CalendarConnectionSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CalendarConnection
+     */
+    omit?: CalendarConnectionOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CalendarConnectionInclude<ExtArgs> | null
+    where?: CalendarConnectionWhereInput
+    orderBy?: CalendarConnectionOrderByWithRelationInput | CalendarConnectionOrderByWithRelationInput[]
+    cursor?: CalendarConnectionWhereUniqueInput
+    take?: number
+    skip?: number
+    distinct?: CalendarConnectionScalarFieldEnum | CalendarConnectionScalarFieldEnum[]
+  }
+
+  /**
+   * User.calendarEvents
+   */
+  export type User$calendarEventsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CalendarEvent
+     */
+    select?: CalendarEventSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CalendarEvent
+     */
+    omit?: CalendarEventOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CalendarEventInclude<ExtArgs> | null
+    where?: CalendarEventWhereInput
+    orderBy?: CalendarEventOrderByWithRelationInput | CalendarEventOrderByWithRelationInput[]
+    cursor?: CalendarEventWhereUniqueInput
+    take?: number
+    skip?: number
+    distinct?: CalendarEventScalarFieldEnum | CalendarEventScalarFieldEnum[]
+  }
+
+  /**
+   * User.calendarSources
+   */
+  export type User$calendarSourcesArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CalendarSource
+     */
+    select?: CalendarSourceSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CalendarSource
+     */
+    omit?: CalendarSourceOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CalendarSourceInclude<ExtArgs> | null
+    where?: CalendarSourceWhereInput
+    orderBy?: CalendarSourceOrderByWithRelationInput | CalendarSourceOrderByWithRelationInput[]
+    cursor?: CalendarSourceWhereUniqueInput
+    take?: number
+    skip?: number
+    distinct?: CalendarSourceScalarFieldEnum | CalendarSourceScalarFieldEnum[]
   }
 
   /**
@@ -23444,6 +24130,7 @@ export namespace Prisma {
     refreshToken: string | null
     accessToken: string | null
     expiresAt: Date | null
+    scope: string | null
     createdAt: Date | null
   }
 
@@ -23455,6 +24142,7 @@ export namespace Prisma {
     refreshToken: string | null
     accessToken: string | null
     expiresAt: Date | null
+    scope: string | null
     createdAt: Date | null
   }
 
@@ -23466,6 +24154,7 @@ export namespace Prisma {
     refreshToken: number
     accessToken: number
     expiresAt: number
+    scope: number
     createdAt: number
     _all: number
   }
@@ -23479,6 +24168,7 @@ export namespace Prisma {
     refreshToken?: true
     accessToken?: true
     expiresAt?: true
+    scope?: true
     createdAt?: true
   }
 
@@ -23490,6 +24180,7 @@ export namespace Prisma {
     refreshToken?: true
     accessToken?: true
     expiresAt?: true
+    scope?: true
     createdAt?: true
   }
 
@@ -23501,6 +24192,7 @@ export namespace Prisma {
     refreshToken?: true
     accessToken?: true
     expiresAt?: true
+    scope?: true
     createdAt?: true
     _all?: true
   }
@@ -23585,6 +24277,7 @@ export namespace Prisma {
     refreshToken: string | null
     accessToken: string | null
     expiresAt: Date | null
+    scope: string | null
     createdAt: Date
     _count: AccountCountAggregateOutputType | null
     _min: AccountMinAggregateOutputType | null
@@ -23613,6 +24306,7 @@ export namespace Prisma {
     refreshToken?: boolean
     accessToken?: boolean
     expiresAt?: boolean
+    scope?: boolean
     createdAt?: boolean
     user?: boolean | UserDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["account"]>
@@ -23625,6 +24319,7 @@ export namespace Prisma {
     refreshToken?: boolean
     accessToken?: boolean
     expiresAt?: boolean
+    scope?: boolean
     createdAt?: boolean
     user?: boolean | UserDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["account"]>
@@ -23637,6 +24332,7 @@ export namespace Prisma {
     refreshToken?: boolean
     accessToken?: boolean
     expiresAt?: boolean
+    scope?: boolean
     createdAt?: boolean
     user?: boolean | UserDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["account"]>
@@ -23649,10 +24345,11 @@ export namespace Prisma {
     refreshToken?: boolean
     accessToken?: boolean
     expiresAt?: boolean
+    scope?: boolean
     createdAt?: boolean
   }
 
-  export type AccountOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "userId" | "provider" | "providerAccountId" | "refreshToken" | "accessToken" | "expiresAt" | "createdAt", ExtArgs["result"]["account"]>
+  export type AccountOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "userId" | "provider" | "providerAccountId" | "refreshToken" | "accessToken" | "expiresAt" | "scope" | "createdAt", ExtArgs["result"]["account"]>
   export type AccountInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     user?: boolean | UserDefaultArgs<ExtArgs>
   }
@@ -23676,6 +24373,7 @@ export namespace Prisma {
       refreshToken: string | null
       accessToken: string | null
       expiresAt: Date | null
+      scope: string | null
       createdAt: Date
     }, ExtArgs["result"]["account"]>
     composites: {}
@@ -24108,6 +24806,7 @@ export namespace Prisma {
     readonly refreshToken: FieldRef<"Account", 'String'>
     readonly accessToken: FieldRef<"Account", 'String'>
     readonly expiresAt: FieldRef<"Account", 'DateTime'>
+    readonly scope: FieldRef<"Account", 'String'>
     readonly createdAt: FieldRef<"Account", 'DateTime'>
   }
     
@@ -24520,6 +25219,4860 @@ export namespace Prisma {
      * Choose, which related nodes to fetch as well
      */
     include?: AccountInclude<ExtArgs> | null
+  }
+
+
+  /**
+   * Model CalendarConnection
+   */
+
+  export type AggregateCalendarConnection = {
+    _count: CalendarConnectionCountAggregateOutputType | null
+    _min: CalendarConnectionMinAggregateOutputType | null
+    _max: CalendarConnectionMaxAggregateOutputType | null
+  }
+
+  export type CalendarConnectionMinAggregateOutputType = {
+    id: string | null
+    userId: string | null
+    provider: $Enums.CalendarProvider | null
+    displayName: string | null
+    status: $Enums.CalendarConnectionStatus | null
+    syncStatus: $Enums.CalendarSyncStatus | null
+    syncCursor: string | null
+    lastSyncedAt: Date | null
+    lastSyncError: string | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type CalendarConnectionMaxAggregateOutputType = {
+    id: string | null
+    userId: string | null
+    provider: $Enums.CalendarProvider | null
+    displayName: string | null
+    status: $Enums.CalendarConnectionStatus | null
+    syncStatus: $Enums.CalendarSyncStatus | null
+    syncCursor: string | null
+    lastSyncedAt: Date | null
+    lastSyncError: string | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type CalendarConnectionCountAggregateOutputType = {
+    id: number
+    userId: number
+    provider: number
+    displayName: number
+    status: number
+    syncStatus: number
+    providerConfig: number
+    syncCursor: number
+    lastSyncedAt: number
+    lastSyncError: number
+    createdAt: number
+    updatedAt: number
+    _all: number
+  }
+
+
+  export type CalendarConnectionMinAggregateInputType = {
+    id?: true
+    userId?: true
+    provider?: true
+    displayName?: true
+    status?: true
+    syncStatus?: true
+    syncCursor?: true
+    lastSyncedAt?: true
+    lastSyncError?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type CalendarConnectionMaxAggregateInputType = {
+    id?: true
+    userId?: true
+    provider?: true
+    displayName?: true
+    status?: true
+    syncStatus?: true
+    syncCursor?: true
+    lastSyncedAt?: true
+    lastSyncError?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type CalendarConnectionCountAggregateInputType = {
+    id?: true
+    userId?: true
+    provider?: true
+    displayName?: true
+    status?: true
+    syncStatus?: true
+    providerConfig?: true
+    syncCursor?: true
+    lastSyncedAt?: true
+    lastSyncError?: true
+    createdAt?: true
+    updatedAt?: true
+    _all?: true
+  }
+
+  export type CalendarConnectionAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which CalendarConnection to aggregate.
+     */
+    where?: CalendarConnectionWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of CalendarConnections to fetch.
+     */
+    orderBy?: CalendarConnectionOrderByWithRelationInput | CalendarConnectionOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: CalendarConnectionWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` CalendarConnections from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` CalendarConnections.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned CalendarConnections
+    **/
+    _count?: true | CalendarConnectionCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: CalendarConnectionMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: CalendarConnectionMaxAggregateInputType
+  }
+
+  export type GetCalendarConnectionAggregateType<T extends CalendarConnectionAggregateArgs> = {
+        [P in keyof T & keyof AggregateCalendarConnection]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateCalendarConnection[P]>
+      : GetScalarType<T[P], AggregateCalendarConnection[P]>
+  }
+
+
+
+
+  export type CalendarConnectionGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: CalendarConnectionWhereInput
+    orderBy?: CalendarConnectionOrderByWithAggregationInput | CalendarConnectionOrderByWithAggregationInput[]
+    by: CalendarConnectionScalarFieldEnum[] | CalendarConnectionScalarFieldEnum
+    having?: CalendarConnectionScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: CalendarConnectionCountAggregateInputType | true
+    _min?: CalendarConnectionMinAggregateInputType
+    _max?: CalendarConnectionMaxAggregateInputType
+  }
+
+  export type CalendarConnectionGroupByOutputType = {
+    id: string
+    userId: string
+    provider: $Enums.CalendarProvider
+    displayName: string
+    status: $Enums.CalendarConnectionStatus
+    syncStatus: $Enums.CalendarSyncStatus
+    providerConfig: JsonValue
+    syncCursor: string | null
+    lastSyncedAt: Date | null
+    lastSyncError: string | null
+    createdAt: Date
+    updatedAt: Date
+    _count: CalendarConnectionCountAggregateOutputType | null
+    _min: CalendarConnectionMinAggregateOutputType | null
+    _max: CalendarConnectionMaxAggregateOutputType | null
+  }
+
+  type GetCalendarConnectionGroupByPayload<T extends CalendarConnectionGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<CalendarConnectionGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof CalendarConnectionGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], CalendarConnectionGroupByOutputType[P]>
+            : GetScalarType<T[P], CalendarConnectionGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type CalendarConnectionSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    userId?: boolean
+    provider?: boolean
+    displayName?: boolean
+    status?: boolean
+    syncStatus?: boolean
+    providerConfig?: boolean
+    syncCursor?: boolean
+    lastSyncedAt?: boolean
+    lastSyncError?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    sources?: boolean | CalendarConnection$sourcesArgs<ExtArgs>
+    user?: boolean | UserDefaultArgs<ExtArgs>
+    _count?: boolean | CalendarConnectionCountOutputTypeDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["calendarConnection"]>
+
+  export type CalendarConnectionSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    userId?: boolean
+    provider?: boolean
+    displayName?: boolean
+    status?: boolean
+    syncStatus?: boolean
+    providerConfig?: boolean
+    syncCursor?: boolean
+    lastSyncedAt?: boolean
+    lastSyncError?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    user?: boolean | UserDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["calendarConnection"]>
+
+  export type CalendarConnectionSelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    userId?: boolean
+    provider?: boolean
+    displayName?: boolean
+    status?: boolean
+    syncStatus?: boolean
+    providerConfig?: boolean
+    syncCursor?: boolean
+    lastSyncedAt?: boolean
+    lastSyncError?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    user?: boolean | UserDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["calendarConnection"]>
+
+  export type CalendarConnectionSelectScalar = {
+    id?: boolean
+    userId?: boolean
+    provider?: boolean
+    displayName?: boolean
+    status?: boolean
+    syncStatus?: boolean
+    providerConfig?: boolean
+    syncCursor?: boolean
+    lastSyncedAt?: boolean
+    lastSyncError?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+  }
+
+  export type CalendarConnectionOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "userId" | "provider" | "displayName" | "status" | "syncStatus" | "providerConfig" | "syncCursor" | "lastSyncedAt" | "lastSyncError" | "createdAt" | "updatedAt", ExtArgs["result"]["calendarConnection"]>
+  export type CalendarConnectionInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    sources?: boolean | CalendarConnection$sourcesArgs<ExtArgs>
+    user?: boolean | UserDefaultArgs<ExtArgs>
+    _count?: boolean | CalendarConnectionCountOutputTypeDefaultArgs<ExtArgs>
+  }
+  export type CalendarConnectionIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    user?: boolean | UserDefaultArgs<ExtArgs>
+  }
+  export type CalendarConnectionIncludeUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    user?: boolean | UserDefaultArgs<ExtArgs>
+  }
+
+  export type $CalendarConnectionPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "CalendarConnection"
+    objects: {
+      sources: Prisma.$CalendarSourcePayload<ExtArgs>[]
+      user: Prisma.$UserPayload<ExtArgs>
+    }
+    scalars: $Extensions.GetPayloadResult<{
+      id: string
+      userId: string
+      provider: $Enums.CalendarProvider
+      displayName: string
+      status: $Enums.CalendarConnectionStatus
+      syncStatus: $Enums.CalendarSyncStatus
+      providerConfig: Prisma.JsonValue
+      syncCursor: string | null
+      lastSyncedAt: Date | null
+      lastSyncError: string | null
+      createdAt: Date
+      updatedAt: Date
+    }, ExtArgs["result"]["calendarConnection"]>
+    composites: {}
+  }
+
+  type CalendarConnectionGetPayload<S extends boolean | null | undefined | CalendarConnectionDefaultArgs> = $Result.GetResult<Prisma.$CalendarConnectionPayload, S>
+
+  type CalendarConnectionCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> =
+    Omit<CalendarConnectionFindManyArgs, 'select' | 'include' | 'distinct' | 'omit'> & {
+      select?: CalendarConnectionCountAggregateInputType | true
+    }
+
+  export interface CalendarConnectionDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['CalendarConnection'], meta: { name: 'CalendarConnection' } }
+    /**
+     * Find zero or one CalendarConnection that matches the filter.
+     * @param {CalendarConnectionFindUniqueArgs} args - Arguments to find a CalendarConnection
+     * @example
+     * // Get one CalendarConnection
+     * const calendarConnection = await prisma.calendarConnection.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends CalendarConnectionFindUniqueArgs>(args: SelectSubset<T, CalendarConnectionFindUniqueArgs<ExtArgs>>): Prisma__CalendarConnectionClient<$Result.GetResult<Prisma.$CalendarConnectionPayload<ExtArgs>, T, "findUnique", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find one CalendarConnection that matches the filter or throw an error with `error.code='P2025'`
+     * if no matches were found.
+     * @param {CalendarConnectionFindUniqueOrThrowArgs} args - Arguments to find a CalendarConnection
+     * @example
+     * // Get one CalendarConnection
+     * const calendarConnection = await prisma.calendarConnection.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends CalendarConnectionFindUniqueOrThrowArgs>(args: SelectSubset<T, CalendarConnectionFindUniqueOrThrowArgs<ExtArgs>>): Prisma__CalendarConnectionClient<$Result.GetResult<Prisma.$CalendarConnectionPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first CalendarConnection that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {CalendarConnectionFindFirstArgs} args - Arguments to find a CalendarConnection
+     * @example
+     * // Get one CalendarConnection
+     * const calendarConnection = await prisma.calendarConnection.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends CalendarConnectionFindFirstArgs>(args?: SelectSubset<T, CalendarConnectionFindFirstArgs<ExtArgs>>): Prisma__CalendarConnectionClient<$Result.GetResult<Prisma.$CalendarConnectionPayload<ExtArgs>, T, "findFirst", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first CalendarConnection that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {CalendarConnectionFindFirstOrThrowArgs} args - Arguments to find a CalendarConnection
+     * @example
+     * // Get one CalendarConnection
+     * const calendarConnection = await prisma.calendarConnection.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends CalendarConnectionFindFirstOrThrowArgs>(args?: SelectSubset<T, CalendarConnectionFindFirstOrThrowArgs<ExtArgs>>): Prisma__CalendarConnectionClient<$Result.GetResult<Prisma.$CalendarConnectionPayload<ExtArgs>, T, "findFirstOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find zero or more CalendarConnections that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {CalendarConnectionFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all CalendarConnections
+     * const calendarConnections = await prisma.calendarConnection.findMany()
+     * 
+     * // Get first 10 CalendarConnections
+     * const calendarConnections = await prisma.calendarConnection.findMany({ take: 10 })
+     * 
+     * // Only select the `id`
+     * const calendarConnectionWithIdOnly = await prisma.calendarConnection.findMany({ select: { id: true } })
+     * 
+     */
+    findMany<T extends CalendarConnectionFindManyArgs>(args?: SelectSubset<T, CalendarConnectionFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$CalendarConnectionPayload<ExtArgs>, T, "findMany", GlobalOmitOptions>>
+
+    /**
+     * Create a CalendarConnection.
+     * @param {CalendarConnectionCreateArgs} args - Arguments to create a CalendarConnection.
+     * @example
+     * // Create one CalendarConnection
+     * const CalendarConnection = await prisma.calendarConnection.create({
+     *   data: {
+     *     // ... data to create a CalendarConnection
+     *   }
+     * })
+     * 
+     */
+    create<T extends CalendarConnectionCreateArgs>(args: SelectSubset<T, CalendarConnectionCreateArgs<ExtArgs>>): Prisma__CalendarConnectionClient<$Result.GetResult<Prisma.$CalendarConnectionPayload<ExtArgs>, T, "create", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Create many CalendarConnections.
+     * @param {CalendarConnectionCreateManyArgs} args - Arguments to create many CalendarConnections.
+     * @example
+     * // Create many CalendarConnections
+     * const calendarConnection = await prisma.calendarConnection.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *     
+     */
+    createMany<T extends CalendarConnectionCreateManyArgs>(args?: SelectSubset<T, CalendarConnectionCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create many CalendarConnections and returns the data saved in the database.
+     * @param {CalendarConnectionCreateManyAndReturnArgs} args - Arguments to create many CalendarConnections.
+     * @example
+     * // Create many CalendarConnections
+     * const calendarConnection = await prisma.calendarConnection.createManyAndReturn({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Create many CalendarConnections and only return the `id`
+     * const calendarConnectionWithIdOnly = await prisma.calendarConnection.createManyAndReturn({
+     *   select: { id: true },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    createManyAndReturn<T extends CalendarConnectionCreateManyAndReturnArgs>(args?: SelectSubset<T, CalendarConnectionCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$CalendarConnectionPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Delete a CalendarConnection.
+     * @param {CalendarConnectionDeleteArgs} args - Arguments to delete one CalendarConnection.
+     * @example
+     * // Delete one CalendarConnection
+     * const CalendarConnection = await prisma.calendarConnection.delete({
+     *   where: {
+     *     // ... filter to delete one CalendarConnection
+     *   }
+     * })
+     * 
+     */
+    delete<T extends CalendarConnectionDeleteArgs>(args: SelectSubset<T, CalendarConnectionDeleteArgs<ExtArgs>>): Prisma__CalendarConnectionClient<$Result.GetResult<Prisma.$CalendarConnectionPayload<ExtArgs>, T, "delete", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Update one CalendarConnection.
+     * @param {CalendarConnectionUpdateArgs} args - Arguments to update one CalendarConnection.
+     * @example
+     * // Update one CalendarConnection
+     * const calendarConnection = await prisma.calendarConnection.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    update<T extends CalendarConnectionUpdateArgs>(args: SelectSubset<T, CalendarConnectionUpdateArgs<ExtArgs>>): Prisma__CalendarConnectionClient<$Result.GetResult<Prisma.$CalendarConnectionPayload<ExtArgs>, T, "update", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Delete zero or more CalendarConnections.
+     * @param {CalendarConnectionDeleteManyArgs} args - Arguments to filter CalendarConnections to delete.
+     * @example
+     * // Delete a few CalendarConnections
+     * const { count } = await prisma.calendarConnection.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+     */
+    deleteMany<T extends CalendarConnectionDeleteManyArgs>(args?: SelectSubset<T, CalendarConnectionDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more CalendarConnections.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {CalendarConnectionUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many CalendarConnections
+     * const calendarConnection = await prisma.calendarConnection.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    updateMany<T extends CalendarConnectionUpdateManyArgs>(args: SelectSubset<T, CalendarConnectionUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more CalendarConnections and returns the data updated in the database.
+     * @param {CalendarConnectionUpdateManyAndReturnArgs} args - Arguments to update many CalendarConnections.
+     * @example
+     * // Update many CalendarConnections
+     * const calendarConnection = await prisma.calendarConnection.updateManyAndReturn({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Update zero or more CalendarConnections and only return the `id`
+     * const calendarConnectionWithIdOnly = await prisma.calendarConnection.updateManyAndReturn({
+     *   select: { id: true },
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    updateManyAndReturn<T extends CalendarConnectionUpdateManyAndReturnArgs>(args: SelectSubset<T, CalendarConnectionUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$CalendarConnectionPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Create or update one CalendarConnection.
+     * @param {CalendarConnectionUpsertArgs} args - Arguments to update or create a CalendarConnection.
+     * @example
+     * // Update or create a CalendarConnection
+     * const calendarConnection = await prisma.calendarConnection.upsert({
+     *   create: {
+     *     // ... data to create a CalendarConnection
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the CalendarConnection we want to update
+     *   }
+     * })
+     */
+    upsert<T extends CalendarConnectionUpsertArgs>(args: SelectSubset<T, CalendarConnectionUpsertArgs<ExtArgs>>): Prisma__CalendarConnectionClient<$Result.GetResult<Prisma.$CalendarConnectionPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+
+    /**
+     * Count the number of CalendarConnections.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {CalendarConnectionCountArgs} args - Arguments to filter CalendarConnections to count.
+     * @example
+     * // Count the number of CalendarConnections
+     * const count = await prisma.calendarConnection.count({
+     *   where: {
+     *     // ... the filter for the CalendarConnections we want to count
+     *   }
+     * })
+    **/
+    count<T extends CalendarConnectionCountArgs>(
+      args?: Subset<T, CalendarConnectionCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], CalendarConnectionCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a CalendarConnection.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {CalendarConnectionAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends CalendarConnectionAggregateArgs>(args: Subset<T, CalendarConnectionAggregateArgs>): Prisma.PrismaPromise<GetCalendarConnectionAggregateType<T>>
+
+    /**
+     * Group by CalendarConnection.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {CalendarConnectionGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends CalendarConnectionGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: CalendarConnectionGroupByArgs['orderBy'] }
+        : { orderBy?: CalendarConnectionGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, CalendarConnectionGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetCalendarConnectionGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the CalendarConnection model
+   */
+  readonly fields: CalendarConnectionFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for CalendarConnection.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__CalendarConnectionClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    sources<T extends CalendarConnection$sourcesArgs<ExtArgs> = {}>(args?: Subset<T, CalendarConnection$sourcesArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$CalendarSourcePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+    user<T extends UserDefaultArgs<ExtArgs> = {}>(args?: Subset<T, UserDefaultArgs<ExtArgs>>): Prisma__UserClient<$Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the CalendarConnection model
+   */
+  interface CalendarConnectionFieldRefs {
+    readonly id: FieldRef<"CalendarConnection", 'String'>
+    readonly userId: FieldRef<"CalendarConnection", 'String'>
+    readonly provider: FieldRef<"CalendarConnection", 'CalendarProvider'>
+    readonly displayName: FieldRef<"CalendarConnection", 'String'>
+    readonly status: FieldRef<"CalendarConnection", 'CalendarConnectionStatus'>
+    readonly syncStatus: FieldRef<"CalendarConnection", 'CalendarSyncStatus'>
+    readonly providerConfig: FieldRef<"CalendarConnection", 'Json'>
+    readonly syncCursor: FieldRef<"CalendarConnection", 'String'>
+    readonly lastSyncedAt: FieldRef<"CalendarConnection", 'DateTime'>
+    readonly lastSyncError: FieldRef<"CalendarConnection", 'String'>
+    readonly createdAt: FieldRef<"CalendarConnection", 'DateTime'>
+    readonly updatedAt: FieldRef<"CalendarConnection", 'DateTime'>
+  }
+    
+
+  // Custom InputTypes
+  /**
+   * CalendarConnection findUnique
+   */
+  export type CalendarConnectionFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CalendarConnection
+     */
+    select?: CalendarConnectionSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CalendarConnection
+     */
+    omit?: CalendarConnectionOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CalendarConnectionInclude<ExtArgs> | null
+    /**
+     * Filter, which CalendarConnection to fetch.
+     */
+    where: CalendarConnectionWhereUniqueInput
+  }
+
+  /**
+   * CalendarConnection findUniqueOrThrow
+   */
+  export type CalendarConnectionFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CalendarConnection
+     */
+    select?: CalendarConnectionSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CalendarConnection
+     */
+    omit?: CalendarConnectionOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CalendarConnectionInclude<ExtArgs> | null
+    /**
+     * Filter, which CalendarConnection to fetch.
+     */
+    where: CalendarConnectionWhereUniqueInput
+  }
+
+  /**
+   * CalendarConnection findFirst
+   */
+  export type CalendarConnectionFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CalendarConnection
+     */
+    select?: CalendarConnectionSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CalendarConnection
+     */
+    omit?: CalendarConnectionOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CalendarConnectionInclude<ExtArgs> | null
+    /**
+     * Filter, which CalendarConnection to fetch.
+     */
+    where?: CalendarConnectionWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of CalendarConnections to fetch.
+     */
+    orderBy?: CalendarConnectionOrderByWithRelationInput | CalendarConnectionOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for CalendarConnections.
+     */
+    cursor?: CalendarConnectionWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` CalendarConnections from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` CalendarConnections.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of CalendarConnections.
+     */
+    distinct?: CalendarConnectionScalarFieldEnum | CalendarConnectionScalarFieldEnum[]
+  }
+
+  /**
+   * CalendarConnection findFirstOrThrow
+   */
+  export type CalendarConnectionFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CalendarConnection
+     */
+    select?: CalendarConnectionSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CalendarConnection
+     */
+    omit?: CalendarConnectionOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CalendarConnectionInclude<ExtArgs> | null
+    /**
+     * Filter, which CalendarConnection to fetch.
+     */
+    where?: CalendarConnectionWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of CalendarConnections to fetch.
+     */
+    orderBy?: CalendarConnectionOrderByWithRelationInput | CalendarConnectionOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for CalendarConnections.
+     */
+    cursor?: CalendarConnectionWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` CalendarConnections from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` CalendarConnections.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of CalendarConnections.
+     */
+    distinct?: CalendarConnectionScalarFieldEnum | CalendarConnectionScalarFieldEnum[]
+  }
+
+  /**
+   * CalendarConnection findMany
+   */
+  export type CalendarConnectionFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CalendarConnection
+     */
+    select?: CalendarConnectionSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CalendarConnection
+     */
+    omit?: CalendarConnectionOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CalendarConnectionInclude<ExtArgs> | null
+    /**
+     * Filter, which CalendarConnections to fetch.
+     */
+    where?: CalendarConnectionWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of CalendarConnections to fetch.
+     */
+    orderBy?: CalendarConnectionOrderByWithRelationInput | CalendarConnectionOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing CalendarConnections.
+     */
+    cursor?: CalendarConnectionWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` CalendarConnections from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` CalendarConnections.
+     */
+    skip?: number
+    distinct?: CalendarConnectionScalarFieldEnum | CalendarConnectionScalarFieldEnum[]
+  }
+
+  /**
+   * CalendarConnection create
+   */
+  export type CalendarConnectionCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CalendarConnection
+     */
+    select?: CalendarConnectionSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CalendarConnection
+     */
+    omit?: CalendarConnectionOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CalendarConnectionInclude<ExtArgs> | null
+    /**
+     * The data needed to create a CalendarConnection.
+     */
+    data: XOR<CalendarConnectionCreateInput, CalendarConnectionUncheckedCreateInput>
+  }
+
+  /**
+   * CalendarConnection createMany
+   */
+  export type CalendarConnectionCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many CalendarConnections.
+     */
+    data: CalendarConnectionCreateManyInput | CalendarConnectionCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * CalendarConnection createManyAndReturn
+   */
+  export type CalendarConnectionCreateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CalendarConnection
+     */
+    select?: CalendarConnectionSelectCreateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the CalendarConnection
+     */
+    omit?: CalendarConnectionOmit<ExtArgs> | null
+    /**
+     * The data used to create many CalendarConnections.
+     */
+    data: CalendarConnectionCreateManyInput | CalendarConnectionCreateManyInput[]
+    skipDuplicates?: boolean
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CalendarConnectionIncludeCreateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * CalendarConnection update
+   */
+  export type CalendarConnectionUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CalendarConnection
+     */
+    select?: CalendarConnectionSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CalendarConnection
+     */
+    omit?: CalendarConnectionOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CalendarConnectionInclude<ExtArgs> | null
+    /**
+     * The data needed to update a CalendarConnection.
+     */
+    data: XOR<CalendarConnectionUpdateInput, CalendarConnectionUncheckedUpdateInput>
+    /**
+     * Choose, which CalendarConnection to update.
+     */
+    where: CalendarConnectionWhereUniqueInput
+  }
+
+  /**
+   * CalendarConnection updateMany
+   */
+  export type CalendarConnectionUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update CalendarConnections.
+     */
+    data: XOR<CalendarConnectionUpdateManyMutationInput, CalendarConnectionUncheckedUpdateManyInput>
+    /**
+     * Filter which CalendarConnections to update
+     */
+    where?: CalendarConnectionWhereInput
+    /**
+     * Limit how many CalendarConnections to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * CalendarConnection updateManyAndReturn
+   */
+  export type CalendarConnectionUpdateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CalendarConnection
+     */
+    select?: CalendarConnectionSelectUpdateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the CalendarConnection
+     */
+    omit?: CalendarConnectionOmit<ExtArgs> | null
+    /**
+     * The data used to update CalendarConnections.
+     */
+    data: XOR<CalendarConnectionUpdateManyMutationInput, CalendarConnectionUncheckedUpdateManyInput>
+    /**
+     * Filter which CalendarConnections to update
+     */
+    where?: CalendarConnectionWhereInput
+    /**
+     * Limit how many CalendarConnections to update.
+     */
+    limit?: number
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CalendarConnectionIncludeUpdateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * CalendarConnection upsert
+   */
+  export type CalendarConnectionUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CalendarConnection
+     */
+    select?: CalendarConnectionSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CalendarConnection
+     */
+    omit?: CalendarConnectionOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CalendarConnectionInclude<ExtArgs> | null
+    /**
+     * The filter to search for the CalendarConnection to update in case it exists.
+     */
+    where: CalendarConnectionWhereUniqueInput
+    /**
+     * In case the CalendarConnection found by the `where` argument doesn't exist, create a new CalendarConnection with this data.
+     */
+    create: XOR<CalendarConnectionCreateInput, CalendarConnectionUncheckedCreateInput>
+    /**
+     * In case the CalendarConnection was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<CalendarConnectionUpdateInput, CalendarConnectionUncheckedUpdateInput>
+  }
+
+  /**
+   * CalendarConnection delete
+   */
+  export type CalendarConnectionDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CalendarConnection
+     */
+    select?: CalendarConnectionSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CalendarConnection
+     */
+    omit?: CalendarConnectionOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CalendarConnectionInclude<ExtArgs> | null
+    /**
+     * Filter which CalendarConnection to delete.
+     */
+    where: CalendarConnectionWhereUniqueInput
+  }
+
+  /**
+   * CalendarConnection deleteMany
+   */
+  export type CalendarConnectionDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which CalendarConnections to delete
+     */
+    where?: CalendarConnectionWhereInput
+    /**
+     * Limit how many CalendarConnections to delete.
+     */
+    limit?: number
+  }
+
+  /**
+   * CalendarConnection.sources
+   */
+  export type CalendarConnection$sourcesArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CalendarSource
+     */
+    select?: CalendarSourceSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CalendarSource
+     */
+    omit?: CalendarSourceOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CalendarSourceInclude<ExtArgs> | null
+    where?: CalendarSourceWhereInput
+    orderBy?: CalendarSourceOrderByWithRelationInput | CalendarSourceOrderByWithRelationInput[]
+    cursor?: CalendarSourceWhereUniqueInput
+    take?: number
+    skip?: number
+    distinct?: CalendarSourceScalarFieldEnum | CalendarSourceScalarFieldEnum[]
+  }
+
+  /**
+   * CalendarConnection without action
+   */
+  export type CalendarConnectionDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CalendarConnection
+     */
+    select?: CalendarConnectionSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CalendarConnection
+     */
+    omit?: CalendarConnectionOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CalendarConnectionInclude<ExtArgs> | null
+  }
+
+
+  /**
+   * Model CalendarSource
+   */
+
+  export type AggregateCalendarSource = {
+    _count: CalendarSourceCountAggregateOutputType | null
+    _min: CalendarSourceMinAggregateOutputType | null
+    _max: CalendarSourceMaxAggregateOutputType | null
+  }
+
+  export type CalendarSourceMinAggregateOutputType = {
+    id: string | null
+    userId: string | null
+    connectionId: string | null
+    title: string | null
+    color: string | null
+    timezone: string | null
+    visible: boolean | null
+    isReadOnly: boolean | null
+    isPrimary: boolean | null
+    syncMode: $Enums.CalendarSourceSyncMode | null
+    externalCalendarId: string | null
+    lastSyncedAt: Date | null
+    lastSyncError: string | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type CalendarSourceMaxAggregateOutputType = {
+    id: string | null
+    userId: string | null
+    connectionId: string | null
+    title: string | null
+    color: string | null
+    timezone: string | null
+    visible: boolean | null
+    isReadOnly: boolean | null
+    isPrimary: boolean | null
+    syncMode: $Enums.CalendarSourceSyncMode | null
+    externalCalendarId: string | null
+    lastSyncedAt: Date | null
+    lastSyncError: string | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type CalendarSourceCountAggregateOutputType = {
+    id: number
+    userId: number
+    connectionId: number
+    title: number
+    color: number
+    timezone: number
+    visible: number
+    isReadOnly: number
+    isPrimary: number
+    syncMode: number
+    externalCalendarId: number
+    metadata: number
+    lastSyncedAt: number
+    lastSyncError: number
+    createdAt: number
+    updatedAt: number
+    _all: number
+  }
+
+
+  export type CalendarSourceMinAggregateInputType = {
+    id?: true
+    userId?: true
+    connectionId?: true
+    title?: true
+    color?: true
+    timezone?: true
+    visible?: true
+    isReadOnly?: true
+    isPrimary?: true
+    syncMode?: true
+    externalCalendarId?: true
+    lastSyncedAt?: true
+    lastSyncError?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type CalendarSourceMaxAggregateInputType = {
+    id?: true
+    userId?: true
+    connectionId?: true
+    title?: true
+    color?: true
+    timezone?: true
+    visible?: true
+    isReadOnly?: true
+    isPrimary?: true
+    syncMode?: true
+    externalCalendarId?: true
+    lastSyncedAt?: true
+    lastSyncError?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type CalendarSourceCountAggregateInputType = {
+    id?: true
+    userId?: true
+    connectionId?: true
+    title?: true
+    color?: true
+    timezone?: true
+    visible?: true
+    isReadOnly?: true
+    isPrimary?: true
+    syncMode?: true
+    externalCalendarId?: true
+    metadata?: true
+    lastSyncedAt?: true
+    lastSyncError?: true
+    createdAt?: true
+    updatedAt?: true
+    _all?: true
+  }
+
+  export type CalendarSourceAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which CalendarSource to aggregate.
+     */
+    where?: CalendarSourceWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of CalendarSources to fetch.
+     */
+    orderBy?: CalendarSourceOrderByWithRelationInput | CalendarSourceOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: CalendarSourceWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` CalendarSources from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` CalendarSources.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned CalendarSources
+    **/
+    _count?: true | CalendarSourceCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: CalendarSourceMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: CalendarSourceMaxAggregateInputType
+  }
+
+  export type GetCalendarSourceAggregateType<T extends CalendarSourceAggregateArgs> = {
+        [P in keyof T & keyof AggregateCalendarSource]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateCalendarSource[P]>
+      : GetScalarType<T[P], AggregateCalendarSource[P]>
+  }
+
+
+
+
+  export type CalendarSourceGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: CalendarSourceWhereInput
+    orderBy?: CalendarSourceOrderByWithAggregationInput | CalendarSourceOrderByWithAggregationInput[]
+    by: CalendarSourceScalarFieldEnum[] | CalendarSourceScalarFieldEnum
+    having?: CalendarSourceScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: CalendarSourceCountAggregateInputType | true
+    _min?: CalendarSourceMinAggregateInputType
+    _max?: CalendarSourceMaxAggregateInputType
+  }
+
+  export type CalendarSourceGroupByOutputType = {
+    id: string
+    userId: string
+    connectionId: string | null
+    title: string
+    color: string
+    timezone: string | null
+    visible: boolean
+    isReadOnly: boolean
+    isPrimary: boolean
+    syncMode: $Enums.CalendarSourceSyncMode
+    externalCalendarId: string | null
+    metadata: JsonValue
+    lastSyncedAt: Date | null
+    lastSyncError: string | null
+    createdAt: Date
+    updatedAt: Date
+    _count: CalendarSourceCountAggregateOutputType | null
+    _min: CalendarSourceMinAggregateOutputType | null
+    _max: CalendarSourceMaxAggregateOutputType | null
+  }
+
+  type GetCalendarSourceGroupByPayload<T extends CalendarSourceGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<CalendarSourceGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof CalendarSourceGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], CalendarSourceGroupByOutputType[P]>
+            : GetScalarType<T[P], CalendarSourceGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type CalendarSourceSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    userId?: boolean
+    connectionId?: boolean
+    title?: boolean
+    color?: boolean
+    timezone?: boolean
+    visible?: boolean
+    isReadOnly?: boolean
+    isPrimary?: boolean
+    syncMode?: boolean
+    externalCalendarId?: boolean
+    metadata?: boolean
+    lastSyncedAt?: boolean
+    lastSyncError?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    connection?: boolean | CalendarSource$connectionArgs<ExtArgs>
+    events?: boolean | CalendarSource$eventsArgs<ExtArgs>
+    user?: boolean | UserDefaultArgs<ExtArgs>
+    _count?: boolean | CalendarSourceCountOutputTypeDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["calendarSource"]>
+
+  export type CalendarSourceSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    userId?: boolean
+    connectionId?: boolean
+    title?: boolean
+    color?: boolean
+    timezone?: boolean
+    visible?: boolean
+    isReadOnly?: boolean
+    isPrimary?: boolean
+    syncMode?: boolean
+    externalCalendarId?: boolean
+    metadata?: boolean
+    lastSyncedAt?: boolean
+    lastSyncError?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    connection?: boolean | CalendarSource$connectionArgs<ExtArgs>
+    user?: boolean | UserDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["calendarSource"]>
+
+  export type CalendarSourceSelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    userId?: boolean
+    connectionId?: boolean
+    title?: boolean
+    color?: boolean
+    timezone?: boolean
+    visible?: boolean
+    isReadOnly?: boolean
+    isPrimary?: boolean
+    syncMode?: boolean
+    externalCalendarId?: boolean
+    metadata?: boolean
+    lastSyncedAt?: boolean
+    lastSyncError?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    connection?: boolean | CalendarSource$connectionArgs<ExtArgs>
+    user?: boolean | UserDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["calendarSource"]>
+
+  export type CalendarSourceSelectScalar = {
+    id?: boolean
+    userId?: boolean
+    connectionId?: boolean
+    title?: boolean
+    color?: boolean
+    timezone?: boolean
+    visible?: boolean
+    isReadOnly?: boolean
+    isPrimary?: boolean
+    syncMode?: boolean
+    externalCalendarId?: boolean
+    metadata?: boolean
+    lastSyncedAt?: boolean
+    lastSyncError?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+  }
+
+  export type CalendarSourceOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "userId" | "connectionId" | "title" | "color" | "timezone" | "visible" | "isReadOnly" | "isPrimary" | "syncMode" | "externalCalendarId" | "metadata" | "lastSyncedAt" | "lastSyncError" | "createdAt" | "updatedAt", ExtArgs["result"]["calendarSource"]>
+  export type CalendarSourceInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    connection?: boolean | CalendarSource$connectionArgs<ExtArgs>
+    events?: boolean | CalendarSource$eventsArgs<ExtArgs>
+    user?: boolean | UserDefaultArgs<ExtArgs>
+    _count?: boolean | CalendarSourceCountOutputTypeDefaultArgs<ExtArgs>
+  }
+  export type CalendarSourceIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    connection?: boolean | CalendarSource$connectionArgs<ExtArgs>
+    user?: boolean | UserDefaultArgs<ExtArgs>
+  }
+  export type CalendarSourceIncludeUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    connection?: boolean | CalendarSource$connectionArgs<ExtArgs>
+    user?: boolean | UserDefaultArgs<ExtArgs>
+  }
+
+  export type $CalendarSourcePayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "CalendarSource"
+    objects: {
+      connection: Prisma.$CalendarConnectionPayload<ExtArgs> | null
+      events: Prisma.$CalendarEventPayload<ExtArgs>[]
+      user: Prisma.$UserPayload<ExtArgs>
+    }
+    scalars: $Extensions.GetPayloadResult<{
+      id: string
+      userId: string
+      connectionId: string | null
+      title: string
+      color: string
+      timezone: string | null
+      visible: boolean
+      isReadOnly: boolean
+      isPrimary: boolean
+      syncMode: $Enums.CalendarSourceSyncMode
+      externalCalendarId: string | null
+      metadata: Prisma.JsonValue
+      lastSyncedAt: Date | null
+      lastSyncError: string | null
+      createdAt: Date
+      updatedAt: Date
+    }, ExtArgs["result"]["calendarSource"]>
+    composites: {}
+  }
+
+  type CalendarSourceGetPayload<S extends boolean | null | undefined | CalendarSourceDefaultArgs> = $Result.GetResult<Prisma.$CalendarSourcePayload, S>
+
+  type CalendarSourceCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> =
+    Omit<CalendarSourceFindManyArgs, 'select' | 'include' | 'distinct' | 'omit'> & {
+      select?: CalendarSourceCountAggregateInputType | true
+    }
+
+  export interface CalendarSourceDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['CalendarSource'], meta: { name: 'CalendarSource' } }
+    /**
+     * Find zero or one CalendarSource that matches the filter.
+     * @param {CalendarSourceFindUniqueArgs} args - Arguments to find a CalendarSource
+     * @example
+     * // Get one CalendarSource
+     * const calendarSource = await prisma.calendarSource.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends CalendarSourceFindUniqueArgs>(args: SelectSubset<T, CalendarSourceFindUniqueArgs<ExtArgs>>): Prisma__CalendarSourceClient<$Result.GetResult<Prisma.$CalendarSourcePayload<ExtArgs>, T, "findUnique", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find one CalendarSource that matches the filter or throw an error with `error.code='P2025'`
+     * if no matches were found.
+     * @param {CalendarSourceFindUniqueOrThrowArgs} args - Arguments to find a CalendarSource
+     * @example
+     * // Get one CalendarSource
+     * const calendarSource = await prisma.calendarSource.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends CalendarSourceFindUniqueOrThrowArgs>(args: SelectSubset<T, CalendarSourceFindUniqueOrThrowArgs<ExtArgs>>): Prisma__CalendarSourceClient<$Result.GetResult<Prisma.$CalendarSourcePayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first CalendarSource that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {CalendarSourceFindFirstArgs} args - Arguments to find a CalendarSource
+     * @example
+     * // Get one CalendarSource
+     * const calendarSource = await prisma.calendarSource.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends CalendarSourceFindFirstArgs>(args?: SelectSubset<T, CalendarSourceFindFirstArgs<ExtArgs>>): Prisma__CalendarSourceClient<$Result.GetResult<Prisma.$CalendarSourcePayload<ExtArgs>, T, "findFirst", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first CalendarSource that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {CalendarSourceFindFirstOrThrowArgs} args - Arguments to find a CalendarSource
+     * @example
+     * // Get one CalendarSource
+     * const calendarSource = await prisma.calendarSource.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends CalendarSourceFindFirstOrThrowArgs>(args?: SelectSubset<T, CalendarSourceFindFirstOrThrowArgs<ExtArgs>>): Prisma__CalendarSourceClient<$Result.GetResult<Prisma.$CalendarSourcePayload<ExtArgs>, T, "findFirstOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find zero or more CalendarSources that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {CalendarSourceFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all CalendarSources
+     * const calendarSources = await prisma.calendarSource.findMany()
+     * 
+     * // Get first 10 CalendarSources
+     * const calendarSources = await prisma.calendarSource.findMany({ take: 10 })
+     * 
+     * // Only select the `id`
+     * const calendarSourceWithIdOnly = await prisma.calendarSource.findMany({ select: { id: true } })
+     * 
+     */
+    findMany<T extends CalendarSourceFindManyArgs>(args?: SelectSubset<T, CalendarSourceFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$CalendarSourcePayload<ExtArgs>, T, "findMany", GlobalOmitOptions>>
+
+    /**
+     * Create a CalendarSource.
+     * @param {CalendarSourceCreateArgs} args - Arguments to create a CalendarSource.
+     * @example
+     * // Create one CalendarSource
+     * const CalendarSource = await prisma.calendarSource.create({
+     *   data: {
+     *     // ... data to create a CalendarSource
+     *   }
+     * })
+     * 
+     */
+    create<T extends CalendarSourceCreateArgs>(args: SelectSubset<T, CalendarSourceCreateArgs<ExtArgs>>): Prisma__CalendarSourceClient<$Result.GetResult<Prisma.$CalendarSourcePayload<ExtArgs>, T, "create", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Create many CalendarSources.
+     * @param {CalendarSourceCreateManyArgs} args - Arguments to create many CalendarSources.
+     * @example
+     * // Create many CalendarSources
+     * const calendarSource = await prisma.calendarSource.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *     
+     */
+    createMany<T extends CalendarSourceCreateManyArgs>(args?: SelectSubset<T, CalendarSourceCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create many CalendarSources and returns the data saved in the database.
+     * @param {CalendarSourceCreateManyAndReturnArgs} args - Arguments to create many CalendarSources.
+     * @example
+     * // Create many CalendarSources
+     * const calendarSource = await prisma.calendarSource.createManyAndReturn({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Create many CalendarSources and only return the `id`
+     * const calendarSourceWithIdOnly = await prisma.calendarSource.createManyAndReturn({
+     *   select: { id: true },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    createManyAndReturn<T extends CalendarSourceCreateManyAndReturnArgs>(args?: SelectSubset<T, CalendarSourceCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$CalendarSourcePayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Delete a CalendarSource.
+     * @param {CalendarSourceDeleteArgs} args - Arguments to delete one CalendarSource.
+     * @example
+     * // Delete one CalendarSource
+     * const CalendarSource = await prisma.calendarSource.delete({
+     *   where: {
+     *     // ... filter to delete one CalendarSource
+     *   }
+     * })
+     * 
+     */
+    delete<T extends CalendarSourceDeleteArgs>(args: SelectSubset<T, CalendarSourceDeleteArgs<ExtArgs>>): Prisma__CalendarSourceClient<$Result.GetResult<Prisma.$CalendarSourcePayload<ExtArgs>, T, "delete", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Update one CalendarSource.
+     * @param {CalendarSourceUpdateArgs} args - Arguments to update one CalendarSource.
+     * @example
+     * // Update one CalendarSource
+     * const calendarSource = await prisma.calendarSource.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    update<T extends CalendarSourceUpdateArgs>(args: SelectSubset<T, CalendarSourceUpdateArgs<ExtArgs>>): Prisma__CalendarSourceClient<$Result.GetResult<Prisma.$CalendarSourcePayload<ExtArgs>, T, "update", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Delete zero or more CalendarSources.
+     * @param {CalendarSourceDeleteManyArgs} args - Arguments to filter CalendarSources to delete.
+     * @example
+     * // Delete a few CalendarSources
+     * const { count } = await prisma.calendarSource.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+     */
+    deleteMany<T extends CalendarSourceDeleteManyArgs>(args?: SelectSubset<T, CalendarSourceDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more CalendarSources.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {CalendarSourceUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many CalendarSources
+     * const calendarSource = await prisma.calendarSource.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    updateMany<T extends CalendarSourceUpdateManyArgs>(args: SelectSubset<T, CalendarSourceUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more CalendarSources and returns the data updated in the database.
+     * @param {CalendarSourceUpdateManyAndReturnArgs} args - Arguments to update many CalendarSources.
+     * @example
+     * // Update many CalendarSources
+     * const calendarSource = await prisma.calendarSource.updateManyAndReturn({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Update zero or more CalendarSources and only return the `id`
+     * const calendarSourceWithIdOnly = await prisma.calendarSource.updateManyAndReturn({
+     *   select: { id: true },
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    updateManyAndReturn<T extends CalendarSourceUpdateManyAndReturnArgs>(args: SelectSubset<T, CalendarSourceUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$CalendarSourcePayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Create or update one CalendarSource.
+     * @param {CalendarSourceUpsertArgs} args - Arguments to update or create a CalendarSource.
+     * @example
+     * // Update or create a CalendarSource
+     * const calendarSource = await prisma.calendarSource.upsert({
+     *   create: {
+     *     // ... data to create a CalendarSource
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the CalendarSource we want to update
+     *   }
+     * })
+     */
+    upsert<T extends CalendarSourceUpsertArgs>(args: SelectSubset<T, CalendarSourceUpsertArgs<ExtArgs>>): Prisma__CalendarSourceClient<$Result.GetResult<Prisma.$CalendarSourcePayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+
+    /**
+     * Count the number of CalendarSources.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {CalendarSourceCountArgs} args - Arguments to filter CalendarSources to count.
+     * @example
+     * // Count the number of CalendarSources
+     * const count = await prisma.calendarSource.count({
+     *   where: {
+     *     // ... the filter for the CalendarSources we want to count
+     *   }
+     * })
+    **/
+    count<T extends CalendarSourceCountArgs>(
+      args?: Subset<T, CalendarSourceCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], CalendarSourceCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a CalendarSource.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {CalendarSourceAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends CalendarSourceAggregateArgs>(args: Subset<T, CalendarSourceAggregateArgs>): Prisma.PrismaPromise<GetCalendarSourceAggregateType<T>>
+
+    /**
+     * Group by CalendarSource.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {CalendarSourceGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends CalendarSourceGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: CalendarSourceGroupByArgs['orderBy'] }
+        : { orderBy?: CalendarSourceGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, CalendarSourceGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetCalendarSourceGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the CalendarSource model
+   */
+  readonly fields: CalendarSourceFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for CalendarSource.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__CalendarSourceClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    connection<T extends CalendarSource$connectionArgs<ExtArgs> = {}>(args?: Subset<T, CalendarSource$connectionArgs<ExtArgs>>): Prisma__CalendarConnectionClient<$Result.GetResult<Prisma.$CalendarConnectionPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+    events<T extends CalendarSource$eventsArgs<ExtArgs> = {}>(args?: Subset<T, CalendarSource$eventsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$CalendarEventPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+    user<T extends UserDefaultArgs<ExtArgs> = {}>(args?: Subset<T, UserDefaultArgs<ExtArgs>>): Prisma__UserClient<$Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the CalendarSource model
+   */
+  interface CalendarSourceFieldRefs {
+    readonly id: FieldRef<"CalendarSource", 'String'>
+    readonly userId: FieldRef<"CalendarSource", 'String'>
+    readonly connectionId: FieldRef<"CalendarSource", 'String'>
+    readonly title: FieldRef<"CalendarSource", 'String'>
+    readonly color: FieldRef<"CalendarSource", 'String'>
+    readonly timezone: FieldRef<"CalendarSource", 'String'>
+    readonly visible: FieldRef<"CalendarSource", 'Boolean'>
+    readonly isReadOnly: FieldRef<"CalendarSource", 'Boolean'>
+    readonly isPrimary: FieldRef<"CalendarSource", 'Boolean'>
+    readonly syncMode: FieldRef<"CalendarSource", 'CalendarSourceSyncMode'>
+    readonly externalCalendarId: FieldRef<"CalendarSource", 'String'>
+    readonly metadata: FieldRef<"CalendarSource", 'Json'>
+    readonly lastSyncedAt: FieldRef<"CalendarSource", 'DateTime'>
+    readonly lastSyncError: FieldRef<"CalendarSource", 'String'>
+    readonly createdAt: FieldRef<"CalendarSource", 'DateTime'>
+    readonly updatedAt: FieldRef<"CalendarSource", 'DateTime'>
+  }
+    
+
+  // Custom InputTypes
+  /**
+   * CalendarSource findUnique
+   */
+  export type CalendarSourceFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CalendarSource
+     */
+    select?: CalendarSourceSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CalendarSource
+     */
+    omit?: CalendarSourceOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CalendarSourceInclude<ExtArgs> | null
+    /**
+     * Filter, which CalendarSource to fetch.
+     */
+    where: CalendarSourceWhereUniqueInput
+  }
+
+  /**
+   * CalendarSource findUniqueOrThrow
+   */
+  export type CalendarSourceFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CalendarSource
+     */
+    select?: CalendarSourceSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CalendarSource
+     */
+    omit?: CalendarSourceOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CalendarSourceInclude<ExtArgs> | null
+    /**
+     * Filter, which CalendarSource to fetch.
+     */
+    where: CalendarSourceWhereUniqueInput
+  }
+
+  /**
+   * CalendarSource findFirst
+   */
+  export type CalendarSourceFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CalendarSource
+     */
+    select?: CalendarSourceSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CalendarSource
+     */
+    omit?: CalendarSourceOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CalendarSourceInclude<ExtArgs> | null
+    /**
+     * Filter, which CalendarSource to fetch.
+     */
+    where?: CalendarSourceWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of CalendarSources to fetch.
+     */
+    orderBy?: CalendarSourceOrderByWithRelationInput | CalendarSourceOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for CalendarSources.
+     */
+    cursor?: CalendarSourceWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` CalendarSources from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` CalendarSources.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of CalendarSources.
+     */
+    distinct?: CalendarSourceScalarFieldEnum | CalendarSourceScalarFieldEnum[]
+  }
+
+  /**
+   * CalendarSource findFirstOrThrow
+   */
+  export type CalendarSourceFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CalendarSource
+     */
+    select?: CalendarSourceSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CalendarSource
+     */
+    omit?: CalendarSourceOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CalendarSourceInclude<ExtArgs> | null
+    /**
+     * Filter, which CalendarSource to fetch.
+     */
+    where?: CalendarSourceWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of CalendarSources to fetch.
+     */
+    orderBy?: CalendarSourceOrderByWithRelationInput | CalendarSourceOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for CalendarSources.
+     */
+    cursor?: CalendarSourceWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` CalendarSources from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` CalendarSources.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of CalendarSources.
+     */
+    distinct?: CalendarSourceScalarFieldEnum | CalendarSourceScalarFieldEnum[]
+  }
+
+  /**
+   * CalendarSource findMany
+   */
+  export type CalendarSourceFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CalendarSource
+     */
+    select?: CalendarSourceSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CalendarSource
+     */
+    omit?: CalendarSourceOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CalendarSourceInclude<ExtArgs> | null
+    /**
+     * Filter, which CalendarSources to fetch.
+     */
+    where?: CalendarSourceWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of CalendarSources to fetch.
+     */
+    orderBy?: CalendarSourceOrderByWithRelationInput | CalendarSourceOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing CalendarSources.
+     */
+    cursor?: CalendarSourceWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` CalendarSources from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` CalendarSources.
+     */
+    skip?: number
+    distinct?: CalendarSourceScalarFieldEnum | CalendarSourceScalarFieldEnum[]
+  }
+
+  /**
+   * CalendarSource create
+   */
+  export type CalendarSourceCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CalendarSource
+     */
+    select?: CalendarSourceSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CalendarSource
+     */
+    omit?: CalendarSourceOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CalendarSourceInclude<ExtArgs> | null
+    /**
+     * The data needed to create a CalendarSource.
+     */
+    data: XOR<CalendarSourceCreateInput, CalendarSourceUncheckedCreateInput>
+  }
+
+  /**
+   * CalendarSource createMany
+   */
+  export type CalendarSourceCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many CalendarSources.
+     */
+    data: CalendarSourceCreateManyInput | CalendarSourceCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * CalendarSource createManyAndReturn
+   */
+  export type CalendarSourceCreateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CalendarSource
+     */
+    select?: CalendarSourceSelectCreateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the CalendarSource
+     */
+    omit?: CalendarSourceOmit<ExtArgs> | null
+    /**
+     * The data used to create many CalendarSources.
+     */
+    data: CalendarSourceCreateManyInput | CalendarSourceCreateManyInput[]
+    skipDuplicates?: boolean
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CalendarSourceIncludeCreateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * CalendarSource update
+   */
+  export type CalendarSourceUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CalendarSource
+     */
+    select?: CalendarSourceSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CalendarSource
+     */
+    omit?: CalendarSourceOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CalendarSourceInclude<ExtArgs> | null
+    /**
+     * The data needed to update a CalendarSource.
+     */
+    data: XOR<CalendarSourceUpdateInput, CalendarSourceUncheckedUpdateInput>
+    /**
+     * Choose, which CalendarSource to update.
+     */
+    where: CalendarSourceWhereUniqueInput
+  }
+
+  /**
+   * CalendarSource updateMany
+   */
+  export type CalendarSourceUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update CalendarSources.
+     */
+    data: XOR<CalendarSourceUpdateManyMutationInput, CalendarSourceUncheckedUpdateManyInput>
+    /**
+     * Filter which CalendarSources to update
+     */
+    where?: CalendarSourceWhereInput
+    /**
+     * Limit how many CalendarSources to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * CalendarSource updateManyAndReturn
+   */
+  export type CalendarSourceUpdateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CalendarSource
+     */
+    select?: CalendarSourceSelectUpdateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the CalendarSource
+     */
+    omit?: CalendarSourceOmit<ExtArgs> | null
+    /**
+     * The data used to update CalendarSources.
+     */
+    data: XOR<CalendarSourceUpdateManyMutationInput, CalendarSourceUncheckedUpdateManyInput>
+    /**
+     * Filter which CalendarSources to update
+     */
+    where?: CalendarSourceWhereInput
+    /**
+     * Limit how many CalendarSources to update.
+     */
+    limit?: number
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CalendarSourceIncludeUpdateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * CalendarSource upsert
+   */
+  export type CalendarSourceUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CalendarSource
+     */
+    select?: CalendarSourceSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CalendarSource
+     */
+    omit?: CalendarSourceOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CalendarSourceInclude<ExtArgs> | null
+    /**
+     * The filter to search for the CalendarSource to update in case it exists.
+     */
+    where: CalendarSourceWhereUniqueInput
+    /**
+     * In case the CalendarSource found by the `where` argument doesn't exist, create a new CalendarSource with this data.
+     */
+    create: XOR<CalendarSourceCreateInput, CalendarSourceUncheckedCreateInput>
+    /**
+     * In case the CalendarSource was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<CalendarSourceUpdateInput, CalendarSourceUncheckedUpdateInput>
+  }
+
+  /**
+   * CalendarSource delete
+   */
+  export type CalendarSourceDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CalendarSource
+     */
+    select?: CalendarSourceSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CalendarSource
+     */
+    omit?: CalendarSourceOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CalendarSourceInclude<ExtArgs> | null
+    /**
+     * Filter which CalendarSource to delete.
+     */
+    where: CalendarSourceWhereUniqueInput
+  }
+
+  /**
+   * CalendarSource deleteMany
+   */
+  export type CalendarSourceDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which CalendarSources to delete
+     */
+    where?: CalendarSourceWhereInput
+    /**
+     * Limit how many CalendarSources to delete.
+     */
+    limit?: number
+  }
+
+  /**
+   * CalendarSource.connection
+   */
+  export type CalendarSource$connectionArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CalendarConnection
+     */
+    select?: CalendarConnectionSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CalendarConnection
+     */
+    omit?: CalendarConnectionOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CalendarConnectionInclude<ExtArgs> | null
+    where?: CalendarConnectionWhereInput
+  }
+
+  /**
+   * CalendarSource.events
+   */
+  export type CalendarSource$eventsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CalendarEvent
+     */
+    select?: CalendarEventSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CalendarEvent
+     */
+    omit?: CalendarEventOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CalendarEventInclude<ExtArgs> | null
+    where?: CalendarEventWhereInput
+    orderBy?: CalendarEventOrderByWithRelationInput | CalendarEventOrderByWithRelationInput[]
+    cursor?: CalendarEventWhereUniqueInput
+    take?: number
+    skip?: number
+    distinct?: CalendarEventScalarFieldEnum | CalendarEventScalarFieldEnum[]
+  }
+
+  /**
+   * CalendarSource without action
+   */
+  export type CalendarSourceDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CalendarSource
+     */
+    select?: CalendarSourceSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CalendarSource
+     */
+    omit?: CalendarSourceOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CalendarSourceInclude<ExtArgs> | null
+  }
+
+
+  /**
+   * Model CalendarEvent
+   */
+
+  export type AggregateCalendarEvent = {
+    _count: CalendarEventCountAggregateOutputType | null
+    _min: CalendarEventMinAggregateOutputType | null
+    _max: CalendarEventMaxAggregateOutputType | null
+  }
+
+  export type CalendarEventMinAggregateOutputType = {
+    id: string | null
+    userId: string | null
+    sourceId: string | null
+    externalEventId: string | null
+    title: string | null
+    description: string | null
+    location: string | null
+    startAt: Date | null
+    endAt: Date | null
+    allDay: boolean | null
+    timezone: string | null
+    recurrenceRule: string | null
+    status: $Enums.CalendarEventStatus | null
+    meetingUrl: string | null
+    linkedContentId: string | null
+    lastSyncedAt: Date | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type CalendarEventMaxAggregateOutputType = {
+    id: string | null
+    userId: string | null
+    sourceId: string | null
+    externalEventId: string | null
+    title: string | null
+    description: string | null
+    location: string | null
+    startAt: Date | null
+    endAt: Date | null
+    allDay: boolean | null
+    timezone: string | null
+    recurrenceRule: string | null
+    status: $Enums.CalendarEventStatus | null
+    meetingUrl: string | null
+    linkedContentId: string | null
+    lastSyncedAt: Date | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type CalendarEventCountAggregateOutputType = {
+    id: number
+    userId: number
+    sourceId: number
+    externalEventId: number
+    title: number
+    description: number
+    location: number
+    startAt: number
+    endAt: number
+    allDay: number
+    timezone: number
+    recurrenceRule: number
+    recurrenceExDates: number
+    recurrenceOverrides: number
+    status: number
+    meetingUrl: number
+    linkedContentId: number
+    providerMetadata: number
+    lastSyncedAt: number
+    createdAt: number
+    updatedAt: number
+    _all: number
+  }
+
+
+  export type CalendarEventMinAggregateInputType = {
+    id?: true
+    userId?: true
+    sourceId?: true
+    externalEventId?: true
+    title?: true
+    description?: true
+    location?: true
+    startAt?: true
+    endAt?: true
+    allDay?: true
+    timezone?: true
+    recurrenceRule?: true
+    status?: true
+    meetingUrl?: true
+    linkedContentId?: true
+    lastSyncedAt?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type CalendarEventMaxAggregateInputType = {
+    id?: true
+    userId?: true
+    sourceId?: true
+    externalEventId?: true
+    title?: true
+    description?: true
+    location?: true
+    startAt?: true
+    endAt?: true
+    allDay?: true
+    timezone?: true
+    recurrenceRule?: true
+    status?: true
+    meetingUrl?: true
+    linkedContentId?: true
+    lastSyncedAt?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type CalendarEventCountAggregateInputType = {
+    id?: true
+    userId?: true
+    sourceId?: true
+    externalEventId?: true
+    title?: true
+    description?: true
+    location?: true
+    startAt?: true
+    endAt?: true
+    allDay?: true
+    timezone?: true
+    recurrenceRule?: true
+    recurrenceExDates?: true
+    recurrenceOverrides?: true
+    status?: true
+    meetingUrl?: true
+    linkedContentId?: true
+    providerMetadata?: true
+    lastSyncedAt?: true
+    createdAt?: true
+    updatedAt?: true
+    _all?: true
+  }
+
+  export type CalendarEventAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which CalendarEvent to aggregate.
+     */
+    where?: CalendarEventWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of CalendarEvents to fetch.
+     */
+    orderBy?: CalendarEventOrderByWithRelationInput | CalendarEventOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: CalendarEventWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` CalendarEvents from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` CalendarEvents.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned CalendarEvents
+    **/
+    _count?: true | CalendarEventCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: CalendarEventMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: CalendarEventMaxAggregateInputType
+  }
+
+  export type GetCalendarEventAggregateType<T extends CalendarEventAggregateArgs> = {
+        [P in keyof T & keyof AggregateCalendarEvent]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateCalendarEvent[P]>
+      : GetScalarType<T[P], AggregateCalendarEvent[P]>
+  }
+
+
+
+
+  export type CalendarEventGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: CalendarEventWhereInput
+    orderBy?: CalendarEventOrderByWithAggregationInput | CalendarEventOrderByWithAggregationInput[]
+    by: CalendarEventScalarFieldEnum[] | CalendarEventScalarFieldEnum
+    having?: CalendarEventScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: CalendarEventCountAggregateInputType | true
+    _min?: CalendarEventMinAggregateInputType
+    _max?: CalendarEventMaxAggregateInputType
+  }
+
+  export type CalendarEventGroupByOutputType = {
+    id: string
+    userId: string
+    sourceId: string
+    externalEventId: string | null
+    title: string
+    description: string | null
+    location: string | null
+    startAt: Date
+    endAt: Date
+    allDay: boolean
+    timezone: string | null
+    recurrenceRule: string | null
+    recurrenceExDates: JsonValue
+    recurrenceOverrides: JsonValue
+    status: $Enums.CalendarEventStatus
+    meetingUrl: string | null
+    linkedContentId: string | null
+    providerMetadata: JsonValue
+    lastSyncedAt: Date | null
+    createdAt: Date
+    updatedAt: Date
+    _count: CalendarEventCountAggregateOutputType | null
+    _min: CalendarEventMinAggregateOutputType | null
+    _max: CalendarEventMaxAggregateOutputType | null
+  }
+
+  type GetCalendarEventGroupByPayload<T extends CalendarEventGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<CalendarEventGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof CalendarEventGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], CalendarEventGroupByOutputType[P]>
+            : GetScalarType<T[P], CalendarEventGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type CalendarEventSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    userId?: boolean
+    sourceId?: boolean
+    externalEventId?: boolean
+    title?: boolean
+    description?: boolean
+    location?: boolean
+    startAt?: boolean
+    endAt?: boolean
+    allDay?: boolean
+    timezone?: boolean
+    recurrenceRule?: boolean
+    recurrenceExDates?: boolean
+    recurrenceOverrides?: boolean
+    status?: boolean
+    meetingUrl?: boolean
+    linkedContentId?: boolean
+    providerMetadata?: boolean
+    lastSyncedAt?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    attendees?: boolean | CalendarEvent$attendeesArgs<ExtArgs>
+    linkedContent?: boolean | CalendarEvent$linkedContentArgs<ExtArgs>
+    source?: boolean | CalendarSourceDefaultArgs<ExtArgs>
+    user?: boolean | UserDefaultArgs<ExtArgs>
+    _count?: boolean | CalendarEventCountOutputTypeDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["calendarEvent"]>
+
+  export type CalendarEventSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    userId?: boolean
+    sourceId?: boolean
+    externalEventId?: boolean
+    title?: boolean
+    description?: boolean
+    location?: boolean
+    startAt?: boolean
+    endAt?: boolean
+    allDay?: boolean
+    timezone?: boolean
+    recurrenceRule?: boolean
+    recurrenceExDates?: boolean
+    recurrenceOverrides?: boolean
+    status?: boolean
+    meetingUrl?: boolean
+    linkedContentId?: boolean
+    providerMetadata?: boolean
+    lastSyncedAt?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    linkedContent?: boolean | CalendarEvent$linkedContentArgs<ExtArgs>
+    source?: boolean | CalendarSourceDefaultArgs<ExtArgs>
+    user?: boolean | UserDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["calendarEvent"]>
+
+  export type CalendarEventSelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    userId?: boolean
+    sourceId?: boolean
+    externalEventId?: boolean
+    title?: boolean
+    description?: boolean
+    location?: boolean
+    startAt?: boolean
+    endAt?: boolean
+    allDay?: boolean
+    timezone?: boolean
+    recurrenceRule?: boolean
+    recurrenceExDates?: boolean
+    recurrenceOverrides?: boolean
+    status?: boolean
+    meetingUrl?: boolean
+    linkedContentId?: boolean
+    providerMetadata?: boolean
+    lastSyncedAt?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    linkedContent?: boolean | CalendarEvent$linkedContentArgs<ExtArgs>
+    source?: boolean | CalendarSourceDefaultArgs<ExtArgs>
+    user?: boolean | UserDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["calendarEvent"]>
+
+  export type CalendarEventSelectScalar = {
+    id?: boolean
+    userId?: boolean
+    sourceId?: boolean
+    externalEventId?: boolean
+    title?: boolean
+    description?: boolean
+    location?: boolean
+    startAt?: boolean
+    endAt?: boolean
+    allDay?: boolean
+    timezone?: boolean
+    recurrenceRule?: boolean
+    recurrenceExDates?: boolean
+    recurrenceOverrides?: boolean
+    status?: boolean
+    meetingUrl?: boolean
+    linkedContentId?: boolean
+    providerMetadata?: boolean
+    lastSyncedAt?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+  }
+
+  export type CalendarEventOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "userId" | "sourceId" | "externalEventId" | "title" | "description" | "location" | "startAt" | "endAt" | "allDay" | "timezone" | "recurrenceRule" | "recurrenceExDates" | "recurrenceOverrides" | "status" | "meetingUrl" | "linkedContentId" | "providerMetadata" | "lastSyncedAt" | "createdAt" | "updatedAt", ExtArgs["result"]["calendarEvent"]>
+  export type CalendarEventInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    attendees?: boolean | CalendarEvent$attendeesArgs<ExtArgs>
+    linkedContent?: boolean | CalendarEvent$linkedContentArgs<ExtArgs>
+    source?: boolean | CalendarSourceDefaultArgs<ExtArgs>
+    user?: boolean | UserDefaultArgs<ExtArgs>
+    _count?: boolean | CalendarEventCountOutputTypeDefaultArgs<ExtArgs>
+  }
+  export type CalendarEventIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    linkedContent?: boolean | CalendarEvent$linkedContentArgs<ExtArgs>
+    source?: boolean | CalendarSourceDefaultArgs<ExtArgs>
+    user?: boolean | UserDefaultArgs<ExtArgs>
+  }
+  export type CalendarEventIncludeUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    linkedContent?: boolean | CalendarEvent$linkedContentArgs<ExtArgs>
+    source?: boolean | CalendarSourceDefaultArgs<ExtArgs>
+    user?: boolean | UserDefaultArgs<ExtArgs>
+  }
+
+  export type $CalendarEventPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "CalendarEvent"
+    objects: {
+      attendees: Prisma.$CalendarEventAttendeePayload<ExtArgs>[]
+      linkedContent: Prisma.$ContentNodePayload<ExtArgs> | null
+      source: Prisma.$CalendarSourcePayload<ExtArgs>
+      user: Prisma.$UserPayload<ExtArgs>
+    }
+    scalars: $Extensions.GetPayloadResult<{
+      id: string
+      userId: string
+      sourceId: string
+      externalEventId: string | null
+      title: string
+      description: string | null
+      location: string | null
+      startAt: Date
+      endAt: Date
+      allDay: boolean
+      timezone: string | null
+      recurrenceRule: string | null
+      recurrenceExDates: Prisma.JsonValue
+      recurrenceOverrides: Prisma.JsonValue
+      status: $Enums.CalendarEventStatus
+      meetingUrl: string | null
+      linkedContentId: string | null
+      providerMetadata: Prisma.JsonValue
+      lastSyncedAt: Date | null
+      createdAt: Date
+      updatedAt: Date
+    }, ExtArgs["result"]["calendarEvent"]>
+    composites: {}
+  }
+
+  type CalendarEventGetPayload<S extends boolean | null | undefined | CalendarEventDefaultArgs> = $Result.GetResult<Prisma.$CalendarEventPayload, S>
+
+  type CalendarEventCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> =
+    Omit<CalendarEventFindManyArgs, 'select' | 'include' | 'distinct' | 'omit'> & {
+      select?: CalendarEventCountAggregateInputType | true
+    }
+
+  export interface CalendarEventDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['CalendarEvent'], meta: { name: 'CalendarEvent' } }
+    /**
+     * Find zero or one CalendarEvent that matches the filter.
+     * @param {CalendarEventFindUniqueArgs} args - Arguments to find a CalendarEvent
+     * @example
+     * // Get one CalendarEvent
+     * const calendarEvent = await prisma.calendarEvent.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends CalendarEventFindUniqueArgs>(args: SelectSubset<T, CalendarEventFindUniqueArgs<ExtArgs>>): Prisma__CalendarEventClient<$Result.GetResult<Prisma.$CalendarEventPayload<ExtArgs>, T, "findUnique", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find one CalendarEvent that matches the filter or throw an error with `error.code='P2025'`
+     * if no matches were found.
+     * @param {CalendarEventFindUniqueOrThrowArgs} args - Arguments to find a CalendarEvent
+     * @example
+     * // Get one CalendarEvent
+     * const calendarEvent = await prisma.calendarEvent.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends CalendarEventFindUniqueOrThrowArgs>(args: SelectSubset<T, CalendarEventFindUniqueOrThrowArgs<ExtArgs>>): Prisma__CalendarEventClient<$Result.GetResult<Prisma.$CalendarEventPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first CalendarEvent that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {CalendarEventFindFirstArgs} args - Arguments to find a CalendarEvent
+     * @example
+     * // Get one CalendarEvent
+     * const calendarEvent = await prisma.calendarEvent.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends CalendarEventFindFirstArgs>(args?: SelectSubset<T, CalendarEventFindFirstArgs<ExtArgs>>): Prisma__CalendarEventClient<$Result.GetResult<Prisma.$CalendarEventPayload<ExtArgs>, T, "findFirst", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first CalendarEvent that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {CalendarEventFindFirstOrThrowArgs} args - Arguments to find a CalendarEvent
+     * @example
+     * // Get one CalendarEvent
+     * const calendarEvent = await prisma.calendarEvent.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends CalendarEventFindFirstOrThrowArgs>(args?: SelectSubset<T, CalendarEventFindFirstOrThrowArgs<ExtArgs>>): Prisma__CalendarEventClient<$Result.GetResult<Prisma.$CalendarEventPayload<ExtArgs>, T, "findFirstOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find zero or more CalendarEvents that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {CalendarEventFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all CalendarEvents
+     * const calendarEvents = await prisma.calendarEvent.findMany()
+     * 
+     * // Get first 10 CalendarEvents
+     * const calendarEvents = await prisma.calendarEvent.findMany({ take: 10 })
+     * 
+     * // Only select the `id`
+     * const calendarEventWithIdOnly = await prisma.calendarEvent.findMany({ select: { id: true } })
+     * 
+     */
+    findMany<T extends CalendarEventFindManyArgs>(args?: SelectSubset<T, CalendarEventFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$CalendarEventPayload<ExtArgs>, T, "findMany", GlobalOmitOptions>>
+
+    /**
+     * Create a CalendarEvent.
+     * @param {CalendarEventCreateArgs} args - Arguments to create a CalendarEvent.
+     * @example
+     * // Create one CalendarEvent
+     * const CalendarEvent = await prisma.calendarEvent.create({
+     *   data: {
+     *     // ... data to create a CalendarEvent
+     *   }
+     * })
+     * 
+     */
+    create<T extends CalendarEventCreateArgs>(args: SelectSubset<T, CalendarEventCreateArgs<ExtArgs>>): Prisma__CalendarEventClient<$Result.GetResult<Prisma.$CalendarEventPayload<ExtArgs>, T, "create", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Create many CalendarEvents.
+     * @param {CalendarEventCreateManyArgs} args - Arguments to create many CalendarEvents.
+     * @example
+     * // Create many CalendarEvents
+     * const calendarEvent = await prisma.calendarEvent.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *     
+     */
+    createMany<T extends CalendarEventCreateManyArgs>(args?: SelectSubset<T, CalendarEventCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create many CalendarEvents and returns the data saved in the database.
+     * @param {CalendarEventCreateManyAndReturnArgs} args - Arguments to create many CalendarEvents.
+     * @example
+     * // Create many CalendarEvents
+     * const calendarEvent = await prisma.calendarEvent.createManyAndReturn({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Create many CalendarEvents and only return the `id`
+     * const calendarEventWithIdOnly = await prisma.calendarEvent.createManyAndReturn({
+     *   select: { id: true },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    createManyAndReturn<T extends CalendarEventCreateManyAndReturnArgs>(args?: SelectSubset<T, CalendarEventCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$CalendarEventPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Delete a CalendarEvent.
+     * @param {CalendarEventDeleteArgs} args - Arguments to delete one CalendarEvent.
+     * @example
+     * // Delete one CalendarEvent
+     * const CalendarEvent = await prisma.calendarEvent.delete({
+     *   where: {
+     *     // ... filter to delete one CalendarEvent
+     *   }
+     * })
+     * 
+     */
+    delete<T extends CalendarEventDeleteArgs>(args: SelectSubset<T, CalendarEventDeleteArgs<ExtArgs>>): Prisma__CalendarEventClient<$Result.GetResult<Prisma.$CalendarEventPayload<ExtArgs>, T, "delete", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Update one CalendarEvent.
+     * @param {CalendarEventUpdateArgs} args - Arguments to update one CalendarEvent.
+     * @example
+     * // Update one CalendarEvent
+     * const calendarEvent = await prisma.calendarEvent.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    update<T extends CalendarEventUpdateArgs>(args: SelectSubset<T, CalendarEventUpdateArgs<ExtArgs>>): Prisma__CalendarEventClient<$Result.GetResult<Prisma.$CalendarEventPayload<ExtArgs>, T, "update", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Delete zero or more CalendarEvents.
+     * @param {CalendarEventDeleteManyArgs} args - Arguments to filter CalendarEvents to delete.
+     * @example
+     * // Delete a few CalendarEvents
+     * const { count } = await prisma.calendarEvent.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+     */
+    deleteMany<T extends CalendarEventDeleteManyArgs>(args?: SelectSubset<T, CalendarEventDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more CalendarEvents.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {CalendarEventUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many CalendarEvents
+     * const calendarEvent = await prisma.calendarEvent.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    updateMany<T extends CalendarEventUpdateManyArgs>(args: SelectSubset<T, CalendarEventUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more CalendarEvents and returns the data updated in the database.
+     * @param {CalendarEventUpdateManyAndReturnArgs} args - Arguments to update many CalendarEvents.
+     * @example
+     * // Update many CalendarEvents
+     * const calendarEvent = await prisma.calendarEvent.updateManyAndReturn({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Update zero or more CalendarEvents and only return the `id`
+     * const calendarEventWithIdOnly = await prisma.calendarEvent.updateManyAndReturn({
+     *   select: { id: true },
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    updateManyAndReturn<T extends CalendarEventUpdateManyAndReturnArgs>(args: SelectSubset<T, CalendarEventUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$CalendarEventPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Create or update one CalendarEvent.
+     * @param {CalendarEventUpsertArgs} args - Arguments to update or create a CalendarEvent.
+     * @example
+     * // Update or create a CalendarEvent
+     * const calendarEvent = await prisma.calendarEvent.upsert({
+     *   create: {
+     *     // ... data to create a CalendarEvent
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the CalendarEvent we want to update
+     *   }
+     * })
+     */
+    upsert<T extends CalendarEventUpsertArgs>(args: SelectSubset<T, CalendarEventUpsertArgs<ExtArgs>>): Prisma__CalendarEventClient<$Result.GetResult<Prisma.$CalendarEventPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+
+    /**
+     * Count the number of CalendarEvents.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {CalendarEventCountArgs} args - Arguments to filter CalendarEvents to count.
+     * @example
+     * // Count the number of CalendarEvents
+     * const count = await prisma.calendarEvent.count({
+     *   where: {
+     *     // ... the filter for the CalendarEvents we want to count
+     *   }
+     * })
+    **/
+    count<T extends CalendarEventCountArgs>(
+      args?: Subset<T, CalendarEventCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], CalendarEventCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a CalendarEvent.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {CalendarEventAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends CalendarEventAggregateArgs>(args: Subset<T, CalendarEventAggregateArgs>): Prisma.PrismaPromise<GetCalendarEventAggregateType<T>>
+
+    /**
+     * Group by CalendarEvent.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {CalendarEventGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends CalendarEventGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: CalendarEventGroupByArgs['orderBy'] }
+        : { orderBy?: CalendarEventGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, CalendarEventGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetCalendarEventGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the CalendarEvent model
+   */
+  readonly fields: CalendarEventFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for CalendarEvent.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__CalendarEventClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    attendees<T extends CalendarEvent$attendeesArgs<ExtArgs> = {}>(args?: Subset<T, CalendarEvent$attendeesArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$CalendarEventAttendeePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+    linkedContent<T extends CalendarEvent$linkedContentArgs<ExtArgs> = {}>(args?: Subset<T, CalendarEvent$linkedContentArgs<ExtArgs>>): Prisma__ContentNodeClient<$Result.GetResult<Prisma.$ContentNodePayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+    source<T extends CalendarSourceDefaultArgs<ExtArgs> = {}>(args?: Subset<T, CalendarSourceDefaultArgs<ExtArgs>>): Prisma__CalendarSourceClient<$Result.GetResult<Prisma.$CalendarSourcePayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+    user<T extends UserDefaultArgs<ExtArgs> = {}>(args?: Subset<T, UserDefaultArgs<ExtArgs>>): Prisma__UserClient<$Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the CalendarEvent model
+   */
+  interface CalendarEventFieldRefs {
+    readonly id: FieldRef<"CalendarEvent", 'String'>
+    readonly userId: FieldRef<"CalendarEvent", 'String'>
+    readonly sourceId: FieldRef<"CalendarEvent", 'String'>
+    readonly externalEventId: FieldRef<"CalendarEvent", 'String'>
+    readonly title: FieldRef<"CalendarEvent", 'String'>
+    readonly description: FieldRef<"CalendarEvent", 'String'>
+    readonly location: FieldRef<"CalendarEvent", 'String'>
+    readonly startAt: FieldRef<"CalendarEvent", 'DateTime'>
+    readonly endAt: FieldRef<"CalendarEvent", 'DateTime'>
+    readonly allDay: FieldRef<"CalendarEvent", 'Boolean'>
+    readonly timezone: FieldRef<"CalendarEvent", 'String'>
+    readonly recurrenceRule: FieldRef<"CalendarEvent", 'String'>
+    readonly recurrenceExDates: FieldRef<"CalendarEvent", 'Json'>
+    readonly recurrenceOverrides: FieldRef<"CalendarEvent", 'Json'>
+    readonly status: FieldRef<"CalendarEvent", 'CalendarEventStatus'>
+    readonly meetingUrl: FieldRef<"CalendarEvent", 'String'>
+    readonly linkedContentId: FieldRef<"CalendarEvent", 'String'>
+    readonly providerMetadata: FieldRef<"CalendarEvent", 'Json'>
+    readonly lastSyncedAt: FieldRef<"CalendarEvent", 'DateTime'>
+    readonly createdAt: FieldRef<"CalendarEvent", 'DateTime'>
+    readonly updatedAt: FieldRef<"CalendarEvent", 'DateTime'>
+  }
+    
+
+  // Custom InputTypes
+  /**
+   * CalendarEvent findUnique
+   */
+  export type CalendarEventFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CalendarEvent
+     */
+    select?: CalendarEventSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CalendarEvent
+     */
+    omit?: CalendarEventOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CalendarEventInclude<ExtArgs> | null
+    /**
+     * Filter, which CalendarEvent to fetch.
+     */
+    where: CalendarEventWhereUniqueInput
+  }
+
+  /**
+   * CalendarEvent findUniqueOrThrow
+   */
+  export type CalendarEventFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CalendarEvent
+     */
+    select?: CalendarEventSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CalendarEvent
+     */
+    omit?: CalendarEventOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CalendarEventInclude<ExtArgs> | null
+    /**
+     * Filter, which CalendarEvent to fetch.
+     */
+    where: CalendarEventWhereUniqueInput
+  }
+
+  /**
+   * CalendarEvent findFirst
+   */
+  export type CalendarEventFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CalendarEvent
+     */
+    select?: CalendarEventSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CalendarEvent
+     */
+    omit?: CalendarEventOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CalendarEventInclude<ExtArgs> | null
+    /**
+     * Filter, which CalendarEvent to fetch.
+     */
+    where?: CalendarEventWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of CalendarEvents to fetch.
+     */
+    orderBy?: CalendarEventOrderByWithRelationInput | CalendarEventOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for CalendarEvents.
+     */
+    cursor?: CalendarEventWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` CalendarEvents from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` CalendarEvents.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of CalendarEvents.
+     */
+    distinct?: CalendarEventScalarFieldEnum | CalendarEventScalarFieldEnum[]
+  }
+
+  /**
+   * CalendarEvent findFirstOrThrow
+   */
+  export type CalendarEventFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CalendarEvent
+     */
+    select?: CalendarEventSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CalendarEvent
+     */
+    omit?: CalendarEventOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CalendarEventInclude<ExtArgs> | null
+    /**
+     * Filter, which CalendarEvent to fetch.
+     */
+    where?: CalendarEventWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of CalendarEvents to fetch.
+     */
+    orderBy?: CalendarEventOrderByWithRelationInput | CalendarEventOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for CalendarEvents.
+     */
+    cursor?: CalendarEventWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` CalendarEvents from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` CalendarEvents.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of CalendarEvents.
+     */
+    distinct?: CalendarEventScalarFieldEnum | CalendarEventScalarFieldEnum[]
+  }
+
+  /**
+   * CalendarEvent findMany
+   */
+  export type CalendarEventFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CalendarEvent
+     */
+    select?: CalendarEventSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CalendarEvent
+     */
+    omit?: CalendarEventOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CalendarEventInclude<ExtArgs> | null
+    /**
+     * Filter, which CalendarEvents to fetch.
+     */
+    where?: CalendarEventWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of CalendarEvents to fetch.
+     */
+    orderBy?: CalendarEventOrderByWithRelationInput | CalendarEventOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing CalendarEvents.
+     */
+    cursor?: CalendarEventWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` CalendarEvents from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` CalendarEvents.
+     */
+    skip?: number
+    distinct?: CalendarEventScalarFieldEnum | CalendarEventScalarFieldEnum[]
+  }
+
+  /**
+   * CalendarEvent create
+   */
+  export type CalendarEventCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CalendarEvent
+     */
+    select?: CalendarEventSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CalendarEvent
+     */
+    omit?: CalendarEventOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CalendarEventInclude<ExtArgs> | null
+    /**
+     * The data needed to create a CalendarEvent.
+     */
+    data: XOR<CalendarEventCreateInput, CalendarEventUncheckedCreateInput>
+  }
+
+  /**
+   * CalendarEvent createMany
+   */
+  export type CalendarEventCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many CalendarEvents.
+     */
+    data: CalendarEventCreateManyInput | CalendarEventCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * CalendarEvent createManyAndReturn
+   */
+  export type CalendarEventCreateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CalendarEvent
+     */
+    select?: CalendarEventSelectCreateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the CalendarEvent
+     */
+    omit?: CalendarEventOmit<ExtArgs> | null
+    /**
+     * The data used to create many CalendarEvents.
+     */
+    data: CalendarEventCreateManyInput | CalendarEventCreateManyInput[]
+    skipDuplicates?: boolean
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CalendarEventIncludeCreateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * CalendarEvent update
+   */
+  export type CalendarEventUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CalendarEvent
+     */
+    select?: CalendarEventSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CalendarEvent
+     */
+    omit?: CalendarEventOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CalendarEventInclude<ExtArgs> | null
+    /**
+     * The data needed to update a CalendarEvent.
+     */
+    data: XOR<CalendarEventUpdateInput, CalendarEventUncheckedUpdateInput>
+    /**
+     * Choose, which CalendarEvent to update.
+     */
+    where: CalendarEventWhereUniqueInput
+  }
+
+  /**
+   * CalendarEvent updateMany
+   */
+  export type CalendarEventUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update CalendarEvents.
+     */
+    data: XOR<CalendarEventUpdateManyMutationInput, CalendarEventUncheckedUpdateManyInput>
+    /**
+     * Filter which CalendarEvents to update
+     */
+    where?: CalendarEventWhereInput
+    /**
+     * Limit how many CalendarEvents to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * CalendarEvent updateManyAndReturn
+   */
+  export type CalendarEventUpdateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CalendarEvent
+     */
+    select?: CalendarEventSelectUpdateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the CalendarEvent
+     */
+    omit?: CalendarEventOmit<ExtArgs> | null
+    /**
+     * The data used to update CalendarEvents.
+     */
+    data: XOR<CalendarEventUpdateManyMutationInput, CalendarEventUncheckedUpdateManyInput>
+    /**
+     * Filter which CalendarEvents to update
+     */
+    where?: CalendarEventWhereInput
+    /**
+     * Limit how many CalendarEvents to update.
+     */
+    limit?: number
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CalendarEventIncludeUpdateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * CalendarEvent upsert
+   */
+  export type CalendarEventUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CalendarEvent
+     */
+    select?: CalendarEventSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CalendarEvent
+     */
+    omit?: CalendarEventOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CalendarEventInclude<ExtArgs> | null
+    /**
+     * The filter to search for the CalendarEvent to update in case it exists.
+     */
+    where: CalendarEventWhereUniqueInput
+    /**
+     * In case the CalendarEvent found by the `where` argument doesn't exist, create a new CalendarEvent with this data.
+     */
+    create: XOR<CalendarEventCreateInput, CalendarEventUncheckedCreateInput>
+    /**
+     * In case the CalendarEvent was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<CalendarEventUpdateInput, CalendarEventUncheckedUpdateInput>
+  }
+
+  /**
+   * CalendarEvent delete
+   */
+  export type CalendarEventDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CalendarEvent
+     */
+    select?: CalendarEventSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CalendarEvent
+     */
+    omit?: CalendarEventOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CalendarEventInclude<ExtArgs> | null
+    /**
+     * Filter which CalendarEvent to delete.
+     */
+    where: CalendarEventWhereUniqueInput
+  }
+
+  /**
+   * CalendarEvent deleteMany
+   */
+  export type CalendarEventDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which CalendarEvents to delete
+     */
+    where?: CalendarEventWhereInput
+    /**
+     * Limit how many CalendarEvents to delete.
+     */
+    limit?: number
+  }
+
+  /**
+   * CalendarEvent.attendees
+   */
+  export type CalendarEvent$attendeesArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CalendarEventAttendee
+     */
+    select?: CalendarEventAttendeeSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CalendarEventAttendee
+     */
+    omit?: CalendarEventAttendeeOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CalendarEventAttendeeInclude<ExtArgs> | null
+    where?: CalendarEventAttendeeWhereInput
+    orderBy?: CalendarEventAttendeeOrderByWithRelationInput | CalendarEventAttendeeOrderByWithRelationInput[]
+    cursor?: CalendarEventAttendeeWhereUniqueInput
+    take?: number
+    skip?: number
+    distinct?: CalendarEventAttendeeScalarFieldEnum | CalendarEventAttendeeScalarFieldEnum[]
+  }
+
+  /**
+   * CalendarEvent.linkedContent
+   */
+  export type CalendarEvent$linkedContentArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ContentNode
+     */
+    select?: ContentNodeSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ContentNode
+     */
+    omit?: ContentNodeOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ContentNodeInclude<ExtArgs> | null
+    where?: ContentNodeWhereInput
+  }
+
+  /**
+   * CalendarEvent without action
+   */
+  export type CalendarEventDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CalendarEvent
+     */
+    select?: CalendarEventSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CalendarEvent
+     */
+    omit?: CalendarEventOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CalendarEventInclude<ExtArgs> | null
+  }
+
+
+  /**
+   * Model CalendarEventAttendee
+   */
+
+  export type AggregateCalendarEventAttendee = {
+    _count: CalendarEventAttendeeCountAggregateOutputType | null
+    _min: CalendarEventAttendeeMinAggregateOutputType | null
+    _max: CalendarEventAttendeeMaxAggregateOutputType | null
+  }
+
+  export type CalendarEventAttendeeMinAggregateOutputType = {
+    id: string | null
+    eventId: string | null
+    email: string | null
+    displayName: string | null
+    isOrganizer: boolean | null
+    responseStatus: $Enums.CalendarAttendeeResponseStatus | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type CalendarEventAttendeeMaxAggregateOutputType = {
+    id: string | null
+    eventId: string | null
+    email: string | null
+    displayName: string | null
+    isOrganizer: boolean | null
+    responseStatus: $Enums.CalendarAttendeeResponseStatus | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type CalendarEventAttendeeCountAggregateOutputType = {
+    id: number
+    eventId: number
+    email: number
+    displayName: number
+    isOrganizer: number
+    responseStatus: number
+    metadata: number
+    createdAt: number
+    updatedAt: number
+    _all: number
+  }
+
+
+  export type CalendarEventAttendeeMinAggregateInputType = {
+    id?: true
+    eventId?: true
+    email?: true
+    displayName?: true
+    isOrganizer?: true
+    responseStatus?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type CalendarEventAttendeeMaxAggregateInputType = {
+    id?: true
+    eventId?: true
+    email?: true
+    displayName?: true
+    isOrganizer?: true
+    responseStatus?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type CalendarEventAttendeeCountAggregateInputType = {
+    id?: true
+    eventId?: true
+    email?: true
+    displayName?: true
+    isOrganizer?: true
+    responseStatus?: true
+    metadata?: true
+    createdAt?: true
+    updatedAt?: true
+    _all?: true
+  }
+
+  export type CalendarEventAttendeeAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which CalendarEventAttendee to aggregate.
+     */
+    where?: CalendarEventAttendeeWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of CalendarEventAttendees to fetch.
+     */
+    orderBy?: CalendarEventAttendeeOrderByWithRelationInput | CalendarEventAttendeeOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: CalendarEventAttendeeWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` CalendarEventAttendees from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` CalendarEventAttendees.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned CalendarEventAttendees
+    **/
+    _count?: true | CalendarEventAttendeeCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: CalendarEventAttendeeMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: CalendarEventAttendeeMaxAggregateInputType
+  }
+
+  export type GetCalendarEventAttendeeAggregateType<T extends CalendarEventAttendeeAggregateArgs> = {
+        [P in keyof T & keyof AggregateCalendarEventAttendee]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateCalendarEventAttendee[P]>
+      : GetScalarType<T[P], AggregateCalendarEventAttendee[P]>
+  }
+
+
+
+
+  export type CalendarEventAttendeeGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: CalendarEventAttendeeWhereInput
+    orderBy?: CalendarEventAttendeeOrderByWithAggregationInput | CalendarEventAttendeeOrderByWithAggregationInput[]
+    by: CalendarEventAttendeeScalarFieldEnum[] | CalendarEventAttendeeScalarFieldEnum
+    having?: CalendarEventAttendeeScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: CalendarEventAttendeeCountAggregateInputType | true
+    _min?: CalendarEventAttendeeMinAggregateInputType
+    _max?: CalendarEventAttendeeMaxAggregateInputType
+  }
+
+  export type CalendarEventAttendeeGroupByOutputType = {
+    id: string
+    eventId: string
+    email: string
+    displayName: string | null
+    isOrganizer: boolean
+    responseStatus: $Enums.CalendarAttendeeResponseStatus
+    metadata: JsonValue
+    createdAt: Date
+    updatedAt: Date
+    _count: CalendarEventAttendeeCountAggregateOutputType | null
+    _min: CalendarEventAttendeeMinAggregateOutputType | null
+    _max: CalendarEventAttendeeMaxAggregateOutputType | null
+  }
+
+  type GetCalendarEventAttendeeGroupByPayload<T extends CalendarEventAttendeeGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<CalendarEventAttendeeGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof CalendarEventAttendeeGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], CalendarEventAttendeeGroupByOutputType[P]>
+            : GetScalarType<T[P], CalendarEventAttendeeGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type CalendarEventAttendeeSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    eventId?: boolean
+    email?: boolean
+    displayName?: boolean
+    isOrganizer?: boolean
+    responseStatus?: boolean
+    metadata?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    event?: boolean | CalendarEventDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["calendarEventAttendee"]>
+
+  export type CalendarEventAttendeeSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    eventId?: boolean
+    email?: boolean
+    displayName?: boolean
+    isOrganizer?: boolean
+    responseStatus?: boolean
+    metadata?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    event?: boolean | CalendarEventDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["calendarEventAttendee"]>
+
+  export type CalendarEventAttendeeSelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    eventId?: boolean
+    email?: boolean
+    displayName?: boolean
+    isOrganizer?: boolean
+    responseStatus?: boolean
+    metadata?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    event?: boolean | CalendarEventDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["calendarEventAttendee"]>
+
+  export type CalendarEventAttendeeSelectScalar = {
+    id?: boolean
+    eventId?: boolean
+    email?: boolean
+    displayName?: boolean
+    isOrganizer?: boolean
+    responseStatus?: boolean
+    metadata?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+  }
+
+  export type CalendarEventAttendeeOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "eventId" | "email" | "displayName" | "isOrganizer" | "responseStatus" | "metadata" | "createdAt" | "updatedAt", ExtArgs["result"]["calendarEventAttendee"]>
+  export type CalendarEventAttendeeInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    event?: boolean | CalendarEventDefaultArgs<ExtArgs>
+  }
+  export type CalendarEventAttendeeIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    event?: boolean | CalendarEventDefaultArgs<ExtArgs>
+  }
+  export type CalendarEventAttendeeIncludeUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    event?: boolean | CalendarEventDefaultArgs<ExtArgs>
+  }
+
+  export type $CalendarEventAttendeePayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "CalendarEventAttendee"
+    objects: {
+      event: Prisma.$CalendarEventPayload<ExtArgs>
+    }
+    scalars: $Extensions.GetPayloadResult<{
+      id: string
+      eventId: string
+      email: string
+      displayName: string | null
+      isOrganizer: boolean
+      responseStatus: $Enums.CalendarAttendeeResponseStatus
+      metadata: Prisma.JsonValue
+      createdAt: Date
+      updatedAt: Date
+    }, ExtArgs["result"]["calendarEventAttendee"]>
+    composites: {}
+  }
+
+  type CalendarEventAttendeeGetPayload<S extends boolean | null | undefined | CalendarEventAttendeeDefaultArgs> = $Result.GetResult<Prisma.$CalendarEventAttendeePayload, S>
+
+  type CalendarEventAttendeeCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> =
+    Omit<CalendarEventAttendeeFindManyArgs, 'select' | 'include' | 'distinct' | 'omit'> & {
+      select?: CalendarEventAttendeeCountAggregateInputType | true
+    }
+
+  export interface CalendarEventAttendeeDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['CalendarEventAttendee'], meta: { name: 'CalendarEventAttendee' } }
+    /**
+     * Find zero or one CalendarEventAttendee that matches the filter.
+     * @param {CalendarEventAttendeeFindUniqueArgs} args - Arguments to find a CalendarEventAttendee
+     * @example
+     * // Get one CalendarEventAttendee
+     * const calendarEventAttendee = await prisma.calendarEventAttendee.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends CalendarEventAttendeeFindUniqueArgs>(args: SelectSubset<T, CalendarEventAttendeeFindUniqueArgs<ExtArgs>>): Prisma__CalendarEventAttendeeClient<$Result.GetResult<Prisma.$CalendarEventAttendeePayload<ExtArgs>, T, "findUnique", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find one CalendarEventAttendee that matches the filter or throw an error with `error.code='P2025'`
+     * if no matches were found.
+     * @param {CalendarEventAttendeeFindUniqueOrThrowArgs} args - Arguments to find a CalendarEventAttendee
+     * @example
+     * // Get one CalendarEventAttendee
+     * const calendarEventAttendee = await prisma.calendarEventAttendee.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends CalendarEventAttendeeFindUniqueOrThrowArgs>(args: SelectSubset<T, CalendarEventAttendeeFindUniqueOrThrowArgs<ExtArgs>>): Prisma__CalendarEventAttendeeClient<$Result.GetResult<Prisma.$CalendarEventAttendeePayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first CalendarEventAttendee that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {CalendarEventAttendeeFindFirstArgs} args - Arguments to find a CalendarEventAttendee
+     * @example
+     * // Get one CalendarEventAttendee
+     * const calendarEventAttendee = await prisma.calendarEventAttendee.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends CalendarEventAttendeeFindFirstArgs>(args?: SelectSubset<T, CalendarEventAttendeeFindFirstArgs<ExtArgs>>): Prisma__CalendarEventAttendeeClient<$Result.GetResult<Prisma.$CalendarEventAttendeePayload<ExtArgs>, T, "findFirst", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first CalendarEventAttendee that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {CalendarEventAttendeeFindFirstOrThrowArgs} args - Arguments to find a CalendarEventAttendee
+     * @example
+     * // Get one CalendarEventAttendee
+     * const calendarEventAttendee = await prisma.calendarEventAttendee.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends CalendarEventAttendeeFindFirstOrThrowArgs>(args?: SelectSubset<T, CalendarEventAttendeeFindFirstOrThrowArgs<ExtArgs>>): Prisma__CalendarEventAttendeeClient<$Result.GetResult<Prisma.$CalendarEventAttendeePayload<ExtArgs>, T, "findFirstOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find zero or more CalendarEventAttendees that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {CalendarEventAttendeeFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all CalendarEventAttendees
+     * const calendarEventAttendees = await prisma.calendarEventAttendee.findMany()
+     * 
+     * // Get first 10 CalendarEventAttendees
+     * const calendarEventAttendees = await prisma.calendarEventAttendee.findMany({ take: 10 })
+     * 
+     * // Only select the `id`
+     * const calendarEventAttendeeWithIdOnly = await prisma.calendarEventAttendee.findMany({ select: { id: true } })
+     * 
+     */
+    findMany<T extends CalendarEventAttendeeFindManyArgs>(args?: SelectSubset<T, CalendarEventAttendeeFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$CalendarEventAttendeePayload<ExtArgs>, T, "findMany", GlobalOmitOptions>>
+
+    /**
+     * Create a CalendarEventAttendee.
+     * @param {CalendarEventAttendeeCreateArgs} args - Arguments to create a CalendarEventAttendee.
+     * @example
+     * // Create one CalendarEventAttendee
+     * const CalendarEventAttendee = await prisma.calendarEventAttendee.create({
+     *   data: {
+     *     // ... data to create a CalendarEventAttendee
+     *   }
+     * })
+     * 
+     */
+    create<T extends CalendarEventAttendeeCreateArgs>(args: SelectSubset<T, CalendarEventAttendeeCreateArgs<ExtArgs>>): Prisma__CalendarEventAttendeeClient<$Result.GetResult<Prisma.$CalendarEventAttendeePayload<ExtArgs>, T, "create", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Create many CalendarEventAttendees.
+     * @param {CalendarEventAttendeeCreateManyArgs} args - Arguments to create many CalendarEventAttendees.
+     * @example
+     * // Create many CalendarEventAttendees
+     * const calendarEventAttendee = await prisma.calendarEventAttendee.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *     
+     */
+    createMany<T extends CalendarEventAttendeeCreateManyArgs>(args?: SelectSubset<T, CalendarEventAttendeeCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create many CalendarEventAttendees and returns the data saved in the database.
+     * @param {CalendarEventAttendeeCreateManyAndReturnArgs} args - Arguments to create many CalendarEventAttendees.
+     * @example
+     * // Create many CalendarEventAttendees
+     * const calendarEventAttendee = await prisma.calendarEventAttendee.createManyAndReturn({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Create many CalendarEventAttendees and only return the `id`
+     * const calendarEventAttendeeWithIdOnly = await prisma.calendarEventAttendee.createManyAndReturn({
+     *   select: { id: true },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    createManyAndReturn<T extends CalendarEventAttendeeCreateManyAndReturnArgs>(args?: SelectSubset<T, CalendarEventAttendeeCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$CalendarEventAttendeePayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Delete a CalendarEventAttendee.
+     * @param {CalendarEventAttendeeDeleteArgs} args - Arguments to delete one CalendarEventAttendee.
+     * @example
+     * // Delete one CalendarEventAttendee
+     * const CalendarEventAttendee = await prisma.calendarEventAttendee.delete({
+     *   where: {
+     *     // ... filter to delete one CalendarEventAttendee
+     *   }
+     * })
+     * 
+     */
+    delete<T extends CalendarEventAttendeeDeleteArgs>(args: SelectSubset<T, CalendarEventAttendeeDeleteArgs<ExtArgs>>): Prisma__CalendarEventAttendeeClient<$Result.GetResult<Prisma.$CalendarEventAttendeePayload<ExtArgs>, T, "delete", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Update one CalendarEventAttendee.
+     * @param {CalendarEventAttendeeUpdateArgs} args - Arguments to update one CalendarEventAttendee.
+     * @example
+     * // Update one CalendarEventAttendee
+     * const calendarEventAttendee = await prisma.calendarEventAttendee.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    update<T extends CalendarEventAttendeeUpdateArgs>(args: SelectSubset<T, CalendarEventAttendeeUpdateArgs<ExtArgs>>): Prisma__CalendarEventAttendeeClient<$Result.GetResult<Prisma.$CalendarEventAttendeePayload<ExtArgs>, T, "update", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Delete zero or more CalendarEventAttendees.
+     * @param {CalendarEventAttendeeDeleteManyArgs} args - Arguments to filter CalendarEventAttendees to delete.
+     * @example
+     * // Delete a few CalendarEventAttendees
+     * const { count } = await prisma.calendarEventAttendee.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+     */
+    deleteMany<T extends CalendarEventAttendeeDeleteManyArgs>(args?: SelectSubset<T, CalendarEventAttendeeDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more CalendarEventAttendees.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {CalendarEventAttendeeUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many CalendarEventAttendees
+     * const calendarEventAttendee = await prisma.calendarEventAttendee.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    updateMany<T extends CalendarEventAttendeeUpdateManyArgs>(args: SelectSubset<T, CalendarEventAttendeeUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more CalendarEventAttendees and returns the data updated in the database.
+     * @param {CalendarEventAttendeeUpdateManyAndReturnArgs} args - Arguments to update many CalendarEventAttendees.
+     * @example
+     * // Update many CalendarEventAttendees
+     * const calendarEventAttendee = await prisma.calendarEventAttendee.updateManyAndReturn({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Update zero or more CalendarEventAttendees and only return the `id`
+     * const calendarEventAttendeeWithIdOnly = await prisma.calendarEventAttendee.updateManyAndReturn({
+     *   select: { id: true },
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    updateManyAndReturn<T extends CalendarEventAttendeeUpdateManyAndReturnArgs>(args: SelectSubset<T, CalendarEventAttendeeUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$CalendarEventAttendeePayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Create or update one CalendarEventAttendee.
+     * @param {CalendarEventAttendeeUpsertArgs} args - Arguments to update or create a CalendarEventAttendee.
+     * @example
+     * // Update or create a CalendarEventAttendee
+     * const calendarEventAttendee = await prisma.calendarEventAttendee.upsert({
+     *   create: {
+     *     // ... data to create a CalendarEventAttendee
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the CalendarEventAttendee we want to update
+     *   }
+     * })
+     */
+    upsert<T extends CalendarEventAttendeeUpsertArgs>(args: SelectSubset<T, CalendarEventAttendeeUpsertArgs<ExtArgs>>): Prisma__CalendarEventAttendeeClient<$Result.GetResult<Prisma.$CalendarEventAttendeePayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+
+    /**
+     * Count the number of CalendarEventAttendees.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {CalendarEventAttendeeCountArgs} args - Arguments to filter CalendarEventAttendees to count.
+     * @example
+     * // Count the number of CalendarEventAttendees
+     * const count = await prisma.calendarEventAttendee.count({
+     *   where: {
+     *     // ... the filter for the CalendarEventAttendees we want to count
+     *   }
+     * })
+    **/
+    count<T extends CalendarEventAttendeeCountArgs>(
+      args?: Subset<T, CalendarEventAttendeeCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], CalendarEventAttendeeCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a CalendarEventAttendee.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {CalendarEventAttendeeAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends CalendarEventAttendeeAggregateArgs>(args: Subset<T, CalendarEventAttendeeAggregateArgs>): Prisma.PrismaPromise<GetCalendarEventAttendeeAggregateType<T>>
+
+    /**
+     * Group by CalendarEventAttendee.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {CalendarEventAttendeeGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends CalendarEventAttendeeGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: CalendarEventAttendeeGroupByArgs['orderBy'] }
+        : { orderBy?: CalendarEventAttendeeGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, CalendarEventAttendeeGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetCalendarEventAttendeeGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the CalendarEventAttendee model
+   */
+  readonly fields: CalendarEventAttendeeFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for CalendarEventAttendee.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__CalendarEventAttendeeClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    event<T extends CalendarEventDefaultArgs<ExtArgs> = {}>(args?: Subset<T, CalendarEventDefaultArgs<ExtArgs>>): Prisma__CalendarEventClient<$Result.GetResult<Prisma.$CalendarEventPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the CalendarEventAttendee model
+   */
+  interface CalendarEventAttendeeFieldRefs {
+    readonly id: FieldRef<"CalendarEventAttendee", 'String'>
+    readonly eventId: FieldRef<"CalendarEventAttendee", 'String'>
+    readonly email: FieldRef<"CalendarEventAttendee", 'String'>
+    readonly displayName: FieldRef<"CalendarEventAttendee", 'String'>
+    readonly isOrganizer: FieldRef<"CalendarEventAttendee", 'Boolean'>
+    readonly responseStatus: FieldRef<"CalendarEventAttendee", 'CalendarAttendeeResponseStatus'>
+    readonly metadata: FieldRef<"CalendarEventAttendee", 'Json'>
+    readonly createdAt: FieldRef<"CalendarEventAttendee", 'DateTime'>
+    readonly updatedAt: FieldRef<"CalendarEventAttendee", 'DateTime'>
+  }
+    
+
+  // Custom InputTypes
+  /**
+   * CalendarEventAttendee findUnique
+   */
+  export type CalendarEventAttendeeFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CalendarEventAttendee
+     */
+    select?: CalendarEventAttendeeSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CalendarEventAttendee
+     */
+    omit?: CalendarEventAttendeeOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CalendarEventAttendeeInclude<ExtArgs> | null
+    /**
+     * Filter, which CalendarEventAttendee to fetch.
+     */
+    where: CalendarEventAttendeeWhereUniqueInput
+  }
+
+  /**
+   * CalendarEventAttendee findUniqueOrThrow
+   */
+  export type CalendarEventAttendeeFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CalendarEventAttendee
+     */
+    select?: CalendarEventAttendeeSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CalendarEventAttendee
+     */
+    omit?: CalendarEventAttendeeOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CalendarEventAttendeeInclude<ExtArgs> | null
+    /**
+     * Filter, which CalendarEventAttendee to fetch.
+     */
+    where: CalendarEventAttendeeWhereUniqueInput
+  }
+
+  /**
+   * CalendarEventAttendee findFirst
+   */
+  export type CalendarEventAttendeeFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CalendarEventAttendee
+     */
+    select?: CalendarEventAttendeeSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CalendarEventAttendee
+     */
+    omit?: CalendarEventAttendeeOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CalendarEventAttendeeInclude<ExtArgs> | null
+    /**
+     * Filter, which CalendarEventAttendee to fetch.
+     */
+    where?: CalendarEventAttendeeWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of CalendarEventAttendees to fetch.
+     */
+    orderBy?: CalendarEventAttendeeOrderByWithRelationInput | CalendarEventAttendeeOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for CalendarEventAttendees.
+     */
+    cursor?: CalendarEventAttendeeWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` CalendarEventAttendees from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` CalendarEventAttendees.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of CalendarEventAttendees.
+     */
+    distinct?: CalendarEventAttendeeScalarFieldEnum | CalendarEventAttendeeScalarFieldEnum[]
+  }
+
+  /**
+   * CalendarEventAttendee findFirstOrThrow
+   */
+  export type CalendarEventAttendeeFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CalendarEventAttendee
+     */
+    select?: CalendarEventAttendeeSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CalendarEventAttendee
+     */
+    omit?: CalendarEventAttendeeOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CalendarEventAttendeeInclude<ExtArgs> | null
+    /**
+     * Filter, which CalendarEventAttendee to fetch.
+     */
+    where?: CalendarEventAttendeeWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of CalendarEventAttendees to fetch.
+     */
+    orderBy?: CalendarEventAttendeeOrderByWithRelationInput | CalendarEventAttendeeOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for CalendarEventAttendees.
+     */
+    cursor?: CalendarEventAttendeeWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` CalendarEventAttendees from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` CalendarEventAttendees.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of CalendarEventAttendees.
+     */
+    distinct?: CalendarEventAttendeeScalarFieldEnum | CalendarEventAttendeeScalarFieldEnum[]
+  }
+
+  /**
+   * CalendarEventAttendee findMany
+   */
+  export type CalendarEventAttendeeFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CalendarEventAttendee
+     */
+    select?: CalendarEventAttendeeSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CalendarEventAttendee
+     */
+    omit?: CalendarEventAttendeeOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CalendarEventAttendeeInclude<ExtArgs> | null
+    /**
+     * Filter, which CalendarEventAttendees to fetch.
+     */
+    where?: CalendarEventAttendeeWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of CalendarEventAttendees to fetch.
+     */
+    orderBy?: CalendarEventAttendeeOrderByWithRelationInput | CalendarEventAttendeeOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing CalendarEventAttendees.
+     */
+    cursor?: CalendarEventAttendeeWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` CalendarEventAttendees from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` CalendarEventAttendees.
+     */
+    skip?: number
+    distinct?: CalendarEventAttendeeScalarFieldEnum | CalendarEventAttendeeScalarFieldEnum[]
+  }
+
+  /**
+   * CalendarEventAttendee create
+   */
+  export type CalendarEventAttendeeCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CalendarEventAttendee
+     */
+    select?: CalendarEventAttendeeSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CalendarEventAttendee
+     */
+    omit?: CalendarEventAttendeeOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CalendarEventAttendeeInclude<ExtArgs> | null
+    /**
+     * The data needed to create a CalendarEventAttendee.
+     */
+    data: XOR<CalendarEventAttendeeCreateInput, CalendarEventAttendeeUncheckedCreateInput>
+  }
+
+  /**
+   * CalendarEventAttendee createMany
+   */
+  export type CalendarEventAttendeeCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many CalendarEventAttendees.
+     */
+    data: CalendarEventAttendeeCreateManyInput | CalendarEventAttendeeCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * CalendarEventAttendee createManyAndReturn
+   */
+  export type CalendarEventAttendeeCreateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CalendarEventAttendee
+     */
+    select?: CalendarEventAttendeeSelectCreateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the CalendarEventAttendee
+     */
+    omit?: CalendarEventAttendeeOmit<ExtArgs> | null
+    /**
+     * The data used to create many CalendarEventAttendees.
+     */
+    data: CalendarEventAttendeeCreateManyInput | CalendarEventAttendeeCreateManyInput[]
+    skipDuplicates?: boolean
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CalendarEventAttendeeIncludeCreateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * CalendarEventAttendee update
+   */
+  export type CalendarEventAttendeeUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CalendarEventAttendee
+     */
+    select?: CalendarEventAttendeeSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CalendarEventAttendee
+     */
+    omit?: CalendarEventAttendeeOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CalendarEventAttendeeInclude<ExtArgs> | null
+    /**
+     * The data needed to update a CalendarEventAttendee.
+     */
+    data: XOR<CalendarEventAttendeeUpdateInput, CalendarEventAttendeeUncheckedUpdateInput>
+    /**
+     * Choose, which CalendarEventAttendee to update.
+     */
+    where: CalendarEventAttendeeWhereUniqueInput
+  }
+
+  /**
+   * CalendarEventAttendee updateMany
+   */
+  export type CalendarEventAttendeeUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update CalendarEventAttendees.
+     */
+    data: XOR<CalendarEventAttendeeUpdateManyMutationInput, CalendarEventAttendeeUncheckedUpdateManyInput>
+    /**
+     * Filter which CalendarEventAttendees to update
+     */
+    where?: CalendarEventAttendeeWhereInput
+    /**
+     * Limit how many CalendarEventAttendees to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * CalendarEventAttendee updateManyAndReturn
+   */
+  export type CalendarEventAttendeeUpdateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CalendarEventAttendee
+     */
+    select?: CalendarEventAttendeeSelectUpdateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the CalendarEventAttendee
+     */
+    omit?: CalendarEventAttendeeOmit<ExtArgs> | null
+    /**
+     * The data used to update CalendarEventAttendees.
+     */
+    data: XOR<CalendarEventAttendeeUpdateManyMutationInput, CalendarEventAttendeeUncheckedUpdateManyInput>
+    /**
+     * Filter which CalendarEventAttendees to update
+     */
+    where?: CalendarEventAttendeeWhereInput
+    /**
+     * Limit how many CalendarEventAttendees to update.
+     */
+    limit?: number
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CalendarEventAttendeeIncludeUpdateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * CalendarEventAttendee upsert
+   */
+  export type CalendarEventAttendeeUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CalendarEventAttendee
+     */
+    select?: CalendarEventAttendeeSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CalendarEventAttendee
+     */
+    omit?: CalendarEventAttendeeOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CalendarEventAttendeeInclude<ExtArgs> | null
+    /**
+     * The filter to search for the CalendarEventAttendee to update in case it exists.
+     */
+    where: CalendarEventAttendeeWhereUniqueInput
+    /**
+     * In case the CalendarEventAttendee found by the `where` argument doesn't exist, create a new CalendarEventAttendee with this data.
+     */
+    create: XOR<CalendarEventAttendeeCreateInput, CalendarEventAttendeeUncheckedCreateInput>
+    /**
+     * In case the CalendarEventAttendee was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<CalendarEventAttendeeUpdateInput, CalendarEventAttendeeUncheckedUpdateInput>
+  }
+
+  /**
+   * CalendarEventAttendee delete
+   */
+  export type CalendarEventAttendeeDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CalendarEventAttendee
+     */
+    select?: CalendarEventAttendeeSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CalendarEventAttendee
+     */
+    omit?: CalendarEventAttendeeOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CalendarEventAttendeeInclude<ExtArgs> | null
+    /**
+     * Filter which CalendarEventAttendee to delete.
+     */
+    where: CalendarEventAttendeeWhereUniqueInput
+  }
+
+  /**
+   * CalendarEventAttendee deleteMany
+   */
+  export type CalendarEventAttendeeDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which CalendarEventAttendees to delete
+     */
+    where?: CalendarEventAttendeeWhereInput
+    /**
+     * Limit how many CalendarEventAttendees to delete.
+     */
+    limit?: number
+  }
+
+  /**
+   * CalendarEventAttendee without action
+   */
+  export type CalendarEventAttendeeDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CalendarEventAttendee
+     */
+    select?: CalendarEventAttendeeSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CalendarEventAttendee
+     */
+    omit?: CalendarEventAttendeeOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CalendarEventAttendeeInclude<ExtArgs> | null
   }
 
 
@@ -33445,10 +38998,93 @@ export namespace Prisma {
     refreshToken: 'refreshToken',
     accessToken: 'accessToken',
     expiresAt: 'expiresAt',
+    scope: 'scope',
     createdAt: 'createdAt'
   };
 
   export type AccountScalarFieldEnum = (typeof AccountScalarFieldEnum)[keyof typeof AccountScalarFieldEnum]
+
+
+  export const CalendarConnectionScalarFieldEnum: {
+    id: 'id',
+    userId: 'userId',
+    provider: 'provider',
+    displayName: 'displayName',
+    status: 'status',
+    syncStatus: 'syncStatus',
+    providerConfig: 'providerConfig',
+    syncCursor: 'syncCursor',
+    lastSyncedAt: 'lastSyncedAt',
+    lastSyncError: 'lastSyncError',
+    createdAt: 'createdAt',
+    updatedAt: 'updatedAt'
+  };
+
+  export type CalendarConnectionScalarFieldEnum = (typeof CalendarConnectionScalarFieldEnum)[keyof typeof CalendarConnectionScalarFieldEnum]
+
+
+  export const CalendarSourceScalarFieldEnum: {
+    id: 'id',
+    userId: 'userId',
+    connectionId: 'connectionId',
+    title: 'title',
+    color: 'color',
+    timezone: 'timezone',
+    visible: 'visible',
+    isReadOnly: 'isReadOnly',
+    isPrimary: 'isPrimary',
+    syncMode: 'syncMode',
+    externalCalendarId: 'externalCalendarId',
+    metadata: 'metadata',
+    lastSyncedAt: 'lastSyncedAt',
+    lastSyncError: 'lastSyncError',
+    createdAt: 'createdAt',
+    updatedAt: 'updatedAt'
+  };
+
+  export type CalendarSourceScalarFieldEnum = (typeof CalendarSourceScalarFieldEnum)[keyof typeof CalendarSourceScalarFieldEnum]
+
+
+  export const CalendarEventScalarFieldEnum: {
+    id: 'id',
+    userId: 'userId',
+    sourceId: 'sourceId',
+    externalEventId: 'externalEventId',
+    title: 'title',
+    description: 'description',
+    location: 'location',
+    startAt: 'startAt',
+    endAt: 'endAt',
+    allDay: 'allDay',
+    timezone: 'timezone',
+    recurrenceRule: 'recurrenceRule',
+    recurrenceExDates: 'recurrenceExDates',
+    recurrenceOverrides: 'recurrenceOverrides',
+    status: 'status',
+    meetingUrl: 'meetingUrl',
+    linkedContentId: 'linkedContentId',
+    providerMetadata: 'providerMetadata',
+    lastSyncedAt: 'lastSyncedAt',
+    createdAt: 'createdAt',
+    updatedAt: 'updatedAt'
+  };
+
+  export type CalendarEventScalarFieldEnum = (typeof CalendarEventScalarFieldEnum)[keyof typeof CalendarEventScalarFieldEnum]
+
+
+  export const CalendarEventAttendeeScalarFieldEnum: {
+    id: 'id',
+    eventId: 'eventId',
+    email: 'email',
+    displayName: 'displayName',
+    isOrganizer: 'isOrganizer',
+    responseStatus: 'responseStatus',
+    metadata: 'metadata',
+    createdAt: 'createdAt',
+    updatedAt: 'updatedAt'
+  };
+
+  export type CalendarEventAttendeeScalarFieldEnum = (typeof CalendarEventAttendeeScalarFieldEnum)[keyof typeof CalendarEventAttendeeScalarFieldEnum]
 
 
   export const AuditLogScalarFieldEnum: {
@@ -33754,6 +39390,90 @@ export namespace Prisma {
 
 
   /**
+   * Reference to a field of type 'CalendarProvider'
+   */
+  export type EnumCalendarProviderFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'CalendarProvider'>
+    
+
+
+  /**
+   * Reference to a field of type 'CalendarProvider[]'
+   */
+  export type ListEnumCalendarProviderFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'CalendarProvider[]'>
+    
+
+
+  /**
+   * Reference to a field of type 'CalendarConnectionStatus'
+   */
+  export type EnumCalendarConnectionStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'CalendarConnectionStatus'>
+    
+
+
+  /**
+   * Reference to a field of type 'CalendarConnectionStatus[]'
+   */
+  export type ListEnumCalendarConnectionStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'CalendarConnectionStatus[]'>
+    
+
+
+  /**
+   * Reference to a field of type 'CalendarSyncStatus'
+   */
+  export type EnumCalendarSyncStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'CalendarSyncStatus'>
+    
+
+
+  /**
+   * Reference to a field of type 'CalendarSyncStatus[]'
+   */
+  export type ListEnumCalendarSyncStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'CalendarSyncStatus[]'>
+    
+
+
+  /**
+   * Reference to a field of type 'CalendarSourceSyncMode'
+   */
+  export type EnumCalendarSourceSyncModeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'CalendarSourceSyncMode'>
+    
+
+
+  /**
+   * Reference to a field of type 'CalendarSourceSyncMode[]'
+   */
+  export type ListEnumCalendarSourceSyncModeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'CalendarSourceSyncMode[]'>
+    
+
+
+  /**
+   * Reference to a field of type 'CalendarEventStatus'
+   */
+  export type EnumCalendarEventStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'CalendarEventStatus'>
+    
+
+
+  /**
+   * Reference to a field of type 'CalendarEventStatus[]'
+   */
+  export type ListEnumCalendarEventStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'CalendarEventStatus[]'>
+    
+
+
+  /**
+   * Reference to a field of type 'CalendarAttendeeResponseStatus'
+   */
+  export type EnumCalendarAttendeeResponseStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'CalendarAttendeeResponseStatus'>
+    
+
+
+  /**
+   * Reference to a field of type 'CalendarAttendeeResponseStatus[]'
+   */
+  export type ListEnumCalendarAttendeeResponseStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'CalendarAttendeeResponseStatus[]'>
+    
+
+
+  /**
    * Reference to a field of type 'FolderViewMode'
    */
   export type EnumFolderViewModeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'FolderViewMode'>
@@ -33825,6 +39545,7 @@ export namespace Prisma {
     children?: ContentNodeListRelationFilter
     contentPath?: XOR<ContentPathNullableScalarRelationFilter, ContentPathWhereInput> | null
     contentTags?: ContentTagListRelationFilter
+    linkedCalendarEvents?: CalendarEventListRelationFilter
     trashBinEntry?: XOR<TrashBinNullableScalarRelationFilter, TrashBinWhereInput> | null
     viewGrants?: ViewGrantListRelationFilter
   }
@@ -33867,6 +39588,7 @@ export namespace Prisma {
     children?: ContentNodeOrderByRelationAggregateInput
     contentPath?: ContentPathOrderByWithRelationInput
     contentTags?: ContentTagOrderByRelationAggregateInput
+    linkedCalendarEvents?: CalendarEventOrderByRelationAggregateInput
     trashBinEntry?: TrashBinOrderByWithRelationInput
     viewGrants?: ViewGrantOrderByRelationAggregateInput
   }
@@ -33913,6 +39635,7 @@ export namespace Prisma {
     children?: ContentNodeListRelationFilter
     contentPath?: XOR<ContentPathNullableScalarRelationFilter, ContentPathWhereInput> | null
     contentTags?: ContentTagListRelationFilter
+    linkedCalendarEvents?: CalendarEventListRelationFilter
     trashBinEntry?: XOR<TrashBinNullableScalarRelationFilter, TrashBinWhereInput> | null
     viewGrants?: ViewGrantListRelationFilter
   }, "id" | "ownerId_slug">
@@ -34809,6 +40532,9 @@ export namespace Prisma {
     auditTargets?: AuditLogListRelationFilter
     adminActions?: AuditLogListRelationFilter
     categories?: CategoryListRelationFilter
+    calendarConnections?: CalendarConnectionListRelationFilter
+    calendarEvents?: CalendarEventListRelationFilter
+    calendarSources?: CalendarSourceListRelationFilter
     contentHistory?: ContentHistoryListRelationFilter
     contentNodes?: ContentNodeListRelationFilter
     sessions?: SessionListRelationFilter
@@ -34833,6 +40559,9 @@ export namespace Prisma {
     auditTargets?: AuditLogOrderByRelationAggregateInput
     adminActions?: AuditLogOrderByRelationAggregateInput
     categories?: CategoryOrderByRelationAggregateInput
+    calendarConnections?: CalendarConnectionOrderByRelationAggregateInput
+    calendarEvents?: CalendarEventOrderByRelationAggregateInput
+    calendarSources?: CalendarSourceOrderByRelationAggregateInput
     contentHistory?: ContentHistoryOrderByRelationAggregateInput
     contentNodes?: ContentNodeOrderByRelationAggregateInput
     sessions?: SessionOrderByRelationAggregateInput
@@ -34860,6 +40589,9 @@ export namespace Prisma {
     auditTargets?: AuditLogListRelationFilter
     adminActions?: AuditLogListRelationFilter
     categories?: CategoryListRelationFilter
+    calendarConnections?: CalendarConnectionListRelationFilter
+    calendarEvents?: CalendarEventListRelationFilter
+    calendarSources?: CalendarSourceListRelationFilter
     contentHistory?: ContentHistoryListRelationFilter
     contentNodes?: ContentNodeListRelationFilter
     sessions?: SessionListRelationFilter
@@ -35175,6 +40907,7 @@ export namespace Prisma {
     refreshToken?: StringNullableFilter<"Account"> | string | null
     accessToken?: StringNullableFilter<"Account"> | string | null
     expiresAt?: DateTimeNullableFilter<"Account"> | Date | string | null
+    scope?: StringNullableFilter<"Account"> | string | null
     createdAt?: DateTimeFilter<"Account"> | Date | string
     user?: XOR<UserScalarRelationFilter, UserWhereInput>
   }
@@ -35187,6 +40920,7 @@ export namespace Prisma {
     refreshToken?: SortOrderInput | SortOrder
     accessToken?: SortOrderInput | SortOrder
     expiresAt?: SortOrderInput | SortOrder
+    scope?: SortOrderInput | SortOrder
     createdAt?: SortOrder
     user?: UserOrderByWithRelationInput
   }
@@ -35203,6 +40937,7 @@ export namespace Prisma {
     refreshToken?: StringNullableFilter<"Account"> | string | null
     accessToken?: StringNullableFilter<"Account"> | string | null
     expiresAt?: DateTimeNullableFilter<"Account"> | Date | string | null
+    scope?: StringNullableFilter<"Account"> | string | null
     createdAt?: DateTimeFilter<"Account"> | Date | string
     user?: XOR<UserScalarRelationFilter, UserWhereInput>
   }, "id" | "provider_providerAccountId" | "provider_providerAccountId">
@@ -35215,6 +40950,7 @@ export namespace Prisma {
     refreshToken?: SortOrderInput | SortOrder
     accessToken?: SortOrderInput | SortOrder
     expiresAt?: SortOrderInput | SortOrder
+    scope?: SortOrderInput | SortOrder
     createdAt?: SortOrder
     _count?: AccountCountOrderByAggregateInput
     _max?: AccountMaxOrderByAggregateInput
@@ -35232,7 +40968,439 @@ export namespace Prisma {
     refreshToken?: StringNullableWithAggregatesFilter<"Account"> | string | null
     accessToken?: StringNullableWithAggregatesFilter<"Account"> | string | null
     expiresAt?: DateTimeNullableWithAggregatesFilter<"Account"> | Date | string | null
+    scope?: StringNullableWithAggregatesFilter<"Account"> | string | null
     createdAt?: DateTimeWithAggregatesFilter<"Account"> | Date | string
+  }
+
+  export type CalendarConnectionWhereInput = {
+    AND?: CalendarConnectionWhereInput | CalendarConnectionWhereInput[]
+    OR?: CalendarConnectionWhereInput[]
+    NOT?: CalendarConnectionWhereInput | CalendarConnectionWhereInput[]
+    id?: UuidFilter<"CalendarConnection"> | string
+    userId?: UuidFilter<"CalendarConnection"> | string
+    provider?: EnumCalendarProviderFilter<"CalendarConnection"> | $Enums.CalendarProvider
+    displayName?: StringFilter<"CalendarConnection"> | string
+    status?: EnumCalendarConnectionStatusFilter<"CalendarConnection"> | $Enums.CalendarConnectionStatus
+    syncStatus?: EnumCalendarSyncStatusFilter<"CalendarConnection"> | $Enums.CalendarSyncStatus
+    providerConfig?: JsonFilter<"CalendarConnection">
+    syncCursor?: StringNullableFilter<"CalendarConnection"> | string | null
+    lastSyncedAt?: DateTimeNullableFilter<"CalendarConnection"> | Date | string | null
+    lastSyncError?: StringNullableFilter<"CalendarConnection"> | string | null
+    createdAt?: DateTimeFilter<"CalendarConnection"> | Date | string
+    updatedAt?: DateTimeFilter<"CalendarConnection"> | Date | string
+    sources?: CalendarSourceListRelationFilter
+    user?: XOR<UserScalarRelationFilter, UserWhereInput>
+  }
+
+  export type CalendarConnectionOrderByWithRelationInput = {
+    id?: SortOrder
+    userId?: SortOrder
+    provider?: SortOrder
+    displayName?: SortOrder
+    status?: SortOrder
+    syncStatus?: SortOrder
+    providerConfig?: SortOrder
+    syncCursor?: SortOrderInput | SortOrder
+    lastSyncedAt?: SortOrderInput | SortOrder
+    lastSyncError?: SortOrderInput | SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+    sources?: CalendarSourceOrderByRelationAggregateInput
+    user?: UserOrderByWithRelationInput
+  }
+
+  export type CalendarConnectionWhereUniqueInput = Prisma.AtLeast<{
+    id?: string
+    AND?: CalendarConnectionWhereInput | CalendarConnectionWhereInput[]
+    OR?: CalendarConnectionWhereInput[]
+    NOT?: CalendarConnectionWhereInput | CalendarConnectionWhereInput[]
+    userId?: UuidFilter<"CalendarConnection"> | string
+    provider?: EnumCalendarProviderFilter<"CalendarConnection"> | $Enums.CalendarProvider
+    displayName?: StringFilter<"CalendarConnection"> | string
+    status?: EnumCalendarConnectionStatusFilter<"CalendarConnection"> | $Enums.CalendarConnectionStatus
+    syncStatus?: EnumCalendarSyncStatusFilter<"CalendarConnection"> | $Enums.CalendarSyncStatus
+    providerConfig?: JsonFilter<"CalendarConnection">
+    syncCursor?: StringNullableFilter<"CalendarConnection"> | string | null
+    lastSyncedAt?: DateTimeNullableFilter<"CalendarConnection"> | Date | string | null
+    lastSyncError?: StringNullableFilter<"CalendarConnection"> | string | null
+    createdAt?: DateTimeFilter<"CalendarConnection"> | Date | string
+    updatedAt?: DateTimeFilter<"CalendarConnection"> | Date | string
+    sources?: CalendarSourceListRelationFilter
+    user?: XOR<UserScalarRelationFilter, UserWhereInput>
+  }, "id">
+
+  export type CalendarConnectionOrderByWithAggregationInput = {
+    id?: SortOrder
+    userId?: SortOrder
+    provider?: SortOrder
+    displayName?: SortOrder
+    status?: SortOrder
+    syncStatus?: SortOrder
+    providerConfig?: SortOrder
+    syncCursor?: SortOrderInput | SortOrder
+    lastSyncedAt?: SortOrderInput | SortOrder
+    lastSyncError?: SortOrderInput | SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+    _count?: CalendarConnectionCountOrderByAggregateInput
+    _max?: CalendarConnectionMaxOrderByAggregateInput
+    _min?: CalendarConnectionMinOrderByAggregateInput
+  }
+
+  export type CalendarConnectionScalarWhereWithAggregatesInput = {
+    AND?: CalendarConnectionScalarWhereWithAggregatesInput | CalendarConnectionScalarWhereWithAggregatesInput[]
+    OR?: CalendarConnectionScalarWhereWithAggregatesInput[]
+    NOT?: CalendarConnectionScalarWhereWithAggregatesInput | CalendarConnectionScalarWhereWithAggregatesInput[]
+    id?: UuidWithAggregatesFilter<"CalendarConnection"> | string
+    userId?: UuidWithAggregatesFilter<"CalendarConnection"> | string
+    provider?: EnumCalendarProviderWithAggregatesFilter<"CalendarConnection"> | $Enums.CalendarProvider
+    displayName?: StringWithAggregatesFilter<"CalendarConnection"> | string
+    status?: EnumCalendarConnectionStatusWithAggregatesFilter<"CalendarConnection"> | $Enums.CalendarConnectionStatus
+    syncStatus?: EnumCalendarSyncStatusWithAggregatesFilter<"CalendarConnection"> | $Enums.CalendarSyncStatus
+    providerConfig?: JsonWithAggregatesFilter<"CalendarConnection">
+    syncCursor?: StringNullableWithAggregatesFilter<"CalendarConnection"> | string | null
+    lastSyncedAt?: DateTimeNullableWithAggregatesFilter<"CalendarConnection"> | Date | string | null
+    lastSyncError?: StringNullableWithAggregatesFilter<"CalendarConnection"> | string | null
+    createdAt?: DateTimeWithAggregatesFilter<"CalendarConnection"> | Date | string
+    updatedAt?: DateTimeWithAggregatesFilter<"CalendarConnection"> | Date | string
+  }
+
+  export type CalendarSourceWhereInput = {
+    AND?: CalendarSourceWhereInput | CalendarSourceWhereInput[]
+    OR?: CalendarSourceWhereInput[]
+    NOT?: CalendarSourceWhereInput | CalendarSourceWhereInput[]
+    id?: UuidFilter<"CalendarSource"> | string
+    userId?: UuidFilter<"CalendarSource"> | string
+    connectionId?: UuidNullableFilter<"CalendarSource"> | string | null
+    title?: StringFilter<"CalendarSource"> | string
+    color?: StringFilter<"CalendarSource"> | string
+    timezone?: StringNullableFilter<"CalendarSource"> | string | null
+    visible?: BoolFilter<"CalendarSource"> | boolean
+    isReadOnly?: BoolFilter<"CalendarSource"> | boolean
+    isPrimary?: BoolFilter<"CalendarSource"> | boolean
+    syncMode?: EnumCalendarSourceSyncModeFilter<"CalendarSource"> | $Enums.CalendarSourceSyncMode
+    externalCalendarId?: StringNullableFilter<"CalendarSource"> | string | null
+    metadata?: JsonFilter<"CalendarSource">
+    lastSyncedAt?: DateTimeNullableFilter<"CalendarSource"> | Date | string | null
+    lastSyncError?: StringNullableFilter<"CalendarSource"> | string | null
+    createdAt?: DateTimeFilter<"CalendarSource"> | Date | string
+    updatedAt?: DateTimeFilter<"CalendarSource"> | Date | string
+    connection?: XOR<CalendarConnectionNullableScalarRelationFilter, CalendarConnectionWhereInput> | null
+    events?: CalendarEventListRelationFilter
+    user?: XOR<UserScalarRelationFilter, UserWhereInput>
+  }
+
+  export type CalendarSourceOrderByWithRelationInput = {
+    id?: SortOrder
+    userId?: SortOrder
+    connectionId?: SortOrderInput | SortOrder
+    title?: SortOrder
+    color?: SortOrder
+    timezone?: SortOrderInput | SortOrder
+    visible?: SortOrder
+    isReadOnly?: SortOrder
+    isPrimary?: SortOrder
+    syncMode?: SortOrder
+    externalCalendarId?: SortOrderInput | SortOrder
+    metadata?: SortOrder
+    lastSyncedAt?: SortOrderInput | SortOrder
+    lastSyncError?: SortOrderInput | SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+    connection?: CalendarConnectionOrderByWithRelationInput
+    events?: CalendarEventOrderByRelationAggregateInput
+    user?: UserOrderByWithRelationInput
+  }
+
+  export type CalendarSourceWhereUniqueInput = Prisma.AtLeast<{
+    id?: string
+    userId_externalCalendarId?: CalendarSourceUserIdExternalCalendarIdCompoundUniqueInput
+    AND?: CalendarSourceWhereInput | CalendarSourceWhereInput[]
+    OR?: CalendarSourceWhereInput[]
+    NOT?: CalendarSourceWhereInput | CalendarSourceWhereInput[]
+    userId?: UuidFilter<"CalendarSource"> | string
+    connectionId?: UuidNullableFilter<"CalendarSource"> | string | null
+    title?: StringFilter<"CalendarSource"> | string
+    color?: StringFilter<"CalendarSource"> | string
+    timezone?: StringNullableFilter<"CalendarSource"> | string | null
+    visible?: BoolFilter<"CalendarSource"> | boolean
+    isReadOnly?: BoolFilter<"CalendarSource"> | boolean
+    isPrimary?: BoolFilter<"CalendarSource"> | boolean
+    syncMode?: EnumCalendarSourceSyncModeFilter<"CalendarSource"> | $Enums.CalendarSourceSyncMode
+    externalCalendarId?: StringNullableFilter<"CalendarSource"> | string | null
+    metadata?: JsonFilter<"CalendarSource">
+    lastSyncedAt?: DateTimeNullableFilter<"CalendarSource"> | Date | string | null
+    lastSyncError?: StringNullableFilter<"CalendarSource"> | string | null
+    createdAt?: DateTimeFilter<"CalendarSource"> | Date | string
+    updatedAt?: DateTimeFilter<"CalendarSource"> | Date | string
+    connection?: XOR<CalendarConnectionNullableScalarRelationFilter, CalendarConnectionWhereInput> | null
+    events?: CalendarEventListRelationFilter
+    user?: XOR<UserScalarRelationFilter, UserWhereInput>
+  }, "id" | "userId_externalCalendarId">
+
+  export type CalendarSourceOrderByWithAggregationInput = {
+    id?: SortOrder
+    userId?: SortOrder
+    connectionId?: SortOrderInput | SortOrder
+    title?: SortOrder
+    color?: SortOrder
+    timezone?: SortOrderInput | SortOrder
+    visible?: SortOrder
+    isReadOnly?: SortOrder
+    isPrimary?: SortOrder
+    syncMode?: SortOrder
+    externalCalendarId?: SortOrderInput | SortOrder
+    metadata?: SortOrder
+    lastSyncedAt?: SortOrderInput | SortOrder
+    lastSyncError?: SortOrderInput | SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+    _count?: CalendarSourceCountOrderByAggregateInput
+    _max?: CalendarSourceMaxOrderByAggregateInput
+    _min?: CalendarSourceMinOrderByAggregateInput
+  }
+
+  export type CalendarSourceScalarWhereWithAggregatesInput = {
+    AND?: CalendarSourceScalarWhereWithAggregatesInput | CalendarSourceScalarWhereWithAggregatesInput[]
+    OR?: CalendarSourceScalarWhereWithAggregatesInput[]
+    NOT?: CalendarSourceScalarWhereWithAggregatesInput | CalendarSourceScalarWhereWithAggregatesInput[]
+    id?: UuidWithAggregatesFilter<"CalendarSource"> | string
+    userId?: UuidWithAggregatesFilter<"CalendarSource"> | string
+    connectionId?: UuidNullableWithAggregatesFilter<"CalendarSource"> | string | null
+    title?: StringWithAggregatesFilter<"CalendarSource"> | string
+    color?: StringWithAggregatesFilter<"CalendarSource"> | string
+    timezone?: StringNullableWithAggregatesFilter<"CalendarSource"> | string | null
+    visible?: BoolWithAggregatesFilter<"CalendarSource"> | boolean
+    isReadOnly?: BoolWithAggregatesFilter<"CalendarSource"> | boolean
+    isPrimary?: BoolWithAggregatesFilter<"CalendarSource"> | boolean
+    syncMode?: EnumCalendarSourceSyncModeWithAggregatesFilter<"CalendarSource"> | $Enums.CalendarSourceSyncMode
+    externalCalendarId?: StringNullableWithAggregatesFilter<"CalendarSource"> | string | null
+    metadata?: JsonWithAggregatesFilter<"CalendarSource">
+    lastSyncedAt?: DateTimeNullableWithAggregatesFilter<"CalendarSource"> | Date | string | null
+    lastSyncError?: StringNullableWithAggregatesFilter<"CalendarSource"> | string | null
+    createdAt?: DateTimeWithAggregatesFilter<"CalendarSource"> | Date | string
+    updatedAt?: DateTimeWithAggregatesFilter<"CalendarSource"> | Date | string
+  }
+
+  export type CalendarEventWhereInput = {
+    AND?: CalendarEventWhereInput | CalendarEventWhereInput[]
+    OR?: CalendarEventWhereInput[]
+    NOT?: CalendarEventWhereInput | CalendarEventWhereInput[]
+    id?: UuidFilter<"CalendarEvent"> | string
+    userId?: UuidFilter<"CalendarEvent"> | string
+    sourceId?: UuidFilter<"CalendarEvent"> | string
+    externalEventId?: StringNullableFilter<"CalendarEvent"> | string | null
+    title?: StringFilter<"CalendarEvent"> | string
+    description?: StringNullableFilter<"CalendarEvent"> | string | null
+    location?: StringNullableFilter<"CalendarEvent"> | string | null
+    startAt?: DateTimeFilter<"CalendarEvent"> | Date | string
+    endAt?: DateTimeFilter<"CalendarEvent"> | Date | string
+    allDay?: BoolFilter<"CalendarEvent"> | boolean
+    timezone?: StringNullableFilter<"CalendarEvent"> | string | null
+    recurrenceRule?: StringNullableFilter<"CalendarEvent"> | string | null
+    recurrenceExDates?: JsonFilter<"CalendarEvent">
+    recurrenceOverrides?: JsonFilter<"CalendarEvent">
+    status?: EnumCalendarEventStatusFilter<"CalendarEvent"> | $Enums.CalendarEventStatus
+    meetingUrl?: StringNullableFilter<"CalendarEvent"> | string | null
+    linkedContentId?: UuidNullableFilter<"CalendarEvent"> | string | null
+    providerMetadata?: JsonFilter<"CalendarEvent">
+    lastSyncedAt?: DateTimeNullableFilter<"CalendarEvent"> | Date | string | null
+    createdAt?: DateTimeFilter<"CalendarEvent"> | Date | string
+    updatedAt?: DateTimeFilter<"CalendarEvent"> | Date | string
+    attendees?: CalendarEventAttendeeListRelationFilter
+    linkedContent?: XOR<ContentNodeNullableScalarRelationFilter, ContentNodeWhereInput> | null
+    source?: XOR<CalendarSourceScalarRelationFilter, CalendarSourceWhereInput>
+    user?: XOR<UserScalarRelationFilter, UserWhereInput>
+  }
+
+  export type CalendarEventOrderByWithRelationInput = {
+    id?: SortOrder
+    userId?: SortOrder
+    sourceId?: SortOrder
+    externalEventId?: SortOrderInput | SortOrder
+    title?: SortOrder
+    description?: SortOrderInput | SortOrder
+    location?: SortOrderInput | SortOrder
+    startAt?: SortOrder
+    endAt?: SortOrder
+    allDay?: SortOrder
+    timezone?: SortOrderInput | SortOrder
+    recurrenceRule?: SortOrderInput | SortOrder
+    recurrenceExDates?: SortOrder
+    recurrenceOverrides?: SortOrder
+    status?: SortOrder
+    meetingUrl?: SortOrderInput | SortOrder
+    linkedContentId?: SortOrderInput | SortOrder
+    providerMetadata?: SortOrder
+    lastSyncedAt?: SortOrderInput | SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+    attendees?: CalendarEventAttendeeOrderByRelationAggregateInput
+    linkedContent?: ContentNodeOrderByWithRelationInput
+    source?: CalendarSourceOrderByWithRelationInput
+    user?: UserOrderByWithRelationInput
+  }
+
+  export type CalendarEventWhereUniqueInput = Prisma.AtLeast<{
+    id?: string
+    sourceId_externalEventId?: CalendarEventSourceIdExternalEventIdCompoundUniqueInput
+    AND?: CalendarEventWhereInput | CalendarEventWhereInput[]
+    OR?: CalendarEventWhereInput[]
+    NOT?: CalendarEventWhereInput | CalendarEventWhereInput[]
+    userId?: UuidFilter<"CalendarEvent"> | string
+    sourceId?: UuidFilter<"CalendarEvent"> | string
+    externalEventId?: StringNullableFilter<"CalendarEvent"> | string | null
+    title?: StringFilter<"CalendarEvent"> | string
+    description?: StringNullableFilter<"CalendarEvent"> | string | null
+    location?: StringNullableFilter<"CalendarEvent"> | string | null
+    startAt?: DateTimeFilter<"CalendarEvent"> | Date | string
+    endAt?: DateTimeFilter<"CalendarEvent"> | Date | string
+    allDay?: BoolFilter<"CalendarEvent"> | boolean
+    timezone?: StringNullableFilter<"CalendarEvent"> | string | null
+    recurrenceRule?: StringNullableFilter<"CalendarEvent"> | string | null
+    recurrenceExDates?: JsonFilter<"CalendarEvent">
+    recurrenceOverrides?: JsonFilter<"CalendarEvent">
+    status?: EnumCalendarEventStatusFilter<"CalendarEvent"> | $Enums.CalendarEventStatus
+    meetingUrl?: StringNullableFilter<"CalendarEvent"> | string | null
+    linkedContentId?: UuidNullableFilter<"CalendarEvent"> | string | null
+    providerMetadata?: JsonFilter<"CalendarEvent">
+    lastSyncedAt?: DateTimeNullableFilter<"CalendarEvent"> | Date | string | null
+    createdAt?: DateTimeFilter<"CalendarEvent"> | Date | string
+    updatedAt?: DateTimeFilter<"CalendarEvent"> | Date | string
+    attendees?: CalendarEventAttendeeListRelationFilter
+    linkedContent?: XOR<ContentNodeNullableScalarRelationFilter, ContentNodeWhereInput> | null
+    source?: XOR<CalendarSourceScalarRelationFilter, CalendarSourceWhereInput>
+    user?: XOR<UserScalarRelationFilter, UserWhereInput>
+  }, "id" | "sourceId_externalEventId">
+
+  export type CalendarEventOrderByWithAggregationInput = {
+    id?: SortOrder
+    userId?: SortOrder
+    sourceId?: SortOrder
+    externalEventId?: SortOrderInput | SortOrder
+    title?: SortOrder
+    description?: SortOrderInput | SortOrder
+    location?: SortOrderInput | SortOrder
+    startAt?: SortOrder
+    endAt?: SortOrder
+    allDay?: SortOrder
+    timezone?: SortOrderInput | SortOrder
+    recurrenceRule?: SortOrderInput | SortOrder
+    recurrenceExDates?: SortOrder
+    recurrenceOverrides?: SortOrder
+    status?: SortOrder
+    meetingUrl?: SortOrderInput | SortOrder
+    linkedContentId?: SortOrderInput | SortOrder
+    providerMetadata?: SortOrder
+    lastSyncedAt?: SortOrderInput | SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+    _count?: CalendarEventCountOrderByAggregateInput
+    _max?: CalendarEventMaxOrderByAggregateInput
+    _min?: CalendarEventMinOrderByAggregateInput
+  }
+
+  export type CalendarEventScalarWhereWithAggregatesInput = {
+    AND?: CalendarEventScalarWhereWithAggregatesInput | CalendarEventScalarWhereWithAggregatesInput[]
+    OR?: CalendarEventScalarWhereWithAggregatesInput[]
+    NOT?: CalendarEventScalarWhereWithAggregatesInput | CalendarEventScalarWhereWithAggregatesInput[]
+    id?: UuidWithAggregatesFilter<"CalendarEvent"> | string
+    userId?: UuidWithAggregatesFilter<"CalendarEvent"> | string
+    sourceId?: UuidWithAggregatesFilter<"CalendarEvent"> | string
+    externalEventId?: StringNullableWithAggregatesFilter<"CalendarEvent"> | string | null
+    title?: StringWithAggregatesFilter<"CalendarEvent"> | string
+    description?: StringNullableWithAggregatesFilter<"CalendarEvent"> | string | null
+    location?: StringNullableWithAggregatesFilter<"CalendarEvent"> | string | null
+    startAt?: DateTimeWithAggregatesFilter<"CalendarEvent"> | Date | string
+    endAt?: DateTimeWithAggregatesFilter<"CalendarEvent"> | Date | string
+    allDay?: BoolWithAggregatesFilter<"CalendarEvent"> | boolean
+    timezone?: StringNullableWithAggregatesFilter<"CalendarEvent"> | string | null
+    recurrenceRule?: StringNullableWithAggregatesFilter<"CalendarEvent"> | string | null
+    recurrenceExDates?: JsonWithAggregatesFilter<"CalendarEvent">
+    recurrenceOverrides?: JsonWithAggregatesFilter<"CalendarEvent">
+    status?: EnumCalendarEventStatusWithAggregatesFilter<"CalendarEvent"> | $Enums.CalendarEventStatus
+    meetingUrl?: StringNullableWithAggregatesFilter<"CalendarEvent"> | string | null
+    linkedContentId?: UuidNullableWithAggregatesFilter<"CalendarEvent"> | string | null
+    providerMetadata?: JsonWithAggregatesFilter<"CalendarEvent">
+    lastSyncedAt?: DateTimeNullableWithAggregatesFilter<"CalendarEvent"> | Date | string | null
+    createdAt?: DateTimeWithAggregatesFilter<"CalendarEvent"> | Date | string
+    updatedAt?: DateTimeWithAggregatesFilter<"CalendarEvent"> | Date | string
+  }
+
+  export type CalendarEventAttendeeWhereInput = {
+    AND?: CalendarEventAttendeeWhereInput | CalendarEventAttendeeWhereInput[]
+    OR?: CalendarEventAttendeeWhereInput[]
+    NOT?: CalendarEventAttendeeWhereInput | CalendarEventAttendeeWhereInput[]
+    id?: UuidFilter<"CalendarEventAttendee"> | string
+    eventId?: UuidFilter<"CalendarEventAttendee"> | string
+    email?: StringFilter<"CalendarEventAttendee"> | string
+    displayName?: StringNullableFilter<"CalendarEventAttendee"> | string | null
+    isOrganizer?: BoolFilter<"CalendarEventAttendee"> | boolean
+    responseStatus?: EnumCalendarAttendeeResponseStatusFilter<"CalendarEventAttendee"> | $Enums.CalendarAttendeeResponseStatus
+    metadata?: JsonFilter<"CalendarEventAttendee">
+    createdAt?: DateTimeFilter<"CalendarEventAttendee"> | Date | string
+    updatedAt?: DateTimeFilter<"CalendarEventAttendee"> | Date | string
+    event?: XOR<CalendarEventScalarRelationFilter, CalendarEventWhereInput>
+  }
+
+  export type CalendarEventAttendeeOrderByWithRelationInput = {
+    id?: SortOrder
+    eventId?: SortOrder
+    email?: SortOrder
+    displayName?: SortOrderInput | SortOrder
+    isOrganizer?: SortOrder
+    responseStatus?: SortOrder
+    metadata?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+    event?: CalendarEventOrderByWithRelationInput
+  }
+
+  export type CalendarEventAttendeeWhereUniqueInput = Prisma.AtLeast<{
+    id?: string
+    eventId_email?: CalendarEventAttendeeEventIdEmailCompoundUniqueInput
+    AND?: CalendarEventAttendeeWhereInput | CalendarEventAttendeeWhereInput[]
+    OR?: CalendarEventAttendeeWhereInput[]
+    NOT?: CalendarEventAttendeeWhereInput | CalendarEventAttendeeWhereInput[]
+    eventId?: UuidFilter<"CalendarEventAttendee"> | string
+    email?: StringFilter<"CalendarEventAttendee"> | string
+    displayName?: StringNullableFilter<"CalendarEventAttendee"> | string | null
+    isOrganizer?: BoolFilter<"CalendarEventAttendee"> | boolean
+    responseStatus?: EnumCalendarAttendeeResponseStatusFilter<"CalendarEventAttendee"> | $Enums.CalendarAttendeeResponseStatus
+    metadata?: JsonFilter<"CalendarEventAttendee">
+    createdAt?: DateTimeFilter<"CalendarEventAttendee"> | Date | string
+    updatedAt?: DateTimeFilter<"CalendarEventAttendee"> | Date | string
+    event?: XOR<CalendarEventScalarRelationFilter, CalendarEventWhereInput>
+  }, "id" | "eventId_email">
+
+  export type CalendarEventAttendeeOrderByWithAggregationInput = {
+    id?: SortOrder
+    eventId?: SortOrder
+    email?: SortOrder
+    displayName?: SortOrderInput | SortOrder
+    isOrganizer?: SortOrder
+    responseStatus?: SortOrder
+    metadata?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+    _count?: CalendarEventAttendeeCountOrderByAggregateInput
+    _max?: CalendarEventAttendeeMaxOrderByAggregateInput
+    _min?: CalendarEventAttendeeMinOrderByAggregateInput
+  }
+
+  export type CalendarEventAttendeeScalarWhereWithAggregatesInput = {
+    AND?: CalendarEventAttendeeScalarWhereWithAggregatesInput | CalendarEventAttendeeScalarWhereWithAggregatesInput[]
+    OR?: CalendarEventAttendeeScalarWhereWithAggregatesInput[]
+    NOT?: CalendarEventAttendeeScalarWhereWithAggregatesInput | CalendarEventAttendeeScalarWhereWithAggregatesInput[]
+    id?: UuidWithAggregatesFilter<"CalendarEventAttendee"> | string
+    eventId?: UuidWithAggregatesFilter<"CalendarEventAttendee"> | string
+    email?: StringWithAggregatesFilter<"CalendarEventAttendee"> | string
+    displayName?: StringNullableWithAggregatesFilter<"CalendarEventAttendee"> | string | null
+    isOrganizer?: BoolWithAggregatesFilter<"CalendarEventAttendee"> | boolean
+    responseStatus?: EnumCalendarAttendeeResponseStatusWithAggregatesFilter<"CalendarEventAttendee"> | $Enums.CalendarAttendeeResponseStatus
+    metadata?: JsonWithAggregatesFilter<"CalendarEventAttendee">
+    createdAt?: DateTimeWithAggregatesFilter<"CalendarEventAttendee"> | Date | string
+    updatedAt?: DateTimeWithAggregatesFilter<"CalendarEventAttendee"> | Date | string
   }
 
   export type AuditLogWhereInput = {
@@ -35786,6 +41954,7 @@ export namespace Prisma {
     children?: ContentNodeCreateNestedManyWithoutParentInput
     contentPath?: ContentPathCreateNestedOneWithoutContentInput
     contentTags?: ContentTagCreateNestedManyWithoutContentInput
+    linkedCalendarEvents?: CalendarEventCreateNestedManyWithoutLinkedContentInput
     trashBinEntry?: TrashBinCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantCreateNestedManyWithoutContentInput
   }
@@ -35825,6 +41994,7 @@ export namespace Prisma {
     children?: ContentNodeUncheckedCreateNestedManyWithoutParentInput
     contentPath?: ContentPathUncheckedCreateNestedOneWithoutContentInput
     contentTags?: ContentTagUncheckedCreateNestedManyWithoutContentInput
+    linkedCalendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutLinkedContentInput
     trashBinEntry?: TrashBinUncheckedCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantUncheckedCreateNestedManyWithoutContentInput
   }
@@ -35864,6 +42034,7 @@ export namespace Prisma {
     children?: ContentNodeUpdateManyWithoutParentNestedInput
     contentPath?: ContentPathUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUpdateManyWithoutContentNestedInput
+    linkedCalendarEvents?: CalendarEventUpdateManyWithoutLinkedContentNestedInput
     trashBinEntry?: TrashBinUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUpdateManyWithoutContentNestedInput
   }
@@ -35903,6 +42074,7 @@ export namespace Prisma {
     children?: ContentNodeUncheckedUpdateManyWithoutParentNestedInput
     contentPath?: ContentPathUncheckedUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUncheckedUpdateManyWithoutContentNestedInput
+    linkedCalendarEvents?: CalendarEventUncheckedUpdateManyWithoutLinkedContentNestedInput
     trashBinEntry?: TrashBinUncheckedUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUncheckedUpdateManyWithoutContentNestedInput
   }
@@ -36857,6 +43029,9 @@ export namespace Prisma {
     auditTargets?: AuditLogCreateNestedManyWithoutTargetUserInput
     adminActions?: AuditLogCreateNestedManyWithoutUserInput
     categories?: CategoryCreateNestedManyWithoutOwnerInput
+    calendarConnections?: CalendarConnectionCreateNestedManyWithoutUserInput
+    calendarEvents?: CalendarEventCreateNestedManyWithoutUserInput
+    calendarSources?: CalendarSourceCreateNestedManyWithoutUserInput
     contentHistory?: ContentHistoryCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeCreateNestedManyWithoutOwnerInput
     sessions?: SessionCreateNestedManyWithoutUserInput
@@ -36881,6 +43056,9 @@ export namespace Prisma {
     auditTargets?: AuditLogUncheckedCreateNestedManyWithoutTargetUserInput
     adminActions?: AuditLogUncheckedCreateNestedManyWithoutUserInput
     categories?: CategoryUncheckedCreateNestedManyWithoutOwnerInput
+    calendarConnections?: CalendarConnectionUncheckedCreateNestedManyWithoutUserInput
+    calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutUserInput
+    calendarSources?: CalendarSourceUncheckedCreateNestedManyWithoutUserInput
     contentHistory?: ContentHistoryUncheckedCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeUncheckedCreateNestedManyWithoutOwnerInput
     sessions?: SessionUncheckedCreateNestedManyWithoutUserInput
@@ -36905,6 +43083,9 @@ export namespace Prisma {
     auditTargets?: AuditLogUpdateManyWithoutTargetUserNestedInput
     adminActions?: AuditLogUpdateManyWithoutUserNestedInput
     categories?: CategoryUpdateManyWithoutOwnerNestedInput
+    calendarConnections?: CalendarConnectionUpdateManyWithoutUserNestedInput
+    calendarEvents?: CalendarEventUpdateManyWithoutUserNestedInput
+    calendarSources?: CalendarSourceUpdateManyWithoutUserNestedInput
     contentHistory?: ContentHistoryUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUpdateManyWithoutUserNestedInput
@@ -36929,6 +43110,9 @@ export namespace Prisma {
     auditTargets?: AuditLogUncheckedUpdateManyWithoutTargetUserNestedInput
     adminActions?: AuditLogUncheckedUpdateManyWithoutUserNestedInput
     categories?: CategoryUncheckedUpdateManyWithoutOwnerNestedInput
+    calendarConnections?: CalendarConnectionUncheckedUpdateManyWithoutUserNestedInput
+    calendarEvents?: CalendarEventUncheckedUpdateManyWithoutUserNestedInput
+    calendarSources?: CalendarSourceUncheckedUpdateManyWithoutUserNestedInput
     contentHistory?: ContentHistoryUncheckedUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUncheckedUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUncheckedUpdateManyWithoutUserNestedInput
@@ -37250,6 +43434,7 @@ export namespace Prisma {
     refreshToken?: string | null
     accessToken?: string | null
     expiresAt?: Date | string | null
+    scope?: string | null
     createdAt?: Date | string
     user: UserCreateNestedOneWithoutAccountsInput
   }
@@ -37262,6 +43447,7 @@ export namespace Prisma {
     refreshToken?: string | null
     accessToken?: string | null
     expiresAt?: Date | string | null
+    scope?: string | null
     createdAt?: Date | string
   }
 
@@ -37272,6 +43458,7 @@ export namespace Prisma {
     refreshToken?: NullableStringFieldUpdateOperationsInput | string | null
     accessToken?: NullableStringFieldUpdateOperationsInput | string | null
     expiresAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    scope?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     user?: UserUpdateOneRequiredWithoutAccountsNestedInput
   }
@@ -37284,6 +43471,7 @@ export namespace Prisma {
     refreshToken?: NullableStringFieldUpdateOperationsInput | string | null
     accessToken?: NullableStringFieldUpdateOperationsInput | string | null
     expiresAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    scope?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
@@ -37295,6 +43483,7 @@ export namespace Prisma {
     refreshToken?: string | null
     accessToken?: string | null
     expiresAt?: Date | string | null
+    scope?: string | null
     createdAt?: Date | string
   }
 
@@ -37305,6 +43494,7 @@ export namespace Prisma {
     refreshToken?: NullableStringFieldUpdateOperationsInput | string | null
     accessToken?: NullableStringFieldUpdateOperationsInput | string | null
     expiresAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    scope?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
@@ -37316,7 +43506,503 @@ export namespace Prisma {
     refreshToken?: NullableStringFieldUpdateOperationsInput | string | null
     accessToken?: NullableStringFieldUpdateOperationsInput | string | null
     expiresAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    scope?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type CalendarConnectionCreateInput = {
+    id?: string
+    provider: $Enums.CalendarProvider
+    displayName: string
+    status?: $Enums.CalendarConnectionStatus
+    syncStatus?: $Enums.CalendarSyncStatus
+    providerConfig?: JsonNullValueInput | InputJsonValue
+    syncCursor?: string | null
+    lastSyncedAt?: Date | string | null
+    lastSyncError?: string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    sources?: CalendarSourceCreateNestedManyWithoutConnectionInput
+    user: UserCreateNestedOneWithoutCalendarConnectionsInput
+  }
+
+  export type CalendarConnectionUncheckedCreateInput = {
+    id?: string
+    userId: string
+    provider: $Enums.CalendarProvider
+    displayName: string
+    status?: $Enums.CalendarConnectionStatus
+    syncStatus?: $Enums.CalendarSyncStatus
+    providerConfig?: JsonNullValueInput | InputJsonValue
+    syncCursor?: string | null
+    lastSyncedAt?: Date | string | null
+    lastSyncError?: string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    sources?: CalendarSourceUncheckedCreateNestedManyWithoutConnectionInput
+  }
+
+  export type CalendarConnectionUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    provider?: EnumCalendarProviderFieldUpdateOperationsInput | $Enums.CalendarProvider
+    displayName?: StringFieldUpdateOperationsInput | string
+    status?: EnumCalendarConnectionStatusFieldUpdateOperationsInput | $Enums.CalendarConnectionStatus
+    syncStatus?: EnumCalendarSyncStatusFieldUpdateOperationsInput | $Enums.CalendarSyncStatus
+    providerConfig?: JsonNullValueInput | InputJsonValue
+    syncCursor?: NullableStringFieldUpdateOperationsInput | string | null
+    lastSyncedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    lastSyncError?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    sources?: CalendarSourceUpdateManyWithoutConnectionNestedInput
+    user?: UserUpdateOneRequiredWithoutCalendarConnectionsNestedInput
+  }
+
+  export type CalendarConnectionUncheckedUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    userId?: StringFieldUpdateOperationsInput | string
+    provider?: EnumCalendarProviderFieldUpdateOperationsInput | $Enums.CalendarProvider
+    displayName?: StringFieldUpdateOperationsInput | string
+    status?: EnumCalendarConnectionStatusFieldUpdateOperationsInput | $Enums.CalendarConnectionStatus
+    syncStatus?: EnumCalendarSyncStatusFieldUpdateOperationsInput | $Enums.CalendarSyncStatus
+    providerConfig?: JsonNullValueInput | InputJsonValue
+    syncCursor?: NullableStringFieldUpdateOperationsInput | string | null
+    lastSyncedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    lastSyncError?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    sources?: CalendarSourceUncheckedUpdateManyWithoutConnectionNestedInput
+  }
+
+  export type CalendarConnectionCreateManyInput = {
+    id?: string
+    userId: string
+    provider: $Enums.CalendarProvider
+    displayName: string
+    status?: $Enums.CalendarConnectionStatus
+    syncStatus?: $Enums.CalendarSyncStatus
+    providerConfig?: JsonNullValueInput | InputJsonValue
+    syncCursor?: string | null
+    lastSyncedAt?: Date | string | null
+    lastSyncError?: string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type CalendarConnectionUpdateManyMutationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    provider?: EnumCalendarProviderFieldUpdateOperationsInput | $Enums.CalendarProvider
+    displayName?: StringFieldUpdateOperationsInput | string
+    status?: EnumCalendarConnectionStatusFieldUpdateOperationsInput | $Enums.CalendarConnectionStatus
+    syncStatus?: EnumCalendarSyncStatusFieldUpdateOperationsInput | $Enums.CalendarSyncStatus
+    providerConfig?: JsonNullValueInput | InputJsonValue
+    syncCursor?: NullableStringFieldUpdateOperationsInput | string | null
+    lastSyncedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    lastSyncError?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type CalendarConnectionUncheckedUpdateManyInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    userId?: StringFieldUpdateOperationsInput | string
+    provider?: EnumCalendarProviderFieldUpdateOperationsInput | $Enums.CalendarProvider
+    displayName?: StringFieldUpdateOperationsInput | string
+    status?: EnumCalendarConnectionStatusFieldUpdateOperationsInput | $Enums.CalendarConnectionStatus
+    syncStatus?: EnumCalendarSyncStatusFieldUpdateOperationsInput | $Enums.CalendarSyncStatus
+    providerConfig?: JsonNullValueInput | InputJsonValue
+    syncCursor?: NullableStringFieldUpdateOperationsInput | string | null
+    lastSyncedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    lastSyncError?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type CalendarSourceCreateInput = {
+    id?: string
+    title: string
+    color?: string
+    timezone?: string | null
+    visible?: boolean
+    isReadOnly?: boolean
+    isPrimary?: boolean
+    syncMode?: $Enums.CalendarSourceSyncMode
+    externalCalendarId?: string | null
+    metadata?: JsonNullValueInput | InputJsonValue
+    lastSyncedAt?: Date | string | null
+    lastSyncError?: string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    connection?: CalendarConnectionCreateNestedOneWithoutSourcesInput
+    events?: CalendarEventCreateNestedManyWithoutSourceInput
+    user: UserCreateNestedOneWithoutCalendarSourcesInput
+  }
+
+  export type CalendarSourceUncheckedCreateInput = {
+    id?: string
+    userId: string
+    connectionId?: string | null
+    title: string
+    color?: string
+    timezone?: string | null
+    visible?: boolean
+    isReadOnly?: boolean
+    isPrimary?: boolean
+    syncMode?: $Enums.CalendarSourceSyncMode
+    externalCalendarId?: string | null
+    metadata?: JsonNullValueInput | InputJsonValue
+    lastSyncedAt?: Date | string | null
+    lastSyncError?: string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    events?: CalendarEventUncheckedCreateNestedManyWithoutSourceInput
+  }
+
+  export type CalendarSourceUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    title?: StringFieldUpdateOperationsInput | string
+    color?: StringFieldUpdateOperationsInput | string
+    timezone?: NullableStringFieldUpdateOperationsInput | string | null
+    visible?: BoolFieldUpdateOperationsInput | boolean
+    isReadOnly?: BoolFieldUpdateOperationsInput | boolean
+    isPrimary?: BoolFieldUpdateOperationsInput | boolean
+    syncMode?: EnumCalendarSourceSyncModeFieldUpdateOperationsInput | $Enums.CalendarSourceSyncMode
+    externalCalendarId?: NullableStringFieldUpdateOperationsInput | string | null
+    metadata?: JsonNullValueInput | InputJsonValue
+    lastSyncedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    lastSyncError?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    connection?: CalendarConnectionUpdateOneWithoutSourcesNestedInput
+    events?: CalendarEventUpdateManyWithoutSourceNestedInput
+    user?: UserUpdateOneRequiredWithoutCalendarSourcesNestedInput
+  }
+
+  export type CalendarSourceUncheckedUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    userId?: StringFieldUpdateOperationsInput | string
+    connectionId?: NullableStringFieldUpdateOperationsInput | string | null
+    title?: StringFieldUpdateOperationsInput | string
+    color?: StringFieldUpdateOperationsInput | string
+    timezone?: NullableStringFieldUpdateOperationsInput | string | null
+    visible?: BoolFieldUpdateOperationsInput | boolean
+    isReadOnly?: BoolFieldUpdateOperationsInput | boolean
+    isPrimary?: BoolFieldUpdateOperationsInput | boolean
+    syncMode?: EnumCalendarSourceSyncModeFieldUpdateOperationsInput | $Enums.CalendarSourceSyncMode
+    externalCalendarId?: NullableStringFieldUpdateOperationsInput | string | null
+    metadata?: JsonNullValueInput | InputJsonValue
+    lastSyncedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    lastSyncError?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    events?: CalendarEventUncheckedUpdateManyWithoutSourceNestedInput
+  }
+
+  export type CalendarSourceCreateManyInput = {
+    id?: string
+    userId: string
+    connectionId?: string | null
+    title: string
+    color?: string
+    timezone?: string | null
+    visible?: boolean
+    isReadOnly?: boolean
+    isPrimary?: boolean
+    syncMode?: $Enums.CalendarSourceSyncMode
+    externalCalendarId?: string | null
+    metadata?: JsonNullValueInput | InputJsonValue
+    lastSyncedAt?: Date | string | null
+    lastSyncError?: string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type CalendarSourceUpdateManyMutationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    title?: StringFieldUpdateOperationsInput | string
+    color?: StringFieldUpdateOperationsInput | string
+    timezone?: NullableStringFieldUpdateOperationsInput | string | null
+    visible?: BoolFieldUpdateOperationsInput | boolean
+    isReadOnly?: BoolFieldUpdateOperationsInput | boolean
+    isPrimary?: BoolFieldUpdateOperationsInput | boolean
+    syncMode?: EnumCalendarSourceSyncModeFieldUpdateOperationsInput | $Enums.CalendarSourceSyncMode
+    externalCalendarId?: NullableStringFieldUpdateOperationsInput | string | null
+    metadata?: JsonNullValueInput | InputJsonValue
+    lastSyncedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    lastSyncError?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type CalendarSourceUncheckedUpdateManyInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    userId?: StringFieldUpdateOperationsInput | string
+    connectionId?: NullableStringFieldUpdateOperationsInput | string | null
+    title?: StringFieldUpdateOperationsInput | string
+    color?: StringFieldUpdateOperationsInput | string
+    timezone?: NullableStringFieldUpdateOperationsInput | string | null
+    visible?: BoolFieldUpdateOperationsInput | boolean
+    isReadOnly?: BoolFieldUpdateOperationsInput | boolean
+    isPrimary?: BoolFieldUpdateOperationsInput | boolean
+    syncMode?: EnumCalendarSourceSyncModeFieldUpdateOperationsInput | $Enums.CalendarSourceSyncMode
+    externalCalendarId?: NullableStringFieldUpdateOperationsInput | string | null
+    metadata?: JsonNullValueInput | InputJsonValue
+    lastSyncedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    lastSyncError?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type CalendarEventCreateInput = {
+    id?: string
+    externalEventId?: string | null
+    title: string
+    description?: string | null
+    location?: string | null
+    startAt: Date | string
+    endAt: Date | string
+    allDay?: boolean
+    timezone?: string | null
+    recurrenceRule?: string | null
+    recurrenceExDates?: JsonNullValueInput | InputJsonValue
+    recurrenceOverrides?: JsonNullValueInput | InputJsonValue
+    status?: $Enums.CalendarEventStatus
+    meetingUrl?: string | null
+    providerMetadata?: JsonNullValueInput | InputJsonValue
+    lastSyncedAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    attendees?: CalendarEventAttendeeCreateNestedManyWithoutEventInput
+    linkedContent?: ContentNodeCreateNestedOneWithoutLinkedCalendarEventsInput
+    source: CalendarSourceCreateNestedOneWithoutEventsInput
+    user: UserCreateNestedOneWithoutCalendarEventsInput
+  }
+
+  export type CalendarEventUncheckedCreateInput = {
+    id?: string
+    userId: string
+    sourceId: string
+    externalEventId?: string | null
+    title: string
+    description?: string | null
+    location?: string | null
+    startAt: Date | string
+    endAt: Date | string
+    allDay?: boolean
+    timezone?: string | null
+    recurrenceRule?: string | null
+    recurrenceExDates?: JsonNullValueInput | InputJsonValue
+    recurrenceOverrides?: JsonNullValueInput | InputJsonValue
+    status?: $Enums.CalendarEventStatus
+    meetingUrl?: string | null
+    linkedContentId?: string | null
+    providerMetadata?: JsonNullValueInput | InputJsonValue
+    lastSyncedAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    attendees?: CalendarEventAttendeeUncheckedCreateNestedManyWithoutEventInput
+  }
+
+  export type CalendarEventUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    externalEventId?: NullableStringFieldUpdateOperationsInput | string | null
+    title?: StringFieldUpdateOperationsInput | string
+    description?: NullableStringFieldUpdateOperationsInput | string | null
+    location?: NullableStringFieldUpdateOperationsInput | string | null
+    startAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    endAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    allDay?: BoolFieldUpdateOperationsInput | boolean
+    timezone?: NullableStringFieldUpdateOperationsInput | string | null
+    recurrenceRule?: NullableStringFieldUpdateOperationsInput | string | null
+    recurrenceExDates?: JsonNullValueInput | InputJsonValue
+    recurrenceOverrides?: JsonNullValueInput | InputJsonValue
+    status?: EnumCalendarEventStatusFieldUpdateOperationsInput | $Enums.CalendarEventStatus
+    meetingUrl?: NullableStringFieldUpdateOperationsInput | string | null
+    providerMetadata?: JsonNullValueInput | InputJsonValue
+    lastSyncedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    attendees?: CalendarEventAttendeeUpdateManyWithoutEventNestedInput
+    linkedContent?: ContentNodeUpdateOneWithoutLinkedCalendarEventsNestedInput
+    source?: CalendarSourceUpdateOneRequiredWithoutEventsNestedInput
+    user?: UserUpdateOneRequiredWithoutCalendarEventsNestedInput
+  }
+
+  export type CalendarEventUncheckedUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    userId?: StringFieldUpdateOperationsInput | string
+    sourceId?: StringFieldUpdateOperationsInput | string
+    externalEventId?: NullableStringFieldUpdateOperationsInput | string | null
+    title?: StringFieldUpdateOperationsInput | string
+    description?: NullableStringFieldUpdateOperationsInput | string | null
+    location?: NullableStringFieldUpdateOperationsInput | string | null
+    startAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    endAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    allDay?: BoolFieldUpdateOperationsInput | boolean
+    timezone?: NullableStringFieldUpdateOperationsInput | string | null
+    recurrenceRule?: NullableStringFieldUpdateOperationsInput | string | null
+    recurrenceExDates?: JsonNullValueInput | InputJsonValue
+    recurrenceOverrides?: JsonNullValueInput | InputJsonValue
+    status?: EnumCalendarEventStatusFieldUpdateOperationsInput | $Enums.CalendarEventStatus
+    meetingUrl?: NullableStringFieldUpdateOperationsInput | string | null
+    linkedContentId?: NullableStringFieldUpdateOperationsInput | string | null
+    providerMetadata?: JsonNullValueInput | InputJsonValue
+    lastSyncedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    attendees?: CalendarEventAttendeeUncheckedUpdateManyWithoutEventNestedInput
+  }
+
+  export type CalendarEventCreateManyInput = {
+    id?: string
+    userId: string
+    sourceId: string
+    externalEventId?: string | null
+    title: string
+    description?: string | null
+    location?: string | null
+    startAt: Date | string
+    endAt: Date | string
+    allDay?: boolean
+    timezone?: string | null
+    recurrenceRule?: string | null
+    recurrenceExDates?: JsonNullValueInput | InputJsonValue
+    recurrenceOverrides?: JsonNullValueInput | InputJsonValue
+    status?: $Enums.CalendarEventStatus
+    meetingUrl?: string | null
+    linkedContentId?: string | null
+    providerMetadata?: JsonNullValueInput | InputJsonValue
+    lastSyncedAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type CalendarEventUpdateManyMutationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    externalEventId?: NullableStringFieldUpdateOperationsInput | string | null
+    title?: StringFieldUpdateOperationsInput | string
+    description?: NullableStringFieldUpdateOperationsInput | string | null
+    location?: NullableStringFieldUpdateOperationsInput | string | null
+    startAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    endAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    allDay?: BoolFieldUpdateOperationsInput | boolean
+    timezone?: NullableStringFieldUpdateOperationsInput | string | null
+    recurrenceRule?: NullableStringFieldUpdateOperationsInput | string | null
+    recurrenceExDates?: JsonNullValueInput | InputJsonValue
+    recurrenceOverrides?: JsonNullValueInput | InputJsonValue
+    status?: EnumCalendarEventStatusFieldUpdateOperationsInput | $Enums.CalendarEventStatus
+    meetingUrl?: NullableStringFieldUpdateOperationsInput | string | null
+    providerMetadata?: JsonNullValueInput | InputJsonValue
+    lastSyncedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type CalendarEventUncheckedUpdateManyInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    userId?: StringFieldUpdateOperationsInput | string
+    sourceId?: StringFieldUpdateOperationsInput | string
+    externalEventId?: NullableStringFieldUpdateOperationsInput | string | null
+    title?: StringFieldUpdateOperationsInput | string
+    description?: NullableStringFieldUpdateOperationsInput | string | null
+    location?: NullableStringFieldUpdateOperationsInput | string | null
+    startAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    endAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    allDay?: BoolFieldUpdateOperationsInput | boolean
+    timezone?: NullableStringFieldUpdateOperationsInput | string | null
+    recurrenceRule?: NullableStringFieldUpdateOperationsInput | string | null
+    recurrenceExDates?: JsonNullValueInput | InputJsonValue
+    recurrenceOverrides?: JsonNullValueInput | InputJsonValue
+    status?: EnumCalendarEventStatusFieldUpdateOperationsInput | $Enums.CalendarEventStatus
+    meetingUrl?: NullableStringFieldUpdateOperationsInput | string | null
+    linkedContentId?: NullableStringFieldUpdateOperationsInput | string | null
+    providerMetadata?: JsonNullValueInput | InputJsonValue
+    lastSyncedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type CalendarEventAttendeeCreateInput = {
+    id?: string
+    email: string
+    displayName?: string | null
+    isOrganizer?: boolean
+    responseStatus?: $Enums.CalendarAttendeeResponseStatus
+    metadata?: JsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    event: CalendarEventCreateNestedOneWithoutAttendeesInput
+  }
+
+  export type CalendarEventAttendeeUncheckedCreateInput = {
+    id?: string
+    eventId: string
+    email: string
+    displayName?: string | null
+    isOrganizer?: boolean
+    responseStatus?: $Enums.CalendarAttendeeResponseStatus
+    metadata?: JsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type CalendarEventAttendeeUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    email?: StringFieldUpdateOperationsInput | string
+    displayName?: NullableStringFieldUpdateOperationsInput | string | null
+    isOrganizer?: BoolFieldUpdateOperationsInput | boolean
+    responseStatus?: EnumCalendarAttendeeResponseStatusFieldUpdateOperationsInput | $Enums.CalendarAttendeeResponseStatus
+    metadata?: JsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    event?: CalendarEventUpdateOneRequiredWithoutAttendeesNestedInput
+  }
+
+  export type CalendarEventAttendeeUncheckedUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    eventId?: StringFieldUpdateOperationsInput | string
+    email?: StringFieldUpdateOperationsInput | string
+    displayName?: NullableStringFieldUpdateOperationsInput | string | null
+    isOrganizer?: BoolFieldUpdateOperationsInput | boolean
+    responseStatus?: EnumCalendarAttendeeResponseStatusFieldUpdateOperationsInput | $Enums.CalendarAttendeeResponseStatus
+    metadata?: JsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type CalendarEventAttendeeCreateManyInput = {
+    id?: string
+    eventId: string
+    email: string
+    displayName?: string | null
+    isOrganizer?: boolean
+    responseStatus?: $Enums.CalendarAttendeeResponseStatus
+    metadata?: JsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type CalendarEventAttendeeUpdateManyMutationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    email?: StringFieldUpdateOperationsInput | string
+    displayName?: NullableStringFieldUpdateOperationsInput | string | null
+    isOrganizer?: BoolFieldUpdateOperationsInput | boolean
+    responseStatus?: EnumCalendarAttendeeResponseStatusFieldUpdateOperationsInput | $Enums.CalendarAttendeeResponseStatus
+    metadata?: JsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type CalendarEventAttendeeUncheckedUpdateManyInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    eventId?: StringFieldUpdateOperationsInput | string
+    email?: StringFieldUpdateOperationsInput | string
+    displayName?: NullableStringFieldUpdateOperationsInput | string | null
+    isOrganizer?: BoolFieldUpdateOperationsInput | boolean
+    responseStatus?: EnumCalendarAttendeeResponseStatusFieldUpdateOperationsInput | $Enums.CalendarAttendeeResponseStatus
+    metadata?: JsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
   export type AuditLogCreateInput = {
@@ -38066,6 +44752,12 @@ export namespace Prisma {
     none?: ContentTagWhereInput
   }
 
+  export type CalendarEventListRelationFilter = {
+    every?: CalendarEventWhereInput
+    some?: CalendarEventWhereInput
+    none?: CalendarEventWhereInput
+  }
+
   export type TrashBinNullableScalarRelationFilter = {
     is?: TrashBinWhereInput | null
     isNot?: TrashBinWhereInput | null
@@ -38099,6 +44791,10 @@ export namespace Prisma {
   }
 
   export type ContentTagOrderByRelationAggregateInput = {
+    _count?: SortOrder
+  }
+
+  export type CalendarEventOrderByRelationAggregateInput = {
     _count?: SortOrder
   }
 
@@ -38961,6 +45657,18 @@ export namespace Prisma {
     none?: CategoryWhereInput
   }
 
+  export type CalendarConnectionListRelationFilter = {
+    every?: CalendarConnectionWhereInput
+    some?: CalendarConnectionWhereInput
+    none?: CalendarConnectionWhereInput
+  }
+
+  export type CalendarSourceListRelationFilter = {
+    every?: CalendarSourceWhereInput
+    some?: CalendarSourceWhereInput
+    none?: CalendarSourceWhereInput
+  }
+
   export type SessionListRelationFilter = {
     every?: SessionWhereInput
     some?: SessionWhereInput
@@ -38994,6 +45702,14 @@ export namespace Prisma {
   }
 
   export type CategoryOrderByRelationAggregateInput = {
+    _count?: SortOrder
+  }
+
+  export type CalendarConnectionOrderByRelationAggregateInput = {
+    _count?: SortOrder
+  }
+
+  export type CalendarSourceOrderByRelationAggregateInput = {
     _count?: SortOrder
   }
 
@@ -39210,6 +45926,7 @@ export namespace Prisma {
     refreshToken?: SortOrder
     accessToken?: SortOrder
     expiresAt?: SortOrder
+    scope?: SortOrder
     createdAt?: SortOrder
   }
 
@@ -39221,6 +45938,7 @@ export namespace Prisma {
     refreshToken?: SortOrder
     accessToken?: SortOrder
     expiresAt?: SortOrder
+    scope?: SortOrder
     createdAt?: SortOrder
   }
 
@@ -39232,7 +45950,348 @@ export namespace Prisma {
     refreshToken?: SortOrder
     accessToken?: SortOrder
     expiresAt?: SortOrder
+    scope?: SortOrder
     createdAt?: SortOrder
+  }
+
+  export type EnumCalendarProviderFilter<$PrismaModel = never> = {
+    equals?: $Enums.CalendarProvider | EnumCalendarProviderFieldRefInput<$PrismaModel>
+    in?: $Enums.CalendarProvider[] | ListEnumCalendarProviderFieldRefInput<$PrismaModel>
+    notIn?: $Enums.CalendarProvider[] | ListEnumCalendarProviderFieldRefInput<$PrismaModel>
+    not?: NestedEnumCalendarProviderFilter<$PrismaModel> | $Enums.CalendarProvider
+  }
+
+  export type EnumCalendarConnectionStatusFilter<$PrismaModel = never> = {
+    equals?: $Enums.CalendarConnectionStatus | EnumCalendarConnectionStatusFieldRefInput<$PrismaModel>
+    in?: $Enums.CalendarConnectionStatus[] | ListEnumCalendarConnectionStatusFieldRefInput<$PrismaModel>
+    notIn?: $Enums.CalendarConnectionStatus[] | ListEnumCalendarConnectionStatusFieldRefInput<$PrismaModel>
+    not?: NestedEnumCalendarConnectionStatusFilter<$PrismaModel> | $Enums.CalendarConnectionStatus
+  }
+
+  export type EnumCalendarSyncStatusFilter<$PrismaModel = never> = {
+    equals?: $Enums.CalendarSyncStatus | EnumCalendarSyncStatusFieldRefInput<$PrismaModel>
+    in?: $Enums.CalendarSyncStatus[] | ListEnumCalendarSyncStatusFieldRefInput<$PrismaModel>
+    notIn?: $Enums.CalendarSyncStatus[] | ListEnumCalendarSyncStatusFieldRefInput<$PrismaModel>
+    not?: NestedEnumCalendarSyncStatusFilter<$PrismaModel> | $Enums.CalendarSyncStatus
+  }
+
+  export type CalendarConnectionCountOrderByAggregateInput = {
+    id?: SortOrder
+    userId?: SortOrder
+    provider?: SortOrder
+    displayName?: SortOrder
+    status?: SortOrder
+    syncStatus?: SortOrder
+    providerConfig?: SortOrder
+    syncCursor?: SortOrder
+    lastSyncedAt?: SortOrder
+    lastSyncError?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type CalendarConnectionMaxOrderByAggregateInput = {
+    id?: SortOrder
+    userId?: SortOrder
+    provider?: SortOrder
+    displayName?: SortOrder
+    status?: SortOrder
+    syncStatus?: SortOrder
+    syncCursor?: SortOrder
+    lastSyncedAt?: SortOrder
+    lastSyncError?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type CalendarConnectionMinOrderByAggregateInput = {
+    id?: SortOrder
+    userId?: SortOrder
+    provider?: SortOrder
+    displayName?: SortOrder
+    status?: SortOrder
+    syncStatus?: SortOrder
+    syncCursor?: SortOrder
+    lastSyncedAt?: SortOrder
+    lastSyncError?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type EnumCalendarProviderWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: $Enums.CalendarProvider | EnumCalendarProviderFieldRefInput<$PrismaModel>
+    in?: $Enums.CalendarProvider[] | ListEnumCalendarProviderFieldRefInput<$PrismaModel>
+    notIn?: $Enums.CalendarProvider[] | ListEnumCalendarProviderFieldRefInput<$PrismaModel>
+    not?: NestedEnumCalendarProviderWithAggregatesFilter<$PrismaModel> | $Enums.CalendarProvider
+    _count?: NestedIntFilter<$PrismaModel>
+    _min?: NestedEnumCalendarProviderFilter<$PrismaModel>
+    _max?: NestedEnumCalendarProviderFilter<$PrismaModel>
+  }
+
+  export type EnumCalendarConnectionStatusWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: $Enums.CalendarConnectionStatus | EnumCalendarConnectionStatusFieldRefInput<$PrismaModel>
+    in?: $Enums.CalendarConnectionStatus[] | ListEnumCalendarConnectionStatusFieldRefInput<$PrismaModel>
+    notIn?: $Enums.CalendarConnectionStatus[] | ListEnumCalendarConnectionStatusFieldRefInput<$PrismaModel>
+    not?: NestedEnumCalendarConnectionStatusWithAggregatesFilter<$PrismaModel> | $Enums.CalendarConnectionStatus
+    _count?: NestedIntFilter<$PrismaModel>
+    _min?: NestedEnumCalendarConnectionStatusFilter<$PrismaModel>
+    _max?: NestedEnumCalendarConnectionStatusFilter<$PrismaModel>
+  }
+
+  export type EnumCalendarSyncStatusWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: $Enums.CalendarSyncStatus | EnumCalendarSyncStatusFieldRefInput<$PrismaModel>
+    in?: $Enums.CalendarSyncStatus[] | ListEnumCalendarSyncStatusFieldRefInput<$PrismaModel>
+    notIn?: $Enums.CalendarSyncStatus[] | ListEnumCalendarSyncStatusFieldRefInput<$PrismaModel>
+    not?: NestedEnumCalendarSyncStatusWithAggregatesFilter<$PrismaModel> | $Enums.CalendarSyncStatus
+    _count?: NestedIntFilter<$PrismaModel>
+    _min?: NestedEnumCalendarSyncStatusFilter<$PrismaModel>
+    _max?: NestedEnumCalendarSyncStatusFilter<$PrismaModel>
+  }
+
+  export type EnumCalendarSourceSyncModeFilter<$PrismaModel = never> = {
+    equals?: $Enums.CalendarSourceSyncMode | EnumCalendarSourceSyncModeFieldRefInput<$PrismaModel>
+    in?: $Enums.CalendarSourceSyncMode[] | ListEnumCalendarSourceSyncModeFieldRefInput<$PrismaModel>
+    notIn?: $Enums.CalendarSourceSyncMode[] | ListEnumCalendarSourceSyncModeFieldRefInput<$PrismaModel>
+    not?: NestedEnumCalendarSourceSyncModeFilter<$PrismaModel> | $Enums.CalendarSourceSyncMode
+  }
+
+  export type CalendarConnectionNullableScalarRelationFilter = {
+    is?: CalendarConnectionWhereInput | null
+    isNot?: CalendarConnectionWhereInput | null
+  }
+
+  export type CalendarSourceUserIdExternalCalendarIdCompoundUniqueInput = {
+    userId: string
+    externalCalendarId: string
+  }
+
+  export type CalendarSourceCountOrderByAggregateInput = {
+    id?: SortOrder
+    userId?: SortOrder
+    connectionId?: SortOrder
+    title?: SortOrder
+    color?: SortOrder
+    timezone?: SortOrder
+    visible?: SortOrder
+    isReadOnly?: SortOrder
+    isPrimary?: SortOrder
+    syncMode?: SortOrder
+    externalCalendarId?: SortOrder
+    metadata?: SortOrder
+    lastSyncedAt?: SortOrder
+    lastSyncError?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type CalendarSourceMaxOrderByAggregateInput = {
+    id?: SortOrder
+    userId?: SortOrder
+    connectionId?: SortOrder
+    title?: SortOrder
+    color?: SortOrder
+    timezone?: SortOrder
+    visible?: SortOrder
+    isReadOnly?: SortOrder
+    isPrimary?: SortOrder
+    syncMode?: SortOrder
+    externalCalendarId?: SortOrder
+    lastSyncedAt?: SortOrder
+    lastSyncError?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type CalendarSourceMinOrderByAggregateInput = {
+    id?: SortOrder
+    userId?: SortOrder
+    connectionId?: SortOrder
+    title?: SortOrder
+    color?: SortOrder
+    timezone?: SortOrder
+    visible?: SortOrder
+    isReadOnly?: SortOrder
+    isPrimary?: SortOrder
+    syncMode?: SortOrder
+    externalCalendarId?: SortOrder
+    lastSyncedAt?: SortOrder
+    lastSyncError?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type EnumCalendarSourceSyncModeWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: $Enums.CalendarSourceSyncMode | EnumCalendarSourceSyncModeFieldRefInput<$PrismaModel>
+    in?: $Enums.CalendarSourceSyncMode[] | ListEnumCalendarSourceSyncModeFieldRefInput<$PrismaModel>
+    notIn?: $Enums.CalendarSourceSyncMode[] | ListEnumCalendarSourceSyncModeFieldRefInput<$PrismaModel>
+    not?: NestedEnumCalendarSourceSyncModeWithAggregatesFilter<$PrismaModel> | $Enums.CalendarSourceSyncMode
+    _count?: NestedIntFilter<$PrismaModel>
+    _min?: NestedEnumCalendarSourceSyncModeFilter<$PrismaModel>
+    _max?: NestedEnumCalendarSourceSyncModeFilter<$PrismaModel>
+  }
+
+  export type EnumCalendarEventStatusFilter<$PrismaModel = never> = {
+    equals?: $Enums.CalendarEventStatus | EnumCalendarEventStatusFieldRefInput<$PrismaModel>
+    in?: $Enums.CalendarEventStatus[] | ListEnumCalendarEventStatusFieldRefInput<$PrismaModel>
+    notIn?: $Enums.CalendarEventStatus[] | ListEnumCalendarEventStatusFieldRefInput<$PrismaModel>
+    not?: NestedEnumCalendarEventStatusFilter<$PrismaModel> | $Enums.CalendarEventStatus
+  }
+
+  export type CalendarEventAttendeeListRelationFilter = {
+    every?: CalendarEventAttendeeWhereInput
+    some?: CalendarEventAttendeeWhereInput
+    none?: CalendarEventAttendeeWhereInput
+  }
+
+  export type CalendarSourceScalarRelationFilter = {
+    is?: CalendarSourceWhereInput
+    isNot?: CalendarSourceWhereInput
+  }
+
+  export type CalendarEventAttendeeOrderByRelationAggregateInput = {
+    _count?: SortOrder
+  }
+
+  export type CalendarEventSourceIdExternalEventIdCompoundUniqueInput = {
+    sourceId: string
+    externalEventId: string
+  }
+
+  export type CalendarEventCountOrderByAggregateInput = {
+    id?: SortOrder
+    userId?: SortOrder
+    sourceId?: SortOrder
+    externalEventId?: SortOrder
+    title?: SortOrder
+    description?: SortOrder
+    location?: SortOrder
+    startAt?: SortOrder
+    endAt?: SortOrder
+    allDay?: SortOrder
+    timezone?: SortOrder
+    recurrenceRule?: SortOrder
+    recurrenceExDates?: SortOrder
+    recurrenceOverrides?: SortOrder
+    status?: SortOrder
+    meetingUrl?: SortOrder
+    linkedContentId?: SortOrder
+    providerMetadata?: SortOrder
+    lastSyncedAt?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type CalendarEventMaxOrderByAggregateInput = {
+    id?: SortOrder
+    userId?: SortOrder
+    sourceId?: SortOrder
+    externalEventId?: SortOrder
+    title?: SortOrder
+    description?: SortOrder
+    location?: SortOrder
+    startAt?: SortOrder
+    endAt?: SortOrder
+    allDay?: SortOrder
+    timezone?: SortOrder
+    recurrenceRule?: SortOrder
+    status?: SortOrder
+    meetingUrl?: SortOrder
+    linkedContentId?: SortOrder
+    lastSyncedAt?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type CalendarEventMinOrderByAggregateInput = {
+    id?: SortOrder
+    userId?: SortOrder
+    sourceId?: SortOrder
+    externalEventId?: SortOrder
+    title?: SortOrder
+    description?: SortOrder
+    location?: SortOrder
+    startAt?: SortOrder
+    endAt?: SortOrder
+    allDay?: SortOrder
+    timezone?: SortOrder
+    recurrenceRule?: SortOrder
+    status?: SortOrder
+    meetingUrl?: SortOrder
+    linkedContentId?: SortOrder
+    lastSyncedAt?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type EnumCalendarEventStatusWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: $Enums.CalendarEventStatus | EnumCalendarEventStatusFieldRefInput<$PrismaModel>
+    in?: $Enums.CalendarEventStatus[] | ListEnumCalendarEventStatusFieldRefInput<$PrismaModel>
+    notIn?: $Enums.CalendarEventStatus[] | ListEnumCalendarEventStatusFieldRefInput<$PrismaModel>
+    not?: NestedEnumCalendarEventStatusWithAggregatesFilter<$PrismaModel> | $Enums.CalendarEventStatus
+    _count?: NestedIntFilter<$PrismaModel>
+    _min?: NestedEnumCalendarEventStatusFilter<$PrismaModel>
+    _max?: NestedEnumCalendarEventStatusFilter<$PrismaModel>
+  }
+
+  export type EnumCalendarAttendeeResponseStatusFilter<$PrismaModel = never> = {
+    equals?: $Enums.CalendarAttendeeResponseStatus | EnumCalendarAttendeeResponseStatusFieldRefInput<$PrismaModel>
+    in?: $Enums.CalendarAttendeeResponseStatus[] | ListEnumCalendarAttendeeResponseStatusFieldRefInput<$PrismaModel>
+    notIn?: $Enums.CalendarAttendeeResponseStatus[] | ListEnumCalendarAttendeeResponseStatusFieldRefInput<$PrismaModel>
+    not?: NestedEnumCalendarAttendeeResponseStatusFilter<$PrismaModel> | $Enums.CalendarAttendeeResponseStatus
+  }
+
+  export type CalendarEventScalarRelationFilter = {
+    is?: CalendarEventWhereInput
+    isNot?: CalendarEventWhereInput
+  }
+
+  export type CalendarEventAttendeeEventIdEmailCompoundUniqueInput = {
+    eventId: string
+    email: string
+  }
+
+  export type CalendarEventAttendeeCountOrderByAggregateInput = {
+    id?: SortOrder
+    eventId?: SortOrder
+    email?: SortOrder
+    displayName?: SortOrder
+    isOrganizer?: SortOrder
+    responseStatus?: SortOrder
+    metadata?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type CalendarEventAttendeeMaxOrderByAggregateInput = {
+    id?: SortOrder
+    eventId?: SortOrder
+    email?: SortOrder
+    displayName?: SortOrder
+    isOrganizer?: SortOrder
+    responseStatus?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type CalendarEventAttendeeMinOrderByAggregateInput = {
+    id?: SortOrder
+    eventId?: SortOrder
+    email?: SortOrder
+    displayName?: SortOrder
+    isOrganizer?: SortOrder
+    responseStatus?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type EnumCalendarAttendeeResponseStatusWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: $Enums.CalendarAttendeeResponseStatus | EnumCalendarAttendeeResponseStatusFieldRefInput<$PrismaModel>
+    in?: $Enums.CalendarAttendeeResponseStatus[] | ListEnumCalendarAttendeeResponseStatusFieldRefInput<$PrismaModel>
+    notIn?: $Enums.CalendarAttendeeResponseStatus[] | ListEnumCalendarAttendeeResponseStatusFieldRefInput<$PrismaModel>
+    not?: NestedEnumCalendarAttendeeResponseStatusWithAggregatesFilter<$PrismaModel> | $Enums.CalendarAttendeeResponseStatus
+    _count?: NestedIntFilter<$PrismaModel>
+    _min?: NestedEnumCalendarAttendeeResponseStatusFilter<$PrismaModel>
+    _max?: NestedEnumCalendarAttendeeResponseStatusFilter<$PrismaModel>
   }
 
   export type UserNullableScalarRelationFilter = {
@@ -39599,6 +46658,13 @@ export namespace Prisma {
     connect?: ContentTagWhereUniqueInput | ContentTagWhereUniqueInput[]
   }
 
+  export type CalendarEventCreateNestedManyWithoutLinkedContentInput = {
+    create?: XOR<CalendarEventCreateWithoutLinkedContentInput, CalendarEventUncheckedCreateWithoutLinkedContentInput> | CalendarEventCreateWithoutLinkedContentInput[] | CalendarEventUncheckedCreateWithoutLinkedContentInput[]
+    connectOrCreate?: CalendarEventCreateOrConnectWithoutLinkedContentInput | CalendarEventCreateOrConnectWithoutLinkedContentInput[]
+    createMany?: CalendarEventCreateManyLinkedContentInputEnvelope
+    connect?: CalendarEventWhereUniqueInput | CalendarEventWhereUniqueInput[]
+  }
+
   export type TrashBinCreateNestedOneWithoutContentInput = {
     create?: XOR<TrashBinCreateWithoutContentInput, TrashBinUncheckedCreateWithoutContentInput>
     connectOrCreate?: TrashBinCreateOrConnectWithoutContentInput
@@ -39724,6 +46790,13 @@ export namespace Prisma {
     connectOrCreate?: ContentTagCreateOrConnectWithoutContentInput | ContentTagCreateOrConnectWithoutContentInput[]
     createMany?: ContentTagCreateManyContentInputEnvelope
     connect?: ContentTagWhereUniqueInput | ContentTagWhereUniqueInput[]
+  }
+
+  export type CalendarEventUncheckedCreateNestedManyWithoutLinkedContentInput = {
+    create?: XOR<CalendarEventCreateWithoutLinkedContentInput, CalendarEventUncheckedCreateWithoutLinkedContentInput> | CalendarEventCreateWithoutLinkedContentInput[] | CalendarEventUncheckedCreateWithoutLinkedContentInput[]
+    connectOrCreate?: CalendarEventCreateOrConnectWithoutLinkedContentInput | CalendarEventCreateOrConnectWithoutLinkedContentInput[]
+    createMany?: CalendarEventCreateManyLinkedContentInputEnvelope
+    connect?: CalendarEventWhereUniqueInput | CalendarEventWhereUniqueInput[]
   }
 
   export type TrashBinUncheckedCreateNestedOneWithoutContentInput = {
@@ -40007,6 +47080,20 @@ export namespace Prisma {
     deleteMany?: ContentTagScalarWhereInput | ContentTagScalarWhereInput[]
   }
 
+  export type CalendarEventUpdateManyWithoutLinkedContentNestedInput = {
+    create?: XOR<CalendarEventCreateWithoutLinkedContentInput, CalendarEventUncheckedCreateWithoutLinkedContentInput> | CalendarEventCreateWithoutLinkedContentInput[] | CalendarEventUncheckedCreateWithoutLinkedContentInput[]
+    connectOrCreate?: CalendarEventCreateOrConnectWithoutLinkedContentInput | CalendarEventCreateOrConnectWithoutLinkedContentInput[]
+    upsert?: CalendarEventUpsertWithWhereUniqueWithoutLinkedContentInput | CalendarEventUpsertWithWhereUniqueWithoutLinkedContentInput[]
+    createMany?: CalendarEventCreateManyLinkedContentInputEnvelope
+    set?: CalendarEventWhereUniqueInput | CalendarEventWhereUniqueInput[]
+    disconnect?: CalendarEventWhereUniqueInput | CalendarEventWhereUniqueInput[]
+    delete?: CalendarEventWhereUniqueInput | CalendarEventWhereUniqueInput[]
+    connect?: CalendarEventWhereUniqueInput | CalendarEventWhereUniqueInput[]
+    update?: CalendarEventUpdateWithWhereUniqueWithoutLinkedContentInput | CalendarEventUpdateWithWhereUniqueWithoutLinkedContentInput[]
+    updateMany?: CalendarEventUpdateManyWithWhereWithoutLinkedContentInput | CalendarEventUpdateManyWithWhereWithoutLinkedContentInput[]
+    deleteMany?: CalendarEventScalarWhereInput | CalendarEventScalarWhereInput[]
+  }
+
   export type TrashBinUpdateOneWithoutContentNestedInput = {
     create?: XOR<TrashBinCreateWithoutContentInput, TrashBinUncheckedCreateWithoutContentInput>
     connectOrCreate?: TrashBinCreateOrConnectWithoutContentInput
@@ -40233,6 +47320,20 @@ export namespace Prisma {
     update?: ContentTagUpdateWithWhereUniqueWithoutContentInput | ContentTagUpdateWithWhereUniqueWithoutContentInput[]
     updateMany?: ContentTagUpdateManyWithWhereWithoutContentInput | ContentTagUpdateManyWithWhereWithoutContentInput[]
     deleteMany?: ContentTagScalarWhereInput | ContentTagScalarWhereInput[]
+  }
+
+  export type CalendarEventUncheckedUpdateManyWithoutLinkedContentNestedInput = {
+    create?: XOR<CalendarEventCreateWithoutLinkedContentInput, CalendarEventUncheckedCreateWithoutLinkedContentInput> | CalendarEventCreateWithoutLinkedContentInput[] | CalendarEventUncheckedCreateWithoutLinkedContentInput[]
+    connectOrCreate?: CalendarEventCreateOrConnectWithoutLinkedContentInput | CalendarEventCreateOrConnectWithoutLinkedContentInput[]
+    upsert?: CalendarEventUpsertWithWhereUniqueWithoutLinkedContentInput | CalendarEventUpsertWithWhereUniqueWithoutLinkedContentInput[]
+    createMany?: CalendarEventCreateManyLinkedContentInputEnvelope
+    set?: CalendarEventWhereUniqueInput | CalendarEventWhereUniqueInput[]
+    disconnect?: CalendarEventWhereUniqueInput | CalendarEventWhereUniqueInput[]
+    delete?: CalendarEventWhereUniqueInput | CalendarEventWhereUniqueInput[]
+    connect?: CalendarEventWhereUniqueInput | CalendarEventWhereUniqueInput[]
+    update?: CalendarEventUpdateWithWhereUniqueWithoutLinkedContentInput | CalendarEventUpdateWithWhereUniqueWithoutLinkedContentInput[]
+    updateMany?: CalendarEventUpdateManyWithWhereWithoutLinkedContentInput | CalendarEventUpdateManyWithWhereWithoutLinkedContentInput[]
+    deleteMany?: CalendarEventScalarWhereInput | CalendarEventScalarWhereInput[]
   }
 
   export type TrashBinUncheckedUpdateOneWithoutContentNestedInput = {
@@ -40537,6 +47638,27 @@ export namespace Prisma {
     connect?: CategoryWhereUniqueInput | CategoryWhereUniqueInput[]
   }
 
+  export type CalendarConnectionCreateNestedManyWithoutUserInput = {
+    create?: XOR<CalendarConnectionCreateWithoutUserInput, CalendarConnectionUncheckedCreateWithoutUserInput> | CalendarConnectionCreateWithoutUserInput[] | CalendarConnectionUncheckedCreateWithoutUserInput[]
+    connectOrCreate?: CalendarConnectionCreateOrConnectWithoutUserInput | CalendarConnectionCreateOrConnectWithoutUserInput[]
+    createMany?: CalendarConnectionCreateManyUserInputEnvelope
+    connect?: CalendarConnectionWhereUniqueInput | CalendarConnectionWhereUniqueInput[]
+  }
+
+  export type CalendarEventCreateNestedManyWithoutUserInput = {
+    create?: XOR<CalendarEventCreateWithoutUserInput, CalendarEventUncheckedCreateWithoutUserInput> | CalendarEventCreateWithoutUserInput[] | CalendarEventUncheckedCreateWithoutUserInput[]
+    connectOrCreate?: CalendarEventCreateOrConnectWithoutUserInput | CalendarEventCreateOrConnectWithoutUserInput[]
+    createMany?: CalendarEventCreateManyUserInputEnvelope
+    connect?: CalendarEventWhereUniqueInput | CalendarEventWhereUniqueInput[]
+  }
+
+  export type CalendarSourceCreateNestedManyWithoutUserInput = {
+    create?: XOR<CalendarSourceCreateWithoutUserInput, CalendarSourceUncheckedCreateWithoutUserInput> | CalendarSourceCreateWithoutUserInput[] | CalendarSourceUncheckedCreateWithoutUserInput[]
+    connectOrCreate?: CalendarSourceCreateOrConnectWithoutUserInput | CalendarSourceCreateOrConnectWithoutUserInput[]
+    createMany?: CalendarSourceCreateManyUserInputEnvelope
+    connect?: CalendarSourceWhereUniqueInput | CalendarSourceWhereUniqueInput[]
+  }
+
   export type ContentHistoryCreateNestedManyWithoutUserInput = {
     create?: XOR<ContentHistoryCreateWithoutUserInput, ContentHistoryUncheckedCreateWithoutUserInput> | ContentHistoryCreateWithoutUserInput[] | ContentHistoryUncheckedCreateWithoutUserInput[]
     connectOrCreate?: ContentHistoryCreateOrConnectWithoutUserInput | ContentHistoryCreateOrConnectWithoutUserInput[]
@@ -40619,6 +47741,27 @@ export namespace Prisma {
     connectOrCreate?: CategoryCreateOrConnectWithoutOwnerInput | CategoryCreateOrConnectWithoutOwnerInput[]
     createMany?: CategoryCreateManyOwnerInputEnvelope
     connect?: CategoryWhereUniqueInput | CategoryWhereUniqueInput[]
+  }
+
+  export type CalendarConnectionUncheckedCreateNestedManyWithoutUserInput = {
+    create?: XOR<CalendarConnectionCreateWithoutUserInput, CalendarConnectionUncheckedCreateWithoutUserInput> | CalendarConnectionCreateWithoutUserInput[] | CalendarConnectionUncheckedCreateWithoutUserInput[]
+    connectOrCreate?: CalendarConnectionCreateOrConnectWithoutUserInput | CalendarConnectionCreateOrConnectWithoutUserInput[]
+    createMany?: CalendarConnectionCreateManyUserInputEnvelope
+    connect?: CalendarConnectionWhereUniqueInput | CalendarConnectionWhereUniqueInput[]
+  }
+
+  export type CalendarEventUncheckedCreateNestedManyWithoutUserInput = {
+    create?: XOR<CalendarEventCreateWithoutUserInput, CalendarEventUncheckedCreateWithoutUserInput> | CalendarEventCreateWithoutUserInput[] | CalendarEventUncheckedCreateWithoutUserInput[]
+    connectOrCreate?: CalendarEventCreateOrConnectWithoutUserInput | CalendarEventCreateOrConnectWithoutUserInput[]
+    createMany?: CalendarEventCreateManyUserInputEnvelope
+    connect?: CalendarEventWhereUniqueInput | CalendarEventWhereUniqueInput[]
+  }
+
+  export type CalendarSourceUncheckedCreateNestedManyWithoutUserInput = {
+    create?: XOR<CalendarSourceCreateWithoutUserInput, CalendarSourceUncheckedCreateWithoutUserInput> | CalendarSourceCreateWithoutUserInput[] | CalendarSourceUncheckedCreateWithoutUserInput[]
+    connectOrCreate?: CalendarSourceCreateOrConnectWithoutUserInput | CalendarSourceCreateOrConnectWithoutUserInput[]
+    createMany?: CalendarSourceCreateManyUserInputEnvelope
+    connect?: CalendarSourceWhereUniqueInput | CalendarSourceWhereUniqueInput[]
   }
 
   export type ContentHistoryUncheckedCreateNestedManyWithoutUserInput = {
@@ -40742,6 +47885,48 @@ export namespace Prisma {
     update?: CategoryUpdateWithWhereUniqueWithoutOwnerInput | CategoryUpdateWithWhereUniqueWithoutOwnerInput[]
     updateMany?: CategoryUpdateManyWithWhereWithoutOwnerInput | CategoryUpdateManyWithWhereWithoutOwnerInput[]
     deleteMany?: CategoryScalarWhereInput | CategoryScalarWhereInput[]
+  }
+
+  export type CalendarConnectionUpdateManyWithoutUserNestedInput = {
+    create?: XOR<CalendarConnectionCreateWithoutUserInput, CalendarConnectionUncheckedCreateWithoutUserInput> | CalendarConnectionCreateWithoutUserInput[] | CalendarConnectionUncheckedCreateWithoutUserInput[]
+    connectOrCreate?: CalendarConnectionCreateOrConnectWithoutUserInput | CalendarConnectionCreateOrConnectWithoutUserInput[]
+    upsert?: CalendarConnectionUpsertWithWhereUniqueWithoutUserInput | CalendarConnectionUpsertWithWhereUniqueWithoutUserInput[]
+    createMany?: CalendarConnectionCreateManyUserInputEnvelope
+    set?: CalendarConnectionWhereUniqueInput | CalendarConnectionWhereUniqueInput[]
+    disconnect?: CalendarConnectionWhereUniqueInput | CalendarConnectionWhereUniqueInput[]
+    delete?: CalendarConnectionWhereUniqueInput | CalendarConnectionWhereUniqueInput[]
+    connect?: CalendarConnectionWhereUniqueInput | CalendarConnectionWhereUniqueInput[]
+    update?: CalendarConnectionUpdateWithWhereUniqueWithoutUserInput | CalendarConnectionUpdateWithWhereUniqueWithoutUserInput[]
+    updateMany?: CalendarConnectionUpdateManyWithWhereWithoutUserInput | CalendarConnectionUpdateManyWithWhereWithoutUserInput[]
+    deleteMany?: CalendarConnectionScalarWhereInput | CalendarConnectionScalarWhereInput[]
+  }
+
+  export type CalendarEventUpdateManyWithoutUserNestedInput = {
+    create?: XOR<CalendarEventCreateWithoutUserInput, CalendarEventUncheckedCreateWithoutUserInput> | CalendarEventCreateWithoutUserInput[] | CalendarEventUncheckedCreateWithoutUserInput[]
+    connectOrCreate?: CalendarEventCreateOrConnectWithoutUserInput | CalendarEventCreateOrConnectWithoutUserInput[]
+    upsert?: CalendarEventUpsertWithWhereUniqueWithoutUserInput | CalendarEventUpsertWithWhereUniqueWithoutUserInput[]
+    createMany?: CalendarEventCreateManyUserInputEnvelope
+    set?: CalendarEventWhereUniqueInput | CalendarEventWhereUniqueInput[]
+    disconnect?: CalendarEventWhereUniqueInput | CalendarEventWhereUniqueInput[]
+    delete?: CalendarEventWhereUniqueInput | CalendarEventWhereUniqueInput[]
+    connect?: CalendarEventWhereUniqueInput | CalendarEventWhereUniqueInput[]
+    update?: CalendarEventUpdateWithWhereUniqueWithoutUserInput | CalendarEventUpdateWithWhereUniqueWithoutUserInput[]
+    updateMany?: CalendarEventUpdateManyWithWhereWithoutUserInput | CalendarEventUpdateManyWithWhereWithoutUserInput[]
+    deleteMany?: CalendarEventScalarWhereInput | CalendarEventScalarWhereInput[]
+  }
+
+  export type CalendarSourceUpdateManyWithoutUserNestedInput = {
+    create?: XOR<CalendarSourceCreateWithoutUserInput, CalendarSourceUncheckedCreateWithoutUserInput> | CalendarSourceCreateWithoutUserInput[] | CalendarSourceUncheckedCreateWithoutUserInput[]
+    connectOrCreate?: CalendarSourceCreateOrConnectWithoutUserInput | CalendarSourceCreateOrConnectWithoutUserInput[]
+    upsert?: CalendarSourceUpsertWithWhereUniqueWithoutUserInput | CalendarSourceUpsertWithWhereUniqueWithoutUserInput[]
+    createMany?: CalendarSourceCreateManyUserInputEnvelope
+    set?: CalendarSourceWhereUniqueInput | CalendarSourceWhereUniqueInput[]
+    disconnect?: CalendarSourceWhereUniqueInput | CalendarSourceWhereUniqueInput[]
+    delete?: CalendarSourceWhereUniqueInput | CalendarSourceWhereUniqueInput[]
+    connect?: CalendarSourceWhereUniqueInput | CalendarSourceWhereUniqueInput[]
+    update?: CalendarSourceUpdateWithWhereUniqueWithoutUserInput | CalendarSourceUpdateWithWhereUniqueWithoutUserInput[]
+    updateMany?: CalendarSourceUpdateManyWithWhereWithoutUserInput | CalendarSourceUpdateManyWithWhereWithoutUserInput[]
+    deleteMany?: CalendarSourceScalarWhereInput | CalendarSourceScalarWhereInput[]
   }
 
   export type ContentHistoryUpdateManyWithoutUserNestedInput = {
@@ -40910,6 +48095,48 @@ export namespace Prisma {
     update?: CategoryUpdateWithWhereUniqueWithoutOwnerInput | CategoryUpdateWithWhereUniqueWithoutOwnerInput[]
     updateMany?: CategoryUpdateManyWithWhereWithoutOwnerInput | CategoryUpdateManyWithWhereWithoutOwnerInput[]
     deleteMany?: CategoryScalarWhereInput | CategoryScalarWhereInput[]
+  }
+
+  export type CalendarConnectionUncheckedUpdateManyWithoutUserNestedInput = {
+    create?: XOR<CalendarConnectionCreateWithoutUserInput, CalendarConnectionUncheckedCreateWithoutUserInput> | CalendarConnectionCreateWithoutUserInput[] | CalendarConnectionUncheckedCreateWithoutUserInput[]
+    connectOrCreate?: CalendarConnectionCreateOrConnectWithoutUserInput | CalendarConnectionCreateOrConnectWithoutUserInput[]
+    upsert?: CalendarConnectionUpsertWithWhereUniqueWithoutUserInput | CalendarConnectionUpsertWithWhereUniqueWithoutUserInput[]
+    createMany?: CalendarConnectionCreateManyUserInputEnvelope
+    set?: CalendarConnectionWhereUniqueInput | CalendarConnectionWhereUniqueInput[]
+    disconnect?: CalendarConnectionWhereUniqueInput | CalendarConnectionWhereUniqueInput[]
+    delete?: CalendarConnectionWhereUniqueInput | CalendarConnectionWhereUniqueInput[]
+    connect?: CalendarConnectionWhereUniqueInput | CalendarConnectionWhereUniqueInput[]
+    update?: CalendarConnectionUpdateWithWhereUniqueWithoutUserInput | CalendarConnectionUpdateWithWhereUniqueWithoutUserInput[]
+    updateMany?: CalendarConnectionUpdateManyWithWhereWithoutUserInput | CalendarConnectionUpdateManyWithWhereWithoutUserInput[]
+    deleteMany?: CalendarConnectionScalarWhereInput | CalendarConnectionScalarWhereInput[]
+  }
+
+  export type CalendarEventUncheckedUpdateManyWithoutUserNestedInput = {
+    create?: XOR<CalendarEventCreateWithoutUserInput, CalendarEventUncheckedCreateWithoutUserInput> | CalendarEventCreateWithoutUserInput[] | CalendarEventUncheckedCreateWithoutUserInput[]
+    connectOrCreate?: CalendarEventCreateOrConnectWithoutUserInput | CalendarEventCreateOrConnectWithoutUserInput[]
+    upsert?: CalendarEventUpsertWithWhereUniqueWithoutUserInput | CalendarEventUpsertWithWhereUniqueWithoutUserInput[]
+    createMany?: CalendarEventCreateManyUserInputEnvelope
+    set?: CalendarEventWhereUniqueInput | CalendarEventWhereUniqueInput[]
+    disconnect?: CalendarEventWhereUniqueInput | CalendarEventWhereUniqueInput[]
+    delete?: CalendarEventWhereUniqueInput | CalendarEventWhereUniqueInput[]
+    connect?: CalendarEventWhereUniqueInput | CalendarEventWhereUniqueInput[]
+    update?: CalendarEventUpdateWithWhereUniqueWithoutUserInput | CalendarEventUpdateWithWhereUniqueWithoutUserInput[]
+    updateMany?: CalendarEventUpdateManyWithWhereWithoutUserInput | CalendarEventUpdateManyWithWhereWithoutUserInput[]
+    deleteMany?: CalendarEventScalarWhereInput | CalendarEventScalarWhereInput[]
+  }
+
+  export type CalendarSourceUncheckedUpdateManyWithoutUserNestedInput = {
+    create?: XOR<CalendarSourceCreateWithoutUserInput, CalendarSourceUncheckedCreateWithoutUserInput> | CalendarSourceCreateWithoutUserInput[] | CalendarSourceUncheckedCreateWithoutUserInput[]
+    connectOrCreate?: CalendarSourceCreateOrConnectWithoutUserInput | CalendarSourceCreateOrConnectWithoutUserInput[]
+    upsert?: CalendarSourceUpsertWithWhereUniqueWithoutUserInput | CalendarSourceUpsertWithWhereUniqueWithoutUserInput[]
+    createMany?: CalendarSourceCreateManyUserInputEnvelope
+    set?: CalendarSourceWhereUniqueInput | CalendarSourceWhereUniqueInput[]
+    disconnect?: CalendarSourceWhereUniqueInput | CalendarSourceWhereUniqueInput[]
+    delete?: CalendarSourceWhereUniqueInput | CalendarSourceWhereUniqueInput[]
+    connect?: CalendarSourceWhereUniqueInput | CalendarSourceWhereUniqueInput[]
+    update?: CalendarSourceUpdateWithWhereUniqueWithoutUserInput | CalendarSourceUpdateWithWhereUniqueWithoutUserInput[]
+    updateMany?: CalendarSourceUpdateManyWithWhereWithoutUserInput | CalendarSourceUpdateManyWithWhereWithoutUserInput[]
+    deleteMany?: CalendarSourceScalarWhereInput | CalendarSourceScalarWhereInput[]
   }
 
   export type ContentHistoryUncheckedUpdateManyWithoutUserNestedInput = {
@@ -41176,6 +48403,258 @@ export namespace Prisma {
     upsert?: UserUpsertWithoutAccountsInput
     connect?: UserWhereUniqueInput
     update?: XOR<XOR<UserUpdateToOneWithWhereWithoutAccountsInput, UserUpdateWithoutAccountsInput>, UserUncheckedUpdateWithoutAccountsInput>
+  }
+
+  export type CalendarSourceCreateNestedManyWithoutConnectionInput = {
+    create?: XOR<CalendarSourceCreateWithoutConnectionInput, CalendarSourceUncheckedCreateWithoutConnectionInput> | CalendarSourceCreateWithoutConnectionInput[] | CalendarSourceUncheckedCreateWithoutConnectionInput[]
+    connectOrCreate?: CalendarSourceCreateOrConnectWithoutConnectionInput | CalendarSourceCreateOrConnectWithoutConnectionInput[]
+    createMany?: CalendarSourceCreateManyConnectionInputEnvelope
+    connect?: CalendarSourceWhereUniqueInput | CalendarSourceWhereUniqueInput[]
+  }
+
+  export type UserCreateNestedOneWithoutCalendarConnectionsInput = {
+    create?: XOR<UserCreateWithoutCalendarConnectionsInput, UserUncheckedCreateWithoutCalendarConnectionsInput>
+    connectOrCreate?: UserCreateOrConnectWithoutCalendarConnectionsInput
+    connect?: UserWhereUniqueInput
+  }
+
+  export type CalendarSourceUncheckedCreateNestedManyWithoutConnectionInput = {
+    create?: XOR<CalendarSourceCreateWithoutConnectionInput, CalendarSourceUncheckedCreateWithoutConnectionInput> | CalendarSourceCreateWithoutConnectionInput[] | CalendarSourceUncheckedCreateWithoutConnectionInput[]
+    connectOrCreate?: CalendarSourceCreateOrConnectWithoutConnectionInput | CalendarSourceCreateOrConnectWithoutConnectionInput[]
+    createMany?: CalendarSourceCreateManyConnectionInputEnvelope
+    connect?: CalendarSourceWhereUniqueInput | CalendarSourceWhereUniqueInput[]
+  }
+
+  export type EnumCalendarProviderFieldUpdateOperationsInput = {
+    set?: $Enums.CalendarProvider
+  }
+
+  export type EnumCalendarConnectionStatusFieldUpdateOperationsInput = {
+    set?: $Enums.CalendarConnectionStatus
+  }
+
+  export type EnumCalendarSyncStatusFieldUpdateOperationsInput = {
+    set?: $Enums.CalendarSyncStatus
+  }
+
+  export type CalendarSourceUpdateManyWithoutConnectionNestedInput = {
+    create?: XOR<CalendarSourceCreateWithoutConnectionInput, CalendarSourceUncheckedCreateWithoutConnectionInput> | CalendarSourceCreateWithoutConnectionInput[] | CalendarSourceUncheckedCreateWithoutConnectionInput[]
+    connectOrCreate?: CalendarSourceCreateOrConnectWithoutConnectionInput | CalendarSourceCreateOrConnectWithoutConnectionInput[]
+    upsert?: CalendarSourceUpsertWithWhereUniqueWithoutConnectionInput | CalendarSourceUpsertWithWhereUniqueWithoutConnectionInput[]
+    createMany?: CalendarSourceCreateManyConnectionInputEnvelope
+    set?: CalendarSourceWhereUniqueInput | CalendarSourceWhereUniqueInput[]
+    disconnect?: CalendarSourceWhereUniqueInput | CalendarSourceWhereUniqueInput[]
+    delete?: CalendarSourceWhereUniqueInput | CalendarSourceWhereUniqueInput[]
+    connect?: CalendarSourceWhereUniqueInput | CalendarSourceWhereUniqueInput[]
+    update?: CalendarSourceUpdateWithWhereUniqueWithoutConnectionInput | CalendarSourceUpdateWithWhereUniqueWithoutConnectionInput[]
+    updateMany?: CalendarSourceUpdateManyWithWhereWithoutConnectionInput | CalendarSourceUpdateManyWithWhereWithoutConnectionInput[]
+    deleteMany?: CalendarSourceScalarWhereInput | CalendarSourceScalarWhereInput[]
+  }
+
+  export type UserUpdateOneRequiredWithoutCalendarConnectionsNestedInput = {
+    create?: XOR<UserCreateWithoutCalendarConnectionsInput, UserUncheckedCreateWithoutCalendarConnectionsInput>
+    connectOrCreate?: UserCreateOrConnectWithoutCalendarConnectionsInput
+    upsert?: UserUpsertWithoutCalendarConnectionsInput
+    connect?: UserWhereUniqueInput
+    update?: XOR<XOR<UserUpdateToOneWithWhereWithoutCalendarConnectionsInput, UserUpdateWithoutCalendarConnectionsInput>, UserUncheckedUpdateWithoutCalendarConnectionsInput>
+  }
+
+  export type CalendarSourceUncheckedUpdateManyWithoutConnectionNestedInput = {
+    create?: XOR<CalendarSourceCreateWithoutConnectionInput, CalendarSourceUncheckedCreateWithoutConnectionInput> | CalendarSourceCreateWithoutConnectionInput[] | CalendarSourceUncheckedCreateWithoutConnectionInput[]
+    connectOrCreate?: CalendarSourceCreateOrConnectWithoutConnectionInput | CalendarSourceCreateOrConnectWithoutConnectionInput[]
+    upsert?: CalendarSourceUpsertWithWhereUniqueWithoutConnectionInput | CalendarSourceUpsertWithWhereUniqueWithoutConnectionInput[]
+    createMany?: CalendarSourceCreateManyConnectionInputEnvelope
+    set?: CalendarSourceWhereUniqueInput | CalendarSourceWhereUniqueInput[]
+    disconnect?: CalendarSourceWhereUniqueInput | CalendarSourceWhereUniqueInput[]
+    delete?: CalendarSourceWhereUniqueInput | CalendarSourceWhereUniqueInput[]
+    connect?: CalendarSourceWhereUniqueInput | CalendarSourceWhereUniqueInput[]
+    update?: CalendarSourceUpdateWithWhereUniqueWithoutConnectionInput | CalendarSourceUpdateWithWhereUniqueWithoutConnectionInput[]
+    updateMany?: CalendarSourceUpdateManyWithWhereWithoutConnectionInput | CalendarSourceUpdateManyWithWhereWithoutConnectionInput[]
+    deleteMany?: CalendarSourceScalarWhereInput | CalendarSourceScalarWhereInput[]
+  }
+
+  export type CalendarConnectionCreateNestedOneWithoutSourcesInput = {
+    create?: XOR<CalendarConnectionCreateWithoutSourcesInput, CalendarConnectionUncheckedCreateWithoutSourcesInput>
+    connectOrCreate?: CalendarConnectionCreateOrConnectWithoutSourcesInput
+    connect?: CalendarConnectionWhereUniqueInput
+  }
+
+  export type CalendarEventCreateNestedManyWithoutSourceInput = {
+    create?: XOR<CalendarEventCreateWithoutSourceInput, CalendarEventUncheckedCreateWithoutSourceInput> | CalendarEventCreateWithoutSourceInput[] | CalendarEventUncheckedCreateWithoutSourceInput[]
+    connectOrCreate?: CalendarEventCreateOrConnectWithoutSourceInput | CalendarEventCreateOrConnectWithoutSourceInput[]
+    createMany?: CalendarEventCreateManySourceInputEnvelope
+    connect?: CalendarEventWhereUniqueInput | CalendarEventWhereUniqueInput[]
+  }
+
+  export type UserCreateNestedOneWithoutCalendarSourcesInput = {
+    create?: XOR<UserCreateWithoutCalendarSourcesInput, UserUncheckedCreateWithoutCalendarSourcesInput>
+    connectOrCreate?: UserCreateOrConnectWithoutCalendarSourcesInput
+    connect?: UserWhereUniqueInput
+  }
+
+  export type CalendarEventUncheckedCreateNestedManyWithoutSourceInput = {
+    create?: XOR<CalendarEventCreateWithoutSourceInput, CalendarEventUncheckedCreateWithoutSourceInput> | CalendarEventCreateWithoutSourceInput[] | CalendarEventUncheckedCreateWithoutSourceInput[]
+    connectOrCreate?: CalendarEventCreateOrConnectWithoutSourceInput | CalendarEventCreateOrConnectWithoutSourceInput[]
+    createMany?: CalendarEventCreateManySourceInputEnvelope
+    connect?: CalendarEventWhereUniqueInput | CalendarEventWhereUniqueInput[]
+  }
+
+  export type EnumCalendarSourceSyncModeFieldUpdateOperationsInput = {
+    set?: $Enums.CalendarSourceSyncMode
+  }
+
+  export type CalendarConnectionUpdateOneWithoutSourcesNestedInput = {
+    create?: XOR<CalendarConnectionCreateWithoutSourcesInput, CalendarConnectionUncheckedCreateWithoutSourcesInput>
+    connectOrCreate?: CalendarConnectionCreateOrConnectWithoutSourcesInput
+    upsert?: CalendarConnectionUpsertWithoutSourcesInput
+    disconnect?: CalendarConnectionWhereInput | boolean
+    delete?: CalendarConnectionWhereInput | boolean
+    connect?: CalendarConnectionWhereUniqueInput
+    update?: XOR<XOR<CalendarConnectionUpdateToOneWithWhereWithoutSourcesInput, CalendarConnectionUpdateWithoutSourcesInput>, CalendarConnectionUncheckedUpdateWithoutSourcesInput>
+  }
+
+  export type CalendarEventUpdateManyWithoutSourceNestedInput = {
+    create?: XOR<CalendarEventCreateWithoutSourceInput, CalendarEventUncheckedCreateWithoutSourceInput> | CalendarEventCreateWithoutSourceInput[] | CalendarEventUncheckedCreateWithoutSourceInput[]
+    connectOrCreate?: CalendarEventCreateOrConnectWithoutSourceInput | CalendarEventCreateOrConnectWithoutSourceInput[]
+    upsert?: CalendarEventUpsertWithWhereUniqueWithoutSourceInput | CalendarEventUpsertWithWhereUniqueWithoutSourceInput[]
+    createMany?: CalendarEventCreateManySourceInputEnvelope
+    set?: CalendarEventWhereUniqueInput | CalendarEventWhereUniqueInput[]
+    disconnect?: CalendarEventWhereUniqueInput | CalendarEventWhereUniqueInput[]
+    delete?: CalendarEventWhereUniqueInput | CalendarEventWhereUniqueInput[]
+    connect?: CalendarEventWhereUniqueInput | CalendarEventWhereUniqueInput[]
+    update?: CalendarEventUpdateWithWhereUniqueWithoutSourceInput | CalendarEventUpdateWithWhereUniqueWithoutSourceInput[]
+    updateMany?: CalendarEventUpdateManyWithWhereWithoutSourceInput | CalendarEventUpdateManyWithWhereWithoutSourceInput[]
+    deleteMany?: CalendarEventScalarWhereInput | CalendarEventScalarWhereInput[]
+  }
+
+  export type UserUpdateOneRequiredWithoutCalendarSourcesNestedInput = {
+    create?: XOR<UserCreateWithoutCalendarSourcesInput, UserUncheckedCreateWithoutCalendarSourcesInput>
+    connectOrCreate?: UserCreateOrConnectWithoutCalendarSourcesInput
+    upsert?: UserUpsertWithoutCalendarSourcesInput
+    connect?: UserWhereUniqueInput
+    update?: XOR<XOR<UserUpdateToOneWithWhereWithoutCalendarSourcesInput, UserUpdateWithoutCalendarSourcesInput>, UserUncheckedUpdateWithoutCalendarSourcesInput>
+  }
+
+  export type CalendarEventUncheckedUpdateManyWithoutSourceNestedInput = {
+    create?: XOR<CalendarEventCreateWithoutSourceInput, CalendarEventUncheckedCreateWithoutSourceInput> | CalendarEventCreateWithoutSourceInput[] | CalendarEventUncheckedCreateWithoutSourceInput[]
+    connectOrCreate?: CalendarEventCreateOrConnectWithoutSourceInput | CalendarEventCreateOrConnectWithoutSourceInput[]
+    upsert?: CalendarEventUpsertWithWhereUniqueWithoutSourceInput | CalendarEventUpsertWithWhereUniqueWithoutSourceInput[]
+    createMany?: CalendarEventCreateManySourceInputEnvelope
+    set?: CalendarEventWhereUniqueInput | CalendarEventWhereUniqueInput[]
+    disconnect?: CalendarEventWhereUniqueInput | CalendarEventWhereUniqueInput[]
+    delete?: CalendarEventWhereUniqueInput | CalendarEventWhereUniqueInput[]
+    connect?: CalendarEventWhereUniqueInput | CalendarEventWhereUniqueInput[]
+    update?: CalendarEventUpdateWithWhereUniqueWithoutSourceInput | CalendarEventUpdateWithWhereUniqueWithoutSourceInput[]
+    updateMany?: CalendarEventUpdateManyWithWhereWithoutSourceInput | CalendarEventUpdateManyWithWhereWithoutSourceInput[]
+    deleteMany?: CalendarEventScalarWhereInput | CalendarEventScalarWhereInput[]
+  }
+
+  export type CalendarEventAttendeeCreateNestedManyWithoutEventInput = {
+    create?: XOR<CalendarEventAttendeeCreateWithoutEventInput, CalendarEventAttendeeUncheckedCreateWithoutEventInput> | CalendarEventAttendeeCreateWithoutEventInput[] | CalendarEventAttendeeUncheckedCreateWithoutEventInput[]
+    connectOrCreate?: CalendarEventAttendeeCreateOrConnectWithoutEventInput | CalendarEventAttendeeCreateOrConnectWithoutEventInput[]
+    createMany?: CalendarEventAttendeeCreateManyEventInputEnvelope
+    connect?: CalendarEventAttendeeWhereUniqueInput | CalendarEventAttendeeWhereUniqueInput[]
+  }
+
+  export type ContentNodeCreateNestedOneWithoutLinkedCalendarEventsInput = {
+    create?: XOR<ContentNodeCreateWithoutLinkedCalendarEventsInput, ContentNodeUncheckedCreateWithoutLinkedCalendarEventsInput>
+    connectOrCreate?: ContentNodeCreateOrConnectWithoutLinkedCalendarEventsInput
+    connect?: ContentNodeWhereUniqueInput
+  }
+
+  export type CalendarSourceCreateNestedOneWithoutEventsInput = {
+    create?: XOR<CalendarSourceCreateWithoutEventsInput, CalendarSourceUncheckedCreateWithoutEventsInput>
+    connectOrCreate?: CalendarSourceCreateOrConnectWithoutEventsInput
+    connect?: CalendarSourceWhereUniqueInput
+  }
+
+  export type UserCreateNestedOneWithoutCalendarEventsInput = {
+    create?: XOR<UserCreateWithoutCalendarEventsInput, UserUncheckedCreateWithoutCalendarEventsInput>
+    connectOrCreate?: UserCreateOrConnectWithoutCalendarEventsInput
+    connect?: UserWhereUniqueInput
+  }
+
+  export type CalendarEventAttendeeUncheckedCreateNestedManyWithoutEventInput = {
+    create?: XOR<CalendarEventAttendeeCreateWithoutEventInput, CalendarEventAttendeeUncheckedCreateWithoutEventInput> | CalendarEventAttendeeCreateWithoutEventInput[] | CalendarEventAttendeeUncheckedCreateWithoutEventInput[]
+    connectOrCreate?: CalendarEventAttendeeCreateOrConnectWithoutEventInput | CalendarEventAttendeeCreateOrConnectWithoutEventInput[]
+    createMany?: CalendarEventAttendeeCreateManyEventInputEnvelope
+    connect?: CalendarEventAttendeeWhereUniqueInput | CalendarEventAttendeeWhereUniqueInput[]
+  }
+
+  export type EnumCalendarEventStatusFieldUpdateOperationsInput = {
+    set?: $Enums.CalendarEventStatus
+  }
+
+  export type CalendarEventAttendeeUpdateManyWithoutEventNestedInput = {
+    create?: XOR<CalendarEventAttendeeCreateWithoutEventInput, CalendarEventAttendeeUncheckedCreateWithoutEventInput> | CalendarEventAttendeeCreateWithoutEventInput[] | CalendarEventAttendeeUncheckedCreateWithoutEventInput[]
+    connectOrCreate?: CalendarEventAttendeeCreateOrConnectWithoutEventInput | CalendarEventAttendeeCreateOrConnectWithoutEventInput[]
+    upsert?: CalendarEventAttendeeUpsertWithWhereUniqueWithoutEventInput | CalendarEventAttendeeUpsertWithWhereUniqueWithoutEventInput[]
+    createMany?: CalendarEventAttendeeCreateManyEventInputEnvelope
+    set?: CalendarEventAttendeeWhereUniqueInput | CalendarEventAttendeeWhereUniqueInput[]
+    disconnect?: CalendarEventAttendeeWhereUniqueInput | CalendarEventAttendeeWhereUniqueInput[]
+    delete?: CalendarEventAttendeeWhereUniqueInput | CalendarEventAttendeeWhereUniqueInput[]
+    connect?: CalendarEventAttendeeWhereUniqueInput | CalendarEventAttendeeWhereUniqueInput[]
+    update?: CalendarEventAttendeeUpdateWithWhereUniqueWithoutEventInput | CalendarEventAttendeeUpdateWithWhereUniqueWithoutEventInput[]
+    updateMany?: CalendarEventAttendeeUpdateManyWithWhereWithoutEventInput | CalendarEventAttendeeUpdateManyWithWhereWithoutEventInput[]
+    deleteMany?: CalendarEventAttendeeScalarWhereInput | CalendarEventAttendeeScalarWhereInput[]
+  }
+
+  export type ContentNodeUpdateOneWithoutLinkedCalendarEventsNestedInput = {
+    create?: XOR<ContentNodeCreateWithoutLinkedCalendarEventsInput, ContentNodeUncheckedCreateWithoutLinkedCalendarEventsInput>
+    connectOrCreate?: ContentNodeCreateOrConnectWithoutLinkedCalendarEventsInput
+    upsert?: ContentNodeUpsertWithoutLinkedCalendarEventsInput
+    disconnect?: ContentNodeWhereInput | boolean
+    delete?: ContentNodeWhereInput | boolean
+    connect?: ContentNodeWhereUniqueInput
+    update?: XOR<XOR<ContentNodeUpdateToOneWithWhereWithoutLinkedCalendarEventsInput, ContentNodeUpdateWithoutLinkedCalendarEventsInput>, ContentNodeUncheckedUpdateWithoutLinkedCalendarEventsInput>
+  }
+
+  export type CalendarSourceUpdateOneRequiredWithoutEventsNestedInput = {
+    create?: XOR<CalendarSourceCreateWithoutEventsInput, CalendarSourceUncheckedCreateWithoutEventsInput>
+    connectOrCreate?: CalendarSourceCreateOrConnectWithoutEventsInput
+    upsert?: CalendarSourceUpsertWithoutEventsInput
+    connect?: CalendarSourceWhereUniqueInput
+    update?: XOR<XOR<CalendarSourceUpdateToOneWithWhereWithoutEventsInput, CalendarSourceUpdateWithoutEventsInput>, CalendarSourceUncheckedUpdateWithoutEventsInput>
+  }
+
+  export type UserUpdateOneRequiredWithoutCalendarEventsNestedInput = {
+    create?: XOR<UserCreateWithoutCalendarEventsInput, UserUncheckedCreateWithoutCalendarEventsInput>
+    connectOrCreate?: UserCreateOrConnectWithoutCalendarEventsInput
+    upsert?: UserUpsertWithoutCalendarEventsInput
+    connect?: UserWhereUniqueInput
+    update?: XOR<XOR<UserUpdateToOneWithWhereWithoutCalendarEventsInput, UserUpdateWithoutCalendarEventsInput>, UserUncheckedUpdateWithoutCalendarEventsInput>
+  }
+
+  export type CalendarEventAttendeeUncheckedUpdateManyWithoutEventNestedInput = {
+    create?: XOR<CalendarEventAttendeeCreateWithoutEventInput, CalendarEventAttendeeUncheckedCreateWithoutEventInput> | CalendarEventAttendeeCreateWithoutEventInput[] | CalendarEventAttendeeUncheckedCreateWithoutEventInput[]
+    connectOrCreate?: CalendarEventAttendeeCreateOrConnectWithoutEventInput | CalendarEventAttendeeCreateOrConnectWithoutEventInput[]
+    upsert?: CalendarEventAttendeeUpsertWithWhereUniqueWithoutEventInput | CalendarEventAttendeeUpsertWithWhereUniqueWithoutEventInput[]
+    createMany?: CalendarEventAttendeeCreateManyEventInputEnvelope
+    set?: CalendarEventAttendeeWhereUniqueInput | CalendarEventAttendeeWhereUniqueInput[]
+    disconnect?: CalendarEventAttendeeWhereUniqueInput | CalendarEventAttendeeWhereUniqueInput[]
+    delete?: CalendarEventAttendeeWhereUniqueInput | CalendarEventAttendeeWhereUniqueInput[]
+    connect?: CalendarEventAttendeeWhereUniqueInput | CalendarEventAttendeeWhereUniqueInput[]
+    update?: CalendarEventAttendeeUpdateWithWhereUniqueWithoutEventInput | CalendarEventAttendeeUpdateWithWhereUniqueWithoutEventInput[]
+    updateMany?: CalendarEventAttendeeUpdateManyWithWhereWithoutEventInput | CalendarEventAttendeeUpdateManyWithWhereWithoutEventInput[]
+    deleteMany?: CalendarEventAttendeeScalarWhereInput | CalendarEventAttendeeScalarWhereInput[]
+  }
+
+  export type CalendarEventCreateNestedOneWithoutAttendeesInput = {
+    create?: XOR<CalendarEventCreateWithoutAttendeesInput, CalendarEventUncheckedCreateWithoutAttendeesInput>
+    connectOrCreate?: CalendarEventCreateOrConnectWithoutAttendeesInput
+    connect?: CalendarEventWhereUniqueInput
+  }
+
+  export type EnumCalendarAttendeeResponseStatusFieldUpdateOperationsInput = {
+    set?: $Enums.CalendarAttendeeResponseStatus
+  }
+
+  export type CalendarEventUpdateOneRequiredWithoutAttendeesNestedInput = {
+    create?: XOR<CalendarEventCreateWithoutAttendeesInput, CalendarEventUncheckedCreateWithoutAttendeesInput>
+    connectOrCreate?: CalendarEventCreateOrConnectWithoutAttendeesInput
+    upsert?: CalendarEventUpsertWithoutAttendeesInput
+    connect?: CalendarEventWhereUniqueInput
+    update?: XOR<XOR<CalendarEventUpdateToOneWithWhereWithoutAttendeesInput, CalendarEventUpdateWithoutAttendeesInput>, CalendarEventUncheckedUpdateWithoutAttendeesInput>
   }
 
   export type ContentNodeCreateNestedOneWithoutAuditLogsInput = {
@@ -41735,6 +49214,108 @@ export namespace Prisma {
     _max?: NestedEnumUserRoleFilter<$PrismaModel>
   }
 
+  export type NestedEnumCalendarProviderFilter<$PrismaModel = never> = {
+    equals?: $Enums.CalendarProvider | EnumCalendarProviderFieldRefInput<$PrismaModel>
+    in?: $Enums.CalendarProvider[] | ListEnumCalendarProviderFieldRefInput<$PrismaModel>
+    notIn?: $Enums.CalendarProvider[] | ListEnumCalendarProviderFieldRefInput<$PrismaModel>
+    not?: NestedEnumCalendarProviderFilter<$PrismaModel> | $Enums.CalendarProvider
+  }
+
+  export type NestedEnumCalendarConnectionStatusFilter<$PrismaModel = never> = {
+    equals?: $Enums.CalendarConnectionStatus | EnumCalendarConnectionStatusFieldRefInput<$PrismaModel>
+    in?: $Enums.CalendarConnectionStatus[] | ListEnumCalendarConnectionStatusFieldRefInput<$PrismaModel>
+    notIn?: $Enums.CalendarConnectionStatus[] | ListEnumCalendarConnectionStatusFieldRefInput<$PrismaModel>
+    not?: NestedEnumCalendarConnectionStatusFilter<$PrismaModel> | $Enums.CalendarConnectionStatus
+  }
+
+  export type NestedEnumCalendarSyncStatusFilter<$PrismaModel = never> = {
+    equals?: $Enums.CalendarSyncStatus | EnumCalendarSyncStatusFieldRefInput<$PrismaModel>
+    in?: $Enums.CalendarSyncStatus[] | ListEnumCalendarSyncStatusFieldRefInput<$PrismaModel>
+    notIn?: $Enums.CalendarSyncStatus[] | ListEnumCalendarSyncStatusFieldRefInput<$PrismaModel>
+    not?: NestedEnumCalendarSyncStatusFilter<$PrismaModel> | $Enums.CalendarSyncStatus
+  }
+
+  export type NestedEnumCalendarProviderWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: $Enums.CalendarProvider | EnumCalendarProviderFieldRefInput<$PrismaModel>
+    in?: $Enums.CalendarProvider[] | ListEnumCalendarProviderFieldRefInput<$PrismaModel>
+    notIn?: $Enums.CalendarProvider[] | ListEnumCalendarProviderFieldRefInput<$PrismaModel>
+    not?: NestedEnumCalendarProviderWithAggregatesFilter<$PrismaModel> | $Enums.CalendarProvider
+    _count?: NestedIntFilter<$PrismaModel>
+    _min?: NestedEnumCalendarProviderFilter<$PrismaModel>
+    _max?: NestedEnumCalendarProviderFilter<$PrismaModel>
+  }
+
+  export type NestedEnumCalendarConnectionStatusWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: $Enums.CalendarConnectionStatus | EnumCalendarConnectionStatusFieldRefInput<$PrismaModel>
+    in?: $Enums.CalendarConnectionStatus[] | ListEnumCalendarConnectionStatusFieldRefInput<$PrismaModel>
+    notIn?: $Enums.CalendarConnectionStatus[] | ListEnumCalendarConnectionStatusFieldRefInput<$PrismaModel>
+    not?: NestedEnumCalendarConnectionStatusWithAggregatesFilter<$PrismaModel> | $Enums.CalendarConnectionStatus
+    _count?: NestedIntFilter<$PrismaModel>
+    _min?: NestedEnumCalendarConnectionStatusFilter<$PrismaModel>
+    _max?: NestedEnumCalendarConnectionStatusFilter<$PrismaModel>
+  }
+
+  export type NestedEnumCalendarSyncStatusWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: $Enums.CalendarSyncStatus | EnumCalendarSyncStatusFieldRefInput<$PrismaModel>
+    in?: $Enums.CalendarSyncStatus[] | ListEnumCalendarSyncStatusFieldRefInput<$PrismaModel>
+    notIn?: $Enums.CalendarSyncStatus[] | ListEnumCalendarSyncStatusFieldRefInput<$PrismaModel>
+    not?: NestedEnumCalendarSyncStatusWithAggregatesFilter<$PrismaModel> | $Enums.CalendarSyncStatus
+    _count?: NestedIntFilter<$PrismaModel>
+    _min?: NestedEnumCalendarSyncStatusFilter<$PrismaModel>
+    _max?: NestedEnumCalendarSyncStatusFilter<$PrismaModel>
+  }
+
+  export type NestedEnumCalendarSourceSyncModeFilter<$PrismaModel = never> = {
+    equals?: $Enums.CalendarSourceSyncMode | EnumCalendarSourceSyncModeFieldRefInput<$PrismaModel>
+    in?: $Enums.CalendarSourceSyncMode[] | ListEnumCalendarSourceSyncModeFieldRefInput<$PrismaModel>
+    notIn?: $Enums.CalendarSourceSyncMode[] | ListEnumCalendarSourceSyncModeFieldRefInput<$PrismaModel>
+    not?: NestedEnumCalendarSourceSyncModeFilter<$PrismaModel> | $Enums.CalendarSourceSyncMode
+  }
+
+  export type NestedEnumCalendarSourceSyncModeWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: $Enums.CalendarSourceSyncMode | EnumCalendarSourceSyncModeFieldRefInput<$PrismaModel>
+    in?: $Enums.CalendarSourceSyncMode[] | ListEnumCalendarSourceSyncModeFieldRefInput<$PrismaModel>
+    notIn?: $Enums.CalendarSourceSyncMode[] | ListEnumCalendarSourceSyncModeFieldRefInput<$PrismaModel>
+    not?: NestedEnumCalendarSourceSyncModeWithAggregatesFilter<$PrismaModel> | $Enums.CalendarSourceSyncMode
+    _count?: NestedIntFilter<$PrismaModel>
+    _min?: NestedEnumCalendarSourceSyncModeFilter<$PrismaModel>
+    _max?: NestedEnumCalendarSourceSyncModeFilter<$PrismaModel>
+  }
+
+  export type NestedEnumCalendarEventStatusFilter<$PrismaModel = never> = {
+    equals?: $Enums.CalendarEventStatus | EnumCalendarEventStatusFieldRefInput<$PrismaModel>
+    in?: $Enums.CalendarEventStatus[] | ListEnumCalendarEventStatusFieldRefInput<$PrismaModel>
+    notIn?: $Enums.CalendarEventStatus[] | ListEnumCalendarEventStatusFieldRefInput<$PrismaModel>
+    not?: NestedEnumCalendarEventStatusFilter<$PrismaModel> | $Enums.CalendarEventStatus
+  }
+
+  export type NestedEnumCalendarEventStatusWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: $Enums.CalendarEventStatus | EnumCalendarEventStatusFieldRefInput<$PrismaModel>
+    in?: $Enums.CalendarEventStatus[] | ListEnumCalendarEventStatusFieldRefInput<$PrismaModel>
+    notIn?: $Enums.CalendarEventStatus[] | ListEnumCalendarEventStatusFieldRefInput<$PrismaModel>
+    not?: NestedEnumCalendarEventStatusWithAggregatesFilter<$PrismaModel> | $Enums.CalendarEventStatus
+    _count?: NestedIntFilter<$PrismaModel>
+    _min?: NestedEnumCalendarEventStatusFilter<$PrismaModel>
+    _max?: NestedEnumCalendarEventStatusFilter<$PrismaModel>
+  }
+
+  export type NestedEnumCalendarAttendeeResponseStatusFilter<$PrismaModel = never> = {
+    equals?: $Enums.CalendarAttendeeResponseStatus | EnumCalendarAttendeeResponseStatusFieldRefInput<$PrismaModel>
+    in?: $Enums.CalendarAttendeeResponseStatus[] | ListEnumCalendarAttendeeResponseStatusFieldRefInput<$PrismaModel>
+    notIn?: $Enums.CalendarAttendeeResponseStatus[] | ListEnumCalendarAttendeeResponseStatusFieldRefInput<$PrismaModel>
+    not?: NestedEnumCalendarAttendeeResponseStatusFilter<$PrismaModel> | $Enums.CalendarAttendeeResponseStatus
+  }
+
+  export type NestedEnumCalendarAttendeeResponseStatusWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: $Enums.CalendarAttendeeResponseStatus | EnumCalendarAttendeeResponseStatusFieldRefInput<$PrismaModel>
+    in?: $Enums.CalendarAttendeeResponseStatus[] | ListEnumCalendarAttendeeResponseStatusFieldRefInput<$PrismaModel>
+    notIn?: $Enums.CalendarAttendeeResponseStatus[] | ListEnumCalendarAttendeeResponseStatusFieldRefInput<$PrismaModel>
+    not?: NestedEnumCalendarAttendeeResponseStatusWithAggregatesFilter<$PrismaModel> | $Enums.CalendarAttendeeResponseStatus
+    _count?: NestedIntFilter<$PrismaModel>
+    _min?: NestedEnumCalendarAttendeeResponseStatusFilter<$PrismaModel>
+    _max?: NestedEnumCalendarAttendeeResponseStatusFilter<$PrismaModel>
+  }
+
   export type NestedEnumFolderViewModeFilter<$PrismaModel = never> = {
     equals?: $Enums.FolderViewMode | EnumFolderViewModeFieldRefInput<$PrismaModel>
     in?: $Enums.FolderViewMode[] | ListEnumFolderViewModeFieldRefInput<$PrismaModel>
@@ -42191,6 +49772,9 @@ export namespace Prisma {
     auditTargets?: AuditLogCreateNestedManyWithoutTargetUserInput
     adminActions?: AuditLogCreateNestedManyWithoutUserInput
     categories?: CategoryCreateNestedManyWithoutOwnerInput
+    calendarConnections?: CalendarConnectionCreateNestedManyWithoutUserInput
+    calendarEvents?: CalendarEventCreateNestedManyWithoutUserInput
+    calendarSources?: CalendarSourceCreateNestedManyWithoutUserInput
     contentHistory?: ContentHistoryCreateNestedManyWithoutUserInput
     sessions?: SessionCreateNestedManyWithoutUserInput
     storageConfigs?: StorageProviderConfigCreateNestedManyWithoutUserInput
@@ -42214,6 +49798,9 @@ export namespace Prisma {
     auditTargets?: AuditLogUncheckedCreateNestedManyWithoutTargetUserInput
     adminActions?: AuditLogUncheckedCreateNestedManyWithoutUserInput
     categories?: CategoryUncheckedCreateNestedManyWithoutOwnerInput
+    calendarConnections?: CalendarConnectionUncheckedCreateNestedManyWithoutUserInput
+    calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutUserInput
+    calendarSources?: CalendarSourceUncheckedCreateNestedManyWithoutUserInput
     contentHistory?: ContentHistoryUncheckedCreateNestedManyWithoutUserInput
     sessions?: SessionUncheckedCreateNestedManyWithoutUserInput
     storageConfigs?: StorageProviderConfigUncheckedCreateNestedManyWithoutUserInput
@@ -42261,6 +49848,7 @@ export namespace Prisma {
     parent?: ContentNodeCreateNestedOneWithoutChildrenInput
     contentPath?: ContentPathCreateNestedOneWithoutContentInput
     contentTags?: ContentTagCreateNestedManyWithoutContentInput
+    linkedCalendarEvents?: CalendarEventCreateNestedManyWithoutLinkedContentInput
     trashBinEntry?: TrashBinCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantCreateNestedManyWithoutContentInput
   }
@@ -42299,6 +49887,7 @@ export namespace Prisma {
     targetLinks?: ContentLinkUncheckedCreateNestedManyWithoutTargetInput
     contentPath?: ContentPathUncheckedCreateNestedOneWithoutContentInput
     contentTags?: ContentTagUncheckedCreateNestedManyWithoutContentInput
+    linkedCalendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutLinkedContentInput
     trashBinEntry?: TrashBinUncheckedCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantUncheckedCreateNestedManyWithoutContentInput
   }
@@ -42342,6 +49931,7 @@ export namespace Prisma {
     children?: ContentNodeCreateNestedManyWithoutParentInput
     contentPath?: ContentPathCreateNestedOneWithoutContentInput
     contentTags?: ContentTagCreateNestedManyWithoutContentInput
+    linkedCalendarEvents?: CalendarEventCreateNestedManyWithoutLinkedContentInput
     trashBinEntry?: TrashBinCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantCreateNestedManyWithoutContentInput
   }
@@ -42380,6 +49970,7 @@ export namespace Prisma {
     children?: ContentNodeUncheckedCreateNestedManyWithoutParentInput
     contentPath?: ContentPathUncheckedCreateNestedOneWithoutContentInput
     contentTags?: ContentTagUncheckedCreateNestedManyWithoutContentInput
+    linkedCalendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutLinkedContentInput
     trashBinEntry?: TrashBinUncheckedCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantUncheckedCreateNestedManyWithoutContentInput
   }
@@ -42434,6 +50025,64 @@ export namespace Prisma {
 
   export type ContentTagCreateManyContentInputEnvelope = {
     data: ContentTagCreateManyContentInput | ContentTagCreateManyContentInput[]
+    skipDuplicates?: boolean
+  }
+
+  export type CalendarEventCreateWithoutLinkedContentInput = {
+    id?: string
+    externalEventId?: string | null
+    title: string
+    description?: string | null
+    location?: string | null
+    startAt: Date | string
+    endAt: Date | string
+    allDay?: boolean
+    timezone?: string | null
+    recurrenceRule?: string | null
+    recurrenceExDates?: JsonNullValueInput | InputJsonValue
+    recurrenceOverrides?: JsonNullValueInput | InputJsonValue
+    status?: $Enums.CalendarEventStatus
+    meetingUrl?: string | null
+    providerMetadata?: JsonNullValueInput | InputJsonValue
+    lastSyncedAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    attendees?: CalendarEventAttendeeCreateNestedManyWithoutEventInput
+    source: CalendarSourceCreateNestedOneWithoutEventsInput
+    user: UserCreateNestedOneWithoutCalendarEventsInput
+  }
+
+  export type CalendarEventUncheckedCreateWithoutLinkedContentInput = {
+    id?: string
+    userId: string
+    sourceId: string
+    externalEventId?: string | null
+    title: string
+    description?: string | null
+    location?: string | null
+    startAt: Date | string
+    endAt: Date | string
+    allDay?: boolean
+    timezone?: string | null
+    recurrenceRule?: string | null
+    recurrenceExDates?: JsonNullValueInput | InputJsonValue
+    recurrenceOverrides?: JsonNullValueInput | InputJsonValue
+    status?: $Enums.CalendarEventStatus
+    meetingUrl?: string | null
+    providerMetadata?: JsonNullValueInput | InputJsonValue
+    lastSyncedAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    attendees?: CalendarEventAttendeeUncheckedCreateNestedManyWithoutEventInput
+  }
+
+  export type CalendarEventCreateOrConnectWithoutLinkedContentInput = {
+    where: CalendarEventWhereUniqueInput
+    create: XOR<CalendarEventCreateWithoutLinkedContentInput, CalendarEventUncheckedCreateWithoutLinkedContentInput>
+  }
+
+  export type CalendarEventCreateManyLinkedContentInputEnvelope = {
+    data: CalendarEventCreateManyLinkedContentInput | CalendarEventCreateManyLinkedContentInput[]
     skipDuplicates?: boolean
   }
 
@@ -43000,6 +50649,9 @@ export namespace Prisma {
     auditTargets?: AuditLogUpdateManyWithoutTargetUserNestedInput
     adminActions?: AuditLogUpdateManyWithoutUserNestedInput
     categories?: CategoryUpdateManyWithoutOwnerNestedInput
+    calendarConnections?: CalendarConnectionUpdateManyWithoutUserNestedInput
+    calendarEvents?: CalendarEventUpdateManyWithoutUserNestedInput
+    calendarSources?: CalendarSourceUpdateManyWithoutUserNestedInput
     contentHistory?: ContentHistoryUpdateManyWithoutUserNestedInput
     sessions?: SessionUpdateManyWithoutUserNestedInput
     storageConfigs?: StorageProviderConfigUpdateManyWithoutUserNestedInput
@@ -43023,6 +50675,9 @@ export namespace Prisma {
     auditTargets?: AuditLogUncheckedUpdateManyWithoutTargetUserNestedInput
     adminActions?: AuditLogUncheckedUpdateManyWithoutUserNestedInput
     categories?: CategoryUncheckedUpdateManyWithoutOwnerNestedInput
+    calendarConnections?: CalendarConnectionUncheckedUpdateManyWithoutUserNestedInput
+    calendarEvents?: CalendarEventUncheckedUpdateManyWithoutUserNestedInput
+    calendarSources?: CalendarSourceUncheckedUpdateManyWithoutUserNestedInput
     contentHistory?: ContentHistoryUncheckedUpdateManyWithoutUserNestedInput
     sessions?: SessionUncheckedUpdateManyWithoutUserNestedInput
     storageConfigs?: StorageProviderConfigUncheckedUpdateManyWithoutUserNestedInput
@@ -43076,6 +50731,7 @@ export namespace Prisma {
     parent?: ContentNodeUpdateOneWithoutChildrenNestedInput
     contentPath?: ContentPathUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUpdateManyWithoutContentNestedInput
+    linkedCalendarEvents?: CalendarEventUpdateManyWithoutLinkedContentNestedInput
     trashBinEntry?: TrashBinUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUpdateManyWithoutContentNestedInput
   }
@@ -43114,6 +50770,7 @@ export namespace Prisma {
     targetLinks?: ContentLinkUncheckedUpdateManyWithoutTargetNestedInput
     contentPath?: ContentPathUncheckedUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUncheckedUpdateManyWithoutContentNestedInput
+    linkedCalendarEvents?: CalendarEventUncheckedUpdateManyWithoutLinkedContentNestedInput
     trashBinEntry?: TrashBinUncheckedUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUncheckedUpdateManyWithoutContentNestedInput
   }
@@ -43206,6 +50863,49 @@ export namespace Prisma {
     tagId?: UuidFilter<"ContentTag"> | string
     createdAt?: DateTimeFilter<"ContentTag"> | Date | string
     positions?: JsonFilter<"ContentTag">
+  }
+
+  export type CalendarEventUpsertWithWhereUniqueWithoutLinkedContentInput = {
+    where: CalendarEventWhereUniqueInput
+    update: XOR<CalendarEventUpdateWithoutLinkedContentInput, CalendarEventUncheckedUpdateWithoutLinkedContentInput>
+    create: XOR<CalendarEventCreateWithoutLinkedContentInput, CalendarEventUncheckedCreateWithoutLinkedContentInput>
+  }
+
+  export type CalendarEventUpdateWithWhereUniqueWithoutLinkedContentInput = {
+    where: CalendarEventWhereUniqueInput
+    data: XOR<CalendarEventUpdateWithoutLinkedContentInput, CalendarEventUncheckedUpdateWithoutLinkedContentInput>
+  }
+
+  export type CalendarEventUpdateManyWithWhereWithoutLinkedContentInput = {
+    where: CalendarEventScalarWhereInput
+    data: XOR<CalendarEventUpdateManyMutationInput, CalendarEventUncheckedUpdateManyWithoutLinkedContentInput>
+  }
+
+  export type CalendarEventScalarWhereInput = {
+    AND?: CalendarEventScalarWhereInput | CalendarEventScalarWhereInput[]
+    OR?: CalendarEventScalarWhereInput[]
+    NOT?: CalendarEventScalarWhereInput | CalendarEventScalarWhereInput[]
+    id?: UuidFilter<"CalendarEvent"> | string
+    userId?: UuidFilter<"CalendarEvent"> | string
+    sourceId?: UuidFilter<"CalendarEvent"> | string
+    externalEventId?: StringNullableFilter<"CalendarEvent"> | string | null
+    title?: StringFilter<"CalendarEvent"> | string
+    description?: StringNullableFilter<"CalendarEvent"> | string | null
+    location?: StringNullableFilter<"CalendarEvent"> | string | null
+    startAt?: DateTimeFilter<"CalendarEvent"> | Date | string
+    endAt?: DateTimeFilter<"CalendarEvent"> | Date | string
+    allDay?: BoolFilter<"CalendarEvent"> | boolean
+    timezone?: StringNullableFilter<"CalendarEvent"> | string | null
+    recurrenceRule?: StringNullableFilter<"CalendarEvent"> | string | null
+    recurrenceExDates?: JsonFilter<"CalendarEvent">
+    recurrenceOverrides?: JsonFilter<"CalendarEvent">
+    status?: EnumCalendarEventStatusFilter<"CalendarEvent"> | $Enums.CalendarEventStatus
+    meetingUrl?: StringNullableFilter<"CalendarEvent"> | string | null
+    linkedContentId?: UuidNullableFilter<"CalendarEvent"> | string | null
+    providerMetadata?: JsonFilter<"CalendarEvent">
+    lastSyncedAt?: DateTimeNullableFilter<"CalendarEvent"> | Date | string | null
+    createdAt?: DateTimeFilter<"CalendarEvent"> | Date | string
+    updatedAt?: DateTimeFilter<"CalendarEvent"> | Date | string
   }
 
   export type TrashBinUpsertWithoutContentInput = {
@@ -43301,6 +51001,7 @@ export namespace Prisma {
     children?: ContentNodeCreateNestedManyWithoutParentInput
     contentPath?: ContentPathCreateNestedOneWithoutContentInput
     contentTags?: ContentTagCreateNestedManyWithoutContentInput
+    linkedCalendarEvents?: CalendarEventCreateNestedManyWithoutLinkedContentInput
     trashBinEntry?: TrashBinCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantCreateNestedManyWithoutContentInput
   }
@@ -43339,6 +51040,7 @@ export namespace Prisma {
     children?: ContentNodeUncheckedCreateNestedManyWithoutParentInput
     contentPath?: ContentPathUncheckedCreateNestedOneWithoutContentInput
     contentTags?: ContentTagUncheckedCreateNestedManyWithoutContentInput
+    linkedCalendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutLinkedContentInput
     trashBinEntry?: TrashBinUncheckedCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantUncheckedCreateNestedManyWithoutContentInput
   }
@@ -43393,6 +51095,7 @@ export namespace Prisma {
     children?: ContentNodeUpdateManyWithoutParentNestedInput
     contentPath?: ContentPathUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUpdateManyWithoutContentNestedInput
+    linkedCalendarEvents?: CalendarEventUpdateManyWithoutLinkedContentNestedInput
     trashBinEntry?: TrashBinUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUpdateManyWithoutContentNestedInput
   }
@@ -43431,6 +51134,7 @@ export namespace Prisma {
     children?: ContentNodeUncheckedUpdateManyWithoutParentNestedInput
     contentPath?: ContentPathUncheckedUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUncheckedUpdateManyWithoutContentNestedInput
+    linkedCalendarEvents?: CalendarEventUncheckedUpdateManyWithoutLinkedContentNestedInput
     trashBinEntry?: TrashBinUncheckedUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUncheckedUpdateManyWithoutContentNestedInput
   }
@@ -43469,6 +51173,7 @@ export namespace Prisma {
     children?: ContentNodeCreateNestedManyWithoutParentInput
     contentPath?: ContentPathCreateNestedOneWithoutContentInput
     contentTags?: ContentTagCreateNestedManyWithoutContentInput
+    linkedCalendarEvents?: CalendarEventCreateNestedManyWithoutLinkedContentInput
     trashBinEntry?: TrashBinCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantCreateNestedManyWithoutContentInput
   }
@@ -43507,6 +51212,7 @@ export namespace Prisma {
     children?: ContentNodeUncheckedCreateNestedManyWithoutParentInput
     contentPath?: ContentPathUncheckedCreateNestedOneWithoutContentInput
     contentTags?: ContentTagUncheckedCreateNestedManyWithoutContentInput
+    linkedCalendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutLinkedContentInput
     trashBinEntry?: TrashBinUncheckedCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantUncheckedCreateNestedManyWithoutContentInput
   }
@@ -43561,6 +51267,7 @@ export namespace Prisma {
     children?: ContentNodeUpdateManyWithoutParentNestedInput
     contentPath?: ContentPathUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUpdateManyWithoutContentNestedInput
+    linkedCalendarEvents?: CalendarEventUpdateManyWithoutLinkedContentNestedInput
     trashBinEntry?: TrashBinUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUpdateManyWithoutContentNestedInput
   }
@@ -43599,6 +51306,7 @@ export namespace Prisma {
     children?: ContentNodeUncheckedUpdateManyWithoutParentNestedInput
     contentPath?: ContentPathUncheckedUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUncheckedUpdateManyWithoutContentNestedInput
+    linkedCalendarEvents?: CalendarEventUncheckedUpdateManyWithoutLinkedContentNestedInput
     trashBinEntry?: TrashBinUncheckedUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUncheckedUpdateManyWithoutContentNestedInput
   }
@@ -43637,6 +51345,7 @@ export namespace Prisma {
     children?: ContentNodeCreateNestedManyWithoutParentInput
     contentPath?: ContentPathCreateNestedOneWithoutContentInput
     contentTags?: ContentTagCreateNestedManyWithoutContentInput
+    linkedCalendarEvents?: CalendarEventCreateNestedManyWithoutLinkedContentInput
     trashBinEntry?: TrashBinCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantCreateNestedManyWithoutContentInput
   }
@@ -43675,6 +51384,7 @@ export namespace Prisma {
     children?: ContentNodeUncheckedCreateNestedManyWithoutParentInput
     contentPath?: ContentPathUncheckedCreateNestedOneWithoutContentInput
     contentTags?: ContentTagUncheckedCreateNestedManyWithoutContentInput
+    linkedCalendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutLinkedContentInput
     trashBinEntry?: TrashBinUncheckedCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantUncheckedCreateNestedManyWithoutContentInput
   }
@@ -43729,6 +51439,7 @@ export namespace Prisma {
     children?: ContentNodeUpdateManyWithoutParentNestedInput
     contentPath?: ContentPathUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUpdateManyWithoutContentNestedInput
+    linkedCalendarEvents?: CalendarEventUpdateManyWithoutLinkedContentNestedInput
     trashBinEntry?: TrashBinUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUpdateManyWithoutContentNestedInput
   }
@@ -43767,6 +51478,7 @@ export namespace Prisma {
     children?: ContentNodeUncheckedUpdateManyWithoutParentNestedInput
     contentPath?: ContentPathUncheckedUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUncheckedUpdateManyWithoutContentNestedInput
+    linkedCalendarEvents?: CalendarEventUncheckedUpdateManyWithoutLinkedContentNestedInput
     trashBinEntry?: TrashBinUncheckedUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUncheckedUpdateManyWithoutContentNestedInput
   }
@@ -43805,6 +51517,7 @@ export namespace Prisma {
     children?: ContentNodeCreateNestedManyWithoutParentInput
     contentPath?: ContentPathCreateNestedOneWithoutContentInput
     contentTags?: ContentTagCreateNestedManyWithoutContentInput
+    linkedCalendarEvents?: CalendarEventCreateNestedManyWithoutLinkedContentInput
     trashBinEntry?: TrashBinCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantCreateNestedManyWithoutContentInput
   }
@@ -43843,6 +51556,7 @@ export namespace Prisma {
     children?: ContentNodeUncheckedCreateNestedManyWithoutParentInput
     contentPath?: ContentPathUncheckedCreateNestedOneWithoutContentInput
     contentTags?: ContentTagUncheckedCreateNestedManyWithoutContentInput
+    linkedCalendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutLinkedContentInput
     trashBinEntry?: TrashBinUncheckedCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantUncheckedCreateNestedManyWithoutContentInput
   }
@@ -43897,6 +51611,7 @@ export namespace Prisma {
     children?: ContentNodeUpdateManyWithoutParentNestedInput
     contentPath?: ContentPathUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUpdateManyWithoutContentNestedInput
+    linkedCalendarEvents?: CalendarEventUpdateManyWithoutLinkedContentNestedInput
     trashBinEntry?: TrashBinUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUpdateManyWithoutContentNestedInput
   }
@@ -43935,6 +51650,7 @@ export namespace Prisma {
     children?: ContentNodeUncheckedUpdateManyWithoutParentNestedInput
     contentPath?: ContentPathUncheckedUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUncheckedUpdateManyWithoutContentNestedInput
+    linkedCalendarEvents?: CalendarEventUncheckedUpdateManyWithoutLinkedContentNestedInput
     trashBinEntry?: TrashBinUncheckedUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUncheckedUpdateManyWithoutContentNestedInput
   }
@@ -43954,6 +51670,9 @@ export namespace Prisma {
     auditTargets?: AuditLogCreateNestedManyWithoutTargetUserInput
     adminActions?: AuditLogCreateNestedManyWithoutUserInput
     categories?: CategoryCreateNestedManyWithoutOwnerInput
+    calendarConnections?: CalendarConnectionCreateNestedManyWithoutUserInput
+    calendarEvents?: CalendarEventCreateNestedManyWithoutUserInput
+    calendarSources?: CalendarSourceCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeCreateNestedManyWithoutOwnerInput
     sessions?: SessionCreateNestedManyWithoutUserInput
     storageConfigs?: StorageProviderConfigCreateNestedManyWithoutUserInput
@@ -43977,6 +51696,9 @@ export namespace Prisma {
     auditTargets?: AuditLogUncheckedCreateNestedManyWithoutTargetUserInput
     adminActions?: AuditLogUncheckedCreateNestedManyWithoutUserInput
     categories?: CategoryUncheckedCreateNestedManyWithoutOwnerInput
+    calendarConnections?: CalendarConnectionUncheckedCreateNestedManyWithoutUserInput
+    calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutUserInput
+    calendarSources?: CalendarSourceUncheckedCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeUncheckedCreateNestedManyWithoutOwnerInput
     sessions?: SessionUncheckedCreateNestedManyWithoutUserInput
     storageConfigs?: StorageProviderConfigUncheckedCreateNestedManyWithoutUserInput
@@ -44024,6 +51746,7 @@ export namespace Prisma {
     children?: ContentNodeCreateNestedManyWithoutParentInput
     contentPath?: ContentPathCreateNestedOneWithoutContentInput
     contentTags?: ContentTagCreateNestedManyWithoutContentInput
+    linkedCalendarEvents?: CalendarEventCreateNestedManyWithoutLinkedContentInput
     trashBinEntry?: TrashBinCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantCreateNestedManyWithoutContentInput
   }
@@ -44062,6 +51785,7 @@ export namespace Prisma {
     children?: ContentNodeUncheckedCreateNestedManyWithoutParentInput
     contentPath?: ContentPathUncheckedCreateNestedOneWithoutContentInput
     contentTags?: ContentTagUncheckedCreateNestedManyWithoutContentInput
+    linkedCalendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutLinkedContentInput
     trashBinEntry?: TrashBinUncheckedCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantUncheckedCreateNestedManyWithoutContentInput
   }
@@ -44097,6 +51821,9 @@ export namespace Prisma {
     auditTargets?: AuditLogUpdateManyWithoutTargetUserNestedInput
     adminActions?: AuditLogUpdateManyWithoutUserNestedInput
     categories?: CategoryUpdateManyWithoutOwnerNestedInput
+    calendarConnections?: CalendarConnectionUpdateManyWithoutUserNestedInput
+    calendarEvents?: CalendarEventUpdateManyWithoutUserNestedInput
+    calendarSources?: CalendarSourceUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUpdateManyWithoutUserNestedInput
     storageConfigs?: StorageProviderConfigUpdateManyWithoutUserNestedInput
@@ -44120,6 +51847,9 @@ export namespace Prisma {
     auditTargets?: AuditLogUncheckedUpdateManyWithoutTargetUserNestedInput
     adminActions?: AuditLogUncheckedUpdateManyWithoutUserNestedInput
     categories?: CategoryUncheckedUpdateManyWithoutOwnerNestedInput
+    calendarConnections?: CalendarConnectionUncheckedUpdateManyWithoutUserNestedInput
+    calendarEvents?: CalendarEventUncheckedUpdateManyWithoutUserNestedInput
+    calendarSources?: CalendarSourceUncheckedUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUncheckedUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUncheckedUpdateManyWithoutUserNestedInput
     storageConfigs?: StorageProviderConfigUncheckedUpdateManyWithoutUserNestedInput
@@ -44173,6 +51903,7 @@ export namespace Prisma {
     children?: ContentNodeUpdateManyWithoutParentNestedInput
     contentPath?: ContentPathUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUpdateManyWithoutContentNestedInput
+    linkedCalendarEvents?: CalendarEventUpdateManyWithoutLinkedContentNestedInput
     trashBinEntry?: TrashBinUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUpdateManyWithoutContentNestedInput
   }
@@ -44211,6 +51942,7 @@ export namespace Prisma {
     children?: ContentNodeUncheckedUpdateManyWithoutParentNestedInput
     contentPath?: ContentPathUncheckedUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUncheckedUpdateManyWithoutContentNestedInput
+    linkedCalendarEvents?: CalendarEventUncheckedUpdateManyWithoutLinkedContentNestedInput
     trashBinEntry?: TrashBinUncheckedUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUncheckedUpdateManyWithoutContentNestedInput
   }
@@ -44249,6 +51981,7 @@ export namespace Prisma {
     parent?: ContentNodeCreateNestedOneWithoutChildrenInput
     children?: ContentNodeCreateNestedManyWithoutParentInput
     contentTags?: ContentTagCreateNestedManyWithoutContentInput
+    linkedCalendarEvents?: CalendarEventCreateNestedManyWithoutLinkedContentInput
     trashBinEntry?: TrashBinCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantCreateNestedManyWithoutContentInput
   }
@@ -44287,6 +52020,7 @@ export namespace Prisma {
     targetLinks?: ContentLinkUncheckedCreateNestedManyWithoutTargetInput
     children?: ContentNodeUncheckedCreateNestedManyWithoutParentInput
     contentTags?: ContentTagUncheckedCreateNestedManyWithoutContentInput
+    linkedCalendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutLinkedContentInput
     trashBinEntry?: TrashBinUncheckedCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantUncheckedCreateNestedManyWithoutContentInput
   }
@@ -44341,6 +52075,7 @@ export namespace Prisma {
     parent?: ContentNodeUpdateOneWithoutChildrenNestedInput
     children?: ContentNodeUpdateManyWithoutParentNestedInput
     contentTags?: ContentTagUpdateManyWithoutContentNestedInput
+    linkedCalendarEvents?: CalendarEventUpdateManyWithoutLinkedContentNestedInput
     trashBinEntry?: TrashBinUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUpdateManyWithoutContentNestedInput
   }
@@ -44379,6 +52114,7 @@ export namespace Prisma {
     targetLinks?: ContentLinkUncheckedUpdateManyWithoutTargetNestedInput
     children?: ContentNodeUncheckedUpdateManyWithoutParentNestedInput
     contentTags?: ContentTagUncheckedUpdateManyWithoutContentNestedInput
+    linkedCalendarEvents?: CalendarEventUncheckedUpdateManyWithoutLinkedContentNestedInput
     trashBinEntry?: TrashBinUncheckedUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUncheckedUpdateManyWithoutContentNestedInput
   }
@@ -44417,6 +52153,7 @@ export namespace Prisma {
     children?: ContentNodeCreateNestedManyWithoutParentInput
     contentPath?: ContentPathCreateNestedOneWithoutContentInput
     contentTags?: ContentTagCreateNestedManyWithoutContentInput
+    linkedCalendarEvents?: CalendarEventCreateNestedManyWithoutLinkedContentInput
     trashBinEntry?: TrashBinCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantCreateNestedManyWithoutContentInput
   }
@@ -44455,6 +52192,7 @@ export namespace Prisma {
     children?: ContentNodeUncheckedCreateNestedManyWithoutParentInput
     contentPath?: ContentPathUncheckedCreateNestedOneWithoutContentInput
     contentTags?: ContentTagUncheckedCreateNestedManyWithoutContentInput
+    linkedCalendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutLinkedContentInput
     trashBinEntry?: TrashBinUncheckedCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantUncheckedCreateNestedManyWithoutContentInput
   }
@@ -44498,6 +52236,7 @@ export namespace Prisma {
     children?: ContentNodeCreateNestedManyWithoutParentInput
     contentPath?: ContentPathCreateNestedOneWithoutContentInput
     contentTags?: ContentTagCreateNestedManyWithoutContentInput
+    linkedCalendarEvents?: CalendarEventCreateNestedManyWithoutLinkedContentInput
     trashBinEntry?: TrashBinCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantCreateNestedManyWithoutContentInput
   }
@@ -44536,6 +52275,7 @@ export namespace Prisma {
     children?: ContentNodeUncheckedCreateNestedManyWithoutParentInput
     contentPath?: ContentPathUncheckedCreateNestedOneWithoutContentInput
     contentTags?: ContentTagUncheckedCreateNestedManyWithoutContentInput
+    linkedCalendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutLinkedContentInput
     trashBinEntry?: TrashBinUncheckedCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantUncheckedCreateNestedManyWithoutContentInput
   }
@@ -44590,6 +52330,7 @@ export namespace Prisma {
     children?: ContentNodeUpdateManyWithoutParentNestedInput
     contentPath?: ContentPathUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUpdateManyWithoutContentNestedInput
+    linkedCalendarEvents?: CalendarEventUpdateManyWithoutLinkedContentNestedInput
     trashBinEntry?: TrashBinUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUpdateManyWithoutContentNestedInput
   }
@@ -44628,6 +52369,7 @@ export namespace Prisma {
     children?: ContentNodeUncheckedUpdateManyWithoutParentNestedInput
     contentPath?: ContentPathUncheckedUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUncheckedUpdateManyWithoutContentNestedInput
+    linkedCalendarEvents?: CalendarEventUncheckedUpdateManyWithoutLinkedContentNestedInput
     trashBinEntry?: TrashBinUncheckedUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUncheckedUpdateManyWithoutContentNestedInput
   }
@@ -44677,6 +52419,7 @@ export namespace Prisma {
     children?: ContentNodeUpdateManyWithoutParentNestedInput
     contentPath?: ContentPathUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUpdateManyWithoutContentNestedInput
+    linkedCalendarEvents?: CalendarEventUpdateManyWithoutLinkedContentNestedInput
     trashBinEntry?: TrashBinUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUpdateManyWithoutContentNestedInput
   }
@@ -44715,6 +52458,7 @@ export namespace Prisma {
     children?: ContentNodeUncheckedUpdateManyWithoutParentNestedInput
     contentPath?: ContentPathUncheckedUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUncheckedUpdateManyWithoutContentNestedInput
+    linkedCalendarEvents?: CalendarEventUncheckedUpdateManyWithoutLinkedContentNestedInput
     trashBinEntry?: TrashBinUncheckedUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUncheckedUpdateManyWithoutContentNestedInput
   }
@@ -44753,6 +52497,7 @@ export namespace Prisma {
     parent?: ContentNodeCreateNestedOneWithoutChildrenInput
     children?: ContentNodeCreateNestedManyWithoutParentInput
     contentPath?: ContentPathCreateNestedOneWithoutContentInput
+    linkedCalendarEvents?: CalendarEventCreateNestedManyWithoutLinkedContentInput
     trashBinEntry?: TrashBinCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantCreateNestedManyWithoutContentInput
   }
@@ -44791,6 +52536,7 @@ export namespace Prisma {
     targetLinks?: ContentLinkUncheckedCreateNestedManyWithoutTargetInput
     children?: ContentNodeUncheckedCreateNestedManyWithoutParentInput
     contentPath?: ContentPathUncheckedCreateNestedOneWithoutContentInput
+    linkedCalendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutLinkedContentInput
     trashBinEntry?: TrashBinUncheckedCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantUncheckedCreateNestedManyWithoutContentInput
   }
@@ -44868,6 +52614,7 @@ export namespace Prisma {
     parent?: ContentNodeUpdateOneWithoutChildrenNestedInput
     children?: ContentNodeUpdateManyWithoutParentNestedInput
     contentPath?: ContentPathUpdateOneWithoutContentNestedInput
+    linkedCalendarEvents?: CalendarEventUpdateManyWithoutLinkedContentNestedInput
     trashBinEntry?: TrashBinUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUpdateManyWithoutContentNestedInput
   }
@@ -44906,6 +52653,7 @@ export namespace Prisma {
     targetLinks?: ContentLinkUncheckedUpdateManyWithoutTargetNestedInput
     children?: ContentNodeUncheckedUpdateManyWithoutParentNestedInput
     contentPath?: ContentPathUncheckedUpdateOneWithoutContentNestedInput
+    linkedCalendarEvents?: CalendarEventUncheckedUpdateManyWithoutLinkedContentNestedInput
     trashBinEntry?: TrashBinUncheckedUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUncheckedUpdateManyWithoutContentNestedInput
   }
@@ -44974,6 +52722,7 @@ export namespace Prisma {
     children?: ContentNodeCreateNestedManyWithoutParentInput
     contentPath?: ContentPathCreateNestedOneWithoutContentInput
     contentTags?: ContentTagCreateNestedManyWithoutContentInput
+    linkedCalendarEvents?: CalendarEventCreateNestedManyWithoutLinkedContentInput
     viewGrants?: ViewGrantCreateNestedManyWithoutContentInput
   }
 
@@ -45012,6 +52761,7 @@ export namespace Prisma {
     children?: ContentNodeUncheckedCreateNestedManyWithoutParentInput
     contentPath?: ContentPathUncheckedCreateNestedOneWithoutContentInput
     contentTags?: ContentTagUncheckedCreateNestedManyWithoutContentInput
+    linkedCalendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutLinkedContentInput
     viewGrants?: ViewGrantUncheckedCreateNestedManyWithoutContentInput
   }
 
@@ -45035,6 +52785,9 @@ export namespace Prisma {
     auditTargets?: AuditLogCreateNestedManyWithoutTargetUserInput
     adminActions?: AuditLogCreateNestedManyWithoutUserInput
     categories?: CategoryCreateNestedManyWithoutOwnerInput
+    calendarConnections?: CalendarConnectionCreateNestedManyWithoutUserInput
+    calendarEvents?: CalendarEventCreateNestedManyWithoutUserInput
+    calendarSources?: CalendarSourceCreateNestedManyWithoutUserInput
     contentHistory?: ContentHistoryCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeCreateNestedManyWithoutOwnerInput
     sessions?: SessionCreateNestedManyWithoutUserInput
@@ -45058,6 +52811,9 @@ export namespace Prisma {
     auditTargets?: AuditLogUncheckedCreateNestedManyWithoutTargetUserInput
     adminActions?: AuditLogUncheckedCreateNestedManyWithoutUserInput
     categories?: CategoryUncheckedCreateNestedManyWithoutOwnerInput
+    calendarConnections?: CalendarConnectionUncheckedCreateNestedManyWithoutUserInput
+    calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutUserInput
+    calendarSources?: CalendarSourceUncheckedCreateNestedManyWithoutUserInput
     contentHistory?: ContentHistoryUncheckedCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeUncheckedCreateNestedManyWithoutOwnerInput
     sessions?: SessionUncheckedCreateNestedManyWithoutUserInput
@@ -45117,6 +52873,7 @@ export namespace Prisma {
     children?: ContentNodeUpdateManyWithoutParentNestedInput
     contentPath?: ContentPathUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUpdateManyWithoutContentNestedInput
+    linkedCalendarEvents?: CalendarEventUpdateManyWithoutLinkedContentNestedInput
     viewGrants?: ViewGrantUpdateManyWithoutContentNestedInput
   }
 
@@ -45155,6 +52912,7 @@ export namespace Prisma {
     children?: ContentNodeUncheckedUpdateManyWithoutParentNestedInput
     contentPath?: ContentPathUncheckedUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUncheckedUpdateManyWithoutContentNestedInput
+    linkedCalendarEvents?: CalendarEventUncheckedUpdateManyWithoutLinkedContentNestedInput
     viewGrants?: ViewGrantUncheckedUpdateManyWithoutContentNestedInput
   }
 
@@ -45184,6 +52942,9 @@ export namespace Prisma {
     auditTargets?: AuditLogUpdateManyWithoutTargetUserNestedInput
     adminActions?: AuditLogUpdateManyWithoutUserNestedInput
     categories?: CategoryUpdateManyWithoutOwnerNestedInput
+    calendarConnections?: CalendarConnectionUpdateManyWithoutUserNestedInput
+    calendarEvents?: CalendarEventUpdateManyWithoutUserNestedInput
+    calendarSources?: CalendarSourceUpdateManyWithoutUserNestedInput
     contentHistory?: ContentHistoryUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUpdateManyWithoutUserNestedInput
@@ -45207,6 +52968,9 @@ export namespace Prisma {
     auditTargets?: AuditLogUncheckedUpdateManyWithoutTargetUserNestedInput
     adminActions?: AuditLogUncheckedUpdateManyWithoutUserNestedInput
     categories?: CategoryUncheckedUpdateManyWithoutOwnerNestedInput
+    calendarConnections?: CalendarConnectionUncheckedUpdateManyWithoutUserNestedInput
+    calendarEvents?: CalendarEventUncheckedUpdateManyWithoutUserNestedInput
+    calendarSources?: CalendarSourceUncheckedUpdateManyWithoutUserNestedInput
     contentHistory?: ContentHistoryUncheckedUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUncheckedUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUncheckedUpdateManyWithoutUserNestedInput
@@ -45230,6 +52994,9 @@ export namespace Prisma {
     auditTargets?: AuditLogCreateNestedManyWithoutTargetUserInput
     adminActions?: AuditLogCreateNestedManyWithoutUserInput
     categories?: CategoryCreateNestedManyWithoutOwnerInput
+    calendarConnections?: CalendarConnectionCreateNestedManyWithoutUserInput
+    calendarEvents?: CalendarEventCreateNestedManyWithoutUserInput
+    calendarSources?: CalendarSourceCreateNestedManyWithoutUserInput
     contentHistory?: ContentHistoryCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeCreateNestedManyWithoutOwnerInput
     sessions?: SessionCreateNestedManyWithoutUserInput
@@ -45253,6 +53020,9 @@ export namespace Prisma {
     auditTargets?: AuditLogUncheckedCreateNestedManyWithoutTargetUserInput
     adminActions?: AuditLogUncheckedCreateNestedManyWithoutUserInput
     categories?: CategoryUncheckedCreateNestedManyWithoutOwnerInput
+    calendarConnections?: CalendarConnectionUncheckedCreateNestedManyWithoutUserInput
+    calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutUserInput
+    calendarSources?: CalendarSourceUncheckedCreateNestedManyWithoutUserInput
     contentHistory?: ContentHistoryUncheckedCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeUncheckedCreateNestedManyWithoutOwnerInput
     sessions?: SessionUncheckedCreateNestedManyWithoutUserInput
@@ -45292,6 +53062,9 @@ export namespace Prisma {
     auditTargets?: AuditLogUpdateManyWithoutTargetUserNestedInput
     adminActions?: AuditLogUpdateManyWithoutUserNestedInput
     categories?: CategoryUpdateManyWithoutOwnerNestedInput
+    calendarConnections?: CalendarConnectionUpdateManyWithoutUserNestedInput
+    calendarEvents?: CalendarEventUpdateManyWithoutUserNestedInput
+    calendarSources?: CalendarSourceUpdateManyWithoutUserNestedInput
     contentHistory?: ContentHistoryUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUpdateManyWithoutUserNestedInput
@@ -45315,6 +53088,9 @@ export namespace Prisma {
     auditTargets?: AuditLogUncheckedUpdateManyWithoutTargetUserNestedInput
     adminActions?: AuditLogUncheckedUpdateManyWithoutUserNestedInput
     categories?: CategoryUncheckedUpdateManyWithoutOwnerNestedInput
+    calendarConnections?: CalendarConnectionUncheckedUpdateManyWithoutUserNestedInput
+    calendarEvents?: CalendarEventUncheckedUpdateManyWithoutUserNestedInput
+    calendarSources?: CalendarSourceUncheckedUpdateManyWithoutUserNestedInput
     contentHistory?: ContentHistoryUncheckedUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUncheckedUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUncheckedUpdateManyWithoutUserNestedInput
@@ -45337,6 +53113,9 @@ export namespace Prisma {
     auditTargets?: AuditLogCreateNestedManyWithoutTargetUserInput
     adminActions?: AuditLogCreateNestedManyWithoutUserInput
     categories?: CategoryCreateNestedManyWithoutOwnerInput
+    calendarConnections?: CalendarConnectionCreateNestedManyWithoutUserInput
+    calendarEvents?: CalendarEventCreateNestedManyWithoutUserInput
+    calendarSources?: CalendarSourceCreateNestedManyWithoutUserInput
     contentHistory?: ContentHistoryCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeCreateNestedManyWithoutOwnerInput
     sessions?: SessionCreateNestedManyWithoutUserInput
@@ -45360,6 +53139,9 @@ export namespace Prisma {
     auditTargets?: AuditLogUncheckedCreateNestedManyWithoutTargetUserInput
     adminActions?: AuditLogUncheckedCreateNestedManyWithoutUserInput
     categories?: CategoryUncheckedCreateNestedManyWithoutOwnerInput
+    calendarConnections?: CalendarConnectionUncheckedCreateNestedManyWithoutUserInput
+    calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutUserInput
+    calendarSources?: CalendarSourceUncheckedCreateNestedManyWithoutUserInput
     contentHistory?: ContentHistoryUncheckedCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeUncheckedCreateNestedManyWithoutOwnerInput
     sessions?: SessionUncheckedCreateNestedManyWithoutUserInput
@@ -45399,6 +53181,9 @@ export namespace Prisma {
     auditTargets?: AuditLogUpdateManyWithoutTargetUserNestedInput
     adminActions?: AuditLogUpdateManyWithoutUserNestedInput
     categories?: CategoryUpdateManyWithoutOwnerNestedInput
+    calendarConnections?: CalendarConnectionUpdateManyWithoutUserNestedInput
+    calendarEvents?: CalendarEventUpdateManyWithoutUserNestedInput
+    calendarSources?: CalendarSourceUpdateManyWithoutUserNestedInput
     contentHistory?: ContentHistoryUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUpdateManyWithoutUserNestedInput
@@ -45422,6 +53207,9 @@ export namespace Prisma {
     auditTargets?: AuditLogUncheckedUpdateManyWithoutTargetUserNestedInput
     adminActions?: AuditLogUncheckedUpdateManyWithoutUserNestedInput
     categories?: CategoryUncheckedUpdateManyWithoutOwnerNestedInput
+    calendarConnections?: CalendarConnectionUncheckedUpdateManyWithoutUserNestedInput
+    calendarEvents?: CalendarEventUncheckedUpdateManyWithoutUserNestedInput
+    calendarSources?: CalendarSourceUncheckedUpdateManyWithoutUserNestedInput
     contentHistory?: ContentHistoryUncheckedUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUncheckedUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUncheckedUpdateManyWithoutUserNestedInput
@@ -45438,6 +53226,7 @@ export namespace Prisma {
     refreshToken?: string | null
     accessToken?: string | null
     expiresAt?: Date | string | null
+    scope?: string | null
     createdAt?: Date | string
   }
 
@@ -45448,6 +53237,7 @@ export namespace Prisma {
     refreshToken?: string | null
     accessToken?: string | null
     expiresAt?: Date | string | null
+    scope?: string | null
     createdAt?: Date | string
   }
 
@@ -45591,6 +53381,152 @@ export namespace Prisma {
     skipDuplicates?: boolean
   }
 
+  export type CalendarConnectionCreateWithoutUserInput = {
+    id?: string
+    provider: $Enums.CalendarProvider
+    displayName: string
+    status?: $Enums.CalendarConnectionStatus
+    syncStatus?: $Enums.CalendarSyncStatus
+    providerConfig?: JsonNullValueInput | InputJsonValue
+    syncCursor?: string | null
+    lastSyncedAt?: Date | string | null
+    lastSyncError?: string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    sources?: CalendarSourceCreateNestedManyWithoutConnectionInput
+  }
+
+  export type CalendarConnectionUncheckedCreateWithoutUserInput = {
+    id?: string
+    provider: $Enums.CalendarProvider
+    displayName: string
+    status?: $Enums.CalendarConnectionStatus
+    syncStatus?: $Enums.CalendarSyncStatus
+    providerConfig?: JsonNullValueInput | InputJsonValue
+    syncCursor?: string | null
+    lastSyncedAt?: Date | string | null
+    lastSyncError?: string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    sources?: CalendarSourceUncheckedCreateNestedManyWithoutConnectionInput
+  }
+
+  export type CalendarConnectionCreateOrConnectWithoutUserInput = {
+    where: CalendarConnectionWhereUniqueInput
+    create: XOR<CalendarConnectionCreateWithoutUserInput, CalendarConnectionUncheckedCreateWithoutUserInput>
+  }
+
+  export type CalendarConnectionCreateManyUserInputEnvelope = {
+    data: CalendarConnectionCreateManyUserInput | CalendarConnectionCreateManyUserInput[]
+    skipDuplicates?: boolean
+  }
+
+  export type CalendarEventCreateWithoutUserInput = {
+    id?: string
+    externalEventId?: string | null
+    title: string
+    description?: string | null
+    location?: string | null
+    startAt: Date | string
+    endAt: Date | string
+    allDay?: boolean
+    timezone?: string | null
+    recurrenceRule?: string | null
+    recurrenceExDates?: JsonNullValueInput | InputJsonValue
+    recurrenceOverrides?: JsonNullValueInput | InputJsonValue
+    status?: $Enums.CalendarEventStatus
+    meetingUrl?: string | null
+    providerMetadata?: JsonNullValueInput | InputJsonValue
+    lastSyncedAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    attendees?: CalendarEventAttendeeCreateNestedManyWithoutEventInput
+    linkedContent?: ContentNodeCreateNestedOneWithoutLinkedCalendarEventsInput
+    source: CalendarSourceCreateNestedOneWithoutEventsInput
+  }
+
+  export type CalendarEventUncheckedCreateWithoutUserInput = {
+    id?: string
+    sourceId: string
+    externalEventId?: string | null
+    title: string
+    description?: string | null
+    location?: string | null
+    startAt: Date | string
+    endAt: Date | string
+    allDay?: boolean
+    timezone?: string | null
+    recurrenceRule?: string | null
+    recurrenceExDates?: JsonNullValueInput | InputJsonValue
+    recurrenceOverrides?: JsonNullValueInput | InputJsonValue
+    status?: $Enums.CalendarEventStatus
+    meetingUrl?: string | null
+    linkedContentId?: string | null
+    providerMetadata?: JsonNullValueInput | InputJsonValue
+    lastSyncedAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    attendees?: CalendarEventAttendeeUncheckedCreateNestedManyWithoutEventInput
+  }
+
+  export type CalendarEventCreateOrConnectWithoutUserInput = {
+    where: CalendarEventWhereUniqueInput
+    create: XOR<CalendarEventCreateWithoutUserInput, CalendarEventUncheckedCreateWithoutUserInput>
+  }
+
+  export type CalendarEventCreateManyUserInputEnvelope = {
+    data: CalendarEventCreateManyUserInput | CalendarEventCreateManyUserInput[]
+    skipDuplicates?: boolean
+  }
+
+  export type CalendarSourceCreateWithoutUserInput = {
+    id?: string
+    title: string
+    color?: string
+    timezone?: string | null
+    visible?: boolean
+    isReadOnly?: boolean
+    isPrimary?: boolean
+    syncMode?: $Enums.CalendarSourceSyncMode
+    externalCalendarId?: string | null
+    metadata?: JsonNullValueInput | InputJsonValue
+    lastSyncedAt?: Date | string | null
+    lastSyncError?: string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    connection?: CalendarConnectionCreateNestedOneWithoutSourcesInput
+    events?: CalendarEventCreateNestedManyWithoutSourceInput
+  }
+
+  export type CalendarSourceUncheckedCreateWithoutUserInput = {
+    id?: string
+    connectionId?: string | null
+    title: string
+    color?: string
+    timezone?: string | null
+    visible?: boolean
+    isReadOnly?: boolean
+    isPrimary?: boolean
+    syncMode?: $Enums.CalendarSourceSyncMode
+    externalCalendarId?: string | null
+    metadata?: JsonNullValueInput | InputJsonValue
+    lastSyncedAt?: Date | string | null
+    lastSyncError?: string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    events?: CalendarEventUncheckedCreateNestedManyWithoutSourceInput
+  }
+
+  export type CalendarSourceCreateOrConnectWithoutUserInput = {
+    where: CalendarSourceWhereUniqueInput
+    create: XOR<CalendarSourceCreateWithoutUserInput, CalendarSourceUncheckedCreateWithoutUserInput>
+  }
+
+  export type CalendarSourceCreateManyUserInputEnvelope = {
+    data: CalendarSourceCreateManyUserInput | CalendarSourceCreateManyUserInput[]
+    skipDuplicates?: boolean
+  }
+
   export type ContentHistoryCreateWithoutUserInput = {
     id?: string
     version: number
@@ -45651,6 +53587,7 @@ export namespace Prisma {
     children?: ContentNodeCreateNestedManyWithoutParentInput
     contentPath?: ContentPathCreateNestedOneWithoutContentInput
     contentTags?: ContentTagCreateNestedManyWithoutContentInput
+    linkedCalendarEvents?: CalendarEventCreateNestedManyWithoutLinkedContentInput
     trashBinEntry?: TrashBinCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantCreateNestedManyWithoutContentInput
   }
@@ -45689,6 +53626,7 @@ export namespace Prisma {
     children?: ContentNodeUncheckedCreateNestedManyWithoutParentInput
     contentPath?: ContentPathUncheckedCreateNestedOneWithoutContentInput
     contentTags?: ContentTagUncheckedCreateNestedManyWithoutContentInput
+    linkedCalendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutLinkedContentInput
     trashBinEntry?: TrashBinUncheckedCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantUncheckedCreateNestedManyWithoutContentInput
   }
@@ -45870,6 +53808,7 @@ export namespace Prisma {
     refreshToken?: StringNullableFilter<"Account"> | string | null
     accessToken?: StringNullableFilter<"Account"> | string | null
     expiresAt?: DateTimeNullableFilter<"Account"> | Date | string | null
+    scope?: StringNullableFilter<"Account"> | string | null
     createdAt?: DateTimeFilter<"Account"> | Date | string
   }
 
@@ -45965,6 +53904,94 @@ export namespace Prisma {
     isPublished?: BoolFilter<"Category"> | boolean
     createdAt?: DateTimeFilter<"Category"> | Date | string
     updatedAt?: DateTimeFilter<"Category"> | Date | string
+  }
+
+  export type CalendarConnectionUpsertWithWhereUniqueWithoutUserInput = {
+    where: CalendarConnectionWhereUniqueInput
+    update: XOR<CalendarConnectionUpdateWithoutUserInput, CalendarConnectionUncheckedUpdateWithoutUserInput>
+    create: XOR<CalendarConnectionCreateWithoutUserInput, CalendarConnectionUncheckedCreateWithoutUserInput>
+  }
+
+  export type CalendarConnectionUpdateWithWhereUniqueWithoutUserInput = {
+    where: CalendarConnectionWhereUniqueInput
+    data: XOR<CalendarConnectionUpdateWithoutUserInput, CalendarConnectionUncheckedUpdateWithoutUserInput>
+  }
+
+  export type CalendarConnectionUpdateManyWithWhereWithoutUserInput = {
+    where: CalendarConnectionScalarWhereInput
+    data: XOR<CalendarConnectionUpdateManyMutationInput, CalendarConnectionUncheckedUpdateManyWithoutUserInput>
+  }
+
+  export type CalendarConnectionScalarWhereInput = {
+    AND?: CalendarConnectionScalarWhereInput | CalendarConnectionScalarWhereInput[]
+    OR?: CalendarConnectionScalarWhereInput[]
+    NOT?: CalendarConnectionScalarWhereInput | CalendarConnectionScalarWhereInput[]
+    id?: UuidFilter<"CalendarConnection"> | string
+    userId?: UuidFilter<"CalendarConnection"> | string
+    provider?: EnumCalendarProviderFilter<"CalendarConnection"> | $Enums.CalendarProvider
+    displayName?: StringFilter<"CalendarConnection"> | string
+    status?: EnumCalendarConnectionStatusFilter<"CalendarConnection"> | $Enums.CalendarConnectionStatus
+    syncStatus?: EnumCalendarSyncStatusFilter<"CalendarConnection"> | $Enums.CalendarSyncStatus
+    providerConfig?: JsonFilter<"CalendarConnection">
+    syncCursor?: StringNullableFilter<"CalendarConnection"> | string | null
+    lastSyncedAt?: DateTimeNullableFilter<"CalendarConnection"> | Date | string | null
+    lastSyncError?: StringNullableFilter<"CalendarConnection"> | string | null
+    createdAt?: DateTimeFilter<"CalendarConnection"> | Date | string
+    updatedAt?: DateTimeFilter<"CalendarConnection"> | Date | string
+  }
+
+  export type CalendarEventUpsertWithWhereUniqueWithoutUserInput = {
+    where: CalendarEventWhereUniqueInput
+    update: XOR<CalendarEventUpdateWithoutUserInput, CalendarEventUncheckedUpdateWithoutUserInput>
+    create: XOR<CalendarEventCreateWithoutUserInput, CalendarEventUncheckedCreateWithoutUserInput>
+  }
+
+  export type CalendarEventUpdateWithWhereUniqueWithoutUserInput = {
+    where: CalendarEventWhereUniqueInput
+    data: XOR<CalendarEventUpdateWithoutUserInput, CalendarEventUncheckedUpdateWithoutUserInput>
+  }
+
+  export type CalendarEventUpdateManyWithWhereWithoutUserInput = {
+    where: CalendarEventScalarWhereInput
+    data: XOR<CalendarEventUpdateManyMutationInput, CalendarEventUncheckedUpdateManyWithoutUserInput>
+  }
+
+  export type CalendarSourceUpsertWithWhereUniqueWithoutUserInput = {
+    where: CalendarSourceWhereUniqueInput
+    update: XOR<CalendarSourceUpdateWithoutUserInput, CalendarSourceUncheckedUpdateWithoutUserInput>
+    create: XOR<CalendarSourceCreateWithoutUserInput, CalendarSourceUncheckedCreateWithoutUserInput>
+  }
+
+  export type CalendarSourceUpdateWithWhereUniqueWithoutUserInput = {
+    where: CalendarSourceWhereUniqueInput
+    data: XOR<CalendarSourceUpdateWithoutUserInput, CalendarSourceUncheckedUpdateWithoutUserInput>
+  }
+
+  export type CalendarSourceUpdateManyWithWhereWithoutUserInput = {
+    where: CalendarSourceScalarWhereInput
+    data: XOR<CalendarSourceUpdateManyMutationInput, CalendarSourceUncheckedUpdateManyWithoutUserInput>
+  }
+
+  export type CalendarSourceScalarWhereInput = {
+    AND?: CalendarSourceScalarWhereInput | CalendarSourceScalarWhereInput[]
+    OR?: CalendarSourceScalarWhereInput[]
+    NOT?: CalendarSourceScalarWhereInput | CalendarSourceScalarWhereInput[]
+    id?: UuidFilter<"CalendarSource"> | string
+    userId?: UuidFilter<"CalendarSource"> | string
+    connectionId?: UuidNullableFilter<"CalendarSource"> | string | null
+    title?: StringFilter<"CalendarSource"> | string
+    color?: StringFilter<"CalendarSource"> | string
+    timezone?: StringNullableFilter<"CalendarSource"> | string | null
+    visible?: BoolFilter<"CalendarSource"> | boolean
+    isReadOnly?: BoolFilter<"CalendarSource"> | boolean
+    isPrimary?: BoolFilter<"CalendarSource"> | boolean
+    syncMode?: EnumCalendarSourceSyncModeFilter<"CalendarSource"> | $Enums.CalendarSourceSyncMode
+    externalCalendarId?: StringNullableFilter<"CalendarSource"> | string | null
+    metadata?: JsonFilter<"CalendarSource">
+    lastSyncedAt?: DateTimeNullableFilter<"CalendarSource"> | Date | string | null
+    lastSyncError?: StringNullableFilter<"CalendarSource"> | string | null
+    createdAt?: DateTimeFilter<"CalendarSource"> | Date | string
+    updatedAt?: DateTimeFilter<"CalendarSource"> | Date | string
   }
 
   export type ContentHistoryUpsertWithWhereUniqueWithoutUserInput = {
@@ -46145,6 +54172,9 @@ export namespace Prisma {
     aiProviderKeys?: AIProviderKeyCreateNestedManyWithoutUserInput
     auditTargets?: AuditLogCreateNestedManyWithoutTargetUserInput
     adminActions?: AuditLogCreateNestedManyWithoutUserInput
+    calendarConnections?: CalendarConnectionCreateNestedManyWithoutUserInput
+    calendarEvents?: CalendarEventCreateNestedManyWithoutUserInput
+    calendarSources?: CalendarSourceCreateNestedManyWithoutUserInput
     contentHistory?: ContentHistoryCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeCreateNestedManyWithoutOwnerInput
     sessions?: SessionCreateNestedManyWithoutUserInput
@@ -46168,6 +54198,9 @@ export namespace Prisma {
     aiProviderKeys?: AIProviderKeyUncheckedCreateNestedManyWithoutUserInput
     auditTargets?: AuditLogUncheckedCreateNestedManyWithoutTargetUserInput
     adminActions?: AuditLogUncheckedCreateNestedManyWithoutUserInput
+    calendarConnections?: CalendarConnectionUncheckedCreateNestedManyWithoutUserInput
+    calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutUserInput
+    calendarSources?: CalendarSourceUncheckedCreateNestedManyWithoutUserInput
     contentHistory?: ContentHistoryUncheckedCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeUncheckedCreateNestedManyWithoutOwnerInput
     sessions?: SessionUncheckedCreateNestedManyWithoutUserInput
@@ -46216,6 +54249,7 @@ export namespace Prisma {
     children?: ContentNodeCreateNestedManyWithoutParentInput
     contentPath?: ContentPathCreateNestedOneWithoutContentInput
     contentTags?: ContentTagCreateNestedManyWithoutContentInput
+    linkedCalendarEvents?: CalendarEventCreateNestedManyWithoutLinkedContentInput
     trashBinEntry?: TrashBinCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantCreateNestedManyWithoutContentInput
   }
@@ -46254,6 +54288,7 @@ export namespace Prisma {
     children?: ContentNodeUncheckedCreateNestedManyWithoutParentInput
     contentPath?: ContentPathUncheckedCreateNestedOneWithoutContentInput
     contentTags?: ContentTagUncheckedCreateNestedManyWithoutContentInput
+    linkedCalendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutLinkedContentInput
     trashBinEntry?: TrashBinUncheckedCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantUncheckedCreateNestedManyWithoutContentInput
   }
@@ -46293,6 +54328,9 @@ export namespace Prisma {
     aiProviderKeys?: AIProviderKeyUpdateManyWithoutUserNestedInput
     auditTargets?: AuditLogUpdateManyWithoutTargetUserNestedInput
     adminActions?: AuditLogUpdateManyWithoutUserNestedInput
+    calendarConnections?: CalendarConnectionUpdateManyWithoutUserNestedInput
+    calendarEvents?: CalendarEventUpdateManyWithoutUserNestedInput
+    calendarSources?: CalendarSourceUpdateManyWithoutUserNestedInput
     contentHistory?: ContentHistoryUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUpdateManyWithoutUserNestedInput
@@ -46316,6 +54354,9 @@ export namespace Prisma {
     aiProviderKeys?: AIProviderKeyUncheckedUpdateManyWithoutUserNestedInput
     auditTargets?: AuditLogUncheckedUpdateManyWithoutTargetUserNestedInput
     adminActions?: AuditLogUncheckedUpdateManyWithoutUserNestedInput
+    calendarConnections?: CalendarConnectionUncheckedUpdateManyWithoutUserNestedInput
+    calendarEvents?: CalendarEventUncheckedUpdateManyWithoutUserNestedInput
+    calendarSources?: CalendarSourceUncheckedUpdateManyWithoutUserNestedInput
     contentHistory?: ContentHistoryUncheckedUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUncheckedUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUncheckedUpdateManyWithoutUserNestedInput
@@ -46380,6 +54421,9 @@ export namespace Prisma {
     auditTargets?: AuditLogCreateNestedManyWithoutTargetUserInput
     adminActions?: AuditLogCreateNestedManyWithoutUserInput
     categories?: CategoryCreateNestedManyWithoutOwnerInput
+    calendarConnections?: CalendarConnectionCreateNestedManyWithoutUserInput
+    calendarEvents?: CalendarEventCreateNestedManyWithoutUserInput
+    calendarSources?: CalendarSourceCreateNestedManyWithoutUserInput
     contentHistory?: ContentHistoryCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeCreateNestedManyWithoutOwnerInput
     sessions?: SessionCreateNestedManyWithoutUserInput
@@ -46403,6 +54447,9 @@ export namespace Prisma {
     auditTargets?: AuditLogUncheckedCreateNestedManyWithoutTargetUserInput
     adminActions?: AuditLogUncheckedCreateNestedManyWithoutUserInput
     categories?: CategoryUncheckedCreateNestedManyWithoutOwnerInput
+    calendarConnections?: CalendarConnectionUncheckedCreateNestedManyWithoutUserInput
+    calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutUserInput
+    calendarSources?: CalendarSourceUncheckedCreateNestedManyWithoutUserInput
     contentHistory?: ContentHistoryUncheckedCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeUncheckedCreateNestedManyWithoutOwnerInput
     sessions?: SessionUncheckedCreateNestedManyWithoutUserInput
@@ -46458,6 +54505,9 @@ export namespace Prisma {
     auditTargets?: AuditLogUpdateManyWithoutTargetUserNestedInput
     adminActions?: AuditLogUpdateManyWithoutUserNestedInput
     categories?: CategoryUpdateManyWithoutOwnerNestedInput
+    calendarConnections?: CalendarConnectionUpdateManyWithoutUserNestedInput
+    calendarEvents?: CalendarEventUpdateManyWithoutUserNestedInput
+    calendarSources?: CalendarSourceUpdateManyWithoutUserNestedInput
     contentHistory?: ContentHistoryUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUpdateManyWithoutUserNestedInput
@@ -46481,6 +54531,9 @@ export namespace Prisma {
     auditTargets?: AuditLogUncheckedUpdateManyWithoutTargetUserNestedInput
     adminActions?: AuditLogUncheckedUpdateManyWithoutUserNestedInput
     categories?: CategoryUncheckedUpdateManyWithoutOwnerNestedInput
+    calendarConnections?: CalendarConnectionUncheckedUpdateManyWithoutUserNestedInput
+    calendarEvents?: CalendarEventUncheckedUpdateManyWithoutUserNestedInput
+    calendarSources?: CalendarSourceUncheckedUpdateManyWithoutUserNestedInput
     contentHistory?: ContentHistoryUncheckedUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUncheckedUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUncheckedUpdateManyWithoutUserNestedInput
@@ -46524,6 +54577,7 @@ export namespace Prisma {
     children?: ContentNodeCreateNestedManyWithoutParentInput
     contentPath?: ContentPathCreateNestedOneWithoutContentInput
     contentTags?: ContentTagCreateNestedManyWithoutContentInput
+    linkedCalendarEvents?: CalendarEventCreateNestedManyWithoutLinkedContentInput
     trashBinEntry?: TrashBinCreateNestedOneWithoutContentInput
   }
 
@@ -46562,6 +54616,7 @@ export namespace Prisma {
     children?: ContentNodeUncheckedCreateNestedManyWithoutParentInput
     contentPath?: ContentPathUncheckedCreateNestedOneWithoutContentInput
     contentTags?: ContentTagUncheckedCreateNestedManyWithoutContentInput
+    linkedCalendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutLinkedContentInput
     trashBinEntry?: TrashBinUncheckedCreateNestedOneWithoutContentInput
   }
 
@@ -46585,6 +54640,9 @@ export namespace Prisma {
     auditTargets?: AuditLogCreateNestedManyWithoutTargetUserInput
     adminActions?: AuditLogCreateNestedManyWithoutUserInput
     categories?: CategoryCreateNestedManyWithoutOwnerInput
+    calendarConnections?: CalendarConnectionCreateNestedManyWithoutUserInput
+    calendarEvents?: CalendarEventCreateNestedManyWithoutUserInput
+    calendarSources?: CalendarSourceCreateNestedManyWithoutUserInput
     contentHistory?: ContentHistoryCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeCreateNestedManyWithoutOwnerInput
     sessions?: SessionCreateNestedManyWithoutUserInput
@@ -46608,6 +54666,9 @@ export namespace Prisma {
     auditTargets?: AuditLogUncheckedCreateNestedManyWithoutTargetUserInput
     adminActions?: AuditLogUncheckedCreateNestedManyWithoutUserInput
     categories?: CategoryUncheckedCreateNestedManyWithoutOwnerInput
+    calendarConnections?: CalendarConnectionUncheckedCreateNestedManyWithoutUserInput
+    calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutUserInput
+    calendarSources?: CalendarSourceUncheckedCreateNestedManyWithoutUserInput
     contentHistory?: ContentHistoryUncheckedCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeUncheckedCreateNestedManyWithoutOwnerInput
     sessions?: SessionUncheckedCreateNestedManyWithoutUserInput
@@ -46667,6 +54728,7 @@ export namespace Prisma {
     children?: ContentNodeUpdateManyWithoutParentNestedInput
     contentPath?: ContentPathUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUpdateManyWithoutContentNestedInput
+    linkedCalendarEvents?: CalendarEventUpdateManyWithoutLinkedContentNestedInput
     trashBinEntry?: TrashBinUpdateOneWithoutContentNestedInput
   }
 
@@ -46705,6 +54767,7 @@ export namespace Prisma {
     children?: ContentNodeUncheckedUpdateManyWithoutParentNestedInput
     contentPath?: ContentPathUncheckedUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUncheckedUpdateManyWithoutContentNestedInput
+    linkedCalendarEvents?: CalendarEventUncheckedUpdateManyWithoutLinkedContentNestedInput
     trashBinEntry?: TrashBinUncheckedUpdateOneWithoutContentNestedInput
   }
 
@@ -46734,6 +54797,9 @@ export namespace Prisma {
     auditTargets?: AuditLogUpdateManyWithoutTargetUserNestedInput
     adminActions?: AuditLogUpdateManyWithoutUserNestedInput
     categories?: CategoryUpdateManyWithoutOwnerNestedInput
+    calendarConnections?: CalendarConnectionUpdateManyWithoutUserNestedInput
+    calendarEvents?: CalendarEventUpdateManyWithoutUserNestedInput
+    calendarSources?: CalendarSourceUpdateManyWithoutUserNestedInput
     contentHistory?: ContentHistoryUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUpdateManyWithoutUserNestedInput
@@ -46757,6 +54823,9 @@ export namespace Prisma {
     auditTargets?: AuditLogUncheckedUpdateManyWithoutTargetUserNestedInput
     adminActions?: AuditLogUncheckedUpdateManyWithoutUserNestedInput
     categories?: CategoryUncheckedUpdateManyWithoutOwnerNestedInput
+    calendarConnections?: CalendarConnectionUncheckedUpdateManyWithoutUserNestedInput
+    calendarEvents?: CalendarEventUncheckedUpdateManyWithoutUserNestedInput
+    calendarSources?: CalendarSourceUncheckedUpdateManyWithoutUserNestedInput
     contentHistory?: ContentHistoryUncheckedUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUncheckedUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUncheckedUpdateManyWithoutUserNestedInput
@@ -46780,6 +54849,9 @@ export namespace Prisma {
     auditTargets?: AuditLogCreateNestedManyWithoutTargetUserInput
     adminActions?: AuditLogCreateNestedManyWithoutUserInput
     categories?: CategoryCreateNestedManyWithoutOwnerInput
+    calendarConnections?: CalendarConnectionCreateNestedManyWithoutUserInput
+    calendarEvents?: CalendarEventCreateNestedManyWithoutUserInput
+    calendarSources?: CalendarSourceCreateNestedManyWithoutUserInput
     contentHistory?: ContentHistoryCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeCreateNestedManyWithoutOwnerInput
     storageConfigs?: StorageProviderConfigCreateNestedManyWithoutUserInput
@@ -46803,6 +54875,9 @@ export namespace Prisma {
     auditTargets?: AuditLogUncheckedCreateNestedManyWithoutTargetUserInput
     adminActions?: AuditLogUncheckedCreateNestedManyWithoutUserInput
     categories?: CategoryUncheckedCreateNestedManyWithoutOwnerInput
+    calendarConnections?: CalendarConnectionUncheckedCreateNestedManyWithoutUserInput
+    calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutUserInput
+    calendarSources?: CalendarSourceUncheckedCreateNestedManyWithoutUserInput
     contentHistory?: ContentHistoryUncheckedCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeUncheckedCreateNestedManyWithoutOwnerInput
     storageConfigs?: StorageProviderConfigUncheckedCreateNestedManyWithoutUserInput
@@ -46842,6 +54917,9 @@ export namespace Prisma {
     auditTargets?: AuditLogUpdateManyWithoutTargetUserNestedInput
     adminActions?: AuditLogUpdateManyWithoutUserNestedInput
     categories?: CategoryUpdateManyWithoutOwnerNestedInput
+    calendarConnections?: CalendarConnectionUpdateManyWithoutUserNestedInput
+    calendarEvents?: CalendarEventUpdateManyWithoutUserNestedInput
+    calendarSources?: CalendarSourceUpdateManyWithoutUserNestedInput
     contentHistory?: ContentHistoryUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUpdateManyWithoutOwnerNestedInput
     storageConfigs?: StorageProviderConfigUpdateManyWithoutUserNestedInput
@@ -46865,6 +54943,9 @@ export namespace Prisma {
     auditTargets?: AuditLogUncheckedUpdateManyWithoutTargetUserNestedInput
     adminActions?: AuditLogUncheckedUpdateManyWithoutUserNestedInput
     categories?: CategoryUncheckedUpdateManyWithoutOwnerNestedInput
+    calendarConnections?: CalendarConnectionUncheckedUpdateManyWithoutUserNestedInput
+    calendarEvents?: CalendarEventUncheckedUpdateManyWithoutUserNestedInput
+    calendarSources?: CalendarSourceUncheckedUpdateManyWithoutUserNestedInput
     contentHistory?: ContentHistoryUncheckedUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUncheckedUpdateManyWithoutOwnerNestedInput
     storageConfigs?: StorageProviderConfigUncheckedUpdateManyWithoutUserNestedInput
@@ -46887,6 +54968,9 @@ export namespace Prisma {
     auditTargets?: AuditLogCreateNestedManyWithoutTargetUserInput
     adminActions?: AuditLogCreateNestedManyWithoutUserInput
     categories?: CategoryCreateNestedManyWithoutOwnerInput
+    calendarConnections?: CalendarConnectionCreateNestedManyWithoutUserInput
+    calendarEvents?: CalendarEventCreateNestedManyWithoutUserInput
+    calendarSources?: CalendarSourceCreateNestedManyWithoutUserInput
     contentHistory?: ContentHistoryCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeCreateNestedManyWithoutOwnerInput
     sessions?: SessionCreateNestedManyWithoutUserInput
@@ -46910,6 +54994,9 @@ export namespace Prisma {
     auditTargets?: AuditLogUncheckedCreateNestedManyWithoutTargetUserInput
     adminActions?: AuditLogUncheckedCreateNestedManyWithoutUserInput
     categories?: CategoryUncheckedCreateNestedManyWithoutOwnerInput
+    calendarConnections?: CalendarConnectionUncheckedCreateNestedManyWithoutUserInput
+    calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutUserInput
+    calendarSources?: CalendarSourceUncheckedCreateNestedManyWithoutUserInput
     contentHistory?: ContentHistoryUncheckedCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeUncheckedCreateNestedManyWithoutOwnerInput
     sessions?: SessionUncheckedCreateNestedManyWithoutUserInput
@@ -46949,6 +55036,9 @@ export namespace Prisma {
     auditTargets?: AuditLogUpdateManyWithoutTargetUserNestedInput
     adminActions?: AuditLogUpdateManyWithoutUserNestedInput
     categories?: CategoryUpdateManyWithoutOwnerNestedInput
+    calendarConnections?: CalendarConnectionUpdateManyWithoutUserNestedInput
+    calendarEvents?: CalendarEventUpdateManyWithoutUserNestedInput
+    calendarSources?: CalendarSourceUpdateManyWithoutUserNestedInput
     contentHistory?: ContentHistoryUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUpdateManyWithoutUserNestedInput
@@ -46972,6 +55062,9 @@ export namespace Prisma {
     auditTargets?: AuditLogUncheckedUpdateManyWithoutTargetUserNestedInput
     adminActions?: AuditLogUncheckedUpdateManyWithoutUserNestedInput
     categories?: CategoryUncheckedUpdateManyWithoutOwnerNestedInput
+    calendarConnections?: CalendarConnectionUncheckedUpdateManyWithoutUserNestedInput
+    calendarEvents?: CalendarEventUncheckedUpdateManyWithoutUserNestedInput
+    calendarSources?: CalendarSourceUncheckedUpdateManyWithoutUserNestedInput
     contentHistory?: ContentHistoryUncheckedUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUncheckedUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUncheckedUpdateManyWithoutUserNestedInput
@@ -46979,6 +55072,1019 @@ export namespace Prisma {
     tags?: TagUncheckedUpdateManyWithoutUserNestedInput
     trashedContent?: TrashBinUncheckedUpdateManyWithoutDeletedByUserNestedInput
     viewGrants?: ViewGrantUncheckedUpdateManyWithoutUserNestedInput
+  }
+
+  export type CalendarSourceCreateWithoutConnectionInput = {
+    id?: string
+    title: string
+    color?: string
+    timezone?: string | null
+    visible?: boolean
+    isReadOnly?: boolean
+    isPrimary?: boolean
+    syncMode?: $Enums.CalendarSourceSyncMode
+    externalCalendarId?: string | null
+    metadata?: JsonNullValueInput | InputJsonValue
+    lastSyncedAt?: Date | string | null
+    lastSyncError?: string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    events?: CalendarEventCreateNestedManyWithoutSourceInput
+    user: UserCreateNestedOneWithoutCalendarSourcesInput
+  }
+
+  export type CalendarSourceUncheckedCreateWithoutConnectionInput = {
+    id?: string
+    userId: string
+    title: string
+    color?: string
+    timezone?: string | null
+    visible?: boolean
+    isReadOnly?: boolean
+    isPrimary?: boolean
+    syncMode?: $Enums.CalendarSourceSyncMode
+    externalCalendarId?: string | null
+    metadata?: JsonNullValueInput | InputJsonValue
+    lastSyncedAt?: Date | string | null
+    lastSyncError?: string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    events?: CalendarEventUncheckedCreateNestedManyWithoutSourceInput
+  }
+
+  export type CalendarSourceCreateOrConnectWithoutConnectionInput = {
+    where: CalendarSourceWhereUniqueInput
+    create: XOR<CalendarSourceCreateWithoutConnectionInput, CalendarSourceUncheckedCreateWithoutConnectionInput>
+  }
+
+  export type CalendarSourceCreateManyConnectionInputEnvelope = {
+    data: CalendarSourceCreateManyConnectionInput | CalendarSourceCreateManyConnectionInput[]
+    skipDuplicates?: boolean
+  }
+
+  export type UserCreateWithoutCalendarConnectionsInput = {
+    id?: string
+    username: string
+    passwordHash?: string | null
+    email: string
+    role?: $Enums.UserRole
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: number
+    accounts?: AccountCreateNestedManyWithoutUserInput
+    aiProviderKeys?: AIProviderKeyCreateNestedManyWithoutUserInput
+    auditTargets?: AuditLogCreateNestedManyWithoutTargetUserInput
+    adminActions?: AuditLogCreateNestedManyWithoutUserInput
+    categories?: CategoryCreateNestedManyWithoutOwnerInput
+    calendarEvents?: CalendarEventCreateNestedManyWithoutUserInput
+    calendarSources?: CalendarSourceCreateNestedManyWithoutUserInput
+    contentHistory?: ContentHistoryCreateNestedManyWithoutUserInput
+    contentNodes?: ContentNodeCreateNestedManyWithoutOwnerInput
+    sessions?: SessionCreateNestedManyWithoutUserInput
+    storageConfigs?: StorageProviderConfigCreateNestedManyWithoutUserInput
+    tags?: TagCreateNestedManyWithoutUserInput
+    trashedContent?: TrashBinCreateNestedManyWithoutDeletedByUserInput
+    viewGrants?: ViewGrantCreateNestedManyWithoutUserInput
+  }
+
+  export type UserUncheckedCreateWithoutCalendarConnectionsInput = {
+    id?: string
+    username: string
+    passwordHash?: string | null
+    email: string
+    role?: $Enums.UserRole
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: number
+    accounts?: AccountUncheckedCreateNestedManyWithoutUserInput
+    aiProviderKeys?: AIProviderKeyUncheckedCreateNestedManyWithoutUserInput
+    auditTargets?: AuditLogUncheckedCreateNestedManyWithoutTargetUserInput
+    adminActions?: AuditLogUncheckedCreateNestedManyWithoutUserInput
+    categories?: CategoryUncheckedCreateNestedManyWithoutOwnerInput
+    calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutUserInput
+    calendarSources?: CalendarSourceUncheckedCreateNestedManyWithoutUserInput
+    contentHistory?: ContentHistoryUncheckedCreateNestedManyWithoutUserInput
+    contentNodes?: ContentNodeUncheckedCreateNestedManyWithoutOwnerInput
+    sessions?: SessionUncheckedCreateNestedManyWithoutUserInput
+    storageConfigs?: StorageProviderConfigUncheckedCreateNestedManyWithoutUserInput
+    tags?: TagUncheckedCreateNestedManyWithoutUserInput
+    trashedContent?: TrashBinUncheckedCreateNestedManyWithoutDeletedByUserInput
+    viewGrants?: ViewGrantUncheckedCreateNestedManyWithoutUserInput
+  }
+
+  export type UserCreateOrConnectWithoutCalendarConnectionsInput = {
+    where: UserWhereUniqueInput
+    create: XOR<UserCreateWithoutCalendarConnectionsInput, UserUncheckedCreateWithoutCalendarConnectionsInput>
+  }
+
+  export type CalendarSourceUpsertWithWhereUniqueWithoutConnectionInput = {
+    where: CalendarSourceWhereUniqueInput
+    update: XOR<CalendarSourceUpdateWithoutConnectionInput, CalendarSourceUncheckedUpdateWithoutConnectionInput>
+    create: XOR<CalendarSourceCreateWithoutConnectionInput, CalendarSourceUncheckedCreateWithoutConnectionInput>
+  }
+
+  export type CalendarSourceUpdateWithWhereUniqueWithoutConnectionInput = {
+    where: CalendarSourceWhereUniqueInput
+    data: XOR<CalendarSourceUpdateWithoutConnectionInput, CalendarSourceUncheckedUpdateWithoutConnectionInput>
+  }
+
+  export type CalendarSourceUpdateManyWithWhereWithoutConnectionInput = {
+    where: CalendarSourceScalarWhereInput
+    data: XOR<CalendarSourceUpdateManyMutationInput, CalendarSourceUncheckedUpdateManyWithoutConnectionInput>
+  }
+
+  export type UserUpsertWithoutCalendarConnectionsInput = {
+    update: XOR<UserUpdateWithoutCalendarConnectionsInput, UserUncheckedUpdateWithoutCalendarConnectionsInput>
+    create: XOR<UserCreateWithoutCalendarConnectionsInput, UserUncheckedCreateWithoutCalendarConnectionsInput>
+    where?: UserWhereInput
+  }
+
+  export type UserUpdateToOneWithWhereWithoutCalendarConnectionsInput = {
+    where?: UserWhereInput
+    data: XOR<UserUpdateWithoutCalendarConnectionsInput, UserUncheckedUpdateWithoutCalendarConnectionsInput>
+  }
+
+  export type UserUpdateWithoutCalendarConnectionsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    username?: StringFieldUpdateOperationsInput | string
+    passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
+    email?: StringFieldUpdateOperationsInput | string
+    role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: IntFieldUpdateOperationsInput | number
+    accounts?: AccountUpdateManyWithoutUserNestedInput
+    aiProviderKeys?: AIProviderKeyUpdateManyWithoutUserNestedInput
+    auditTargets?: AuditLogUpdateManyWithoutTargetUserNestedInput
+    adminActions?: AuditLogUpdateManyWithoutUserNestedInput
+    categories?: CategoryUpdateManyWithoutOwnerNestedInput
+    calendarEvents?: CalendarEventUpdateManyWithoutUserNestedInput
+    calendarSources?: CalendarSourceUpdateManyWithoutUserNestedInput
+    contentHistory?: ContentHistoryUpdateManyWithoutUserNestedInput
+    contentNodes?: ContentNodeUpdateManyWithoutOwnerNestedInput
+    sessions?: SessionUpdateManyWithoutUserNestedInput
+    storageConfigs?: StorageProviderConfigUpdateManyWithoutUserNestedInput
+    tags?: TagUpdateManyWithoutUserNestedInput
+    trashedContent?: TrashBinUpdateManyWithoutDeletedByUserNestedInput
+    viewGrants?: ViewGrantUpdateManyWithoutUserNestedInput
+  }
+
+  export type UserUncheckedUpdateWithoutCalendarConnectionsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    username?: StringFieldUpdateOperationsInput | string
+    passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
+    email?: StringFieldUpdateOperationsInput | string
+    role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: IntFieldUpdateOperationsInput | number
+    accounts?: AccountUncheckedUpdateManyWithoutUserNestedInput
+    aiProviderKeys?: AIProviderKeyUncheckedUpdateManyWithoutUserNestedInput
+    auditTargets?: AuditLogUncheckedUpdateManyWithoutTargetUserNestedInput
+    adminActions?: AuditLogUncheckedUpdateManyWithoutUserNestedInput
+    categories?: CategoryUncheckedUpdateManyWithoutOwnerNestedInput
+    calendarEvents?: CalendarEventUncheckedUpdateManyWithoutUserNestedInput
+    calendarSources?: CalendarSourceUncheckedUpdateManyWithoutUserNestedInput
+    contentHistory?: ContentHistoryUncheckedUpdateManyWithoutUserNestedInput
+    contentNodes?: ContentNodeUncheckedUpdateManyWithoutOwnerNestedInput
+    sessions?: SessionUncheckedUpdateManyWithoutUserNestedInput
+    storageConfigs?: StorageProviderConfigUncheckedUpdateManyWithoutUserNestedInput
+    tags?: TagUncheckedUpdateManyWithoutUserNestedInput
+    trashedContent?: TrashBinUncheckedUpdateManyWithoutDeletedByUserNestedInput
+    viewGrants?: ViewGrantUncheckedUpdateManyWithoutUserNestedInput
+  }
+
+  export type CalendarConnectionCreateWithoutSourcesInput = {
+    id?: string
+    provider: $Enums.CalendarProvider
+    displayName: string
+    status?: $Enums.CalendarConnectionStatus
+    syncStatus?: $Enums.CalendarSyncStatus
+    providerConfig?: JsonNullValueInput | InputJsonValue
+    syncCursor?: string | null
+    lastSyncedAt?: Date | string | null
+    lastSyncError?: string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    user: UserCreateNestedOneWithoutCalendarConnectionsInput
+  }
+
+  export type CalendarConnectionUncheckedCreateWithoutSourcesInput = {
+    id?: string
+    userId: string
+    provider: $Enums.CalendarProvider
+    displayName: string
+    status?: $Enums.CalendarConnectionStatus
+    syncStatus?: $Enums.CalendarSyncStatus
+    providerConfig?: JsonNullValueInput | InputJsonValue
+    syncCursor?: string | null
+    lastSyncedAt?: Date | string | null
+    lastSyncError?: string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type CalendarConnectionCreateOrConnectWithoutSourcesInput = {
+    where: CalendarConnectionWhereUniqueInput
+    create: XOR<CalendarConnectionCreateWithoutSourcesInput, CalendarConnectionUncheckedCreateWithoutSourcesInput>
+  }
+
+  export type CalendarEventCreateWithoutSourceInput = {
+    id?: string
+    externalEventId?: string | null
+    title: string
+    description?: string | null
+    location?: string | null
+    startAt: Date | string
+    endAt: Date | string
+    allDay?: boolean
+    timezone?: string | null
+    recurrenceRule?: string | null
+    recurrenceExDates?: JsonNullValueInput | InputJsonValue
+    recurrenceOverrides?: JsonNullValueInput | InputJsonValue
+    status?: $Enums.CalendarEventStatus
+    meetingUrl?: string | null
+    providerMetadata?: JsonNullValueInput | InputJsonValue
+    lastSyncedAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    attendees?: CalendarEventAttendeeCreateNestedManyWithoutEventInput
+    linkedContent?: ContentNodeCreateNestedOneWithoutLinkedCalendarEventsInput
+    user: UserCreateNestedOneWithoutCalendarEventsInput
+  }
+
+  export type CalendarEventUncheckedCreateWithoutSourceInput = {
+    id?: string
+    userId: string
+    externalEventId?: string | null
+    title: string
+    description?: string | null
+    location?: string | null
+    startAt: Date | string
+    endAt: Date | string
+    allDay?: boolean
+    timezone?: string | null
+    recurrenceRule?: string | null
+    recurrenceExDates?: JsonNullValueInput | InputJsonValue
+    recurrenceOverrides?: JsonNullValueInput | InputJsonValue
+    status?: $Enums.CalendarEventStatus
+    meetingUrl?: string | null
+    linkedContentId?: string | null
+    providerMetadata?: JsonNullValueInput | InputJsonValue
+    lastSyncedAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    attendees?: CalendarEventAttendeeUncheckedCreateNestedManyWithoutEventInput
+  }
+
+  export type CalendarEventCreateOrConnectWithoutSourceInput = {
+    where: CalendarEventWhereUniqueInput
+    create: XOR<CalendarEventCreateWithoutSourceInput, CalendarEventUncheckedCreateWithoutSourceInput>
+  }
+
+  export type CalendarEventCreateManySourceInputEnvelope = {
+    data: CalendarEventCreateManySourceInput | CalendarEventCreateManySourceInput[]
+    skipDuplicates?: boolean
+  }
+
+  export type UserCreateWithoutCalendarSourcesInput = {
+    id?: string
+    username: string
+    passwordHash?: string | null
+    email: string
+    role?: $Enums.UserRole
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: number
+    accounts?: AccountCreateNestedManyWithoutUserInput
+    aiProviderKeys?: AIProviderKeyCreateNestedManyWithoutUserInput
+    auditTargets?: AuditLogCreateNestedManyWithoutTargetUserInput
+    adminActions?: AuditLogCreateNestedManyWithoutUserInput
+    categories?: CategoryCreateNestedManyWithoutOwnerInput
+    calendarConnections?: CalendarConnectionCreateNestedManyWithoutUserInput
+    calendarEvents?: CalendarEventCreateNestedManyWithoutUserInput
+    contentHistory?: ContentHistoryCreateNestedManyWithoutUserInput
+    contentNodes?: ContentNodeCreateNestedManyWithoutOwnerInput
+    sessions?: SessionCreateNestedManyWithoutUserInput
+    storageConfigs?: StorageProviderConfigCreateNestedManyWithoutUserInput
+    tags?: TagCreateNestedManyWithoutUserInput
+    trashedContent?: TrashBinCreateNestedManyWithoutDeletedByUserInput
+    viewGrants?: ViewGrantCreateNestedManyWithoutUserInput
+  }
+
+  export type UserUncheckedCreateWithoutCalendarSourcesInput = {
+    id?: string
+    username: string
+    passwordHash?: string | null
+    email: string
+    role?: $Enums.UserRole
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: number
+    accounts?: AccountUncheckedCreateNestedManyWithoutUserInput
+    aiProviderKeys?: AIProviderKeyUncheckedCreateNestedManyWithoutUserInput
+    auditTargets?: AuditLogUncheckedCreateNestedManyWithoutTargetUserInput
+    adminActions?: AuditLogUncheckedCreateNestedManyWithoutUserInput
+    categories?: CategoryUncheckedCreateNestedManyWithoutOwnerInput
+    calendarConnections?: CalendarConnectionUncheckedCreateNestedManyWithoutUserInput
+    calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutUserInput
+    contentHistory?: ContentHistoryUncheckedCreateNestedManyWithoutUserInput
+    contentNodes?: ContentNodeUncheckedCreateNestedManyWithoutOwnerInput
+    sessions?: SessionUncheckedCreateNestedManyWithoutUserInput
+    storageConfigs?: StorageProviderConfigUncheckedCreateNestedManyWithoutUserInput
+    tags?: TagUncheckedCreateNestedManyWithoutUserInput
+    trashedContent?: TrashBinUncheckedCreateNestedManyWithoutDeletedByUserInput
+    viewGrants?: ViewGrantUncheckedCreateNestedManyWithoutUserInput
+  }
+
+  export type UserCreateOrConnectWithoutCalendarSourcesInput = {
+    where: UserWhereUniqueInput
+    create: XOR<UserCreateWithoutCalendarSourcesInput, UserUncheckedCreateWithoutCalendarSourcesInput>
+  }
+
+  export type CalendarConnectionUpsertWithoutSourcesInput = {
+    update: XOR<CalendarConnectionUpdateWithoutSourcesInput, CalendarConnectionUncheckedUpdateWithoutSourcesInput>
+    create: XOR<CalendarConnectionCreateWithoutSourcesInput, CalendarConnectionUncheckedCreateWithoutSourcesInput>
+    where?: CalendarConnectionWhereInput
+  }
+
+  export type CalendarConnectionUpdateToOneWithWhereWithoutSourcesInput = {
+    where?: CalendarConnectionWhereInput
+    data: XOR<CalendarConnectionUpdateWithoutSourcesInput, CalendarConnectionUncheckedUpdateWithoutSourcesInput>
+  }
+
+  export type CalendarConnectionUpdateWithoutSourcesInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    provider?: EnumCalendarProviderFieldUpdateOperationsInput | $Enums.CalendarProvider
+    displayName?: StringFieldUpdateOperationsInput | string
+    status?: EnumCalendarConnectionStatusFieldUpdateOperationsInput | $Enums.CalendarConnectionStatus
+    syncStatus?: EnumCalendarSyncStatusFieldUpdateOperationsInput | $Enums.CalendarSyncStatus
+    providerConfig?: JsonNullValueInput | InputJsonValue
+    syncCursor?: NullableStringFieldUpdateOperationsInput | string | null
+    lastSyncedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    lastSyncError?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    user?: UserUpdateOneRequiredWithoutCalendarConnectionsNestedInput
+  }
+
+  export type CalendarConnectionUncheckedUpdateWithoutSourcesInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    userId?: StringFieldUpdateOperationsInput | string
+    provider?: EnumCalendarProviderFieldUpdateOperationsInput | $Enums.CalendarProvider
+    displayName?: StringFieldUpdateOperationsInput | string
+    status?: EnumCalendarConnectionStatusFieldUpdateOperationsInput | $Enums.CalendarConnectionStatus
+    syncStatus?: EnumCalendarSyncStatusFieldUpdateOperationsInput | $Enums.CalendarSyncStatus
+    providerConfig?: JsonNullValueInput | InputJsonValue
+    syncCursor?: NullableStringFieldUpdateOperationsInput | string | null
+    lastSyncedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    lastSyncError?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type CalendarEventUpsertWithWhereUniqueWithoutSourceInput = {
+    where: CalendarEventWhereUniqueInput
+    update: XOR<CalendarEventUpdateWithoutSourceInput, CalendarEventUncheckedUpdateWithoutSourceInput>
+    create: XOR<CalendarEventCreateWithoutSourceInput, CalendarEventUncheckedCreateWithoutSourceInput>
+  }
+
+  export type CalendarEventUpdateWithWhereUniqueWithoutSourceInput = {
+    where: CalendarEventWhereUniqueInput
+    data: XOR<CalendarEventUpdateWithoutSourceInput, CalendarEventUncheckedUpdateWithoutSourceInput>
+  }
+
+  export type CalendarEventUpdateManyWithWhereWithoutSourceInput = {
+    where: CalendarEventScalarWhereInput
+    data: XOR<CalendarEventUpdateManyMutationInput, CalendarEventUncheckedUpdateManyWithoutSourceInput>
+  }
+
+  export type UserUpsertWithoutCalendarSourcesInput = {
+    update: XOR<UserUpdateWithoutCalendarSourcesInput, UserUncheckedUpdateWithoutCalendarSourcesInput>
+    create: XOR<UserCreateWithoutCalendarSourcesInput, UserUncheckedCreateWithoutCalendarSourcesInput>
+    where?: UserWhereInput
+  }
+
+  export type UserUpdateToOneWithWhereWithoutCalendarSourcesInput = {
+    where?: UserWhereInput
+    data: XOR<UserUpdateWithoutCalendarSourcesInput, UserUncheckedUpdateWithoutCalendarSourcesInput>
+  }
+
+  export type UserUpdateWithoutCalendarSourcesInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    username?: StringFieldUpdateOperationsInput | string
+    passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
+    email?: StringFieldUpdateOperationsInput | string
+    role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: IntFieldUpdateOperationsInput | number
+    accounts?: AccountUpdateManyWithoutUserNestedInput
+    aiProviderKeys?: AIProviderKeyUpdateManyWithoutUserNestedInput
+    auditTargets?: AuditLogUpdateManyWithoutTargetUserNestedInput
+    adminActions?: AuditLogUpdateManyWithoutUserNestedInput
+    categories?: CategoryUpdateManyWithoutOwnerNestedInput
+    calendarConnections?: CalendarConnectionUpdateManyWithoutUserNestedInput
+    calendarEvents?: CalendarEventUpdateManyWithoutUserNestedInput
+    contentHistory?: ContentHistoryUpdateManyWithoutUserNestedInput
+    contentNodes?: ContentNodeUpdateManyWithoutOwnerNestedInput
+    sessions?: SessionUpdateManyWithoutUserNestedInput
+    storageConfigs?: StorageProviderConfigUpdateManyWithoutUserNestedInput
+    tags?: TagUpdateManyWithoutUserNestedInput
+    trashedContent?: TrashBinUpdateManyWithoutDeletedByUserNestedInput
+    viewGrants?: ViewGrantUpdateManyWithoutUserNestedInput
+  }
+
+  export type UserUncheckedUpdateWithoutCalendarSourcesInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    username?: StringFieldUpdateOperationsInput | string
+    passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
+    email?: StringFieldUpdateOperationsInput | string
+    role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: IntFieldUpdateOperationsInput | number
+    accounts?: AccountUncheckedUpdateManyWithoutUserNestedInput
+    aiProviderKeys?: AIProviderKeyUncheckedUpdateManyWithoutUserNestedInput
+    auditTargets?: AuditLogUncheckedUpdateManyWithoutTargetUserNestedInput
+    adminActions?: AuditLogUncheckedUpdateManyWithoutUserNestedInput
+    categories?: CategoryUncheckedUpdateManyWithoutOwnerNestedInput
+    calendarConnections?: CalendarConnectionUncheckedUpdateManyWithoutUserNestedInput
+    calendarEvents?: CalendarEventUncheckedUpdateManyWithoutUserNestedInput
+    contentHistory?: ContentHistoryUncheckedUpdateManyWithoutUserNestedInput
+    contentNodes?: ContentNodeUncheckedUpdateManyWithoutOwnerNestedInput
+    sessions?: SessionUncheckedUpdateManyWithoutUserNestedInput
+    storageConfigs?: StorageProviderConfigUncheckedUpdateManyWithoutUserNestedInput
+    tags?: TagUncheckedUpdateManyWithoutUserNestedInput
+    trashedContent?: TrashBinUncheckedUpdateManyWithoutDeletedByUserNestedInput
+    viewGrants?: ViewGrantUncheckedUpdateManyWithoutUserNestedInput
+  }
+
+  export type CalendarEventAttendeeCreateWithoutEventInput = {
+    id?: string
+    email: string
+    displayName?: string | null
+    isOrganizer?: boolean
+    responseStatus?: $Enums.CalendarAttendeeResponseStatus
+    metadata?: JsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type CalendarEventAttendeeUncheckedCreateWithoutEventInput = {
+    id?: string
+    email: string
+    displayName?: string | null
+    isOrganizer?: boolean
+    responseStatus?: $Enums.CalendarAttendeeResponseStatus
+    metadata?: JsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type CalendarEventAttendeeCreateOrConnectWithoutEventInput = {
+    where: CalendarEventAttendeeWhereUniqueInput
+    create: XOR<CalendarEventAttendeeCreateWithoutEventInput, CalendarEventAttendeeUncheckedCreateWithoutEventInput>
+  }
+
+  export type CalendarEventAttendeeCreateManyEventInputEnvelope = {
+    data: CalendarEventAttendeeCreateManyEventInput | CalendarEventAttendeeCreateManyEventInput[]
+    skipDuplicates?: boolean
+  }
+
+  export type ContentNodeCreateWithoutLinkedCalendarEventsInput = {
+    id?: string
+    title: string
+    slug: string
+    contentType: $Enums.ContentType
+    role?: $Enums.ContentRole
+    displayOrder?: number
+    isPublished?: boolean
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    deletedAt?: Date | string | null
+    deletedBy?: string | null
+    customIcon?: string | null
+    iconColor?: string | null
+    auditLogs?: AuditLogCreateNestedManyWithoutTargetContentInput
+    codePayload?: CodePayloadCreateNestedOneWithoutContentInput
+    filePayload?: FilePayloadCreateNestedOneWithoutContentInput
+    htmlPayload?: HtmlPayloadCreateNestedOneWithoutContentInput
+    notePayload?: NotePayloadCreateNestedOneWithoutContentInput
+    folderPayload?: FolderPayloadCreateNestedOneWithoutContentInput
+    externalPayload?: ExternalPayloadCreateNestedOneWithoutContentInput
+    chatPayload?: ChatPayloadCreateNestedOneWithoutContentInput
+    visualizationPayload?: VisualizationPayloadCreateNestedOneWithoutContentInput
+    dataPayload?: DataPayloadCreateNestedOneWithoutContentInput
+    hopePayload?: HopePayloadCreateNestedOneWithoutContentInput
+    workflowPayload?: WorkflowPayloadCreateNestedOneWithoutContentInput
+    history?: ContentHistoryCreateNestedManyWithoutContentInput
+    sourceLinks?: ContentLinkCreateNestedManyWithoutSourceInput
+    targetLinks?: ContentLinkCreateNestedManyWithoutTargetInput
+    category?: CategoryCreateNestedOneWithoutContentNodesInput
+    owner: UserCreateNestedOneWithoutContentNodesInput
+    parent?: ContentNodeCreateNestedOneWithoutChildrenInput
+    children?: ContentNodeCreateNestedManyWithoutParentInput
+    contentPath?: ContentPathCreateNestedOneWithoutContentInput
+    contentTags?: ContentTagCreateNestedManyWithoutContentInput
+    trashBinEntry?: TrashBinCreateNestedOneWithoutContentInput
+    viewGrants?: ViewGrantCreateNestedManyWithoutContentInput
+  }
+
+  export type ContentNodeUncheckedCreateWithoutLinkedCalendarEventsInput = {
+    id?: string
+    ownerId: string
+    title: string
+    slug: string
+    contentType: $Enums.ContentType
+    role?: $Enums.ContentRole
+    parentId?: string | null
+    displayOrder?: number
+    categoryId?: string | null
+    isPublished?: boolean
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    deletedAt?: Date | string | null
+    deletedBy?: string | null
+    customIcon?: string | null
+    iconColor?: string | null
+    auditLogs?: AuditLogUncheckedCreateNestedManyWithoutTargetContentInput
+    codePayload?: CodePayloadUncheckedCreateNestedOneWithoutContentInput
+    filePayload?: FilePayloadUncheckedCreateNestedOneWithoutContentInput
+    htmlPayload?: HtmlPayloadUncheckedCreateNestedOneWithoutContentInput
+    notePayload?: NotePayloadUncheckedCreateNestedOneWithoutContentInput
+    folderPayload?: FolderPayloadUncheckedCreateNestedOneWithoutContentInput
+    externalPayload?: ExternalPayloadUncheckedCreateNestedOneWithoutContentInput
+    chatPayload?: ChatPayloadUncheckedCreateNestedOneWithoutContentInput
+    visualizationPayload?: VisualizationPayloadUncheckedCreateNestedOneWithoutContentInput
+    dataPayload?: DataPayloadUncheckedCreateNestedOneWithoutContentInput
+    hopePayload?: HopePayloadUncheckedCreateNestedOneWithoutContentInput
+    workflowPayload?: WorkflowPayloadUncheckedCreateNestedOneWithoutContentInput
+    history?: ContentHistoryUncheckedCreateNestedManyWithoutContentInput
+    sourceLinks?: ContentLinkUncheckedCreateNestedManyWithoutSourceInput
+    targetLinks?: ContentLinkUncheckedCreateNestedManyWithoutTargetInput
+    children?: ContentNodeUncheckedCreateNestedManyWithoutParentInput
+    contentPath?: ContentPathUncheckedCreateNestedOneWithoutContentInput
+    contentTags?: ContentTagUncheckedCreateNestedManyWithoutContentInput
+    trashBinEntry?: TrashBinUncheckedCreateNestedOneWithoutContentInput
+    viewGrants?: ViewGrantUncheckedCreateNestedManyWithoutContentInput
+  }
+
+  export type ContentNodeCreateOrConnectWithoutLinkedCalendarEventsInput = {
+    where: ContentNodeWhereUniqueInput
+    create: XOR<ContentNodeCreateWithoutLinkedCalendarEventsInput, ContentNodeUncheckedCreateWithoutLinkedCalendarEventsInput>
+  }
+
+  export type CalendarSourceCreateWithoutEventsInput = {
+    id?: string
+    title: string
+    color?: string
+    timezone?: string | null
+    visible?: boolean
+    isReadOnly?: boolean
+    isPrimary?: boolean
+    syncMode?: $Enums.CalendarSourceSyncMode
+    externalCalendarId?: string | null
+    metadata?: JsonNullValueInput | InputJsonValue
+    lastSyncedAt?: Date | string | null
+    lastSyncError?: string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    connection?: CalendarConnectionCreateNestedOneWithoutSourcesInput
+    user: UserCreateNestedOneWithoutCalendarSourcesInput
+  }
+
+  export type CalendarSourceUncheckedCreateWithoutEventsInput = {
+    id?: string
+    userId: string
+    connectionId?: string | null
+    title: string
+    color?: string
+    timezone?: string | null
+    visible?: boolean
+    isReadOnly?: boolean
+    isPrimary?: boolean
+    syncMode?: $Enums.CalendarSourceSyncMode
+    externalCalendarId?: string | null
+    metadata?: JsonNullValueInput | InputJsonValue
+    lastSyncedAt?: Date | string | null
+    lastSyncError?: string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type CalendarSourceCreateOrConnectWithoutEventsInput = {
+    where: CalendarSourceWhereUniqueInput
+    create: XOR<CalendarSourceCreateWithoutEventsInput, CalendarSourceUncheckedCreateWithoutEventsInput>
+  }
+
+  export type UserCreateWithoutCalendarEventsInput = {
+    id?: string
+    username: string
+    passwordHash?: string | null
+    email: string
+    role?: $Enums.UserRole
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: number
+    accounts?: AccountCreateNestedManyWithoutUserInput
+    aiProviderKeys?: AIProviderKeyCreateNestedManyWithoutUserInput
+    auditTargets?: AuditLogCreateNestedManyWithoutTargetUserInput
+    adminActions?: AuditLogCreateNestedManyWithoutUserInput
+    categories?: CategoryCreateNestedManyWithoutOwnerInput
+    calendarConnections?: CalendarConnectionCreateNestedManyWithoutUserInput
+    calendarSources?: CalendarSourceCreateNestedManyWithoutUserInput
+    contentHistory?: ContentHistoryCreateNestedManyWithoutUserInput
+    contentNodes?: ContentNodeCreateNestedManyWithoutOwnerInput
+    sessions?: SessionCreateNestedManyWithoutUserInput
+    storageConfigs?: StorageProviderConfigCreateNestedManyWithoutUserInput
+    tags?: TagCreateNestedManyWithoutUserInput
+    trashedContent?: TrashBinCreateNestedManyWithoutDeletedByUserInput
+    viewGrants?: ViewGrantCreateNestedManyWithoutUserInput
+  }
+
+  export type UserUncheckedCreateWithoutCalendarEventsInput = {
+    id?: string
+    username: string
+    passwordHash?: string | null
+    email: string
+    role?: $Enums.UserRole
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: number
+    accounts?: AccountUncheckedCreateNestedManyWithoutUserInput
+    aiProviderKeys?: AIProviderKeyUncheckedCreateNestedManyWithoutUserInput
+    auditTargets?: AuditLogUncheckedCreateNestedManyWithoutTargetUserInput
+    adminActions?: AuditLogUncheckedCreateNestedManyWithoutUserInput
+    categories?: CategoryUncheckedCreateNestedManyWithoutOwnerInput
+    calendarConnections?: CalendarConnectionUncheckedCreateNestedManyWithoutUserInput
+    calendarSources?: CalendarSourceUncheckedCreateNestedManyWithoutUserInput
+    contentHistory?: ContentHistoryUncheckedCreateNestedManyWithoutUserInput
+    contentNodes?: ContentNodeUncheckedCreateNestedManyWithoutOwnerInput
+    sessions?: SessionUncheckedCreateNestedManyWithoutUserInput
+    storageConfigs?: StorageProviderConfigUncheckedCreateNestedManyWithoutUserInput
+    tags?: TagUncheckedCreateNestedManyWithoutUserInput
+    trashedContent?: TrashBinUncheckedCreateNestedManyWithoutDeletedByUserInput
+    viewGrants?: ViewGrantUncheckedCreateNestedManyWithoutUserInput
+  }
+
+  export type UserCreateOrConnectWithoutCalendarEventsInput = {
+    where: UserWhereUniqueInput
+    create: XOR<UserCreateWithoutCalendarEventsInput, UserUncheckedCreateWithoutCalendarEventsInput>
+  }
+
+  export type CalendarEventAttendeeUpsertWithWhereUniqueWithoutEventInput = {
+    where: CalendarEventAttendeeWhereUniqueInput
+    update: XOR<CalendarEventAttendeeUpdateWithoutEventInput, CalendarEventAttendeeUncheckedUpdateWithoutEventInput>
+    create: XOR<CalendarEventAttendeeCreateWithoutEventInput, CalendarEventAttendeeUncheckedCreateWithoutEventInput>
+  }
+
+  export type CalendarEventAttendeeUpdateWithWhereUniqueWithoutEventInput = {
+    where: CalendarEventAttendeeWhereUniqueInput
+    data: XOR<CalendarEventAttendeeUpdateWithoutEventInput, CalendarEventAttendeeUncheckedUpdateWithoutEventInput>
+  }
+
+  export type CalendarEventAttendeeUpdateManyWithWhereWithoutEventInput = {
+    where: CalendarEventAttendeeScalarWhereInput
+    data: XOR<CalendarEventAttendeeUpdateManyMutationInput, CalendarEventAttendeeUncheckedUpdateManyWithoutEventInput>
+  }
+
+  export type CalendarEventAttendeeScalarWhereInput = {
+    AND?: CalendarEventAttendeeScalarWhereInput | CalendarEventAttendeeScalarWhereInput[]
+    OR?: CalendarEventAttendeeScalarWhereInput[]
+    NOT?: CalendarEventAttendeeScalarWhereInput | CalendarEventAttendeeScalarWhereInput[]
+    id?: UuidFilter<"CalendarEventAttendee"> | string
+    eventId?: UuidFilter<"CalendarEventAttendee"> | string
+    email?: StringFilter<"CalendarEventAttendee"> | string
+    displayName?: StringNullableFilter<"CalendarEventAttendee"> | string | null
+    isOrganizer?: BoolFilter<"CalendarEventAttendee"> | boolean
+    responseStatus?: EnumCalendarAttendeeResponseStatusFilter<"CalendarEventAttendee"> | $Enums.CalendarAttendeeResponseStatus
+    metadata?: JsonFilter<"CalendarEventAttendee">
+    createdAt?: DateTimeFilter<"CalendarEventAttendee"> | Date | string
+    updatedAt?: DateTimeFilter<"CalendarEventAttendee"> | Date | string
+  }
+
+  export type ContentNodeUpsertWithoutLinkedCalendarEventsInput = {
+    update: XOR<ContentNodeUpdateWithoutLinkedCalendarEventsInput, ContentNodeUncheckedUpdateWithoutLinkedCalendarEventsInput>
+    create: XOR<ContentNodeCreateWithoutLinkedCalendarEventsInput, ContentNodeUncheckedCreateWithoutLinkedCalendarEventsInput>
+    where?: ContentNodeWhereInput
+  }
+
+  export type ContentNodeUpdateToOneWithWhereWithoutLinkedCalendarEventsInput = {
+    where?: ContentNodeWhereInput
+    data: XOR<ContentNodeUpdateWithoutLinkedCalendarEventsInput, ContentNodeUncheckedUpdateWithoutLinkedCalendarEventsInput>
+  }
+
+  export type ContentNodeUpdateWithoutLinkedCalendarEventsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    title?: StringFieldUpdateOperationsInput | string
+    slug?: StringFieldUpdateOperationsInput | string
+    contentType?: EnumContentTypeFieldUpdateOperationsInput | $Enums.ContentType
+    role?: EnumContentRoleFieldUpdateOperationsInput | $Enums.ContentRole
+    displayOrder?: IntFieldUpdateOperationsInput | number
+    isPublished?: BoolFieldUpdateOperationsInput | boolean
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    deletedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    deletedBy?: NullableStringFieldUpdateOperationsInput | string | null
+    customIcon?: NullableStringFieldUpdateOperationsInput | string | null
+    iconColor?: NullableStringFieldUpdateOperationsInput | string | null
+    auditLogs?: AuditLogUpdateManyWithoutTargetContentNestedInput
+    codePayload?: CodePayloadUpdateOneWithoutContentNestedInput
+    filePayload?: FilePayloadUpdateOneWithoutContentNestedInput
+    htmlPayload?: HtmlPayloadUpdateOneWithoutContentNestedInput
+    notePayload?: NotePayloadUpdateOneWithoutContentNestedInput
+    folderPayload?: FolderPayloadUpdateOneWithoutContentNestedInput
+    externalPayload?: ExternalPayloadUpdateOneWithoutContentNestedInput
+    chatPayload?: ChatPayloadUpdateOneWithoutContentNestedInput
+    visualizationPayload?: VisualizationPayloadUpdateOneWithoutContentNestedInput
+    dataPayload?: DataPayloadUpdateOneWithoutContentNestedInput
+    hopePayload?: HopePayloadUpdateOneWithoutContentNestedInput
+    workflowPayload?: WorkflowPayloadUpdateOneWithoutContentNestedInput
+    history?: ContentHistoryUpdateManyWithoutContentNestedInput
+    sourceLinks?: ContentLinkUpdateManyWithoutSourceNestedInput
+    targetLinks?: ContentLinkUpdateManyWithoutTargetNestedInput
+    category?: CategoryUpdateOneWithoutContentNodesNestedInput
+    owner?: UserUpdateOneRequiredWithoutContentNodesNestedInput
+    parent?: ContentNodeUpdateOneWithoutChildrenNestedInput
+    children?: ContentNodeUpdateManyWithoutParentNestedInput
+    contentPath?: ContentPathUpdateOneWithoutContentNestedInput
+    contentTags?: ContentTagUpdateManyWithoutContentNestedInput
+    trashBinEntry?: TrashBinUpdateOneWithoutContentNestedInput
+    viewGrants?: ViewGrantUpdateManyWithoutContentNestedInput
+  }
+
+  export type ContentNodeUncheckedUpdateWithoutLinkedCalendarEventsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    ownerId?: StringFieldUpdateOperationsInput | string
+    title?: StringFieldUpdateOperationsInput | string
+    slug?: StringFieldUpdateOperationsInput | string
+    contentType?: EnumContentTypeFieldUpdateOperationsInput | $Enums.ContentType
+    role?: EnumContentRoleFieldUpdateOperationsInput | $Enums.ContentRole
+    parentId?: NullableStringFieldUpdateOperationsInput | string | null
+    displayOrder?: IntFieldUpdateOperationsInput | number
+    categoryId?: NullableStringFieldUpdateOperationsInput | string | null
+    isPublished?: BoolFieldUpdateOperationsInput | boolean
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    deletedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    deletedBy?: NullableStringFieldUpdateOperationsInput | string | null
+    customIcon?: NullableStringFieldUpdateOperationsInput | string | null
+    iconColor?: NullableStringFieldUpdateOperationsInput | string | null
+    auditLogs?: AuditLogUncheckedUpdateManyWithoutTargetContentNestedInput
+    codePayload?: CodePayloadUncheckedUpdateOneWithoutContentNestedInput
+    filePayload?: FilePayloadUncheckedUpdateOneWithoutContentNestedInput
+    htmlPayload?: HtmlPayloadUncheckedUpdateOneWithoutContentNestedInput
+    notePayload?: NotePayloadUncheckedUpdateOneWithoutContentNestedInput
+    folderPayload?: FolderPayloadUncheckedUpdateOneWithoutContentNestedInput
+    externalPayload?: ExternalPayloadUncheckedUpdateOneWithoutContentNestedInput
+    chatPayload?: ChatPayloadUncheckedUpdateOneWithoutContentNestedInput
+    visualizationPayload?: VisualizationPayloadUncheckedUpdateOneWithoutContentNestedInput
+    dataPayload?: DataPayloadUncheckedUpdateOneWithoutContentNestedInput
+    hopePayload?: HopePayloadUncheckedUpdateOneWithoutContentNestedInput
+    workflowPayload?: WorkflowPayloadUncheckedUpdateOneWithoutContentNestedInput
+    history?: ContentHistoryUncheckedUpdateManyWithoutContentNestedInput
+    sourceLinks?: ContentLinkUncheckedUpdateManyWithoutSourceNestedInput
+    targetLinks?: ContentLinkUncheckedUpdateManyWithoutTargetNestedInput
+    children?: ContentNodeUncheckedUpdateManyWithoutParentNestedInput
+    contentPath?: ContentPathUncheckedUpdateOneWithoutContentNestedInput
+    contentTags?: ContentTagUncheckedUpdateManyWithoutContentNestedInput
+    trashBinEntry?: TrashBinUncheckedUpdateOneWithoutContentNestedInput
+    viewGrants?: ViewGrantUncheckedUpdateManyWithoutContentNestedInput
+  }
+
+  export type CalendarSourceUpsertWithoutEventsInput = {
+    update: XOR<CalendarSourceUpdateWithoutEventsInput, CalendarSourceUncheckedUpdateWithoutEventsInput>
+    create: XOR<CalendarSourceCreateWithoutEventsInput, CalendarSourceUncheckedCreateWithoutEventsInput>
+    where?: CalendarSourceWhereInput
+  }
+
+  export type CalendarSourceUpdateToOneWithWhereWithoutEventsInput = {
+    where?: CalendarSourceWhereInput
+    data: XOR<CalendarSourceUpdateWithoutEventsInput, CalendarSourceUncheckedUpdateWithoutEventsInput>
+  }
+
+  export type CalendarSourceUpdateWithoutEventsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    title?: StringFieldUpdateOperationsInput | string
+    color?: StringFieldUpdateOperationsInput | string
+    timezone?: NullableStringFieldUpdateOperationsInput | string | null
+    visible?: BoolFieldUpdateOperationsInput | boolean
+    isReadOnly?: BoolFieldUpdateOperationsInput | boolean
+    isPrimary?: BoolFieldUpdateOperationsInput | boolean
+    syncMode?: EnumCalendarSourceSyncModeFieldUpdateOperationsInput | $Enums.CalendarSourceSyncMode
+    externalCalendarId?: NullableStringFieldUpdateOperationsInput | string | null
+    metadata?: JsonNullValueInput | InputJsonValue
+    lastSyncedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    lastSyncError?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    connection?: CalendarConnectionUpdateOneWithoutSourcesNestedInput
+    user?: UserUpdateOneRequiredWithoutCalendarSourcesNestedInput
+  }
+
+  export type CalendarSourceUncheckedUpdateWithoutEventsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    userId?: StringFieldUpdateOperationsInput | string
+    connectionId?: NullableStringFieldUpdateOperationsInput | string | null
+    title?: StringFieldUpdateOperationsInput | string
+    color?: StringFieldUpdateOperationsInput | string
+    timezone?: NullableStringFieldUpdateOperationsInput | string | null
+    visible?: BoolFieldUpdateOperationsInput | boolean
+    isReadOnly?: BoolFieldUpdateOperationsInput | boolean
+    isPrimary?: BoolFieldUpdateOperationsInput | boolean
+    syncMode?: EnumCalendarSourceSyncModeFieldUpdateOperationsInput | $Enums.CalendarSourceSyncMode
+    externalCalendarId?: NullableStringFieldUpdateOperationsInput | string | null
+    metadata?: JsonNullValueInput | InputJsonValue
+    lastSyncedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    lastSyncError?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type UserUpsertWithoutCalendarEventsInput = {
+    update: XOR<UserUpdateWithoutCalendarEventsInput, UserUncheckedUpdateWithoutCalendarEventsInput>
+    create: XOR<UserCreateWithoutCalendarEventsInput, UserUncheckedCreateWithoutCalendarEventsInput>
+    where?: UserWhereInput
+  }
+
+  export type UserUpdateToOneWithWhereWithoutCalendarEventsInput = {
+    where?: UserWhereInput
+    data: XOR<UserUpdateWithoutCalendarEventsInput, UserUncheckedUpdateWithoutCalendarEventsInput>
+  }
+
+  export type UserUpdateWithoutCalendarEventsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    username?: StringFieldUpdateOperationsInput | string
+    passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
+    email?: StringFieldUpdateOperationsInput | string
+    role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: IntFieldUpdateOperationsInput | number
+    accounts?: AccountUpdateManyWithoutUserNestedInput
+    aiProviderKeys?: AIProviderKeyUpdateManyWithoutUserNestedInput
+    auditTargets?: AuditLogUpdateManyWithoutTargetUserNestedInput
+    adminActions?: AuditLogUpdateManyWithoutUserNestedInput
+    categories?: CategoryUpdateManyWithoutOwnerNestedInput
+    calendarConnections?: CalendarConnectionUpdateManyWithoutUserNestedInput
+    calendarSources?: CalendarSourceUpdateManyWithoutUserNestedInput
+    contentHistory?: ContentHistoryUpdateManyWithoutUserNestedInput
+    contentNodes?: ContentNodeUpdateManyWithoutOwnerNestedInput
+    sessions?: SessionUpdateManyWithoutUserNestedInput
+    storageConfigs?: StorageProviderConfigUpdateManyWithoutUserNestedInput
+    tags?: TagUpdateManyWithoutUserNestedInput
+    trashedContent?: TrashBinUpdateManyWithoutDeletedByUserNestedInput
+    viewGrants?: ViewGrantUpdateManyWithoutUserNestedInput
+  }
+
+  export type UserUncheckedUpdateWithoutCalendarEventsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    username?: StringFieldUpdateOperationsInput | string
+    passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
+    email?: StringFieldUpdateOperationsInput | string
+    role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: IntFieldUpdateOperationsInput | number
+    accounts?: AccountUncheckedUpdateManyWithoutUserNestedInput
+    aiProviderKeys?: AIProviderKeyUncheckedUpdateManyWithoutUserNestedInput
+    auditTargets?: AuditLogUncheckedUpdateManyWithoutTargetUserNestedInput
+    adminActions?: AuditLogUncheckedUpdateManyWithoutUserNestedInput
+    categories?: CategoryUncheckedUpdateManyWithoutOwnerNestedInput
+    calendarConnections?: CalendarConnectionUncheckedUpdateManyWithoutUserNestedInput
+    calendarSources?: CalendarSourceUncheckedUpdateManyWithoutUserNestedInput
+    contentHistory?: ContentHistoryUncheckedUpdateManyWithoutUserNestedInput
+    contentNodes?: ContentNodeUncheckedUpdateManyWithoutOwnerNestedInput
+    sessions?: SessionUncheckedUpdateManyWithoutUserNestedInput
+    storageConfigs?: StorageProviderConfigUncheckedUpdateManyWithoutUserNestedInput
+    tags?: TagUncheckedUpdateManyWithoutUserNestedInput
+    trashedContent?: TrashBinUncheckedUpdateManyWithoutDeletedByUserNestedInput
+    viewGrants?: ViewGrantUncheckedUpdateManyWithoutUserNestedInput
+  }
+
+  export type CalendarEventCreateWithoutAttendeesInput = {
+    id?: string
+    externalEventId?: string | null
+    title: string
+    description?: string | null
+    location?: string | null
+    startAt: Date | string
+    endAt: Date | string
+    allDay?: boolean
+    timezone?: string | null
+    recurrenceRule?: string | null
+    recurrenceExDates?: JsonNullValueInput | InputJsonValue
+    recurrenceOverrides?: JsonNullValueInput | InputJsonValue
+    status?: $Enums.CalendarEventStatus
+    meetingUrl?: string | null
+    providerMetadata?: JsonNullValueInput | InputJsonValue
+    lastSyncedAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    linkedContent?: ContentNodeCreateNestedOneWithoutLinkedCalendarEventsInput
+    source: CalendarSourceCreateNestedOneWithoutEventsInput
+    user: UserCreateNestedOneWithoutCalendarEventsInput
+  }
+
+  export type CalendarEventUncheckedCreateWithoutAttendeesInput = {
+    id?: string
+    userId: string
+    sourceId: string
+    externalEventId?: string | null
+    title: string
+    description?: string | null
+    location?: string | null
+    startAt: Date | string
+    endAt: Date | string
+    allDay?: boolean
+    timezone?: string | null
+    recurrenceRule?: string | null
+    recurrenceExDates?: JsonNullValueInput | InputJsonValue
+    recurrenceOverrides?: JsonNullValueInput | InputJsonValue
+    status?: $Enums.CalendarEventStatus
+    meetingUrl?: string | null
+    linkedContentId?: string | null
+    providerMetadata?: JsonNullValueInput | InputJsonValue
+    lastSyncedAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type CalendarEventCreateOrConnectWithoutAttendeesInput = {
+    where: CalendarEventWhereUniqueInput
+    create: XOR<CalendarEventCreateWithoutAttendeesInput, CalendarEventUncheckedCreateWithoutAttendeesInput>
+  }
+
+  export type CalendarEventUpsertWithoutAttendeesInput = {
+    update: XOR<CalendarEventUpdateWithoutAttendeesInput, CalendarEventUncheckedUpdateWithoutAttendeesInput>
+    create: XOR<CalendarEventCreateWithoutAttendeesInput, CalendarEventUncheckedCreateWithoutAttendeesInput>
+    where?: CalendarEventWhereInput
+  }
+
+  export type CalendarEventUpdateToOneWithWhereWithoutAttendeesInput = {
+    where?: CalendarEventWhereInput
+    data: XOR<CalendarEventUpdateWithoutAttendeesInput, CalendarEventUncheckedUpdateWithoutAttendeesInput>
+  }
+
+  export type CalendarEventUpdateWithoutAttendeesInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    externalEventId?: NullableStringFieldUpdateOperationsInput | string | null
+    title?: StringFieldUpdateOperationsInput | string
+    description?: NullableStringFieldUpdateOperationsInput | string | null
+    location?: NullableStringFieldUpdateOperationsInput | string | null
+    startAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    endAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    allDay?: BoolFieldUpdateOperationsInput | boolean
+    timezone?: NullableStringFieldUpdateOperationsInput | string | null
+    recurrenceRule?: NullableStringFieldUpdateOperationsInput | string | null
+    recurrenceExDates?: JsonNullValueInput | InputJsonValue
+    recurrenceOverrides?: JsonNullValueInput | InputJsonValue
+    status?: EnumCalendarEventStatusFieldUpdateOperationsInput | $Enums.CalendarEventStatus
+    meetingUrl?: NullableStringFieldUpdateOperationsInput | string | null
+    providerMetadata?: JsonNullValueInput | InputJsonValue
+    lastSyncedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    linkedContent?: ContentNodeUpdateOneWithoutLinkedCalendarEventsNestedInput
+    source?: CalendarSourceUpdateOneRequiredWithoutEventsNestedInput
+    user?: UserUpdateOneRequiredWithoutCalendarEventsNestedInput
+  }
+
+  export type CalendarEventUncheckedUpdateWithoutAttendeesInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    userId?: StringFieldUpdateOperationsInput | string
+    sourceId?: StringFieldUpdateOperationsInput | string
+    externalEventId?: NullableStringFieldUpdateOperationsInput | string | null
+    title?: StringFieldUpdateOperationsInput | string
+    description?: NullableStringFieldUpdateOperationsInput | string | null
+    location?: NullableStringFieldUpdateOperationsInput | string | null
+    startAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    endAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    allDay?: BoolFieldUpdateOperationsInput | boolean
+    timezone?: NullableStringFieldUpdateOperationsInput | string | null
+    recurrenceRule?: NullableStringFieldUpdateOperationsInput | string | null
+    recurrenceExDates?: JsonNullValueInput | InputJsonValue
+    recurrenceOverrides?: JsonNullValueInput | InputJsonValue
+    status?: EnumCalendarEventStatusFieldUpdateOperationsInput | $Enums.CalendarEventStatus
+    meetingUrl?: NullableStringFieldUpdateOperationsInput | string | null
+    linkedContentId?: NullableStringFieldUpdateOperationsInput | string | null
+    providerMetadata?: JsonNullValueInput | InputJsonValue
+    lastSyncedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
   export type ContentNodeCreateWithoutAuditLogsInput = {
@@ -47015,6 +56121,7 @@ export namespace Prisma {
     children?: ContentNodeCreateNestedManyWithoutParentInput
     contentPath?: ContentPathCreateNestedOneWithoutContentInput
     contentTags?: ContentTagCreateNestedManyWithoutContentInput
+    linkedCalendarEvents?: CalendarEventCreateNestedManyWithoutLinkedContentInput
     trashBinEntry?: TrashBinCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantCreateNestedManyWithoutContentInput
   }
@@ -47053,6 +56160,7 @@ export namespace Prisma {
     children?: ContentNodeUncheckedCreateNestedManyWithoutParentInput
     contentPath?: ContentPathUncheckedCreateNestedOneWithoutContentInput
     contentTags?: ContentTagUncheckedCreateNestedManyWithoutContentInput
+    linkedCalendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutLinkedContentInput
     trashBinEntry?: TrashBinUncheckedCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantUncheckedCreateNestedManyWithoutContentInput
   }
@@ -47076,6 +56184,9 @@ export namespace Prisma {
     aiProviderKeys?: AIProviderKeyCreateNestedManyWithoutUserInput
     adminActions?: AuditLogCreateNestedManyWithoutUserInput
     categories?: CategoryCreateNestedManyWithoutOwnerInput
+    calendarConnections?: CalendarConnectionCreateNestedManyWithoutUserInput
+    calendarEvents?: CalendarEventCreateNestedManyWithoutUserInput
+    calendarSources?: CalendarSourceCreateNestedManyWithoutUserInput
     contentHistory?: ContentHistoryCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeCreateNestedManyWithoutOwnerInput
     sessions?: SessionCreateNestedManyWithoutUserInput
@@ -47099,6 +56210,9 @@ export namespace Prisma {
     aiProviderKeys?: AIProviderKeyUncheckedCreateNestedManyWithoutUserInput
     adminActions?: AuditLogUncheckedCreateNestedManyWithoutUserInput
     categories?: CategoryUncheckedCreateNestedManyWithoutOwnerInput
+    calendarConnections?: CalendarConnectionUncheckedCreateNestedManyWithoutUserInput
+    calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutUserInput
+    calendarSources?: CalendarSourceUncheckedCreateNestedManyWithoutUserInput
     contentHistory?: ContentHistoryUncheckedCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeUncheckedCreateNestedManyWithoutOwnerInput
     sessions?: SessionUncheckedCreateNestedManyWithoutUserInput
@@ -47127,6 +56241,9 @@ export namespace Prisma {
     aiProviderKeys?: AIProviderKeyCreateNestedManyWithoutUserInput
     auditTargets?: AuditLogCreateNestedManyWithoutTargetUserInput
     categories?: CategoryCreateNestedManyWithoutOwnerInput
+    calendarConnections?: CalendarConnectionCreateNestedManyWithoutUserInput
+    calendarEvents?: CalendarEventCreateNestedManyWithoutUserInput
+    calendarSources?: CalendarSourceCreateNestedManyWithoutUserInput
     contentHistory?: ContentHistoryCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeCreateNestedManyWithoutOwnerInput
     sessions?: SessionCreateNestedManyWithoutUserInput
@@ -47150,6 +56267,9 @@ export namespace Prisma {
     aiProviderKeys?: AIProviderKeyUncheckedCreateNestedManyWithoutUserInput
     auditTargets?: AuditLogUncheckedCreateNestedManyWithoutTargetUserInput
     categories?: CategoryUncheckedCreateNestedManyWithoutOwnerInput
+    calendarConnections?: CalendarConnectionUncheckedCreateNestedManyWithoutUserInput
+    calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutUserInput
+    calendarSources?: CalendarSourceUncheckedCreateNestedManyWithoutUserInput
     contentHistory?: ContentHistoryUncheckedCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeUncheckedCreateNestedManyWithoutOwnerInput
     sessions?: SessionUncheckedCreateNestedManyWithoutUserInput
@@ -47209,6 +56329,7 @@ export namespace Prisma {
     children?: ContentNodeUpdateManyWithoutParentNestedInput
     contentPath?: ContentPathUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUpdateManyWithoutContentNestedInput
+    linkedCalendarEvents?: CalendarEventUpdateManyWithoutLinkedContentNestedInput
     trashBinEntry?: TrashBinUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUpdateManyWithoutContentNestedInput
   }
@@ -47247,6 +56368,7 @@ export namespace Prisma {
     children?: ContentNodeUncheckedUpdateManyWithoutParentNestedInput
     contentPath?: ContentPathUncheckedUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUncheckedUpdateManyWithoutContentNestedInput
+    linkedCalendarEvents?: CalendarEventUncheckedUpdateManyWithoutLinkedContentNestedInput
     trashBinEntry?: TrashBinUncheckedUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUncheckedUpdateManyWithoutContentNestedInput
   }
@@ -47276,6 +56398,9 @@ export namespace Prisma {
     aiProviderKeys?: AIProviderKeyUpdateManyWithoutUserNestedInput
     adminActions?: AuditLogUpdateManyWithoutUserNestedInput
     categories?: CategoryUpdateManyWithoutOwnerNestedInput
+    calendarConnections?: CalendarConnectionUpdateManyWithoutUserNestedInput
+    calendarEvents?: CalendarEventUpdateManyWithoutUserNestedInput
+    calendarSources?: CalendarSourceUpdateManyWithoutUserNestedInput
     contentHistory?: ContentHistoryUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUpdateManyWithoutUserNestedInput
@@ -47299,6 +56424,9 @@ export namespace Prisma {
     aiProviderKeys?: AIProviderKeyUncheckedUpdateManyWithoutUserNestedInput
     adminActions?: AuditLogUncheckedUpdateManyWithoutUserNestedInput
     categories?: CategoryUncheckedUpdateManyWithoutOwnerNestedInput
+    calendarConnections?: CalendarConnectionUncheckedUpdateManyWithoutUserNestedInput
+    calendarEvents?: CalendarEventUncheckedUpdateManyWithoutUserNestedInput
+    calendarSources?: CalendarSourceUncheckedUpdateManyWithoutUserNestedInput
     contentHistory?: ContentHistoryUncheckedUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUncheckedUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUncheckedUpdateManyWithoutUserNestedInput
@@ -47333,6 +56461,9 @@ export namespace Prisma {
     aiProviderKeys?: AIProviderKeyUpdateManyWithoutUserNestedInput
     auditTargets?: AuditLogUpdateManyWithoutTargetUserNestedInput
     categories?: CategoryUpdateManyWithoutOwnerNestedInput
+    calendarConnections?: CalendarConnectionUpdateManyWithoutUserNestedInput
+    calendarEvents?: CalendarEventUpdateManyWithoutUserNestedInput
+    calendarSources?: CalendarSourceUpdateManyWithoutUserNestedInput
     contentHistory?: ContentHistoryUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUpdateManyWithoutUserNestedInput
@@ -47356,6 +56487,9 @@ export namespace Prisma {
     aiProviderKeys?: AIProviderKeyUncheckedUpdateManyWithoutUserNestedInput
     auditTargets?: AuditLogUncheckedUpdateManyWithoutTargetUserNestedInput
     categories?: CategoryUncheckedUpdateManyWithoutOwnerNestedInput
+    calendarConnections?: CalendarConnectionUncheckedUpdateManyWithoutUserNestedInput
+    calendarEvents?: CalendarEventUncheckedUpdateManyWithoutUserNestedInput
+    calendarSources?: CalendarSourceUncheckedUpdateManyWithoutUserNestedInput
     contentHistory?: ContentHistoryUncheckedUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUncheckedUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUncheckedUpdateManyWithoutUserNestedInput
@@ -47399,6 +56533,7 @@ export namespace Prisma {
     children?: ContentNodeCreateNestedManyWithoutParentInput
     contentPath?: ContentPathCreateNestedOneWithoutContentInput
     contentTags?: ContentTagCreateNestedManyWithoutContentInput
+    linkedCalendarEvents?: CalendarEventCreateNestedManyWithoutLinkedContentInput
     trashBinEntry?: TrashBinCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantCreateNestedManyWithoutContentInput
   }
@@ -47437,6 +56572,7 @@ export namespace Prisma {
     children?: ContentNodeUncheckedCreateNestedManyWithoutParentInput
     contentPath?: ContentPathUncheckedCreateNestedOneWithoutContentInput
     contentTags?: ContentTagUncheckedCreateNestedManyWithoutContentInput
+    linkedCalendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutLinkedContentInput
     trashBinEntry?: TrashBinUncheckedCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantUncheckedCreateNestedManyWithoutContentInput
   }
@@ -47491,6 +56627,7 @@ export namespace Prisma {
     children?: ContentNodeUpdateManyWithoutParentNestedInput
     contentPath?: ContentPathUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUpdateManyWithoutContentNestedInput
+    linkedCalendarEvents?: CalendarEventUpdateManyWithoutLinkedContentNestedInput
     trashBinEntry?: TrashBinUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUpdateManyWithoutContentNestedInput
   }
@@ -47529,6 +56666,7 @@ export namespace Prisma {
     children?: ContentNodeUncheckedUpdateManyWithoutParentNestedInput
     contentPath?: ContentPathUncheckedUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUncheckedUpdateManyWithoutContentNestedInput
+    linkedCalendarEvents?: CalendarEventUncheckedUpdateManyWithoutLinkedContentNestedInput
     trashBinEntry?: TrashBinUncheckedUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUncheckedUpdateManyWithoutContentNestedInput
   }
@@ -47567,6 +56705,7 @@ export namespace Prisma {
     children?: ContentNodeCreateNestedManyWithoutParentInput
     contentPath?: ContentPathCreateNestedOneWithoutContentInput
     contentTags?: ContentTagCreateNestedManyWithoutContentInput
+    linkedCalendarEvents?: CalendarEventCreateNestedManyWithoutLinkedContentInput
     trashBinEntry?: TrashBinCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantCreateNestedManyWithoutContentInput
   }
@@ -47605,6 +56744,7 @@ export namespace Prisma {
     children?: ContentNodeUncheckedCreateNestedManyWithoutParentInput
     contentPath?: ContentPathUncheckedCreateNestedOneWithoutContentInput
     contentTags?: ContentTagUncheckedCreateNestedManyWithoutContentInput
+    linkedCalendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutLinkedContentInput
     trashBinEntry?: TrashBinUncheckedCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantUncheckedCreateNestedManyWithoutContentInput
   }
@@ -47659,6 +56799,7 @@ export namespace Prisma {
     children?: ContentNodeUpdateManyWithoutParentNestedInput
     contentPath?: ContentPathUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUpdateManyWithoutContentNestedInput
+    linkedCalendarEvents?: CalendarEventUpdateManyWithoutLinkedContentNestedInput
     trashBinEntry?: TrashBinUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUpdateManyWithoutContentNestedInput
   }
@@ -47697,6 +56838,7 @@ export namespace Prisma {
     children?: ContentNodeUncheckedUpdateManyWithoutParentNestedInput
     contentPath?: ContentPathUncheckedUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUncheckedUpdateManyWithoutContentNestedInput
+    linkedCalendarEvents?: CalendarEventUncheckedUpdateManyWithoutLinkedContentNestedInput
     trashBinEntry?: TrashBinUncheckedUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUncheckedUpdateManyWithoutContentNestedInput
   }
@@ -47735,6 +56877,7 @@ export namespace Prisma {
     children?: ContentNodeCreateNestedManyWithoutParentInput
     contentPath?: ContentPathCreateNestedOneWithoutContentInput
     contentTags?: ContentTagCreateNestedManyWithoutContentInput
+    linkedCalendarEvents?: CalendarEventCreateNestedManyWithoutLinkedContentInput
     trashBinEntry?: TrashBinCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantCreateNestedManyWithoutContentInput
   }
@@ -47773,6 +56916,7 @@ export namespace Prisma {
     children?: ContentNodeUncheckedCreateNestedManyWithoutParentInput
     contentPath?: ContentPathUncheckedCreateNestedOneWithoutContentInput
     contentTags?: ContentTagUncheckedCreateNestedManyWithoutContentInput
+    linkedCalendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutLinkedContentInput
     trashBinEntry?: TrashBinUncheckedCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantUncheckedCreateNestedManyWithoutContentInput
   }
@@ -47827,6 +56971,7 @@ export namespace Prisma {
     children?: ContentNodeUpdateManyWithoutParentNestedInput
     contentPath?: ContentPathUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUpdateManyWithoutContentNestedInput
+    linkedCalendarEvents?: CalendarEventUpdateManyWithoutLinkedContentNestedInput
     trashBinEntry?: TrashBinUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUpdateManyWithoutContentNestedInput
   }
@@ -47865,6 +57010,7 @@ export namespace Prisma {
     children?: ContentNodeUncheckedUpdateManyWithoutParentNestedInput
     contentPath?: ContentPathUncheckedUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUncheckedUpdateManyWithoutContentNestedInput
+    linkedCalendarEvents?: CalendarEventUncheckedUpdateManyWithoutLinkedContentNestedInput
     trashBinEntry?: TrashBinUncheckedUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUncheckedUpdateManyWithoutContentNestedInput
   }
@@ -47903,6 +57049,7 @@ export namespace Prisma {
     children?: ContentNodeCreateNestedManyWithoutParentInput
     contentPath?: ContentPathCreateNestedOneWithoutContentInput
     contentTags?: ContentTagCreateNestedManyWithoutContentInput
+    linkedCalendarEvents?: CalendarEventCreateNestedManyWithoutLinkedContentInput
     trashBinEntry?: TrashBinCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantCreateNestedManyWithoutContentInput
   }
@@ -47941,6 +57088,7 @@ export namespace Prisma {
     children?: ContentNodeUncheckedCreateNestedManyWithoutParentInput
     contentPath?: ContentPathUncheckedCreateNestedOneWithoutContentInput
     contentTags?: ContentTagUncheckedCreateNestedManyWithoutContentInput
+    linkedCalendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutLinkedContentInput
     trashBinEntry?: TrashBinUncheckedCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantUncheckedCreateNestedManyWithoutContentInput
   }
@@ -47995,6 +57143,7 @@ export namespace Prisma {
     children?: ContentNodeUpdateManyWithoutParentNestedInput
     contentPath?: ContentPathUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUpdateManyWithoutContentNestedInput
+    linkedCalendarEvents?: CalendarEventUpdateManyWithoutLinkedContentNestedInput
     trashBinEntry?: TrashBinUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUpdateManyWithoutContentNestedInput
   }
@@ -48033,6 +57182,7 @@ export namespace Prisma {
     children?: ContentNodeUncheckedUpdateManyWithoutParentNestedInput
     contentPath?: ContentPathUncheckedUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUncheckedUpdateManyWithoutContentNestedInput
+    linkedCalendarEvents?: CalendarEventUncheckedUpdateManyWithoutLinkedContentNestedInput
     trashBinEntry?: TrashBinUncheckedUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUncheckedUpdateManyWithoutContentNestedInput
   }
@@ -48071,6 +57221,7 @@ export namespace Prisma {
     children?: ContentNodeCreateNestedManyWithoutParentInput
     contentPath?: ContentPathCreateNestedOneWithoutContentInput
     contentTags?: ContentTagCreateNestedManyWithoutContentInput
+    linkedCalendarEvents?: CalendarEventCreateNestedManyWithoutLinkedContentInput
     trashBinEntry?: TrashBinCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantCreateNestedManyWithoutContentInput
   }
@@ -48109,6 +57260,7 @@ export namespace Prisma {
     children?: ContentNodeUncheckedCreateNestedManyWithoutParentInput
     contentPath?: ContentPathUncheckedCreateNestedOneWithoutContentInput
     contentTags?: ContentTagUncheckedCreateNestedManyWithoutContentInput
+    linkedCalendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutLinkedContentInput
     trashBinEntry?: TrashBinUncheckedCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantUncheckedCreateNestedManyWithoutContentInput
   }
@@ -48163,6 +57315,7 @@ export namespace Prisma {
     children?: ContentNodeUpdateManyWithoutParentNestedInput
     contentPath?: ContentPathUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUpdateManyWithoutContentNestedInput
+    linkedCalendarEvents?: CalendarEventUpdateManyWithoutLinkedContentNestedInput
     trashBinEntry?: TrashBinUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUpdateManyWithoutContentNestedInput
   }
@@ -48201,6 +57354,7 @@ export namespace Prisma {
     children?: ContentNodeUncheckedUpdateManyWithoutParentNestedInput
     contentPath?: ContentPathUncheckedUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUncheckedUpdateManyWithoutContentNestedInput
+    linkedCalendarEvents?: CalendarEventUncheckedUpdateManyWithoutLinkedContentNestedInput
     trashBinEntry?: TrashBinUncheckedUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUncheckedUpdateManyWithoutContentNestedInput
   }
@@ -48239,6 +57393,7 @@ export namespace Prisma {
     children?: ContentNodeCreateNestedManyWithoutParentInput
     contentPath?: ContentPathCreateNestedOneWithoutContentInput
     contentTags?: ContentTagCreateNestedManyWithoutContentInput
+    linkedCalendarEvents?: CalendarEventCreateNestedManyWithoutLinkedContentInput
     trashBinEntry?: TrashBinCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantCreateNestedManyWithoutContentInput
   }
@@ -48277,6 +57432,7 @@ export namespace Prisma {
     children?: ContentNodeUncheckedCreateNestedManyWithoutParentInput
     contentPath?: ContentPathUncheckedCreateNestedOneWithoutContentInput
     contentTags?: ContentTagUncheckedCreateNestedManyWithoutContentInput
+    linkedCalendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutLinkedContentInput
     trashBinEntry?: TrashBinUncheckedCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantUncheckedCreateNestedManyWithoutContentInput
   }
@@ -48331,6 +57487,7 @@ export namespace Prisma {
     children?: ContentNodeUpdateManyWithoutParentNestedInput
     contentPath?: ContentPathUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUpdateManyWithoutContentNestedInput
+    linkedCalendarEvents?: CalendarEventUpdateManyWithoutLinkedContentNestedInput
     trashBinEntry?: TrashBinUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUpdateManyWithoutContentNestedInput
   }
@@ -48369,6 +57526,7 @@ export namespace Prisma {
     children?: ContentNodeUncheckedUpdateManyWithoutParentNestedInput
     contentPath?: ContentPathUncheckedUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUncheckedUpdateManyWithoutContentNestedInput
+    linkedCalendarEvents?: CalendarEventUncheckedUpdateManyWithoutLinkedContentNestedInput
     trashBinEntry?: TrashBinUncheckedUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUncheckedUpdateManyWithoutContentNestedInput
   }
@@ -48407,6 +57565,7 @@ export namespace Prisma {
     children?: ContentNodeCreateNestedManyWithoutParentInput
     contentPath?: ContentPathCreateNestedOneWithoutContentInput
     contentTags?: ContentTagCreateNestedManyWithoutContentInput
+    linkedCalendarEvents?: CalendarEventCreateNestedManyWithoutLinkedContentInput
     trashBinEntry?: TrashBinCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantCreateNestedManyWithoutContentInput
   }
@@ -48445,6 +57604,7 @@ export namespace Prisma {
     children?: ContentNodeUncheckedCreateNestedManyWithoutParentInput
     contentPath?: ContentPathUncheckedCreateNestedOneWithoutContentInput
     contentTags?: ContentTagUncheckedCreateNestedManyWithoutContentInput
+    linkedCalendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutLinkedContentInput
     trashBinEntry?: TrashBinUncheckedCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantUncheckedCreateNestedManyWithoutContentInput
   }
@@ -48499,6 +57659,7 @@ export namespace Prisma {
     children?: ContentNodeUpdateManyWithoutParentNestedInput
     contentPath?: ContentPathUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUpdateManyWithoutContentNestedInput
+    linkedCalendarEvents?: CalendarEventUpdateManyWithoutLinkedContentNestedInput
     trashBinEntry?: TrashBinUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUpdateManyWithoutContentNestedInput
   }
@@ -48537,6 +57698,7 @@ export namespace Prisma {
     children?: ContentNodeUncheckedUpdateManyWithoutParentNestedInput
     contentPath?: ContentPathUncheckedUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUncheckedUpdateManyWithoutContentNestedInput
+    linkedCalendarEvents?: CalendarEventUncheckedUpdateManyWithoutLinkedContentNestedInput
     trashBinEntry?: TrashBinUncheckedUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUncheckedUpdateManyWithoutContentNestedInput
   }
@@ -48601,6 +57763,29 @@ export namespace Prisma {
     tagId: string
     createdAt?: Date | string
     positions?: JsonNullValueInput | InputJsonValue
+  }
+
+  export type CalendarEventCreateManyLinkedContentInput = {
+    id?: string
+    userId: string
+    sourceId: string
+    externalEventId?: string | null
+    title: string
+    description?: string | null
+    location?: string | null
+    startAt: Date | string
+    endAt: Date | string
+    allDay?: boolean
+    timezone?: string | null
+    recurrenceRule?: string | null
+    recurrenceExDates?: JsonNullValueInput | InputJsonValue
+    recurrenceOverrides?: JsonNullValueInput | InputJsonValue
+    status?: $Enums.CalendarEventStatus
+    meetingUrl?: string | null
+    providerMetadata?: JsonNullValueInput | InputJsonValue
+    lastSyncedAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
   }
 
   export type ViewGrantCreateManyContentInput = {
@@ -48756,6 +57941,7 @@ export namespace Prisma {
     children?: ContentNodeUpdateManyWithoutParentNestedInput
     contentPath?: ContentPathUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUpdateManyWithoutContentNestedInput
+    linkedCalendarEvents?: CalendarEventUpdateManyWithoutLinkedContentNestedInput
     trashBinEntry?: TrashBinUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUpdateManyWithoutContentNestedInput
   }
@@ -48794,6 +57980,7 @@ export namespace Prisma {
     children?: ContentNodeUncheckedUpdateManyWithoutParentNestedInput
     contentPath?: ContentPathUncheckedUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUncheckedUpdateManyWithoutContentNestedInput
+    linkedCalendarEvents?: CalendarEventUncheckedUpdateManyWithoutLinkedContentNestedInput
     trashBinEntry?: TrashBinUncheckedUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUncheckedUpdateManyWithoutContentNestedInput
   }
@@ -48837,6 +58024,77 @@ export namespace Prisma {
     positions?: JsonNullValueInput | InputJsonValue
   }
 
+  export type CalendarEventUpdateWithoutLinkedContentInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    externalEventId?: NullableStringFieldUpdateOperationsInput | string | null
+    title?: StringFieldUpdateOperationsInput | string
+    description?: NullableStringFieldUpdateOperationsInput | string | null
+    location?: NullableStringFieldUpdateOperationsInput | string | null
+    startAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    endAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    allDay?: BoolFieldUpdateOperationsInput | boolean
+    timezone?: NullableStringFieldUpdateOperationsInput | string | null
+    recurrenceRule?: NullableStringFieldUpdateOperationsInput | string | null
+    recurrenceExDates?: JsonNullValueInput | InputJsonValue
+    recurrenceOverrides?: JsonNullValueInput | InputJsonValue
+    status?: EnumCalendarEventStatusFieldUpdateOperationsInput | $Enums.CalendarEventStatus
+    meetingUrl?: NullableStringFieldUpdateOperationsInput | string | null
+    providerMetadata?: JsonNullValueInput | InputJsonValue
+    lastSyncedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    attendees?: CalendarEventAttendeeUpdateManyWithoutEventNestedInput
+    source?: CalendarSourceUpdateOneRequiredWithoutEventsNestedInput
+    user?: UserUpdateOneRequiredWithoutCalendarEventsNestedInput
+  }
+
+  export type CalendarEventUncheckedUpdateWithoutLinkedContentInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    userId?: StringFieldUpdateOperationsInput | string
+    sourceId?: StringFieldUpdateOperationsInput | string
+    externalEventId?: NullableStringFieldUpdateOperationsInput | string | null
+    title?: StringFieldUpdateOperationsInput | string
+    description?: NullableStringFieldUpdateOperationsInput | string | null
+    location?: NullableStringFieldUpdateOperationsInput | string | null
+    startAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    endAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    allDay?: BoolFieldUpdateOperationsInput | boolean
+    timezone?: NullableStringFieldUpdateOperationsInput | string | null
+    recurrenceRule?: NullableStringFieldUpdateOperationsInput | string | null
+    recurrenceExDates?: JsonNullValueInput | InputJsonValue
+    recurrenceOverrides?: JsonNullValueInput | InputJsonValue
+    status?: EnumCalendarEventStatusFieldUpdateOperationsInput | $Enums.CalendarEventStatus
+    meetingUrl?: NullableStringFieldUpdateOperationsInput | string | null
+    providerMetadata?: JsonNullValueInput | InputJsonValue
+    lastSyncedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    attendees?: CalendarEventAttendeeUncheckedUpdateManyWithoutEventNestedInput
+  }
+
+  export type CalendarEventUncheckedUpdateManyWithoutLinkedContentInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    userId?: StringFieldUpdateOperationsInput | string
+    sourceId?: StringFieldUpdateOperationsInput | string
+    externalEventId?: NullableStringFieldUpdateOperationsInput | string | null
+    title?: StringFieldUpdateOperationsInput | string
+    description?: NullableStringFieldUpdateOperationsInput | string | null
+    location?: NullableStringFieldUpdateOperationsInput | string | null
+    startAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    endAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    allDay?: BoolFieldUpdateOperationsInput | boolean
+    timezone?: NullableStringFieldUpdateOperationsInput | string | null
+    recurrenceRule?: NullableStringFieldUpdateOperationsInput | string | null
+    recurrenceExDates?: JsonNullValueInput | InputJsonValue
+    recurrenceOverrides?: JsonNullValueInput | InputJsonValue
+    status?: EnumCalendarEventStatusFieldUpdateOperationsInput | $Enums.CalendarEventStatus
+    meetingUrl?: NullableStringFieldUpdateOperationsInput | string | null
+    providerMetadata?: JsonNullValueInput | InputJsonValue
+    lastSyncedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
   export type ViewGrantUpdateWithoutContentInput = {
     id?: StringFieldUpdateOperationsInput | string
     accessLevel?: StringFieldUpdateOperationsInput | string
@@ -48868,6 +58126,7 @@ export namespace Prisma {
     refreshToken?: string | null
     accessToken?: string | null
     expiresAt?: Date | string | null
+    scope?: string | null
     createdAt?: Date | string
   }
 
@@ -48911,6 +58170,61 @@ export namespace Prisma {
     description?: string | null
     displayOrder?: number
     isPublished?: boolean
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type CalendarConnectionCreateManyUserInput = {
+    id?: string
+    provider: $Enums.CalendarProvider
+    displayName: string
+    status?: $Enums.CalendarConnectionStatus
+    syncStatus?: $Enums.CalendarSyncStatus
+    providerConfig?: JsonNullValueInput | InputJsonValue
+    syncCursor?: string | null
+    lastSyncedAt?: Date | string | null
+    lastSyncError?: string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type CalendarEventCreateManyUserInput = {
+    id?: string
+    sourceId: string
+    externalEventId?: string | null
+    title: string
+    description?: string | null
+    location?: string | null
+    startAt: Date | string
+    endAt: Date | string
+    allDay?: boolean
+    timezone?: string | null
+    recurrenceRule?: string | null
+    recurrenceExDates?: JsonNullValueInput | InputJsonValue
+    recurrenceOverrides?: JsonNullValueInput | InputJsonValue
+    status?: $Enums.CalendarEventStatus
+    meetingUrl?: string | null
+    linkedContentId?: string | null
+    providerMetadata?: JsonNullValueInput | InputJsonValue
+    lastSyncedAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type CalendarSourceCreateManyUserInput = {
+    id?: string
+    connectionId?: string | null
+    title: string
+    color?: string
+    timezone?: string | null
+    visible?: boolean
+    isReadOnly?: boolean
+    isPrimary?: boolean
+    syncMode?: $Enums.CalendarSourceSyncMode
+    externalCalendarId?: string | null
+    metadata?: JsonNullValueInput | InputJsonValue
+    lastSyncedAt?: Date | string | null
+    lastSyncError?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
   }
@@ -48992,6 +58306,7 @@ export namespace Prisma {
     refreshToken?: NullableStringFieldUpdateOperationsInput | string | null
     accessToken?: NullableStringFieldUpdateOperationsInput | string | null
     expiresAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    scope?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
@@ -49002,6 +58317,7 @@ export namespace Prisma {
     refreshToken?: NullableStringFieldUpdateOperationsInput | string | null
     accessToken?: NullableStringFieldUpdateOperationsInput | string | null
     expiresAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    scope?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
@@ -49012,6 +58328,7 @@ export namespace Prisma {
     refreshToken?: NullableStringFieldUpdateOperationsInput | string | null
     accessToken?: NullableStringFieldUpdateOperationsInput | string | null
     expiresAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    scope?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
@@ -49149,6 +58466,177 @@ export namespace Prisma {
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
+  export type CalendarConnectionUpdateWithoutUserInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    provider?: EnumCalendarProviderFieldUpdateOperationsInput | $Enums.CalendarProvider
+    displayName?: StringFieldUpdateOperationsInput | string
+    status?: EnumCalendarConnectionStatusFieldUpdateOperationsInput | $Enums.CalendarConnectionStatus
+    syncStatus?: EnumCalendarSyncStatusFieldUpdateOperationsInput | $Enums.CalendarSyncStatus
+    providerConfig?: JsonNullValueInput | InputJsonValue
+    syncCursor?: NullableStringFieldUpdateOperationsInput | string | null
+    lastSyncedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    lastSyncError?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    sources?: CalendarSourceUpdateManyWithoutConnectionNestedInput
+  }
+
+  export type CalendarConnectionUncheckedUpdateWithoutUserInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    provider?: EnumCalendarProviderFieldUpdateOperationsInput | $Enums.CalendarProvider
+    displayName?: StringFieldUpdateOperationsInput | string
+    status?: EnumCalendarConnectionStatusFieldUpdateOperationsInput | $Enums.CalendarConnectionStatus
+    syncStatus?: EnumCalendarSyncStatusFieldUpdateOperationsInput | $Enums.CalendarSyncStatus
+    providerConfig?: JsonNullValueInput | InputJsonValue
+    syncCursor?: NullableStringFieldUpdateOperationsInput | string | null
+    lastSyncedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    lastSyncError?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    sources?: CalendarSourceUncheckedUpdateManyWithoutConnectionNestedInput
+  }
+
+  export type CalendarConnectionUncheckedUpdateManyWithoutUserInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    provider?: EnumCalendarProviderFieldUpdateOperationsInput | $Enums.CalendarProvider
+    displayName?: StringFieldUpdateOperationsInput | string
+    status?: EnumCalendarConnectionStatusFieldUpdateOperationsInput | $Enums.CalendarConnectionStatus
+    syncStatus?: EnumCalendarSyncStatusFieldUpdateOperationsInput | $Enums.CalendarSyncStatus
+    providerConfig?: JsonNullValueInput | InputJsonValue
+    syncCursor?: NullableStringFieldUpdateOperationsInput | string | null
+    lastSyncedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    lastSyncError?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type CalendarEventUpdateWithoutUserInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    externalEventId?: NullableStringFieldUpdateOperationsInput | string | null
+    title?: StringFieldUpdateOperationsInput | string
+    description?: NullableStringFieldUpdateOperationsInput | string | null
+    location?: NullableStringFieldUpdateOperationsInput | string | null
+    startAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    endAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    allDay?: BoolFieldUpdateOperationsInput | boolean
+    timezone?: NullableStringFieldUpdateOperationsInput | string | null
+    recurrenceRule?: NullableStringFieldUpdateOperationsInput | string | null
+    recurrenceExDates?: JsonNullValueInput | InputJsonValue
+    recurrenceOverrides?: JsonNullValueInput | InputJsonValue
+    status?: EnumCalendarEventStatusFieldUpdateOperationsInput | $Enums.CalendarEventStatus
+    meetingUrl?: NullableStringFieldUpdateOperationsInput | string | null
+    providerMetadata?: JsonNullValueInput | InputJsonValue
+    lastSyncedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    attendees?: CalendarEventAttendeeUpdateManyWithoutEventNestedInput
+    linkedContent?: ContentNodeUpdateOneWithoutLinkedCalendarEventsNestedInput
+    source?: CalendarSourceUpdateOneRequiredWithoutEventsNestedInput
+  }
+
+  export type CalendarEventUncheckedUpdateWithoutUserInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    sourceId?: StringFieldUpdateOperationsInput | string
+    externalEventId?: NullableStringFieldUpdateOperationsInput | string | null
+    title?: StringFieldUpdateOperationsInput | string
+    description?: NullableStringFieldUpdateOperationsInput | string | null
+    location?: NullableStringFieldUpdateOperationsInput | string | null
+    startAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    endAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    allDay?: BoolFieldUpdateOperationsInput | boolean
+    timezone?: NullableStringFieldUpdateOperationsInput | string | null
+    recurrenceRule?: NullableStringFieldUpdateOperationsInput | string | null
+    recurrenceExDates?: JsonNullValueInput | InputJsonValue
+    recurrenceOverrides?: JsonNullValueInput | InputJsonValue
+    status?: EnumCalendarEventStatusFieldUpdateOperationsInput | $Enums.CalendarEventStatus
+    meetingUrl?: NullableStringFieldUpdateOperationsInput | string | null
+    linkedContentId?: NullableStringFieldUpdateOperationsInput | string | null
+    providerMetadata?: JsonNullValueInput | InputJsonValue
+    lastSyncedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    attendees?: CalendarEventAttendeeUncheckedUpdateManyWithoutEventNestedInput
+  }
+
+  export type CalendarEventUncheckedUpdateManyWithoutUserInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    sourceId?: StringFieldUpdateOperationsInput | string
+    externalEventId?: NullableStringFieldUpdateOperationsInput | string | null
+    title?: StringFieldUpdateOperationsInput | string
+    description?: NullableStringFieldUpdateOperationsInput | string | null
+    location?: NullableStringFieldUpdateOperationsInput | string | null
+    startAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    endAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    allDay?: BoolFieldUpdateOperationsInput | boolean
+    timezone?: NullableStringFieldUpdateOperationsInput | string | null
+    recurrenceRule?: NullableStringFieldUpdateOperationsInput | string | null
+    recurrenceExDates?: JsonNullValueInput | InputJsonValue
+    recurrenceOverrides?: JsonNullValueInput | InputJsonValue
+    status?: EnumCalendarEventStatusFieldUpdateOperationsInput | $Enums.CalendarEventStatus
+    meetingUrl?: NullableStringFieldUpdateOperationsInput | string | null
+    linkedContentId?: NullableStringFieldUpdateOperationsInput | string | null
+    providerMetadata?: JsonNullValueInput | InputJsonValue
+    lastSyncedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type CalendarSourceUpdateWithoutUserInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    title?: StringFieldUpdateOperationsInput | string
+    color?: StringFieldUpdateOperationsInput | string
+    timezone?: NullableStringFieldUpdateOperationsInput | string | null
+    visible?: BoolFieldUpdateOperationsInput | boolean
+    isReadOnly?: BoolFieldUpdateOperationsInput | boolean
+    isPrimary?: BoolFieldUpdateOperationsInput | boolean
+    syncMode?: EnumCalendarSourceSyncModeFieldUpdateOperationsInput | $Enums.CalendarSourceSyncMode
+    externalCalendarId?: NullableStringFieldUpdateOperationsInput | string | null
+    metadata?: JsonNullValueInput | InputJsonValue
+    lastSyncedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    lastSyncError?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    connection?: CalendarConnectionUpdateOneWithoutSourcesNestedInput
+    events?: CalendarEventUpdateManyWithoutSourceNestedInput
+  }
+
+  export type CalendarSourceUncheckedUpdateWithoutUserInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    connectionId?: NullableStringFieldUpdateOperationsInput | string | null
+    title?: StringFieldUpdateOperationsInput | string
+    color?: StringFieldUpdateOperationsInput | string
+    timezone?: NullableStringFieldUpdateOperationsInput | string | null
+    visible?: BoolFieldUpdateOperationsInput | boolean
+    isReadOnly?: BoolFieldUpdateOperationsInput | boolean
+    isPrimary?: BoolFieldUpdateOperationsInput | boolean
+    syncMode?: EnumCalendarSourceSyncModeFieldUpdateOperationsInput | $Enums.CalendarSourceSyncMode
+    externalCalendarId?: NullableStringFieldUpdateOperationsInput | string | null
+    metadata?: JsonNullValueInput | InputJsonValue
+    lastSyncedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    lastSyncError?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    events?: CalendarEventUncheckedUpdateManyWithoutSourceNestedInput
+  }
+
+  export type CalendarSourceUncheckedUpdateManyWithoutUserInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    connectionId?: NullableStringFieldUpdateOperationsInput | string | null
+    title?: StringFieldUpdateOperationsInput | string
+    color?: StringFieldUpdateOperationsInput | string
+    timezone?: NullableStringFieldUpdateOperationsInput | string | null
+    visible?: BoolFieldUpdateOperationsInput | boolean
+    isReadOnly?: BoolFieldUpdateOperationsInput | boolean
+    isPrimary?: BoolFieldUpdateOperationsInput | boolean
+    syncMode?: EnumCalendarSourceSyncModeFieldUpdateOperationsInput | $Enums.CalendarSourceSyncMode
+    externalCalendarId?: NullableStringFieldUpdateOperationsInput | string | null
+    metadata?: JsonNullValueInput | InputJsonValue
+    lastSyncedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    lastSyncError?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
   export type ContentHistoryUpdateWithoutUserInput = {
     id?: StringFieldUpdateOperationsInput | string
     version?: IntFieldUpdateOperationsInput | number
@@ -49207,6 +58695,7 @@ export namespace Prisma {
     children?: ContentNodeUpdateManyWithoutParentNestedInput
     contentPath?: ContentPathUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUpdateManyWithoutContentNestedInput
+    linkedCalendarEvents?: CalendarEventUpdateManyWithoutLinkedContentNestedInput
     trashBinEntry?: TrashBinUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUpdateManyWithoutContentNestedInput
   }
@@ -49245,6 +58734,7 @@ export namespace Prisma {
     children?: ContentNodeUncheckedUpdateManyWithoutParentNestedInput
     contentPath?: ContentPathUncheckedUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUncheckedUpdateManyWithoutContentNestedInput
+    linkedCalendarEvents?: CalendarEventUncheckedUpdateManyWithoutLinkedContentNestedInput
     trashBinEntry?: TrashBinUncheckedUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUncheckedUpdateManyWithoutContentNestedInput
   }
@@ -49453,6 +58943,7 @@ export namespace Prisma {
     children?: ContentNodeUpdateManyWithoutParentNestedInput
     contentPath?: ContentPathUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUpdateManyWithoutContentNestedInput
+    linkedCalendarEvents?: CalendarEventUpdateManyWithoutLinkedContentNestedInput
     trashBinEntry?: TrashBinUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUpdateManyWithoutContentNestedInput
   }
@@ -49491,6 +58982,7 @@ export namespace Prisma {
     children?: ContentNodeUncheckedUpdateManyWithoutParentNestedInput
     contentPath?: ContentPathUncheckedUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUncheckedUpdateManyWithoutContentNestedInput
+    linkedCalendarEvents?: CalendarEventUncheckedUpdateManyWithoutLinkedContentNestedInput
     trashBinEntry?: TrashBinUncheckedUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUncheckedUpdateManyWithoutContentNestedInput
   }
@@ -49539,6 +59031,218 @@ export namespace Prisma {
     contentId?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     positions?: JsonNullValueInput | InputJsonValue
+  }
+
+  export type CalendarSourceCreateManyConnectionInput = {
+    id?: string
+    userId: string
+    title: string
+    color?: string
+    timezone?: string | null
+    visible?: boolean
+    isReadOnly?: boolean
+    isPrimary?: boolean
+    syncMode?: $Enums.CalendarSourceSyncMode
+    externalCalendarId?: string | null
+    metadata?: JsonNullValueInput | InputJsonValue
+    lastSyncedAt?: Date | string | null
+    lastSyncError?: string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type CalendarSourceUpdateWithoutConnectionInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    title?: StringFieldUpdateOperationsInput | string
+    color?: StringFieldUpdateOperationsInput | string
+    timezone?: NullableStringFieldUpdateOperationsInput | string | null
+    visible?: BoolFieldUpdateOperationsInput | boolean
+    isReadOnly?: BoolFieldUpdateOperationsInput | boolean
+    isPrimary?: BoolFieldUpdateOperationsInput | boolean
+    syncMode?: EnumCalendarSourceSyncModeFieldUpdateOperationsInput | $Enums.CalendarSourceSyncMode
+    externalCalendarId?: NullableStringFieldUpdateOperationsInput | string | null
+    metadata?: JsonNullValueInput | InputJsonValue
+    lastSyncedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    lastSyncError?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    events?: CalendarEventUpdateManyWithoutSourceNestedInput
+    user?: UserUpdateOneRequiredWithoutCalendarSourcesNestedInput
+  }
+
+  export type CalendarSourceUncheckedUpdateWithoutConnectionInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    userId?: StringFieldUpdateOperationsInput | string
+    title?: StringFieldUpdateOperationsInput | string
+    color?: StringFieldUpdateOperationsInput | string
+    timezone?: NullableStringFieldUpdateOperationsInput | string | null
+    visible?: BoolFieldUpdateOperationsInput | boolean
+    isReadOnly?: BoolFieldUpdateOperationsInput | boolean
+    isPrimary?: BoolFieldUpdateOperationsInput | boolean
+    syncMode?: EnumCalendarSourceSyncModeFieldUpdateOperationsInput | $Enums.CalendarSourceSyncMode
+    externalCalendarId?: NullableStringFieldUpdateOperationsInput | string | null
+    metadata?: JsonNullValueInput | InputJsonValue
+    lastSyncedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    lastSyncError?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    events?: CalendarEventUncheckedUpdateManyWithoutSourceNestedInput
+  }
+
+  export type CalendarSourceUncheckedUpdateManyWithoutConnectionInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    userId?: StringFieldUpdateOperationsInput | string
+    title?: StringFieldUpdateOperationsInput | string
+    color?: StringFieldUpdateOperationsInput | string
+    timezone?: NullableStringFieldUpdateOperationsInput | string | null
+    visible?: BoolFieldUpdateOperationsInput | boolean
+    isReadOnly?: BoolFieldUpdateOperationsInput | boolean
+    isPrimary?: BoolFieldUpdateOperationsInput | boolean
+    syncMode?: EnumCalendarSourceSyncModeFieldUpdateOperationsInput | $Enums.CalendarSourceSyncMode
+    externalCalendarId?: NullableStringFieldUpdateOperationsInput | string | null
+    metadata?: JsonNullValueInput | InputJsonValue
+    lastSyncedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    lastSyncError?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type CalendarEventCreateManySourceInput = {
+    id?: string
+    userId: string
+    externalEventId?: string | null
+    title: string
+    description?: string | null
+    location?: string | null
+    startAt: Date | string
+    endAt: Date | string
+    allDay?: boolean
+    timezone?: string | null
+    recurrenceRule?: string | null
+    recurrenceExDates?: JsonNullValueInput | InputJsonValue
+    recurrenceOverrides?: JsonNullValueInput | InputJsonValue
+    status?: $Enums.CalendarEventStatus
+    meetingUrl?: string | null
+    linkedContentId?: string | null
+    providerMetadata?: JsonNullValueInput | InputJsonValue
+    lastSyncedAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type CalendarEventUpdateWithoutSourceInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    externalEventId?: NullableStringFieldUpdateOperationsInput | string | null
+    title?: StringFieldUpdateOperationsInput | string
+    description?: NullableStringFieldUpdateOperationsInput | string | null
+    location?: NullableStringFieldUpdateOperationsInput | string | null
+    startAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    endAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    allDay?: BoolFieldUpdateOperationsInput | boolean
+    timezone?: NullableStringFieldUpdateOperationsInput | string | null
+    recurrenceRule?: NullableStringFieldUpdateOperationsInput | string | null
+    recurrenceExDates?: JsonNullValueInput | InputJsonValue
+    recurrenceOverrides?: JsonNullValueInput | InputJsonValue
+    status?: EnumCalendarEventStatusFieldUpdateOperationsInput | $Enums.CalendarEventStatus
+    meetingUrl?: NullableStringFieldUpdateOperationsInput | string | null
+    providerMetadata?: JsonNullValueInput | InputJsonValue
+    lastSyncedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    attendees?: CalendarEventAttendeeUpdateManyWithoutEventNestedInput
+    linkedContent?: ContentNodeUpdateOneWithoutLinkedCalendarEventsNestedInput
+    user?: UserUpdateOneRequiredWithoutCalendarEventsNestedInput
+  }
+
+  export type CalendarEventUncheckedUpdateWithoutSourceInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    userId?: StringFieldUpdateOperationsInput | string
+    externalEventId?: NullableStringFieldUpdateOperationsInput | string | null
+    title?: StringFieldUpdateOperationsInput | string
+    description?: NullableStringFieldUpdateOperationsInput | string | null
+    location?: NullableStringFieldUpdateOperationsInput | string | null
+    startAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    endAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    allDay?: BoolFieldUpdateOperationsInput | boolean
+    timezone?: NullableStringFieldUpdateOperationsInput | string | null
+    recurrenceRule?: NullableStringFieldUpdateOperationsInput | string | null
+    recurrenceExDates?: JsonNullValueInput | InputJsonValue
+    recurrenceOverrides?: JsonNullValueInput | InputJsonValue
+    status?: EnumCalendarEventStatusFieldUpdateOperationsInput | $Enums.CalendarEventStatus
+    meetingUrl?: NullableStringFieldUpdateOperationsInput | string | null
+    linkedContentId?: NullableStringFieldUpdateOperationsInput | string | null
+    providerMetadata?: JsonNullValueInput | InputJsonValue
+    lastSyncedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    attendees?: CalendarEventAttendeeUncheckedUpdateManyWithoutEventNestedInput
+  }
+
+  export type CalendarEventUncheckedUpdateManyWithoutSourceInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    userId?: StringFieldUpdateOperationsInput | string
+    externalEventId?: NullableStringFieldUpdateOperationsInput | string | null
+    title?: StringFieldUpdateOperationsInput | string
+    description?: NullableStringFieldUpdateOperationsInput | string | null
+    location?: NullableStringFieldUpdateOperationsInput | string | null
+    startAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    endAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    allDay?: BoolFieldUpdateOperationsInput | boolean
+    timezone?: NullableStringFieldUpdateOperationsInput | string | null
+    recurrenceRule?: NullableStringFieldUpdateOperationsInput | string | null
+    recurrenceExDates?: JsonNullValueInput | InputJsonValue
+    recurrenceOverrides?: JsonNullValueInput | InputJsonValue
+    status?: EnumCalendarEventStatusFieldUpdateOperationsInput | $Enums.CalendarEventStatus
+    meetingUrl?: NullableStringFieldUpdateOperationsInput | string | null
+    linkedContentId?: NullableStringFieldUpdateOperationsInput | string | null
+    providerMetadata?: JsonNullValueInput | InputJsonValue
+    lastSyncedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type CalendarEventAttendeeCreateManyEventInput = {
+    id?: string
+    email: string
+    displayName?: string | null
+    isOrganizer?: boolean
+    responseStatus?: $Enums.CalendarAttendeeResponseStatus
+    metadata?: JsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type CalendarEventAttendeeUpdateWithoutEventInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    email?: StringFieldUpdateOperationsInput | string
+    displayName?: NullableStringFieldUpdateOperationsInput | string | null
+    isOrganizer?: BoolFieldUpdateOperationsInput | boolean
+    responseStatus?: EnumCalendarAttendeeResponseStatusFieldUpdateOperationsInput | $Enums.CalendarAttendeeResponseStatus
+    metadata?: JsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type CalendarEventAttendeeUncheckedUpdateWithoutEventInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    email?: StringFieldUpdateOperationsInput | string
+    displayName?: NullableStringFieldUpdateOperationsInput | string | null
+    isOrganizer?: BoolFieldUpdateOperationsInput | boolean
+    responseStatus?: EnumCalendarAttendeeResponseStatusFieldUpdateOperationsInput | $Enums.CalendarAttendeeResponseStatus
+    metadata?: JsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type CalendarEventAttendeeUncheckedUpdateManyWithoutEventInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    email?: StringFieldUpdateOperationsInput | string
+    displayName?: NullableStringFieldUpdateOperationsInput | string | null
+    isOrganizer?: BoolFieldUpdateOperationsInput | boolean
+    responseStatus?: EnumCalendarAttendeeResponseStatusFieldUpdateOperationsInput | $Enums.CalendarAttendeeResponseStatus
+    metadata?: JsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
 

@@ -39,6 +39,45 @@ enum FolderViewMode {
   canvas     // Visual graph (mind map style)
 }
 
+enum CalendarProvider {
+  local
+  google
+  ical
+}
+
+enum CalendarConnectionStatus {
+  active
+  disconnected
+  error
+  reconnect_required
+}
+
+enum CalendarSyncStatus {
+  idle
+  syncing
+  success
+  error
+}
+
+enum CalendarSourceSyncMode {
+  local
+  imported
+  subscription
+}
+
+enum CalendarEventStatus {
+  confirmed
+  tentative
+  cancelled
+}
+
+enum CalendarAttendeeResponseStatus {
+  needs_action
+  accepted
+  tentative
+  declined
+}
+
 model ContentNode {
   id            String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   ownerId       String           @db.Uuid
@@ -82,6 +121,7 @@ model ContentNode {
   children      ContentNode[]    @relation("Hierarchy")
   contentPath   ContentPath?
   contentTags   ContentTag[]
+  linkedCalendarEvents CalendarEvent[]
   trashBinEntry TrashBin?
   viewGrants    ViewGrant[]
 
@@ -288,6 +328,9 @@ model User {
   auditTargets    AuditLog[]              @relation("AuditTargets")
   adminActions    AuditLog[]              @relation("AdminActions")
   categories      Category[]
+  calendarConnections CalendarConnection[]
+  calendarEvents   CalendarEvent[]
+  calendarSources  CalendarSource[]
   contentHistory  ContentHistory[]
   contentNodes    ContentNode[]
   sessions        Session[]
@@ -363,6 +406,7 @@ model Account {
   refreshToken      String?
   accessToken       String?
   expiresAt         DateTime? @db.Timestamptz(6)
+  scope             String?
   createdAt         DateTime  @default(now()) @db.Timestamptz(6)
   user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -370,6 +414,101 @@ model Account {
   @@unique([provider, providerAccountId], map: "Account_provider_providerAccId_key")
   @@index([userId])
   @@index([provider])
+}
+
+model CalendarConnection {
+  id            String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId        String                   @db.Uuid
+  provider      CalendarProvider
+  displayName   String                   @db.VarChar(100)
+  status        CalendarConnectionStatus @default(active)
+  syncStatus    CalendarSyncStatus       @default(idle)
+  providerConfig Json                    @default("{}")
+  syncCursor    String?
+  lastSyncedAt  DateTime?                @db.Timestamptz(6)
+  lastSyncError String?
+  createdAt     DateTime                 @default(now()) @db.Timestamptz(6)
+  updatedAt     DateTime                 @updatedAt @db.Timestamptz(6)
+  sources       CalendarSource[]
+  user          User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, provider])
+  @@index([userId, status])
+}
+
+model CalendarSource {
+  id               String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId           String                  @db.Uuid
+  connectionId     String?                 @db.Uuid
+  title            String                  @db.VarChar(120)
+  color            String                  @default("#2563EB") @db.VarChar(16)
+  timezone         String?                 @db.VarChar(64)
+  visible          Boolean                 @default(true)
+  isReadOnly       Boolean                 @default(false)
+  isPrimary        Boolean                 @default(false)
+  syncMode         CalendarSourceSyncMode  @default(local)
+  externalCalendarId String?               @db.VarChar(255)
+  metadata         Json                    @default("{}")
+  lastSyncedAt     DateTime?               @db.Timestamptz(6)
+  lastSyncError    String?
+  createdAt        DateTime                @default(now()) @db.Timestamptz(6)
+  updatedAt        DateTime                @updatedAt @db.Timestamptz(6)
+  connection       CalendarConnection?     @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  events           CalendarEvent[]
+  user             User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, visible])
+  @@index([connectionId])
+  @@unique([userId, externalCalendarId])
+}
+
+model CalendarEvent {
+  id               String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId           String             @db.Uuid
+  sourceId         String             @db.Uuid
+  externalEventId  String?            @db.VarChar(255)
+  title            String             @db.VarChar(255)
+  description      String?
+  location         String?            @db.VarChar(255)
+  startAt          DateTime           @db.Timestamptz(6)
+  endAt            DateTime           @db.Timestamptz(6)
+  allDay           Boolean            @default(false)
+  timezone         String?            @db.VarChar(64)
+  recurrenceRule   String?
+  recurrenceExDates Json              @default("[]")
+  recurrenceOverrides Json            @default("{}")
+  status           CalendarEventStatus @default(confirmed)
+  meetingUrl       String?            @db.VarChar(1024)
+  linkedContentId  String?            @db.Uuid
+  providerMetadata Json               @default("{}")
+  lastSyncedAt     DateTime?          @db.Timestamptz(6)
+  createdAt        DateTime           @default(now()) @db.Timestamptz(6)
+  updatedAt        DateTime           @updatedAt @db.Timestamptz(6)
+  attendees        CalendarEventAttendee[]
+  linkedContent    ContentNode?       @relation(fields: [linkedContentId], references: [id], onDelete: SetNull)
+  source           CalendarSource     @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  user             User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, startAt, endAt])
+  @@index([sourceId, startAt])
+  @@index([linkedContentId])
+  @@unique([sourceId, externalEventId])
+}
+
+model CalendarEventAttendee {
+  id             String                          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  eventId        String                          @db.Uuid
+  email          String                          @db.VarChar(255)
+  displayName    String?                         @db.VarChar(255)
+  isOrganizer    Boolean                         @default(false)
+  responseStatus CalendarAttendeeResponseStatus  @default(needs_action)
+  metadata       Json                            @default("{}")
+  createdAt      DateTime                        @default(now()) @db.Timestamptz(6)
+  updatedAt      DateTime                        @updatedAt @db.Timestamptz(6)
+  event          CalendarEvent                   @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, email])
+  @@index([eventId, responseStatus])
 }
 
 model AuditLog {

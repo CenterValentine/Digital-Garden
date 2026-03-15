@@ -226,6 +226,91 @@ nav[class*="fixed"] {
   right: 0 !important;
 }
 
+/* FullCalendar surface tuning for the light notes shell */
+.dg-calendar-shell .fc {
+  height: 100%;
+  color: var(--shale-dark);
+}
+
+.dg-calendar-shell .fc-theme-standard td,
+.dg-calendar-shell .fc-theme-standard th,
+.dg-calendar-shell .fc-scrollgrid,
+.dg-calendar-shell .fc-scrollgrid-section > * {
+  border-color: rgba(70, 94, 115, 0.22);
+}
+
+.dg-calendar-shell .fc-col-header-cell {
+  background: rgba(70, 94, 115, 0.08);
+}
+
+.dg-calendar-shell .fc-col-header-cell-cushion,
+.dg-calendar-shell .fc-daygrid-day-number,
+.dg-calendar-shell .fc-list-day-text,
+.dg-calendar-shell .fc-list-day-side-text {
+  color: var(--shale-dark);
+  font-weight: 600;
+}
+
+.dg-calendar-shell .fc-daygrid-day-number {
+  padding: 0.55rem 0.65rem 0 0;
+}
+
+.dg-calendar-shell .fc-day-other {
+  background: rgba(70, 94, 115, 0.025);
+}
+
+.dg-calendar-shell .fc-day-other .fc-daygrid-day-number {
+  color: rgba(70, 94, 115, 0.5);
+}
+
+.dg-calendar-shell .fc-day-sat,
+.dg-calendar-shell .fc-day-sun {
+  background: rgba(70, 94, 115, 0.03);
+}
+
+.dg-calendar-shell .fc-timegrid-slot-label-cushion,
+.dg-calendar-shell .fc-timegrid-axis-cushion {
+  color: var(--shale-mid);
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.dg-calendar-shell .fc-timegrid-slot,
+.dg-calendar-shell .fc-timegrid-axis,
+.dg-calendar-shell .fc-daygrid-day-frame {
+  background-image: linear-gradient(to bottom, rgba(255, 255, 255, 0.35), rgba(255, 255, 255, 0.2));
+}
+
+.dg-calendar-shell .fc-day-today {
+  box-shadow: inset 0 0 0 1px rgba(201, 168, 108, 0.38);
+}
+
+.dg-calendar-shell .fc-event {
+  border-width: 1px;
+  border-radius: 10px;
+  box-shadow: 0 4px 12px rgba(70, 94, 115, 0.12);
+}
+
+.dg-calendar-shell .fc-h-event .fc-event-main-frame,
+.dg-calendar-shell .fc-timegrid-event .fc-event-main-frame {
+  align-items: center;
+}
+
+.dg-calendar-shell .fc-daygrid-event .fc-event-main,
+.dg-calendar-shell .fc-timegrid-event .fc-event-main,
+.dg-calendar-shell .fc-list-event .fc-event-main {
+  padding: 0.28rem 0.7rem 0.28rem 0.9rem;
+}
+
+.dg-calendar-shell .fc-event-main {
+  color: white;
+  font-weight: 600;
+}
+
+.dg-calendar-shell .fc-list-event-dot {
+  border-color: currentColor;
+}
+
 
 /* Neon glow filters matching branch node aesthetic */
 .neon-glow-sm {

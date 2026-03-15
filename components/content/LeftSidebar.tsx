@@ -16,6 +16,7 @@ import { LeftSidebarExtensions } from "./content/LeftSidebarExtensions";
 import { FileUploadDialog } from "./dialogs/FileUploadDialog";
 import { useLeftPanelCollapseStore } from "@/state/left-panel-collapse-store";
 import { useLeftPanelViewStore } from "@/state/left-panel-view-store";
+import { CalendarCompanionPanel } from "@/components/calendar/CalendarCompanionPanel";
 
 export function LeftSidebar() {
   const { mode } = useLeftPanelCollapseStore();
@@ -45,11 +46,6 @@ export function LeftSidebar() {
       }
     }
     checkGoogleAuth();
-  }, []);
-
-  // Trigger content refresh
-  const handleRefresh = useCallback(() => {
-    setRefreshTrigger((prev) => prev + 1);
   }, []);
 
   // Listen for cross-component tree refresh events (e.g. from ChatPanel save)
@@ -194,6 +190,8 @@ export function LeftSidebar() {
         )}
 
         {activeView === "extensions" && <LeftSidebarExtensions />}
+
+        {activeView === "calendar" && <CalendarCompanionPanel />}
 
         {/* Search view is handled by LeftSidebarContent with isSearchOpen state */}
         {activeView === "search" && (
