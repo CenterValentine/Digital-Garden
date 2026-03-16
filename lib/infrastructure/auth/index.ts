@@ -44,6 +44,8 @@ export {
   linkOAuthAccount,
   refreshGoogleAccessToken,
   getValidGoogleAccessToken,
+  getGoogleAccount,
+  hasGoogleScope,
 } from "./oauth";
 
 // Password utilities

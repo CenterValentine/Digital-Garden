@@ -258,6 +258,24 @@ export function getSlashCommands(editor: Editor): SlashCommand[] {
       },
       aliases: ["img", "picture", "photo"],
     },
+    {
+      title: "Create Event",
+      description: "Draft a calendar event from this note or selected text",
+      icon: "📅",
+      command: ({ editor, range }) => {
+        const selection = editor.state.selection;
+        const selectedText = editor.state.doc.textBetween(selection.from, selection.to, " ").trim();
+        editor.chain().focus().deleteRange(range).run();
+        window.dispatchEvent(
+          new CustomEvent("dg:create-calendar-event", {
+            detail: {
+              text: selectedText || "",
+            },
+          })
+        );
+      },
+      aliases: ["calendar", "meeting", "schedule", "event"],
+    },
     // M6: Tag insertion
     {
       title: "Tag",

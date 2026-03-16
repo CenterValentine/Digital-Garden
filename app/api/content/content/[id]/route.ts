@@ -257,6 +257,7 @@ export async function PATCH(
 
     // Prepare update data
     const updateData: Record<string, unknown> = {};
+    let shouldTouchContentNode = false;
 
     if (title !== undefined) {
       if (!title || title.trim().length === 0) {
@@ -284,6 +285,7 @@ export async function PATCH(
         );
       }
       updateData.title = title;
+      shouldTouchContentNode = true;
 
       // Regenerate slug if title changed
       if (title !== existing.title) {
@@ -293,21 +295,27 @@ export async function PATCH(
 
     if (parentId !== undefined) {
       updateData.parentId = parentId;
+      shouldTouchContentNode = true;
     }
     if (categoryId !== undefined) {
       updateData.categoryId = categoryId;
+      shouldTouchContentNode = true;
     }
     if (isPublished !== undefined) {
       updateData.isPublished = isPublished;
+      shouldTouchContentNode = true;
     }
     if (customIcon !== undefined) {
       updateData.customIcon = customIcon;
+      shouldTouchContentNode = true;
     }
     if (iconColor !== undefined) {
       updateData.iconColor = iconColor;
+      shouldTouchContentNode = true;
     }
     if (displayOrder !== undefined) {
       updateData.displayOrder = displayOrder;
+      shouldTouchContentNode = true;
     }
 
     // Update payload data (upsert: create NotePayload if it doesn't exist)
@@ -348,6 +356,7 @@ export async function PATCH(
 
       // Sprint 37: Sync image references (ContentLink with linkType "image-ref")
       await syncImageReferences(id, json, session.user.id);
+      shouldTouchContentNode = true;
     }
 
     if (existing.htmlPayload && html !== undefined) {
@@ -360,6 +369,7 @@ export async function PATCH(
           searchText,
         },
       });
+      shouldTouchContentNode = true;
     }
 
     if (existing.codePayload && code !== undefined) {
@@ -374,6 +384,7 @@ export async function PATCH(
           searchText,
         },
       });
+      shouldTouchContentNode = true;
     }
 
     // Phase 2: Update external link URL
@@ -384,6 +395,7 @@ export async function PATCH(
           url,
         },
       });
+      shouldTouchContentNode = true;
     }
 
     // Phase 2: Update folder payload
@@ -408,6 +420,7 @@ export async function PATCH(
           where: { contentId: id },
           data: folderUpdateData,
         });
+        shouldTouchContentNode = true;
       }
     }
 
@@ -420,6 +433,7 @@ export async function PATCH(
           updatedAt: new Date(),
         },
       });
+      shouldTouchContentNode = true;
     }
 
     // Update chat payload (upsert: create if it doesn't exist)
@@ -436,6 +450,11 @@ export async function PATCH(
           metadata: (chatMetadata ?? {}) as any,
         },
       });
+      shouldTouchContentNode = true;
+    }
+
+    if (shouldTouchContentNode) {
+      updateData.updatedAt = new Date();
     }
 
     // Update content node

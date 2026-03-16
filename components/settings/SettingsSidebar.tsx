@@ -150,6 +150,25 @@ const UserIcon = () => (
   </svg>
 );
 
+const CalendarIcon = () => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="16"
+    height="16"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M8 2v4" />
+    <path d="M16 2v4" />
+    <rect width="18" height="18" x="3" y="4" rx="2" />
+    <path d="M3 10h18" />
+  </svg>
+);
+
 interface NavItem {
   href: string;
   label: string;
@@ -190,6 +209,12 @@ const navItems: NavItem[] = [
     href: "/settings/preferences",
     label: "Preferences",
     icon: <SlidersIcon />,
+  },
+  {
+    href: "/settings/calendar",
+    label: "Calendar",
+    icon: <CalendarIcon />,
+    badge: "New",
   },
   {
     href: "/settings/account",
