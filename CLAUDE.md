@@ -26,7 +26,7 @@ npx prisma studio     # Database GUI (http://localhost:5555)
 
 **Build pipeline:** `pnpm build` runs three steps sequentially: `prisma generate` → `pnpm build:tokens` (style-dictionary) → `next build`.
 
-**Vercel build** runs `prisma migrate deploy` → `prisma generate` → `build:tokens` → `next build --webpack`. Local dev uses Turbopack (no webpack flag).
+**Vercel build** runs `prisma generate` → `build:tokens` → `next build --webpack`. Local dev uses Turbopack (no webpack flag). Migrations are run manually via `npx prisma migrate deploy`.
 
 ## Environment Setup
 
@@ -121,7 +121,6 @@ All stores in `state/`. Pattern: `create<T>()(persist((set, get) => ({...}), { n
 - `upload-settings-store.ts` — Upload preferences
 - `file-tree-filter-store.ts` — File tree filtering
 - `ai-chat-store.ts` — AI chat panel state
-- `calendar-store.ts` — Calendar view state, selected date, event cache
 - `debug-view-store.ts` — Dev debug toggles
 
 ### TipTap Editor
@@ -163,25 +162,9 @@ Factory pattern in `lib/infrastructure/storage/`. Providers: Cloudflare R2 (prim
 
 Collaboration hooks for Excalidraw, Mermaid diagrams, and diagrams.net. Security headers configured in `next.config.ts` for iframe embedding.
 
-### Calendar System
-
-**Location:** `lib/domain/calendar/`
-
-Multi-provider calendar with Google Calendar sync support. Architecture: `CalendarConnection` (provider credentials) → `CalendarSource` (individual calendars) → `CalendarEvent` (events with recurrence, attendees, content linking).
-
-- `service.ts` — Core calendar service: CRUD for connections/sources/events, Google Calendar sync, content linking
-- `types.ts` — Calendar domain types
-- `quick-add.ts` — Natural language event creation
-
-**Models:** `CalendarConnection`, `CalendarSource`, `CalendarEvent`, `CalendarEventAttendee` (see `prisma/schema.prisma`)
-
-**UI:** `components/calendar/` — `CalendarWorkspace` (main view), `CalendarInspector` (event details), `CalendarCompanionPanel` (sidebar), `CalendarQuickAddDialog`
-
-**Store:** `state/calendar-store.ts` — Selected date, view mode, visible sources, event cache
-
 ### Authentication
 
-Custom OAuth with Google Sign-In (extended for Calendar scopes). `lib/infrastructure/auth/` (barrel export via `index.ts`). Role hierarchy: owner > admin > member > guest. Admin endpoints require `requireRole("owner")`.
+Custom OAuth with Google Sign-In. `lib/infrastructure/auth/` (barrel export via `index.ts`). Role hierarchy: owner > admin > member > guest. Admin endpoints require `requireRole("owner")`.
 
 ### AI Integration
 
@@ -231,9 +214,7 @@ GET          /content/export/health       # Export health check
 POST         /content/external/preview    # Open Graph metadata fetch
 ```
 
-Other API areas: `app/api/admin/`, `app/api/auth/`, `app/api/calendar/`, `app/api/google-drive/`, `app/api/onlyoffice/`, `app/api/visualization/`, `app/api/categories/`, `app/api/user/`
-
-**Calendar API:** `app/api/calendar/` — connections CRUD + sync, sources CRUD, events CRUD, quick-add, bootstrap
+Other API areas: `app/api/admin/`, `app/api/auth/`, `app/api/google-drive/`, `app/api/onlyoffice/`, `app/api/visualization/`, `app/api/categories/`, `app/api/user/`
 
 **Type definitions:** `lib/domain/content/api-types.ts`
 
@@ -244,8 +225,6 @@ app/
 ├── (authenticated)/content/    # Content IDE routes
 ├── api/                        # API routes (content/, admin/, auth/, google-drive/, etc.)
 └── globals.css                 # Global styles + generated design tokens
-
-components/calendar/                # Calendar workspace, inspector, quick-add
 
 components/content/
 ├── ai/                         # AI chat panel components
@@ -266,7 +245,6 @@ lib/
 ├── database/                   # client.ts (Prisma singleton), generated/prisma/
 ├── domain/
 │   ├── admin/                  # Admin panel + audit logging
-│   ├── calendar/               # Calendar service, types, quick-add (barrel: index.ts)
 │   ├── content/                # ContentNode utilities, OG fetcher, external validation
 │   ├── editor/                 # TipTap extensions (extensions/, commands/)
 │   ├── export/                 # Converters, metadata sidecars, bulk export, validation
@@ -287,7 +265,7 @@ lib/
     ├── system/                 # Liquid Glass tokens (surfaces, intents, motion)
     └── integrations/           # Third-party UI utilities
 
-state/                          # 17 Zustand stores (see State Management above)
+state/                          # 16 Zustand stores (see State Management above)
 prisma/                         # schema.prisma, migrations/, seed.ts
 ```
 
