@@ -12,7 +12,6 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { useContentStore } from "@/state/content-store";
-import { useTreeStateStore } from "@/state/tree-state-store";
 import { ArrowLeft } from "lucide-react";
 
 interface Backlink {
@@ -31,11 +30,11 @@ interface BacklinksData {
   count: number;
 }
 
-export function BacklinksPanel() {
-  // Use tree selection for backlinks (includes notes AND folders)
-  const selectedIds = useTreeStateStore((state) => state.selectedIds);
-  const selectedContentId = selectedIds.length === 1 ? selectedIds[0] : null;
+interface BacklinksPanelProps {
+  contentId?: string | null;
+}
 
+export function BacklinksPanel({ contentId }: BacklinksPanelProps) {
   const setSelectedContentId = useContentStore((state) => state.setSelectedContentId);
   const clearSelection = useContentStore((state) => state.clearSelection);
 
@@ -45,13 +44,13 @@ export function BacklinksPanel() {
 
   // Fetch backlinks when selected content changes
   useEffect(() => {
-    if (!selectedContentId) {
+    if (!contentId) {
       setBacklinks(null);
       return;
     }
 
     // Skip if this is a temporary document being created
-    if (selectedContentId.startsWith("temp-")) {
+    if (contentId.startsWith("temp-")) {
       setBacklinks(null);
       setIsLoading(false);
       return;
@@ -62,7 +61,7 @@ export function BacklinksPanel() {
       setError(null);
 
       try {
-        const response = await fetch(`/api/content/backlinks/${selectedContentId}`, {
+        const response = await fetch(`/api/content/backlinks/${contentId}`, {
           credentials: "include",
         });
 
@@ -99,15 +98,18 @@ export function BacklinksPanel() {
     };
 
     fetchBacklinks();
-  }, [selectedContentId]);
+  }, [clearSelection, contentId]);
 
   // Handle clicking a backlink to navigate to that note
-  const handleBacklinkClick = (backlinkId: string) => {
-    setSelectedContentId(backlinkId);
+  const handleBacklinkClick = (backlink: Backlink) => {
+    setSelectedContentId(backlink.id, {
+      title: backlink.title,
+      contentType: "note",
+    });
   };
 
   // Empty state - no note selected
-  if (!selectedContentId) {
+  if (!contentId) {
     return (
       <div className="flex h-full items-center justify-center p-4 text-center">
         <div className="text-sm text-gray-400">
@@ -141,7 +143,7 @@ export function BacklinksPanel() {
       <div className="flex h-full flex-col items-center justify-center p-4 text-center">
         <div className="mb-2 text-sm font-medium text-gray-300">No backlinks</div>
         <div className="text-xs text-gray-500">
-          No other notes link to "{backlinks.targetTitle}"
+          No other notes link to &ldquo;{backlinks.targetTitle}&rdquo;
         </div>
       </div>
     );
@@ -156,7 +158,7 @@ export function BacklinksPanel() {
           {backlinks?.count} {backlinks?.count === 1 ? "backlink" : "backlinks"}
         </div>
         <div className="text-xs text-gray-500">
-          Notes linking to "{backlinks?.targetTitle}"
+          Notes linking to &ldquo;{backlinks?.targetTitle}&rdquo;
         </div>
       </div>
 
@@ -165,7 +167,7 @@ export function BacklinksPanel() {
         {backlinks?.backlinks.map((backlink) => (
           <button
             key={backlink.id}
-            onClick={() => handleBacklinkClick(backlink.id)}
+            onClick={() => handleBacklinkClick(backlink)}
             className="w-full rounded-lg border border-white/10 bg-white/5 p-3 text-left transition-all hover:border-white/20 hover:bg-white/10 hover:shadow-sm"
           >
             {/* Note title with arrow icon */}
@@ -179,7 +181,7 @@ export function BacklinksPanel() {
             {/* Link text preview */}
             {backlink.linkText && (
               <div className="mb-1 text-xs text-primary">
-                "{backlink.linkText}"
+                &ldquo;{backlink.linkText}&rdquo;
               </div>
             )}
 

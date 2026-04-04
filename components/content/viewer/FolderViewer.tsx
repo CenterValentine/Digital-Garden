@@ -14,10 +14,12 @@
 import { useState, useEffect, useCallback } from "react";
 import { Folder, List, LayoutGrid, Columns3, LayoutDashboard, Network } from "lucide-react";
 import { FolderViewContainer } from "@/components/content/folder-views/FolderViewContainer";
+import type { WorkspacePaneId } from "@/state/content-store";
 import { toast } from "sonner";
 
 interface FolderViewerProps {
   contentId: string;
+  paneId: WorkspacePaneId;
   title: string;
   viewMode?: "list" | "gallery" | "kanban" | "dashboard" | "canvas";
   sortMode?: string | null;
@@ -27,6 +29,7 @@ interface FolderViewerProps {
 
 export function FolderViewer({
   contentId,
+  paneId,
   title,
   viewMode: initialViewMode = "list",
   sortMode = null,
@@ -136,6 +139,7 @@ export function FolderViewer({
         <FolderViewContainer
           viewMode={viewMode}
           folderId={contentId}
+          paneId={paneId}
           folderTitle={title}
           viewPrefs={viewPrefs}
           sortMode={sortMode}

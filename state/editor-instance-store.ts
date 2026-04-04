@@ -1,40 +1,72 @@
 /**
  * Editor Instance Store
  *
- * Shares the active TipTap editor instance between the editor component
- * and other consumers (AI chat panel, outline panel, etc.).
- *
- * NOT persisted — the editor instance is ephemeral and tied to the
- * component lifecycle. When the user navigates away, the editor unmounts
- * and clears its registration.
- *
- * Also manages AI editing state: lock, abort, and queue.
+ * Tracks editor instances and AI edit state per content id so tab switches do
+ * not retarget sidebar AI actions at the wrong editor.
  */
 
 import { create } from "zustand";
 import type { Editor } from "@tiptap/react";
 
-export interface EditorInstanceState {
-  /** The active TipTap editor instance, or null if no editor is mounted */
-  editor: Editor | null;
-
-  /** Whether AI is currently editing the document */
-  isAiEditing: boolean;
-
-  /** Register the editor instance (called on mount) */
-  setEditor: (editor: Editor | null) => void;
-
-  /** Set AI editing state (locks/unlocks editor) */
-  setAiEditing: (editing: boolean) => void;
+interface EditorInstanceStore {
+  editorsByContentId: Record<string, Editor | null>;
+  aiEditingByContentId: Record<string, boolean>;
+  setEditor: (contentId: string, editor: Editor | null) => void;
+  getEditor: (contentId?: string | null) => Editor | null;
+  clearEditor: (contentId: string) => void;
+  setAiEditing: (contentId: string, editing: boolean) => void;
+  isAiEditingFor: (contentId?: string | null) => boolean;
 }
 
-export const useEditorInstanceStore = create<EditorInstanceState>()(
-  (set) => ({
-    editor: null,
-    isAiEditing: false,
+export const useEditorInstanceStore = create<EditorInstanceStore>((set, get) => ({
+  editorsByContentId: {},
+  aiEditingByContentId: {},
 
-    setEditor: (editor) => set({ editor }),
+  setEditor: (contentId, editor) => {
+    set((state) => ({
+      editorsByContentId: {
+        ...state.editorsByContentId,
+        [contentId]: editor,
+      },
+    }));
+  },
 
-    setAiEditing: (editing) => set({ isAiEditing: editing }),
-  })
-);
+  getEditor: (contentId) => {
+    if (!contentId) return null;
+    return get().editorsByContentId[contentId] ?? null;
+  },
+
+  clearEditor: (contentId) => {
+    set((state) => {
+      const nextEditors = { ...state.editorsByContentId };
+      const nextAiEditing = { ...state.aiEditingByContentId };
+      delete nextEditors[contentId];
+      delete nextAiEditing[contentId];
+      return {
+        editorsByContentId: nextEditors,
+        aiEditingByContentId: nextAiEditing,
+      };
+    });
+  },
+
+  setAiEditing: (contentId, editing) => {
+    set((state) => {
+      const nextAiEditing = { ...state.aiEditingByContentId };
+
+      if (editing) {
+        nextAiEditing[contentId] = true;
+      } else {
+        delete nextAiEditing[contentId];
+      }
+
+      return {
+        aiEditingByContentId: nextAiEditing,
+      };
+    });
+  },
+
+  isAiEditingFor: (contentId) => {
+    if (!contentId) return false;
+    return get().aiEditingByContentId[contentId] ?? false;
+  },
+}));

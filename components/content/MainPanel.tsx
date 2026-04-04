@@ -5,19 +5,15 @@
  */
 
 import { Suspense } from "react";
-import { MainPanelHeader } from "./headers/MainPanelHeader";
-import { MainPanelContent } from "./content/MainPanelContent";
+import { MainPanelWorkspace } from "./MainPanelWorkspace";
 import { EditorSkeleton } from "./skeletons/EditorSkeleton";
 
 export function MainPanel() {
   return (
-    <div className="flex h-full flex-col">
-      {/* Tab bar - Renders immediately (Server Component) */}
-      <MainPanelHeader />
-
-      {/* Editor - Progressive with Suspense (Client Component) */}
+    <div className="flex h-full min-h-0 flex-col overflow-hidden">
+      {/* Workspace - Progressive with Suspense */}
       <Suspense fallback={<EditorSkeleton />}>
-        <MainPanelContent />
+        <MainPanelWorkspace />
       </Suspense>
     </div>
   );

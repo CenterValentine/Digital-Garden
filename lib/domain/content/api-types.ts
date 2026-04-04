@@ -207,9 +207,6 @@ export interface CreateContentRequest {
   viewMode?: "list" | "gallery" | "kanban" | "dashboard" | "canvas";
   sortMode?: string | null;
   includeReferencedContent?: boolean;
-
-  // Page template creation
-  fromTemplateId?: string;
 }
 
 export interface UpdateContentRequest {

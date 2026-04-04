@@ -6,8 +6,7 @@
  */
 
 import { NextResponse } from "next/server";
-import { getSession, getValidGoogleAccessToken, getGoogleAccount, hasGoogleScope } from "@/lib/infrastructure/auth";
-import { GOOGLE_CALENDAR_SCOPE } from "@/lib/domain/calendar/types";
+import { getSession, getValidGoogleAccessToken } from "@/lib/infrastructure/auth";
 
 export async function GET() {
   try {
@@ -23,13 +22,10 @@ export async function GET() {
     // Proactively refresh Google access token if expired
     // This ensures the user has a valid token for subsequent API calls
     let hasValidToken = false;
-    let hasCalendarScope = false;
     try {
       await getValidGoogleAccessToken(session.user.id);
       hasValidToken = true;
-      const account = await getGoogleAccount(session.user.id);
-      hasCalendarScope = hasGoogleScope(account?.scope, GOOGLE_CALENDAR_SCOPE);
-    } catch {
+    } catch (error) {
       // No Google account or refresh failed
       // This is not an error - just means user doesn't have Google auth
       hasValidToken = false;
@@ -41,7 +37,6 @@ export async function GET() {
         hasGoogleAuth: hasValidToken,
         provider: hasValidToken ? "google" : null,
         hasValidToken,
-        hasCalendarScope,
       },
     });
   } catch (error) {

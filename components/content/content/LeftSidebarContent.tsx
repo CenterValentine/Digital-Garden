@@ -21,7 +21,6 @@ import { useContentStore } from "@/state/content-store";
 import { useSearchStore } from "@/state/search-store";
 import { useTreeStateStore } from "@/state/tree-state-store";
 import { useContextMenuStore } from "@/state/context-menu-store";
-import { usePageTemplateStore } from "@/state/page-template-store";
 import type { TreeNode, ContentType } from "@/lib/domain/content/types";
 
 interface TreeApiResponse {
@@ -66,7 +65,6 @@ export function LeftSidebarContent({
     type: "folder" | "note" | "file" | "code" | "html" | "docx" | "xlsx" | "json" | "external" | "chat" | "visualization" | "data" | "hope" | "workflow";
     parentId: string | null;
     tempId: string; // Temporary ID for the placeholder node
-    fromTemplateId?: string; // Page template ID when creating from template
   } | null>(null);
   const [expandNodeId, setExpandNodeId] = useState<string | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<{
@@ -102,6 +100,8 @@ export function LeftSidebarContent({
   // Content selection store
   const selectedContentId = useContentStore((state) => state.selectedContentId);
   const setSelectedContentId = useContentStore((state) => state.setSelectedContentId);
+  const replaceContentTab = useContentStore((state) => state.replaceContentTab);
+  const closeContentTabs = useContentStore((state) => state.closeContentTabs);
   const { setSelectedIds } = useTreeStateStore();
 
   // Search store - conditionally show search panel
@@ -166,15 +166,6 @@ export function LeftSidebarContent({
     checkGoogleAuth();
   }, []);
 
-  // Fetch page templates for the creation menu
-  useEffect(() => {
-    const ptStore = usePageTemplateStore.getState();
-    if (!ptStore.isLoaded && !ptStore.isLoading) {
-      ptStore.fetchCategories();
-      ptStore.fetchTemplates();
-    }
-  }, []);
-
   // Load and save checkbox preference to/from localStorage
   useEffect(() => {
     // Load from localStorage on mount
@@ -217,7 +208,7 @@ export function LeftSidebarContent({
 
   // Sync tree selection when selectedContentId changes (from search, backlinks, etc.)
   useEffect(() => {
-    if (selectedContentId) {
+    if (selectedContentId && !selectedContentId.startsWith("temp-")) {
       // Update tree selection to match the active file
       setSelectedIds([selectedContentId]);
     }
@@ -263,91 +254,6 @@ export function LeftSidebarContent({
       window.removeEventListener('edit-external-link' as any, handleEditExternal);
     };
   }, []);
-
-  // Listen for template-based note creation events (from header menu + context menu)
-  // Uses the same inline placeholder + edit flow as handleCreate
-  useEffect(() => {
-    const handleCreateFromTemplate = (event: CustomEvent<{ parentId: string | null; templateId: string; defaultTitle?: string }>) => {
-      const { parentId: requestedParentId, templateId, defaultTitle } = event.detail;
-      if (!treeData) return;
-
-      // Determine parentId: use requested if provided, otherwise derive from selection
-      let parentId = requestedParentId;
-      if (parentId === null) {
-        const { selectedIds: treeSelectedIds } = useTreeStateStore.getState();
-        if (treeSelectedIds.length === 1) {
-          const findNode = (nodes: TreeNode[]): TreeNode | null => {
-            for (const node of nodes) {
-              if (node.id === treeSelectedIds[0]) return node;
-              if (node.children) {
-                const found = findNode(node.children);
-                if (found) return found;
-              }
-            }
-            return null;
-          };
-          const selectedNode = findNode(treeData);
-          if (selectedNode) {
-            parentId = selectedNode.contentType === "folder"
-              ? selectedNode.id
-              : selectedNode.parentId || null;
-          }
-        }
-      }
-
-      // Create placeholder node with default title pre-filled
-      const tempId = `temp-${Date.now()}-${Math.random()}`;
-      const tempNode: TreeNode = {
-        id: tempId,
-        title: defaultTitle || "", // Pre-fill with template's default title
-        slug: "",
-        contentType: "note",
-        parentId,
-        displayOrder: 0,
-        customIcon: null,
-        iconColor: null,
-        isPublished: false,
-        children: [],
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        deletedAt: null,
-      };
-
-      // Insert temp node into tree
-      const insertTempNode = (nodes: TreeNode[]): TreeNode[] => {
-        if (parentId === null) {
-          return [tempNode, ...nodes];
-        }
-        return nodes.map((node) => {
-          if (node.id === parentId) {
-            return { ...node, children: [tempNode, ...(node.children || [])] };
-          }
-          if (node.children) {
-            return { ...node, children: insertTempNode(node.children) };
-          }
-          return node;
-        });
-      };
-
-      setTreeData(insertTempNode(treeData));
-      setCreatingItem({
-        type: "note",
-        parentId,
-        tempId,
-        fromTemplateId: templateId,
-      });
-
-      // Auto-expand parent folder
-      if (parentId !== null) {
-        setExpandNodeId(parentId);
-      }
-    };
-
-    window.addEventListener("dg:create-from-template" as any, handleCreateFromTemplate);
-    return () => {
-      window.removeEventListener("dg:create-from-template" as any, handleCreateFromTemplate);
-    };
-  }, [treeData]);
 
 
   // Apply move operation to tree structure (for optimistic updates)
@@ -574,10 +480,10 @@ export function LeftSidebarContent({
     const firstNode = nodes[0];
     if (firstNode) {
       console.log("Selected node:", firstNode);
-
-      // Phase 2: All content types can now be displayed in main panel
-      // MainPanelContent will route to appropriate viewer based on contentType
-      setSelectedContentId(firstNode.id);
+      setSelectedContentId(firstNode.id, {
+        title: firstNode.title,
+        contentType: firstNode.contentType,
+      });
     } else {
       // No selection - clear content
       setSelectedContentId(null);
@@ -673,7 +579,10 @@ export function LeftSidebarContent({
 
         // Success! Refresh tree and navigate to new link
         await fetchTree();
-        setSelectedContentId(result.data.id);
+        setSelectedContentId(result.data.id, {
+          title: result.data.title,
+          contentType: result.data.contentType ?? "external",
+        });
         toast.success(`Created external link "${data.name}"`);
       }
     } catch (err) {
@@ -693,11 +602,19 @@ export function LeftSidebarContent({
       return;
     }
 
-    const { type, parentId, tempId, fromTemplateId } = creatingItem;
+    const { type, parentId, tempId } = creatingItem;
+    const optimisticContentType: ContentType =
+      type === "docx" || type === "xlsx" || type === "json"
+        ? "file"
+        : (type as ContentType);
 
     // Optimistically navigate to new file (not folders) immediately
     if (type !== "folder") {
-      setSelectedContentId(tempId);
+      setSelectedContentId(tempId, {
+        title: title.trim() || "Untitled",
+        contentType: optimisticContentType,
+        temporary: true,
+      });
     }
 
     // Auto-add .md extension to note files if not present
@@ -827,7 +744,7 @@ export function LeftSidebarContent({
             setTreeData(removeTempNode(treeData));
           }
           setCreatingItem(null);
-          setSelectedContentId(null);
+          closeContentTabs([tempId]);
 
           setErrorDialog({
             title: "Failed to create document",
@@ -839,19 +756,19 @@ export function LeftSidebarContent({
         // Success! Refresh tree to show new document
         fetchTree();
         setCreatingItem(null);
-        setSelectedContentId(result.data.id);
+        replaceContentTab(`tab:${tempId}`, result.data.id, {
+          title: result.data.title,
+          contentType: result.data.contentType ?? "file",
+          temporary: false,
+          pin: true,
+        });
         console.log(`[LeftSidebarContent] ${type.toUpperCase()} created:`, result.data.id);
         return;
       }
 
-      // If creating from a page template, pass templateId instead of default payload
-      if (fromTemplateId) {
-        requestBody.fromTemplateId = fromTemplateId;
-      }
-
       if (type === "folder") {
         requestBody.isFolder = true;
-      } else if (type === "note" && !fromTemplateId) {
+      } else if (type === "note") {
         requestBody.tiptapJson = config.payload?.tiptapJson;
       } else if (type === "code") {
         requestBody.code = config.payload?.code;
@@ -898,7 +815,7 @@ export function LeftSidebarContent({
 
         // Clear optimistic navigation
         if (type !== "folder") {
-          setSelectedContentId(null);
+          closeContentTabs([tempId]);
         }
 
         setErrorDialog({
@@ -971,7 +888,12 @@ export function LeftSidebarContent({
 
         // Navigate to newly created file (but not folders)
         if (type !== "folder") {
-          setSelectedContentId(apiResponse.id);
+          replaceContentTab(`tab:${tempId}`, apiResponse.id, {
+            title: apiResponse.title,
+            contentType: apiResponse.contentType,
+            temporary: false,
+            pin: true,
+          });
         }
       } else {
         // Fallback: If API doesn't return expected data, refresh tree
@@ -1000,7 +922,7 @@ export function LeftSidebarContent({
 
       // Clear optimistic navigation
       if (type !== "folder") {
-        setSelectedContentId(null);
+        closeContentTabs([tempId]);
       }
 
       setErrorDialog({
@@ -1028,6 +950,7 @@ export function LeftSidebarContent({
 
     const newTreeData = removeTempNode(treeData);
     setTreeData(newTreeData);
+    closeContentTabs([tempId]);
 
     // Clear creating state
     setCreatingItem(null);
@@ -1383,6 +1306,7 @@ export function LeftSidebarContent({
       }
 
       // Refresh tree to remove deleted items (even if some failed)
+      closeContentTabs(successes.map((item) => item.id));
       await fetchTree();
     } catch (err) {
       console.error("Failed to delete:", err);

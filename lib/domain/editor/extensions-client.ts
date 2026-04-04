@@ -32,20 +32,6 @@ import { createWikiLinkSuggestion } from "./extensions/wiki-link-suggestion";
 import { Tag } from "./extensions/tag";
 import { EditorImage } from "./extensions/image";
 import { AiHighlight } from "./extensions/ai-highlight";
-import { BlockFocusExtension } from "./extensions/block-focus-ext";
-// Sprint 44: Block extensions (beta-gated at slash command level, always registered for parsing)
-import { CardPanel } from "./extensions/blocks/card-panel";
-import { Accordion } from "./extensions/blocks/accordion";
-import { Columns, Column } from "./extensions/blocks/columns";
-import { Tabs, TabPanel } from "./extensions/blocks/tabs";
-// Sprint 47: Input block extensions
-import { TextInput } from "./extensions/blocks/text-input";
-import { SelectInput } from "./extensions/blocks/select-input";
-import { CheckboxInput } from "./extensions/blocks/checkbox-input";
-import { DateInput } from "./extensions/blocks/date-input";
-import { NumberInput } from "./extensions/blocks/number-input";
-import { RatingInput } from "./extensions/blocks/rating-input";
-import { PromptInput } from "./extensions/blocks/prompt-input";
 
 // Create lowlight instance with common languages
 const lowlight = createLowlight(common);
@@ -189,26 +175,6 @@ export function getEditorExtensions(options?: EditorExtensionsOptions): Extensio
 
     // Sprint 40: AI content highlighting
     AiHighlight,
-
-    // Sprint 43: Block selection tracking
-    BlockFocusExtension,
-
-    // Sprint 44: Block extensions (beta — always registered so existing docs parse correctly)
-    CardPanel,
-    Accordion,
-    Columns,
-    Column,
-    Tabs,
-    TabPanel,
-
-    // Sprint 47: Input block extensions
-    TextInput,
-    SelectInput,
-    CheckboxInput,
-    DateInput,
-    NumberInput,
-    RatingInput,
-    PromptInput,
 
     // M6: Tags with autocomplete
     Tag.configure({

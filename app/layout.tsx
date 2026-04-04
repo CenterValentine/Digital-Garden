@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import React from "react";
-import { Geist, Geist_Mono } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 
 import Head from "./layout/head";
@@ -8,14 +8,16 @@ import NavBar from "@/components/client/nav/NavBar";
 import { Toaster } from "@/components/client/ui/sonner";
 import { SettingsInitializer } from "@/components/settings/SettingsInitializer";
 
-const geistSans = Geist({
+const geistSans = localFont({
+  src: "../public/fonts/liberation-sans-regular.ttf",
   variable: "--font-geist-sans",
-  subsets: ["latin"],
+  display: "swap",
 });
 
-const geistMono = Geist_Mono({
+const geistMono = localFont({
+  src: "../public/fonts/cascadia-code-regular.woff2",
   variable: "--font-geist-mono",
-  subsets: ["latin"],
+  display: "swap",
 });
 
 export const metadata: Metadata = {

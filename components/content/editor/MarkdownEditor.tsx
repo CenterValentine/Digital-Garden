@@ -24,9 +24,6 @@ import { uploadImage } from "@/lib/domain/editor/hooks/use-image-upload";
 import { isImageUrl } from "@/lib/domain/editor/utils/image-url";
 import { useEditorInstanceStore } from "@/state/editor-instance-store";
 import { useSettingsStore } from "@/state/settings-store";
-import { useContextMenuStore } from "@/state/context-menu-store";
-import { useTemplateStore } from "@/state/template-store";
-import { useSnippetStore } from "@/state/snippet-store";
 import { toast } from "sonner";
 
 export interface EditorStats {
@@ -303,27 +300,15 @@ export function MarkdownEditor({
 
   // Register editor instance in global store for AI chat panel access
   useEffect(() => {
-    if (editor) {
-      useEditorInstanceStore.getState().setEditor(editor);
+    if (editor && contentId) {
+      useEditorInstanceStore.getState().setEditor(contentId, editor);
     }
     return () => {
-      useEditorInstanceStore.getState().setEditor(null);
+      if (contentId) {
+        useEditorInstanceStore.getState().clearEditor(contentId);
+      }
     };
-  }, [editor]);
-
-  // Load template/snippet data for editor context menu
-  useEffect(() => {
-    const ts = useTemplateStore.getState();
-    const ss = useSnippetStore.getState();
-    if (!ts.isLoaded) {
-      ts.fetchCategories();
-      ts.fetchTemplates();
-    }
-    if (!ss.isLoaded) {
-      ss.fetchCategories();
-      ss.fetchSnippets();
-    }
-  }, []);
+  }, [contentId, editor]);
 
   // Handle Cmd+K / Ctrl+K keyboard shortcut for link dialog
   useEffect(() => {
@@ -510,30 +495,6 @@ export function MarkdownEditor({
           catch drops reliably regardless of where they land in the editor area. */}
       <div
         className="flex-1 overflow-y-auto"
-        onContextMenu={(e) => {
-          if (!editor) return;
-
-          // Option+right-click or inspect pass-through → native browser menu
-          if (e.altKey || (window as any).__passNativeContextMenu) {
-            (window as any).__passNativeContextMenu = false;
-            return;
-          }
-
-          const { from, to } = editor.state.selection;
-          const hasSelection = from !== to;
-
-          e.preventDefault();
-          useContextMenuStore.getState().openMenu(
-            "main-editor",
-            { x: e.clientX, y: e.clientY },
-            {
-              hasSelection,
-              contextTarget: e.target as Element,
-              contextX: e.clientX,
-              contextY: e.clientY,
-            }
-          );
-        }}
         onDragOver={(e) => {
           if (
             e.dataTransfer.types.includes("Files") ||

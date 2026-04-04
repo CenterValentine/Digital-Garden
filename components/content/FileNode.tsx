@@ -77,12 +77,14 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
 
   const { openMenu } = useContextMenuStore();
   const selectedContentId = useContentStore((state) => state.selectedContentId);
+  const openContentIds = useContentStore((state) => state.openContentIds);
 
   // Three-state selection system:
   // 1. Active: This file is open in the editor (brightest)
   // 2. Selected: This file is selected in tree (medium)
   // 3. Multi-selected: Part of multi-selection (subtle)
   const isActive = data.id === selectedContentId;
+  const isOpenInTab = openContentIds.includes(data.id);
   const isSelected = node.isSelected;
   const tree = node.tree;
   const isMultiSelected = isSelected && tree.selectedNodes && tree.selectedNodes.length > 1;
@@ -433,6 +435,9 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
     }
     if (isActive) {
       return "bg-primary/20 text-primary font-medium"; // Active in panel (brightest)
+    }
+    if (isOpenInTab) {
+      return "bg-gold-primary/8 text-gold-primary"; // Open in another tab
     }
     if (isMultiSelected) {
       return "bg-white/8 text-gray-300"; // Multi-selected (subtle)

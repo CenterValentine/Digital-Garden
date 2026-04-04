@@ -11,6 +11,7 @@ import { useState, useRef, useEffect } from "react";
 import { Bug, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/glass/button";
 import { useDebugViewStore, type DebugViewMode } from "@/state/debug-view-store";
+import { useContentStore } from "@/state/content-store";
 import { getSurfaceStyles } from "@/lib/design/system";
 
 const VIEW_MODES: Array<{ value: DebugViewMode; label: string; description: string }> = [
@@ -24,13 +25,10 @@ export function DebugViewToggle() {
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
+  const layoutMode = useContentStore((state) => state.layoutMode);
+  const isDevelopment = process.env.NODE_ENV === "development";
 
   const { isDebugPanelVisible, toggleDebugPanel, viewMode, setViewMode } = useDebugViewStore();
-
-  // Only render in development mode
-  if (process.env.NODE_ENV !== "development") {
-    return null;
-  }
 
   // Close menu when clicking outside
   useEffect(() => {
@@ -63,6 +61,10 @@ export function DebugViewToggle() {
 
   const currentMode = VIEW_MODES.find((m) => m.value === viewMode) || VIEW_MODES[0];
   const glass1 = getSurfaceStyles("glass-1");
+
+  if (!isDevelopment || layoutMode !== "single") {
+    return null;
+  }
 
   return (
     <div className="relative">

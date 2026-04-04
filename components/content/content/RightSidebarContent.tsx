@@ -14,28 +14,28 @@ import { OutlinePanel } from "../OutlinePanel";
 import { ChatOutlinePanel } from "../ChatOutlinePanel";
 import { TagsPanel } from "../TagsPanel";
 import { ChatPanel } from "../ai/ChatPanel";
-import { CalendarInspector } from "@/components/calendar/CalendarInspector";
-import { PropertiesPanel } from "../blocks/PropertiesPanel";
 import { useOutlineStore } from "@/state/outline-store";
 import { useContentStore } from "@/state/content-store";
-import { useLeftPanelViewStore } from "@/state/left-panel-view-store";
-import type { RightSidebarTab } from "../RightSidebar";
 import type { OutlineHeading } from "@/lib/domain/content/outline-extractor";
 import type { ChatOutlineEntry } from "@/lib/domain/ai/chat-outline";
+import type { RightSidebarTab } from "@/state/right-sidebar-state-store";
 
 interface RightSidebarContentProps {
   activeTab: RightSidebarTab;
 }
 
 export function RightSidebarContent({ activeTab }: RightSidebarContentProps) {
-  const outline = useOutlineStore((state) => state.outline);
+  const selectedContentId = useContentStore((s) => s.selectedContentId);
+  const outline = useOutlineStore((state) =>
+    state.getViewState(selectedContentId).outline
+  );
   const setActiveHeadingId = useOutlineStore((state) => state.setActiveHeadingId);
   const selectedContentType = useContentStore((s) => s.selectedContentType);
-  const { activeView } = useLeftPanelViewStore();
 
   // Handle outline heading click — dispatches a CustomEvent that MarkdownEditor listens for
   const handleHeadingClick = (heading: OutlineHeading) => {
-    setActiveHeadingId(heading.id);
+    if (!selectedContentId) return;
+    setActiveHeadingId(selectedContentId, heading.id);
     window.dispatchEvent(
       new CustomEvent("scroll-to-heading", {
         detail: { position: heading.position, id: heading.id, text: heading.text, level: heading.level },
@@ -54,26 +54,26 @@ export function RightSidebarContent({ activeTab }: RightSidebarContentProps) {
 
   const isChat = selectedContentType === "chat";
 
-  if (activeView === "calendar") {
-    return (
-      <div className="flex-1 overflow-hidden">
-        <CalendarInspector />
-      </div>
-    );
-  }
-
   return (
     <div className="flex-1 overflow-hidden">
-      {activeTab === "backlinks" && <BacklinksPanel />}
+      {activeTab === "backlinks" && (
+        <BacklinksPanel contentId={selectedContentId} />
+      )}
       {activeTab === "outline" &&
         (isChat ? (
-          <ChatOutlinePanel onEntryClick={handleChatEntryClick} />
+          <ChatOutlinePanel
+            contentId={selectedContentId}
+            onEntryClick={handleChatEntryClick}
+          />
         ) : (
-          <OutlinePanel outline={outline} onHeadingClick={handleHeadingClick} />
+          <OutlinePanel
+            contentId={selectedContentId}
+            outline={outline}
+            onHeadingClick={handleHeadingClick}
+          />
         ))}
-      {activeTab === "tags" && <TagsPanel />}
-      {activeTab === "properties" && <PropertiesPanel />}
-      {activeTab === "chat" && <ChatPanel />}
+      {activeTab === "tags" && <TagsPanel contentId={selectedContentId} />}
+      {activeTab === "chat" && <ChatPanel contentId={selectedContentId} />}
     </div>
   );
 }

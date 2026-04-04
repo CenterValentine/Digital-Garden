@@ -8,7 +8,10 @@
  * M4: File Tree Completion - File Tree Context Menu
  */
 
+import type { ReactNode } from "react";
 import {
+  ArrowUpLeft,
+  ArrowUpRight,
   Edit,
   Trash2,
   Copy,
@@ -27,11 +30,22 @@ import {
   Eye,
   EyeOff,
   ExternalLink,
+  ArrowDownLeft,
+  ArrowDownRight,
 } from "lucide-react";
 import type { ContextMenuActionProvider, ContextMenuSection, ContextMenuAction } from "./types";
-import { getNewContentMenuItems, type NewContentCallbacks, type PageTemplateMenuData } from "@/components/content/menu-items/new-content-menu";
+import { getNewContentMenuItems, type NewContentCallbacks } from "@/components/content/menu-items/new-content-menu";
 import { supportsCustomIcon } from "@/lib/domain/content/file-extension-utils";
-import { usePageTemplateStore } from "@/state/page-template-store";
+import {
+  BOTTOM_LEFT_PANE_ID,
+  BOTTOM_RIGHT_PANE_ID,
+  TOP_LEFT_PANE_ID,
+  TOP_RIGHT_PANE_ID,
+  getPaneLabel,
+  getVisiblePaneIds,
+  useContentStore,
+  type WorkspacePaneId,
+} from "@/state/content-store";
 
 /**
  * Context passed to file tree action provider
@@ -144,17 +158,8 @@ export const fileTreeActionProvider: ContextMenuActionProvider = (ctx) => {
   const isSingleSelection = selectedIds.length === 1;
   const isMultiSelection = selectedIds.length > 1;
   const isFolder = clickedNode?.isFolder || false;
-
-  // Recursive mapper for NewContentMenuItem → ContextMenuAction
-  const mapMenuItem = (item: { id: string; label: string; icon: any; shortcut?: string; onClick?: () => void; disabled?: boolean; submenu?: any[] }): ContextMenuAction => ({
-    id: item.id,
-    label: item.label,
-    icon: item.icon,
-    shortcut: item.shortcut,
-    onClick: item.onClick,
-    disabled: item.disabled,
-    submenu: item.submenu ? item.submenu.map(mapMenuItem) : undefined,
-  });
+  const { layoutMode, openContentInPane } = useContentStore.getState();
+  const visiblePaneIds = new Set(getVisiblePaneIds(layoutMode));
 
   // Section 1: Create actions (always show for single selection or empty space)
   // Behavior:
@@ -195,25 +200,7 @@ export const fileTreeActionProvider: ContextMenuActionProvider = (ctx) => {
       onCreateWorkflow,
     };
 
-    // Build page template data from store for Note submenu
-    const { categories: ptCats, templates: ptTpls } = usePageTemplateStore.getState();
-    let pageTemplateData: PageTemplateMenuData | undefined;
-    if (ptTpls.length > 0) {
-      pageTemplateData = {
-        categories: ptCats.map((c) => ({ id: c.id, name: c.name, isSystem: c.isSystem })),
-        templates: ptTpls.map((t) => ({ id: t.id, title: t.title, categoryId: t.categoryId, defaultTitle: t.defaultTitle })),
-      };
-      // Add template creation callback via CustomEvent
-      callbacks.onCreateNoteFromTemplate = (parentId: string | null, templateId: string, defaultTitle?: string) => {
-        window.dispatchEvent(
-          new CustomEvent("dg:create-from-template", {
-            detail: { parentId, templateId, defaultTitle },
-          })
-        );
-      };
-    }
-
-    const newMenuItems = getNewContentMenuItems(callbacks, targetId, pageTemplateData);
+    const newMenuItems = getNewContentMenuItems(callbacks, targetId);
 
     sections.push({
       title: "New",
@@ -222,7 +209,22 @@ export const fileTreeActionProvider: ContextMenuActionProvider = (ctx) => {
           id: "create-submenu",
           label: "New",
           icon: <Plus className="h-4 w-4" />,
-          submenu: newMenuItems.map(mapMenuItem),
+          submenu: newMenuItems.map((item) => ({
+            id: item.id,
+            label: item.label,
+            icon: item.icon,
+            shortcut: item.shortcut,
+            onClick: item.onClick,
+            disabled: item.disabled,
+            submenu: item.submenu ? item.submenu.map((subItem) => ({
+              id: subItem.id,
+              label: subItem.label,
+              icon: subItem.icon,
+              shortcut: subItem.shortcut,
+              onClick: subItem.onClick,
+              disabled: subItem.disabled,
+            })) : undefined,
+          })),
           divider: true,
         },
       ],
@@ -321,10 +323,54 @@ export const fileTreeActionProvider: ContextMenuActionProvider = (ctx) => {
   }
 
   // Section 3: Edit actions (single selection only, exclude external links)
-  if (isSingleSelection && clickedId && clickedNode?.contentType !== "external") {
+  if (isSingleSelection && clickedId && clickedNode && clickedNode.contentType !== "external") {
     const canCustomizeIcon = clickedNode && supportsCustomIcon(clickedNode);
+    const paneActions: Array<{
+      id: WorkspacePaneId;
+      label: string;
+      icon: ReactNode;
+    }> = [
+      {
+        id: TOP_LEFT_PANE_ID,
+        label: "Top Left Pane",
+        icon: <ArrowUpLeft className="h-4 w-4" />,
+      },
+      {
+        id: TOP_RIGHT_PANE_ID,
+        label: "Top Right Pane",
+        icon: <ArrowUpRight className="h-4 w-4" />,
+      },
+      {
+        id: BOTTOM_LEFT_PANE_ID,
+        label: "Bottom Left Pane",
+        icon: <ArrowDownLeft className="h-4 w-4" />,
+      },
+      {
+        id: BOTTOM_RIGHT_PANE_ID,
+        label: "Bottom Right Pane",
+        icon: <ArrowDownRight className="h-4 w-4" />,
+      },
+    ];
 
     const editActions: ContextMenuAction[] = [
+      {
+        id: "open-in-pane",
+        label: "Open In Pane",
+        icon: <ExternalLink className="h-4 w-4" />,
+        submenu: paneActions.map((pane) => ({
+          id: `open-${pane.id}`,
+          label: visiblePaneIds.has(pane.id)
+            ? getPaneLabel(layoutMode, pane.id)
+            : `${pane.label} (expand layout)`,
+          icon: pane.icon,
+          onClick: () =>
+            openContentInPane(clickedId, pane.id, {
+              title: clickedNode.title,
+              contentType: clickedNode.contentType,
+              pin: true,
+            }),
+        })),
+      },
       {
         id: "rename",
         label: "Rename",
