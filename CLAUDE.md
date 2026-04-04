@@ -26,7 +26,7 @@ npx prisma studio     # Database GUI (http://localhost:5555)
 
 **Build pipeline:** `pnpm build` runs three steps sequentially: `prisma generate` → `pnpm build:tokens` (style-dictionary) → `next build`.
 
-**Vercel build** runs `prisma migrate deploy` → `prisma generate` → `build:tokens` → `next build --webpack`. Local dev uses Turbopack (no webpack flag).
+**Vercel build** runs `prisma generate` → `build:tokens` → `next build --webpack`. Local dev uses Turbopack (no webpack flag). Migrations are run manually via `npx prisma migrate deploy`.
 
 ## Environment Setup
 

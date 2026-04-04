@@ -36,7 +36,7 @@ export function ContentToolbar() {
             key={tool.definition.id}
             onClick={tool.execute}
             disabled={tool.isDisabled}
-            className="flex items-center gap-1.5 rounded px-2.5 py-1 text-xs font-medium text-gray-300 transition-colors hover:bg-white/10 hover:text-white disabled:opacity-50"
+            className="flex items-center gap-1.5 rounded px-2.5 py-1 text-xs font-medium text-gray-500 transition-colors hover:bg-black/5 hover:text-gray-900 disabled:opacity-50 dark:text-gray-300 dark:hover:bg-white/10 dark:hover:text-white"
             title={tool.definition.label}
             type="button"
           >

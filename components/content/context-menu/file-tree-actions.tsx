@@ -8,7 +8,10 @@
  * M4: File Tree Completion - File Tree Context Menu
  */
 
+import type { ReactNode } from "react";
 import {
+  ArrowUpLeft,
+  ArrowUpRight,
   Edit,
   Trash2,
   Copy,
@@ -27,10 +30,22 @@ import {
   Eye,
   EyeOff,
   ExternalLink,
+  ArrowDownLeft,
+  ArrowDownRight,
 } from "lucide-react";
 import type { ContextMenuActionProvider, ContextMenuSection, ContextMenuAction } from "./types";
 import { getNewContentMenuItems, type NewContentCallbacks } from "@/components/content/menu-items/new-content-menu";
 import { supportsCustomIcon } from "@/lib/domain/content/file-extension-utils";
+import {
+  BOTTOM_LEFT_PANE_ID,
+  BOTTOM_RIGHT_PANE_ID,
+  TOP_LEFT_PANE_ID,
+  TOP_RIGHT_PANE_ID,
+  getPaneLabel,
+  getVisiblePaneIds,
+  useContentStore,
+  type WorkspacePaneId,
+} from "@/state/content-store";
 
 /**
  * Context passed to file tree action provider
@@ -143,6 +158,8 @@ export const fileTreeActionProvider: ContextMenuActionProvider = (ctx) => {
   const isSingleSelection = selectedIds.length === 1;
   const isMultiSelection = selectedIds.length > 1;
   const isFolder = clickedNode?.isFolder || false;
+  const { layoutMode, openContentInPane } = useContentStore.getState();
+  const visiblePaneIds = new Set(getVisiblePaneIds(layoutMode));
 
   // Section 1: Create actions (always show for single selection or empty space)
   // Behavior:
@@ -306,10 +323,54 @@ export const fileTreeActionProvider: ContextMenuActionProvider = (ctx) => {
   }
 
   // Section 3: Edit actions (single selection only, exclude external links)
-  if (isSingleSelection && clickedId && clickedNode?.contentType !== "external") {
+  if (isSingleSelection && clickedId && clickedNode && clickedNode.contentType !== "external") {
     const canCustomizeIcon = clickedNode && supportsCustomIcon(clickedNode);
+    const paneActions: Array<{
+      id: WorkspacePaneId;
+      label: string;
+      icon: ReactNode;
+    }> = [
+      {
+        id: TOP_LEFT_PANE_ID,
+        label: "Top Left Pane",
+        icon: <ArrowUpLeft className="h-4 w-4" />,
+      },
+      {
+        id: TOP_RIGHT_PANE_ID,
+        label: "Top Right Pane",
+        icon: <ArrowUpRight className="h-4 w-4" />,
+      },
+      {
+        id: BOTTOM_LEFT_PANE_ID,
+        label: "Bottom Left Pane",
+        icon: <ArrowDownLeft className="h-4 w-4" />,
+      },
+      {
+        id: BOTTOM_RIGHT_PANE_ID,
+        label: "Bottom Right Pane",
+        icon: <ArrowDownRight className="h-4 w-4" />,
+      },
+    ];
 
     const editActions: ContextMenuAction[] = [
+      {
+        id: "open-in-pane",
+        label: "Open In Pane",
+        icon: <ExternalLink className="h-4 w-4" />,
+        submenu: paneActions.map((pane) => ({
+          id: `open-${pane.id}`,
+          label: visiblePaneIds.has(pane.id)
+            ? getPaneLabel(layoutMode, pane.id)
+            : `${pane.label} (expand layout)`,
+          icon: pane.icon,
+          onClick: () =>
+            openContentInPane(clickedId, pane.id, {
+              title: clickedNode.title,
+              contentType: clickedNode.contentType,
+              pin: true,
+            }),
+        })),
+      },
       {
         id: "rename",
         label: "Rename",

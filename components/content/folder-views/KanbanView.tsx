@@ -32,6 +32,7 @@ import { toast } from "sonner";
 import { getSurfaceStyles } from "@/lib/design/system";
 import type { FolderViewProps } from "./FolderViewContainer";
 import { getDisplayExtension } from "@/lib/domain/content/file-extension-utils";
+import { useContentStore, type WorkspacePaneId } from "@/state/content-store";
 
 interface ContentChild {
   id: string;
@@ -49,8 +50,21 @@ interface Column {
   items: ContentChild[];
 }
 
-function SortableCard({ item }: { item: ContentChild }) {
+interface KanbanViewPrefs {
+  columnTitles?: string[];
+  cardAssignments?: Record<string, string>;
+  cardOrder?: Record<string, string[]>;
+}
+
+function SortableCard({
+  item,
+  paneId,
+}: {
+  item: ContentChild;
+  paneId: WorkspacePaneId;
+}) {
   const glass0 = getSurfaceStyles("glass-0");
+  const setSelectedContentId = useContentStore((state) => state.setSelectedContentId);
   const {
     attributes,
     listeners,
@@ -73,11 +87,11 @@ function SortableCard({ item }: { item: ContentChild }) {
 
   const handleOpenContent = (e: React.MouseEvent) => {
     e.stopPropagation(); // Prevent drag from triggering
-    window.dispatchEvent(
-      new CustomEvent("content-selected", {
-        detail: { contentId: item.id },
-      })
-    );
+    setSelectedContentId(item.id, {
+      title: item.title,
+      contentType: item.contentType,
+      paneId,
+    });
   };
 
   return (
@@ -146,17 +160,18 @@ function DroppableColumn({
 
 export function KanbanView({
   folderId,
-  folderTitle,
+  paneId,
+  folderTitle: _folderTitle,
   viewPrefs = {},
   onUpdateView,
 }: FolderViewProps) {
-  const glass0 = getSurfaceStyles("glass-0");
   const [columns, setColumns] = useState<Column[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeId, setActiveId] = useState<string | null>(null);
+  const kanbanPrefs = viewPrefs as KanbanViewPrefs;
 
   // Kanban view preferences
-  const columnTitles = viewPrefs.columnTitles || ["To Do", "In Progress", "Done"];
+  const columnTitles = kanbanPrefs.columnTitles ?? ["To Do", "In Progress", "Done"];
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -190,7 +205,7 @@ export function KanbanView({
 
       await onUpdateView({
         viewPrefs: {
-          ...viewPrefs,
+          ...kanbanPrefs,
           cardAssignments,
           cardOrder,
         },
@@ -228,8 +243,8 @@ export function KanbanView({
       const notes = data.data?.items || data.items || [];
 
       // Load saved column assignments from viewPrefs
-      const cardAssignments = (viewPrefs.cardAssignments || {}) as Record<string, string>;
-      const cardOrder = (viewPrefs.cardOrder || {}) as Record<string, string[]>;
+      const cardAssignments = kanbanPrefs.cardAssignments ?? {};
+      const cardOrder = kanbanPrefs.cardOrder ?? {};
 
       // Distribute notes across columns based on saved assignments
       const newColumns: Column[] = columnTitles.map((title: string, index: number) => {
@@ -401,7 +416,7 @@ export function KanbanView({
                   strategy={verticalListSortingStrategy}
                 >
                   {column.items.map((item) => (
-                    <SortableCard key={item.id} item={item} />
+                    <SortableCard key={item.id} item={item} paneId={paneId} />
                   ))}
                 </SortableContext>
 

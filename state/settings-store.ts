@@ -27,8 +27,8 @@ interface SettingsStore extends UserSettings {
   setFileSettings: (files: Partial<UserSettings["files"]>) => Promise<void>;
   setSearchSettings: (search: Partial<UserSettings["search"]>) => Promise<void>;
   setEditorSettings: (editor: Partial<UserSettings["editor"]>) => Promise<void>;
-  setCalendarSettings: (calendar: Partial<UserSettings["calendar"]>) => Promise<void>;
   setAISettings: (ai: Partial<UserSettings["ai"]>) => Promise<void>;
+  setCalendarSettings: (calendar: Partial<NonNullable<UserSettings["calendar"]>>) => Promise<void>;
 }
 
 export const useSettingsStore = create<SettingsStore>()(
@@ -70,19 +70,8 @@ export const useSettingsStore = create<SettingsStore>()(
 
       // Save to backend
       saveToBackend: async () => {
-        const state = get();
-        const settings: UserSettings = {
-          version: state.version,
-          ui: state.ui,
-          files: state.files,
-          fileTree: state.fileTree,
-          external: state.external,
-          search: state.search,
-          editor: state.editor,
-          calendar: state.calendar,
-          ai: state.ai,
-          exportBackup: state.exportBackup,
-        };
+        const { isSyncing, lastSyncedAt, hasPendingChanges, error, ...settings } =
+          get();
 
         set({ isSyncing: true, error: null });
         try {
@@ -176,17 +165,17 @@ export const useSettingsStore = create<SettingsStore>()(
         await get().saveToBackend();
       },
 
-      setCalendarSettings: async (calendar) => {
+      setAISettings: async (ai) => {
         set((state) => ({
-          calendar: { ...state.calendar, ...calendar },
+          ai: { ...state.ai, ...ai },
           hasPendingChanges: true,
         }));
         await get().saveToBackend();
       },
 
-      setAISettings: async (ai) => {
+      setCalendarSettings: async (calendar) => {
         set((state) => ({
-          ai: { ...state.ai, ...ai },
+          calendar: { ...state.calendar, ...calendar },
           hasPendingChanges: true,
         }));
         await get().saveToBackend();

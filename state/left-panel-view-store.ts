@@ -2,13 +2,13 @@
  * Left Panel View Store
  *
  * Manages which view is active in the left sidebar when in full mode.
- * Views: "files" (default), "search", "extensions", and "calendar"
+ * Three views: "files" (default), "search", and "extensions"
  */
 
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
-type LeftPanelView = "files" | "search" | "extensions" | "calendar";
+type LeftPanelView = "files" | "search" | "extensions";
 
 interface LeftPanelViewState {
   activeView: LeftPanelView;

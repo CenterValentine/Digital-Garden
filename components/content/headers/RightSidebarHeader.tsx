@@ -15,9 +15,8 @@ import { PanelRightClose } from "lucide-react";
 import { useRightPanelCollapseStore } from "@/state/right-panel-collapse-store";
 import { useContentStore } from "@/state/content-store";
 import { queryTools } from "@/lib/domain/tools";
-import type { ContentType } from "@/lib/domain/tools";
-import type { RightSidebarTab } from "../RightSidebar";
-import { useLeftPanelViewStore } from "@/state/left-panel-view-store";
+import type { ToolDefinition, ContentType } from "@/lib/domain/tools";
+import type { RightSidebarTab } from "@/state/right-sidebar-state-store";
 
 /** Inline SVG paths keyed by tabKey (project pattern: inline SVG in headers) */
 const TAB_SVG_PATHS: Record<string, string> = {
@@ -26,8 +25,6 @@ const TAB_SVG_PATHS: Record<string, string> = {
   outline: "M4 6h16M4 12h16M4 18h7",
   tags: "M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z",
   chat: "M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z",
-  calendar:
-    "M8 2v4M16 2v4M3 10h18M5 6h14a2 2 0 012 2v11a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2z",
 };
 
 /** Tab titles keyed by tabKey */
@@ -36,7 +33,6 @@ const TAB_TITLES: Record<string, string> = {
   outline: "Outline",
   tags: "Tags",
   chat: "AI Chat",
-  calendar: "Event Inspector",
 };
 
 interface RightSidebarHeaderProps {
@@ -47,21 +43,17 @@ interface RightSidebarHeaderProps {
 export function RightSidebarHeader({ activeTab, onTabChange }: RightSidebarHeaderProps) {
   const { toggleCollapsed } = useRightPanelCollapseStore();
   const selectedContentType = useContentStore((state) => state.selectedContentType);
-  const { activeView } = useLeftPanelViewStore();
 
   // Get visible tabs from registry, filtered by current content type
-  const tabs =
-    activeView === "calendar"
-      ? [{ id: "calendar-inspector", label: "Calendar", tabKey: "calendar" }]
-      : queryTools({
-          surface: "sidebar-tab",
-          contentType: (selectedContentType as ContentType) ?? undefined,
-        });
+  const tabs = queryTools({
+    surface: "sidebar-tab",
+    contentType: (selectedContentType as ContentType) ?? undefined,
+  });
 
   return (
     <div className="flex h-12 shrink-0 items-center justify-between border-b border-white/10 px-4">
       <div className="flex flex-1 items-center justify-around">
-        {tabs.map((tool) => {
+        {tabs.map((tool: ToolDefinition) => {
           const tabKey = tool.tabKey as RightSidebarTab | undefined;
           if (!tabKey) return null;
 

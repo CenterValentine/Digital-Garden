@@ -7,6 +7,7 @@
 
 "use client";
 
+import type { WorkspacePaneId } from "@/state/content-store";
 import { ListView } from "./ListView";
 import { GalleryView } from "./GalleryView";
 import { KanbanView } from "./KanbanView";
@@ -17,13 +18,14 @@ export type FolderViewMode = "list" | "gallery" | "kanban" | "dashboard" | "canv
 
 export interface FolderViewProps {
   folderId: string;
+  paneId: WorkspacePaneId;
   folderTitle: string;
-  viewPrefs?: Record<string, any>;
+  viewPrefs?: Record<string, unknown>;
   sortMode?: string | null;
   includeReferencedContent?: boolean;
   onUpdateView?: (updates: {
     viewMode?: FolderViewMode;
-    viewPrefs?: Record<string, any>;
+    viewPrefs?: Record<string, unknown>;
     sortMode?: string | null;
     includeReferencedContent?: boolean;
   }) => Promise<void>;
@@ -36,6 +38,7 @@ interface FolderViewContainerProps extends FolderViewProps {
 export function FolderViewContainer({
   viewMode,
   folderId,
+  paneId,
   folderTitle,
   viewPrefs = {},
   sortMode = null,
@@ -44,6 +47,7 @@ export function FolderViewContainer({
 }: FolderViewContainerProps) {
   const commonProps = {
     folderId,
+    paneId,
     folderTitle,
     viewPrefs,
     sortMode,

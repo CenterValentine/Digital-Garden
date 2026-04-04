@@ -100,6 +100,8 @@ export function LeftSidebarContent({
   // Content selection store
   const selectedContentId = useContentStore((state) => state.selectedContentId);
   const setSelectedContentId = useContentStore((state) => state.setSelectedContentId);
+  const replaceContentTab = useContentStore((state) => state.replaceContentTab);
+  const closeContentTabs = useContentStore((state) => state.closeContentTabs);
   const { setSelectedIds } = useTreeStateStore();
 
   // Search store - conditionally show search panel
@@ -206,7 +208,7 @@ export function LeftSidebarContent({
 
   // Sync tree selection when selectedContentId changes (from search, backlinks, etc.)
   useEffect(() => {
-    if (selectedContentId) {
+    if (selectedContentId && !selectedContentId.startsWith("temp-")) {
       // Update tree selection to match the active file
       setSelectedIds([selectedContentId]);
     }
@@ -478,10 +480,10 @@ export function LeftSidebarContent({
     const firstNode = nodes[0];
     if (firstNode) {
       console.log("Selected node:", firstNode);
-
-      // Phase 2: All content types can now be displayed in main panel
-      // MainPanelContent will route to appropriate viewer based on contentType
-      setSelectedContentId(firstNode.id);
+      setSelectedContentId(firstNode.id, {
+        title: firstNode.title,
+        contentType: firstNode.contentType,
+      });
     } else {
       // No selection - clear content
       setSelectedContentId(null);
@@ -577,7 +579,10 @@ export function LeftSidebarContent({
 
         // Success! Refresh tree and navigate to new link
         await fetchTree();
-        setSelectedContentId(result.data.id);
+        setSelectedContentId(result.data.id, {
+          title: result.data.title,
+          contentType: result.data.contentType ?? "external",
+        });
         toast.success(`Created external link "${data.name}"`);
       }
     } catch (err) {
@@ -598,10 +603,18 @@ export function LeftSidebarContent({
     }
 
     const { type, parentId, tempId } = creatingItem;
+    const optimisticContentType: ContentType =
+      type === "docx" || type === "xlsx" || type === "json"
+        ? "file"
+        : (type as ContentType);
 
     // Optimistically navigate to new file (not folders) immediately
     if (type !== "folder") {
-      setSelectedContentId(tempId);
+      setSelectedContentId(tempId, {
+        title: title.trim() || "Untitled",
+        contentType: optimisticContentType,
+        temporary: true,
+      });
     }
 
     // Auto-add .md extension to note files if not present
@@ -731,7 +744,7 @@ export function LeftSidebarContent({
             setTreeData(removeTempNode(treeData));
           }
           setCreatingItem(null);
-          setSelectedContentId(null);
+          closeContentTabs([tempId]);
 
           setErrorDialog({
             title: "Failed to create document",
@@ -743,7 +756,12 @@ export function LeftSidebarContent({
         // Success! Refresh tree to show new document
         fetchTree();
         setCreatingItem(null);
-        setSelectedContentId(result.data.id);
+        replaceContentTab(`tab:${tempId}`, result.data.id, {
+          title: result.data.title,
+          contentType: result.data.contentType ?? "file",
+          temporary: false,
+          pin: true,
+        });
         console.log(`[LeftSidebarContent] ${type.toUpperCase()} created:`, result.data.id);
         return;
       }
@@ -797,7 +815,7 @@ export function LeftSidebarContent({
 
         // Clear optimistic navigation
         if (type !== "folder") {
-          setSelectedContentId(null);
+          closeContentTabs([tempId]);
         }
 
         setErrorDialog({
@@ -870,7 +888,12 @@ export function LeftSidebarContent({
 
         // Navigate to newly created file (but not folders)
         if (type !== "folder") {
-          setSelectedContentId(apiResponse.id);
+          replaceContentTab(`tab:${tempId}`, apiResponse.id, {
+            title: apiResponse.title,
+            contentType: apiResponse.contentType,
+            temporary: false,
+            pin: true,
+          });
         }
       } else {
         // Fallback: If API doesn't return expected data, refresh tree
@@ -899,7 +922,7 @@ export function LeftSidebarContent({
 
       // Clear optimistic navigation
       if (type !== "folder") {
-        setSelectedContentId(null);
+        closeContentTabs([tempId]);
       }
 
       setErrorDialog({
@@ -927,6 +950,7 @@ export function LeftSidebarContent({
 
     const newTreeData = removeTempNode(treeData);
     setTreeData(newTreeData);
+    closeContentTabs([tempId]);
 
     // Clear creating state
     setCreatingItem(null);
@@ -1282,6 +1306,7 @@ export function LeftSidebarContent({
       }
 
       // Refresh tree to remove deleted items (even if some failed)
+      closeContentTabs(successes.map((item) => item.id));
       await fetchTree();
     } catch (err) {
       console.error("Failed to delete:", err);

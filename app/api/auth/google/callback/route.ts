@@ -5,7 +5,6 @@ import {
   verifyGoogleToken,
   findOrCreateOAuthUser,
 } from '@/lib/infrastructure/auth/oauth'
-import { ensureGoogleConnection, syncGoogleConnection } from "@/lib/domain/calendar/service";
 import { createSession } from '@/lib/infrastructure/auth/session'
 import { extractUsername } from '@/lib/infrastructure/auth/types'
 
@@ -48,7 +47,7 @@ export async function GET(
     const redirectUri = new URL('/api/auth/google/callback', request.url).toString()
 
     // Exchange code for tokens
-    const { idToken, accessToken, refreshToken, expiresIn, scope } = await exchangeCodeForTokens(
+    const { idToken, accessToken, refreshToken, expiresIn } = await exchangeCodeForTokens(
       code,
       redirectUri
     )
@@ -73,14 +72,8 @@ export async function GET(
       username,
       accessToken,
       refreshToken,
-      expiresIn,
-      scope
+      expiresIn
     )
-
-    const connection = await ensureGoogleConnection(user.id)
-    if (connection.status === "active") {
-      await syncGoogleConnection(user.id, connection.id)
-    }
 
     // Create session
     await createSession(user.id)
@@ -101,3 +94,4 @@ export async function GET(
     )
   }
 }
+

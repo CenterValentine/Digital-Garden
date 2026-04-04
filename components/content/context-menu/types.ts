@@ -31,6 +31,23 @@ export interface ContextMenuAction {
   destructive?: boolean;
   /** Divider after this item */
   divider?: boolean;
+  /** Section label shown above this item */
+  sectionLabel?: string;
+  /** Inline text input rendered inside the menu item */
+  inlineInput?: {
+    placeholder?: string;
+    inputLabel?: string;
+    autoFocus?: boolean;
+    onSubmit: (value: string) => void | ContextMenuAction[] | Promise<void | ContextMenuAction[]>;
+  };
+  /** Whether this action renders a searchable sub-list */
+  searchable?: boolean;
+  /** Secondary icon action (e.g. delete button on the right) */
+  secondaryAction?: {
+    icon: string;
+    onClick: () => void | Promise<void>;
+    confirmLabel?: string;
+  };
 }
 
 /**

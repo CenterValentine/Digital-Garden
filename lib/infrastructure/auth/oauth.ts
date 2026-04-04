@@ -62,7 +62,7 @@ export async function verifyGoogleToken(idToken: string): Promise<{
 export async function exchangeCodeForTokens(
   code: string,
   redirectUri: string
-): Promise<{ accessToken: string; idToken: string; refreshToken?: string; expiresIn?: number; scope?: string }> {
+): Promise<{ accessToken: string; idToken: string; refreshToken?: string; expiresIn?: number }> {
   if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) {
     throw new Error("Google OAuth not configured");
   }
@@ -83,7 +83,6 @@ export async function exchangeCodeForTokens(
       accessToken: tokens.access_token,
       idToken: tokens.id_token,
       refreshToken: tokens.refresh_token || undefined,
-      scope: tokens.scope || undefined,
       expiresIn: tokens.expiry_date
         ? Math.floor((tokens.expiry_date - Date.now()) / 1000)
         : 3600, // Default to 1 hour
@@ -111,8 +110,7 @@ export async function findOrCreateOAuthUser(
   username: string,
   accessToken?: string,
   refreshToken?: string,
-  expiresIn?: number,
-  scope?: string
+  expiresIn?: number
 ): Promise<{ user: User; account: Account }> {
   // Check if account already exists
   const existingAccount = await prisma.account.findUnique({
@@ -135,7 +133,6 @@ export async function findOrCreateOAuthUser(
         data: {
           accessToken,
           refreshToken,
-          scope: scope || existingAccount.scope,
           expiresAt: expiresIn ? new Date(Date.now() + expiresIn * 1000) : null,
         },
         include: {
@@ -178,7 +175,6 @@ export async function findOrCreateOAuthUser(
       providerAccountId,
       accessToken,
       refreshToken,
-      scope,
       expiresAt: expiresIn ? new Date(Date.now() + expiresIn * 1000) : null,
     },
   });
@@ -303,8 +299,7 @@ export async function linkOAuthAccount(
   providerAccountId: string,
   accessToken?: string,
   refreshToken?: string,
-  expiresAt?: bigint,
-  scope?: string
+  expiresAt?: bigint
 ): Promise<Account> {
   const account = await prisma.account.create({
     data: {
@@ -313,7 +308,6 @@ export async function linkOAuthAccount(
       providerAccountId,
       accessToken,
       refreshToken,
-      scope,
       expiresAt: expiresAt as any,
     },
   });
@@ -321,15 +315,19 @@ export async function linkOAuthAccount(
   return account as Account;
 }
 
+/**
+ * Get Google OAuth account for a user
+ */
 export async function getGoogleAccount(userId: string) {
   return prisma.account.findFirst({
-    where: {
-      userId,
-      provider: "google",
-    },
+    where: { userId, provider: "google" },
   });
 }
 
-export function hasGoogleScope(scope: string | null | undefined, expectedScope: string) {
-  return Boolean(scope?.split(/\s+/).includes(expectedScope));
+/**
+ * Check if a scope string contains a target scope
+ */
+export function hasGoogleScope(scope: string | null | undefined, targetScope: string): boolean {
+  if (!scope) return false;
+  return scope.split(" ").includes(targetScope);
 }

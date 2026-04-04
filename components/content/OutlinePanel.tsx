@@ -14,31 +14,32 @@
 
 "use client";
 
-import { useEffect } from "react";
-import { useContentStore } from "@/state/content-store";
 import { useOutlineStore } from "@/state/outline-store";
 import type { OutlineHeading } from "@/lib/domain/content/outline-extractor";
 
 interface OutlinePanelProps {
+  /** Content id this outline belongs to */
+  contentId?: string | null;
   /** Current outline headings from the editor */
   outline?: OutlineHeading[];
   /** Callback when a heading is clicked - scrolls editor to that heading */
   onHeadingClick?: (heading: OutlineHeading) => void;
 }
 
-export function OutlinePanel({ outline = [], onHeadingClick }: OutlinePanelProps) {
-  const selectedContentId = useContentStore((state) => state.selectedContentId);
-  const activeHeadingId = useOutlineStore((state) => state.activeHeadingId);
+export function OutlinePanel({
+  contentId,
+  outline = [],
+  onHeadingClick,
+}: OutlinePanelProps) {
+  const activeHeadingId = useOutlineStore((state) =>
+    state.getViewState(contentId).activeHeadingId
+  );
   const setActiveHeadingId = useOutlineStore((state) => state.setActiveHeadingId);
-
-  // Reset active heading when switching notes
-  useEffect(() => {
-    setActiveHeadingId(null);
-  }, [selectedContentId, setActiveHeadingId]);
 
   // Handle heading click
   const handleHeadingClick = (heading: OutlineHeading) => {
-    setActiveHeadingId(heading.id);
+    if (!contentId) return;
+    setActiveHeadingId(contentId, heading.id);
     if (onHeadingClick) {
       onHeadingClick(heading);
     }
@@ -51,7 +52,7 @@ export function OutlinePanel({ outline = [], onHeadingClick }: OutlinePanelProps
   };
 
   // Empty state - no note selected
-  if (!selectedContentId) {
+  if (!contentId) {
     return (
       <div className="flex h-full flex-col items-center justify-center p-8 text-center">
         <svg

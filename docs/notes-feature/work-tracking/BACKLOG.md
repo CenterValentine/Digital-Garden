@@ -141,6 +141,48 @@ The following sprints were originally 38-42 in Epoch 9 but are deferred to Epoch
 
 ---
 
+## Epoch 12: Main Panel Tabs + Split Workspace
+
+**Goal**: Introduce tabbed main-panel content first, then build split workspace on the same pane-aware state model.
+**Detailed plan**: [epoch-12-main-panel-tabs-and-split-workspace.md](epochs/epoch-12-main-panel-tabs-and-split-workspace.md)
+
+### Sprint 50: Tab Foundation
+- [x] Pane-aware workspace state (`panes`, `tabs`, `activePaneId`, `openContentIds`)
+- [x] Main-panel tabs with activate/reuse/close behavior
+- [x] URL reflects active content and open tabs
+- [x] Delete closes matching tabs
+- [x] Preview-tab reuse until explicit pin/focus
+- [x] Tree distinguishes active content from open content
+- [x] Sidebar active tab restored per content
+- [ ] Build + smoke gate on port `3001`
+
+### Sprint 51: Sidebar Isolation + Workspace Preservation
+- [x] Scope outline state by content/view
+- [x] Scope editor instance / AI editing state by content/view
+- [x] Scope navigation history by pane
+- [x] Restore sidebar state without bleed between tabs
+- [x] Preserve workspace restoration when leaving content and returning
+
+### Sprint 52: Dual-Pane Split
+- [x] Render dual-pane split on the same workspace model
+- [x] Focused pane drives shared sidebar state
+- [x] Maintain save and tree-highlight correctness across both panes
+- [x] Manual smoke on port `3001`
+
+### Sprint 53: Quad Split
+- [x] Expand to four-corner layout
+- [x] Keep pane activation and shared-sidebar behavior deterministic
+- [x] Pass final stability gate under rapid pane/tab switching
+
+### Sprint 54: Tab Drag + Adaptive Pane Reshaping
+- [x] Drag tabs between existing panes
+- [x] When only one pane is visible, drag tabs into standardized viewport targets to create vertical, horizontal, or quad splits
+- [x] Collapse the workspace to the simplest valid layout when panes are emptied by tab moves
+- [x] Treat explicit drag-and-drop as the source of truth for tab placement, separate from toolbar-driven layout memory
+- [ ] Manual smoke on port `3001`
+
+---
+
 ## Future Epochs (Unplanned)
 
 **Detailed stubs**: [future-epochs.md](epochs/future-epochs.md)
@@ -152,12 +194,6 @@ The following sprints were originally 38-42 in Epoch 9 but are deferred to Epoch
 
 ### UI Revisions
 - Default themes + custom user themes, editor styling, font/color customization
-
-### Main Panel Multiple Tabs + Workspace Preservation
-- Multi-document editing, Obsidian-like tabs (file name as tab label), collaboration-friendly
-- **Workspace preservation**: Navigating away (e.g., to Settings) and back restores the full tab state — all open tabs, active tab, scroll positions
-- Tabs show file names; the existing title header in the content area remains as-is
-- User can view multiple content nodes simultaneously via tabs
 
 ### YouTube Playlists & Summarizing (much later)
 - Playlist support, AI video summarization, transcript indexing

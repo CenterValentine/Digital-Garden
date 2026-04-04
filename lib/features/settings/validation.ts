@@ -52,23 +52,7 @@ const editorSettingsSchema = z
     autoSaveDelay: z.number().min(1000).max(10000).optional(),
     spellCheck: z.boolean().optional(),
     wordWrap: z.boolean().optional(),
-  })
-  .optional();
-
-const calendarSettingsSchema = z
-  .object({
-    defaultView: z
-      .enum(["dayGridMonth", "timeGridWeek", "timeGridDay", "listWeek"])
-      .optional(),
-    firstDayOfWeek: z.number().min(0).max(6).optional(),
-    showWeekends: z.boolean().optional(),
-    timezoneMode: z.enum(["local", "utc", "calendar"]).optional(),
-    defaultSourceId: z.string().uuid().nullable().optional(),
-    defaultEventDurationMinutes: z.number().min(15).max(1440).optional(),
-    quickAddMode: z.enum(["modal", "sidebar"]).optional(),
-    showDeclinedEvents: z.boolean().optional(),
-    showMiniCalendar: z.boolean().optional(),
-    showUpcomingAgenda: z.boolean().optional(),
+    betaBlocks: z.boolean().optional(),
   })
   .optional();
 
@@ -194,6 +178,19 @@ const exportBackupSettingsSchema = z
   })
   .optional();
 
+// Calendar Settings Schema (Epoch 11: Calendar Integration)
+const calendarSettingsSchema = z
+  .object({
+    defaultView: z
+      .enum(["dayGridMonth", "timeGridWeek", "timeGridDay", "listWeek"])
+      .optional(),
+    defaultEventDurationMinutes: z.number().min(5).max(480).optional(),
+    showWeekends: z.boolean().optional(),
+    showDeclinedEvents: z.boolean().optional(),
+    firstDayOfWeek: z.number().min(0).max(6).optional(),
+  })
+  .optional();
+
 // Complete Settings Schema
 export const userSettingsSchema = z.object({
   version: z.number().default(1),
@@ -203,9 +200,9 @@ export const userSettingsSchema = z.object({
   external: externalSettingsSchema,
   search: searchSettingsSchema,
   editor: editorSettingsSchema,
-  calendar: calendarSettingsSchema,
   ai: aiSettingsSchema,
   exportBackup: exportBackupSettingsSchema,
+  calendar: calendarSettingsSchema,
 });
 
 export type UserSettings = z.infer<typeof userSettingsSchema>;
@@ -309,18 +306,6 @@ export const DEFAULT_SETTINGS: UserSettings = {
     autoSaveDelay: 2000,
     spellCheck: true,
     wordWrap: true,
-  },
-  calendar: {
-    defaultView: "dayGridMonth",
-    firstDayOfWeek: 0,
-    showWeekends: true,
-    timezoneMode: "local",
-    defaultSourceId: null,
-    defaultEventDurationMinutes: 60,
-    quickAddMode: "modal",
-    showDeclinedEvents: true,
-    showMiniCalendar: true,
-    showUpcomingAgenda: true,
   },
   ai: {
     enabled: true,

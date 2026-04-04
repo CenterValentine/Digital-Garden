@@ -8,6 +8,7 @@ import type { Prisma } from "@/lib/database/generated/prisma";
 import { GOOGLE_CALENDAR_SCOPE } from "./types";
 import type {
   CalendarConnectionDTO,
+  CalendarEventAttendeeDTO,
   CalendarEventDTO,
   CalendarEventMutationInput,
   CalendarEventWithRelations,
@@ -53,10 +54,15 @@ function readIcalText(value: unknown): string | null {
 
 function serializeConnection(connection: CalendarConnectionModel): CalendarConnectionDTO {
   return {
-    ...connection,
+    id: connection.id,
+    provider: connection.provider as CalendarConnectionDTO["provider"],
+    displayName: connection.displayName,
+    status: connection.status as CalendarConnectionDTO["status"],
+    syncStatus: connection.syncStatus as CalendarConnectionDTO["syncStatus"],
     providerConfig: (connection.providerConfig as Record<string, unknown>) ?? {},
     syncCursor: connection.syncCursor,
     lastSyncedAt: toIsoOrNull(connection.lastSyncedAt),
+    lastSyncError: connection.lastSyncError,
     createdAt: connection.createdAt.toISOString(),
     updatedAt: connection.updatedAt.toISOString(),
   };
@@ -66,14 +72,14 @@ function serializeSource(source: CalendarSourceWithConnection): CalendarSourceDT
   return {
     id: source.id,
     connectionId: source.connectionId,
-    provider: source.connection?.provider ?? "local",
+    provider: (source.connection?.provider ?? "local") as CalendarSourceDTO["provider"],
     title: source.title,
     color: source.color,
     timezone: source.timezone,
     visible: source.visible,
     isReadOnly: source.isReadOnly,
     isPrimary: source.isPrimary,
-    syncMode: source.syncMode,
+    syncMode: source.syncMode as CalendarSourceDTO["syncMode"],
     externalCalendarId: source.externalCalendarId,
     metadata: (source.metadata as Record<string, unknown>) ?? {},
     lastSyncedAt: toIsoOrNull(source.lastSyncedAt),
@@ -96,7 +102,7 @@ export function serializeEvent(event: CalendarEventWithRelations): CalendarEvent
     recurrenceRule: event.recurrenceRule,
     recurrenceExDates: ((event.recurrenceExDates as string[]) ?? []).map((date) => new Date(date).toISOString()),
     recurrenceOverrides: (event.recurrenceOverrides as Record<string, unknown>) ?? {},
-    status: event.status,
+    status: event.status as CalendarEventDTO["status"],
     meetingUrl: event.meetingUrl,
     linkedContentId: event.linkedContentId,
     linkedNote: event.linkedContent
@@ -112,7 +118,7 @@ export function serializeEvent(event: CalendarEventWithRelations): CalendarEvent
     updatedAt: event.updatedAt.toISOString(),
     source: {
       id: event.source.id,
-      provider: event.source.connection?.provider ?? "local",
+      provider: (event.source.connection?.provider ?? "local") as CalendarSourceDTO["provider"],
       title: event.source.title,
       color: event.source.color,
       isReadOnly: event.source.isReadOnly,
@@ -122,7 +128,7 @@ export function serializeEvent(event: CalendarEventWithRelations): CalendarEvent
       email: attendee.email,
       displayName: attendee.displayName,
       isOrganizer: attendee.isOrganizer,
-      responseStatus: attendee.responseStatus,
+      responseStatus: attendee.responseStatus as CalendarEventAttendeeDTO["responseStatus"],
     })),
   };
 }
@@ -900,7 +906,7 @@ export async function updateCalendarEvent(userId: string, eventId: string, input
       input.recurrenceExDates ?? ((existing.recurrenceExDates as string[]) ?? []),
     recurrenceOverrides:
       input.recurrenceOverrides ?? ((existing.recurrenceOverrides as Record<string, unknown>) ?? {}),
-    status: input.status ?? existing.status,
+    status: (input.status ?? existing.status) as "confirmed" | "tentative" | "cancelled",
     meetingUrl: input.meetingUrl ?? existing.meetingUrl,
     linkedContentId: input.linkedContentId ?? existing.linkedContentId,
     attendees: input.attendees,

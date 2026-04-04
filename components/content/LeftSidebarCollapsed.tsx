@@ -7,7 +7,7 @@
 
 "use client";
 
-import { Folder, Search, Puzzle, CalendarDays } from "lucide-react";
+import { Folder, Search, Puzzle } from "lucide-react";
 import { useSearchStore } from "@/state/search-store";
 import { useLeftPanelCollapseStore } from "@/state/left-panel-collapse-store";
 import { useLeftPanelViewStore } from "@/state/left-panel-view-store";
@@ -44,14 +44,6 @@ export function LeftSidebarCollapsed() {
     }
   };
 
-  const handleCalendarClick = () => {
-    setMode("full");
-    setActiveView("calendar");
-    if (isSearchOpen) {
-      toggleSearch();
-    }
-  };
-
   return (
     <div className="flex h-full w-12 flex-col items-center border-r border-white/10 bg-black/20 py-2 gap-1">
       {/* Files icon */}
@@ -80,19 +72,6 @@ export function LeftSidebarCollapsed() {
         type="button"
       >
         <Search className="h-5 w-5" />
-      </button>
-
-      <button
-        onClick={handleCalendarClick}
-        className={`rounded p-2 transition-colors ${
-          activeView === "calendar"
-            ? "text-gold-primary bg-white/10"
-            : "text-gray-400 hover:bg-white/10 hover:text-gold-primary"
-        }`}
-        title="Calendar"
-        type="button"
-      >
-        <CalendarDays className="h-5 w-5" />
       </button>
 
       {/* Extensions placeholder */}

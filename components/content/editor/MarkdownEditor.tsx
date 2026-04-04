@@ -300,13 +300,15 @@ export function MarkdownEditor({
 
   // Register editor instance in global store for AI chat panel access
   useEffect(() => {
-    if (editor) {
-      useEditorInstanceStore.getState().setEditor(editor);
+    if (editor && contentId) {
+      useEditorInstanceStore.getState().setEditor(contentId, editor);
     }
     return () => {
-      useEditorInstanceStore.getState().setEditor(null);
+      if (contentId) {
+        useEditorInstanceStore.getState().clearEditor(contentId);
+      }
     };
-  }, [editor]);
+  }, [contentId, editor]);
 
   // Handle Cmd+K / Ctrl+K keyboard shortcut for link dialog
   useEffect(() => {

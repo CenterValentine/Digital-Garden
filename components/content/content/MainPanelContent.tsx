@@ -15,7 +15,12 @@ import { ToolDebugPanel } from "../toolbar/ToolDebugPanel";
 import type { ContentType as ToolContentType } from "@/lib/domain/tools";
 import { toast } from "sonner";
 import { Allotment } from "allotment";
-import { useContentStore } from "@/state/content-store";
+import {
+  getPaneActiveContentId,
+  getPaneActiveTab,
+  useContentStore,
+  type WorkspacePaneId,
+} from "@/state/content-store";
 import { useEditorStatsStore } from "@/state/editor-stats-store";
 import { useOutlineStore } from "@/state/outline-store";
 import { useDebugViewStore } from "@/state/debug-view-store";
@@ -29,8 +34,6 @@ import { VisualizationViewer } from "../viewer/VisualizationViewer";
 import { DataViewer } from "../viewer/DataViewer";
 import { HopeViewer } from "../viewer/HopeViewer";
 import { WorkflowViewer } from "../viewer/WorkflowViewer";
-import { MainPanelNavigation } from "../MainPanelNavigation";
-import { CalendarWorkspace } from "@/components/calendar/CalendarWorkspace";
 import { DebugViewToggle } from "../viewer/DebugViewToggle";
 import { JSONDebugView } from "../viewer/debug/JSONDebugView";
 import { TreeDebugView } from "../viewer/debug/TreeDebugView";
@@ -40,7 +43,6 @@ import type { JSONContent } from "@tiptap/core";
 import type { EditorStats } from "../editor/MarkdownEditor";
 import type { OutlineHeading } from "@/lib/domain/content/outline-extractor";
 import { extractOutline } from "@/lib/domain/content/outline-extractor";
-import { useLeftPanelViewStore } from "@/state/left-panel-view-store";
 
 interface ContentResponse {
   success: boolean;
@@ -50,8 +52,6 @@ interface ContentResponse {
     slug: string;
     parentId: string | null;
     contentType: string;
-    createdAt: string;
-    updatedAt: string;
     note?: {
       tiptapJson: any; // Prisma Json type
       searchText: string;
@@ -98,19 +98,31 @@ interface ContentResponse {
   };
 }
 
-export function MainPanelContent() {
-  const selectedContentId = useContentStore((state) => state.selectedContentId);
+interface MainPanelContentProps {
+  paneId: WorkspacePaneId;
+}
+
+export function MainPanelContent({ paneId }: MainPanelContentProps) {
+  const activePaneId = useContentStore((state) => state.activePaneId);
+  const layoutMode = useContentStore((state) => state.layoutMode);
+  const selectedContentId = useContentStore((state) =>
+    getPaneActiveContentId(state, paneId)
+  );
+  const activeTabId = useContentStore((state) =>
+    getPaneActiveTab(state, paneId)?.id ?? null
+  );
   const setSelectedContentId = useContentStore((state) => state.setSelectedContentId);
   const setSelectedContentType = useContentStore((state) => state.setSelectedContentType);
-  const clearSelection = useContentStore((state) => state.clearSelection);
+  const updateContentTab = useContentStore((state) => state.updateContentTab);
+  const pinContentTab = useContentStore((state) => state.pinContentTab);
+  const closeContentTabs = useContentStore((state) => state.closeContentTabs);
   const { setStats, setLastSaved, setIsSaving, setHasUnsavedChanges, reset: resetStats } = useEditorStatsStore();
-  const { setOutline, clearOutline } = useOutlineStore();
-  const { isDebugPanelVisible, toggleDebugPanel, viewMode } = useDebugViewStore();
-  const { activeView } = useLeftPanelViewStore();
+  const { setOutline } = useOutlineStore();
+  const { isDebugPanelVisible, toggleDebugPanel, setDebugPanelVisible, viewMode } = useDebugViewStore();
+  const isActivePane = activePaneId === paneId;
+  const isMultiPane = layoutMode !== "single";
   const [noteContent, setNoteContent] = useState<JSONContent | null>(null);
   const [noteTitle, setNoteTitle] = useState<string>("");
-  const [contentCreatedAt, setContentCreatedAt] = useState<string | null>(null);
-  const [contentUpdatedAt, setContentUpdatedAt] = useState<string | null>(null);
   const [contentType, setContentType] = useState<string | null>(null);
   const [contentParentId, setContentParentId] = useState<string | null>(null);
   const [contentData, setContentData] = useState<any>(null); // Phase 2: Store payload data
@@ -133,40 +145,15 @@ export function MainPanelContent() {
     };
   }, [selectedContentId]);
 
-  // Restore selection from URL or localStorage on mount
-  useEffect(() => {
-    // Only run once on mount
-    if (selectedContentId) return;
-
-    // Try URL first (using "content" param for all content types)
-    const urlParams = new URLSearchParams(window.location.search);
-    const contentIdFromUrl = urlParams.get("content");
-
-    if (contentIdFromUrl) {
-      console.log('[MainPanelContent] Restoring content from URL:', contentIdFromUrl);
-      setSelectedContentId(contentIdFromUrl);
-      return;
-    }
-
-    // Fallback to localStorage
-    const lastSelectedId = localStorage.getItem("lastSelectedContentId");
-    if (lastSelectedId) {
-      console.log('[MainPanelContent] Restoring content from localStorage:', lastSelectedId);
-      setSelectedContentId(lastSelectedId);
-    }
-  }, []); // Empty dependency array - only run on mount
-
   // Fetch note content when selection changes
   // Also re-fetch when content is updated (e.g., renamed in file tree)
   useEffect(() => {
     if (!selectedContentId) {
       setNoteContent(null);
       setNoteTitle("");
-      setContentCreatedAt(null);
-      setContentUpdatedAt(null);
+      setContentType(null);
+      setContentParentId(null);
       setContentData(null); // Clear Phase 2 payload data
-      resetStats(); // Reset stats when no note selected
-      clearOutline(); // Clear outline when no note selected
       return;
     }
 
@@ -195,7 +182,7 @@ export function MainPanelContent() {
         if (response.status === 404) {
           console.warn(`Content ${selectedContentId} not found (404). Clearing stale selection.`);
           toast.error("Note not found. It may have been deleted.");
-          clearSelection();
+          closeContentTabs([selectedContentId]);
           return;
         }
 
@@ -211,11 +198,13 @@ export function MainPanelContent() {
         }
 
         setNoteTitle(result.data.title);
-        setContentCreatedAt(result.data.createdAt);
-        setContentUpdatedAt(result.data.updatedAt);
         setContentParentId(result.data.parentId);
         setContentType(result.data.contentType);
-        setSelectedContentType(result.data.contentType);
+        updateContentTab(selectedContentId, {
+          title: result.data.title,
+          contentType: result.data.contentType,
+          isTemporary: false,
+        });
 
         // Store payload data for Phase 2 content types
         switch (result.data.contentType) {
@@ -263,7 +252,7 @@ export function MainPanelContent() {
 
               // Extract initial outline
               const initialOutline = extractOutline(emptyDoc);
-              setOutline(initialOutline);
+              setOutline(selectedContentId, initialOutline);
             } else {
               console.log('Setting note content:', content);
               const validContent = content as JSONContent;
@@ -271,7 +260,7 @@ export function MainPanelContent() {
 
               // Extract initial outline from loaded content
               const initialOutline = extractOutline(validContent);
-              setOutline(initialOutline);
+              setOutline(selectedContentId, initialOutline);
             }
           } catch (parseError) {
             console.error('Failed to parse TipTap JSON:', parseError);
@@ -284,7 +273,7 @@ export function MainPanelContent() {
 
             // Extract initial outline
             const initialOutline = extractOutline(emptyDoc);
-            setOutline(initialOutline);
+            setOutline(selectedContentId, initialOutline);
           }
         } else {
           console.log('No note payload, using empty document');
@@ -297,7 +286,7 @@ export function MainPanelContent() {
 
           // Extract initial outline from loaded content
           const initialOutline = extractOutline(emptyDoc);
-          setOutline(initialOutline);
+          setOutline(selectedContentId, initialOutline);
         }
       } catch (err) {
         console.error("Failed to fetch note:", err);
@@ -308,7 +297,24 @@ export function MainPanelContent() {
     };
 
     fetchNote();
-  }, [selectedContentId, refreshTrigger, clearSelection, resetStats, clearOutline, setOutline]);
+  }, [
+    selectedContentId,
+    refreshTrigger,
+    closeContentTabs,
+    setOutline,
+    updateContentTab,
+  ]);
+
+  useEffect(() => {
+    if (!isActivePane || selectedContentId) return;
+    resetStats();
+    setSelectedContentType(null);
+  }, [isActivePane, resetStats, selectedContentId, setSelectedContentType]);
+
+  useEffect(() => {
+    if (!isActivePane) return;
+    setSelectedContentType(contentType);
+  }, [contentType, isActivePane, setSelectedContentType]);
 
   // Listen for content updates (e.g., when renamed in file tree)
   useEffect(() => {
@@ -316,18 +322,16 @@ export function MainPanelContent() {
       const { contentId, updates } = event.detail;
 
       // If the updated content is the currently selected one, refresh it
-      if (contentId === selectedContentId) {
-        console.log('[MainPanelContent] Content updated, refreshing:', contentId, updates);
+        if (contentId === selectedContentId) {
+          console.log('[MainPanelContent] Content updated, refreshing:', contentId, updates);
 
-        // If only title changed, update it directly (faster than refetch)
-        if (updates.title && Object.keys(updates).length === 1) {
-          setNoteTitle(updates.title);
-          if (updates.updatedAt) {
-            setContentUpdatedAt(updates.updatedAt);
-          }
-        } else {
-          // Other changes, trigger full refetch
-          setRefreshTrigger(prev => prev + 1);
+          // If only title changed, update it directly (faster than refetch)
+          if (updates.title && Object.keys(updates).length === 1) {
+            setNoteTitle(updates.title);
+            updateContentTab(contentId, { title: updates.title });
+          } else {
+            // Other changes, trigger full refetch
+            setRefreshTrigger(prev => prev + 1);
         }
       }
     };
@@ -336,25 +340,27 @@ export function MainPanelContent() {
     return () => {
       window.removeEventListener('content-updated' as any, handleContentUpdate as any);
     };
-  }, [selectedContentId]);
+  }, [selectedContentId, updateContentTab]);
 
   // Stats change handler
   const handleStatsChange = useCallback(
     (stats: EditorStats) => {
+      if (!isActivePane) return;
       setStats({
         wordCount: stats.words,
         characterCount: stats.characters,
       });
     },
-    [setStats]
+    [isActivePane, setStats]
   );
 
   // Outline change handler
   const handleOutlineChange = useCallback(
     (outline: OutlineHeading[]) => {
-      setOutline(outline);
+      if (!selectedContentId) return;
+      setOutline(selectedContentId, outline);
     },
-    [setOutline]
+    [selectedContentId, setOutline]
   );
 
   // Auto-save handler — hardened against cross-document race conditions.
@@ -365,13 +371,12 @@ export function MainPanelContent() {
     async (content: JSONContent) => {
       if (!selectedContentId) return;
 
-      // GUARD: Read the live selectedContentId from the store at save-time.
-      // If it no longer matches the closure's value, the user navigated away
-      // and this save targets a stale document — discard it.
-      const currentId = useContentStore.getState().selectedContentId;
+      // GUARD: Only discard saves when this pane has navigated to a different
+      // document. Another pane becoming focused should not cancel the save.
+      const currentId = getPaneActiveContentId(useContentStore.getState(), paneId);
       if (currentId !== selectedContentId) {
         console.warn(
-          `[MainPanelContent] Blocked cross-document save: handleSave targets ${selectedContentId}, but store has ${currentId}`
+          `[MainPanelContent] Blocked cross-document save: handleSave targets ${selectedContentId}, but pane ${paneId} has ${currentId}`
         );
         return;
       }
@@ -408,19 +413,16 @@ export function MainPanelContent() {
         // Final guard: verify we're still on the same document before
         // updating parent state. This catches the edge case where the user
         // navigated during the network round-trip.
-        const postSaveId = useContentStore.getState().selectedContentId;
+        const postSaveId = getPaneActiveContentId(useContentStore.getState(), paneId);
         if (postSaveId !== selectedContentId) {
           console.warn(
-            `[MainPanelContent] User navigated during save — skipping state update for ${selectedContentId}`
+            `[MainPanelContent] Pane ${paneId} navigated during save — skipping state update for ${selectedContentId}`
           );
           return;
         }
 
         console.log("Note saved successfully");
         setLastSaved(new Date());
-        if (result.data?.updatedAt) {
-          setContentUpdatedAt(result.data.updatedAt);
-        }
         // Keep parent state in sync so re-mounts (e.g., ExpandableEditor
         // collapse/reopen) receive the latest persisted content
         setNoteContent(content);
@@ -436,7 +438,7 @@ export function MainPanelContent() {
         setIsSaving(false);
       }
     },
-    [selectedContentId, setIsSaving, setHasUnsavedChanges, setLastSaved]
+    [paneId, selectedContentId, setIsSaving, setHasUnsavedChanges, setLastSaved]
   );
 
   // Wiki-link click handler - navigate to note or folder by title
@@ -464,18 +466,11 @@ export function MainPanelContent() {
 
         if (matchedContent) {
           console.log('[MainPanelContent] Navigating to:', matchedContent.contentType, matchedContent.id, matchedContent.title);
-
-          if (matchedContent.contentType === 'folder') {
-            // For folders: select in tree and expand (don't open in editor)
-            // Import tree state store to handle folder navigation
-            const { setSelectedIds, setExpanded } = await import('@/state/tree-state-store').then(m => m.useTreeStateStore.getState());
-            setSelectedIds([matchedContent.id]);
-            setExpanded(matchedContent.id, true);
-            setSelectedContentId(null); // Clear editor selection
-          } else {
-            // For notes: open in editor
-            setSelectedContentId(matchedContent.id);
-          }
+          setSelectedContentId(matchedContent.id, {
+            title: matchedContent.title,
+            contentType: matchedContent.contentType,
+            paneId,
+          });
         } else {
           console.warn('[MainPanelContent] No content found with title:', targetTitle);
         }
@@ -483,7 +478,7 @@ export function MainPanelContent() {
         console.error('[MainPanelContent] Error finding content:', err);
       }
     },
-    [setSelectedContentId]
+    [paneId, setSelectedContentId]
   );
 
   // Fetch notes for wiki-link autocomplete
@@ -596,6 +591,10 @@ export function MainPanelContent() {
     if (process.env.NODE_ENV !== "development") return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (isMultiPane) {
+        return;
+      }
+
       // Cmd+Shift+D (Mac) or Ctrl+Shift+D (Windows/Linux)
       if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === "D") {
         e.preventDefault();
@@ -605,7 +604,12 @@ export function MainPanelContent() {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [toggleDebugPanel]);
+  }, [isMultiPane, toggleDebugPanel]);
+
+  useEffect(() => {
+    if (!isMultiPane || !isDebugPanelVisible) return;
+    setDebugPanelVisible(false);
+  }, [isDebugPanelVisible, isMultiPane, setDebugPanelVisible]);
 
   // ─── Tool Surface Handlers ───
   const handleExportMarkdown = useCallback(async () => {
@@ -685,7 +689,12 @@ export function MainPanelContent() {
           }
           // Navigate to the imported note
           if (result.data.contentId) {
-            setSelectedContentId(result.data.contentId);
+            setSelectedContentId(result.data.contentId, {
+              title: result.data.title,
+              contentType: "note",
+              pin: true,
+              paneId,
+            });
             setSelectedContentType("note");
           }
         } else {
@@ -697,7 +706,7 @@ export function MainPanelContent() {
     };
 
     input.click();
-  }, [contentType, selectedContentId, setSelectedContentId, setSelectedContentType]);
+  }, [contentType, paneId, selectedContentId, setSelectedContentId, setSelectedContentType]);
 
   // Export chat conversation as markdown transcript
   const handleExportChat = useCallback(() => {
@@ -730,15 +739,6 @@ export function MainPanelContent() {
     "export-chat": handleExportChat,
     "copy-link": handleCopyLink,
   }), [handleImportMarkdown, handleExportMarkdown, handleExportChat, handleCopyLink]);
-
-  if (activeView === "calendar") {
-    return (
-      <ToolSurfaceProvider contentType={null} handlers={toolHandlers}>
-        <CalendarWorkspace />
-        {process.env.NODE_ENV === "development" && <ToolDebugPanel />}
-      </ToolSurfaceProvider>
-    );
-  }
 
   // Welcome screen when no note selected
   if (!selectedContentId) {
@@ -780,6 +780,7 @@ export function MainPanelContent() {
     contentElement = (
       <FolderViewer
         contentId={selectedContentId}
+        paneId={paneId}
         title={noteTitle}
         viewMode={contentData?.viewMode || "list"}
         sortMode={contentData?.sortMode || null}
@@ -865,20 +866,8 @@ export function MainPanelContent() {
       <div className="flex flex-col h-full">
         {/* Note title header with debug toggle */}
         <div className="flex-none px-6 pt-6 pb-2 flex items-start justify-between">
-          <div>
-            <h1 className="text-3xl font-semibold text-foreground mb-0">{noteTitle}</h1>
-            {(contentCreatedAt || contentUpdatedAt) && (
-              <div className="mt-2 flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
-                {contentCreatedAt && (
-                  <span>Created {new Date(contentCreatedAt).toLocaleString()}</span>
-                )}
-                {contentUpdatedAt && (
-                  <span>Last updated {new Date(contentUpdatedAt).toLocaleString()}</span>
-                )}
-              </div>
-            )}
-          </div>
-          {process.env.NODE_ENV === "development" && <DebugViewToggle />}
+          <h1 className="text-3xl font-semibold text-foreground mb-0">{noteTitle}</h1>
+          {process.env.NODE_ENV === "development" && !isMultiPane && <DebugViewToggle />}
         </div>
 
         {/* Editor */}
@@ -901,7 +890,7 @@ export function MainPanelContent() {
     );
 
     // Wrap in split pane if debug panel is visible
-    if (isDebugPanelVisible && process.env.NODE_ENV === "development") {
+    if (isDebugPanelVisible && !isMultiPane && process.env.NODE_ENV === "development") {
       contentElement = (
         <Allotment defaultSizes={[60, 40]}>
           <Allotment.Pane minSize={300}>{editorElement}</Allotment.Pane>
@@ -922,26 +911,39 @@ export function MainPanelContent() {
   // Render navigation once, then content below
   return (
     <ToolSurfaceProvider contentType={(contentType as ToolContentType) ?? null} handlers={toolHandlers}>
-      {selectedContentId && <MainPanelNavigation />}
-      {selectedContentId && <ContentToolbar />}
-      {isNonNoteContent ? (
-        <div className="flex-1 flex flex-col overflow-y-auto">
-          <div className="flex-1">{contentElement}</div>
-          <ExpandableEditor
-            contentId={selectedContentId}
-            contentType={contentType}
-            noteContent={noteContent}
-            onSave={handleSave}
-            onWikiLinkClick={handleWikiLinkClick}
-            fetchNotesForWikiLink={fetchNotesForWikiLink}
-            fetchTags={fetchTags}
-            createTag={createTag}
-          />
-        </div>
-      ) : (
-        contentElement
-      )}
-      {process.env.NODE_ENV === "development" && <ToolDebugPanel />}
+      <div
+        className="flex h-full min-h-0 flex-col overflow-hidden"
+        onPointerDownCapture={() => {
+          if (activeTabId) {
+            pinContentTab(activeTabId);
+          }
+        }}
+        onFocusCapture={() => {
+          if (activeTabId) {
+            pinContentTab(activeTabId);
+          }
+        }}
+      >
+        {selectedContentId && <ContentToolbar />}
+        {isNonNoteContent ? (
+          <div className="flex flex-1 min-h-0 flex-col overflow-y-auto">
+            <div className="flex-1 min-h-0">{contentElement}</div>
+            <ExpandableEditor
+              contentId={selectedContentId}
+              contentType={contentType}
+              noteContent={noteContent}
+              onSave={handleSave}
+              onWikiLinkClick={handleWikiLinkClick}
+              fetchNotesForWikiLink={fetchNotesForWikiLink}
+              fetchTags={fetchTags}
+              createTag={createTag}
+            />
+          </div>
+        ) : (
+          contentElement
+        )}
+        {process.env.NODE_ENV === "development" && !isMultiPane && <ToolDebugPanel />}
+      </div>
     </ToolSurfaceProvider>
   );
 }

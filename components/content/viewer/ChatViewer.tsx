@@ -307,21 +307,14 @@ export function ChatViewer({
   // ─── Sprint 41: Chat outline sync ───
   const setChatOutline = useOutlineStore((s) => s.setChatOutline);
   const chatOutlineGranularity = useOutlineStore(
-    (s) => s.chatOutlineGranularity
+    (s) => s.getViewState(contentId).chatOutlineGranularity
   );
 
   // Update outline store when messages or granularity changes (real-time)
   useEffect(() => {
     const entries = extractChatOutline(messages, chatOutlineGranularity);
-    setChatOutline(entries);
-  }, [messages, chatOutlineGranularity, setChatOutline]);
-
-  // Clear chat outline on unmount
-  useEffect(() => {
-    return () => {
-      useOutlineStore.getState().setChatOutline([]);
-    };
-  }, []);
+    setChatOutline(contentId, entries);
+  }, [contentId, messages, chatOutlineGranularity, setChatOutline]);
 
   // ─── Sprint 41: Scroll-to-message from outline clicks ───
   useEffect(() => {

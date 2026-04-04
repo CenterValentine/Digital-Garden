@@ -28,8 +28,8 @@ export type Account = {
   providerAccountId: string;
   accessToken: string | null;
   refreshToken: string | null;
-  expiresAt: bigint | null;
   scope: string | null;
+  expiresAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 };

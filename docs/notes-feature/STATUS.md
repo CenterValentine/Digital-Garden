@@ -1,8 +1,8 @@
 ---
-last_updated: 2026-03-13
-current_epoch: 10
-current_sprint: 42
-sprint_status: complete
+last_updated: 2026-03-25
+current_epoch: 12
+current_sprint: 54
+sprint_status: in_progress
 ---
 
 # Digital Garden Content IDE - Status
@@ -35,18 +35,41 @@ before planning and executing. There may be additions or modifications.
 
 ## Current Work
 
-### Active Epoch: Epoch 10 - AI TipTap (Injected Before Remaining Epoch 9)
-**Duration**: 5 sprints (38-42)
-**Theme**: AI-powered document editing, provider expansion, edit highlighting
+### Active Epoch: Epoch 12 - Main Panel Tabs + Split Workspace
+**Duration**: 5 sprints (50-54)
+**Theme**: Tabbed main-panel workspaces, per-tab runtime isolation, split-pane foundation
 
 **Sprint Plan**:
-- Sprint 38: Providers + BYOK Persistence + Rich Bot Responses (complete)
-- Sprint 39: AI Text-Editing Tools — Client-Side Architecture (complete)
-- Sprint 40: AI Edit Highlighting + AI Image Insert (complete)
-- Sprint 41: Chat Content Outlines (complete)
-- Sprint 42: AI Image Generation (complete)
+- Sprint 50: Tab Foundation (complete)
+- Sprint 51: Sidebar Isolation + Workspace Preservation (complete)
+- Sprint 52: Dual-Pane Split (complete)
+- Sprint 53: Quad Split (complete)
+- Sprint 54: Tab Drag + Adaptive Pane Reshaping (in progress)
 
 ## Recent Completions (Last 30 Days)
+
+**Mar 25, 2026**: Sprint 53 Quad Split — COMPLETE
+- Added four layout modes: single, dual vertical, dual horizontal, and quad split from the same workspace model
+- Shared workspace toolbar now controls the focused pane instead of rendering per pane
+- Right-click `Open In Pane` expands the workspace when the requested pane is not currently visible
+- Multi-pane debug surfaces are suppressed when pane count is greater than one
+- Split orientation remount fix prevents vertical/horizontal mode confusion after repeated toggles
+- Pane switching no longer refetches content just because focus changed
+- Tab placement now follows persistent horizontal/vertical user preference instead of transient visible-pane merges
+- Active tab styling refined with flush underline and conservative lift
+- Build gate passed
+- Manual smoke passed on port `3001`
+
+**Mar 24, 2026**: Sprint 51 Sidebar Isolation + Workspace Preservation — COMPLETE
+- Persisted right-sidebar runtime per content via `state/right-sidebar-state-store.ts`
+- Sidebar panels now receive explicit `contentId` scope instead of relying on the global selection singleton
+- Outline store now clears invalid active heading/chat-outline selections when content-specific outlines refresh
+- Editor instance store now clears stale AI edit runtime when an editor unmounts
+- Navigation history remains pane-scoped and filters invalid cleared-content entries
+- Workspace restoration now keeps the active tab restorable in URL/localStorage when leaving content and returning
+- Repaired Epoch 12 Sprint 50/51 worktree git indirection under `Digital-Garden. nosync/.worktrees/`
+- Targeted eslint on changed files passed
+- Build gate passed
 
 **Mar 13, 2026**: Sprint 42 AI Image Generation — COMPLETE
 - 8-provider image generation system: OpenAI (DALL·E 3, GPT Image 1), Google (Imagen 3), DeepAI, fal.ai (FLUX.1 Dev/Schnell), Together AI (FLUX/SDXL), Fireworks AI, RunwayML (Gen-3), Artbreeder
@@ -182,8 +205,8 @@ before planning and executing. There may be additions or modifications.
 
 ## Up Next
 
-### Epoch 11: Editor Enhancements (Remaining Epoch 9)
-URL/OG embeds, YouTube, drag/reorder, templates, snapshots, context menu.
+### Epoch 12: Sprint 54 - Tab Drag + Adaptive Pane Reshaping
+Direct tab dragging between panes, single-pane split targets, and adaptive layout collapse are in progress. Next checkpoint is manual smoke on port `3001`.
 
 **See**: [Epoch Plans](work-tracking/epochs/) for detailed sprint breakdowns
 
@@ -242,7 +265,7 @@ URL/OG embeds, YouTube, drag/reorder, templates, snapshots, context menu.
 
 ## Quick Links
 
-- [Current Sprint](work-tracking/CURRENT-SPRINT.md) - Sprint 42 details
+- [Current Sprint](work-tracking/CURRENT-SPRINT.md) - Sprint 54 details
 - [Backlog](work-tracking/BACKLOG.md) - Prioritized work items
 - [Epoch Plans](work-tracking/epochs/) - Epoch 8, 9, 10, future stubs
 - [TipTap Editor Rules](guides/editor/TIPTAP-EDITOR-RULES.md) - Editor behavior rules

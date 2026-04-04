@@ -4,13 +4,6 @@ import { v4 as uuidv4 } from 'uuid'
 
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID
 const GOOGLE_AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth'
-const GOOGLE_SCOPES = [
-  'openid',
-  'email',
-  'profile',
-  'https://www.googleapis.com/auth/drive',
-  'https://www.googleapis.com/auth/calendar',
-]
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
   if (!GOOGLE_CLIENT_ID) {
@@ -44,7 +37,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     client_id: GOOGLE_CLIENT_ID,
     redirect_uri: redirectUri,
     response_type: 'code',
-    scope: GOOGLE_SCOPES.join(' '),
+    scope: 'openid email profile https://www.googleapis.com/auth/drive',
     state,
     access_type: 'offline',
     prompt: 'consent',
@@ -54,3 +47,4 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
   return NextResponse.redirect(authUrl)
 }
+

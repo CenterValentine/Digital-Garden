@@ -1,8 +1,6 @@
 "use client";
 
-import { DndProvider, useDrop, useDragDropManager } from "react-dnd";
-import { HTML5Backend } from "react-dnd-html5-backend";
-import { NativeTypes } from "react-dnd-html5-backend";
+import { useRef, useState } from "react";
 import { validateFileBatch } from "@/lib/infrastructure/media/file-validation";
 import { toast } from "sonner";
 import { FileTree } from "./FileTree";
@@ -38,49 +36,68 @@ interface FileTreeWithDropZoneProps {
 }
 
 /**
- * Inner component that uses useDrop hook
- * Must be inside DndProvider context
+ * Tree wrapper that supports external file drops without creating another
+ * react-dnd backend alongside react-arborist's internal one.
  */
 function FileTreeDropZoneInner({ onFileDrop, ...treeProps }: FileTreeWithDropZoneProps) {
-  // Get the DND manager to pass to react-arborist
-  // This allows react-arborist to share our DndProvider instead of creating its own
-  const manager = useDragDropManager();
+  const dragDepthRef = useRef(0);
+  const [isDragActive, setIsDragActive] = useState(false);
 
-  const [{ isOver, canDrop }, dropRef] = useDrop(
-    () => ({
-      accept: NativeTypes.FILE,
-      drop: (item: { files: File[] }) => {
-        const droppedFiles = item.files;
+  const isExternalFileDrag = (event: React.DragEvent<HTMLDivElement>) => {
+    return Array.from(event.dataTransfer?.types ?? []).includes("Files");
+  };
 
-        if (droppedFiles.length === 0) return;
+  const handleDragEnter = (event: React.DragEvent<HTMLDivElement>) => {
+    if (!isExternalFileDrag(event)) return;
+    dragDepthRef.current += 1;
+    setIsDragActive(true);
+  };
 
-        // Validate files
-        const { validFiles, invalidFiles } = validateFileBatch(droppedFiles);
+  const handleDragOver = (event: React.DragEvent<HTMLDivElement>) => {
+    if (!isExternalFileDrag(event)) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "copy";
+    setIsDragActive(true);
+  };
 
-        // Show error toasts for invalid files
-        invalidFiles.forEach(({ file, error }) => {
-          toast.error(error, {
-            description: `File: ${file.name}`,
-          });
-        });
+  const handleDragLeave = (event: React.DragEvent<HTMLDivElement>) => {
+    if (!isExternalFileDrag(event)) return;
+    dragDepthRef.current = Math.max(0, dragDepthRef.current - 1);
+    if (dragDepthRef.current === 0) {
+      setIsDragActive(false);
+    }
+  };
 
-        // If we have valid files, notify parent to open upload dialog
-        if (validFiles.length > 0 && onFileDrop) {
-          onFileDrop(validFiles);
-        }
-      },
-      collect: (monitor) => ({
-        isOver: monitor.isOver(),
-        canDrop: monitor.canDrop(),
-      }),
-    }),
-    [onFileDrop]
-  );
+  const handleDrop = (event: React.DragEvent<HTMLDivElement>) => {
+    if (!isExternalFileDrag(event)) return;
+    event.preventDefault();
+    dragDepthRef.current = 0;
+    setIsDragActive(false);
 
-  const isDragActive = isOver && canDrop;
+    const droppedFiles = Array.from(event.dataTransfer.files ?? []);
+    if (droppedFiles.length === 0) return;
+
+    const { validFiles, invalidFiles } = validateFileBatch(droppedFiles);
+
+    invalidFiles.forEach(({ file, error }) => {
+      toast.error(error, {
+        description: `File: ${file.name}`,
+      });
+    });
+
+    if (validFiles.length > 0 && onFileDrop) {
+      onFileDrop(validFiles);
+    }
+  };
 
   return (
-    <div ref={dropRef as any} className="relative w-full h-full">
+    <div
+      className="relative w-full h-full"
+      onDragEnter={handleDragEnter}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
       {/* Drag-and-drop overlay */}
       {isDragActive && (
         <div
@@ -116,27 +133,17 @@ function FileTreeDropZoneInner({ onFileDrop, ...treeProps }: FileTreeWithDropZon
         </div>
       )}
 
-      {/* Pass dndManager to FileTree so it uses our DndProvider */}
-      <FileTree {...treeProps} dndManager={manager} />
+      <FileTree {...treeProps} />
     </div>
   );
 }
 
 /**
- * Wrapper that provides DndProvider context
+ * Wrapper that renders the shared tree + file-drop surface
  *
- * This component creates a single DndProvider that is shared by both:
- * 1. The useDrop hook (for external file drops)
- * 2. react-arborist's Tree (for node reordering)
- *
- * By passing the dndManager to FileTree, react-arborist will use our
- * DndProvider instead of creating its own, preventing the
- * "Cannot have two HTML5 backends" error.
+ * The DndProvider now lives above the sidebar so remounting this tree
+ * during panel transitions does not attempt to create another backend.
  */
 export function FileTreeWithDropZone(props: FileTreeWithDropZoneProps) {
-  return (
-    <DndProvider backend={HTML5Backend}>
-      <FileTreeDropZoneInner {...props} />
-    </DndProvider>
-  );
+  return <FileTreeDropZoneInner {...props} />;
 }

@@ -26,6 +26,7 @@ import { FileText, Folder, File as FileIcon, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 import type { FolderViewProps } from "./FolderViewContainer";
 import { getDisplayExtension } from "@/lib/domain/content/file-extension-utils";
+import { useContentStore } from "@/state/content-store";
 
 interface ContentChild {
   id: string;
@@ -41,10 +42,12 @@ interface ContentLink {
 
 export function CanvasView({
   folderId,
+  paneId,
   folderTitle,
   viewPrefs = {},
   onUpdateView,
 }: FolderViewProps) {
+  const setSelectedContentId = useContentStore((state) => state.setSelectedContentId);
   const [items, setItems] = useState<ContentChild[]>([]);
   const [links, setLinks] = useState<ContentLink[]>([]);
   const [loading, setLoading] = useState(true);
@@ -106,11 +109,11 @@ export function CanvasView({
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
-                    window.dispatchEvent(
-                      new CustomEvent("content-selected", {
-                        detail: { contentId: item.id },
-                      })
-                    );
+                    setSelectedContentId(item.id, {
+                      title: item.title,
+                      contentType: item.contentType,
+                      paneId,
+                    });
                   }}
                   className="flex-shrink-0 p-1 rounded hover:bg-white/50 transition-colors"
                   title="Open in main panel"
@@ -156,13 +159,15 @@ export function CanvasView({
   );
 
   const handleNodeClick = useCallback((_event: React.MouseEvent, node: Node) => {
-    // Trigger content selection
-    window.dispatchEvent(
-      new CustomEvent("content-selected", {
-        detail: { contentId: node.id },
-      })
-    );
-  }, []);
+    const item = items.find((candidate) => candidate.id === node.id);
+    if (!item) return;
+
+    setSelectedContentId(item.id, {
+      title: item.title,
+      contentType: item.contentType,
+      paneId,
+    });
+  }, [items, paneId, setSelectedContentId]);
 
   const handleNodesChangeWithSave = useCallback(
     (changes: any[]) => {

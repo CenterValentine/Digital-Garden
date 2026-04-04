@@ -16,6 +16,7 @@ import { toast } from "sonner";
 import { getSurfaceStyles } from "@/lib/design/system";
 import type { FolderViewProps } from "./FolderViewContainer";
 import { getDisplayExtension } from "@/lib/domain/content/file-extension-utils";
+import { useContentStore } from "@/state/content-store";
 
 interface ContentChild {
   id: string;
@@ -34,11 +35,13 @@ interface ContentChild {
 
 export function DashboardView({
   folderId,
+  paneId,
   folderTitle,
   viewPrefs = {},
   onUpdateView,
 }: FolderViewProps) {
   const glass0 = getSurfaceStyles("glass-0");
+  const setSelectedContentId = useContentStore((state) => state.setSelectedContentId);
   const [items, setItems] = useState<ContentChild[]>([]);
   const [loading, setLoading] = useState(true);
   const [layout, setLayout] = useState<Layout>([]);
@@ -105,12 +108,11 @@ export function DashboardView({
   };
 
   const handleItemClick = (item: ContentChild) => {
-    // Trigger content selection
-    window.dispatchEvent(
-      new CustomEvent("content-selected", {
-        detail: { contentId: item.id },
-      })
-    );
+    setSelectedContentId(item.id, {
+      title: item.title,
+      contentType: item.contentType,
+      paneId,
+    });
   };
 
   const getIcon = (contentType: string) => {
