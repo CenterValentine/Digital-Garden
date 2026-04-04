@@ -150,6 +150,26 @@ const UserIcon = () => (
   </svg>
 );
 
+const ScissorsIcon = () => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="16"
+    height="16"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <circle cx="6" cy="6" r="3" />
+    <path d="M8.12 8.12 12 12" />
+    <path d="M20 4 8.12 15.88" />
+    <circle cx="6" cy="18" r="3" />
+    <path d="M14.8 14.8 20 20" />
+  </svg>
+);
+
 const CalendarIcon = () => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
@@ -203,6 +223,12 @@ const navItems: NavItem[] = [
     href: "/settings/ai",
     label: "AI",
     icon: <BrainIcon />,
+    badge: "New",
+  },
+  {
+    href: "/settings/templates",
+    label: "Templates & Snippets",
+    icon: <ScissorsIcon />,
     badge: "New",
   },
   {

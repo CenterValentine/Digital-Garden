@@ -15,7 +15,9 @@ import {
   getNewContentMenuItems,
   type NewContentCallbacks,
   type NewContentMenuItem,
+  type PageTemplateMenuData,
 } from "@/components/content/menu-items/new-content-menu";
+import { usePageTemplateStore } from "@/state/page-template-store";
 
 interface LeftSidebarHeaderActionsProps extends NewContentCallbacks {
   disabled?: boolean;
@@ -97,6 +99,94 @@ function MenuItem({
 }
 
 /**
+ * SubMenuItem Component - Renders a single item inside a SubMenu, with optional nested submenu
+ */
+function SubMenuItem({
+  item,
+  index,
+  totalItems,
+  onClose,
+  parentPosition,
+}: {
+  item: NewContentMenuItem;
+  index: number;
+  totalItems: number;
+  onClose: () => void;
+  parentPosition: { x: number; y: number };
+}) {
+  const itemRef = useRef<HTMLButtonElement>(null);
+  const [nestedOpen, setNestedOpen] = useState(false);
+  const [nestedPosition, setNestedPosition] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const closeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const hasNested = item.submenu && item.submenu.length > 0;
+
+  const handleMouseEnter = () => {
+    if (closeTimeoutRef.current) {
+      clearTimeout(closeTimeoutRef.current);
+      closeTimeoutRef.current = null;
+    }
+    if (hasNested && itemRef.current) {
+      const rect = itemRef.current.getBoundingClientRect();
+      setNestedPosition({ x: rect.right + 2, y: rect.top });
+      setNestedOpen(true);
+    }
+  };
+
+  const handleMouseLeave = () => {
+    if (hasNested) {
+      closeTimeoutRef.current = setTimeout(() => setNestedOpen(false), 200);
+    }
+  };
+
+  const handleNestedMouseEnter = () => {
+    if (closeTimeoutRef.current) {
+      clearTimeout(closeTimeoutRef.current);
+      closeTimeoutRef.current = null;
+    }
+  };
+
+  return (
+    <div className="relative">
+      <button
+        ref={itemRef}
+        onClick={() => {
+          if (!hasNested && item.onClick) {
+            item.onClick();
+            onClose();
+          }
+        }}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+        disabled={item.disabled && !hasNested}
+        className={`flex w-full items-center justify-between gap-2 px-3 py-2 text-sm text-left text-white hover:bg-white/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+          index === 0 ? "first:rounded-t-md" : "border-t border-white/5"
+        } ${index === totalItems - 1 ? "last:rounded-b-md" : ""}`}
+      >
+        <div className="flex items-center gap-2">
+          {item.icon}
+          <span>{item.label}</span>
+        </div>
+        {hasNested ? (
+          <ChevronRight className="h-3 w-3 text-gray-400" />
+        ) : item.shortcut ? (
+          <span className="text-[11px] text-gray-400">{item.shortcut}</span>
+        ) : null}
+      </button>
+      {hasNested && nestedOpen && (
+        <SubMenu
+          items={item.submenu!}
+          position={nestedPosition}
+          maxHeight={400}
+          onClose={onClose}
+          onMouseEnter={handleNestedMouseEnter}
+          onMouseLeave={handleMouseLeave}
+        />
+      )}
+    </div>
+  );
+}
+
+/**
  * SubMenu Component - Renders submenu items in a portal
  */
 function SubMenu({
@@ -134,25 +224,14 @@ function SubMenu({
       onMouseLeave={onMouseLeave}
     >
       {items.map((subItem, index) => (
-        <button
+        <SubMenuItem
           key={subItem.id}
-          onClick={() => {
-            if (subItem.onClick) {
-              subItem.onClick();
-              onClose();
-            }
-          }}
-          disabled={subItem.disabled}
-          className={`flex w-full items-center gap-2 px-3 py-2 text-sm text-left text-white hover:bg-white/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
-            index === 0 ? "first:rounded-t-md" : "border-t border-white/5"
-          } ${index === items.length - 1 ? "last:rounded-b-md" : ""}`}
-        >
-          {subItem.icon}
-          <span>{subItem.label}</span>
-          {subItem.shortcut && (
-            <span className="ml-auto text-[11px] text-gray-400">{subItem.shortcut}</span>
-          )}
-        </button>
+          item={subItem}
+          index={index}
+          totalItems={items.length}
+          onClose={onClose}
+          parentPosition={position}
+        />
       ))}
     </div>
   );
@@ -169,7 +248,6 @@ export function LeftSidebarHeaderActions({
   const [showMenu, setShowMenu] = useState(false);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
-  const submenuRef = useRef<HTMLDivElement>(null);
   const [menuPosition, setMenuPosition] = useState<{ x: number; y: number; maxHeight: number } | null>(null);
   const [openSubmenu, setOpenSubmenu] = useState<{ id: string; position: { x: number; y: number }; maxHeight: number } | null>(null);
   const submenuCloseTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -272,14 +350,37 @@ export function LeftSidebarHeaderActions({
       key,
       callback
         ? (parentId: string | null) => {
-            setShowMenu(false);
-            return callback(parentId);
-          }
+              setShowMenu(false);
+              return (callback as (parentId: string | null) => void)(parentId);
+            }
         : undefined,
     ])
   ) as NewContentCallbacks;
 
-  const menuItems = getNewContentMenuItems(wrappedCallbacks, null);
+  // Build page template data for the Note submenu
+  const ptCategories = usePageTemplateStore((s) => s.categories);
+  const ptTemplates = usePageTemplateStore((s) => s.templates);
+  const pageTemplateData: PageTemplateMenuData | undefined =
+    ptTemplates.length > 0
+      ? {
+          categories: ptCategories.map((c) => ({ id: c.id, name: c.name, isSystem: c.isSystem })),
+          templates: ptTemplates.map((t) => ({ id: t.id, title: t.title, categoryId: t.categoryId, defaultTitle: t.defaultTitle })),
+        }
+      : undefined;
+
+  // Add template creation callback via CustomEvent (dispatched to LeftSidebarContent)
+  if (pageTemplateData) {
+    wrappedCallbacks.onCreateNoteFromTemplate = (parentId: string | null, templateId: string, defaultTitle?: string) => {
+      setShowMenu(false);
+      window.dispatchEvent(
+        new CustomEvent("dg:create-from-template", {
+          detail: { parentId, templateId, defaultTitle },
+        })
+      );
+    };
+  }
+
+  const menuItems = getNewContentMenuItems(wrappedCallbacks, null, pageTemplateData);
 
   // Initial render without positioning (to measure dimensions)
   const menuStyle = !menuPosition

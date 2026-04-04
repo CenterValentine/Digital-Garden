@@ -15,7 +15,7 @@
 
 "use client";
 
-import type { ComponentType } from "react";
+import { type ComponentType, useState, useEffect, useRef, useCallback } from "react";
 import { BubbleMenu as TipTapBubbleMenu } from "@tiptap/react/menus";
 import type { Editor } from "@tiptap/core";
 import { PluginKey } from "@tiptap/pm/state";
@@ -28,9 +28,15 @@ import {
   Heading1,
   Heading2,
   Heading3,
+  Copy,
+  ClipboardPaste,
+  LayoutTemplate,
+  TextQuote,
+  Paintbrush,
 } from "lucide-react";
 import { queryTools } from "@/lib/domain/tools";
 import type { ToolDefinition } from "@/lib/domain/tools";
+import { useContextMenuStore } from "@/state/context-menu-store";
 
 // Create unique plugin key for this bubble menu
 const textFormattingBubbleMenuKey = new PluginKey("textFormattingBubbleMenu");
@@ -166,12 +172,111 @@ const bubbleMenuShouldShow = ({
   return true;
 };
 
+/** Captured inline + block formatting snapshot */
+interface CapturedFormat {
+  bold: boolean;
+  italic: boolean;
+  strike: boolean;
+  code: boolean;
+  heading: 1 | 2 | 3 | null;
+}
+
+/** Read the active formatting at the current selection */
+function captureFormat(editor: Editor): CapturedFormat {
+  return {
+    bold: editor.isActive("bold"),
+    italic: editor.isActive("italic"),
+    strike: editor.isActive("strike"),
+    code: editor.isActive("code"),
+    heading: editor.isActive("heading", { level: 1 }) ? 1
+      : editor.isActive("heading", { level: 2 }) ? 2
+      : editor.isActive("heading", { level: 3 }) ? 3
+      : null,
+  };
+}
+
+/** Apply a captured format snapshot to the current selection */
+function applyFormat(editor: Editor, fmt: CapturedFormat) {
+  const chain = editor.chain();
+
+  // Toggle each inline mark to match the captured state
+  if (fmt.bold !== editor.isActive("bold")) chain.toggleBold();
+  if (fmt.italic !== editor.isActive("italic")) chain.toggleItalic();
+  if (fmt.strike !== editor.isActive("strike")) chain.toggleStrike();
+  if (fmt.code !== editor.isActive("code")) chain.toggleCode();
+
+  // Block-level: heading or paragraph
+  if (fmt.heading) {
+    if (!editor.isActive("heading", { level: fmt.heading })) {
+      chain.setHeading({ level: fmt.heading });
+    }
+  } else if (editor.isActive("heading")) {
+    chain.setParagraph();
+  }
+
+  chain.run();
+}
+
 export interface BubbleMenuProps {
   editor: Editor | null;
   onLinkClick?: () => void;
 }
 
 export function BubbleMenu({ editor, onLinkClick }: BubbleMenuProps) {
+  const [paintMode, setPaintMode] = useState(false);
+  const fmtRef = useRef<CapturedFormat | null>(null);
+  const originRef = useRef<{ from: number; to: number } | null>(null);
+
+  // Apply format when the user makes a new non-empty selection in paint mode
+  const handleSelectionUpdate = useCallback(() => {
+    if (!editor || !fmtRef.current) return;
+    const { from, to } = editor.state.selection;
+    if (from === to) return; // empty — user is still clicking around
+    const orig = originRef.current;
+    if (orig && orig.from === from && orig.to === to) return; // same selection
+    applyFormat(editor, fmtRef.current);
+    fmtRef.current = null;
+    originRef.current = null;
+    setPaintMode(false);
+  }, [editor]);
+
+  // Subscribe/unsubscribe to selectionUpdate based on paint mode
+  useEffect(() => {
+    if (!editor) return;
+    if (paintMode) {
+      editor.on("selectionUpdate", handleSelectionUpdate);
+    }
+    return () => {
+      editor.off("selectionUpdate", handleSelectionUpdate);
+    };
+  }, [editor, paintMode, handleSelectionUpdate]);
+
+  // Add/remove cursor class on the editor DOM
+  useEffect(() => {
+    if (!editor) return;
+    const el = editor.view.dom;
+    if (paintMode) {
+      el.style.cursor = "crosshair";
+    } else {
+      el.style.cursor = "";
+    }
+    return () => { el.style.cursor = ""; };
+  }, [editor, paintMode]);
+
+  // Cancel paint mode on Escape
+  useEffect(() => {
+    if (!paintMode) return;
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        fmtRef.current = null;
+        originRef.current = null;
+        setPaintMode(false);
+      }
+    };
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, [paintMode]);
+
   if (!editor) {
     return null;
   }
@@ -210,6 +315,107 @@ export function BubbleMenu({ editor, onLinkClick }: BubbleMenuProps) {
           })}
         </div>
       ))}
+
+      {/* Copy / Paste */}
+      <div className="flex items-center gap-1">
+        <div className="mx-1 h-6 w-px bg-white/10" />
+        <button
+          onMouseDown={preventFocusLoss}
+          onClick={() => {
+            const { from, to } = editor.state.selection;
+            if (from !== to) {
+              const text = editor.state.doc.textBetween(from, to, "\n");
+              navigator.clipboard.writeText(text).catch(() => {});
+            }
+          }}
+          className="rounded p-1.5 transition-colors hover:bg-white/10 text-gray-400"
+          title="Copy (⌘C)"
+          type="button"
+        >
+          <Copy className="h-4 w-4" />
+        </button>
+        <button
+          onMouseDown={preventFocusLoss}
+          onClick={async () => {
+            try {
+              const text = await navigator.clipboard.readText();
+              if (text) editor.chain().insertContent(text).run();
+            } catch { /* clipboard permission denied */ }
+          }}
+          className="rounded p-1.5 transition-colors hover:bg-white/10 text-gray-400"
+          title="Paste (⌘V)"
+          type="button"
+        >
+          <ClipboardPaste className="h-4 w-4" />
+        </button>
+      </div>
+
+      {/* Format Painter */}
+      <div className="flex items-center gap-1">
+        <div className="mx-1 h-6 w-px bg-white/10" />
+        <button
+          onMouseDown={preventFocusLoss}
+          onClick={() => {
+            if (paintMode) {
+              // Toggle off
+              fmtRef.current = null;
+              originRef.current = null;
+              setPaintMode(false);
+            } else {
+              const { from, to } = editor.state.selection;
+              if (from !== to) {
+                fmtRef.current = captureFormat(editor);
+                originRef.current = { from, to };
+                setPaintMode(true);
+              }
+            }
+          }}
+          className={`rounded p-1.5 transition-colors hover:bg-white/10 ${
+            paintMode ? "bg-amber-500/30 text-amber-300" : "text-gray-400"
+          }`}
+          title={paintMode ? "Format Painter (active — Esc to cancel)" : "Format Painter"}
+          type="button"
+        >
+          <Paintbrush className="h-4 w-4" />
+        </button>
+      </div>
+
+      {/* Save selection as Template / Snippet */}
+      <div className="flex items-center gap-1">
+        <div className="mx-1 h-6 w-px bg-white/10" />
+        <button
+          onMouseDown={preventFocusLoss}
+          onClick={(e) => {
+            const rect = e.currentTarget.getBoundingClientRect();
+            useContextMenuStore.getState().openMenu(
+              "main-editor",
+              { x: rect.left, y: rect.bottom + 4 },
+              { hasSelection: true, bubbleMenuAction: "save-template" },
+            );
+          }}
+          className="rounded p-1.5 transition-colors hover:bg-white/10 text-gray-400"
+          title="Save as Template"
+          type="button"
+        >
+          <LayoutTemplate className="h-4 w-4" />
+        </button>
+        <button
+          onMouseDown={preventFocusLoss}
+          onClick={(e) => {
+            const rect = e.currentTarget.getBoundingClientRect();
+            useContextMenuStore.getState().openMenu(
+              "main-editor",
+              { x: rect.left, y: rect.bottom + 4 },
+              { hasSelection: true, bubbleMenuAction: "save-snippet" },
+            );
+          }}
+          className="rounded p-1.5 transition-colors hover:bg-white/10 text-gray-400"
+          title="Save as Snippet"
+          type="button"
+        >
+          <TextQuote className="h-4 w-4" />
+        </button>
+      </div>
     </TipTapBubbleMenu>
   );
 }

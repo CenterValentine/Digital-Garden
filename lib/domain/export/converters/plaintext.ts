@@ -44,6 +44,10 @@ export class PlainTextConverter implements DocumentConverter {
   private extractPlainText(node: JSONContent): string {
     if (!node) return "";
 
+    // Sprint 47: Convert input blocks to plain text values (strip chrome)
+    const inputText = this.extractInputBlockText(node);
+    if (inputText !== null) return inputText;
+
     let text = "";
 
     // Handle text nodes
@@ -69,6 +73,42 @@ export class PlainTextConverter implements DocumentConverter {
     }
 
     return text;
+  }
+
+  /**
+   * Extract plain text from input block nodes.
+   * Returns null if not an input block.
+   */
+  private extractInputBlockText(node: JSONContent): string | null {
+    const attrs = node.attrs;
+    if (!attrs) return null;
+
+    const label = attrs.label ? `${attrs.label}: ` : "";
+
+    switch (node.type) {
+      case "textInput":
+        return attrs.value ? `${label}${attrs.value}\n` : "";
+      case "numberInput":
+        return `${label}${attrs.value ?? 0}${attrs.unit ? ` ${attrs.unit}` : ""}\n`;
+      case "dateInput":
+        return attrs.value ? `${label}${attrs.value}\n` : "";
+      case "selectInput":
+        if (attrs.allowMultiple && attrs.selectedValues?.length) {
+          return `${label}${attrs.selectedValues.join(", ")}\n`;
+        }
+        return attrs.selectedValue ? `${label}${attrs.selectedValue}\n` : "";
+      case "checkboxInput":
+        if (attrs.groupMode && attrs.selectedValues?.length) {
+          return `${label}${attrs.selectedValues.join(", ")}\n`;
+        }
+        return `${label}${attrs.checked ? "Yes" : "No"}\n`;
+      case "ratingInput":
+        return `${label}${attrs.value ?? 0}/${attrs.maxRating ?? 5}\n`;
+      case "promptInput":
+        return attrs.response ? `${label}${attrs.response}\n` : "";
+      default:
+        return null;
+    }
   }
 
   /**

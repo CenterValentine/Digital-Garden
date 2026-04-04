@@ -21,6 +21,7 @@ import { useEditorInstanceStore } from "@/state/editor-instance-store";
 import { AiEditOrchestrator, parseEditPayload } from "@/lib/domain/editor/ai";
 import { ChatMessage } from "./ChatMessage";
 import { ChatInput } from "./ChatInput";
+import { ChatSnippetMenu } from "./ChatSnippetMenu";
 import { ModelPicker, useModelSelection } from "./ModelPicker";
 import { BASE_TOOL_METADATA, BASE_TOOL_IDS } from "@/lib/domain/ai/tools/metadata";
 import type { SuggestionItem } from "./ChatSuggestionMenu";
@@ -46,6 +47,20 @@ export function ChatPanel() {
   const modelIdRef = useRef(modelId);
   modelIdRef.current = modelId;
 
+  // ─── Attached snippets (Sprint 45) ───
+  const [attachedSnippetIds, setAttachedSnippetIds] = useState<string[]>([]);
+  const snippetIdsRef = useRef<string[]>([]);
+
+  const handleSnippetAttached = useCallback((snippetId: string) => {
+    setAttachedSnippetIds((prev) => {
+      const next = prev.includes(snippetId)
+        ? prev.filter((id) => id !== snippetId)
+        : [...prev, snippetId];
+      snippetIdsRef.current = next;
+      return next;
+    });
+  }, []);
+
   // Keep refs for the memoized transport closure
   const contentIdRef = useRef(selectedContentId);
   contentIdRef.current = selectedContentId;
@@ -60,6 +75,7 @@ export function ChatPanel() {
           providerId: providerIdRef.current,
           modelId: modelIdRef.current,
           mentionedContentIds: mentionedIdsRef.current,
+          snippetIds: snippetIdsRef.current,
         }),
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -211,6 +227,8 @@ export function ChatPanel() {
       processedToolIdsRef.current.clear();
       setMessages([]);
       setInput("");
+      setAttachedSnippetIds([]);
+      snippetIdsRef.current = [];
     }
   }, [selectedContentId, setMessages]);
 
@@ -248,6 +266,10 @@ export function ChatPanel() {
 
     setInput("");
     sendMessage({ text });
+
+    // Clear attached snippets after send — they're per-message context
+    setAttachedSnippetIds([]);
+    snippetIdsRef.current = [];
   }, [input, sendMessage]);
 
   // Save conversation — creates a chat ContentNode
@@ -436,6 +458,12 @@ export function ChatPanel() {
         mentionResults={mentionResults}
         commandItems={commandItems}
         onMentionInserted={handleMentionInserted}
+        onSnippetAttached={handleSnippetAttached}
+        attachedSnippetIds={attachedSnippetIds}
+      />
+      <ChatSnippetMenu
+        onSelect={handleSnippetAttached}
+        selectedIds={attachedSnippetIds}
       />
 
       {/* Model picker — compact, below input */}

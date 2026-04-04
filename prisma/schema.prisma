@@ -39,6 +39,14 @@ enum FolderViewMode {
   canvas     // Visual graph (mind map style)
 }
 
+// Epoch 11: Block system categories
+enum ReusableCategoryScope {
+  content_template
+  snippet
+  page_template
+  saved_block
+}
+
 enum CalendarProvider {
   local
   google
@@ -328,6 +336,11 @@ model User {
   auditTargets    AuditLog[]              @relation("AuditTargets")
   adminActions    AuditLog[]              @relation("AdminActions")
   categories      Category[]
+  reusableCategories ReusableCategory[]
+  savedBlocks     SavedBlock[]
+  contentTemplates ContentTemplate[]
+  snippets         Snippet[]
+  pageTemplates    PageTemplate[]
   calendarConnections CalendarConnection[]
   calendarEvents   CalendarEvent[]
   calendarSources  CalendarSource[]
@@ -356,6 +369,115 @@ model Category {
   contentNodes ContentNode[]
 
   @@index([ownerId, displayOrder])
+}
+
+// ============================================================
+// Epoch 11: Reusable Categories, Saved Blocks
+// ============================================================
+
+model ReusableCategory {
+  id           String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name         String                @db.VarChar(100)
+  slug         String                @db.VarChar(100)
+  scope        ReusableCategoryScope
+  userId       String?               @db.Uuid   // null = system-wide pre-curated
+  parentId     String?               @db.Uuid   // future subcategory support (not implemented yet)
+  displayOrder Int                   @default(0)
+  createdAt    DateTime              @default(now()) @db.Timestamptz(6)
+  updatedAt    DateTime              @updatedAt @db.Timestamptz(6)
+  user         User?                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parent       ReusableCategory?     @relation("CategoryHierarchy", fields: [parentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  children     ReusableCategory[]    @relation("CategoryHierarchy")
+  savedBlocks       SavedBlock[]
+  contentTemplates  ContentTemplate[]
+  snippets          Snippet[]
+  pageTemplates     PageTemplate[]
+
+  @@unique([userId, scope, slug])
+  @@index([userId, scope, displayOrder])
+  @@index([parentId])
+}
+
+model SavedBlock {
+  id          String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  title       String             @db.VarChar(255)
+  blockType   String             @db.VarChar(100)  // which block extension type
+  tiptapJson  Json                                  // the block node's TipTap JSON
+  searchText  String             @default("")
+  categoryId  String             @db.Uuid
+  userId      String?            @db.Uuid           // null = system-curated
+  usageCount  Int                @default(0)
+  lastUsedAt  DateTime?          @db.Timestamptz(6)
+  createdAt   DateTime           @default(now()) @db.Timestamptz(6)
+  updatedAt   DateTime           @updatedAt @db.Timestamptz(6)
+  category    ReusableCategory   @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  user        User?              @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, categoryId])
+  @@index([userId, blockType])
+  @@index([searchText(ops: raw("gin_trgm_ops"))], type: Gin)
+}
+
+model ContentTemplate {
+  id          String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  title       String             @db.VarChar(255)
+  tiptapJson  Json
+  searchText  String             @default("")
+  categoryId  String             @db.Uuid
+  userId      String             @db.Uuid
+  usageCount  Int                @default(0)
+  lastUsedAt  DateTime?          @db.Timestamptz(6)
+  createdAt   DateTime           @default(now()) @db.Timestamptz(6)
+  updatedAt   DateTime           @updatedAt @db.Timestamptz(6)
+  category    ReusableCategory   @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  user        User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, categoryId])
+  @@index([userId, lastUsedAt(sort: Desc)])
+  @@index([searchText(ops: raw("gin_trgm_ops"))], type: Gin)
+}
+
+model Snippet {
+  id            String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  title         String?            @db.VarChar(255)
+  content       String
+  tiptapJson    Json?
+  searchText    String             @default("")
+  categoryId    String             @db.Uuid
+  userId        String             @db.Uuid
+  usageCount    Int                @default(0)
+  lastUsedAt    DateTime?          @db.Timestamptz(6)
+  isAiContext   Boolean            @default(true)
+  isVisibleInUI Boolean            @default(true)
+  createdAt     DateTime           @default(now()) @db.Timestamptz(6)
+  updatedAt     DateTime           @updatedAt @db.Timestamptz(6)
+  category      ReusableCategory   @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  user          User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, categoryId])
+  @@index([userId, isAiContext])
+  @@index([userId, isVisibleInUI])
+  @@index([searchText(ops: raw("gin_trgm_ops"))], type: Gin)
+}
+
+model PageTemplate {
+  id           String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  title        String             @db.VarChar(255)
+  tiptapJson   Json                                  // stored as TipTap JSON — lossless
+  searchText   String             @default("")
+  categoryId   String             @db.Uuid
+  userId       String?            @db.Uuid           // null = system-curated
+  defaultTitle String?            @db.VarChar(255)    // pre-filled title on creation
+  customIcon   String?            @db.VarChar(100)
+  iconColor    String?            @db.VarChar(20)
+  usageCount   Int                @default(0)
+  createdAt    DateTime           @default(now()) @db.Timestamptz(6)
+  updatedAt    DateTime           @updatedAt @db.Timestamptz(6)
+  category     ReusableCategory   @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  user         User?              @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, categoryId])
+  @@index([searchText(ops: raw("gin_trgm_ops"))], type: Gin)
 }
 
 model Tag {

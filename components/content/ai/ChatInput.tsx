@@ -16,7 +16,7 @@ import {
   type KeyboardEvent,
   type FormEvent,
 } from "react";
-import { ArrowUp, Square, Mic } from "lucide-react";
+import { ArrowUp, Square, Mic, Paperclip } from "lucide-react";
 import { cn } from "@/lib/core/utils";
 import {
   ChatSuggestionMenu,
@@ -40,6 +40,10 @@ interface ChatInputProps {
   commandItems?: SuggestionItem[];
   /** Called when a mention is inserted (parent tracks for send) */
   onMentionInserted?: (item: SuggestionItem) => void;
+  /** Called when a snippet is attached for AI context */
+  onSnippetAttached?: (snippetId: string, displayTitle: string) => void;
+  /** Currently attached snippet IDs */
+  attachedSnippetIds?: string[];
 }
 
 export function ChatInput({
@@ -54,6 +58,8 @@ export function ChatInput({
   mentionResults = [],
   commandItems = [],
   onMentionInserted,
+  onSnippetAttached,
+  attachedSnippetIds = [],
 }: ChatInputProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const triggerPosRef = useRef<number>(-1);
@@ -295,6 +301,30 @@ export function ChatInput({
           style={{ maxHeight: 160 }}
         />
       </div>
+
+      {/* Snippet attach button (Sprint 45) */}
+      {onSnippetAttached && (
+        <button
+          type="button"
+          title="Attach snippet for AI context"
+          onClick={() => {
+            window.dispatchEvent(new CustomEvent("open-chat-snippet-menu"));
+          }}
+          className={cn(
+            "relative flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-colors",
+            attachedSnippetIds.length > 0
+              ? "text-blue-400 bg-blue-500/10 border border-blue-500/20"
+              : "text-gray-500 hover:text-gray-300 hover:bg-white/5"
+          )}
+        >
+          <Paperclip className="h-4 w-4" />
+          {attachedSnippetIds.length > 0 && (
+            <span className="absolute -top-1 -right-1 text-[9px] bg-blue-500 text-white rounded-full w-3.5 h-3.5 flex items-center justify-center">
+              {attachedSnippetIds.length}
+            </span>
+          )}
+        </button>
+      )}
 
       {/* Mic button placeholder (Sprint 35) */}
       <button

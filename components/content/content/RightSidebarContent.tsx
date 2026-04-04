@@ -15,6 +15,7 @@ import { ChatOutlinePanel } from "../ChatOutlinePanel";
 import { TagsPanel } from "../TagsPanel";
 import { ChatPanel } from "../ai/ChatPanel";
 import { CalendarInspector } from "@/components/calendar/CalendarInspector";
+import { PropertiesPanel } from "../blocks/PropertiesPanel";
 import { useOutlineStore } from "@/state/outline-store";
 import { useContentStore } from "@/state/content-store";
 import { useLeftPanelViewStore } from "@/state/left-panel-view-store";
@@ -71,6 +72,7 @@ export function RightSidebarContent({ activeTab }: RightSidebarContentProps) {
           <OutlinePanel outline={outline} onHeadingClick={handleHeadingClick} />
         ))}
       {activeTab === "tags" && <TagsPanel />}
+      {activeTab === "properties" && <PropertiesPanel />}
       {activeTab === "chat" && <ChatPanel />}
     </div>
   );

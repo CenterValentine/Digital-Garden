@@ -15,6 +15,8 @@ import Suggestion from "@tiptap/suggestion";
 import { PluginKey } from "@tiptap/pm/state";
 import tippy, { Instance as TippyInstance } from "tippy.js";
 import { SlashCommandsList, type SlashCommandsListRef } from "./slash-commands-menu";
+import { getAllSlashBlocks } from "@/lib/domain/blocks/registry";
+import { buildBlockInsertJson } from "@/lib/domain/blocks/node-view-factory";
 
 // Plugin key for slash commands
 export const slashCommandsPluginKey = new PluginKey("slashCommands");
@@ -292,6 +294,79 @@ export function getSlashCommands(editor: Editor): SlashCommand[] {
       },
       aliases: ["hashtag", "label"],
     },
+    // Sprint 44b: Individual block type commands (dynamically from registry)
+    ...getAllSlashBlocks().map((def) => ({
+      title: def.label,
+      description: def.description,
+      icon: "◆",
+      command: ({ editor, range }: { editor: Editor; range: Range }) => {
+        // For accordion: capture text and heading level from current line as title
+        if (def.type === "accordion") {
+          const $from = editor.state.doc.resolve(range.from);
+          const lineStart = $from.start();
+          const textBefore = editor.state.doc.textBetween(lineStart, range.from).trim();
+          const json = buildBlockInsertJson("accordion");
+          const attrs = json.attrs as Record<string, unknown>;
+          if (textBefore && attrs) {
+            attrs.headerText = textBefore;
+          }
+          // Detect heading level from parent node (e.g., ## text /accordion → H2)
+          const parentNode = $from.parent;
+          if (parentNode.type.name === "heading" && attrs) {
+            const level = parentNode.attrs.level;
+            if (level >= 1 && level <= 3) {
+              attrs.headerLevel = String(level);
+            }
+          }
+          // Delete from line start through the slash command
+          const deleteFrom = textBefore ? lineStart : range.from;
+          editor.chain().focus()
+            .deleteRange({ from: deleteFrom, to: range.to })
+            .insertContent(json)
+            .run();
+          return;
+        }
+        editor.chain().focus().deleteRange(range).insertContent(buildBlockInsertJson(def.type)).run();
+      },
+      aliases: def.searchTerms || [def.type],
+    })),
+
+    // Sprint 45: Content Templates
+    {
+      title: "Template",
+      description: "Insert a content template",
+      icon: "📄",
+      command: ({ editor, range }: { editor: Editor; range: Range }) => {
+        editor.chain().focus().deleteRange(range).run();
+        window.dispatchEvent(new CustomEvent("open-template-picker"));
+      },
+      aliases: ["template", "fragment", "reusable"],
+    },
+
+    // Sprint 45: Snippets
+    {
+      title: "Snippet",
+      description: "Insert a knowledge snippet",
+      icon: "✂️",
+      command: ({ editor, range }: { editor: Editor; range: Range }) => {
+        editor.chain().focus().deleteRange(range).run();
+        window.dispatchEvent(new CustomEvent("open-snippet-picker"));
+      },
+      aliases: ["snippet", "clip", "note", "fact"],
+    },
+
+    // Sprint 43: Saved Blocks picker
+    {
+      title: "Saved Block",
+      description: "Insert a block from your library",
+      icon: "📦",
+      command: ({ editor, range }: { editor: Editor; range: Range }) => {
+        editor.chain().focus().deleteRange(range).run();
+        window.dispatchEvent(new CustomEvent("open-saved-block-picker"));
+      },
+      aliases: ["block", "library", "saved", "reuse"],
+    },
+
     // Report Issue - Always at the bottom
     {
       title: "Report an Issue",

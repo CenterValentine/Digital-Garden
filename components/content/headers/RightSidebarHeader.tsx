@@ -14,6 +14,7 @@
 import { PanelRightClose } from "lucide-react";
 import { useRightPanelCollapseStore } from "@/state/right-panel-collapse-store";
 import { useContentStore } from "@/state/content-store";
+import { useBlockStore } from "@/state/block-store";
 import { queryTools } from "@/lib/domain/tools";
 import type { ContentType } from "@/lib/domain/tools";
 import type { RightSidebarTab } from "../RightSidebar";
@@ -28,6 +29,8 @@ const TAB_SVG_PATHS: Record<string, string> = {
   chat: "M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z",
   calendar:
     "M8 2v4M16 2v4M3 10h18M5 6h14a2 2 0 012 2v11a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2z",
+  properties:
+    "M12 3l1.912 5.813a2 2 0 001.272 1.272L21 12l-5.813 1.912a2 2 0 00-1.272 1.272L12 21l-1.912-5.813a2 2 0 00-1.272-1.272L3 12l5.813-1.912a2 2 0 001.272-1.272L12 3z",
 };
 
 /** Tab titles keyed by tabKey */
@@ -37,6 +40,7 @@ const TAB_TITLES: Record<string, string> = {
   tags: "Tags",
   chat: "AI Chat",
   calendar: "Event Inspector",
+  properties: "Block Properties",
 };
 
 interface RightSidebarHeaderProps {
@@ -48,15 +52,21 @@ export function RightSidebarHeader({ activeTab, onTabChange }: RightSidebarHeade
   const { toggleCollapsed } = useRightPanelCollapseStore();
   const selectedContentType = useContentStore((state) => state.selectedContentType);
   const { activeView } = useLeftPanelViewStore();
+  const selectedBlockId = useBlockStore((s) => s.selectedBlockId);
 
   // Get visible tabs from registry, filtered by current content type
-  const tabs =
+  const allTabs =
     activeView === "calendar"
       ? [{ id: "calendar-inspector", label: "Calendar", tabKey: "calendar" }]
       : queryTools({
           surface: "sidebar-tab",
           contentType: (selectedContentType as ContentType) ?? undefined,
         });
+
+  // Only show properties tab when a block is selected
+  const tabs = allTabs.filter(
+    (t) => t.tabKey !== "properties" || selectedBlockId
+  );
 
   return (
     <div className="flex h-12 shrink-0 items-center justify-between border-b border-white/10 px-4">

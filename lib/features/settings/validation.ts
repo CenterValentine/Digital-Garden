@@ -52,6 +52,8 @@ const editorSettingsSchema = z
     autoSaveDelay: z.number().min(1000).max(10000).optional(),
     spellCheck: z.boolean().optional(),
     wordWrap: z.boolean().optional(),
+    /** Enable beta block types (Card, Accordion, Columns, Tabs) in slash commands */
+    betaBlocks: z.boolean().optional(),
   })
   .optional();
 
@@ -309,6 +311,7 @@ export const DEFAULT_SETTINGS: UserSettings = {
     autoSaveDelay: 2000,
     spellCheck: true,
     wordWrap: true,
+    betaBlocks: true, // TODO: flip to false before release
   },
   calendar: {
     defaultView: "dayGridMonth",

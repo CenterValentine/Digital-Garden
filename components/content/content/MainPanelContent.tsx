@@ -41,6 +41,15 @@ import type { EditorStats } from "../editor/MarkdownEditor";
 import type { OutlineHeading } from "@/lib/domain/content/outline-extractor";
 import { extractOutline } from "@/lib/domain/content/outline-extractor";
 import { useLeftPanelViewStore } from "@/state/left-panel-view-store";
+import { useEditorInstanceStore } from "@/state/editor-instance-store";
+import { BlockBuilder } from "../blocks/BlockBuilder";
+import { SavedBlockPicker } from "../blocks/SavedBlockPicker";
+import { TemplatePicker } from "../editor/TemplatePicker";
+import { SnippetPicker } from "../editor/SnippetPicker";
+import { TemplateEditorDialog } from "../editor/TemplateEditorDialog";
+import { SnippetEditorDialog } from "../editor/SnippetEditorDialog";
+import { CategoryMoveDialog } from "../dialogs/CategoryMoveDialog";
+import { SaveAsPageTemplateDialog } from "../dialogs/SaveAsPageTemplateDialog";
 
 interface ContentResponse {
   success: boolean;
@@ -117,6 +126,7 @@ export function MainPanelContent() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0); // Used to force refetch
+  const [showSaveAsTemplate, setShowSaveAsTemplate] = useState(false);
 
   // AbortController for in-flight save requests. When the user navigates to
   // a different document, we abort any pending fetch to prevent Doc A's content
@@ -640,6 +650,14 @@ export function MainPanelContent() {
     }
   }, [selectedContentId, noteTitle]);
 
+  const handleSaveAsPageTemplate = useCallback(() => {
+    if (contentType !== "note") {
+      toast.error("Only notes can be saved as page templates");
+      return;
+    }
+    setShowSaveAsTemplate(true);
+  }, [contentType]);
+
   const handleCopyLink = useCallback(() => {
     const url = window.location.href;
     navigator.clipboard.writeText(url);
@@ -722,14 +740,29 @@ export function MainPanelContent() {
     toast.success("Chat exported as Markdown");
   }, [contentData, noteTitle]);
 
+  // Block builder insert handler — uses the shared editor instance
+  const handleBlockBuilderInsert = useCallback((tiptapNodes: unknown[]) => {
+    const editor = useEditorInstanceStore.getState().editor;
+    if (!editor) return;
+    editor.chain().focus().insertContent(tiptapNodes).run();
+  }, []);
+
+  // Saved block picker insert handler — single block object
+  const handleSavedBlockInsert = useCallback((tiptapJson: Record<string, unknown>) => {
+    const editor = useEditorInstanceStore.getState().editor;
+    if (!editor) return;
+    editor.chain().focus().insertContent(tiptapJson).run();
+  }, []);
+
   // Handlers passed as prop to ToolSurfaceProvider (can't use useRegisterToolHandler
   // here because this component renders the provider — useContext sees the parent, not self)
   const toolHandlers = useMemo(() => ({
     "import-markdown": handleImportMarkdown,
     "export-markdown": handleExportMarkdown,
     "export-chat": handleExportChat,
+    "save-as-page-template": handleSaveAsPageTemplate,
     "copy-link": handleCopyLink,
-  }), [handleImportMarkdown, handleExportMarkdown, handleExportChat, handleCopyLink]);
+  }), [handleImportMarkdown, handleExportMarkdown, handleExportChat, handleSaveAsPageTemplate, handleCopyLink]);
 
   if (activeView === "calendar") {
     return (
@@ -942,6 +975,19 @@ export function MainPanelContent() {
         contentElement
       )}
       {process.env.NODE_ENV === "development" && <ToolDebugPanel />}
+      <BlockBuilder onInsert={handleBlockBuilderInsert} />
+      <SavedBlockPicker onInsert={handleSavedBlockInsert} />
+      <TemplatePicker />
+      <SnippetPicker />
+      <TemplateEditorDialog />
+      <SnippetEditorDialog />
+      <CategoryMoveDialog />
+      <SaveAsPageTemplateDialog
+        open={showSaveAsTemplate}
+        onOpenChange={setShowSaveAsTemplate}
+        noteTitle={noteTitle}
+        tiptapJson={noteContent || { type: "doc", content: [] }}
+      />
     </ToolSurfaceProvider>
   );
 }

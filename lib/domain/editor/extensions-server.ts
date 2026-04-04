@@ -23,6 +23,19 @@ import { HeadingHardbreakSplit } from "./extensions/heading-hardbreak-split";
 import { BlockquoteLineOnly } from "./extensions/blockquote-line-only";
 import { ServerImage } from "./extensions/image";
 import { AiHighlight } from "./extensions/ai-highlight";
+// Sprint 44: Server-safe block extensions (no NodeView)
+import { ServerCardPanel } from "./extensions/blocks/card-panel";
+import { ServerAccordion } from "./extensions/blocks/accordion";
+import { ServerColumns, ServerColumn } from "./extensions/blocks/columns";
+import { ServerTabs, ServerTabPanel } from "./extensions/blocks/tabs";
+// Sprint 47: Server-safe input block extensions (no NodeView)
+import { ServerTextInput } from "./extensions/blocks/text-input";
+import { ServerSelectInput } from "./extensions/blocks/select-input";
+import { ServerCheckboxInput } from "./extensions/blocks/checkbox-input";
+import { ServerDateInput } from "./extensions/blocks/date-input";
+import { ServerNumberInput } from "./extensions/blocks/number-input";
+import { ServerRatingInput } from "./extensions/blocks/rating-input";
+import { ServerPromptInput } from "./extensions/blocks/prompt-input";
 
 // Create lowlight instance with common languages
 const lowlight = createLowlight(common);
@@ -106,6 +119,23 @@ export function getServerExtensions(): Extensions {
 
     // Sprint 40: AI content highlighting
     AiHighlight,
+
+    // Sprint 44: Server-safe block extensions (beta)
+    ServerCardPanel,
+    ServerAccordion,
+    ServerColumns,
+    ServerColumn,
+    ServerTabs,
+    ServerTabPanel,
+
+    // Sprint 47: Server-safe input block extensions
+    ServerTextInput,
+    ServerSelectInput,
+    ServerCheckboxInput,
+    ServerDateInput,
+    ServerNumberInput,
+    ServerRatingInput,
+    ServerPromptInput,
 
     // Note: SlashCommands excluded - it uses React components
   ];

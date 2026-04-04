@@ -38,6 +38,15 @@ const TOOL_REGISTRY: ToolDefinition[] = [
     group: "export",
   },
   {
+    id: "save-as-page-template",
+    label: "Save as Template",
+    iconName: "BookTemplate",
+    surfaces: ["toolbar"],
+    contentTypes: ["note"],
+    order: 150,
+    group: "template",
+  },
+  {
     id: "copy-link",
     label: "Copy Link",
     iconName: "Link2",
@@ -133,6 +142,15 @@ const TOOL_REGISTRY: ToolDefinition[] = [
   },
 
   // ─── SIDEBAR TABS (matches current RightSidebar) ───
+  {
+    id: "properties-tab",
+    label: "Properties",
+    iconName: "Settings2",
+    surfaces: ["sidebar-tab"],
+    contentTypes: ["note"],
+    order: 25,
+    tabKey: "properties",
+  },
   {
     id: "backlinks-tab",
     label: "Backlinks",

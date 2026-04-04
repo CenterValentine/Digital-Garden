@@ -7,7 +7,7 @@
  * Returns null when no toolbar tools are available.
  */
 
-import { Download, Link2, Upload } from "lucide-react";
+import { Download, Link2, Upload, BookTemplate } from "lucide-react";
 import { useToolSurface } from "@/lib/domain/tools";
 import type { ComponentType } from "react";
 
@@ -16,6 +16,7 @@ const ICON_MAP: Record<string, ComponentType<{ className?: string }>> = {
   Download,
   Link2,
   Upload,
+  BookTemplate,
 };
 
 export function ContentToolbar() {

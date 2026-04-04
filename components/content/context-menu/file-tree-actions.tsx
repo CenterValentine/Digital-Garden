@@ -29,8 +29,9 @@ import {
   ExternalLink,
 } from "lucide-react";
 import type { ContextMenuActionProvider, ContextMenuSection, ContextMenuAction } from "./types";
-import { getNewContentMenuItems, type NewContentCallbacks } from "@/components/content/menu-items/new-content-menu";
+import { getNewContentMenuItems, type NewContentCallbacks, type PageTemplateMenuData } from "@/components/content/menu-items/new-content-menu";
 import { supportsCustomIcon } from "@/lib/domain/content/file-extension-utils";
+import { usePageTemplateStore } from "@/state/page-template-store";
 
 /**
  * Context passed to file tree action provider
@@ -144,6 +145,17 @@ export const fileTreeActionProvider: ContextMenuActionProvider = (ctx) => {
   const isMultiSelection = selectedIds.length > 1;
   const isFolder = clickedNode?.isFolder || false;
 
+  // Recursive mapper for NewContentMenuItem → ContextMenuAction
+  const mapMenuItem = (item: { id: string; label: string; icon: any; shortcut?: string; onClick?: () => void; disabled?: boolean; submenu?: any[] }): ContextMenuAction => ({
+    id: item.id,
+    label: item.label,
+    icon: item.icon,
+    shortcut: item.shortcut,
+    onClick: item.onClick,
+    disabled: item.disabled,
+    submenu: item.submenu ? item.submenu.map(mapMenuItem) : undefined,
+  });
+
   // Section 1: Create actions (always show for single selection or empty space)
   // Behavior:
   // - Right-click on folder → Create inside folder (as children)
@@ -183,7 +195,25 @@ export const fileTreeActionProvider: ContextMenuActionProvider = (ctx) => {
       onCreateWorkflow,
     };
 
-    const newMenuItems = getNewContentMenuItems(callbacks, targetId);
+    // Build page template data from store for Note submenu
+    const { categories: ptCats, templates: ptTpls } = usePageTemplateStore.getState();
+    let pageTemplateData: PageTemplateMenuData | undefined;
+    if (ptTpls.length > 0) {
+      pageTemplateData = {
+        categories: ptCats.map((c) => ({ id: c.id, name: c.name, isSystem: c.isSystem })),
+        templates: ptTpls.map((t) => ({ id: t.id, title: t.title, categoryId: t.categoryId, defaultTitle: t.defaultTitle })),
+      };
+      // Add template creation callback via CustomEvent
+      callbacks.onCreateNoteFromTemplate = (parentId: string | null, templateId: string, defaultTitle?: string) => {
+        window.dispatchEvent(
+          new CustomEvent("dg:create-from-template", {
+            detail: { parentId, templateId, defaultTitle },
+          })
+        );
+      };
+    }
+
+    const newMenuItems = getNewContentMenuItems(callbacks, targetId, pageTemplateData);
 
     sections.push({
       title: "New",
@@ -192,22 +222,7 @@ export const fileTreeActionProvider: ContextMenuActionProvider = (ctx) => {
           id: "create-submenu",
           label: "New",
           icon: <Plus className="h-4 w-4" />,
-          submenu: newMenuItems.map((item) => ({
-            id: item.id,
-            label: item.label,
-            icon: item.icon,
-            shortcut: item.shortcut,
-            onClick: item.onClick,
-            disabled: item.disabled,
-            submenu: item.submenu ? item.submenu.map((subItem) => ({
-              id: subItem.id,
-              label: subItem.label,
-              icon: subItem.icon,
-              shortcut: subItem.shortcut,
-              onClick: subItem.onClick,
-              disabled: subItem.disabled,
-            })) : undefined,
-          })),
+          submenu: newMenuItems.map(mapMenuItem),
           divider: true,
         },
       ],

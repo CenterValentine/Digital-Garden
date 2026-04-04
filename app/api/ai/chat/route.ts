@@ -139,6 +139,63 @@ export async function POST(request: Request) {
       }
     }
 
+    // Sprint 45: Auto-inject user's knowledge snippets into system prompt
+    let snippetContext = "";
+    try {
+      const aiSnippets = await prisma.snippet.findMany({
+        where: {
+          userId: session.user.id,
+          isAiContext: true,
+        },
+        select: {
+          title: true,
+          content: true,
+          category: { select: { name: true } },
+        },
+        orderBy: { lastUsedAt: "desc" },
+        take: 20,
+      });
+
+      if (aiSnippets.length > 0) {
+        const formatted = aiSnippets.map((s) => {
+          const title = s.title || s.content.split("\n")[0].slice(0, 60);
+          return `- [${s.category.name}] ${title}: ${s.content.slice(0, 300)}`;
+        });
+        snippetContext = `\n\nThe user has saved the following knowledge snippets for your reference:\n\n${formatted.join("\n")}`;
+      }
+    } catch {
+      // Non-critical — continue without snippets
+    }
+
+    // Include snippet IDs from chat area snippet menu
+    const snippetIds: string[] = body.snippetIds ?? [];
+    let selectedSnippetContext = "";
+    if (snippetIds.length > 0) {
+      try {
+        const selectedSnippets = await prisma.snippet.findMany({
+          where: {
+            id: { in: snippetIds.slice(0, 10) },
+            userId: session.user.id,
+          },
+          select: {
+            title: true,
+            content: true,
+            category: { select: { name: true } },
+          },
+        });
+
+        if (selectedSnippets.length > 0) {
+          const formatted = selectedSnippets.map((s) => {
+            const title = s.title || s.content.split("\n")[0].slice(0, 60);
+            return `### ${title}\n${s.content}`;
+          });
+          selectedSnippetContext = `\n\nThe user has attached the following snippets to this message:\n\n${formatted.join("\n\n")}`;
+        }
+      } catch {
+        // Non-critical
+      }
+    }
+
     // Stream the response
     const result = streamText({
       model: wrappedModel,
@@ -163,7 +220,7 @@ IMPORTANT EDITING RULES:
 
 When you generate an image, the user can insert it into the document at their cursor position.`
           : ""
-      }${mentionedContext}`,
+      }${mentionedContext}${snippetContext}${selectedSnippetContext}`,
     });
 
     return result.toUIMessageStreamResponse();

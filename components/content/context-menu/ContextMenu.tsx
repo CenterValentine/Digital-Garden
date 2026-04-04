@@ -18,9 +18,9 @@
 
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, Check, X } from "lucide-react";
 import { useContextMenuStore } from "@/state/context-menu-store";
 import type { ContextMenuActionProvider, ContextMenuAction } from "./types";
 import { calculateMenuPosition, calculateSubmenuPosition } from "@/lib/core/menu-positioning";
@@ -31,7 +31,9 @@ interface ContextMenuProps {
 }
 
 /**
- * MenuAction Component - Renders individual menu action with optional submenu
+ * MenuAction Component - Renders individual menu action with optional submenu.
+ * Supports inline input mode: clicking an action with `inlineInput` transforms
+ * it into a text input + confirm button without closing the menu.
  */
 function MenuAction({
   action,
@@ -39,16 +41,22 @@ function MenuAction({
   onSubmenuOpen,
   onSubmenuClose,
   openSubmenuId,
+  onReplaceActions,
 }: {
   action: ContextMenuAction;
   onClose: () => void;
   onSubmenuOpen: (actionId: string, rect: DOMRect) => void;
   onSubmenuClose: () => void;
   openSubmenuId: string | null;
+  /** When inline submit returns new actions, replace the parent submenu's items */
+  onReplaceActions?: (actions: ContextMenuAction[]) => void;
 }) {
   const buttonRef = useRef<HTMLButtonElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const hasSubmenu = action.submenu && action.submenu.length > 0;
-  const isSubmenuOpen = openSubmenuId === action.id;
+  const [isInputMode, setIsInputMode] = useState(action.inlineInput?.autoFocus ?? false);
+  const [inputValue, setInputValue] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleMouseEnter = () => {
     if (hasSubmenu && buttonRef.current) {
@@ -57,51 +65,174 @@ function MenuAction({
     }
   };
 
-  return (
-    <div className="relative">
-      <button
-        ref={buttonRef}
-        onClick={async () => {
-          if (!hasSubmenu && action.onClick) {
-            await action.onClick();
-            onClose();
-          }
-        }}
-        onMouseEnter={handleMouseEnter}
-        disabled={action.disabled && !hasSubmenu}
-        className={`
-          flex w-full items-center justify-between gap-3 px-2.5 py-1 text-left text-sm transition-colors
-          ${action.disabled && !hasSubmenu
-            ? "cursor-not-allowed opacity-40"
-            : action.destructive
-              ? "text-gray-900 hover:bg-red-500/10 hover:text-red-600 dark:text-gray-100 dark:hover:text-red-400"
-              : "text-gray-900 hover:bg-primary/10 hover:text-primary dark:text-gray-100"
-          }
-        `}
-      >
-        {/* Left: Icon + Label */}
-        <div className="flex items-center gap-2">
-          {action.icon && <span className="flex-shrink-0 text-current opacity-70">{action.icon}</span>}
-          <span className={action.destructive ? "text-red-600 dark:text-red-400" : ""}>
-            {action.label}
-          </span>
-        </div>
+  // Pre-fill and select input when entering input mode
+  useEffect(() => {
+    if (isInputMode && action.inlineInput) {
+      // Pre-fill with placeholder value so user can accept as-is
+      if (!inputValue && action.inlineInput.placeholder) {
+        setInputValue(action.inlineInput.placeholder);
+      }
+      setTimeout(() => {
+        inputRef.current?.focus();
+        inputRef.current?.select(); // Select all so user can type to replace
+      }, 50);
+    }
+  }, [isInputMode]); // eslint-disable-line react-hooks/exhaustive-deps
 
-        {/* Right: Keyboard shortcut or chevron for submenu */}
-        {hasSubmenu ? (
-          <ChevronRight className="h-3 w-3 text-gray-400 dark:text-gray-500" />
-        ) : action.shortcut ? (
-          <span className="text-[11px] text-gray-400 dark:text-gray-500">
-            {action.shortcut}
-          </span>
-        ) : null}
-      </button>
+  const handleInlineSubmit = useCallback(async () => {
+    const val = inputValue.trim();
+    if (!val || !action.inlineInput || isSubmitting) return;
+    setIsSubmitting(true);
+    try {
+      const result = await action.inlineInput.onSubmit(val);
+      // If onSubmit returns new actions, replace the submenu instead of closing
+      if (Array.isArray(result) && onReplaceActions) {
+        onReplaceActions(result);
+        setIsSubmitting(false);
+        setIsInputMode(false);
+        setInputValue("");
+        return;
+      }
+      // Normal flow — close menu
+      setIsSubmitting(false);
+      setIsInputMode(false);
+      setInputValue("");
+      onClose();
+    } catch {
+      setIsSubmitting(false);
+      setIsInputMode(false);
+      setInputValue("");
+      onClose();
+    }
+  }, [inputValue, action.inlineInput, isSubmitting, onClose, onReplaceActions]);
+
+  // Divider-only item — render as a clean horizontal line
+  if (action.divider && !action.label) {
+    return <div className="my-1 mx-2 border-t border-gray-200 dark:border-gray-700" />;
+  }
+
+  // Section label above the action
+  const sectionLabelEl = action.sectionLabel ? (
+    <div className="px-2.5 pt-1.5 pb-0.5 text-[10px] font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+      {action.sectionLabel}
+    </div>
+  ) : null;
+
+  // Inline input mode rendering
+  if (isInputMode && action.inlineInput) {
+    return (
+      <>
+        {sectionLabelEl}
+        {action.inlineInput.inputLabel && (
+          <>
+            <div className="mx-2 mt-1 border-t border-gray-200 dark:border-gray-700" />
+            <div className="px-2.5 pt-1.5 pb-0.5 text-[10px] font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+              {action.inlineInput.inputLabel}
+            </div>
+          </>
+        )}
+        <div className="px-1.5 py-1">
+          <div className="flex items-center gap-1">
+            <input
+              ref={inputRef}
+              type="text"
+              value={inputValue}
+              onChange={(e) => setInputValue(e.target.value)}
+              onKeyDown={(e) => {
+                e.stopPropagation();
+                if (e.key === "Enter") handleInlineSubmit();
+                if (e.key === "Escape") {
+                  setIsInputMode(false);
+                  setInputValue("");
+                }
+              }}
+              placeholder={action.inlineInput.placeholder}
+              disabled={isSubmitting}
+              className="flex-1 min-w-0 px-2 py-1 text-xs rounded bg-gray-100 border border-gray-300 text-gray-900 placeholder:text-gray-400 focus:border-gray-400 focus:outline-none dark:bg-white/10 dark:border-white/20 dark:text-gray-100 dark:placeholder:text-gray-500 dark:focus:border-white/40 disabled:opacity-50"
+            />
+            <button
+              onClick={handleInlineSubmit}
+              disabled={!inputValue.trim() || isSubmitting}
+              className="flex-shrink-0 p-1 rounded hover:bg-gray-200 dark:hover:bg-white/10 text-green-600 dark:text-green-400 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            >
+              <Check className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  return (
+    <>
+    {sectionLabelEl}
+    <div className="relative group/action">
+      <div className="flex items-center">
+        <button
+          ref={buttonRef}
+          onClick={async () => {
+            // If this action has inline input config, enter input mode instead
+            if (action.inlineInput) {
+              setIsInputMode(true);
+              return;
+            }
+            if (!hasSubmenu && action.onClick) {
+              await action.onClick();
+              onClose();
+            }
+          }}
+          onMouseEnter={handleMouseEnter}
+          disabled={action.disabled && !hasSubmenu}
+          className={`
+            flex flex-1 min-w-0 items-center justify-between gap-3 px-2.5 py-1 text-left text-sm transition-colors
+            ${action.disabled && !hasSubmenu
+              ? "cursor-not-allowed opacity-40"
+              : action.destructive
+                ? "text-gray-900 hover:bg-red-500/10 hover:text-red-600 dark:text-gray-100 dark:hover:text-red-400"
+                : "text-gray-900 hover:bg-primary/10 hover:text-primary dark:text-gray-100"
+            }
+          `}
+        >
+          {/* Left: Icon + Label */}
+          <div className="flex items-center gap-2 min-w-0">
+            {action.icon && <span className="flex-shrink-0 text-current opacity-70">{action.icon}</span>}
+            <span className={`truncate ${action.destructive ? "text-red-600 dark:text-red-400" : ""}`}>
+              {action.label}
+            </span>
+          </div>
+
+          {/* Right: Keyboard shortcut or chevron for submenu */}
+          {hasSubmenu ? (
+            <ChevronRight className="h-3 w-3 flex-shrink-0 text-gray-400 dark:text-gray-500" />
+          ) : action.shortcut ? (
+            <span className="text-[11px] flex-shrink-0 text-gray-400 dark:text-gray-500">
+              {action.shortcut}
+            </span>
+          ) : null}
+        </button>
+
+        {/* Secondary action (e.g., delete "x") — shown on hover */}
+        {action.secondaryAction && (
+          <button
+            onClick={async (e) => {
+              e.stopPropagation();
+              await action.secondaryAction!.onClick();
+              // Don't close — allow back-to-back deletes. Store refresh will update the menu.
+            }}
+            className="flex-shrink-0 p-1 mr-1 rounded opacity-0 group-hover/action:opacity-100 hover:bg-red-500/20 text-gray-500 hover:text-red-400 transition-all"
+            title={action.secondaryAction.confirmLabel || "Remove"}
+          >
+            <X className="h-3 w-3" />
+          </button>
+        )}
+      </div>
 
       {/* Divider after item */}
       {action.divider && (
         <div className="my-0.5 border-t border-gray-200/50 dark:border-gray-700/50" />
       )}
     </div>
+    </>
   );
 }
 
@@ -109,23 +240,55 @@ function MenuAction({
  * SubMenu Component - Renders submenu items (supports nested submenus)
  */
 function SubMenu({
-  actions,
+  actions: initialActions,
   position,
   onClose,
   onMouseEnter,
-  onMouseLeave,
   submenuRef,
+  searchable,
 }: {
   actions: ContextMenuAction[];
   position: { x: number; y: number; maxHeight?: number };
   onClose: () => void;
   onMouseEnter: () => void;
-  onMouseLeave: () => void;
   submenuRef?: React.RefObject<HTMLDivElement | null>;
+  searchable?: boolean;
 }) {
   const localSubmenuRef = useRef<HTMLDivElement>(null);
   const refToUse = submenuRef || localSubmenuRef;
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const [mounted, setMounted] = useState(false);
+  const [dynamicActions, setDynamicActions] = useState<ContextMenuAction[] | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const rawActions = dynamicActions || initialActions;
+
+  // Filter actions by search query
+  const actions = (() => {
+    if (!searchable || !searchQuery.trim()) return rawActions;
+    const q = searchQuery.toLowerCase();
+    return rawActions.flatMap((action) => {
+      // Skip dividers/disabled headers
+      if (action.divider && !action.label) return [action];
+      // If action has a submenu, filter its children
+      if (action.submenu && action.submenu.length > 0) {
+        const filtered = action.submenu.filter((sub) =>
+          sub.label.toLowerCase().includes(q),
+        );
+        if (filtered.length === 0) return [];
+        return [{ ...action, submenu: filtered }];
+      }
+      // Direct action — match label
+      if (action.label.toLowerCase().includes(q)) return [action];
+      return [];
+    });
+  })();
+
+  // Auto-focus search input when searchable
+  useEffect(() => {
+    if (searchable && mounted) {
+      setTimeout(() => searchInputRef.current?.focus(), 50);
+    }
+  }, [searchable, mounted]);
   const [nestedSubmenu, setNestedSubmenu] = useState<{
     id: string;
     position: { x: number; y: number };
@@ -191,6 +354,7 @@ function SubMenu({
   const submenuContent = (
     <div
       ref={refToUse}
+      data-context-menu
       className="fixed z-[130] min-w-[180px] rounded-md border border-white/20 bg-white/95 shadow-lg backdrop-blur-sm dark:bg-gray-900/95 overflow-y-auto"
       style={{
         left: `${position.x}px`,
@@ -198,8 +362,20 @@ function SubMenu({
         maxHeight: `${position.maxHeight || 400}px`,
       }}
       onMouseEnter={onMouseEnter}
-      onMouseLeave={onMouseLeave}
     >
+      {searchable && (
+        <div className="px-1.5 pt-1.5 pb-1">
+          <input
+            ref={searchInputRef}
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            onKeyDown={(e) => e.stopPropagation()}
+            placeholder="Search..."
+            className="w-full px-2 py-1 text-xs rounded bg-gray-100 border border-gray-300 text-gray-900 placeholder:text-gray-400 focus:border-gray-400 focus:outline-none dark:bg-white/10 dark:border-white/20 dark:text-gray-100 dark:placeholder:text-gray-500 dark:focus:border-white/40"
+          />
+        </div>
+      )}
       <div className="py-0.5">
         {actions.map((subAction) => (
           <MenuAction
@@ -209,6 +385,7 @@ function SubMenu({
             onSubmenuOpen={handleNestedSubmenuOpen}
             onSubmenuClose={handleNestedSubmenuClose}
             openSubmenuId={nestedSubmenu?.id || null}
+            onReplaceActions={setDynamicActions}
           />
         ))}
       </div>
@@ -224,7 +401,7 @@ function SubMenu({
             position={nestedSubmenu.position}
             onClose={onClose}
             onMouseEnter={handleNestedSubmenuMouseEnter}
-            onMouseLeave={handleNestedSubmenuClose}
+            searchable={action.searchable}
           />
         );
       })()}
@@ -250,14 +427,14 @@ export function ContextMenu({ actionProviders }: ContextMenuProps) {
     if (!isOpen) return;
 
     const handleClickOutside = (e: MouseEvent) => {
-      const target = e.target as Node;
-      const isClickInMenu = menuRef.current?.contains(target);
-      const isClickInSubmenu = submenuRef.current?.contains(target);
+      const target = e.target as Element;
 
-      // Only close if click is outside BOTH the menu and submenu
-      if (!isClickInMenu && !isClickInSubmenu) {
-        closeMenu();
+      // Check if click is inside ANY context menu portal (main menu or nested submenus)
+      if (target.closest?.("[data-context-menu]")) {
+        return;
       }
+
+      closeMenu();
     };
 
     // Small delay to prevent immediate closing when menu opens
@@ -417,15 +594,15 @@ export function ContextMenu({ actionProviders }: ContextMenuProps) {
   const menuContent = (
     <div
       ref={menuRef}
+      data-context-menu
       className="fixed z-[120] min-w-[180px] rounded-md border border-white/20 bg-white/95 shadow-lg backdrop-blur-sm dark:bg-gray-900/95 overflow-y-auto"
       style={initialMenuStyle}
-      onMouseLeave={handleSubmenuClose}
     >
       {sections.map((section, sectionIndex) => (
         <div key={sectionIndex}>
           {/* Section title (optional) - compact styling */}
           {section.title && (
-            <div className="px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-gray-400 dark:text-gray-500">
+            <div className="px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
               {section.title}
             </div>
           )}
@@ -451,8 +628,8 @@ export function ContextMenu({ actionProviders }: ContextMenuProps) {
                       position={openSubmenu.position}
                       onClose={closeMenu}
                       onMouseEnter={handleSubmenuMouseEnter}
-                      onMouseLeave={handleSubmenuClose}
                       submenuRef={submenuRef}
+                      searchable={action.searchable}
                     />
                   )}
               </div>

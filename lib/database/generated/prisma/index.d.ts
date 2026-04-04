@@ -84,6 +84,31 @@ export type User = $Result.DefaultSelection<Prisma.$UserPayload>
  */
 export type Category = $Result.DefaultSelection<Prisma.$CategoryPayload>
 /**
+ * Model ReusableCategory
+ * 
+ */
+export type ReusableCategory = $Result.DefaultSelection<Prisma.$ReusableCategoryPayload>
+/**
+ * Model SavedBlock
+ * 
+ */
+export type SavedBlock = $Result.DefaultSelection<Prisma.$SavedBlockPayload>
+/**
+ * Model ContentTemplate
+ * 
+ */
+export type ContentTemplate = $Result.DefaultSelection<Prisma.$ContentTemplatePayload>
+/**
+ * Model Snippet
+ * 
+ */
+export type Snippet = $Result.DefaultSelection<Prisma.$SnippetPayload>
+/**
+ * Model PageTemplate
+ * 
+ */
+export type PageTemplate = $Result.DefaultSelection<Prisma.$PageTemplatePayload>
+/**
  * Model Tag
  * 
  */
@@ -206,6 +231,16 @@ export const FolderViewMode: {
 export type FolderViewMode = (typeof FolderViewMode)[keyof typeof FolderViewMode]
 
 
+export const ReusableCategoryScope: {
+  content_template: 'content_template',
+  snippet: 'snippet',
+  page_template: 'page_template',
+  saved_block: 'saved_block'
+};
+
+export type ReusableCategoryScope = (typeof ReusableCategoryScope)[keyof typeof ReusableCategoryScope]
+
+
 export const CalendarProvider: {
   local: 'local',
   google: 'google',
@@ -304,6 +339,10 @@ export type FolderViewMode = $Enums.FolderViewMode
 
 export const FolderViewMode: typeof $Enums.FolderViewMode
 
+export type ReusableCategoryScope = $Enums.ReusableCategoryScope
+
+export const ReusableCategoryScope: typeof $Enums.ReusableCategoryScope
+
 export type CalendarProvider = $Enums.CalendarProvider
 
 export const CalendarProvider: typeof $Enums.CalendarProvider
@@ -346,7 +385,9 @@ export const StorageProvider: typeof $Enums.StorageProvider
  * Type-safe database client for TypeScript & Node.js
  * @example
  * ```
- * const prisma = new PrismaClient()
+ * const prisma = new PrismaClient({
+ *   adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL })
+ * })
  * // Fetch zero or more ContentNodes
  * const contentNodes = await prisma.contentNode.findMany()
  * ```
@@ -367,7 +408,9 @@ export class PrismaClient<
    * Type-safe database client for TypeScript & Node.js
    * @example
    * ```
-   * const prisma = new PrismaClient()
+   * const prisma = new PrismaClient({
+   *   adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL })
+   * })
    * // Fetch zero or more ContentNodes
    * const contentNodes = await prisma.contentNode.findMany()
    * ```
@@ -447,7 +490,7 @@ export class PrismaClient<
    * ])
    * ```
    * 
-   * Read more in our [docs](https://www.prisma.io/docs/concepts/components/prisma-client/transactions).
+   * Read more in our [docs](https://www.prisma.io/docs/orm/prisma-client/queries/transactions).
    */
   $transaction<P extends Prisma.PrismaPromise<any>[]>(arg: [...P], options?: { isolationLevel?: Prisma.TransactionIsolationLevel }): $Utils.JsPromise<runtime.Types.Utils.UnwrapTuple<P>>
 
@@ -596,6 +639,56 @@ export class PrismaClient<
     * ```
     */
   get category(): Prisma.CategoryDelegate<ExtArgs, ClientOptions>;
+
+  /**
+   * `prisma.reusableCategory`: Exposes CRUD operations for the **ReusableCategory** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more ReusableCategories
+    * const reusableCategories = await prisma.reusableCategory.findMany()
+    * ```
+    */
+  get reusableCategory(): Prisma.ReusableCategoryDelegate<ExtArgs, ClientOptions>;
+
+  /**
+   * `prisma.savedBlock`: Exposes CRUD operations for the **SavedBlock** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more SavedBlocks
+    * const savedBlocks = await prisma.savedBlock.findMany()
+    * ```
+    */
+  get savedBlock(): Prisma.SavedBlockDelegate<ExtArgs, ClientOptions>;
+
+  /**
+   * `prisma.contentTemplate`: Exposes CRUD operations for the **ContentTemplate** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more ContentTemplates
+    * const contentTemplates = await prisma.contentTemplate.findMany()
+    * ```
+    */
+  get contentTemplate(): Prisma.ContentTemplateDelegate<ExtArgs, ClientOptions>;
+
+  /**
+   * `prisma.snippet`: Exposes CRUD operations for the **Snippet** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more Snippets
+    * const snippets = await prisma.snippet.findMany()
+    * ```
+    */
+  get snippet(): Prisma.SnippetDelegate<ExtArgs, ClientOptions>;
+
+  /**
+   * `prisma.pageTemplate`: Exposes CRUD operations for the **PageTemplate** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more PageTemplates
+    * const pageTemplates = await prisma.pageTemplate.findMany()
+    * ```
+    */
+  get pageTemplate(): Prisma.PageTemplateDelegate<ExtArgs, ClientOptions>;
 
   /**
    * `prisma.tag`: Exposes CRUD operations for the **Tag** model.
@@ -806,8 +899,8 @@ export namespace Prisma {
   export import Exact = $Public.Exact
 
   /**
-   * Prisma Client JS version: 7.2.0
-   * Query Engine version: 0c8ef2ce45c83248ab3df073180d5eda9e8be7a3
+   * Prisma Client JS version: 7.6.0
+   * Query Engine version: 75cbdc1eb7150937890ad5465d861175c6624711
    */
   export type PrismaVersion = {
     client: string
@@ -1204,6 +1297,11 @@ export namespace Prisma {
     AIProviderKey: 'AIProviderKey',
     User: 'User',
     Category: 'Category',
+    ReusableCategory: 'ReusableCategory',
+    SavedBlock: 'SavedBlock',
+    ContentTemplate: 'ContentTemplate',
+    Snippet: 'Snippet',
+    PageTemplate: 'PageTemplate',
     Tag: 'Tag',
     ViewGrant: 'ViewGrant',
     Session: 'Session',
@@ -1235,7 +1333,7 @@ export namespace Prisma {
       omit: GlobalOmitOptions
     }
     meta: {
-      modelProps: "contentNode" | "notePayload" | "filePayload" | "htmlPayload" | "codePayload" | "contentHistory" | "contentPath" | "contentLink" | "contentTag" | "trashBin" | "storageProviderConfig" | "aIProviderKey" | "user" | "category" | "tag" | "viewGrant" | "session" | "account" | "calendarConnection" | "calendarSource" | "calendarEvent" | "calendarEventAttendee" | "auditLog" | "folderPayload" | "externalPayload" | "chatPayload" | "visualizationPayload" | "dataPayload" | "hopePayload" | "workflowPayload"
+      modelProps: "contentNode" | "notePayload" | "filePayload" | "htmlPayload" | "codePayload" | "contentHistory" | "contentPath" | "contentLink" | "contentTag" | "trashBin" | "storageProviderConfig" | "aIProviderKey" | "user" | "category" | "reusableCategory" | "savedBlock" | "contentTemplate" | "snippet" | "pageTemplate" | "tag" | "viewGrant" | "session" | "account" | "calendarConnection" | "calendarSource" | "calendarEvent" | "calendarEventAttendee" | "auditLog" | "folderPayload" | "externalPayload" | "chatPayload" | "visualizationPayload" | "dataPayload" | "hopePayload" | "workflowPayload"
       txIsolationLevel: Prisma.TransactionIsolationLevel
     }
     model: {
@@ -2272,6 +2370,376 @@ export namespace Prisma {
           count: {
             args: Prisma.CategoryCountArgs<ExtArgs>
             result: $Utils.Optional<CategoryCountAggregateOutputType> | number
+          }
+        }
+      }
+      ReusableCategory: {
+        payload: Prisma.$ReusableCategoryPayload<ExtArgs>
+        fields: Prisma.ReusableCategoryFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.ReusableCategoryFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ReusableCategoryPayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.ReusableCategoryFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ReusableCategoryPayload>
+          }
+          findFirst: {
+            args: Prisma.ReusableCategoryFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ReusableCategoryPayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.ReusableCategoryFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ReusableCategoryPayload>
+          }
+          findMany: {
+            args: Prisma.ReusableCategoryFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ReusableCategoryPayload>[]
+          }
+          create: {
+            args: Prisma.ReusableCategoryCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ReusableCategoryPayload>
+          }
+          createMany: {
+            args: Prisma.ReusableCategoryCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          createManyAndReturn: {
+            args: Prisma.ReusableCategoryCreateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ReusableCategoryPayload>[]
+          }
+          delete: {
+            args: Prisma.ReusableCategoryDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ReusableCategoryPayload>
+          }
+          update: {
+            args: Prisma.ReusableCategoryUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ReusableCategoryPayload>
+          }
+          deleteMany: {
+            args: Prisma.ReusableCategoryDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.ReusableCategoryUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateManyAndReturn: {
+            args: Prisma.ReusableCategoryUpdateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ReusableCategoryPayload>[]
+          }
+          upsert: {
+            args: Prisma.ReusableCategoryUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ReusableCategoryPayload>
+          }
+          aggregate: {
+            args: Prisma.ReusableCategoryAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregateReusableCategory>
+          }
+          groupBy: {
+            args: Prisma.ReusableCategoryGroupByArgs<ExtArgs>
+            result: $Utils.Optional<ReusableCategoryGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.ReusableCategoryCountArgs<ExtArgs>
+            result: $Utils.Optional<ReusableCategoryCountAggregateOutputType> | number
+          }
+        }
+      }
+      SavedBlock: {
+        payload: Prisma.$SavedBlockPayload<ExtArgs>
+        fields: Prisma.SavedBlockFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.SavedBlockFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SavedBlockPayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.SavedBlockFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SavedBlockPayload>
+          }
+          findFirst: {
+            args: Prisma.SavedBlockFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SavedBlockPayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.SavedBlockFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SavedBlockPayload>
+          }
+          findMany: {
+            args: Prisma.SavedBlockFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SavedBlockPayload>[]
+          }
+          create: {
+            args: Prisma.SavedBlockCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SavedBlockPayload>
+          }
+          createMany: {
+            args: Prisma.SavedBlockCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          createManyAndReturn: {
+            args: Prisma.SavedBlockCreateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SavedBlockPayload>[]
+          }
+          delete: {
+            args: Prisma.SavedBlockDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SavedBlockPayload>
+          }
+          update: {
+            args: Prisma.SavedBlockUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SavedBlockPayload>
+          }
+          deleteMany: {
+            args: Prisma.SavedBlockDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.SavedBlockUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateManyAndReturn: {
+            args: Prisma.SavedBlockUpdateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SavedBlockPayload>[]
+          }
+          upsert: {
+            args: Prisma.SavedBlockUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SavedBlockPayload>
+          }
+          aggregate: {
+            args: Prisma.SavedBlockAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregateSavedBlock>
+          }
+          groupBy: {
+            args: Prisma.SavedBlockGroupByArgs<ExtArgs>
+            result: $Utils.Optional<SavedBlockGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.SavedBlockCountArgs<ExtArgs>
+            result: $Utils.Optional<SavedBlockCountAggregateOutputType> | number
+          }
+        }
+      }
+      ContentTemplate: {
+        payload: Prisma.$ContentTemplatePayload<ExtArgs>
+        fields: Prisma.ContentTemplateFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.ContentTemplateFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ContentTemplatePayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.ContentTemplateFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ContentTemplatePayload>
+          }
+          findFirst: {
+            args: Prisma.ContentTemplateFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ContentTemplatePayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.ContentTemplateFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ContentTemplatePayload>
+          }
+          findMany: {
+            args: Prisma.ContentTemplateFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ContentTemplatePayload>[]
+          }
+          create: {
+            args: Prisma.ContentTemplateCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ContentTemplatePayload>
+          }
+          createMany: {
+            args: Prisma.ContentTemplateCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          createManyAndReturn: {
+            args: Prisma.ContentTemplateCreateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ContentTemplatePayload>[]
+          }
+          delete: {
+            args: Prisma.ContentTemplateDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ContentTemplatePayload>
+          }
+          update: {
+            args: Prisma.ContentTemplateUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ContentTemplatePayload>
+          }
+          deleteMany: {
+            args: Prisma.ContentTemplateDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.ContentTemplateUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateManyAndReturn: {
+            args: Prisma.ContentTemplateUpdateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ContentTemplatePayload>[]
+          }
+          upsert: {
+            args: Prisma.ContentTemplateUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ContentTemplatePayload>
+          }
+          aggregate: {
+            args: Prisma.ContentTemplateAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregateContentTemplate>
+          }
+          groupBy: {
+            args: Prisma.ContentTemplateGroupByArgs<ExtArgs>
+            result: $Utils.Optional<ContentTemplateGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.ContentTemplateCountArgs<ExtArgs>
+            result: $Utils.Optional<ContentTemplateCountAggregateOutputType> | number
+          }
+        }
+      }
+      Snippet: {
+        payload: Prisma.$SnippetPayload<ExtArgs>
+        fields: Prisma.SnippetFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.SnippetFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SnippetPayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.SnippetFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SnippetPayload>
+          }
+          findFirst: {
+            args: Prisma.SnippetFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SnippetPayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.SnippetFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SnippetPayload>
+          }
+          findMany: {
+            args: Prisma.SnippetFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SnippetPayload>[]
+          }
+          create: {
+            args: Prisma.SnippetCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SnippetPayload>
+          }
+          createMany: {
+            args: Prisma.SnippetCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          createManyAndReturn: {
+            args: Prisma.SnippetCreateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SnippetPayload>[]
+          }
+          delete: {
+            args: Prisma.SnippetDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SnippetPayload>
+          }
+          update: {
+            args: Prisma.SnippetUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SnippetPayload>
+          }
+          deleteMany: {
+            args: Prisma.SnippetDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.SnippetUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateManyAndReturn: {
+            args: Prisma.SnippetUpdateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SnippetPayload>[]
+          }
+          upsert: {
+            args: Prisma.SnippetUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SnippetPayload>
+          }
+          aggregate: {
+            args: Prisma.SnippetAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregateSnippet>
+          }
+          groupBy: {
+            args: Prisma.SnippetGroupByArgs<ExtArgs>
+            result: $Utils.Optional<SnippetGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.SnippetCountArgs<ExtArgs>
+            result: $Utils.Optional<SnippetCountAggregateOutputType> | number
+          }
+        }
+      }
+      PageTemplate: {
+        payload: Prisma.$PageTemplatePayload<ExtArgs>
+        fields: Prisma.PageTemplateFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.PageTemplateFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$PageTemplatePayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.PageTemplateFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$PageTemplatePayload>
+          }
+          findFirst: {
+            args: Prisma.PageTemplateFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$PageTemplatePayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.PageTemplateFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$PageTemplatePayload>
+          }
+          findMany: {
+            args: Prisma.PageTemplateFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$PageTemplatePayload>[]
+          }
+          create: {
+            args: Prisma.PageTemplateCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$PageTemplatePayload>
+          }
+          createMany: {
+            args: Prisma.PageTemplateCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          createManyAndReturn: {
+            args: Prisma.PageTemplateCreateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$PageTemplatePayload>[]
+          }
+          delete: {
+            args: Prisma.PageTemplateDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$PageTemplatePayload>
+          }
+          update: {
+            args: Prisma.PageTemplateUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$PageTemplatePayload>
+          }
+          deleteMany: {
+            args: Prisma.PageTemplateDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.PageTemplateUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateManyAndReturn: {
+            args: Prisma.PageTemplateUpdateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$PageTemplatePayload>[]
+          }
+          upsert: {
+            args: Prisma.PageTemplateUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$PageTemplatePayload>
+          }
+          aggregate: {
+            args: Prisma.PageTemplateAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregatePageTemplate>
+          }
+          groupBy: {
+            args: Prisma.PageTemplateGroupByArgs<ExtArgs>
+            result: $Utils.Optional<PageTemplateGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.PageTemplateCountArgs<ExtArgs>
+            result: $Utils.Optional<PageTemplateCountAggregateOutputType> | number
           }
         }
       }
@@ -3581,6 +4049,11 @@ export namespace Prisma {
     aIProviderKey?: AIProviderKeyOmit
     user?: UserOmit
     category?: CategoryOmit
+    reusableCategory?: ReusableCategoryOmit
+    savedBlock?: SavedBlockOmit
+    contentTemplate?: ContentTemplateOmit
+    snippet?: SnippetOmit
+    pageTemplate?: PageTemplateOmit
     tag?: TagOmit
     viewGrant?: ViewGrantOmit
     session?: SessionOmit
@@ -3776,6 +4249,11 @@ export namespace Prisma {
     auditTargets: number
     adminActions: number
     categories: number
+    reusableCategories: number
+    savedBlocks: number
+    contentTemplates: number
+    snippets: number
+    pageTemplates: number
     calendarConnections: number
     calendarEvents: number
     calendarSources: number
@@ -3794,6 +4272,11 @@ export namespace Prisma {
     auditTargets?: boolean | UserCountOutputTypeCountAuditTargetsArgs
     adminActions?: boolean | UserCountOutputTypeCountAdminActionsArgs
     categories?: boolean | UserCountOutputTypeCountCategoriesArgs
+    reusableCategories?: boolean | UserCountOutputTypeCountReusableCategoriesArgs
+    savedBlocks?: boolean | UserCountOutputTypeCountSavedBlocksArgs
+    contentTemplates?: boolean | UserCountOutputTypeCountContentTemplatesArgs
+    snippets?: boolean | UserCountOutputTypeCountSnippetsArgs
+    pageTemplates?: boolean | UserCountOutputTypeCountPageTemplatesArgs
     calendarConnections?: boolean | UserCountOutputTypeCountCalendarConnectionsArgs
     calendarEvents?: boolean | UserCountOutputTypeCountCalendarEventsArgs
     calendarSources?: boolean | UserCountOutputTypeCountCalendarSourcesArgs
@@ -3850,6 +4333,41 @@ export namespace Prisma {
    */
   export type UserCountOutputTypeCountCategoriesArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     where?: CategoryWhereInput
+  }
+
+  /**
+   * UserCountOutputType without action
+   */
+  export type UserCountOutputTypeCountReusableCategoriesArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: ReusableCategoryWhereInput
+  }
+
+  /**
+   * UserCountOutputType without action
+   */
+  export type UserCountOutputTypeCountSavedBlocksArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: SavedBlockWhereInput
+  }
+
+  /**
+   * UserCountOutputType without action
+   */
+  export type UserCountOutputTypeCountContentTemplatesArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: ContentTemplateWhereInput
+  }
+
+  /**
+   * UserCountOutputType without action
+   */
+  export type UserCountOutputTypeCountSnippetsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: SnippetWhereInput
+  }
+
+  /**
+   * UserCountOutputType without action
+   */
+  export type UserCountOutputTypeCountPageTemplatesArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: PageTemplateWhereInput
   }
 
   /**
@@ -3951,6 +4469,73 @@ export namespace Prisma {
    */
   export type CategoryCountOutputTypeCountContentNodesArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     where?: ContentNodeWhereInput
+  }
+
+
+  /**
+   * Count Type ReusableCategoryCountOutputType
+   */
+
+  export type ReusableCategoryCountOutputType = {
+    children: number
+    savedBlocks: number
+    contentTemplates: number
+    snippets: number
+    pageTemplates: number
+  }
+
+  export type ReusableCategoryCountOutputTypeSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    children?: boolean | ReusableCategoryCountOutputTypeCountChildrenArgs
+    savedBlocks?: boolean | ReusableCategoryCountOutputTypeCountSavedBlocksArgs
+    contentTemplates?: boolean | ReusableCategoryCountOutputTypeCountContentTemplatesArgs
+    snippets?: boolean | ReusableCategoryCountOutputTypeCountSnippetsArgs
+    pageTemplates?: boolean | ReusableCategoryCountOutputTypeCountPageTemplatesArgs
+  }
+
+  // Custom InputTypes
+  /**
+   * ReusableCategoryCountOutputType without action
+   */
+  export type ReusableCategoryCountOutputTypeDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ReusableCategoryCountOutputType
+     */
+    select?: ReusableCategoryCountOutputTypeSelect<ExtArgs> | null
+  }
+
+  /**
+   * ReusableCategoryCountOutputType without action
+   */
+  export type ReusableCategoryCountOutputTypeCountChildrenArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: ReusableCategoryWhereInput
+  }
+
+  /**
+   * ReusableCategoryCountOutputType without action
+   */
+  export type ReusableCategoryCountOutputTypeCountSavedBlocksArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: SavedBlockWhereInput
+  }
+
+  /**
+   * ReusableCategoryCountOutputType without action
+   */
+  export type ReusableCategoryCountOutputTypeCountContentTemplatesArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: ContentTemplateWhereInput
+  }
+
+  /**
+   * ReusableCategoryCountOutputType without action
+   */
+  export type ReusableCategoryCountOutputTypeCountSnippetsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: SnippetWhereInput
+  }
+
+  /**
+   * ReusableCategoryCountOutputType without action
+   */
+  export type ReusableCategoryCountOutputTypeCountPageTemplatesArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: PageTemplateWhereInput
   }
 
 
@@ -5201,6 +5786,11 @@ export namespace Prisma {
      * Skip the first `n` ContentNodes.
      */
     skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of ContentNodes.
+     */
     distinct?: ContentNodeScalarFieldEnum | ContentNodeScalarFieldEnum[]
   }
 
@@ -6741,6 +7331,11 @@ export namespace Prisma {
      * Skip the first `n` NotePayloads.
      */
     skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of NotePayloads.
+     */
     distinct?: NotePayloadScalarFieldEnum | NotePayloadScalarFieldEnum[]
   }
 
@@ -8075,6 +8670,11 @@ export namespace Prisma {
      * Skip the first `n` FilePayloads.
      */
     skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of FilePayloads.
+     */
     distinct?: FilePayloadScalarFieldEnum | FilePayloadScalarFieldEnum[]
   }
 
@@ -9190,6 +9790,11 @@ export namespace Prisma {
      * Skip the first `n` HtmlPayloads.
      */
     skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of HtmlPayloads.
+     */
     distinct?: HtmlPayloadScalarFieldEnum | HtmlPayloadScalarFieldEnum[]
   }
 
@@ -10270,6 +10875,11 @@ export namespace Prisma {
      * Skip the first `n` CodePayloads.
      */
     skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of CodePayloads.
+     */
     distinct?: CodePayloadScalarFieldEnum | CodePayloadScalarFieldEnum[]
   }
 
@@ -11379,6 +11989,11 @@ export namespace Prisma {
      * Skip the first `n` ContentHistories.
      */
     skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of ContentHistories.
+     */
     distinct?: ContentHistoryScalarFieldEnum | ContentHistoryScalarFieldEnum[]
   }
 
@@ -12467,6 +13082,11 @@ export namespace Prisma {
      * Skip the first `n` ContentPaths.
      */
     skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of ContentPaths.
+     */
     distinct?: ContentPathScalarFieldEnum | ContentPathScalarFieldEnum[]
   }
 
@@ -13559,6 +14179,11 @@ export namespace Prisma {
      * Skip the first `n` ContentLinks.
      */
     skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of ContentLinks.
+     */
     distinct?: ContentLinkScalarFieldEnum | ContentLinkScalarFieldEnum[]
   }
 
@@ -14621,6 +15246,11 @@ export namespace Prisma {
      * Skip the first `n` ContentTags.
      */
     skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of ContentTags.
+     */
     distinct?: ContentTagScalarFieldEnum | ContentTagScalarFieldEnum[]
   }
 
@@ -15722,6 +16352,11 @@ export namespace Prisma {
      * Skip the first `n` TrashBins.
      */
     skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of TrashBins.
+     */
     distinct?: TrashBinScalarFieldEnum | TrashBinScalarFieldEnum[]
   }
 
@@ -16828,6 +17463,11 @@ export namespace Prisma {
      * Skip the first `n` StorageProviderConfigs.
      */
     skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of StorageProviderConfigs.
+     */
     distinct?: StorageProviderConfigScalarFieldEnum | StorageProviderConfigScalarFieldEnum[]
   }
 
@@ -17938,6 +18578,11 @@ export namespace Prisma {
      * Skip the first `n` AIProviderKeys.
      */
     skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of AIProviderKeys.
+     */
     distinct?: AIProviderKeyScalarFieldEnum | AIProviderKeyScalarFieldEnum[]
   }
 
@@ -18387,6 +19032,11 @@ export namespace Prisma {
     auditTargets?: boolean | User$auditTargetsArgs<ExtArgs>
     adminActions?: boolean | User$adminActionsArgs<ExtArgs>
     categories?: boolean | User$categoriesArgs<ExtArgs>
+    reusableCategories?: boolean | User$reusableCategoriesArgs<ExtArgs>
+    savedBlocks?: boolean | User$savedBlocksArgs<ExtArgs>
+    contentTemplates?: boolean | User$contentTemplatesArgs<ExtArgs>
+    snippets?: boolean | User$snippetsArgs<ExtArgs>
+    pageTemplates?: boolean | User$pageTemplatesArgs<ExtArgs>
     calendarConnections?: boolean | User$calendarConnectionsArgs<ExtArgs>
     calendarEvents?: boolean | User$calendarEventsArgs<ExtArgs>
     calendarSources?: boolean | User$calendarSourcesArgs<ExtArgs>
@@ -18443,6 +19093,11 @@ export namespace Prisma {
     auditTargets?: boolean | User$auditTargetsArgs<ExtArgs>
     adminActions?: boolean | User$adminActionsArgs<ExtArgs>
     categories?: boolean | User$categoriesArgs<ExtArgs>
+    reusableCategories?: boolean | User$reusableCategoriesArgs<ExtArgs>
+    savedBlocks?: boolean | User$savedBlocksArgs<ExtArgs>
+    contentTemplates?: boolean | User$contentTemplatesArgs<ExtArgs>
+    snippets?: boolean | User$snippetsArgs<ExtArgs>
+    pageTemplates?: boolean | User$pageTemplatesArgs<ExtArgs>
     calendarConnections?: boolean | User$calendarConnectionsArgs<ExtArgs>
     calendarEvents?: boolean | User$calendarEventsArgs<ExtArgs>
     calendarSources?: boolean | User$calendarSourcesArgs<ExtArgs>
@@ -18466,6 +19121,11 @@ export namespace Prisma {
       auditTargets: Prisma.$AuditLogPayload<ExtArgs>[]
       adminActions: Prisma.$AuditLogPayload<ExtArgs>[]
       categories: Prisma.$CategoryPayload<ExtArgs>[]
+      reusableCategories: Prisma.$ReusableCategoryPayload<ExtArgs>[]
+      savedBlocks: Prisma.$SavedBlockPayload<ExtArgs>[]
+      contentTemplates: Prisma.$ContentTemplatePayload<ExtArgs>[]
+      snippets: Prisma.$SnippetPayload<ExtArgs>[]
+      pageTemplates: Prisma.$PageTemplatePayload<ExtArgs>[]
       calendarConnections: Prisma.$CalendarConnectionPayload<ExtArgs>[]
       calendarEvents: Prisma.$CalendarEventPayload<ExtArgs>[]
       calendarSources: Prisma.$CalendarSourcePayload<ExtArgs>[]
@@ -18886,6 +19546,11 @@ export namespace Prisma {
     auditTargets<T extends User$auditTargetsArgs<ExtArgs> = {}>(args?: Subset<T, User$auditTargetsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$AuditLogPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     adminActions<T extends User$adminActionsArgs<ExtArgs> = {}>(args?: Subset<T, User$adminActionsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$AuditLogPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     categories<T extends User$categoriesArgs<ExtArgs> = {}>(args?: Subset<T, User$categoriesArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$CategoryPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+    reusableCategories<T extends User$reusableCategoriesArgs<ExtArgs> = {}>(args?: Subset<T, User$reusableCategoriesArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ReusableCategoryPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+    savedBlocks<T extends User$savedBlocksArgs<ExtArgs> = {}>(args?: Subset<T, User$savedBlocksArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$SavedBlockPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+    contentTemplates<T extends User$contentTemplatesArgs<ExtArgs> = {}>(args?: Subset<T, User$contentTemplatesArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ContentTemplatePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+    snippets<T extends User$snippetsArgs<ExtArgs> = {}>(args?: Subset<T, User$snippetsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$SnippetPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+    pageTemplates<T extends User$pageTemplatesArgs<ExtArgs> = {}>(args?: Subset<T, User$pageTemplatesArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$PageTemplatePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     calendarConnections<T extends User$calendarConnectionsArgs<ExtArgs> = {}>(args?: Subset<T, User$calendarConnectionsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$CalendarConnectionPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     calendarEvents<T extends User$calendarEventsArgs<ExtArgs> = {}>(args?: Subset<T, User$calendarEventsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$CalendarEventPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     calendarSources<T extends User$calendarSourcesArgs<ExtArgs> = {}>(args?: Subset<T, User$calendarSourcesArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$CalendarSourcePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
@@ -19130,6 +19795,11 @@ export namespace Prisma {
      * Skip the first `n` Users.
      */
     skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of Users.
+     */
     distinct?: UserScalarFieldEnum | UserScalarFieldEnum[]
   }
 
@@ -19439,6 +20109,126 @@ export namespace Prisma {
     take?: number
     skip?: number
     distinct?: CategoryScalarFieldEnum | CategoryScalarFieldEnum[]
+  }
+
+  /**
+   * User.reusableCategories
+   */
+  export type User$reusableCategoriesArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ReusableCategory
+     */
+    select?: ReusableCategorySelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ReusableCategory
+     */
+    omit?: ReusableCategoryOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ReusableCategoryInclude<ExtArgs> | null
+    where?: ReusableCategoryWhereInput
+    orderBy?: ReusableCategoryOrderByWithRelationInput | ReusableCategoryOrderByWithRelationInput[]
+    cursor?: ReusableCategoryWhereUniqueInput
+    take?: number
+    skip?: number
+    distinct?: ReusableCategoryScalarFieldEnum | ReusableCategoryScalarFieldEnum[]
+  }
+
+  /**
+   * User.savedBlocks
+   */
+  export type User$savedBlocksArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SavedBlock
+     */
+    select?: SavedBlockSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the SavedBlock
+     */
+    omit?: SavedBlockOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SavedBlockInclude<ExtArgs> | null
+    where?: SavedBlockWhereInput
+    orderBy?: SavedBlockOrderByWithRelationInput | SavedBlockOrderByWithRelationInput[]
+    cursor?: SavedBlockWhereUniqueInput
+    take?: number
+    skip?: number
+    distinct?: SavedBlockScalarFieldEnum | SavedBlockScalarFieldEnum[]
+  }
+
+  /**
+   * User.contentTemplates
+   */
+  export type User$contentTemplatesArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ContentTemplate
+     */
+    select?: ContentTemplateSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ContentTemplate
+     */
+    omit?: ContentTemplateOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ContentTemplateInclude<ExtArgs> | null
+    where?: ContentTemplateWhereInput
+    orderBy?: ContentTemplateOrderByWithRelationInput | ContentTemplateOrderByWithRelationInput[]
+    cursor?: ContentTemplateWhereUniqueInput
+    take?: number
+    skip?: number
+    distinct?: ContentTemplateScalarFieldEnum | ContentTemplateScalarFieldEnum[]
+  }
+
+  /**
+   * User.snippets
+   */
+  export type User$snippetsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Snippet
+     */
+    select?: SnippetSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Snippet
+     */
+    omit?: SnippetOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SnippetInclude<ExtArgs> | null
+    where?: SnippetWhereInput
+    orderBy?: SnippetOrderByWithRelationInput | SnippetOrderByWithRelationInput[]
+    cursor?: SnippetWhereUniqueInput
+    take?: number
+    skip?: number
+    distinct?: SnippetScalarFieldEnum | SnippetScalarFieldEnum[]
+  }
+
+  /**
+   * User.pageTemplates
+   */
+  export type User$pageTemplatesArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the PageTemplate
+     */
+    select?: PageTemplateSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the PageTemplate
+     */
+    omit?: PageTemplateOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: PageTemplateInclude<ExtArgs> | null
+    where?: PageTemplateWhereInput
+    orderBy?: PageTemplateOrderByWithRelationInput | PageTemplateOrderByWithRelationInput[]
+    cursor?: PageTemplateWhereUniqueInput
+    take?: number
+    skip?: number
+    distinct?: PageTemplateScalarFieldEnum | PageTemplateScalarFieldEnum[]
   }
 
   /**
@@ -20632,6 +21422,11 @@ export namespace Prisma {
      * Skip the first `n` Categories.
      */
     skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of Categories.
+     */
     distinct?: CategoryScalarFieldEnum | CategoryScalarFieldEnum[]
   }
 
@@ -20871,6 +21666,6123 @@ export namespace Prisma {
      * Choose, which related nodes to fetch as well
      */
     include?: CategoryInclude<ExtArgs> | null
+  }
+
+
+  /**
+   * Model ReusableCategory
+   */
+
+  export type AggregateReusableCategory = {
+    _count: ReusableCategoryCountAggregateOutputType | null
+    _avg: ReusableCategoryAvgAggregateOutputType | null
+    _sum: ReusableCategorySumAggregateOutputType | null
+    _min: ReusableCategoryMinAggregateOutputType | null
+    _max: ReusableCategoryMaxAggregateOutputType | null
+  }
+
+  export type ReusableCategoryAvgAggregateOutputType = {
+    displayOrder: number | null
+  }
+
+  export type ReusableCategorySumAggregateOutputType = {
+    displayOrder: number | null
+  }
+
+  export type ReusableCategoryMinAggregateOutputType = {
+    id: string | null
+    name: string | null
+    slug: string | null
+    scope: $Enums.ReusableCategoryScope | null
+    userId: string | null
+    parentId: string | null
+    displayOrder: number | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type ReusableCategoryMaxAggregateOutputType = {
+    id: string | null
+    name: string | null
+    slug: string | null
+    scope: $Enums.ReusableCategoryScope | null
+    userId: string | null
+    parentId: string | null
+    displayOrder: number | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type ReusableCategoryCountAggregateOutputType = {
+    id: number
+    name: number
+    slug: number
+    scope: number
+    userId: number
+    parentId: number
+    displayOrder: number
+    createdAt: number
+    updatedAt: number
+    _all: number
+  }
+
+
+  export type ReusableCategoryAvgAggregateInputType = {
+    displayOrder?: true
+  }
+
+  export type ReusableCategorySumAggregateInputType = {
+    displayOrder?: true
+  }
+
+  export type ReusableCategoryMinAggregateInputType = {
+    id?: true
+    name?: true
+    slug?: true
+    scope?: true
+    userId?: true
+    parentId?: true
+    displayOrder?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type ReusableCategoryMaxAggregateInputType = {
+    id?: true
+    name?: true
+    slug?: true
+    scope?: true
+    userId?: true
+    parentId?: true
+    displayOrder?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type ReusableCategoryCountAggregateInputType = {
+    id?: true
+    name?: true
+    slug?: true
+    scope?: true
+    userId?: true
+    parentId?: true
+    displayOrder?: true
+    createdAt?: true
+    updatedAt?: true
+    _all?: true
+  }
+
+  export type ReusableCategoryAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which ReusableCategory to aggregate.
+     */
+    where?: ReusableCategoryWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of ReusableCategories to fetch.
+     */
+    orderBy?: ReusableCategoryOrderByWithRelationInput | ReusableCategoryOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: ReusableCategoryWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` ReusableCategories from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` ReusableCategories.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned ReusableCategories
+    **/
+    _count?: true | ReusableCategoryCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to average
+    **/
+    _avg?: ReusableCategoryAvgAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to sum
+    **/
+    _sum?: ReusableCategorySumAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: ReusableCategoryMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: ReusableCategoryMaxAggregateInputType
+  }
+
+  export type GetReusableCategoryAggregateType<T extends ReusableCategoryAggregateArgs> = {
+        [P in keyof T & keyof AggregateReusableCategory]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateReusableCategory[P]>
+      : GetScalarType<T[P], AggregateReusableCategory[P]>
+  }
+
+
+
+
+  export type ReusableCategoryGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: ReusableCategoryWhereInput
+    orderBy?: ReusableCategoryOrderByWithAggregationInput | ReusableCategoryOrderByWithAggregationInput[]
+    by: ReusableCategoryScalarFieldEnum[] | ReusableCategoryScalarFieldEnum
+    having?: ReusableCategoryScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: ReusableCategoryCountAggregateInputType | true
+    _avg?: ReusableCategoryAvgAggregateInputType
+    _sum?: ReusableCategorySumAggregateInputType
+    _min?: ReusableCategoryMinAggregateInputType
+    _max?: ReusableCategoryMaxAggregateInputType
+  }
+
+  export type ReusableCategoryGroupByOutputType = {
+    id: string
+    name: string
+    slug: string
+    scope: $Enums.ReusableCategoryScope
+    userId: string | null
+    parentId: string | null
+    displayOrder: number
+    createdAt: Date
+    updatedAt: Date
+    _count: ReusableCategoryCountAggregateOutputType | null
+    _avg: ReusableCategoryAvgAggregateOutputType | null
+    _sum: ReusableCategorySumAggregateOutputType | null
+    _min: ReusableCategoryMinAggregateOutputType | null
+    _max: ReusableCategoryMaxAggregateOutputType | null
+  }
+
+  type GetReusableCategoryGroupByPayload<T extends ReusableCategoryGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<ReusableCategoryGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof ReusableCategoryGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], ReusableCategoryGroupByOutputType[P]>
+            : GetScalarType<T[P], ReusableCategoryGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type ReusableCategorySelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    name?: boolean
+    slug?: boolean
+    scope?: boolean
+    userId?: boolean
+    parentId?: boolean
+    displayOrder?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    user?: boolean | ReusableCategory$userArgs<ExtArgs>
+    parent?: boolean | ReusableCategory$parentArgs<ExtArgs>
+    children?: boolean | ReusableCategory$childrenArgs<ExtArgs>
+    savedBlocks?: boolean | ReusableCategory$savedBlocksArgs<ExtArgs>
+    contentTemplates?: boolean | ReusableCategory$contentTemplatesArgs<ExtArgs>
+    snippets?: boolean | ReusableCategory$snippetsArgs<ExtArgs>
+    pageTemplates?: boolean | ReusableCategory$pageTemplatesArgs<ExtArgs>
+    _count?: boolean | ReusableCategoryCountOutputTypeDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["reusableCategory"]>
+
+  export type ReusableCategorySelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    name?: boolean
+    slug?: boolean
+    scope?: boolean
+    userId?: boolean
+    parentId?: boolean
+    displayOrder?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    user?: boolean | ReusableCategory$userArgs<ExtArgs>
+    parent?: boolean | ReusableCategory$parentArgs<ExtArgs>
+  }, ExtArgs["result"]["reusableCategory"]>
+
+  export type ReusableCategorySelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    name?: boolean
+    slug?: boolean
+    scope?: boolean
+    userId?: boolean
+    parentId?: boolean
+    displayOrder?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    user?: boolean | ReusableCategory$userArgs<ExtArgs>
+    parent?: boolean | ReusableCategory$parentArgs<ExtArgs>
+  }, ExtArgs["result"]["reusableCategory"]>
+
+  export type ReusableCategorySelectScalar = {
+    id?: boolean
+    name?: boolean
+    slug?: boolean
+    scope?: boolean
+    userId?: boolean
+    parentId?: boolean
+    displayOrder?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+  }
+
+  export type ReusableCategoryOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "name" | "slug" | "scope" | "userId" | "parentId" | "displayOrder" | "createdAt" | "updatedAt", ExtArgs["result"]["reusableCategory"]>
+  export type ReusableCategoryInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    user?: boolean | ReusableCategory$userArgs<ExtArgs>
+    parent?: boolean | ReusableCategory$parentArgs<ExtArgs>
+    children?: boolean | ReusableCategory$childrenArgs<ExtArgs>
+    savedBlocks?: boolean | ReusableCategory$savedBlocksArgs<ExtArgs>
+    contentTemplates?: boolean | ReusableCategory$contentTemplatesArgs<ExtArgs>
+    snippets?: boolean | ReusableCategory$snippetsArgs<ExtArgs>
+    pageTemplates?: boolean | ReusableCategory$pageTemplatesArgs<ExtArgs>
+    _count?: boolean | ReusableCategoryCountOutputTypeDefaultArgs<ExtArgs>
+  }
+  export type ReusableCategoryIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    user?: boolean | ReusableCategory$userArgs<ExtArgs>
+    parent?: boolean | ReusableCategory$parentArgs<ExtArgs>
+  }
+  export type ReusableCategoryIncludeUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    user?: boolean | ReusableCategory$userArgs<ExtArgs>
+    parent?: boolean | ReusableCategory$parentArgs<ExtArgs>
+  }
+
+  export type $ReusableCategoryPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "ReusableCategory"
+    objects: {
+      user: Prisma.$UserPayload<ExtArgs> | null
+      parent: Prisma.$ReusableCategoryPayload<ExtArgs> | null
+      children: Prisma.$ReusableCategoryPayload<ExtArgs>[]
+      savedBlocks: Prisma.$SavedBlockPayload<ExtArgs>[]
+      contentTemplates: Prisma.$ContentTemplatePayload<ExtArgs>[]
+      snippets: Prisma.$SnippetPayload<ExtArgs>[]
+      pageTemplates: Prisma.$PageTemplatePayload<ExtArgs>[]
+    }
+    scalars: $Extensions.GetPayloadResult<{
+      id: string
+      name: string
+      slug: string
+      scope: $Enums.ReusableCategoryScope
+      userId: string | null
+      parentId: string | null
+      displayOrder: number
+      createdAt: Date
+      updatedAt: Date
+    }, ExtArgs["result"]["reusableCategory"]>
+    composites: {}
+  }
+
+  type ReusableCategoryGetPayload<S extends boolean | null | undefined | ReusableCategoryDefaultArgs> = $Result.GetResult<Prisma.$ReusableCategoryPayload, S>
+
+  type ReusableCategoryCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> =
+    Omit<ReusableCategoryFindManyArgs, 'select' | 'include' | 'distinct' | 'omit'> & {
+      select?: ReusableCategoryCountAggregateInputType | true
+    }
+
+  export interface ReusableCategoryDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['ReusableCategory'], meta: { name: 'ReusableCategory' } }
+    /**
+     * Find zero or one ReusableCategory that matches the filter.
+     * @param {ReusableCategoryFindUniqueArgs} args - Arguments to find a ReusableCategory
+     * @example
+     * // Get one ReusableCategory
+     * const reusableCategory = await prisma.reusableCategory.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends ReusableCategoryFindUniqueArgs>(args: SelectSubset<T, ReusableCategoryFindUniqueArgs<ExtArgs>>): Prisma__ReusableCategoryClient<$Result.GetResult<Prisma.$ReusableCategoryPayload<ExtArgs>, T, "findUnique", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find one ReusableCategory that matches the filter or throw an error with `error.code='P2025'`
+     * if no matches were found.
+     * @param {ReusableCategoryFindUniqueOrThrowArgs} args - Arguments to find a ReusableCategory
+     * @example
+     * // Get one ReusableCategory
+     * const reusableCategory = await prisma.reusableCategory.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends ReusableCategoryFindUniqueOrThrowArgs>(args: SelectSubset<T, ReusableCategoryFindUniqueOrThrowArgs<ExtArgs>>): Prisma__ReusableCategoryClient<$Result.GetResult<Prisma.$ReusableCategoryPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first ReusableCategory that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ReusableCategoryFindFirstArgs} args - Arguments to find a ReusableCategory
+     * @example
+     * // Get one ReusableCategory
+     * const reusableCategory = await prisma.reusableCategory.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends ReusableCategoryFindFirstArgs>(args?: SelectSubset<T, ReusableCategoryFindFirstArgs<ExtArgs>>): Prisma__ReusableCategoryClient<$Result.GetResult<Prisma.$ReusableCategoryPayload<ExtArgs>, T, "findFirst", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first ReusableCategory that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ReusableCategoryFindFirstOrThrowArgs} args - Arguments to find a ReusableCategory
+     * @example
+     * // Get one ReusableCategory
+     * const reusableCategory = await prisma.reusableCategory.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends ReusableCategoryFindFirstOrThrowArgs>(args?: SelectSubset<T, ReusableCategoryFindFirstOrThrowArgs<ExtArgs>>): Prisma__ReusableCategoryClient<$Result.GetResult<Prisma.$ReusableCategoryPayload<ExtArgs>, T, "findFirstOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find zero or more ReusableCategories that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ReusableCategoryFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all ReusableCategories
+     * const reusableCategories = await prisma.reusableCategory.findMany()
+     * 
+     * // Get first 10 ReusableCategories
+     * const reusableCategories = await prisma.reusableCategory.findMany({ take: 10 })
+     * 
+     * // Only select the `id`
+     * const reusableCategoryWithIdOnly = await prisma.reusableCategory.findMany({ select: { id: true } })
+     * 
+     */
+    findMany<T extends ReusableCategoryFindManyArgs>(args?: SelectSubset<T, ReusableCategoryFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ReusableCategoryPayload<ExtArgs>, T, "findMany", GlobalOmitOptions>>
+
+    /**
+     * Create a ReusableCategory.
+     * @param {ReusableCategoryCreateArgs} args - Arguments to create a ReusableCategory.
+     * @example
+     * // Create one ReusableCategory
+     * const ReusableCategory = await prisma.reusableCategory.create({
+     *   data: {
+     *     // ... data to create a ReusableCategory
+     *   }
+     * })
+     * 
+     */
+    create<T extends ReusableCategoryCreateArgs>(args: SelectSubset<T, ReusableCategoryCreateArgs<ExtArgs>>): Prisma__ReusableCategoryClient<$Result.GetResult<Prisma.$ReusableCategoryPayload<ExtArgs>, T, "create", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Create many ReusableCategories.
+     * @param {ReusableCategoryCreateManyArgs} args - Arguments to create many ReusableCategories.
+     * @example
+     * // Create many ReusableCategories
+     * const reusableCategory = await prisma.reusableCategory.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *     
+     */
+    createMany<T extends ReusableCategoryCreateManyArgs>(args?: SelectSubset<T, ReusableCategoryCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create many ReusableCategories and returns the data saved in the database.
+     * @param {ReusableCategoryCreateManyAndReturnArgs} args - Arguments to create many ReusableCategories.
+     * @example
+     * // Create many ReusableCategories
+     * const reusableCategory = await prisma.reusableCategory.createManyAndReturn({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Create many ReusableCategories and only return the `id`
+     * const reusableCategoryWithIdOnly = await prisma.reusableCategory.createManyAndReturn({
+     *   select: { id: true },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    createManyAndReturn<T extends ReusableCategoryCreateManyAndReturnArgs>(args?: SelectSubset<T, ReusableCategoryCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ReusableCategoryPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Delete a ReusableCategory.
+     * @param {ReusableCategoryDeleteArgs} args - Arguments to delete one ReusableCategory.
+     * @example
+     * // Delete one ReusableCategory
+     * const ReusableCategory = await prisma.reusableCategory.delete({
+     *   where: {
+     *     // ... filter to delete one ReusableCategory
+     *   }
+     * })
+     * 
+     */
+    delete<T extends ReusableCategoryDeleteArgs>(args: SelectSubset<T, ReusableCategoryDeleteArgs<ExtArgs>>): Prisma__ReusableCategoryClient<$Result.GetResult<Prisma.$ReusableCategoryPayload<ExtArgs>, T, "delete", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Update one ReusableCategory.
+     * @param {ReusableCategoryUpdateArgs} args - Arguments to update one ReusableCategory.
+     * @example
+     * // Update one ReusableCategory
+     * const reusableCategory = await prisma.reusableCategory.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    update<T extends ReusableCategoryUpdateArgs>(args: SelectSubset<T, ReusableCategoryUpdateArgs<ExtArgs>>): Prisma__ReusableCategoryClient<$Result.GetResult<Prisma.$ReusableCategoryPayload<ExtArgs>, T, "update", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Delete zero or more ReusableCategories.
+     * @param {ReusableCategoryDeleteManyArgs} args - Arguments to filter ReusableCategories to delete.
+     * @example
+     * // Delete a few ReusableCategories
+     * const { count } = await prisma.reusableCategory.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+     */
+    deleteMany<T extends ReusableCategoryDeleteManyArgs>(args?: SelectSubset<T, ReusableCategoryDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more ReusableCategories.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ReusableCategoryUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many ReusableCategories
+     * const reusableCategory = await prisma.reusableCategory.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    updateMany<T extends ReusableCategoryUpdateManyArgs>(args: SelectSubset<T, ReusableCategoryUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more ReusableCategories and returns the data updated in the database.
+     * @param {ReusableCategoryUpdateManyAndReturnArgs} args - Arguments to update many ReusableCategories.
+     * @example
+     * // Update many ReusableCategories
+     * const reusableCategory = await prisma.reusableCategory.updateManyAndReturn({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Update zero or more ReusableCategories and only return the `id`
+     * const reusableCategoryWithIdOnly = await prisma.reusableCategory.updateManyAndReturn({
+     *   select: { id: true },
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    updateManyAndReturn<T extends ReusableCategoryUpdateManyAndReturnArgs>(args: SelectSubset<T, ReusableCategoryUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ReusableCategoryPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Create or update one ReusableCategory.
+     * @param {ReusableCategoryUpsertArgs} args - Arguments to update or create a ReusableCategory.
+     * @example
+     * // Update or create a ReusableCategory
+     * const reusableCategory = await prisma.reusableCategory.upsert({
+     *   create: {
+     *     // ... data to create a ReusableCategory
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the ReusableCategory we want to update
+     *   }
+     * })
+     */
+    upsert<T extends ReusableCategoryUpsertArgs>(args: SelectSubset<T, ReusableCategoryUpsertArgs<ExtArgs>>): Prisma__ReusableCategoryClient<$Result.GetResult<Prisma.$ReusableCategoryPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+
+    /**
+     * Count the number of ReusableCategories.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ReusableCategoryCountArgs} args - Arguments to filter ReusableCategories to count.
+     * @example
+     * // Count the number of ReusableCategories
+     * const count = await prisma.reusableCategory.count({
+     *   where: {
+     *     // ... the filter for the ReusableCategories we want to count
+     *   }
+     * })
+    **/
+    count<T extends ReusableCategoryCountArgs>(
+      args?: Subset<T, ReusableCategoryCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], ReusableCategoryCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a ReusableCategory.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ReusableCategoryAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends ReusableCategoryAggregateArgs>(args: Subset<T, ReusableCategoryAggregateArgs>): Prisma.PrismaPromise<GetReusableCategoryAggregateType<T>>
+
+    /**
+     * Group by ReusableCategory.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ReusableCategoryGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends ReusableCategoryGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: ReusableCategoryGroupByArgs['orderBy'] }
+        : { orderBy?: ReusableCategoryGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, ReusableCategoryGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetReusableCategoryGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the ReusableCategory model
+   */
+  readonly fields: ReusableCategoryFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for ReusableCategory.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__ReusableCategoryClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    user<T extends ReusableCategory$userArgs<ExtArgs> = {}>(args?: Subset<T, ReusableCategory$userArgs<ExtArgs>>): Prisma__UserClient<$Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+    parent<T extends ReusableCategory$parentArgs<ExtArgs> = {}>(args?: Subset<T, ReusableCategory$parentArgs<ExtArgs>>): Prisma__ReusableCategoryClient<$Result.GetResult<Prisma.$ReusableCategoryPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+    children<T extends ReusableCategory$childrenArgs<ExtArgs> = {}>(args?: Subset<T, ReusableCategory$childrenArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ReusableCategoryPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+    savedBlocks<T extends ReusableCategory$savedBlocksArgs<ExtArgs> = {}>(args?: Subset<T, ReusableCategory$savedBlocksArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$SavedBlockPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+    contentTemplates<T extends ReusableCategory$contentTemplatesArgs<ExtArgs> = {}>(args?: Subset<T, ReusableCategory$contentTemplatesArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ContentTemplatePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+    snippets<T extends ReusableCategory$snippetsArgs<ExtArgs> = {}>(args?: Subset<T, ReusableCategory$snippetsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$SnippetPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+    pageTemplates<T extends ReusableCategory$pageTemplatesArgs<ExtArgs> = {}>(args?: Subset<T, ReusableCategory$pageTemplatesArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$PageTemplatePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the ReusableCategory model
+   */
+  interface ReusableCategoryFieldRefs {
+    readonly id: FieldRef<"ReusableCategory", 'String'>
+    readonly name: FieldRef<"ReusableCategory", 'String'>
+    readonly slug: FieldRef<"ReusableCategory", 'String'>
+    readonly scope: FieldRef<"ReusableCategory", 'ReusableCategoryScope'>
+    readonly userId: FieldRef<"ReusableCategory", 'String'>
+    readonly parentId: FieldRef<"ReusableCategory", 'String'>
+    readonly displayOrder: FieldRef<"ReusableCategory", 'Int'>
+    readonly createdAt: FieldRef<"ReusableCategory", 'DateTime'>
+    readonly updatedAt: FieldRef<"ReusableCategory", 'DateTime'>
+  }
+    
+
+  // Custom InputTypes
+  /**
+   * ReusableCategory findUnique
+   */
+  export type ReusableCategoryFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ReusableCategory
+     */
+    select?: ReusableCategorySelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ReusableCategory
+     */
+    omit?: ReusableCategoryOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ReusableCategoryInclude<ExtArgs> | null
+    /**
+     * Filter, which ReusableCategory to fetch.
+     */
+    where: ReusableCategoryWhereUniqueInput
+  }
+
+  /**
+   * ReusableCategory findUniqueOrThrow
+   */
+  export type ReusableCategoryFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ReusableCategory
+     */
+    select?: ReusableCategorySelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ReusableCategory
+     */
+    omit?: ReusableCategoryOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ReusableCategoryInclude<ExtArgs> | null
+    /**
+     * Filter, which ReusableCategory to fetch.
+     */
+    where: ReusableCategoryWhereUniqueInput
+  }
+
+  /**
+   * ReusableCategory findFirst
+   */
+  export type ReusableCategoryFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ReusableCategory
+     */
+    select?: ReusableCategorySelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ReusableCategory
+     */
+    omit?: ReusableCategoryOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ReusableCategoryInclude<ExtArgs> | null
+    /**
+     * Filter, which ReusableCategory to fetch.
+     */
+    where?: ReusableCategoryWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of ReusableCategories to fetch.
+     */
+    orderBy?: ReusableCategoryOrderByWithRelationInput | ReusableCategoryOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for ReusableCategories.
+     */
+    cursor?: ReusableCategoryWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` ReusableCategories from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` ReusableCategories.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of ReusableCategories.
+     */
+    distinct?: ReusableCategoryScalarFieldEnum | ReusableCategoryScalarFieldEnum[]
+  }
+
+  /**
+   * ReusableCategory findFirstOrThrow
+   */
+  export type ReusableCategoryFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ReusableCategory
+     */
+    select?: ReusableCategorySelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ReusableCategory
+     */
+    omit?: ReusableCategoryOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ReusableCategoryInclude<ExtArgs> | null
+    /**
+     * Filter, which ReusableCategory to fetch.
+     */
+    where?: ReusableCategoryWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of ReusableCategories to fetch.
+     */
+    orderBy?: ReusableCategoryOrderByWithRelationInput | ReusableCategoryOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for ReusableCategories.
+     */
+    cursor?: ReusableCategoryWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` ReusableCategories from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` ReusableCategories.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of ReusableCategories.
+     */
+    distinct?: ReusableCategoryScalarFieldEnum | ReusableCategoryScalarFieldEnum[]
+  }
+
+  /**
+   * ReusableCategory findMany
+   */
+  export type ReusableCategoryFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ReusableCategory
+     */
+    select?: ReusableCategorySelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ReusableCategory
+     */
+    omit?: ReusableCategoryOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ReusableCategoryInclude<ExtArgs> | null
+    /**
+     * Filter, which ReusableCategories to fetch.
+     */
+    where?: ReusableCategoryWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of ReusableCategories to fetch.
+     */
+    orderBy?: ReusableCategoryOrderByWithRelationInput | ReusableCategoryOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing ReusableCategories.
+     */
+    cursor?: ReusableCategoryWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` ReusableCategories from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` ReusableCategories.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of ReusableCategories.
+     */
+    distinct?: ReusableCategoryScalarFieldEnum | ReusableCategoryScalarFieldEnum[]
+  }
+
+  /**
+   * ReusableCategory create
+   */
+  export type ReusableCategoryCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ReusableCategory
+     */
+    select?: ReusableCategorySelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ReusableCategory
+     */
+    omit?: ReusableCategoryOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ReusableCategoryInclude<ExtArgs> | null
+    /**
+     * The data needed to create a ReusableCategory.
+     */
+    data: XOR<ReusableCategoryCreateInput, ReusableCategoryUncheckedCreateInput>
+  }
+
+  /**
+   * ReusableCategory createMany
+   */
+  export type ReusableCategoryCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many ReusableCategories.
+     */
+    data: ReusableCategoryCreateManyInput | ReusableCategoryCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * ReusableCategory createManyAndReturn
+   */
+  export type ReusableCategoryCreateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ReusableCategory
+     */
+    select?: ReusableCategorySelectCreateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the ReusableCategory
+     */
+    omit?: ReusableCategoryOmit<ExtArgs> | null
+    /**
+     * The data used to create many ReusableCategories.
+     */
+    data: ReusableCategoryCreateManyInput | ReusableCategoryCreateManyInput[]
+    skipDuplicates?: boolean
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ReusableCategoryIncludeCreateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * ReusableCategory update
+   */
+  export type ReusableCategoryUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ReusableCategory
+     */
+    select?: ReusableCategorySelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ReusableCategory
+     */
+    omit?: ReusableCategoryOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ReusableCategoryInclude<ExtArgs> | null
+    /**
+     * The data needed to update a ReusableCategory.
+     */
+    data: XOR<ReusableCategoryUpdateInput, ReusableCategoryUncheckedUpdateInput>
+    /**
+     * Choose, which ReusableCategory to update.
+     */
+    where: ReusableCategoryWhereUniqueInput
+  }
+
+  /**
+   * ReusableCategory updateMany
+   */
+  export type ReusableCategoryUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update ReusableCategories.
+     */
+    data: XOR<ReusableCategoryUpdateManyMutationInput, ReusableCategoryUncheckedUpdateManyInput>
+    /**
+     * Filter which ReusableCategories to update
+     */
+    where?: ReusableCategoryWhereInput
+    /**
+     * Limit how many ReusableCategories to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * ReusableCategory updateManyAndReturn
+   */
+  export type ReusableCategoryUpdateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ReusableCategory
+     */
+    select?: ReusableCategorySelectUpdateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the ReusableCategory
+     */
+    omit?: ReusableCategoryOmit<ExtArgs> | null
+    /**
+     * The data used to update ReusableCategories.
+     */
+    data: XOR<ReusableCategoryUpdateManyMutationInput, ReusableCategoryUncheckedUpdateManyInput>
+    /**
+     * Filter which ReusableCategories to update
+     */
+    where?: ReusableCategoryWhereInput
+    /**
+     * Limit how many ReusableCategories to update.
+     */
+    limit?: number
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ReusableCategoryIncludeUpdateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * ReusableCategory upsert
+   */
+  export type ReusableCategoryUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ReusableCategory
+     */
+    select?: ReusableCategorySelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ReusableCategory
+     */
+    omit?: ReusableCategoryOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ReusableCategoryInclude<ExtArgs> | null
+    /**
+     * The filter to search for the ReusableCategory to update in case it exists.
+     */
+    where: ReusableCategoryWhereUniqueInput
+    /**
+     * In case the ReusableCategory found by the `where` argument doesn't exist, create a new ReusableCategory with this data.
+     */
+    create: XOR<ReusableCategoryCreateInput, ReusableCategoryUncheckedCreateInput>
+    /**
+     * In case the ReusableCategory was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<ReusableCategoryUpdateInput, ReusableCategoryUncheckedUpdateInput>
+  }
+
+  /**
+   * ReusableCategory delete
+   */
+  export type ReusableCategoryDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ReusableCategory
+     */
+    select?: ReusableCategorySelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ReusableCategory
+     */
+    omit?: ReusableCategoryOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ReusableCategoryInclude<ExtArgs> | null
+    /**
+     * Filter which ReusableCategory to delete.
+     */
+    where: ReusableCategoryWhereUniqueInput
+  }
+
+  /**
+   * ReusableCategory deleteMany
+   */
+  export type ReusableCategoryDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which ReusableCategories to delete
+     */
+    where?: ReusableCategoryWhereInput
+    /**
+     * Limit how many ReusableCategories to delete.
+     */
+    limit?: number
+  }
+
+  /**
+   * ReusableCategory.user
+   */
+  export type ReusableCategory$userArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the User
+     */
+    select?: UserSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the User
+     */
+    omit?: UserOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: UserInclude<ExtArgs> | null
+    where?: UserWhereInput
+  }
+
+  /**
+   * ReusableCategory.parent
+   */
+  export type ReusableCategory$parentArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ReusableCategory
+     */
+    select?: ReusableCategorySelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ReusableCategory
+     */
+    omit?: ReusableCategoryOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ReusableCategoryInclude<ExtArgs> | null
+    where?: ReusableCategoryWhereInput
+  }
+
+  /**
+   * ReusableCategory.children
+   */
+  export type ReusableCategory$childrenArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ReusableCategory
+     */
+    select?: ReusableCategorySelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ReusableCategory
+     */
+    omit?: ReusableCategoryOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ReusableCategoryInclude<ExtArgs> | null
+    where?: ReusableCategoryWhereInput
+    orderBy?: ReusableCategoryOrderByWithRelationInput | ReusableCategoryOrderByWithRelationInput[]
+    cursor?: ReusableCategoryWhereUniqueInput
+    take?: number
+    skip?: number
+    distinct?: ReusableCategoryScalarFieldEnum | ReusableCategoryScalarFieldEnum[]
+  }
+
+  /**
+   * ReusableCategory.savedBlocks
+   */
+  export type ReusableCategory$savedBlocksArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SavedBlock
+     */
+    select?: SavedBlockSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the SavedBlock
+     */
+    omit?: SavedBlockOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SavedBlockInclude<ExtArgs> | null
+    where?: SavedBlockWhereInput
+    orderBy?: SavedBlockOrderByWithRelationInput | SavedBlockOrderByWithRelationInput[]
+    cursor?: SavedBlockWhereUniqueInput
+    take?: number
+    skip?: number
+    distinct?: SavedBlockScalarFieldEnum | SavedBlockScalarFieldEnum[]
+  }
+
+  /**
+   * ReusableCategory.contentTemplates
+   */
+  export type ReusableCategory$contentTemplatesArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ContentTemplate
+     */
+    select?: ContentTemplateSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ContentTemplate
+     */
+    omit?: ContentTemplateOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ContentTemplateInclude<ExtArgs> | null
+    where?: ContentTemplateWhereInput
+    orderBy?: ContentTemplateOrderByWithRelationInput | ContentTemplateOrderByWithRelationInput[]
+    cursor?: ContentTemplateWhereUniqueInput
+    take?: number
+    skip?: number
+    distinct?: ContentTemplateScalarFieldEnum | ContentTemplateScalarFieldEnum[]
+  }
+
+  /**
+   * ReusableCategory.snippets
+   */
+  export type ReusableCategory$snippetsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Snippet
+     */
+    select?: SnippetSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Snippet
+     */
+    omit?: SnippetOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SnippetInclude<ExtArgs> | null
+    where?: SnippetWhereInput
+    orderBy?: SnippetOrderByWithRelationInput | SnippetOrderByWithRelationInput[]
+    cursor?: SnippetWhereUniqueInput
+    take?: number
+    skip?: number
+    distinct?: SnippetScalarFieldEnum | SnippetScalarFieldEnum[]
+  }
+
+  /**
+   * ReusableCategory.pageTemplates
+   */
+  export type ReusableCategory$pageTemplatesArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the PageTemplate
+     */
+    select?: PageTemplateSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the PageTemplate
+     */
+    omit?: PageTemplateOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: PageTemplateInclude<ExtArgs> | null
+    where?: PageTemplateWhereInput
+    orderBy?: PageTemplateOrderByWithRelationInput | PageTemplateOrderByWithRelationInput[]
+    cursor?: PageTemplateWhereUniqueInput
+    take?: number
+    skip?: number
+    distinct?: PageTemplateScalarFieldEnum | PageTemplateScalarFieldEnum[]
+  }
+
+  /**
+   * ReusableCategory without action
+   */
+  export type ReusableCategoryDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ReusableCategory
+     */
+    select?: ReusableCategorySelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ReusableCategory
+     */
+    omit?: ReusableCategoryOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ReusableCategoryInclude<ExtArgs> | null
+  }
+
+
+  /**
+   * Model SavedBlock
+   */
+
+  export type AggregateSavedBlock = {
+    _count: SavedBlockCountAggregateOutputType | null
+    _avg: SavedBlockAvgAggregateOutputType | null
+    _sum: SavedBlockSumAggregateOutputType | null
+    _min: SavedBlockMinAggregateOutputType | null
+    _max: SavedBlockMaxAggregateOutputType | null
+  }
+
+  export type SavedBlockAvgAggregateOutputType = {
+    usageCount: number | null
+  }
+
+  export type SavedBlockSumAggregateOutputType = {
+    usageCount: number | null
+  }
+
+  export type SavedBlockMinAggregateOutputType = {
+    id: string | null
+    title: string | null
+    blockType: string | null
+    searchText: string | null
+    categoryId: string | null
+    userId: string | null
+    usageCount: number | null
+    lastUsedAt: Date | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type SavedBlockMaxAggregateOutputType = {
+    id: string | null
+    title: string | null
+    blockType: string | null
+    searchText: string | null
+    categoryId: string | null
+    userId: string | null
+    usageCount: number | null
+    lastUsedAt: Date | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type SavedBlockCountAggregateOutputType = {
+    id: number
+    title: number
+    blockType: number
+    tiptapJson: number
+    searchText: number
+    categoryId: number
+    userId: number
+    usageCount: number
+    lastUsedAt: number
+    createdAt: number
+    updatedAt: number
+    _all: number
+  }
+
+
+  export type SavedBlockAvgAggregateInputType = {
+    usageCount?: true
+  }
+
+  export type SavedBlockSumAggregateInputType = {
+    usageCount?: true
+  }
+
+  export type SavedBlockMinAggregateInputType = {
+    id?: true
+    title?: true
+    blockType?: true
+    searchText?: true
+    categoryId?: true
+    userId?: true
+    usageCount?: true
+    lastUsedAt?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type SavedBlockMaxAggregateInputType = {
+    id?: true
+    title?: true
+    blockType?: true
+    searchText?: true
+    categoryId?: true
+    userId?: true
+    usageCount?: true
+    lastUsedAt?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type SavedBlockCountAggregateInputType = {
+    id?: true
+    title?: true
+    blockType?: true
+    tiptapJson?: true
+    searchText?: true
+    categoryId?: true
+    userId?: true
+    usageCount?: true
+    lastUsedAt?: true
+    createdAt?: true
+    updatedAt?: true
+    _all?: true
+  }
+
+  export type SavedBlockAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which SavedBlock to aggregate.
+     */
+    where?: SavedBlockWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of SavedBlocks to fetch.
+     */
+    orderBy?: SavedBlockOrderByWithRelationInput | SavedBlockOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: SavedBlockWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` SavedBlocks from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` SavedBlocks.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned SavedBlocks
+    **/
+    _count?: true | SavedBlockCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to average
+    **/
+    _avg?: SavedBlockAvgAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to sum
+    **/
+    _sum?: SavedBlockSumAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: SavedBlockMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: SavedBlockMaxAggregateInputType
+  }
+
+  export type GetSavedBlockAggregateType<T extends SavedBlockAggregateArgs> = {
+        [P in keyof T & keyof AggregateSavedBlock]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateSavedBlock[P]>
+      : GetScalarType<T[P], AggregateSavedBlock[P]>
+  }
+
+
+
+
+  export type SavedBlockGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: SavedBlockWhereInput
+    orderBy?: SavedBlockOrderByWithAggregationInput | SavedBlockOrderByWithAggregationInput[]
+    by: SavedBlockScalarFieldEnum[] | SavedBlockScalarFieldEnum
+    having?: SavedBlockScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: SavedBlockCountAggregateInputType | true
+    _avg?: SavedBlockAvgAggregateInputType
+    _sum?: SavedBlockSumAggregateInputType
+    _min?: SavedBlockMinAggregateInputType
+    _max?: SavedBlockMaxAggregateInputType
+  }
+
+  export type SavedBlockGroupByOutputType = {
+    id: string
+    title: string
+    blockType: string
+    tiptapJson: JsonValue
+    searchText: string
+    categoryId: string
+    userId: string | null
+    usageCount: number
+    lastUsedAt: Date | null
+    createdAt: Date
+    updatedAt: Date
+    _count: SavedBlockCountAggregateOutputType | null
+    _avg: SavedBlockAvgAggregateOutputType | null
+    _sum: SavedBlockSumAggregateOutputType | null
+    _min: SavedBlockMinAggregateOutputType | null
+    _max: SavedBlockMaxAggregateOutputType | null
+  }
+
+  type GetSavedBlockGroupByPayload<T extends SavedBlockGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<SavedBlockGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof SavedBlockGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], SavedBlockGroupByOutputType[P]>
+            : GetScalarType<T[P], SavedBlockGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type SavedBlockSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    title?: boolean
+    blockType?: boolean
+    tiptapJson?: boolean
+    searchText?: boolean
+    categoryId?: boolean
+    userId?: boolean
+    usageCount?: boolean
+    lastUsedAt?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    category?: boolean | ReusableCategoryDefaultArgs<ExtArgs>
+    user?: boolean | SavedBlock$userArgs<ExtArgs>
+  }, ExtArgs["result"]["savedBlock"]>
+
+  export type SavedBlockSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    title?: boolean
+    blockType?: boolean
+    tiptapJson?: boolean
+    searchText?: boolean
+    categoryId?: boolean
+    userId?: boolean
+    usageCount?: boolean
+    lastUsedAt?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    category?: boolean | ReusableCategoryDefaultArgs<ExtArgs>
+    user?: boolean | SavedBlock$userArgs<ExtArgs>
+  }, ExtArgs["result"]["savedBlock"]>
+
+  export type SavedBlockSelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    title?: boolean
+    blockType?: boolean
+    tiptapJson?: boolean
+    searchText?: boolean
+    categoryId?: boolean
+    userId?: boolean
+    usageCount?: boolean
+    lastUsedAt?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    category?: boolean | ReusableCategoryDefaultArgs<ExtArgs>
+    user?: boolean | SavedBlock$userArgs<ExtArgs>
+  }, ExtArgs["result"]["savedBlock"]>
+
+  export type SavedBlockSelectScalar = {
+    id?: boolean
+    title?: boolean
+    blockType?: boolean
+    tiptapJson?: boolean
+    searchText?: boolean
+    categoryId?: boolean
+    userId?: boolean
+    usageCount?: boolean
+    lastUsedAt?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+  }
+
+  export type SavedBlockOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "title" | "blockType" | "tiptapJson" | "searchText" | "categoryId" | "userId" | "usageCount" | "lastUsedAt" | "createdAt" | "updatedAt", ExtArgs["result"]["savedBlock"]>
+  export type SavedBlockInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    category?: boolean | ReusableCategoryDefaultArgs<ExtArgs>
+    user?: boolean | SavedBlock$userArgs<ExtArgs>
+  }
+  export type SavedBlockIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    category?: boolean | ReusableCategoryDefaultArgs<ExtArgs>
+    user?: boolean | SavedBlock$userArgs<ExtArgs>
+  }
+  export type SavedBlockIncludeUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    category?: boolean | ReusableCategoryDefaultArgs<ExtArgs>
+    user?: boolean | SavedBlock$userArgs<ExtArgs>
+  }
+
+  export type $SavedBlockPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "SavedBlock"
+    objects: {
+      category: Prisma.$ReusableCategoryPayload<ExtArgs>
+      user: Prisma.$UserPayload<ExtArgs> | null
+    }
+    scalars: $Extensions.GetPayloadResult<{
+      id: string
+      title: string
+      blockType: string
+      tiptapJson: Prisma.JsonValue
+      searchText: string
+      categoryId: string
+      userId: string | null
+      usageCount: number
+      lastUsedAt: Date | null
+      createdAt: Date
+      updatedAt: Date
+    }, ExtArgs["result"]["savedBlock"]>
+    composites: {}
+  }
+
+  type SavedBlockGetPayload<S extends boolean | null | undefined | SavedBlockDefaultArgs> = $Result.GetResult<Prisma.$SavedBlockPayload, S>
+
+  type SavedBlockCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> =
+    Omit<SavedBlockFindManyArgs, 'select' | 'include' | 'distinct' | 'omit'> & {
+      select?: SavedBlockCountAggregateInputType | true
+    }
+
+  export interface SavedBlockDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['SavedBlock'], meta: { name: 'SavedBlock' } }
+    /**
+     * Find zero or one SavedBlock that matches the filter.
+     * @param {SavedBlockFindUniqueArgs} args - Arguments to find a SavedBlock
+     * @example
+     * // Get one SavedBlock
+     * const savedBlock = await prisma.savedBlock.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends SavedBlockFindUniqueArgs>(args: SelectSubset<T, SavedBlockFindUniqueArgs<ExtArgs>>): Prisma__SavedBlockClient<$Result.GetResult<Prisma.$SavedBlockPayload<ExtArgs>, T, "findUnique", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find one SavedBlock that matches the filter or throw an error with `error.code='P2025'`
+     * if no matches were found.
+     * @param {SavedBlockFindUniqueOrThrowArgs} args - Arguments to find a SavedBlock
+     * @example
+     * // Get one SavedBlock
+     * const savedBlock = await prisma.savedBlock.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends SavedBlockFindUniqueOrThrowArgs>(args: SelectSubset<T, SavedBlockFindUniqueOrThrowArgs<ExtArgs>>): Prisma__SavedBlockClient<$Result.GetResult<Prisma.$SavedBlockPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first SavedBlock that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {SavedBlockFindFirstArgs} args - Arguments to find a SavedBlock
+     * @example
+     * // Get one SavedBlock
+     * const savedBlock = await prisma.savedBlock.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends SavedBlockFindFirstArgs>(args?: SelectSubset<T, SavedBlockFindFirstArgs<ExtArgs>>): Prisma__SavedBlockClient<$Result.GetResult<Prisma.$SavedBlockPayload<ExtArgs>, T, "findFirst", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first SavedBlock that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {SavedBlockFindFirstOrThrowArgs} args - Arguments to find a SavedBlock
+     * @example
+     * // Get one SavedBlock
+     * const savedBlock = await prisma.savedBlock.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends SavedBlockFindFirstOrThrowArgs>(args?: SelectSubset<T, SavedBlockFindFirstOrThrowArgs<ExtArgs>>): Prisma__SavedBlockClient<$Result.GetResult<Prisma.$SavedBlockPayload<ExtArgs>, T, "findFirstOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find zero or more SavedBlocks that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {SavedBlockFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all SavedBlocks
+     * const savedBlocks = await prisma.savedBlock.findMany()
+     * 
+     * // Get first 10 SavedBlocks
+     * const savedBlocks = await prisma.savedBlock.findMany({ take: 10 })
+     * 
+     * // Only select the `id`
+     * const savedBlockWithIdOnly = await prisma.savedBlock.findMany({ select: { id: true } })
+     * 
+     */
+    findMany<T extends SavedBlockFindManyArgs>(args?: SelectSubset<T, SavedBlockFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$SavedBlockPayload<ExtArgs>, T, "findMany", GlobalOmitOptions>>
+
+    /**
+     * Create a SavedBlock.
+     * @param {SavedBlockCreateArgs} args - Arguments to create a SavedBlock.
+     * @example
+     * // Create one SavedBlock
+     * const SavedBlock = await prisma.savedBlock.create({
+     *   data: {
+     *     // ... data to create a SavedBlock
+     *   }
+     * })
+     * 
+     */
+    create<T extends SavedBlockCreateArgs>(args: SelectSubset<T, SavedBlockCreateArgs<ExtArgs>>): Prisma__SavedBlockClient<$Result.GetResult<Prisma.$SavedBlockPayload<ExtArgs>, T, "create", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Create many SavedBlocks.
+     * @param {SavedBlockCreateManyArgs} args - Arguments to create many SavedBlocks.
+     * @example
+     * // Create many SavedBlocks
+     * const savedBlock = await prisma.savedBlock.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *     
+     */
+    createMany<T extends SavedBlockCreateManyArgs>(args?: SelectSubset<T, SavedBlockCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create many SavedBlocks and returns the data saved in the database.
+     * @param {SavedBlockCreateManyAndReturnArgs} args - Arguments to create many SavedBlocks.
+     * @example
+     * // Create many SavedBlocks
+     * const savedBlock = await prisma.savedBlock.createManyAndReturn({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Create many SavedBlocks and only return the `id`
+     * const savedBlockWithIdOnly = await prisma.savedBlock.createManyAndReturn({
+     *   select: { id: true },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    createManyAndReturn<T extends SavedBlockCreateManyAndReturnArgs>(args?: SelectSubset<T, SavedBlockCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$SavedBlockPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Delete a SavedBlock.
+     * @param {SavedBlockDeleteArgs} args - Arguments to delete one SavedBlock.
+     * @example
+     * // Delete one SavedBlock
+     * const SavedBlock = await prisma.savedBlock.delete({
+     *   where: {
+     *     // ... filter to delete one SavedBlock
+     *   }
+     * })
+     * 
+     */
+    delete<T extends SavedBlockDeleteArgs>(args: SelectSubset<T, SavedBlockDeleteArgs<ExtArgs>>): Prisma__SavedBlockClient<$Result.GetResult<Prisma.$SavedBlockPayload<ExtArgs>, T, "delete", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Update one SavedBlock.
+     * @param {SavedBlockUpdateArgs} args - Arguments to update one SavedBlock.
+     * @example
+     * // Update one SavedBlock
+     * const savedBlock = await prisma.savedBlock.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    update<T extends SavedBlockUpdateArgs>(args: SelectSubset<T, SavedBlockUpdateArgs<ExtArgs>>): Prisma__SavedBlockClient<$Result.GetResult<Prisma.$SavedBlockPayload<ExtArgs>, T, "update", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Delete zero or more SavedBlocks.
+     * @param {SavedBlockDeleteManyArgs} args - Arguments to filter SavedBlocks to delete.
+     * @example
+     * // Delete a few SavedBlocks
+     * const { count } = await prisma.savedBlock.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+     */
+    deleteMany<T extends SavedBlockDeleteManyArgs>(args?: SelectSubset<T, SavedBlockDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more SavedBlocks.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {SavedBlockUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many SavedBlocks
+     * const savedBlock = await prisma.savedBlock.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    updateMany<T extends SavedBlockUpdateManyArgs>(args: SelectSubset<T, SavedBlockUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more SavedBlocks and returns the data updated in the database.
+     * @param {SavedBlockUpdateManyAndReturnArgs} args - Arguments to update many SavedBlocks.
+     * @example
+     * // Update many SavedBlocks
+     * const savedBlock = await prisma.savedBlock.updateManyAndReturn({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Update zero or more SavedBlocks and only return the `id`
+     * const savedBlockWithIdOnly = await prisma.savedBlock.updateManyAndReturn({
+     *   select: { id: true },
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    updateManyAndReturn<T extends SavedBlockUpdateManyAndReturnArgs>(args: SelectSubset<T, SavedBlockUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$SavedBlockPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Create or update one SavedBlock.
+     * @param {SavedBlockUpsertArgs} args - Arguments to update or create a SavedBlock.
+     * @example
+     * // Update or create a SavedBlock
+     * const savedBlock = await prisma.savedBlock.upsert({
+     *   create: {
+     *     // ... data to create a SavedBlock
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the SavedBlock we want to update
+     *   }
+     * })
+     */
+    upsert<T extends SavedBlockUpsertArgs>(args: SelectSubset<T, SavedBlockUpsertArgs<ExtArgs>>): Prisma__SavedBlockClient<$Result.GetResult<Prisma.$SavedBlockPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+
+    /**
+     * Count the number of SavedBlocks.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {SavedBlockCountArgs} args - Arguments to filter SavedBlocks to count.
+     * @example
+     * // Count the number of SavedBlocks
+     * const count = await prisma.savedBlock.count({
+     *   where: {
+     *     // ... the filter for the SavedBlocks we want to count
+     *   }
+     * })
+    **/
+    count<T extends SavedBlockCountArgs>(
+      args?: Subset<T, SavedBlockCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], SavedBlockCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a SavedBlock.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {SavedBlockAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends SavedBlockAggregateArgs>(args: Subset<T, SavedBlockAggregateArgs>): Prisma.PrismaPromise<GetSavedBlockAggregateType<T>>
+
+    /**
+     * Group by SavedBlock.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {SavedBlockGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends SavedBlockGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: SavedBlockGroupByArgs['orderBy'] }
+        : { orderBy?: SavedBlockGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, SavedBlockGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetSavedBlockGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the SavedBlock model
+   */
+  readonly fields: SavedBlockFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for SavedBlock.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__SavedBlockClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    category<T extends ReusableCategoryDefaultArgs<ExtArgs> = {}>(args?: Subset<T, ReusableCategoryDefaultArgs<ExtArgs>>): Prisma__ReusableCategoryClient<$Result.GetResult<Prisma.$ReusableCategoryPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+    user<T extends SavedBlock$userArgs<ExtArgs> = {}>(args?: Subset<T, SavedBlock$userArgs<ExtArgs>>): Prisma__UserClient<$Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the SavedBlock model
+   */
+  interface SavedBlockFieldRefs {
+    readonly id: FieldRef<"SavedBlock", 'String'>
+    readonly title: FieldRef<"SavedBlock", 'String'>
+    readonly blockType: FieldRef<"SavedBlock", 'String'>
+    readonly tiptapJson: FieldRef<"SavedBlock", 'Json'>
+    readonly searchText: FieldRef<"SavedBlock", 'String'>
+    readonly categoryId: FieldRef<"SavedBlock", 'String'>
+    readonly userId: FieldRef<"SavedBlock", 'String'>
+    readonly usageCount: FieldRef<"SavedBlock", 'Int'>
+    readonly lastUsedAt: FieldRef<"SavedBlock", 'DateTime'>
+    readonly createdAt: FieldRef<"SavedBlock", 'DateTime'>
+    readonly updatedAt: FieldRef<"SavedBlock", 'DateTime'>
+  }
+    
+
+  // Custom InputTypes
+  /**
+   * SavedBlock findUnique
+   */
+  export type SavedBlockFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SavedBlock
+     */
+    select?: SavedBlockSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the SavedBlock
+     */
+    omit?: SavedBlockOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SavedBlockInclude<ExtArgs> | null
+    /**
+     * Filter, which SavedBlock to fetch.
+     */
+    where: SavedBlockWhereUniqueInput
+  }
+
+  /**
+   * SavedBlock findUniqueOrThrow
+   */
+  export type SavedBlockFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SavedBlock
+     */
+    select?: SavedBlockSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the SavedBlock
+     */
+    omit?: SavedBlockOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SavedBlockInclude<ExtArgs> | null
+    /**
+     * Filter, which SavedBlock to fetch.
+     */
+    where: SavedBlockWhereUniqueInput
+  }
+
+  /**
+   * SavedBlock findFirst
+   */
+  export type SavedBlockFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SavedBlock
+     */
+    select?: SavedBlockSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the SavedBlock
+     */
+    omit?: SavedBlockOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SavedBlockInclude<ExtArgs> | null
+    /**
+     * Filter, which SavedBlock to fetch.
+     */
+    where?: SavedBlockWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of SavedBlocks to fetch.
+     */
+    orderBy?: SavedBlockOrderByWithRelationInput | SavedBlockOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for SavedBlocks.
+     */
+    cursor?: SavedBlockWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` SavedBlocks from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` SavedBlocks.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of SavedBlocks.
+     */
+    distinct?: SavedBlockScalarFieldEnum | SavedBlockScalarFieldEnum[]
+  }
+
+  /**
+   * SavedBlock findFirstOrThrow
+   */
+  export type SavedBlockFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SavedBlock
+     */
+    select?: SavedBlockSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the SavedBlock
+     */
+    omit?: SavedBlockOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SavedBlockInclude<ExtArgs> | null
+    /**
+     * Filter, which SavedBlock to fetch.
+     */
+    where?: SavedBlockWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of SavedBlocks to fetch.
+     */
+    orderBy?: SavedBlockOrderByWithRelationInput | SavedBlockOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for SavedBlocks.
+     */
+    cursor?: SavedBlockWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` SavedBlocks from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` SavedBlocks.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of SavedBlocks.
+     */
+    distinct?: SavedBlockScalarFieldEnum | SavedBlockScalarFieldEnum[]
+  }
+
+  /**
+   * SavedBlock findMany
+   */
+  export type SavedBlockFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SavedBlock
+     */
+    select?: SavedBlockSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the SavedBlock
+     */
+    omit?: SavedBlockOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SavedBlockInclude<ExtArgs> | null
+    /**
+     * Filter, which SavedBlocks to fetch.
+     */
+    where?: SavedBlockWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of SavedBlocks to fetch.
+     */
+    orderBy?: SavedBlockOrderByWithRelationInput | SavedBlockOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing SavedBlocks.
+     */
+    cursor?: SavedBlockWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` SavedBlocks from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` SavedBlocks.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of SavedBlocks.
+     */
+    distinct?: SavedBlockScalarFieldEnum | SavedBlockScalarFieldEnum[]
+  }
+
+  /**
+   * SavedBlock create
+   */
+  export type SavedBlockCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SavedBlock
+     */
+    select?: SavedBlockSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the SavedBlock
+     */
+    omit?: SavedBlockOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SavedBlockInclude<ExtArgs> | null
+    /**
+     * The data needed to create a SavedBlock.
+     */
+    data: XOR<SavedBlockCreateInput, SavedBlockUncheckedCreateInput>
+  }
+
+  /**
+   * SavedBlock createMany
+   */
+  export type SavedBlockCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many SavedBlocks.
+     */
+    data: SavedBlockCreateManyInput | SavedBlockCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * SavedBlock createManyAndReturn
+   */
+  export type SavedBlockCreateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SavedBlock
+     */
+    select?: SavedBlockSelectCreateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the SavedBlock
+     */
+    omit?: SavedBlockOmit<ExtArgs> | null
+    /**
+     * The data used to create many SavedBlocks.
+     */
+    data: SavedBlockCreateManyInput | SavedBlockCreateManyInput[]
+    skipDuplicates?: boolean
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SavedBlockIncludeCreateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * SavedBlock update
+   */
+  export type SavedBlockUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SavedBlock
+     */
+    select?: SavedBlockSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the SavedBlock
+     */
+    omit?: SavedBlockOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SavedBlockInclude<ExtArgs> | null
+    /**
+     * The data needed to update a SavedBlock.
+     */
+    data: XOR<SavedBlockUpdateInput, SavedBlockUncheckedUpdateInput>
+    /**
+     * Choose, which SavedBlock to update.
+     */
+    where: SavedBlockWhereUniqueInput
+  }
+
+  /**
+   * SavedBlock updateMany
+   */
+  export type SavedBlockUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update SavedBlocks.
+     */
+    data: XOR<SavedBlockUpdateManyMutationInput, SavedBlockUncheckedUpdateManyInput>
+    /**
+     * Filter which SavedBlocks to update
+     */
+    where?: SavedBlockWhereInput
+    /**
+     * Limit how many SavedBlocks to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * SavedBlock updateManyAndReturn
+   */
+  export type SavedBlockUpdateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SavedBlock
+     */
+    select?: SavedBlockSelectUpdateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the SavedBlock
+     */
+    omit?: SavedBlockOmit<ExtArgs> | null
+    /**
+     * The data used to update SavedBlocks.
+     */
+    data: XOR<SavedBlockUpdateManyMutationInput, SavedBlockUncheckedUpdateManyInput>
+    /**
+     * Filter which SavedBlocks to update
+     */
+    where?: SavedBlockWhereInput
+    /**
+     * Limit how many SavedBlocks to update.
+     */
+    limit?: number
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SavedBlockIncludeUpdateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * SavedBlock upsert
+   */
+  export type SavedBlockUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SavedBlock
+     */
+    select?: SavedBlockSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the SavedBlock
+     */
+    omit?: SavedBlockOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SavedBlockInclude<ExtArgs> | null
+    /**
+     * The filter to search for the SavedBlock to update in case it exists.
+     */
+    where: SavedBlockWhereUniqueInput
+    /**
+     * In case the SavedBlock found by the `where` argument doesn't exist, create a new SavedBlock with this data.
+     */
+    create: XOR<SavedBlockCreateInput, SavedBlockUncheckedCreateInput>
+    /**
+     * In case the SavedBlock was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<SavedBlockUpdateInput, SavedBlockUncheckedUpdateInput>
+  }
+
+  /**
+   * SavedBlock delete
+   */
+  export type SavedBlockDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SavedBlock
+     */
+    select?: SavedBlockSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the SavedBlock
+     */
+    omit?: SavedBlockOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SavedBlockInclude<ExtArgs> | null
+    /**
+     * Filter which SavedBlock to delete.
+     */
+    where: SavedBlockWhereUniqueInput
+  }
+
+  /**
+   * SavedBlock deleteMany
+   */
+  export type SavedBlockDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which SavedBlocks to delete
+     */
+    where?: SavedBlockWhereInput
+    /**
+     * Limit how many SavedBlocks to delete.
+     */
+    limit?: number
+  }
+
+  /**
+   * SavedBlock.user
+   */
+  export type SavedBlock$userArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the User
+     */
+    select?: UserSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the User
+     */
+    omit?: UserOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: UserInclude<ExtArgs> | null
+    where?: UserWhereInput
+  }
+
+  /**
+   * SavedBlock without action
+   */
+  export type SavedBlockDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SavedBlock
+     */
+    select?: SavedBlockSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the SavedBlock
+     */
+    omit?: SavedBlockOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SavedBlockInclude<ExtArgs> | null
+  }
+
+
+  /**
+   * Model ContentTemplate
+   */
+
+  export type AggregateContentTemplate = {
+    _count: ContentTemplateCountAggregateOutputType | null
+    _avg: ContentTemplateAvgAggregateOutputType | null
+    _sum: ContentTemplateSumAggregateOutputType | null
+    _min: ContentTemplateMinAggregateOutputType | null
+    _max: ContentTemplateMaxAggregateOutputType | null
+  }
+
+  export type ContentTemplateAvgAggregateOutputType = {
+    usageCount: number | null
+  }
+
+  export type ContentTemplateSumAggregateOutputType = {
+    usageCount: number | null
+  }
+
+  export type ContentTemplateMinAggregateOutputType = {
+    id: string | null
+    title: string | null
+    searchText: string | null
+    categoryId: string | null
+    userId: string | null
+    usageCount: number | null
+    lastUsedAt: Date | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type ContentTemplateMaxAggregateOutputType = {
+    id: string | null
+    title: string | null
+    searchText: string | null
+    categoryId: string | null
+    userId: string | null
+    usageCount: number | null
+    lastUsedAt: Date | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type ContentTemplateCountAggregateOutputType = {
+    id: number
+    title: number
+    tiptapJson: number
+    searchText: number
+    categoryId: number
+    userId: number
+    usageCount: number
+    lastUsedAt: number
+    createdAt: number
+    updatedAt: number
+    _all: number
+  }
+
+
+  export type ContentTemplateAvgAggregateInputType = {
+    usageCount?: true
+  }
+
+  export type ContentTemplateSumAggregateInputType = {
+    usageCount?: true
+  }
+
+  export type ContentTemplateMinAggregateInputType = {
+    id?: true
+    title?: true
+    searchText?: true
+    categoryId?: true
+    userId?: true
+    usageCount?: true
+    lastUsedAt?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type ContentTemplateMaxAggregateInputType = {
+    id?: true
+    title?: true
+    searchText?: true
+    categoryId?: true
+    userId?: true
+    usageCount?: true
+    lastUsedAt?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type ContentTemplateCountAggregateInputType = {
+    id?: true
+    title?: true
+    tiptapJson?: true
+    searchText?: true
+    categoryId?: true
+    userId?: true
+    usageCount?: true
+    lastUsedAt?: true
+    createdAt?: true
+    updatedAt?: true
+    _all?: true
+  }
+
+  export type ContentTemplateAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which ContentTemplate to aggregate.
+     */
+    where?: ContentTemplateWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of ContentTemplates to fetch.
+     */
+    orderBy?: ContentTemplateOrderByWithRelationInput | ContentTemplateOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: ContentTemplateWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` ContentTemplates from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` ContentTemplates.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned ContentTemplates
+    **/
+    _count?: true | ContentTemplateCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to average
+    **/
+    _avg?: ContentTemplateAvgAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to sum
+    **/
+    _sum?: ContentTemplateSumAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: ContentTemplateMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: ContentTemplateMaxAggregateInputType
+  }
+
+  export type GetContentTemplateAggregateType<T extends ContentTemplateAggregateArgs> = {
+        [P in keyof T & keyof AggregateContentTemplate]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateContentTemplate[P]>
+      : GetScalarType<T[P], AggregateContentTemplate[P]>
+  }
+
+
+
+
+  export type ContentTemplateGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: ContentTemplateWhereInput
+    orderBy?: ContentTemplateOrderByWithAggregationInput | ContentTemplateOrderByWithAggregationInput[]
+    by: ContentTemplateScalarFieldEnum[] | ContentTemplateScalarFieldEnum
+    having?: ContentTemplateScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: ContentTemplateCountAggregateInputType | true
+    _avg?: ContentTemplateAvgAggregateInputType
+    _sum?: ContentTemplateSumAggregateInputType
+    _min?: ContentTemplateMinAggregateInputType
+    _max?: ContentTemplateMaxAggregateInputType
+  }
+
+  export type ContentTemplateGroupByOutputType = {
+    id: string
+    title: string
+    tiptapJson: JsonValue
+    searchText: string
+    categoryId: string
+    userId: string
+    usageCount: number
+    lastUsedAt: Date | null
+    createdAt: Date
+    updatedAt: Date
+    _count: ContentTemplateCountAggregateOutputType | null
+    _avg: ContentTemplateAvgAggregateOutputType | null
+    _sum: ContentTemplateSumAggregateOutputType | null
+    _min: ContentTemplateMinAggregateOutputType | null
+    _max: ContentTemplateMaxAggregateOutputType | null
+  }
+
+  type GetContentTemplateGroupByPayload<T extends ContentTemplateGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<ContentTemplateGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof ContentTemplateGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], ContentTemplateGroupByOutputType[P]>
+            : GetScalarType<T[P], ContentTemplateGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type ContentTemplateSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    title?: boolean
+    tiptapJson?: boolean
+    searchText?: boolean
+    categoryId?: boolean
+    userId?: boolean
+    usageCount?: boolean
+    lastUsedAt?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    category?: boolean | ReusableCategoryDefaultArgs<ExtArgs>
+    user?: boolean | UserDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["contentTemplate"]>
+
+  export type ContentTemplateSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    title?: boolean
+    tiptapJson?: boolean
+    searchText?: boolean
+    categoryId?: boolean
+    userId?: boolean
+    usageCount?: boolean
+    lastUsedAt?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    category?: boolean | ReusableCategoryDefaultArgs<ExtArgs>
+    user?: boolean | UserDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["contentTemplate"]>
+
+  export type ContentTemplateSelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    title?: boolean
+    tiptapJson?: boolean
+    searchText?: boolean
+    categoryId?: boolean
+    userId?: boolean
+    usageCount?: boolean
+    lastUsedAt?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    category?: boolean | ReusableCategoryDefaultArgs<ExtArgs>
+    user?: boolean | UserDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["contentTemplate"]>
+
+  export type ContentTemplateSelectScalar = {
+    id?: boolean
+    title?: boolean
+    tiptapJson?: boolean
+    searchText?: boolean
+    categoryId?: boolean
+    userId?: boolean
+    usageCount?: boolean
+    lastUsedAt?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+  }
+
+  export type ContentTemplateOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "title" | "tiptapJson" | "searchText" | "categoryId" | "userId" | "usageCount" | "lastUsedAt" | "createdAt" | "updatedAt", ExtArgs["result"]["contentTemplate"]>
+  export type ContentTemplateInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    category?: boolean | ReusableCategoryDefaultArgs<ExtArgs>
+    user?: boolean | UserDefaultArgs<ExtArgs>
+  }
+  export type ContentTemplateIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    category?: boolean | ReusableCategoryDefaultArgs<ExtArgs>
+    user?: boolean | UserDefaultArgs<ExtArgs>
+  }
+  export type ContentTemplateIncludeUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    category?: boolean | ReusableCategoryDefaultArgs<ExtArgs>
+    user?: boolean | UserDefaultArgs<ExtArgs>
+  }
+
+  export type $ContentTemplatePayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "ContentTemplate"
+    objects: {
+      category: Prisma.$ReusableCategoryPayload<ExtArgs>
+      user: Prisma.$UserPayload<ExtArgs>
+    }
+    scalars: $Extensions.GetPayloadResult<{
+      id: string
+      title: string
+      tiptapJson: Prisma.JsonValue
+      searchText: string
+      categoryId: string
+      userId: string
+      usageCount: number
+      lastUsedAt: Date | null
+      createdAt: Date
+      updatedAt: Date
+    }, ExtArgs["result"]["contentTemplate"]>
+    composites: {}
+  }
+
+  type ContentTemplateGetPayload<S extends boolean | null | undefined | ContentTemplateDefaultArgs> = $Result.GetResult<Prisma.$ContentTemplatePayload, S>
+
+  type ContentTemplateCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> =
+    Omit<ContentTemplateFindManyArgs, 'select' | 'include' | 'distinct' | 'omit'> & {
+      select?: ContentTemplateCountAggregateInputType | true
+    }
+
+  export interface ContentTemplateDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['ContentTemplate'], meta: { name: 'ContentTemplate' } }
+    /**
+     * Find zero or one ContentTemplate that matches the filter.
+     * @param {ContentTemplateFindUniqueArgs} args - Arguments to find a ContentTemplate
+     * @example
+     * // Get one ContentTemplate
+     * const contentTemplate = await prisma.contentTemplate.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends ContentTemplateFindUniqueArgs>(args: SelectSubset<T, ContentTemplateFindUniqueArgs<ExtArgs>>): Prisma__ContentTemplateClient<$Result.GetResult<Prisma.$ContentTemplatePayload<ExtArgs>, T, "findUnique", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find one ContentTemplate that matches the filter or throw an error with `error.code='P2025'`
+     * if no matches were found.
+     * @param {ContentTemplateFindUniqueOrThrowArgs} args - Arguments to find a ContentTemplate
+     * @example
+     * // Get one ContentTemplate
+     * const contentTemplate = await prisma.contentTemplate.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends ContentTemplateFindUniqueOrThrowArgs>(args: SelectSubset<T, ContentTemplateFindUniqueOrThrowArgs<ExtArgs>>): Prisma__ContentTemplateClient<$Result.GetResult<Prisma.$ContentTemplatePayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first ContentTemplate that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ContentTemplateFindFirstArgs} args - Arguments to find a ContentTemplate
+     * @example
+     * // Get one ContentTemplate
+     * const contentTemplate = await prisma.contentTemplate.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends ContentTemplateFindFirstArgs>(args?: SelectSubset<T, ContentTemplateFindFirstArgs<ExtArgs>>): Prisma__ContentTemplateClient<$Result.GetResult<Prisma.$ContentTemplatePayload<ExtArgs>, T, "findFirst", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first ContentTemplate that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ContentTemplateFindFirstOrThrowArgs} args - Arguments to find a ContentTemplate
+     * @example
+     * // Get one ContentTemplate
+     * const contentTemplate = await prisma.contentTemplate.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends ContentTemplateFindFirstOrThrowArgs>(args?: SelectSubset<T, ContentTemplateFindFirstOrThrowArgs<ExtArgs>>): Prisma__ContentTemplateClient<$Result.GetResult<Prisma.$ContentTemplatePayload<ExtArgs>, T, "findFirstOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find zero or more ContentTemplates that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ContentTemplateFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all ContentTemplates
+     * const contentTemplates = await prisma.contentTemplate.findMany()
+     * 
+     * // Get first 10 ContentTemplates
+     * const contentTemplates = await prisma.contentTemplate.findMany({ take: 10 })
+     * 
+     * // Only select the `id`
+     * const contentTemplateWithIdOnly = await prisma.contentTemplate.findMany({ select: { id: true } })
+     * 
+     */
+    findMany<T extends ContentTemplateFindManyArgs>(args?: SelectSubset<T, ContentTemplateFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ContentTemplatePayload<ExtArgs>, T, "findMany", GlobalOmitOptions>>
+
+    /**
+     * Create a ContentTemplate.
+     * @param {ContentTemplateCreateArgs} args - Arguments to create a ContentTemplate.
+     * @example
+     * // Create one ContentTemplate
+     * const ContentTemplate = await prisma.contentTemplate.create({
+     *   data: {
+     *     // ... data to create a ContentTemplate
+     *   }
+     * })
+     * 
+     */
+    create<T extends ContentTemplateCreateArgs>(args: SelectSubset<T, ContentTemplateCreateArgs<ExtArgs>>): Prisma__ContentTemplateClient<$Result.GetResult<Prisma.$ContentTemplatePayload<ExtArgs>, T, "create", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Create many ContentTemplates.
+     * @param {ContentTemplateCreateManyArgs} args - Arguments to create many ContentTemplates.
+     * @example
+     * // Create many ContentTemplates
+     * const contentTemplate = await prisma.contentTemplate.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *     
+     */
+    createMany<T extends ContentTemplateCreateManyArgs>(args?: SelectSubset<T, ContentTemplateCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create many ContentTemplates and returns the data saved in the database.
+     * @param {ContentTemplateCreateManyAndReturnArgs} args - Arguments to create many ContentTemplates.
+     * @example
+     * // Create many ContentTemplates
+     * const contentTemplate = await prisma.contentTemplate.createManyAndReturn({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Create many ContentTemplates and only return the `id`
+     * const contentTemplateWithIdOnly = await prisma.contentTemplate.createManyAndReturn({
+     *   select: { id: true },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    createManyAndReturn<T extends ContentTemplateCreateManyAndReturnArgs>(args?: SelectSubset<T, ContentTemplateCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ContentTemplatePayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Delete a ContentTemplate.
+     * @param {ContentTemplateDeleteArgs} args - Arguments to delete one ContentTemplate.
+     * @example
+     * // Delete one ContentTemplate
+     * const ContentTemplate = await prisma.contentTemplate.delete({
+     *   where: {
+     *     // ... filter to delete one ContentTemplate
+     *   }
+     * })
+     * 
+     */
+    delete<T extends ContentTemplateDeleteArgs>(args: SelectSubset<T, ContentTemplateDeleteArgs<ExtArgs>>): Prisma__ContentTemplateClient<$Result.GetResult<Prisma.$ContentTemplatePayload<ExtArgs>, T, "delete", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Update one ContentTemplate.
+     * @param {ContentTemplateUpdateArgs} args - Arguments to update one ContentTemplate.
+     * @example
+     * // Update one ContentTemplate
+     * const contentTemplate = await prisma.contentTemplate.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    update<T extends ContentTemplateUpdateArgs>(args: SelectSubset<T, ContentTemplateUpdateArgs<ExtArgs>>): Prisma__ContentTemplateClient<$Result.GetResult<Prisma.$ContentTemplatePayload<ExtArgs>, T, "update", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Delete zero or more ContentTemplates.
+     * @param {ContentTemplateDeleteManyArgs} args - Arguments to filter ContentTemplates to delete.
+     * @example
+     * // Delete a few ContentTemplates
+     * const { count } = await prisma.contentTemplate.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+     */
+    deleteMany<T extends ContentTemplateDeleteManyArgs>(args?: SelectSubset<T, ContentTemplateDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more ContentTemplates.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ContentTemplateUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many ContentTemplates
+     * const contentTemplate = await prisma.contentTemplate.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    updateMany<T extends ContentTemplateUpdateManyArgs>(args: SelectSubset<T, ContentTemplateUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more ContentTemplates and returns the data updated in the database.
+     * @param {ContentTemplateUpdateManyAndReturnArgs} args - Arguments to update many ContentTemplates.
+     * @example
+     * // Update many ContentTemplates
+     * const contentTemplate = await prisma.contentTemplate.updateManyAndReturn({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Update zero or more ContentTemplates and only return the `id`
+     * const contentTemplateWithIdOnly = await prisma.contentTemplate.updateManyAndReturn({
+     *   select: { id: true },
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    updateManyAndReturn<T extends ContentTemplateUpdateManyAndReturnArgs>(args: SelectSubset<T, ContentTemplateUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ContentTemplatePayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Create or update one ContentTemplate.
+     * @param {ContentTemplateUpsertArgs} args - Arguments to update or create a ContentTemplate.
+     * @example
+     * // Update or create a ContentTemplate
+     * const contentTemplate = await prisma.contentTemplate.upsert({
+     *   create: {
+     *     // ... data to create a ContentTemplate
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the ContentTemplate we want to update
+     *   }
+     * })
+     */
+    upsert<T extends ContentTemplateUpsertArgs>(args: SelectSubset<T, ContentTemplateUpsertArgs<ExtArgs>>): Prisma__ContentTemplateClient<$Result.GetResult<Prisma.$ContentTemplatePayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+
+    /**
+     * Count the number of ContentTemplates.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ContentTemplateCountArgs} args - Arguments to filter ContentTemplates to count.
+     * @example
+     * // Count the number of ContentTemplates
+     * const count = await prisma.contentTemplate.count({
+     *   where: {
+     *     // ... the filter for the ContentTemplates we want to count
+     *   }
+     * })
+    **/
+    count<T extends ContentTemplateCountArgs>(
+      args?: Subset<T, ContentTemplateCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], ContentTemplateCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a ContentTemplate.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ContentTemplateAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends ContentTemplateAggregateArgs>(args: Subset<T, ContentTemplateAggregateArgs>): Prisma.PrismaPromise<GetContentTemplateAggregateType<T>>
+
+    /**
+     * Group by ContentTemplate.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ContentTemplateGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends ContentTemplateGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: ContentTemplateGroupByArgs['orderBy'] }
+        : { orderBy?: ContentTemplateGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, ContentTemplateGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetContentTemplateGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the ContentTemplate model
+   */
+  readonly fields: ContentTemplateFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for ContentTemplate.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__ContentTemplateClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    category<T extends ReusableCategoryDefaultArgs<ExtArgs> = {}>(args?: Subset<T, ReusableCategoryDefaultArgs<ExtArgs>>): Prisma__ReusableCategoryClient<$Result.GetResult<Prisma.$ReusableCategoryPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+    user<T extends UserDefaultArgs<ExtArgs> = {}>(args?: Subset<T, UserDefaultArgs<ExtArgs>>): Prisma__UserClient<$Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the ContentTemplate model
+   */
+  interface ContentTemplateFieldRefs {
+    readonly id: FieldRef<"ContentTemplate", 'String'>
+    readonly title: FieldRef<"ContentTemplate", 'String'>
+    readonly tiptapJson: FieldRef<"ContentTemplate", 'Json'>
+    readonly searchText: FieldRef<"ContentTemplate", 'String'>
+    readonly categoryId: FieldRef<"ContentTemplate", 'String'>
+    readonly userId: FieldRef<"ContentTemplate", 'String'>
+    readonly usageCount: FieldRef<"ContentTemplate", 'Int'>
+    readonly lastUsedAt: FieldRef<"ContentTemplate", 'DateTime'>
+    readonly createdAt: FieldRef<"ContentTemplate", 'DateTime'>
+    readonly updatedAt: FieldRef<"ContentTemplate", 'DateTime'>
+  }
+    
+
+  // Custom InputTypes
+  /**
+   * ContentTemplate findUnique
+   */
+  export type ContentTemplateFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ContentTemplate
+     */
+    select?: ContentTemplateSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ContentTemplate
+     */
+    omit?: ContentTemplateOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ContentTemplateInclude<ExtArgs> | null
+    /**
+     * Filter, which ContentTemplate to fetch.
+     */
+    where: ContentTemplateWhereUniqueInput
+  }
+
+  /**
+   * ContentTemplate findUniqueOrThrow
+   */
+  export type ContentTemplateFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ContentTemplate
+     */
+    select?: ContentTemplateSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ContentTemplate
+     */
+    omit?: ContentTemplateOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ContentTemplateInclude<ExtArgs> | null
+    /**
+     * Filter, which ContentTemplate to fetch.
+     */
+    where: ContentTemplateWhereUniqueInput
+  }
+
+  /**
+   * ContentTemplate findFirst
+   */
+  export type ContentTemplateFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ContentTemplate
+     */
+    select?: ContentTemplateSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ContentTemplate
+     */
+    omit?: ContentTemplateOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ContentTemplateInclude<ExtArgs> | null
+    /**
+     * Filter, which ContentTemplate to fetch.
+     */
+    where?: ContentTemplateWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of ContentTemplates to fetch.
+     */
+    orderBy?: ContentTemplateOrderByWithRelationInput | ContentTemplateOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for ContentTemplates.
+     */
+    cursor?: ContentTemplateWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` ContentTemplates from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` ContentTemplates.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of ContentTemplates.
+     */
+    distinct?: ContentTemplateScalarFieldEnum | ContentTemplateScalarFieldEnum[]
+  }
+
+  /**
+   * ContentTemplate findFirstOrThrow
+   */
+  export type ContentTemplateFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ContentTemplate
+     */
+    select?: ContentTemplateSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ContentTemplate
+     */
+    omit?: ContentTemplateOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ContentTemplateInclude<ExtArgs> | null
+    /**
+     * Filter, which ContentTemplate to fetch.
+     */
+    where?: ContentTemplateWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of ContentTemplates to fetch.
+     */
+    orderBy?: ContentTemplateOrderByWithRelationInput | ContentTemplateOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for ContentTemplates.
+     */
+    cursor?: ContentTemplateWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` ContentTemplates from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` ContentTemplates.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of ContentTemplates.
+     */
+    distinct?: ContentTemplateScalarFieldEnum | ContentTemplateScalarFieldEnum[]
+  }
+
+  /**
+   * ContentTemplate findMany
+   */
+  export type ContentTemplateFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ContentTemplate
+     */
+    select?: ContentTemplateSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ContentTemplate
+     */
+    omit?: ContentTemplateOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ContentTemplateInclude<ExtArgs> | null
+    /**
+     * Filter, which ContentTemplates to fetch.
+     */
+    where?: ContentTemplateWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of ContentTemplates to fetch.
+     */
+    orderBy?: ContentTemplateOrderByWithRelationInput | ContentTemplateOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing ContentTemplates.
+     */
+    cursor?: ContentTemplateWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` ContentTemplates from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` ContentTemplates.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of ContentTemplates.
+     */
+    distinct?: ContentTemplateScalarFieldEnum | ContentTemplateScalarFieldEnum[]
+  }
+
+  /**
+   * ContentTemplate create
+   */
+  export type ContentTemplateCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ContentTemplate
+     */
+    select?: ContentTemplateSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ContentTemplate
+     */
+    omit?: ContentTemplateOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ContentTemplateInclude<ExtArgs> | null
+    /**
+     * The data needed to create a ContentTemplate.
+     */
+    data: XOR<ContentTemplateCreateInput, ContentTemplateUncheckedCreateInput>
+  }
+
+  /**
+   * ContentTemplate createMany
+   */
+  export type ContentTemplateCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many ContentTemplates.
+     */
+    data: ContentTemplateCreateManyInput | ContentTemplateCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * ContentTemplate createManyAndReturn
+   */
+  export type ContentTemplateCreateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ContentTemplate
+     */
+    select?: ContentTemplateSelectCreateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the ContentTemplate
+     */
+    omit?: ContentTemplateOmit<ExtArgs> | null
+    /**
+     * The data used to create many ContentTemplates.
+     */
+    data: ContentTemplateCreateManyInput | ContentTemplateCreateManyInput[]
+    skipDuplicates?: boolean
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ContentTemplateIncludeCreateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * ContentTemplate update
+   */
+  export type ContentTemplateUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ContentTemplate
+     */
+    select?: ContentTemplateSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ContentTemplate
+     */
+    omit?: ContentTemplateOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ContentTemplateInclude<ExtArgs> | null
+    /**
+     * The data needed to update a ContentTemplate.
+     */
+    data: XOR<ContentTemplateUpdateInput, ContentTemplateUncheckedUpdateInput>
+    /**
+     * Choose, which ContentTemplate to update.
+     */
+    where: ContentTemplateWhereUniqueInput
+  }
+
+  /**
+   * ContentTemplate updateMany
+   */
+  export type ContentTemplateUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update ContentTemplates.
+     */
+    data: XOR<ContentTemplateUpdateManyMutationInput, ContentTemplateUncheckedUpdateManyInput>
+    /**
+     * Filter which ContentTemplates to update
+     */
+    where?: ContentTemplateWhereInput
+    /**
+     * Limit how many ContentTemplates to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * ContentTemplate updateManyAndReturn
+   */
+  export type ContentTemplateUpdateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ContentTemplate
+     */
+    select?: ContentTemplateSelectUpdateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the ContentTemplate
+     */
+    omit?: ContentTemplateOmit<ExtArgs> | null
+    /**
+     * The data used to update ContentTemplates.
+     */
+    data: XOR<ContentTemplateUpdateManyMutationInput, ContentTemplateUncheckedUpdateManyInput>
+    /**
+     * Filter which ContentTemplates to update
+     */
+    where?: ContentTemplateWhereInput
+    /**
+     * Limit how many ContentTemplates to update.
+     */
+    limit?: number
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ContentTemplateIncludeUpdateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * ContentTemplate upsert
+   */
+  export type ContentTemplateUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ContentTemplate
+     */
+    select?: ContentTemplateSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ContentTemplate
+     */
+    omit?: ContentTemplateOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ContentTemplateInclude<ExtArgs> | null
+    /**
+     * The filter to search for the ContentTemplate to update in case it exists.
+     */
+    where: ContentTemplateWhereUniqueInput
+    /**
+     * In case the ContentTemplate found by the `where` argument doesn't exist, create a new ContentTemplate with this data.
+     */
+    create: XOR<ContentTemplateCreateInput, ContentTemplateUncheckedCreateInput>
+    /**
+     * In case the ContentTemplate was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<ContentTemplateUpdateInput, ContentTemplateUncheckedUpdateInput>
+  }
+
+  /**
+   * ContentTemplate delete
+   */
+  export type ContentTemplateDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ContentTemplate
+     */
+    select?: ContentTemplateSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ContentTemplate
+     */
+    omit?: ContentTemplateOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ContentTemplateInclude<ExtArgs> | null
+    /**
+     * Filter which ContentTemplate to delete.
+     */
+    where: ContentTemplateWhereUniqueInput
+  }
+
+  /**
+   * ContentTemplate deleteMany
+   */
+  export type ContentTemplateDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which ContentTemplates to delete
+     */
+    where?: ContentTemplateWhereInput
+    /**
+     * Limit how many ContentTemplates to delete.
+     */
+    limit?: number
+  }
+
+  /**
+   * ContentTemplate without action
+   */
+  export type ContentTemplateDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ContentTemplate
+     */
+    select?: ContentTemplateSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ContentTemplate
+     */
+    omit?: ContentTemplateOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ContentTemplateInclude<ExtArgs> | null
+  }
+
+
+  /**
+   * Model Snippet
+   */
+
+  export type AggregateSnippet = {
+    _count: SnippetCountAggregateOutputType | null
+    _avg: SnippetAvgAggregateOutputType | null
+    _sum: SnippetSumAggregateOutputType | null
+    _min: SnippetMinAggregateOutputType | null
+    _max: SnippetMaxAggregateOutputType | null
+  }
+
+  export type SnippetAvgAggregateOutputType = {
+    usageCount: number | null
+  }
+
+  export type SnippetSumAggregateOutputType = {
+    usageCount: number | null
+  }
+
+  export type SnippetMinAggregateOutputType = {
+    id: string | null
+    title: string | null
+    content: string | null
+    searchText: string | null
+    categoryId: string | null
+    userId: string | null
+    usageCount: number | null
+    lastUsedAt: Date | null
+    isAiContext: boolean | null
+    isVisibleInUI: boolean | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type SnippetMaxAggregateOutputType = {
+    id: string | null
+    title: string | null
+    content: string | null
+    searchText: string | null
+    categoryId: string | null
+    userId: string | null
+    usageCount: number | null
+    lastUsedAt: Date | null
+    isAiContext: boolean | null
+    isVisibleInUI: boolean | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type SnippetCountAggregateOutputType = {
+    id: number
+    title: number
+    content: number
+    tiptapJson: number
+    searchText: number
+    categoryId: number
+    userId: number
+    usageCount: number
+    lastUsedAt: number
+    isAiContext: number
+    isVisibleInUI: number
+    createdAt: number
+    updatedAt: number
+    _all: number
+  }
+
+
+  export type SnippetAvgAggregateInputType = {
+    usageCount?: true
+  }
+
+  export type SnippetSumAggregateInputType = {
+    usageCount?: true
+  }
+
+  export type SnippetMinAggregateInputType = {
+    id?: true
+    title?: true
+    content?: true
+    searchText?: true
+    categoryId?: true
+    userId?: true
+    usageCount?: true
+    lastUsedAt?: true
+    isAiContext?: true
+    isVisibleInUI?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type SnippetMaxAggregateInputType = {
+    id?: true
+    title?: true
+    content?: true
+    searchText?: true
+    categoryId?: true
+    userId?: true
+    usageCount?: true
+    lastUsedAt?: true
+    isAiContext?: true
+    isVisibleInUI?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type SnippetCountAggregateInputType = {
+    id?: true
+    title?: true
+    content?: true
+    tiptapJson?: true
+    searchText?: true
+    categoryId?: true
+    userId?: true
+    usageCount?: true
+    lastUsedAt?: true
+    isAiContext?: true
+    isVisibleInUI?: true
+    createdAt?: true
+    updatedAt?: true
+    _all?: true
+  }
+
+  export type SnippetAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which Snippet to aggregate.
+     */
+    where?: SnippetWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of Snippets to fetch.
+     */
+    orderBy?: SnippetOrderByWithRelationInput | SnippetOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: SnippetWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` Snippets from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` Snippets.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned Snippets
+    **/
+    _count?: true | SnippetCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to average
+    **/
+    _avg?: SnippetAvgAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to sum
+    **/
+    _sum?: SnippetSumAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: SnippetMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: SnippetMaxAggregateInputType
+  }
+
+  export type GetSnippetAggregateType<T extends SnippetAggregateArgs> = {
+        [P in keyof T & keyof AggregateSnippet]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateSnippet[P]>
+      : GetScalarType<T[P], AggregateSnippet[P]>
+  }
+
+
+
+
+  export type SnippetGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: SnippetWhereInput
+    orderBy?: SnippetOrderByWithAggregationInput | SnippetOrderByWithAggregationInput[]
+    by: SnippetScalarFieldEnum[] | SnippetScalarFieldEnum
+    having?: SnippetScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: SnippetCountAggregateInputType | true
+    _avg?: SnippetAvgAggregateInputType
+    _sum?: SnippetSumAggregateInputType
+    _min?: SnippetMinAggregateInputType
+    _max?: SnippetMaxAggregateInputType
+  }
+
+  export type SnippetGroupByOutputType = {
+    id: string
+    title: string | null
+    content: string
+    tiptapJson: JsonValue | null
+    searchText: string
+    categoryId: string
+    userId: string
+    usageCount: number
+    lastUsedAt: Date | null
+    isAiContext: boolean
+    isVisibleInUI: boolean
+    createdAt: Date
+    updatedAt: Date
+    _count: SnippetCountAggregateOutputType | null
+    _avg: SnippetAvgAggregateOutputType | null
+    _sum: SnippetSumAggregateOutputType | null
+    _min: SnippetMinAggregateOutputType | null
+    _max: SnippetMaxAggregateOutputType | null
+  }
+
+  type GetSnippetGroupByPayload<T extends SnippetGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<SnippetGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof SnippetGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], SnippetGroupByOutputType[P]>
+            : GetScalarType<T[P], SnippetGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type SnippetSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    title?: boolean
+    content?: boolean
+    tiptapJson?: boolean
+    searchText?: boolean
+    categoryId?: boolean
+    userId?: boolean
+    usageCount?: boolean
+    lastUsedAt?: boolean
+    isAiContext?: boolean
+    isVisibleInUI?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    category?: boolean | ReusableCategoryDefaultArgs<ExtArgs>
+    user?: boolean | UserDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["snippet"]>
+
+  export type SnippetSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    title?: boolean
+    content?: boolean
+    tiptapJson?: boolean
+    searchText?: boolean
+    categoryId?: boolean
+    userId?: boolean
+    usageCount?: boolean
+    lastUsedAt?: boolean
+    isAiContext?: boolean
+    isVisibleInUI?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    category?: boolean | ReusableCategoryDefaultArgs<ExtArgs>
+    user?: boolean | UserDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["snippet"]>
+
+  export type SnippetSelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    title?: boolean
+    content?: boolean
+    tiptapJson?: boolean
+    searchText?: boolean
+    categoryId?: boolean
+    userId?: boolean
+    usageCount?: boolean
+    lastUsedAt?: boolean
+    isAiContext?: boolean
+    isVisibleInUI?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    category?: boolean | ReusableCategoryDefaultArgs<ExtArgs>
+    user?: boolean | UserDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["snippet"]>
+
+  export type SnippetSelectScalar = {
+    id?: boolean
+    title?: boolean
+    content?: boolean
+    tiptapJson?: boolean
+    searchText?: boolean
+    categoryId?: boolean
+    userId?: boolean
+    usageCount?: boolean
+    lastUsedAt?: boolean
+    isAiContext?: boolean
+    isVisibleInUI?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+  }
+
+  export type SnippetOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "title" | "content" | "tiptapJson" | "searchText" | "categoryId" | "userId" | "usageCount" | "lastUsedAt" | "isAiContext" | "isVisibleInUI" | "createdAt" | "updatedAt", ExtArgs["result"]["snippet"]>
+  export type SnippetInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    category?: boolean | ReusableCategoryDefaultArgs<ExtArgs>
+    user?: boolean | UserDefaultArgs<ExtArgs>
+  }
+  export type SnippetIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    category?: boolean | ReusableCategoryDefaultArgs<ExtArgs>
+    user?: boolean | UserDefaultArgs<ExtArgs>
+  }
+  export type SnippetIncludeUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    category?: boolean | ReusableCategoryDefaultArgs<ExtArgs>
+    user?: boolean | UserDefaultArgs<ExtArgs>
+  }
+
+  export type $SnippetPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "Snippet"
+    objects: {
+      category: Prisma.$ReusableCategoryPayload<ExtArgs>
+      user: Prisma.$UserPayload<ExtArgs>
+    }
+    scalars: $Extensions.GetPayloadResult<{
+      id: string
+      title: string | null
+      content: string
+      tiptapJson: Prisma.JsonValue | null
+      searchText: string
+      categoryId: string
+      userId: string
+      usageCount: number
+      lastUsedAt: Date | null
+      isAiContext: boolean
+      isVisibleInUI: boolean
+      createdAt: Date
+      updatedAt: Date
+    }, ExtArgs["result"]["snippet"]>
+    composites: {}
+  }
+
+  type SnippetGetPayload<S extends boolean | null | undefined | SnippetDefaultArgs> = $Result.GetResult<Prisma.$SnippetPayload, S>
+
+  type SnippetCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> =
+    Omit<SnippetFindManyArgs, 'select' | 'include' | 'distinct' | 'omit'> & {
+      select?: SnippetCountAggregateInputType | true
+    }
+
+  export interface SnippetDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['Snippet'], meta: { name: 'Snippet' } }
+    /**
+     * Find zero or one Snippet that matches the filter.
+     * @param {SnippetFindUniqueArgs} args - Arguments to find a Snippet
+     * @example
+     * // Get one Snippet
+     * const snippet = await prisma.snippet.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends SnippetFindUniqueArgs>(args: SelectSubset<T, SnippetFindUniqueArgs<ExtArgs>>): Prisma__SnippetClient<$Result.GetResult<Prisma.$SnippetPayload<ExtArgs>, T, "findUnique", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find one Snippet that matches the filter or throw an error with `error.code='P2025'`
+     * if no matches were found.
+     * @param {SnippetFindUniqueOrThrowArgs} args - Arguments to find a Snippet
+     * @example
+     * // Get one Snippet
+     * const snippet = await prisma.snippet.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends SnippetFindUniqueOrThrowArgs>(args: SelectSubset<T, SnippetFindUniqueOrThrowArgs<ExtArgs>>): Prisma__SnippetClient<$Result.GetResult<Prisma.$SnippetPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first Snippet that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {SnippetFindFirstArgs} args - Arguments to find a Snippet
+     * @example
+     * // Get one Snippet
+     * const snippet = await prisma.snippet.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends SnippetFindFirstArgs>(args?: SelectSubset<T, SnippetFindFirstArgs<ExtArgs>>): Prisma__SnippetClient<$Result.GetResult<Prisma.$SnippetPayload<ExtArgs>, T, "findFirst", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first Snippet that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {SnippetFindFirstOrThrowArgs} args - Arguments to find a Snippet
+     * @example
+     * // Get one Snippet
+     * const snippet = await prisma.snippet.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends SnippetFindFirstOrThrowArgs>(args?: SelectSubset<T, SnippetFindFirstOrThrowArgs<ExtArgs>>): Prisma__SnippetClient<$Result.GetResult<Prisma.$SnippetPayload<ExtArgs>, T, "findFirstOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find zero or more Snippets that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {SnippetFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all Snippets
+     * const snippets = await prisma.snippet.findMany()
+     * 
+     * // Get first 10 Snippets
+     * const snippets = await prisma.snippet.findMany({ take: 10 })
+     * 
+     * // Only select the `id`
+     * const snippetWithIdOnly = await prisma.snippet.findMany({ select: { id: true } })
+     * 
+     */
+    findMany<T extends SnippetFindManyArgs>(args?: SelectSubset<T, SnippetFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$SnippetPayload<ExtArgs>, T, "findMany", GlobalOmitOptions>>
+
+    /**
+     * Create a Snippet.
+     * @param {SnippetCreateArgs} args - Arguments to create a Snippet.
+     * @example
+     * // Create one Snippet
+     * const Snippet = await prisma.snippet.create({
+     *   data: {
+     *     // ... data to create a Snippet
+     *   }
+     * })
+     * 
+     */
+    create<T extends SnippetCreateArgs>(args: SelectSubset<T, SnippetCreateArgs<ExtArgs>>): Prisma__SnippetClient<$Result.GetResult<Prisma.$SnippetPayload<ExtArgs>, T, "create", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Create many Snippets.
+     * @param {SnippetCreateManyArgs} args - Arguments to create many Snippets.
+     * @example
+     * // Create many Snippets
+     * const snippet = await prisma.snippet.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *     
+     */
+    createMany<T extends SnippetCreateManyArgs>(args?: SelectSubset<T, SnippetCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create many Snippets and returns the data saved in the database.
+     * @param {SnippetCreateManyAndReturnArgs} args - Arguments to create many Snippets.
+     * @example
+     * // Create many Snippets
+     * const snippet = await prisma.snippet.createManyAndReturn({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Create many Snippets and only return the `id`
+     * const snippetWithIdOnly = await prisma.snippet.createManyAndReturn({
+     *   select: { id: true },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    createManyAndReturn<T extends SnippetCreateManyAndReturnArgs>(args?: SelectSubset<T, SnippetCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$SnippetPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Delete a Snippet.
+     * @param {SnippetDeleteArgs} args - Arguments to delete one Snippet.
+     * @example
+     * // Delete one Snippet
+     * const Snippet = await prisma.snippet.delete({
+     *   where: {
+     *     // ... filter to delete one Snippet
+     *   }
+     * })
+     * 
+     */
+    delete<T extends SnippetDeleteArgs>(args: SelectSubset<T, SnippetDeleteArgs<ExtArgs>>): Prisma__SnippetClient<$Result.GetResult<Prisma.$SnippetPayload<ExtArgs>, T, "delete", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Update one Snippet.
+     * @param {SnippetUpdateArgs} args - Arguments to update one Snippet.
+     * @example
+     * // Update one Snippet
+     * const snippet = await prisma.snippet.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    update<T extends SnippetUpdateArgs>(args: SelectSubset<T, SnippetUpdateArgs<ExtArgs>>): Prisma__SnippetClient<$Result.GetResult<Prisma.$SnippetPayload<ExtArgs>, T, "update", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Delete zero or more Snippets.
+     * @param {SnippetDeleteManyArgs} args - Arguments to filter Snippets to delete.
+     * @example
+     * // Delete a few Snippets
+     * const { count } = await prisma.snippet.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+     */
+    deleteMany<T extends SnippetDeleteManyArgs>(args?: SelectSubset<T, SnippetDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more Snippets.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {SnippetUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many Snippets
+     * const snippet = await prisma.snippet.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    updateMany<T extends SnippetUpdateManyArgs>(args: SelectSubset<T, SnippetUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more Snippets and returns the data updated in the database.
+     * @param {SnippetUpdateManyAndReturnArgs} args - Arguments to update many Snippets.
+     * @example
+     * // Update many Snippets
+     * const snippet = await prisma.snippet.updateManyAndReturn({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Update zero or more Snippets and only return the `id`
+     * const snippetWithIdOnly = await prisma.snippet.updateManyAndReturn({
+     *   select: { id: true },
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    updateManyAndReturn<T extends SnippetUpdateManyAndReturnArgs>(args: SelectSubset<T, SnippetUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$SnippetPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Create or update one Snippet.
+     * @param {SnippetUpsertArgs} args - Arguments to update or create a Snippet.
+     * @example
+     * // Update or create a Snippet
+     * const snippet = await prisma.snippet.upsert({
+     *   create: {
+     *     // ... data to create a Snippet
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the Snippet we want to update
+     *   }
+     * })
+     */
+    upsert<T extends SnippetUpsertArgs>(args: SelectSubset<T, SnippetUpsertArgs<ExtArgs>>): Prisma__SnippetClient<$Result.GetResult<Prisma.$SnippetPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+
+    /**
+     * Count the number of Snippets.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {SnippetCountArgs} args - Arguments to filter Snippets to count.
+     * @example
+     * // Count the number of Snippets
+     * const count = await prisma.snippet.count({
+     *   where: {
+     *     // ... the filter for the Snippets we want to count
+     *   }
+     * })
+    **/
+    count<T extends SnippetCountArgs>(
+      args?: Subset<T, SnippetCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], SnippetCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a Snippet.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {SnippetAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends SnippetAggregateArgs>(args: Subset<T, SnippetAggregateArgs>): Prisma.PrismaPromise<GetSnippetAggregateType<T>>
+
+    /**
+     * Group by Snippet.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {SnippetGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends SnippetGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: SnippetGroupByArgs['orderBy'] }
+        : { orderBy?: SnippetGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, SnippetGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetSnippetGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the Snippet model
+   */
+  readonly fields: SnippetFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for Snippet.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__SnippetClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    category<T extends ReusableCategoryDefaultArgs<ExtArgs> = {}>(args?: Subset<T, ReusableCategoryDefaultArgs<ExtArgs>>): Prisma__ReusableCategoryClient<$Result.GetResult<Prisma.$ReusableCategoryPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+    user<T extends UserDefaultArgs<ExtArgs> = {}>(args?: Subset<T, UserDefaultArgs<ExtArgs>>): Prisma__UserClient<$Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the Snippet model
+   */
+  interface SnippetFieldRefs {
+    readonly id: FieldRef<"Snippet", 'String'>
+    readonly title: FieldRef<"Snippet", 'String'>
+    readonly content: FieldRef<"Snippet", 'String'>
+    readonly tiptapJson: FieldRef<"Snippet", 'Json'>
+    readonly searchText: FieldRef<"Snippet", 'String'>
+    readonly categoryId: FieldRef<"Snippet", 'String'>
+    readonly userId: FieldRef<"Snippet", 'String'>
+    readonly usageCount: FieldRef<"Snippet", 'Int'>
+    readonly lastUsedAt: FieldRef<"Snippet", 'DateTime'>
+    readonly isAiContext: FieldRef<"Snippet", 'Boolean'>
+    readonly isVisibleInUI: FieldRef<"Snippet", 'Boolean'>
+    readonly createdAt: FieldRef<"Snippet", 'DateTime'>
+    readonly updatedAt: FieldRef<"Snippet", 'DateTime'>
+  }
+    
+
+  // Custom InputTypes
+  /**
+   * Snippet findUnique
+   */
+  export type SnippetFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Snippet
+     */
+    select?: SnippetSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Snippet
+     */
+    omit?: SnippetOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SnippetInclude<ExtArgs> | null
+    /**
+     * Filter, which Snippet to fetch.
+     */
+    where: SnippetWhereUniqueInput
+  }
+
+  /**
+   * Snippet findUniqueOrThrow
+   */
+  export type SnippetFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Snippet
+     */
+    select?: SnippetSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Snippet
+     */
+    omit?: SnippetOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SnippetInclude<ExtArgs> | null
+    /**
+     * Filter, which Snippet to fetch.
+     */
+    where: SnippetWhereUniqueInput
+  }
+
+  /**
+   * Snippet findFirst
+   */
+  export type SnippetFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Snippet
+     */
+    select?: SnippetSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Snippet
+     */
+    omit?: SnippetOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SnippetInclude<ExtArgs> | null
+    /**
+     * Filter, which Snippet to fetch.
+     */
+    where?: SnippetWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of Snippets to fetch.
+     */
+    orderBy?: SnippetOrderByWithRelationInput | SnippetOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for Snippets.
+     */
+    cursor?: SnippetWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` Snippets from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` Snippets.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of Snippets.
+     */
+    distinct?: SnippetScalarFieldEnum | SnippetScalarFieldEnum[]
+  }
+
+  /**
+   * Snippet findFirstOrThrow
+   */
+  export type SnippetFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Snippet
+     */
+    select?: SnippetSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Snippet
+     */
+    omit?: SnippetOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SnippetInclude<ExtArgs> | null
+    /**
+     * Filter, which Snippet to fetch.
+     */
+    where?: SnippetWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of Snippets to fetch.
+     */
+    orderBy?: SnippetOrderByWithRelationInput | SnippetOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for Snippets.
+     */
+    cursor?: SnippetWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` Snippets from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` Snippets.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of Snippets.
+     */
+    distinct?: SnippetScalarFieldEnum | SnippetScalarFieldEnum[]
+  }
+
+  /**
+   * Snippet findMany
+   */
+  export type SnippetFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Snippet
+     */
+    select?: SnippetSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Snippet
+     */
+    omit?: SnippetOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SnippetInclude<ExtArgs> | null
+    /**
+     * Filter, which Snippets to fetch.
+     */
+    where?: SnippetWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of Snippets to fetch.
+     */
+    orderBy?: SnippetOrderByWithRelationInput | SnippetOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing Snippets.
+     */
+    cursor?: SnippetWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` Snippets from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` Snippets.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of Snippets.
+     */
+    distinct?: SnippetScalarFieldEnum | SnippetScalarFieldEnum[]
+  }
+
+  /**
+   * Snippet create
+   */
+  export type SnippetCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Snippet
+     */
+    select?: SnippetSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Snippet
+     */
+    omit?: SnippetOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SnippetInclude<ExtArgs> | null
+    /**
+     * The data needed to create a Snippet.
+     */
+    data: XOR<SnippetCreateInput, SnippetUncheckedCreateInput>
+  }
+
+  /**
+   * Snippet createMany
+   */
+  export type SnippetCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many Snippets.
+     */
+    data: SnippetCreateManyInput | SnippetCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * Snippet createManyAndReturn
+   */
+  export type SnippetCreateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Snippet
+     */
+    select?: SnippetSelectCreateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the Snippet
+     */
+    omit?: SnippetOmit<ExtArgs> | null
+    /**
+     * The data used to create many Snippets.
+     */
+    data: SnippetCreateManyInput | SnippetCreateManyInput[]
+    skipDuplicates?: boolean
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SnippetIncludeCreateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * Snippet update
+   */
+  export type SnippetUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Snippet
+     */
+    select?: SnippetSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Snippet
+     */
+    omit?: SnippetOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SnippetInclude<ExtArgs> | null
+    /**
+     * The data needed to update a Snippet.
+     */
+    data: XOR<SnippetUpdateInput, SnippetUncheckedUpdateInput>
+    /**
+     * Choose, which Snippet to update.
+     */
+    where: SnippetWhereUniqueInput
+  }
+
+  /**
+   * Snippet updateMany
+   */
+  export type SnippetUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update Snippets.
+     */
+    data: XOR<SnippetUpdateManyMutationInput, SnippetUncheckedUpdateManyInput>
+    /**
+     * Filter which Snippets to update
+     */
+    where?: SnippetWhereInput
+    /**
+     * Limit how many Snippets to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * Snippet updateManyAndReturn
+   */
+  export type SnippetUpdateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Snippet
+     */
+    select?: SnippetSelectUpdateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the Snippet
+     */
+    omit?: SnippetOmit<ExtArgs> | null
+    /**
+     * The data used to update Snippets.
+     */
+    data: XOR<SnippetUpdateManyMutationInput, SnippetUncheckedUpdateManyInput>
+    /**
+     * Filter which Snippets to update
+     */
+    where?: SnippetWhereInput
+    /**
+     * Limit how many Snippets to update.
+     */
+    limit?: number
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SnippetIncludeUpdateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * Snippet upsert
+   */
+  export type SnippetUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Snippet
+     */
+    select?: SnippetSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Snippet
+     */
+    omit?: SnippetOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SnippetInclude<ExtArgs> | null
+    /**
+     * The filter to search for the Snippet to update in case it exists.
+     */
+    where: SnippetWhereUniqueInput
+    /**
+     * In case the Snippet found by the `where` argument doesn't exist, create a new Snippet with this data.
+     */
+    create: XOR<SnippetCreateInput, SnippetUncheckedCreateInput>
+    /**
+     * In case the Snippet was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<SnippetUpdateInput, SnippetUncheckedUpdateInput>
+  }
+
+  /**
+   * Snippet delete
+   */
+  export type SnippetDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Snippet
+     */
+    select?: SnippetSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Snippet
+     */
+    omit?: SnippetOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SnippetInclude<ExtArgs> | null
+    /**
+     * Filter which Snippet to delete.
+     */
+    where: SnippetWhereUniqueInput
+  }
+
+  /**
+   * Snippet deleteMany
+   */
+  export type SnippetDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which Snippets to delete
+     */
+    where?: SnippetWhereInput
+    /**
+     * Limit how many Snippets to delete.
+     */
+    limit?: number
+  }
+
+  /**
+   * Snippet without action
+   */
+  export type SnippetDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Snippet
+     */
+    select?: SnippetSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Snippet
+     */
+    omit?: SnippetOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SnippetInclude<ExtArgs> | null
+  }
+
+
+  /**
+   * Model PageTemplate
+   */
+
+  export type AggregatePageTemplate = {
+    _count: PageTemplateCountAggregateOutputType | null
+    _avg: PageTemplateAvgAggregateOutputType | null
+    _sum: PageTemplateSumAggregateOutputType | null
+    _min: PageTemplateMinAggregateOutputType | null
+    _max: PageTemplateMaxAggregateOutputType | null
+  }
+
+  export type PageTemplateAvgAggregateOutputType = {
+    usageCount: number | null
+  }
+
+  export type PageTemplateSumAggregateOutputType = {
+    usageCount: number | null
+  }
+
+  export type PageTemplateMinAggregateOutputType = {
+    id: string | null
+    title: string | null
+    searchText: string | null
+    categoryId: string | null
+    userId: string | null
+    defaultTitle: string | null
+    customIcon: string | null
+    iconColor: string | null
+    usageCount: number | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type PageTemplateMaxAggregateOutputType = {
+    id: string | null
+    title: string | null
+    searchText: string | null
+    categoryId: string | null
+    userId: string | null
+    defaultTitle: string | null
+    customIcon: string | null
+    iconColor: string | null
+    usageCount: number | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type PageTemplateCountAggregateOutputType = {
+    id: number
+    title: number
+    tiptapJson: number
+    searchText: number
+    categoryId: number
+    userId: number
+    defaultTitle: number
+    customIcon: number
+    iconColor: number
+    usageCount: number
+    createdAt: number
+    updatedAt: number
+    _all: number
+  }
+
+
+  export type PageTemplateAvgAggregateInputType = {
+    usageCount?: true
+  }
+
+  export type PageTemplateSumAggregateInputType = {
+    usageCount?: true
+  }
+
+  export type PageTemplateMinAggregateInputType = {
+    id?: true
+    title?: true
+    searchText?: true
+    categoryId?: true
+    userId?: true
+    defaultTitle?: true
+    customIcon?: true
+    iconColor?: true
+    usageCount?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type PageTemplateMaxAggregateInputType = {
+    id?: true
+    title?: true
+    searchText?: true
+    categoryId?: true
+    userId?: true
+    defaultTitle?: true
+    customIcon?: true
+    iconColor?: true
+    usageCount?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type PageTemplateCountAggregateInputType = {
+    id?: true
+    title?: true
+    tiptapJson?: true
+    searchText?: true
+    categoryId?: true
+    userId?: true
+    defaultTitle?: true
+    customIcon?: true
+    iconColor?: true
+    usageCount?: true
+    createdAt?: true
+    updatedAt?: true
+    _all?: true
+  }
+
+  export type PageTemplateAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which PageTemplate to aggregate.
+     */
+    where?: PageTemplateWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of PageTemplates to fetch.
+     */
+    orderBy?: PageTemplateOrderByWithRelationInput | PageTemplateOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: PageTemplateWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` PageTemplates from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` PageTemplates.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned PageTemplates
+    **/
+    _count?: true | PageTemplateCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to average
+    **/
+    _avg?: PageTemplateAvgAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to sum
+    **/
+    _sum?: PageTemplateSumAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: PageTemplateMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: PageTemplateMaxAggregateInputType
+  }
+
+  export type GetPageTemplateAggregateType<T extends PageTemplateAggregateArgs> = {
+        [P in keyof T & keyof AggregatePageTemplate]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregatePageTemplate[P]>
+      : GetScalarType<T[P], AggregatePageTemplate[P]>
+  }
+
+
+
+
+  export type PageTemplateGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: PageTemplateWhereInput
+    orderBy?: PageTemplateOrderByWithAggregationInput | PageTemplateOrderByWithAggregationInput[]
+    by: PageTemplateScalarFieldEnum[] | PageTemplateScalarFieldEnum
+    having?: PageTemplateScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: PageTemplateCountAggregateInputType | true
+    _avg?: PageTemplateAvgAggregateInputType
+    _sum?: PageTemplateSumAggregateInputType
+    _min?: PageTemplateMinAggregateInputType
+    _max?: PageTemplateMaxAggregateInputType
+  }
+
+  export type PageTemplateGroupByOutputType = {
+    id: string
+    title: string
+    tiptapJson: JsonValue
+    searchText: string
+    categoryId: string
+    userId: string | null
+    defaultTitle: string | null
+    customIcon: string | null
+    iconColor: string | null
+    usageCount: number
+    createdAt: Date
+    updatedAt: Date
+    _count: PageTemplateCountAggregateOutputType | null
+    _avg: PageTemplateAvgAggregateOutputType | null
+    _sum: PageTemplateSumAggregateOutputType | null
+    _min: PageTemplateMinAggregateOutputType | null
+    _max: PageTemplateMaxAggregateOutputType | null
+  }
+
+  type GetPageTemplateGroupByPayload<T extends PageTemplateGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<PageTemplateGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof PageTemplateGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], PageTemplateGroupByOutputType[P]>
+            : GetScalarType<T[P], PageTemplateGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type PageTemplateSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    title?: boolean
+    tiptapJson?: boolean
+    searchText?: boolean
+    categoryId?: boolean
+    userId?: boolean
+    defaultTitle?: boolean
+    customIcon?: boolean
+    iconColor?: boolean
+    usageCount?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    category?: boolean | ReusableCategoryDefaultArgs<ExtArgs>
+    user?: boolean | PageTemplate$userArgs<ExtArgs>
+  }, ExtArgs["result"]["pageTemplate"]>
+
+  export type PageTemplateSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    title?: boolean
+    tiptapJson?: boolean
+    searchText?: boolean
+    categoryId?: boolean
+    userId?: boolean
+    defaultTitle?: boolean
+    customIcon?: boolean
+    iconColor?: boolean
+    usageCount?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    category?: boolean | ReusableCategoryDefaultArgs<ExtArgs>
+    user?: boolean | PageTemplate$userArgs<ExtArgs>
+  }, ExtArgs["result"]["pageTemplate"]>
+
+  export type PageTemplateSelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    title?: boolean
+    tiptapJson?: boolean
+    searchText?: boolean
+    categoryId?: boolean
+    userId?: boolean
+    defaultTitle?: boolean
+    customIcon?: boolean
+    iconColor?: boolean
+    usageCount?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    category?: boolean | ReusableCategoryDefaultArgs<ExtArgs>
+    user?: boolean | PageTemplate$userArgs<ExtArgs>
+  }, ExtArgs["result"]["pageTemplate"]>
+
+  export type PageTemplateSelectScalar = {
+    id?: boolean
+    title?: boolean
+    tiptapJson?: boolean
+    searchText?: boolean
+    categoryId?: boolean
+    userId?: boolean
+    defaultTitle?: boolean
+    customIcon?: boolean
+    iconColor?: boolean
+    usageCount?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+  }
+
+  export type PageTemplateOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "title" | "tiptapJson" | "searchText" | "categoryId" | "userId" | "defaultTitle" | "customIcon" | "iconColor" | "usageCount" | "createdAt" | "updatedAt", ExtArgs["result"]["pageTemplate"]>
+  export type PageTemplateInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    category?: boolean | ReusableCategoryDefaultArgs<ExtArgs>
+    user?: boolean | PageTemplate$userArgs<ExtArgs>
+  }
+  export type PageTemplateIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    category?: boolean | ReusableCategoryDefaultArgs<ExtArgs>
+    user?: boolean | PageTemplate$userArgs<ExtArgs>
+  }
+  export type PageTemplateIncludeUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    category?: boolean | ReusableCategoryDefaultArgs<ExtArgs>
+    user?: boolean | PageTemplate$userArgs<ExtArgs>
+  }
+
+  export type $PageTemplatePayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "PageTemplate"
+    objects: {
+      category: Prisma.$ReusableCategoryPayload<ExtArgs>
+      user: Prisma.$UserPayload<ExtArgs> | null
+    }
+    scalars: $Extensions.GetPayloadResult<{
+      id: string
+      title: string
+      tiptapJson: Prisma.JsonValue
+      searchText: string
+      categoryId: string
+      userId: string | null
+      defaultTitle: string | null
+      customIcon: string | null
+      iconColor: string | null
+      usageCount: number
+      createdAt: Date
+      updatedAt: Date
+    }, ExtArgs["result"]["pageTemplate"]>
+    composites: {}
+  }
+
+  type PageTemplateGetPayload<S extends boolean | null | undefined | PageTemplateDefaultArgs> = $Result.GetResult<Prisma.$PageTemplatePayload, S>
+
+  type PageTemplateCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> =
+    Omit<PageTemplateFindManyArgs, 'select' | 'include' | 'distinct' | 'omit'> & {
+      select?: PageTemplateCountAggregateInputType | true
+    }
+
+  export interface PageTemplateDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['PageTemplate'], meta: { name: 'PageTemplate' } }
+    /**
+     * Find zero or one PageTemplate that matches the filter.
+     * @param {PageTemplateFindUniqueArgs} args - Arguments to find a PageTemplate
+     * @example
+     * // Get one PageTemplate
+     * const pageTemplate = await prisma.pageTemplate.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends PageTemplateFindUniqueArgs>(args: SelectSubset<T, PageTemplateFindUniqueArgs<ExtArgs>>): Prisma__PageTemplateClient<$Result.GetResult<Prisma.$PageTemplatePayload<ExtArgs>, T, "findUnique", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find one PageTemplate that matches the filter or throw an error with `error.code='P2025'`
+     * if no matches were found.
+     * @param {PageTemplateFindUniqueOrThrowArgs} args - Arguments to find a PageTemplate
+     * @example
+     * // Get one PageTemplate
+     * const pageTemplate = await prisma.pageTemplate.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends PageTemplateFindUniqueOrThrowArgs>(args: SelectSubset<T, PageTemplateFindUniqueOrThrowArgs<ExtArgs>>): Prisma__PageTemplateClient<$Result.GetResult<Prisma.$PageTemplatePayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first PageTemplate that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {PageTemplateFindFirstArgs} args - Arguments to find a PageTemplate
+     * @example
+     * // Get one PageTemplate
+     * const pageTemplate = await prisma.pageTemplate.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends PageTemplateFindFirstArgs>(args?: SelectSubset<T, PageTemplateFindFirstArgs<ExtArgs>>): Prisma__PageTemplateClient<$Result.GetResult<Prisma.$PageTemplatePayload<ExtArgs>, T, "findFirst", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first PageTemplate that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {PageTemplateFindFirstOrThrowArgs} args - Arguments to find a PageTemplate
+     * @example
+     * // Get one PageTemplate
+     * const pageTemplate = await prisma.pageTemplate.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends PageTemplateFindFirstOrThrowArgs>(args?: SelectSubset<T, PageTemplateFindFirstOrThrowArgs<ExtArgs>>): Prisma__PageTemplateClient<$Result.GetResult<Prisma.$PageTemplatePayload<ExtArgs>, T, "findFirstOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find zero or more PageTemplates that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {PageTemplateFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all PageTemplates
+     * const pageTemplates = await prisma.pageTemplate.findMany()
+     * 
+     * // Get first 10 PageTemplates
+     * const pageTemplates = await prisma.pageTemplate.findMany({ take: 10 })
+     * 
+     * // Only select the `id`
+     * const pageTemplateWithIdOnly = await prisma.pageTemplate.findMany({ select: { id: true } })
+     * 
+     */
+    findMany<T extends PageTemplateFindManyArgs>(args?: SelectSubset<T, PageTemplateFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$PageTemplatePayload<ExtArgs>, T, "findMany", GlobalOmitOptions>>
+
+    /**
+     * Create a PageTemplate.
+     * @param {PageTemplateCreateArgs} args - Arguments to create a PageTemplate.
+     * @example
+     * // Create one PageTemplate
+     * const PageTemplate = await prisma.pageTemplate.create({
+     *   data: {
+     *     // ... data to create a PageTemplate
+     *   }
+     * })
+     * 
+     */
+    create<T extends PageTemplateCreateArgs>(args: SelectSubset<T, PageTemplateCreateArgs<ExtArgs>>): Prisma__PageTemplateClient<$Result.GetResult<Prisma.$PageTemplatePayload<ExtArgs>, T, "create", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Create many PageTemplates.
+     * @param {PageTemplateCreateManyArgs} args - Arguments to create many PageTemplates.
+     * @example
+     * // Create many PageTemplates
+     * const pageTemplate = await prisma.pageTemplate.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *     
+     */
+    createMany<T extends PageTemplateCreateManyArgs>(args?: SelectSubset<T, PageTemplateCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create many PageTemplates and returns the data saved in the database.
+     * @param {PageTemplateCreateManyAndReturnArgs} args - Arguments to create many PageTemplates.
+     * @example
+     * // Create many PageTemplates
+     * const pageTemplate = await prisma.pageTemplate.createManyAndReturn({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Create many PageTemplates and only return the `id`
+     * const pageTemplateWithIdOnly = await prisma.pageTemplate.createManyAndReturn({
+     *   select: { id: true },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    createManyAndReturn<T extends PageTemplateCreateManyAndReturnArgs>(args?: SelectSubset<T, PageTemplateCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$PageTemplatePayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Delete a PageTemplate.
+     * @param {PageTemplateDeleteArgs} args - Arguments to delete one PageTemplate.
+     * @example
+     * // Delete one PageTemplate
+     * const PageTemplate = await prisma.pageTemplate.delete({
+     *   where: {
+     *     // ... filter to delete one PageTemplate
+     *   }
+     * })
+     * 
+     */
+    delete<T extends PageTemplateDeleteArgs>(args: SelectSubset<T, PageTemplateDeleteArgs<ExtArgs>>): Prisma__PageTemplateClient<$Result.GetResult<Prisma.$PageTemplatePayload<ExtArgs>, T, "delete", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Update one PageTemplate.
+     * @param {PageTemplateUpdateArgs} args - Arguments to update one PageTemplate.
+     * @example
+     * // Update one PageTemplate
+     * const pageTemplate = await prisma.pageTemplate.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    update<T extends PageTemplateUpdateArgs>(args: SelectSubset<T, PageTemplateUpdateArgs<ExtArgs>>): Prisma__PageTemplateClient<$Result.GetResult<Prisma.$PageTemplatePayload<ExtArgs>, T, "update", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Delete zero or more PageTemplates.
+     * @param {PageTemplateDeleteManyArgs} args - Arguments to filter PageTemplates to delete.
+     * @example
+     * // Delete a few PageTemplates
+     * const { count } = await prisma.pageTemplate.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+     */
+    deleteMany<T extends PageTemplateDeleteManyArgs>(args?: SelectSubset<T, PageTemplateDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more PageTemplates.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {PageTemplateUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many PageTemplates
+     * const pageTemplate = await prisma.pageTemplate.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    updateMany<T extends PageTemplateUpdateManyArgs>(args: SelectSubset<T, PageTemplateUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more PageTemplates and returns the data updated in the database.
+     * @param {PageTemplateUpdateManyAndReturnArgs} args - Arguments to update many PageTemplates.
+     * @example
+     * // Update many PageTemplates
+     * const pageTemplate = await prisma.pageTemplate.updateManyAndReturn({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Update zero or more PageTemplates and only return the `id`
+     * const pageTemplateWithIdOnly = await prisma.pageTemplate.updateManyAndReturn({
+     *   select: { id: true },
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    updateManyAndReturn<T extends PageTemplateUpdateManyAndReturnArgs>(args: SelectSubset<T, PageTemplateUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$PageTemplatePayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Create or update one PageTemplate.
+     * @param {PageTemplateUpsertArgs} args - Arguments to update or create a PageTemplate.
+     * @example
+     * // Update or create a PageTemplate
+     * const pageTemplate = await prisma.pageTemplate.upsert({
+     *   create: {
+     *     // ... data to create a PageTemplate
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the PageTemplate we want to update
+     *   }
+     * })
+     */
+    upsert<T extends PageTemplateUpsertArgs>(args: SelectSubset<T, PageTemplateUpsertArgs<ExtArgs>>): Prisma__PageTemplateClient<$Result.GetResult<Prisma.$PageTemplatePayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+
+    /**
+     * Count the number of PageTemplates.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {PageTemplateCountArgs} args - Arguments to filter PageTemplates to count.
+     * @example
+     * // Count the number of PageTemplates
+     * const count = await prisma.pageTemplate.count({
+     *   where: {
+     *     // ... the filter for the PageTemplates we want to count
+     *   }
+     * })
+    **/
+    count<T extends PageTemplateCountArgs>(
+      args?: Subset<T, PageTemplateCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], PageTemplateCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a PageTemplate.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {PageTemplateAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends PageTemplateAggregateArgs>(args: Subset<T, PageTemplateAggregateArgs>): Prisma.PrismaPromise<GetPageTemplateAggregateType<T>>
+
+    /**
+     * Group by PageTemplate.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {PageTemplateGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends PageTemplateGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: PageTemplateGroupByArgs['orderBy'] }
+        : { orderBy?: PageTemplateGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, PageTemplateGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetPageTemplateGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the PageTemplate model
+   */
+  readonly fields: PageTemplateFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for PageTemplate.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__PageTemplateClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    category<T extends ReusableCategoryDefaultArgs<ExtArgs> = {}>(args?: Subset<T, ReusableCategoryDefaultArgs<ExtArgs>>): Prisma__ReusableCategoryClient<$Result.GetResult<Prisma.$ReusableCategoryPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+    user<T extends PageTemplate$userArgs<ExtArgs> = {}>(args?: Subset<T, PageTemplate$userArgs<ExtArgs>>): Prisma__UserClient<$Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the PageTemplate model
+   */
+  interface PageTemplateFieldRefs {
+    readonly id: FieldRef<"PageTemplate", 'String'>
+    readonly title: FieldRef<"PageTemplate", 'String'>
+    readonly tiptapJson: FieldRef<"PageTemplate", 'Json'>
+    readonly searchText: FieldRef<"PageTemplate", 'String'>
+    readonly categoryId: FieldRef<"PageTemplate", 'String'>
+    readonly userId: FieldRef<"PageTemplate", 'String'>
+    readonly defaultTitle: FieldRef<"PageTemplate", 'String'>
+    readonly customIcon: FieldRef<"PageTemplate", 'String'>
+    readonly iconColor: FieldRef<"PageTemplate", 'String'>
+    readonly usageCount: FieldRef<"PageTemplate", 'Int'>
+    readonly createdAt: FieldRef<"PageTemplate", 'DateTime'>
+    readonly updatedAt: FieldRef<"PageTemplate", 'DateTime'>
+  }
+    
+
+  // Custom InputTypes
+  /**
+   * PageTemplate findUnique
+   */
+  export type PageTemplateFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the PageTemplate
+     */
+    select?: PageTemplateSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the PageTemplate
+     */
+    omit?: PageTemplateOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: PageTemplateInclude<ExtArgs> | null
+    /**
+     * Filter, which PageTemplate to fetch.
+     */
+    where: PageTemplateWhereUniqueInput
+  }
+
+  /**
+   * PageTemplate findUniqueOrThrow
+   */
+  export type PageTemplateFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the PageTemplate
+     */
+    select?: PageTemplateSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the PageTemplate
+     */
+    omit?: PageTemplateOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: PageTemplateInclude<ExtArgs> | null
+    /**
+     * Filter, which PageTemplate to fetch.
+     */
+    where: PageTemplateWhereUniqueInput
+  }
+
+  /**
+   * PageTemplate findFirst
+   */
+  export type PageTemplateFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the PageTemplate
+     */
+    select?: PageTemplateSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the PageTemplate
+     */
+    omit?: PageTemplateOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: PageTemplateInclude<ExtArgs> | null
+    /**
+     * Filter, which PageTemplate to fetch.
+     */
+    where?: PageTemplateWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of PageTemplates to fetch.
+     */
+    orderBy?: PageTemplateOrderByWithRelationInput | PageTemplateOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for PageTemplates.
+     */
+    cursor?: PageTemplateWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` PageTemplates from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` PageTemplates.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of PageTemplates.
+     */
+    distinct?: PageTemplateScalarFieldEnum | PageTemplateScalarFieldEnum[]
+  }
+
+  /**
+   * PageTemplate findFirstOrThrow
+   */
+  export type PageTemplateFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the PageTemplate
+     */
+    select?: PageTemplateSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the PageTemplate
+     */
+    omit?: PageTemplateOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: PageTemplateInclude<ExtArgs> | null
+    /**
+     * Filter, which PageTemplate to fetch.
+     */
+    where?: PageTemplateWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of PageTemplates to fetch.
+     */
+    orderBy?: PageTemplateOrderByWithRelationInput | PageTemplateOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for PageTemplates.
+     */
+    cursor?: PageTemplateWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` PageTemplates from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` PageTemplates.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of PageTemplates.
+     */
+    distinct?: PageTemplateScalarFieldEnum | PageTemplateScalarFieldEnum[]
+  }
+
+  /**
+   * PageTemplate findMany
+   */
+  export type PageTemplateFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the PageTemplate
+     */
+    select?: PageTemplateSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the PageTemplate
+     */
+    omit?: PageTemplateOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: PageTemplateInclude<ExtArgs> | null
+    /**
+     * Filter, which PageTemplates to fetch.
+     */
+    where?: PageTemplateWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of PageTemplates to fetch.
+     */
+    orderBy?: PageTemplateOrderByWithRelationInput | PageTemplateOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing PageTemplates.
+     */
+    cursor?: PageTemplateWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` PageTemplates from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` PageTemplates.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of PageTemplates.
+     */
+    distinct?: PageTemplateScalarFieldEnum | PageTemplateScalarFieldEnum[]
+  }
+
+  /**
+   * PageTemplate create
+   */
+  export type PageTemplateCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the PageTemplate
+     */
+    select?: PageTemplateSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the PageTemplate
+     */
+    omit?: PageTemplateOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: PageTemplateInclude<ExtArgs> | null
+    /**
+     * The data needed to create a PageTemplate.
+     */
+    data: XOR<PageTemplateCreateInput, PageTemplateUncheckedCreateInput>
+  }
+
+  /**
+   * PageTemplate createMany
+   */
+  export type PageTemplateCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many PageTemplates.
+     */
+    data: PageTemplateCreateManyInput | PageTemplateCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * PageTemplate createManyAndReturn
+   */
+  export type PageTemplateCreateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the PageTemplate
+     */
+    select?: PageTemplateSelectCreateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the PageTemplate
+     */
+    omit?: PageTemplateOmit<ExtArgs> | null
+    /**
+     * The data used to create many PageTemplates.
+     */
+    data: PageTemplateCreateManyInput | PageTemplateCreateManyInput[]
+    skipDuplicates?: boolean
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: PageTemplateIncludeCreateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * PageTemplate update
+   */
+  export type PageTemplateUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the PageTemplate
+     */
+    select?: PageTemplateSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the PageTemplate
+     */
+    omit?: PageTemplateOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: PageTemplateInclude<ExtArgs> | null
+    /**
+     * The data needed to update a PageTemplate.
+     */
+    data: XOR<PageTemplateUpdateInput, PageTemplateUncheckedUpdateInput>
+    /**
+     * Choose, which PageTemplate to update.
+     */
+    where: PageTemplateWhereUniqueInput
+  }
+
+  /**
+   * PageTemplate updateMany
+   */
+  export type PageTemplateUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update PageTemplates.
+     */
+    data: XOR<PageTemplateUpdateManyMutationInput, PageTemplateUncheckedUpdateManyInput>
+    /**
+     * Filter which PageTemplates to update
+     */
+    where?: PageTemplateWhereInput
+    /**
+     * Limit how many PageTemplates to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * PageTemplate updateManyAndReturn
+   */
+  export type PageTemplateUpdateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the PageTemplate
+     */
+    select?: PageTemplateSelectUpdateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the PageTemplate
+     */
+    omit?: PageTemplateOmit<ExtArgs> | null
+    /**
+     * The data used to update PageTemplates.
+     */
+    data: XOR<PageTemplateUpdateManyMutationInput, PageTemplateUncheckedUpdateManyInput>
+    /**
+     * Filter which PageTemplates to update
+     */
+    where?: PageTemplateWhereInput
+    /**
+     * Limit how many PageTemplates to update.
+     */
+    limit?: number
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: PageTemplateIncludeUpdateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * PageTemplate upsert
+   */
+  export type PageTemplateUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the PageTemplate
+     */
+    select?: PageTemplateSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the PageTemplate
+     */
+    omit?: PageTemplateOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: PageTemplateInclude<ExtArgs> | null
+    /**
+     * The filter to search for the PageTemplate to update in case it exists.
+     */
+    where: PageTemplateWhereUniqueInput
+    /**
+     * In case the PageTemplate found by the `where` argument doesn't exist, create a new PageTemplate with this data.
+     */
+    create: XOR<PageTemplateCreateInput, PageTemplateUncheckedCreateInput>
+    /**
+     * In case the PageTemplate was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<PageTemplateUpdateInput, PageTemplateUncheckedUpdateInput>
+  }
+
+  /**
+   * PageTemplate delete
+   */
+  export type PageTemplateDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the PageTemplate
+     */
+    select?: PageTemplateSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the PageTemplate
+     */
+    omit?: PageTemplateOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: PageTemplateInclude<ExtArgs> | null
+    /**
+     * Filter which PageTemplate to delete.
+     */
+    where: PageTemplateWhereUniqueInput
+  }
+
+  /**
+   * PageTemplate deleteMany
+   */
+  export type PageTemplateDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which PageTemplates to delete
+     */
+    where?: PageTemplateWhereInput
+    /**
+     * Limit how many PageTemplates to delete.
+     */
+    limit?: number
+  }
+
+  /**
+   * PageTemplate.user
+   */
+  export type PageTemplate$userArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the User
+     */
+    select?: UserSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the User
+     */
+    omit?: UserOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: UserInclude<ExtArgs> | null
+    where?: UserWhereInput
+  }
+
+  /**
+   * PageTemplate without action
+   */
+  export type PageTemplateDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the PageTemplate
+     */
+    select?: PageTemplateSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the PageTemplate
+     */
+    omit?: PageTemplateOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: PageTemplateInclude<ExtArgs> | null
   }
 
 
@@ -21733,6 +28645,11 @@ export namespace Prisma {
      * Skip the first `n` Tags.
      */
     skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of Tags.
+     */
     distinct?: TagScalarFieldEnum | TagScalarFieldEnum[]
   }
 
@@ -22836,6 +29753,11 @@ export namespace Prisma {
      * Skip the first `n` ViewGrants.
      */
     skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of ViewGrants.
+     */
     distinct?: ViewGrantScalarFieldEnum | ViewGrantScalarFieldEnum[]
   }
 
@@ -23894,6 +30816,11 @@ export namespace Prisma {
      * Skip the first `n` Sessions.
      */
     skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of Sessions.
+     */
     distinct?: SessionScalarFieldEnum | SessionScalarFieldEnum[]
   }
 
@@ -25004,6 +31931,11 @@ export namespace Prisma {
      * Skip the first `n` Accounts.
      */
     skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of Accounts.
+     */
     distinct?: AccountScalarFieldEnum | AccountScalarFieldEnum[]
   }
 
@@ -26155,6 +33087,11 @@ export namespace Prisma {
      * Skip the first `n` CalendarConnections.
      */
     skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of CalendarConnections.
+     */
     distinct?: CalendarConnectionScalarFieldEnum | CalendarConnectionScalarFieldEnum[]
   }
 
@@ -27390,6 +34327,11 @@ export namespace Prisma {
      * Skip the first `n` CalendarSources.
      */
     skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of CalendarSources.
+     */
     distinct?: CalendarSourceScalarFieldEnum | CalendarSourceScalarFieldEnum[]
   }
 
@@ -28709,6 +35651,11 @@ export namespace Prisma {
      * Skip the first `n` CalendarEvents.
      */
     skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of CalendarEvents.
+     */
     distinct?: CalendarEventScalarFieldEnum | CalendarEventScalarFieldEnum[]
   }
 
@@ -29858,6 +36805,11 @@ export namespace Prisma {
      * Skip the first `n` CalendarEventAttendees.
      */
     skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of CalendarEventAttendees.
+     */
     distinct?: CalendarEventAttendeeScalarFieldEnum | CalendarEventAttendeeScalarFieldEnum[]
   }
 
@@ -30980,6 +37932,11 @@ export namespace Prisma {
      * Skip the first `n` AuditLogs.
      */
     skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of AuditLogs.
+     */
     distinct?: AuditLogScalarFieldEnum | AuditLogScalarFieldEnum[]
   }
 
@@ -32098,6 +39055,11 @@ export namespace Prisma {
      * Skip the first `n` FolderPayloads.
      */
     skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of FolderPayloads.
+     */
     distinct?: FolderPayloadScalarFieldEnum | FolderPayloadScalarFieldEnum[]
   }
 
@@ -33165,6 +40127,11 @@ export namespace Prisma {
      * Skip the first `n` ExternalPayloads.
      */
     skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of ExternalPayloads.
+     */
     distinct?: ExternalPayloadScalarFieldEnum | ExternalPayloadScalarFieldEnum[]
   }
 
@@ -34215,6 +41182,11 @@ export namespace Prisma {
      * Skip the first `n` ChatPayloads.
      */
     skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of ChatPayloads.
+     */
     distinct?: ChatPayloadScalarFieldEnum | ChatPayloadScalarFieldEnum[]
   }
 
@@ -35278,6 +42250,11 @@ export namespace Prisma {
      * Skip the first `n` VisualizationPayloads.
      */
     skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of VisualizationPayloads.
+     */
     distinct?: VisualizationPayloadScalarFieldEnum | VisualizationPayloadScalarFieldEnum[]
   }
 
@@ -36341,6 +43318,11 @@ export namespace Prisma {
      * Skip the first `n` DataPayloads.
      */
     skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of DataPayloads.
+     */
     distinct?: DataPayloadScalarFieldEnum | DataPayloadScalarFieldEnum[]
   }
 
@@ -37434,6 +44416,11 @@ export namespace Prisma {
      * Skip the first `n` HopePayloads.
      */
     skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of HopePayloads.
+     */
     distinct?: HopePayloadScalarFieldEnum | HopePayloadScalarFieldEnum[]
   }
 
@@ -38510,6 +45497,11 @@ export namespace Prisma {
      * Skip the first `n` WorkflowPayloads.
      */
     skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of WorkflowPayloads.
+     */
     distinct?: WorkflowPayloadScalarFieldEnum | WorkflowPayloadScalarFieldEnum[]
   }
 
@@ -38955,6 +45947,91 @@ export namespace Prisma {
   export type CategoryScalarFieldEnum = (typeof CategoryScalarFieldEnum)[keyof typeof CategoryScalarFieldEnum]
 
 
+  export const ReusableCategoryScalarFieldEnum: {
+    id: 'id',
+    name: 'name',
+    slug: 'slug',
+    scope: 'scope',
+    userId: 'userId',
+    parentId: 'parentId',
+    displayOrder: 'displayOrder',
+    createdAt: 'createdAt',
+    updatedAt: 'updatedAt'
+  };
+
+  export type ReusableCategoryScalarFieldEnum = (typeof ReusableCategoryScalarFieldEnum)[keyof typeof ReusableCategoryScalarFieldEnum]
+
+
+  export const SavedBlockScalarFieldEnum: {
+    id: 'id',
+    title: 'title',
+    blockType: 'blockType',
+    tiptapJson: 'tiptapJson',
+    searchText: 'searchText',
+    categoryId: 'categoryId',
+    userId: 'userId',
+    usageCount: 'usageCount',
+    lastUsedAt: 'lastUsedAt',
+    createdAt: 'createdAt',
+    updatedAt: 'updatedAt'
+  };
+
+  export type SavedBlockScalarFieldEnum = (typeof SavedBlockScalarFieldEnum)[keyof typeof SavedBlockScalarFieldEnum]
+
+
+  export const ContentTemplateScalarFieldEnum: {
+    id: 'id',
+    title: 'title',
+    tiptapJson: 'tiptapJson',
+    searchText: 'searchText',
+    categoryId: 'categoryId',
+    userId: 'userId',
+    usageCount: 'usageCount',
+    lastUsedAt: 'lastUsedAt',
+    createdAt: 'createdAt',
+    updatedAt: 'updatedAt'
+  };
+
+  export type ContentTemplateScalarFieldEnum = (typeof ContentTemplateScalarFieldEnum)[keyof typeof ContentTemplateScalarFieldEnum]
+
+
+  export const SnippetScalarFieldEnum: {
+    id: 'id',
+    title: 'title',
+    content: 'content',
+    tiptapJson: 'tiptapJson',
+    searchText: 'searchText',
+    categoryId: 'categoryId',
+    userId: 'userId',
+    usageCount: 'usageCount',
+    lastUsedAt: 'lastUsedAt',
+    isAiContext: 'isAiContext',
+    isVisibleInUI: 'isVisibleInUI',
+    createdAt: 'createdAt',
+    updatedAt: 'updatedAt'
+  };
+
+  export type SnippetScalarFieldEnum = (typeof SnippetScalarFieldEnum)[keyof typeof SnippetScalarFieldEnum]
+
+
+  export const PageTemplateScalarFieldEnum: {
+    id: 'id',
+    title: 'title',
+    tiptapJson: 'tiptapJson',
+    searchText: 'searchText',
+    categoryId: 'categoryId',
+    userId: 'userId',
+    defaultTitle: 'defaultTitle',
+    customIcon: 'customIcon',
+    iconColor: 'iconColor',
+    usageCount: 'usageCount',
+    createdAt: 'createdAt',
+    updatedAt: 'updatedAt'
+  };
+
+  export type PageTemplateScalarFieldEnum = (typeof PageTemplateScalarFieldEnum)[keyof typeof PageTemplateScalarFieldEnum]
+
+
   export const TagScalarFieldEnum: {
     id: 'id',
     name: 'name',
@@ -39386,6 +46463,20 @@ export namespace Prisma {
    * Reference to a field of type 'UserRole[]'
    */
   export type ListEnumUserRoleFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'UserRole[]'>
+    
+
+
+  /**
+   * Reference to a field of type 'ReusableCategoryScope'
+   */
+  export type EnumReusableCategoryScopeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'ReusableCategoryScope'>
+    
+
+
+  /**
+   * Reference to a field of type 'ReusableCategoryScope[]'
+   */
+  export type ListEnumReusableCategoryScopeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'ReusableCategoryScope[]'>
     
 
 
@@ -40532,6 +47623,11 @@ export namespace Prisma {
     auditTargets?: AuditLogListRelationFilter
     adminActions?: AuditLogListRelationFilter
     categories?: CategoryListRelationFilter
+    reusableCategories?: ReusableCategoryListRelationFilter
+    savedBlocks?: SavedBlockListRelationFilter
+    contentTemplates?: ContentTemplateListRelationFilter
+    snippets?: SnippetListRelationFilter
+    pageTemplates?: PageTemplateListRelationFilter
     calendarConnections?: CalendarConnectionListRelationFilter
     calendarEvents?: CalendarEventListRelationFilter
     calendarSources?: CalendarSourceListRelationFilter
@@ -40559,6 +47655,11 @@ export namespace Prisma {
     auditTargets?: AuditLogOrderByRelationAggregateInput
     adminActions?: AuditLogOrderByRelationAggregateInput
     categories?: CategoryOrderByRelationAggregateInput
+    reusableCategories?: ReusableCategoryOrderByRelationAggregateInput
+    savedBlocks?: SavedBlockOrderByRelationAggregateInput
+    contentTemplates?: ContentTemplateOrderByRelationAggregateInput
+    snippets?: SnippetOrderByRelationAggregateInput
+    pageTemplates?: PageTemplateOrderByRelationAggregateInput
     calendarConnections?: CalendarConnectionOrderByRelationAggregateInput
     calendarEvents?: CalendarEventOrderByRelationAggregateInput
     calendarSources?: CalendarSourceOrderByRelationAggregateInput
@@ -40589,6 +47690,11 @@ export namespace Prisma {
     auditTargets?: AuditLogListRelationFilter
     adminActions?: AuditLogListRelationFilter
     categories?: CategoryListRelationFilter
+    reusableCategories?: ReusableCategoryListRelationFilter
+    savedBlocks?: SavedBlockListRelationFilter
+    contentTemplates?: ContentTemplateListRelationFilter
+    snippets?: SnippetListRelationFilter
+    pageTemplates?: PageTemplateListRelationFilter
     calendarConnections?: CalendarConnectionListRelationFilter
     calendarEvents?: CalendarEventListRelationFilter
     calendarSources?: CalendarSourceListRelationFilter
@@ -40711,6 +47817,472 @@ export namespace Prisma {
     isPublished?: BoolWithAggregatesFilter<"Category"> | boolean
     createdAt?: DateTimeWithAggregatesFilter<"Category"> | Date | string
     updatedAt?: DateTimeWithAggregatesFilter<"Category"> | Date | string
+  }
+
+  export type ReusableCategoryWhereInput = {
+    AND?: ReusableCategoryWhereInput | ReusableCategoryWhereInput[]
+    OR?: ReusableCategoryWhereInput[]
+    NOT?: ReusableCategoryWhereInput | ReusableCategoryWhereInput[]
+    id?: UuidFilter<"ReusableCategory"> | string
+    name?: StringFilter<"ReusableCategory"> | string
+    slug?: StringFilter<"ReusableCategory"> | string
+    scope?: EnumReusableCategoryScopeFilter<"ReusableCategory"> | $Enums.ReusableCategoryScope
+    userId?: UuidNullableFilter<"ReusableCategory"> | string | null
+    parentId?: UuidNullableFilter<"ReusableCategory"> | string | null
+    displayOrder?: IntFilter<"ReusableCategory"> | number
+    createdAt?: DateTimeFilter<"ReusableCategory"> | Date | string
+    updatedAt?: DateTimeFilter<"ReusableCategory"> | Date | string
+    user?: XOR<UserNullableScalarRelationFilter, UserWhereInput> | null
+    parent?: XOR<ReusableCategoryNullableScalarRelationFilter, ReusableCategoryWhereInput> | null
+    children?: ReusableCategoryListRelationFilter
+    savedBlocks?: SavedBlockListRelationFilter
+    contentTemplates?: ContentTemplateListRelationFilter
+    snippets?: SnippetListRelationFilter
+    pageTemplates?: PageTemplateListRelationFilter
+  }
+
+  export type ReusableCategoryOrderByWithRelationInput = {
+    id?: SortOrder
+    name?: SortOrder
+    slug?: SortOrder
+    scope?: SortOrder
+    userId?: SortOrderInput | SortOrder
+    parentId?: SortOrderInput | SortOrder
+    displayOrder?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+    user?: UserOrderByWithRelationInput
+    parent?: ReusableCategoryOrderByWithRelationInput
+    children?: ReusableCategoryOrderByRelationAggregateInput
+    savedBlocks?: SavedBlockOrderByRelationAggregateInput
+    contentTemplates?: ContentTemplateOrderByRelationAggregateInput
+    snippets?: SnippetOrderByRelationAggregateInput
+    pageTemplates?: PageTemplateOrderByRelationAggregateInput
+  }
+
+  export type ReusableCategoryWhereUniqueInput = Prisma.AtLeast<{
+    id?: string
+    userId_scope_slug?: ReusableCategoryUserIdScopeSlugCompoundUniqueInput
+    AND?: ReusableCategoryWhereInput | ReusableCategoryWhereInput[]
+    OR?: ReusableCategoryWhereInput[]
+    NOT?: ReusableCategoryWhereInput | ReusableCategoryWhereInput[]
+    name?: StringFilter<"ReusableCategory"> | string
+    slug?: StringFilter<"ReusableCategory"> | string
+    scope?: EnumReusableCategoryScopeFilter<"ReusableCategory"> | $Enums.ReusableCategoryScope
+    userId?: UuidNullableFilter<"ReusableCategory"> | string | null
+    parentId?: UuidNullableFilter<"ReusableCategory"> | string | null
+    displayOrder?: IntFilter<"ReusableCategory"> | number
+    createdAt?: DateTimeFilter<"ReusableCategory"> | Date | string
+    updatedAt?: DateTimeFilter<"ReusableCategory"> | Date | string
+    user?: XOR<UserNullableScalarRelationFilter, UserWhereInput> | null
+    parent?: XOR<ReusableCategoryNullableScalarRelationFilter, ReusableCategoryWhereInput> | null
+    children?: ReusableCategoryListRelationFilter
+    savedBlocks?: SavedBlockListRelationFilter
+    contentTemplates?: ContentTemplateListRelationFilter
+    snippets?: SnippetListRelationFilter
+    pageTemplates?: PageTemplateListRelationFilter
+  }, "id" | "userId_scope_slug">
+
+  export type ReusableCategoryOrderByWithAggregationInput = {
+    id?: SortOrder
+    name?: SortOrder
+    slug?: SortOrder
+    scope?: SortOrder
+    userId?: SortOrderInput | SortOrder
+    parentId?: SortOrderInput | SortOrder
+    displayOrder?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+    _count?: ReusableCategoryCountOrderByAggregateInput
+    _avg?: ReusableCategoryAvgOrderByAggregateInput
+    _max?: ReusableCategoryMaxOrderByAggregateInput
+    _min?: ReusableCategoryMinOrderByAggregateInput
+    _sum?: ReusableCategorySumOrderByAggregateInput
+  }
+
+  export type ReusableCategoryScalarWhereWithAggregatesInput = {
+    AND?: ReusableCategoryScalarWhereWithAggregatesInput | ReusableCategoryScalarWhereWithAggregatesInput[]
+    OR?: ReusableCategoryScalarWhereWithAggregatesInput[]
+    NOT?: ReusableCategoryScalarWhereWithAggregatesInput | ReusableCategoryScalarWhereWithAggregatesInput[]
+    id?: UuidWithAggregatesFilter<"ReusableCategory"> | string
+    name?: StringWithAggregatesFilter<"ReusableCategory"> | string
+    slug?: StringWithAggregatesFilter<"ReusableCategory"> | string
+    scope?: EnumReusableCategoryScopeWithAggregatesFilter<"ReusableCategory"> | $Enums.ReusableCategoryScope
+    userId?: UuidNullableWithAggregatesFilter<"ReusableCategory"> | string | null
+    parentId?: UuidNullableWithAggregatesFilter<"ReusableCategory"> | string | null
+    displayOrder?: IntWithAggregatesFilter<"ReusableCategory"> | number
+    createdAt?: DateTimeWithAggregatesFilter<"ReusableCategory"> | Date | string
+    updatedAt?: DateTimeWithAggregatesFilter<"ReusableCategory"> | Date | string
+  }
+
+  export type SavedBlockWhereInput = {
+    AND?: SavedBlockWhereInput | SavedBlockWhereInput[]
+    OR?: SavedBlockWhereInput[]
+    NOT?: SavedBlockWhereInput | SavedBlockWhereInput[]
+    id?: UuidFilter<"SavedBlock"> | string
+    title?: StringFilter<"SavedBlock"> | string
+    blockType?: StringFilter<"SavedBlock"> | string
+    tiptapJson?: JsonFilter<"SavedBlock">
+    searchText?: StringFilter<"SavedBlock"> | string
+    categoryId?: UuidFilter<"SavedBlock"> | string
+    userId?: UuidNullableFilter<"SavedBlock"> | string | null
+    usageCount?: IntFilter<"SavedBlock"> | number
+    lastUsedAt?: DateTimeNullableFilter<"SavedBlock"> | Date | string | null
+    createdAt?: DateTimeFilter<"SavedBlock"> | Date | string
+    updatedAt?: DateTimeFilter<"SavedBlock"> | Date | string
+    category?: XOR<ReusableCategoryScalarRelationFilter, ReusableCategoryWhereInput>
+    user?: XOR<UserNullableScalarRelationFilter, UserWhereInput> | null
+  }
+
+  export type SavedBlockOrderByWithRelationInput = {
+    id?: SortOrder
+    title?: SortOrder
+    blockType?: SortOrder
+    tiptapJson?: SortOrder
+    searchText?: SortOrder
+    categoryId?: SortOrder
+    userId?: SortOrderInput | SortOrder
+    usageCount?: SortOrder
+    lastUsedAt?: SortOrderInput | SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+    category?: ReusableCategoryOrderByWithRelationInput
+    user?: UserOrderByWithRelationInput
+  }
+
+  export type SavedBlockWhereUniqueInput = Prisma.AtLeast<{
+    id?: string
+    AND?: SavedBlockWhereInput | SavedBlockWhereInput[]
+    OR?: SavedBlockWhereInput[]
+    NOT?: SavedBlockWhereInput | SavedBlockWhereInput[]
+    title?: StringFilter<"SavedBlock"> | string
+    blockType?: StringFilter<"SavedBlock"> | string
+    tiptapJson?: JsonFilter<"SavedBlock">
+    searchText?: StringFilter<"SavedBlock"> | string
+    categoryId?: UuidFilter<"SavedBlock"> | string
+    userId?: UuidNullableFilter<"SavedBlock"> | string | null
+    usageCount?: IntFilter<"SavedBlock"> | number
+    lastUsedAt?: DateTimeNullableFilter<"SavedBlock"> | Date | string | null
+    createdAt?: DateTimeFilter<"SavedBlock"> | Date | string
+    updatedAt?: DateTimeFilter<"SavedBlock"> | Date | string
+    category?: XOR<ReusableCategoryScalarRelationFilter, ReusableCategoryWhereInput>
+    user?: XOR<UserNullableScalarRelationFilter, UserWhereInput> | null
+  }, "id">
+
+  export type SavedBlockOrderByWithAggregationInput = {
+    id?: SortOrder
+    title?: SortOrder
+    blockType?: SortOrder
+    tiptapJson?: SortOrder
+    searchText?: SortOrder
+    categoryId?: SortOrder
+    userId?: SortOrderInput | SortOrder
+    usageCount?: SortOrder
+    lastUsedAt?: SortOrderInput | SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+    _count?: SavedBlockCountOrderByAggregateInput
+    _avg?: SavedBlockAvgOrderByAggregateInput
+    _max?: SavedBlockMaxOrderByAggregateInput
+    _min?: SavedBlockMinOrderByAggregateInput
+    _sum?: SavedBlockSumOrderByAggregateInput
+  }
+
+  export type SavedBlockScalarWhereWithAggregatesInput = {
+    AND?: SavedBlockScalarWhereWithAggregatesInput | SavedBlockScalarWhereWithAggregatesInput[]
+    OR?: SavedBlockScalarWhereWithAggregatesInput[]
+    NOT?: SavedBlockScalarWhereWithAggregatesInput | SavedBlockScalarWhereWithAggregatesInput[]
+    id?: UuidWithAggregatesFilter<"SavedBlock"> | string
+    title?: StringWithAggregatesFilter<"SavedBlock"> | string
+    blockType?: StringWithAggregatesFilter<"SavedBlock"> | string
+    tiptapJson?: JsonWithAggregatesFilter<"SavedBlock">
+    searchText?: StringWithAggregatesFilter<"SavedBlock"> | string
+    categoryId?: UuidWithAggregatesFilter<"SavedBlock"> | string
+    userId?: UuidNullableWithAggregatesFilter<"SavedBlock"> | string | null
+    usageCount?: IntWithAggregatesFilter<"SavedBlock"> | number
+    lastUsedAt?: DateTimeNullableWithAggregatesFilter<"SavedBlock"> | Date | string | null
+    createdAt?: DateTimeWithAggregatesFilter<"SavedBlock"> | Date | string
+    updatedAt?: DateTimeWithAggregatesFilter<"SavedBlock"> | Date | string
+  }
+
+  export type ContentTemplateWhereInput = {
+    AND?: ContentTemplateWhereInput | ContentTemplateWhereInput[]
+    OR?: ContentTemplateWhereInput[]
+    NOT?: ContentTemplateWhereInput | ContentTemplateWhereInput[]
+    id?: UuidFilter<"ContentTemplate"> | string
+    title?: StringFilter<"ContentTemplate"> | string
+    tiptapJson?: JsonFilter<"ContentTemplate">
+    searchText?: StringFilter<"ContentTemplate"> | string
+    categoryId?: UuidFilter<"ContentTemplate"> | string
+    userId?: UuidFilter<"ContentTemplate"> | string
+    usageCount?: IntFilter<"ContentTemplate"> | number
+    lastUsedAt?: DateTimeNullableFilter<"ContentTemplate"> | Date | string | null
+    createdAt?: DateTimeFilter<"ContentTemplate"> | Date | string
+    updatedAt?: DateTimeFilter<"ContentTemplate"> | Date | string
+    category?: XOR<ReusableCategoryScalarRelationFilter, ReusableCategoryWhereInput>
+    user?: XOR<UserScalarRelationFilter, UserWhereInput>
+  }
+
+  export type ContentTemplateOrderByWithRelationInput = {
+    id?: SortOrder
+    title?: SortOrder
+    tiptapJson?: SortOrder
+    searchText?: SortOrder
+    categoryId?: SortOrder
+    userId?: SortOrder
+    usageCount?: SortOrder
+    lastUsedAt?: SortOrderInput | SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+    category?: ReusableCategoryOrderByWithRelationInput
+    user?: UserOrderByWithRelationInput
+  }
+
+  export type ContentTemplateWhereUniqueInput = Prisma.AtLeast<{
+    id?: string
+    AND?: ContentTemplateWhereInput | ContentTemplateWhereInput[]
+    OR?: ContentTemplateWhereInput[]
+    NOT?: ContentTemplateWhereInput | ContentTemplateWhereInput[]
+    title?: StringFilter<"ContentTemplate"> | string
+    tiptapJson?: JsonFilter<"ContentTemplate">
+    searchText?: StringFilter<"ContentTemplate"> | string
+    categoryId?: UuidFilter<"ContentTemplate"> | string
+    userId?: UuidFilter<"ContentTemplate"> | string
+    usageCount?: IntFilter<"ContentTemplate"> | number
+    lastUsedAt?: DateTimeNullableFilter<"ContentTemplate"> | Date | string | null
+    createdAt?: DateTimeFilter<"ContentTemplate"> | Date | string
+    updatedAt?: DateTimeFilter<"ContentTemplate"> | Date | string
+    category?: XOR<ReusableCategoryScalarRelationFilter, ReusableCategoryWhereInput>
+    user?: XOR<UserScalarRelationFilter, UserWhereInput>
+  }, "id">
+
+  export type ContentTemplateOrderByWithAggregationInput = {
+    id?: SortOrder
+    title?: SortOrder
+    tiptapJson?: SortOrder
+    searchText?: SortOrder
+    categoryId?: SortOrder
+    userId?: SortOrder
+    usageCount?: SortOrder
+    lastUsedAt?: SortOrderInput | SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+    _count?: ContentTemplateCountOrderByAggregateInput
+    _avg?: ContentTemplateAvgOrderByAggregateInput
+    _max?: ContentTemplateMaxOrderByAggregateInput
+    _min?: ContentTemplateMinOrderByAggregateInput
+    _sum?: ContentTemplateSumOrderByAggregateInput
+  }
+
+  export type ContentTemplateScalarWhereWithAggregatesInput = {
+    AND?: ContentTemplateScalarWhereWithAggregatesInput | ContentTemplateScalarWhereWithAggregatesInput[]
+    OR?: ContentTemplateScalarWhereWithAggregatesInput[]
+    NOT?: ContentTemplateScalarWhereWithAggregatesInput | ContentTemplateScalarWhereWithAggregatesInput[]
+    id?: UuidWithAggregatesFilter<"ContentTemplate"> | string
+    title?: StringWithAggregatesFilter<"ContentTemplate"> | string
+    tiptapJson?: JsonWithAggregatesFilter<"ContentTemplate">
+    searchText?: StringWithAggregatesFilter<"ContentTemplate"> | string
+    categoryId?: UuidWithAggregatesFilter<"ContentTemplate"> | string
+    userId?: UuidWithAggregatesFilter<"ContentTemplate"> | string
+    usageCount?: IntWithAggregatesFilter<"ContentTemplate"> | number
+    lastUsedAt?: DateTimeNullableWithAggregatesFilter<"ContentTemplate"> | Date | string | null
+    createdAt?: DateTimeWithAggregatesFilter<"ContentTemplate"> | Date | string
+    updatedAt?: DateTimeWithAggregatesFilter<"ContentTemplate"> | Date | string
+  }
+
+  export type SnippetWhereInput = {
+    AND?: SnippetWhereInput | SnippetWhereInput[]
+    OR?: SnippetWhereInput[]
+    NOT?: SnippetWhereInput | SnippetWhereInput[]
+    id?: UuidFilter<"Snippet"> | string
+    title?: StringNullableFilter<"Snippet"> | string | null
+    content?: StringFilter<"Snippet"> | string
+    tiptapJson?: JsonNullableFilter<"Snippet">
+    searchText?: StringFilter<"Snippet"> | string
+    categoryId?: UuidFilter<"Snippet"> | string
+    userId?: UuidFilter<"Snippet"> | string
+    usageCount?: IntFilter<"Snippet"> | number
+    lastUsedAt?: DateTimeNullableFilter<"Snippet"> | Date | string | null
+    isAiContext?: BoolFilter<"Snippet"> | boolean
+    isVisibleInUI?: BoolFilter<"Snippet"> | boolean
+    createdAt?: DateTimeFilter<"Snippet"> | Date | string
+    updatedAt?: DateTimeFilter<"Snippet"> | Date | string
+    category?: XOR<ReusableCategoryScalarRelationFilter, ReusableCategoryWhereInput>
+    user?: XOR<UserScalarRelationFilter, UserWhereInput>
+  }
+
+  export type SnippetOrderByWithRelationInput = {
+    id?: SortOrder
+    title?: SortOrderInput | SortOrder
+    content?: SortOrder
+    tiptapJson?: SortOrderInput | SortOrder
+    searchText?: SortOrder
+    categoryId?: SortOrder
+    userId?: SortOrder
+    usageCount?: SortOrder
+    lastUsedAt?: SortOrderInput | SortOrder
+    isAiContext?: SortOrder
+    isVisibleInUI?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+    category?: ReusableCategoryOrderByWithRelationInput
+    user?: UserOrderByWithRelationInput
+  }
+
+  export type SnippetWhereUniqueInput = Prisma.AtLeast<{
+    id?: string
+    AND?: SnippetWhereInput | SnippetWhereInput[]
+    OR?: SnippetWhereInput[]
+    NOT?: SnippetWhereInput | SnippetWhereInput[]
+    title?: StringNullableFilter<"Snippet"> | string | null
+    content?: StringFilter<"Snippet"> | string
+    tiptapJson?: JsonNullableFilter<"Snippet">
+    searchText?: StringFilter<"Snippet"> | string
+    categoryId?: UuidFilter<"Snippet"> | string
+    userId?: UuidFilter<"Snippet"> | string
+    usageCount?: IntFilter<"Snippet"> | number
+    lastUsedAt?: DateTimeNullableFilter<"Snippet"> | Date | string | null
+    isAiContext?: BoolFilter<"Snippet"> | boolean
+    isVisibleInUI?: BoolFilter<"Snippet"> | boolean
+    createdAt?: DateTimeFilter<"Snippet"> | Date | string
+    updatedAt?: DateTimeFilter<"Snippet"> | Date | string
+    category?: XOR<ReusableCategoryScalarRelationFilter, ReusableCategoryWhereInput>
+    user?: XOR<UserScalarRelationFilter, UserWhereInput>
+  }, "id">
+
+  export type SnippetOrderByWithAggregationInput = {
+    id?: SortOrder
+    title?: SortOrderInput | SortOrder
+    content?: SortOrder
+    tiptapJson?: SortOrderInput | SortOrder
+    searchText?: SortOrder
+    categoryId?: SortOrder
+    userId?: SortOrder
+    usageCount?: SortOrder
+    lastUsedAt?: SortOrderInput | SortOrder
+    isAiContext?: SortOrder
+    isVisibleInUI?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+    _count?: SnippetCountOrderByAggregateInput
+    _avg?: SnippetAvgOrderByAggregateInput
+    _max?: SnippetMaxOrderByAggregateInput
+    _min?: SnippetMinOrderByAggregateInput
+    _sum?: SnippetSumOrderByAggregateInput
+  }
+
+  export type SnippetScalarWhereWithAggregatesInput = {
+    AND?: SnippetScalarWhereWithAggregatesInput | SnippetScalarWhereWithAggregatesInput[]
+    OR?: SnippetScalarWhereWithAggregatesInput[]
+    NOT?: SnippetScalarWhereWithAggregatesInput | SnippetScalarWhereWithAggregatesInput[]
+    id?: UuidWithAggregatesFilter<"Snippet"> | string
+    title?: StringNullableWithAggregatesFilter<"Snippet"> | string | null
+    content?: StringWithAggregatesFilter<"Snippet"> | string
+    tiptapJson?: JsonNullableWithAggregatesFilter<"Snippet">
+    searchText?: StringWithAggregatesFilter<"Snippet"> | string
+    categoryId?: UuidWithAggregatesFilter<"Snippet"> | string
+    userId?: UuidWithAggregatesFilter<"Snippet"> | string
+    usageCount?: IntWithAggregatesFilter<"Snippet"> | number
+    lastUsedAt?: DateTimeNullableWithAggregatesFilter<"Snippet"> | Date | string | null
+    isAiContext?: BoolWithAggregatesFilter<"Snippet"> | boolean
+    isVisibleInUI?: BoolWithAggregatesFilter<"Snippet"> | boolean
+    createdAt?: DateTimeWithAggregatesFilter<"Snippet"> | Date | string
+    updatedAt?: DateTimeWithAggregatesFilter<"Snippet"> | Date | string
+  }
+
+  export type PageTemplateWhereInput = {
+    AND?: PageTemplateWhereInput | PageTemplateWhereInput[]
+    OR?: PageTemplateWhereInput[]
+    NOT?: PageTemplateWhereInput | PageTemplateWhereInput[]
+    id?: UuidFilter<"PageTemplate"> | string
+    title?: StringFilter<"PageTemplate"> | string
+    tiptapJson?: JsonFilter<"PageTemplate">
+    searchText?: StringFilter<"PageTemplate"> | string
+    categoryId?: UuidFilter<"PageTemplate"> | string
+    userId?: UuidNullableFilter<"PageTemplate"> | string | null
+    defaultTitle?: StringNullableFilter<"PageTemplate"> | string | null
+    customIcon?: StringNullableFilter<"PageTemplate"> | string | null
+    iconColor?: StringNullableFilter<"PageTemplate"> | string | null
+    usageCount?: IntFilter<"PageTemplate"> | number
+    createdAt?: DateTimeFilter<"PageTemplate"> | Date | string
+    updatedAt?: DateTimeFilter<"PageTemplate"> | Date | string
+    category?: XOR<ReusableCategoryScalarRelationFilter, ReusableCategoryWhereInput>
+    user?: XOR<UserNullableScalarRelationFilter, UserWhereInput> | null
+  }
+
+  export type PageTemplateOrderByWithRelationInput = {
+    id?: SortOrder
+    title?: SortOrder
+    tiptapJson?: SortOrder
+    searchText?: SortOrder
+    categoryId?: SortOrder
+    userId?: SortOrderInput | SortOrder
+    defaultTitle?: SortOrderInput | SortOrder
+    customIcon?: SortOrderInput | SortOrder
+    iconColor?: SortOrderInput | SortOrder
+    usageCount?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+    category?: ReusableCategoryOrderByWithRelationInput
+    user?: UserOrderByWithRelationInput
+  }
+
+  export type PageTemplateWhereUniqueInput = Prisma.AtLeast<{
+    id?: string
+    AND?: PageTemplateWhereInput | PageTemplateWhereInput[]
+    OR?: PageTemplateWhereInput[]
+    NOT?: PageTemplateWhereInput | PageTemplateWhereInput[]
+    title?: StringFilter<"PageTemplate"> | string
+    tiptapJson?: JsonFilter<"PageTemplate">
+    searchText?: StringFilter<"PageTemplate"> | string
+    categoryId?: UuidFilter<"PageTemplate"> | string
+    userId?: UuidNullableFilter<"PageTemplate"> | string | null
+    defaultTitle?: StringNullableFilter<"PageTemplate"> | string | null
+    customIcon?: StringNullableFilter<"PageTemplate"> | string | null
+    iconColor?: StringNullableFilter<"PageTemplate"> | string | null
+    usageCount?: IntFilter<"PageTemplate"> | number
+    createdAt?: DateTimeFilter<"PageTemplate"> | Date | string
+    updatedAt?: DateTimeFilter<"PageTemplate"> | Date | string
+    category?: XOR<ReusableCategoryScalarRelationFilter, ReusableCategoryWhereInput>
+    user?: XOR<UserNullableScalarRelationFilter, UserWhereInput> | null
+  }, "id">
+
+  export type PageTemplateOrderByWithAggregationInput = {
+    id?: SortOrder
+    title?: SortOrder
+    tiptapJson?: SortOrder
+    searchText?: SortOrder
+    categoryId?: SortOrder
+    userId?: SortOrderInput | SortOrder
+    defaultTitle?: SortOrderInput | SortOrder
+    customIcon?: SortOrderInput | SortOrder
+    iconColor?: SortOrderInput | SortOrder
+    usageCount?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+    _count?: PageTemplateCountOrderByAggregateInput
+    _avg?: PageTemplateAvgOrderByAggregateInput
+    _max?: PageTemplateMaxOrderByAggregateInput
+    _min?: PageTemplateMinOrderByAggregateInput
+    _sum?: PageTemplateSumOrderByAggregateInput
+  }
+
+  export type PageTemplateScalarWhereWithAggregatesInput = {
+    AND?: PageTemplateScalarWhereWithAggregatesInput | PageTemplateScalarWhereWithAggregatesInput[]
+    OR?: PageTemplateScalarWhereWithAggregatesInput[]
+    NOT?: PageTemplateScalarWhereWithAggregatesInput | PageTemplateScalarWhereWithAggregatesInput[]
+    id?: UuidWithAggregatesFilter<"PageTemplate"> | string
+    title?: StringWithAggregatesFilter<"PageTemplate"> | string
+    tiptapJson?: JsonWithAggregatesFilter<"PageTemplate">
+    searchText?: StringWithAggregatesFilter<"PageTemplate"> | string
+    categoryId?: UuidWithAggregatesFilter<"PageTemplate"> | string
+    userId?: UuidNullableWithAggregatesFilter<"PageTemplate"> | string | null
+    defaultTitle?: StringNullableWithAggregatesFilter<"PageTemplate"> | string | null
+    customIcon?: StringNullableWithAggregatesFilter<"PageTemplate"> | string | null
+    iconColor?: StringNullableWithAggregatesFilter<"PageTemplate"> | string | null
+    usageCount?: IntWithAggregatesFilter<"PageTemplate"> | number
+    createdAt?: DateTimeWithAggregatesFilter<"PageTemplate"> | Date | string
+    updatedAt?: DateTimeWithAggregatesFilter<"PageTemplate"> | Date | string
   }
 
   export type TagWhereInput = {
@@ -43029,6 +50601,11 @@ export namespace Prisma {
     auditTargets?: AuditLogCreateNestedManyWithoutTargetUserInput
     adminActions?: AuditLogCreateNestedManyWithoutUserInput
     categories?: CategoryCreateNestedManyWithoutOwnerInput
+    reusableCategories?: ReusableCategoryCreateNestedManyWithoutUserInput
+    savedBlocks?: SavedBlockCreateNestedManyWithoutUserInput
+    contentTemplates?: ContentTemplateCreateNestedManyWithoutUserInput
+    snippets?: SnippetCreateNestedManyWithoutUserInput
+    pageTemplates?: PageTemplateCreateNestedManyWithoutUserInput
     calendarConnections?: CalendarConnectionCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventCreateNestedManyWithoutUserInput
     calendarSources?: CalendarSourceCreateNestedManyWithoutUserInput
@@ -43056,6 +50633,11 @@ export namespace Prisma {
     auditTargets?: AuditLogUncheckedCreateNestedManyWithoutTargetUserInput
     adminActions?: AuditLogUncheckedCreateNestedManyWithoutUserInput
     categories?: CategoryUncheckedCreateNestedManyWithoutOwnerInput
+    reusableCategories?: ReusableCategoryUncheckedCreateNestedManyWithoutUserInput
+    savedBlocks?: SavedBlockUncheckedCreateNestedManyWithoutUserInput
+    contentTemplates?: ContentTemplateUncheckedCreateNestedManyWithoutUserInput
+    snippets?: SnippetUncheckedCreateNestedManyWithoutUserInput
+    pageTemplates?: PageTemplateUncheckedCreateNestedManyWithoutUserInput
     calendarConnections?: CalendarConnectionUncheckedCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutUserInput
     calendarSources?: CalendarSourceUncheckedCreateNestedManyWithoutUserInput
@@ -43083,6 +50665,11 @@ export namespace Prisma {
     auditTargets?: AuditLogUpdateManyWithoutTargetUserNestedInput
     adminActions?: AuditLogUpdateManyWithoutUserNestedInput
     categories?: CategoryUpdateManyWithoutOwnerNestedInput
+    reusableCategories?: ReusableCategoryUpdateManyWithoutUserNestedInput
+    savedBlocks?: SavedBlockUpdateManyWithoutUserNestedInput
+    contentTemplates?: ContentTemplateUpdateManyWithoutUserNestedInput
+    snippets?: SnippetUpdateManyWithoutUserNestedInput
+    pageTemplates?: PageTemplateUpdateManyWithoutUserNestedInput
     calendarConnections?: CalendarConnectionUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUpdateManyWithoutUserNestedInput
     calendarSources?: CalendarSourceUpdateManyWithoutUserNestedInput
@@ -43110,6 +50697,11 @@ export namespace Prisma {
     auditTargets?: AuditLogUncheckedUpdateManyWithoutTargetUserNestedInput
     adminActions?: AuditLogUncheckedUpdateManyWithoutUserNestedInput
     categories?: CategoryUncheckedUpdateManyWithoutOwnerNestedInput
+    reusableCategories?: ReusableCategoryUncheckedUpdateManyWithoutUserNestedInput
+    savedBlocks?: SavedBlockUncheckedUpdateManyWithoutUserNestedInput
+    contentTemplates?: ContentTemplateUncheckedUpdateManyWithoutUserNestedInput
+    snippets?: SnippetUncheckedUpdateManyWithoutUserNestedInput
+    pageTemplates?: PageTemplateUncheckedUpdateManyWithoutUserNestedInput
     calendarConnections?: CalendarConnectionUncheckedUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUncheckedUpdateManyWithoutUserNestedInput
     calendarSources?: CalendarSourceUncheckedUpdateManyWithoutUserNestedInput
@@ -43241,6 +50833,506 @@ export namespace Prisma {
     ownerId?: StringFieldUpdateOperationsInput | string
     displayOrder?: IntFieldUpdateOperationsInput | number
     isPublished?: BoolFieldUpdateOperationsInput | boolean
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type ReusableCategoryCreateInput = {
+    id?: string
+    name: string
+    slug: string
+    scope: $Enums.ReusableCategoryScope
+    displayOrder?: number
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    user?: UserCreateNestedOneWithoutReusableCategoriesInput
+    parent?: ReusableCategoryCreateNestedOneWithoutChildrenInput
+    children?: ReusableCategoryCreateNestedManyWithoutParentInput
+    savedBlocks?: SavedBlockCreateNestedManyWithoutCategoryInput
+    contentTemplates?: ContentTemplateCreateNestedManyWithoutCategoryInput
+    snippets?: SnippetCreateNestedManyWithoutCategoryInput
+    pageTemplates?: PageTemplateCreateNestedManyWithoutCategoryInput
+  }
+
+  export type ReusableCategoryUncheckedCreateInput = {
+    id?: string
+    name: string
+    slug: string
+    scope: $Enums.ReusableCategoryScope
+    userId?: string | null
+    parentId?: string | null
+    displayOrder?: number
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    children?: ReusableCategoryUncheckedCreateNestedManyWithoutParentInput
+    savedBlocks?: SavedBlockUncheckedCreateNestedManyWithoutCategoryInput
+    contentTemplates?: ContentTemplateUncheckedCreateNestedManyWithoutCategoryInput
+    snippets?: SnippetUncheckedCreateNestedManyWithoutCategoryInput
+    pageTemplates?: PageTemplateUncheckedCreateNestedManyWithoutCategoryInput
+  }
+
+  export type ReusableCategoryUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    slug?: StringFieldUpdateOperationsInput | string
+    scope?: EnumReusableCategoryScopeFieldUpdateOperationsInput | $Enums.ReusableCategoryScope
+    displayOrder?: IntFieldUpdateOperationsInput | number
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    user?: UserUpdateOneWithoutReusableCategoriesNestedInput
+    parent?: ReusableCategoryUpdateOneWithoutChildrenNestedInput
+    children?: ReusableCategoryUpdateManyWithoutParentNestedInput
+    savedBlocks?: SavedBlockUpdateManyWithoutCategoryNestedInput
+    contentTemplates?: ContentTemplateUpdateManyWithoutCategoryNestedInput
+    snippets?: SnippetUpdateManyWithoutCategoryNestedInput
+    pageTemplates?: PageTemplateUpdateManyWithoutCategoryNestedInput
+  }
+
+  export type ReusableCategoryUncheckedUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    slug?: StringFieldUpdateOperationsInput | string
+    scope?: EnumReusableCategoryScopeFieldUpdateOperationsInput | $Enums.ReusableCategoryScope
+    userId?: NullableStringFieldUpdateOperationsInput | string | null
+    parentId?: NullableStringFieldUpdateOperationsInput | string | null
+    displayOrder?: IntFieldUpdateOperationsInput | number
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    children?: ReusableCategoryUncheckedUpdateManyWithoutParentNestedInput
+    savedBlocks?: SavedBlockUncheckedUpdateManyWithoutCategoryNestedInput
+    contentTemplates?: ContentTemplateUncheckedUpdateManyWithoutCategoryNestedInput
+    snippets?: SnippetUncheckedUpdateManyWithoutCategoryNestedInput
+    pageTemplates?: PageTemplateUncheckedUpdateManyWithoutCategoryNestedInput
+  }
+
+  export type ReusableCategoryCreateManyInput = {
+    id?: string
+    name: string
+    slug: string
+    scope: $Enums.ReusableCategoryScope
+    userId?: string | null
+    parentId?: string | null
+    displayOrder?: number
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type ReusableCategoryUpdateManyMutationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    slug?: StringFieldUpdateOperationsInput | string
+    scope?: EnumReusableCategoryScopeFieldUpdateOperationsInput | $Enums.ReusableCategoryScope
+    displayOrder?: IntFieldUpdateOperationsInput | number
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type ReusableCategoryUncheckedUpdateManyInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    slug?: StringFieldUpdateOperationsInput | string
+    scope?: EnumReusableCategoryScopeFieldUpdateOperationsInput | $Enums.ReusableCategoryScope
+    userId?: NullableStringFieldUpdateOperationsInput | string | null
+    parentId?: NullableStringFieldUpdateOperationsInput | string | null
+    displayOrder?: IntFieldUpdateOperationsInput | number
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type SavedBlockCreateInput = {
+    id?: string
+    title: string
+    blockType: string
+    tiptapJson: JsonNullValueInput | InputJsonValue
+    searchText?: string
+    usageCount?: number
+    lastUsedAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    category: ReusableCategoryCreateNestedOneWithoutSavedBlocksInput
+    user?: UserCreateNestedOneWithoutSavedBlocksInput
+  }
+
+  export type SavedBlockUncheckedCreateInput = {
+    id?: string
+    title: string
+    blockType: string
+    tiptapJson: JsonNullValueInput | InputJsonValue
+    searchText?: string
+    categoryId: string
+    userId?: string | null
+    usageCount?: number
+    lastUsedAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type SavedBlockUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    title?: StringFieldUpdateOperationsInput | string
+    blockType?: StringFieldUpdateOperationsInput | string
+    tiptapJson?: JsonNullValueInput | InputJsonValue
+    searchText?: StringFieldUpdateOperationsInput | string
+    usageCount?: IntFieldUpdateOperationsInput | number
+    lastUsedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    category?: ReusableCategoryUpdateOneRequiredWithoutSavedBlocksNestedInput
+    user?: UserUpdateOneWithoutSavedBlocksNestedInput
+  }
+
+  export type SavedBlockUncheckedUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    title?: StringFieldUpdateOperationsInput | string
+    blockType?: StringFieldUpdateOperationsInput | string
+    tiptapJson?: JsonNullValueInput | InputJsonValue
+    searchText?: StringFieldUpdateOperationsInput | string
+    categoryId?: StringFieldUpdateOperationsInput | string
+    userId?: NullableStringFieldUpdateOperationsInput | string | null
+    usageCount?: IntFieldUpdateOperationsInput | number
+    lastUsedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type SavedBlockCreateManyInput = {
+    id?: string
+    title: string
+    blockType: string
+    tiptapJson: JsonNullValueInput | InputJsonValue
+    searchText?: string
+    categoryId: string
+    userId?: string | null
+    usageCount?: number
+    lastUsedAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type SavedBlockUpdateManyMutationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    title?: StringFieldUpdateOperationsInput | string
+    blockType?: StringFieldUpdateOperationsInput | string
+    tiptapJson?: JsonNullValueInput | InputJsonValue
+    searchText?: StringFieldUpdateOperationsInput | string
+    usageCount?: IntFieldUpdateOperationsInput | number
+    lastUsedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type SavedBlockUncheckedUpdateManyInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    title?: StringFieldUpdateOperationsInput | string
+    blockType?: StringFieldUpdateOperationsInput | string
+    tiptapJson?: JsonNullValueInput | InputJsonValue
+    searchText?: StringFieldUpdateOperationsInput | string
+    categoryId?: StringFieldUpdateOperationsInput | string
+    userId?: NullableStringFieldUpdateOperationsInput | string | null
+    usageCount?: IntFieldUpdateOperationsInput | number
+    lastUsedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type ContentTemplateCreateInput = {
+    id?: string
+    title: string
+    tiptapJson: JsonNullValueInput | InputJsonValue
+    searchText?: string
+    usageCount?: number
+    lastUsedAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    category: ReusableCategoryCreateNestedOneWithoutContentTemplatesInput
+    user: UserCreateNestedOneWithoutContentTemplatesInput
+  }
+
+  export type ContentTemplateUncheckedCreateInput = {
+    id?: string
+    title: string
+    tiptapJson: JsonNullValueInput | InputJsonValue
+    searchText?: string
+    categoryId: string
+    userId: string
+    usageCount?: number
+    lastUsedAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type ContentTemplateUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    title?: StringFieldUpdateOperationsInput | string
+    tiptapJson?: JsonNullValueInput | InputJsonValue
+    searchText?: StringFieldUpdateOperationsInput | string
+    usageCount?: IntFieldUpdateOperationsInput | number
+    lastUsedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    category?: ReusableCategoryUpdateOneRequiredWithoutContentTemplatesNestedInput
+    user?: UserUpdateOneRequiredWithoutContentTemplatesNestedInput
+  }
+
+  export type ContentTemplateUncheckedUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    title?: StringFieldUpdateOperationsInput | string
+    tiptapJson?: JsonNullValueInput | InputJsonValue
+    searchText?: StringFieldUpdateOperationsInput | string
+    categoryId?: StringFieldUpdateOperationsInput | string
+    userId?: StringFieldUpdateOperationsInput | string
+    usageCount?: IntFieldUpdateOperationsInput | number
+    lastUsedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type ContentTemplateCreateManyInput = {
+    id?: string
+    title: string
+    tiptapJson: JsonNullValueInput | InputJsonValue
+    searchText?: string
+    categoryId: string
+    userId: string
+    usageCount?: number
+    lastUsedAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type ContentTemplateUpdateManyMutationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    title?: StringFieldUpdateOperationsInput | string
+    tiptapJson?: JsonNullValueInput | InputJsonValue
+    searchText?: StringFieldUpdateOperationsInput | string
+    usageCount?: IntFieldUpdateOperationsInput | number
+    lastUsedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type ContentTemplateUncheckedUpdateManyInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    title?: StringFieldUpdateOperationsInput | string
+    tiptapJson?: JsonNullValueInput | InputJsonValue
+    searchText?: StringFieldUpdateOperationsInput | string
+    categoryId?: StringFieldUpdateOperationsInput | string
+    userId?: StringFieldUpdateOperationsInput | string
+    usageCount?: IntFieldUpdateOperationsInput | number
+    lastUsedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type SnippetCreateInput = {
+    id?: string
+    title?: string | null
+    content: string
+    tiptapJson?: NullableJsonNullValueInput | InputJsonValue
+    searchText?: string
+    usageCount?: number
+    lastUsedAt?: Date | string | null
+    isAiContext?: boolean
+    isVisibleInUI?: boolean
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    category: ReusableCategoryCreateNestedOneWithoutSnippetsInput
+    user: UserCreateNestedOneWithoutSnippetsInput
+  }
+
+  export type SnippetUncheckedCreateInput = {
+    id?: string
+    title?: string | null
+    content: string
+    tiptapJson?: NullableJsonNullValueInput | InputJsonValue
+    searchText?: string
+    categoryId: string
+    userId: string
+    usageCount?: number
+    lastUsedAt?: Date | string | null
+    isAiContext?: boolean
+    isVisibleInUI?: boolean
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type SnippetUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    title?: NullableStringFieldUpdateOperationsInput | string | null
+    content?: StringFieldUpdateOperationsInput | string
+    tiptapJson?: NullableJsonNullValueInput | InputJsonValue
+    searchText?: StringFieldUpdateOperationsInput | string
+    usageCount?: IntFieldUpdateOperationsInput | number
+    lastUsedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    isAiContext?: BoolFieldUpdateOperationsInput | boolean
+    isVisibleInUI?: BoolFieldUpdateOperationsInput | boolean
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    category?: ReusableCategoryUpdateOneRequiredWithoutSnippetsNestedInput
+    user?: UserUpdateOneRequiredWithoutSnippetsNestedInput
+  }
+
+  export type SnippetUncheckedUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    title?: NullableStringFieldUpdateOperationsInput | string | null
+    content?: StringFieldUpdateOperationsInput | string
+    tiptapJson?: NullableJsonNullValueInput | InputJsonValue
+    searchText?: StringFieldUpdateOperationsInput | string
+    categoryId?: StringFieldUpdateOperationsInput | string
+    userId?: StringFieldUpdateOperationsInput | string
+    usageCount?: IntFieldUpdateOperationsInput | number
+    lastUsedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    isAiContext?: BoolFieldUpdateOperationsInput | boolean
+    isVisibleInUI?: BoolFieldUpdateOperationsInput | boolean
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type SnippetCreateManyInput = {
+    id?: string
+    title?: string | null
+    content: string
+    tiptapJson?: NullableJsonNullValueInput | InputJsonValue
+    searchText?: string
+    categoryId: string
+    userId: string
+    usageCount?: number
+    lastUsedAt?: Date | string | null
+    isAiContext?: boolean
+    isVisibleInUI?: boolean
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type SnippetUpdateManyMutationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    title?: NullableStringFieldUpdateOperationsInput | string | null
+    content?: StringFieldUpdateOperationsInput | string
+    tiptapJson?: NullableJsonNullValueInput | InputJsonValue
+    searchText?: StringFieldUpdateOperationsInput | string
+    usageCount?: IntFieldUpdateOperationsInput | number
+    lastUsedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    isAiContext?: BoolFieldUpdateOperationsInput | boolean
+    isVisibleInUI?: BoolFieldUpdateOperationsInput | boolean
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type SnippetUncheckedUpdateManyInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    title?: NullableStringFieldUpdateOperationsInput | string | null
+    content?: StringFieldUpdateOperationsInput | string
+    tiptapJson?: NullableJsonNullValueInput | InputJsonValue
+    searchText?: StringFieldUpdateOperationsInput | string
+    categoryId?: StringFieldUpdateOperationsInput | string
+    userId?: StringFieldUpdateOperationsInput | string
+    usageCount?: IntFieldUpdateOperationsInput | number
+    lastUsedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    isAiContext?: BoolFieldUpdateOperationsInput | boolean
+    isVisibleInUI?: BoolFieldUpdateOperationsInput | boolean
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type PageTemplateCreateInput = {
+    id?: string
+    title: string
+    tiptapJson: JsonNullValueInput | InputJsonValue
+    searchText?: string
+    defaultTitle?: string | null
+    customIcon?: string | null
+    iconColor?: string | null
+    usageCount?: number
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    category: ReusableCategoryCreateNestedOneWithoutPageTemplatesInput
+    user?: UserCreateNestedOneWithoutPageTemplatesInput
+  }
+
+  export type PageTemplateUncheckedCreateInput = {
+    id?: string
+    title: string
+    tiptapJson: JsonNullValueInput | InputJsonValue
+    searchText?: string
+    categoryId: string
+    userId?: string | null
+    defaultTitle?: string | null
+    customIcon?: string | null
+    iconColor?: string | null
+    usageCount?: number
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type PageTemplateUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    title?: StringFieldUpdateOperationsInput | string
+    tiptapJson?: JsonNullValueInput | InputJsonValue
+    searchText?: StringFieldUpdateOperationsInput | string
+    defaultTitle?: NullableStringFieldUpdateOperationsInput | string | null
+    customIcon?: NullableStringFieldUpdateOperationsInput | string | null
+    iconColor?: NullableStringFieldUpdateOperationsInput | string | null
+    usageCount?: IntFieldUpdateOperationsInput | number
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    category?: ReusableCategoryUpdateOneRequiredWithoutPageTemplatesNestedInput
+    user?: UserUpdateOneWithoutPageTemplatesNestedInput
+  }
+
+  export type PageTemplateUncheckedUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    title?: StringFieldUpdateOperationsInput | string
+    tiptapJson?: JsonNullValueInput | InputJsonValue
+    searchText?: StringFieldUpdateOperationsInput | string
+    categoryId?: StringFieldUpdateOperationsInput | string
+    userId?: NullableStringFieldUpdateOperationsInput | string | null
+    defaultTitle?: NullableStringFieldUpdateOperationsInput | string | null
+    customIcon?: NullableStringFieldUpdateOperationsInput | string | null
+    iconColor?: NullableStringFieldUpdateOperationsInput | string | null
+    usageCount?: IntFieldUpdateOperationsInput | number
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type PageTemplateCreateManyInput = {
+    id?: string
+    title: string
+    tiptapJson: JsonNullValueInput | InputJsonValue
+    searchText?: string
+    categoryId: string
+    userId?: string | null
+    defaultTitle?: string | null
+    customIcon?: string | null
+    iconColor?: string | null
+    usageCount?: number
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type PageTemplateUpdateManyMutationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    title?: StringFieldUpdateOperationsInput | string
+    tiptapJson?: JsonNullValueInput | InputJsonValue
+    searchText?: StringFieldUpdateOperationsInput | string
+    defaultTitle?: NullableStringFieldUpdateOperationsInput | string | null
+    customIcon?: NullableStringFieldUpdateOperationsInput | string | null
+    iconColor?: NullableStringFieldUpdateOperationsInput | string | null
+    usageCount?: IntFieldUpdateOperationsInput | number
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type PageTemplateUncheckedUpdateManyInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    title?: StringFieldUpdateOperationsInput | string
+    tiptapJson?: JsonNullValueInput | InputJsonValue
+    searchText?: StringFieldUpdateOperationsInput | string
+    categoryId?: StringFieldUpdateOperationsInput | string
+    userId?: NullableStringFieldUpdateOperationsInput | string | null
+    defaultTitle?: NullableStringFieldUpdateOperationsInput | string | null
+    customIcon?: NullableStringFieldUpdateOperationsInput | string | null
+    iconColor?: NullableStringFieldUpdateOperationsInput | string | null
+    usageCount?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -45657,6 +53749,36 @@ export namespace Prisma {
     none?: CategoryWhereInput
   }
 
+  export type ReusableCategoryListRelationFilter = {
+    every?: ReusableCategoryWhereInput
+    some?: ReusableCategoryWhereInput
+    none?: ReusableCategoryWhereInput
+  }
+
+  export type SavedBlockListRelationFilter = {
+    every?: SavedBlockWhereInput
+    some?: SavedBlockWhereInput
+    none?: SavedBlockWhereInput
+  }
+
+  export type ContentTemplateListRelationFilter = {
+    every?: ContentTemplateWhereInput
+    some?: ContentTemplateWhereInput
+    none?: ContentTemplateWhereInput
+  }
+
+  export type SnippetListRelationFilter = {
+    every?: SnippetWhereInput
+    some?: SnippetWhereInput
+    none?: SnippetWhereInput
+  }
+
+  export type PageTemplateListRelationFilter = {
+    every?: PageTemplateWhereInput
+    some?: PageTemplateWhereInput
+    none?: PageTemplateWhereInput
+  }
+
   export type CalendarConnectionListRelationFilter = {
     every?: CalendarConnectionWhereInput
     some?: CalendarConnectionWhereInput
@@ -45702,6 +53824,26 @@ export namespace Prisma {
   }
 
   export type CategoryOrderByRelationAggregateInput = {
+    _count?: SortOrder
+  }
+
+  export type ReusableCategoryOrderByRelationAggregateInput = {
+    _count?: SortOrder
+  }
+
+  export type SavedBlockOrderByRelationAggregateInput = {
+    _count?: SortOrder
+  }
+
+  export type ContentTemplateOrderByRelationAggregateInput = {
+    _count?: SortOrder
+  }
+
+  export type SnippetOrderByRelationAggregateInput = {
+    _count?: SortOrder
+  }
+
+  export type PageTemplateOrderByRelationAggregateInput = {
     _count?: SortOrder
   }
 
@@ -45823,6 +53965,286 @@ export namespace Prisma {
 
   export type CategorySumOrderByAggregateInput = {
     displayOrder?: SortOrder
+  }
+
+  export type EnumReusableCategoryScopeFilter<$PrismaModel = never> = {
+    equals?: $Enums.ReusableCategoryScope | EnumReusableCategoryScopeFieldRefInput<$PrismaModel>
+    in?: $Enums.ReusableCategoryScope[] | ListEnumReusableCategoryScopeFieldRefInput<$PrismaModel>
+    notIn?: $Enums.ReusableCategoryScope[] | ListEnumReusableCategoryScopeFieldRefInput<$PrismaModel>
+    not?: NestedEnumReusableCategoryScopeFilter<$PrismaModel> | $Enums.ReusableCategoryScope
+  }
+
+  export type UserNullableScalarRelationFilter = {
+    is?: UserWhereInput | null
+    isNot?: UserWhereInput | null
+  }
+
+  export type ReusableCategoryNullableScalarRelationFilter = {
+    is?: ReusableCategoryWhereInput | null
+    isNot?: ReusableCategoryWhereInput | null
+  }
+
+  export type ReusableCategoryUserIdScopeSlugCompoundUniqueInput = {
+    userId: string
+    scope: $Enums.ReusableCategoryScope
+    slug: string
+  }
+
+  export type ReusableCategoryCountOrderByAggregateInput = {
+    id?: SortOrder
+    name?: SortOrder
+    slug?: SortOrder
+    scope?: SortOrder
+    userId?: SortOrder
+    parentId?: SortOrder
+    displayOrder?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type ReusableCategoryAvgOrderByAggregateInput = {
+    displayOrder?: SortOrder
+  }
+
+  export type ReusableCategoryMaxOrderByAggregateInput = {
+    id?: SortOrder
+    name?: SortOrder
+    slug?: SortOrder
+    scope?: SortOrder
+    userId?: SortOrder
+    parentId?: SortOrder
+    displayOrder?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type ReusableCategoryMinOrderByAggregateInput = {
+    id?: SortOrder
+    name?: SortOrder
+    slug?: SortOrder
+    scope?: SortOrder
+    userId?: SortOrder
+    parentId?: SortOrder
+    displayOrder?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type ReusableCategorySumOrderByAggregateInput = {
+    displayOrder?: SortOrder
+  }
+
+  export type EnumReusableCategoryScopeWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: $Enums.ReusableCategoryScope | EnumReusableCategoryScopeFieldRefInput<$PrismaModel>
+    in?: $Enums.ReusableCategoryScope[] | ListEnumReusableCategoryScopeFieldRefInput<$PrismaModel>
+    notIn?: $Enums.ReusableCategoryScope[] | ListEnumReusableCategoryScopeFieldRefInput<$PrismaModel>
+    not?: NestedEnumReusableCategoryScopeWithAggregatesFilter<$PrismaModel> | $Enums.ReusableCategoryScope
+    _count?: NestedIntFilter<$PrismaModel>
+    _min?: NestedEnumReusableCategoryScopeFilter<$PrismaModel>
+    _max?: NestedEnumReusableCategoryScopeFilter<$PrismaModel>
+  }
+
+  export type ReusableCategoryScalarRelationFilter = {
+    is?: ReusableCategoryWhereInput
+    isNot?: ReusableCategoryWhereInput
+  }
+
+  export type SavedBlockCountOrderByAggregateInput = {
+    id?: SortOrder
+    title?: SortOrder
+    blockType?: SortOrder
+    tiptapJson?: SortOrder
+    searchText?: SortOrder
+    categoryId?: SortOrder
+    userId?: SortOrder
+    usageCount?: SortOrder
+    lastUsedAt?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type SavedBlockAvgOrderByAggregateInput = {
+    usageCount?: SortOrder
+  }
+
+  export type SavedBlockMaxOrderByAggregateInput = {
+    id?: SortOrder
+    title?: SortOrder
+    blockType?: SortOrder
+    searchText?: SortOrder
+    categoryId?: SortOrder
+    userId?: SortOrder
+    usageCount?: SortOrder
+    lastUsedAt?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type SavedBlockMinOrderByAggregateInput = {
+    id?: SortOrder
+    title?: SortOrder
+    blockType?: SortOrder
+    searchText?: SortOrder
+    categoryId?: SortOrder
+    userId?: SortOrder
+    usageCount?: SortOrder
+    lastUsedAt?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type SavedBlockSumOrderByAggregateInput = {
+    usageCount?: SortOrder
+  }
+
+  export type ContentTemplateCountOrderByAggregateInput = {
+    id?: SortOrder
+    title?: SortOrder
+    tiptapJson?: SortOrder
+    searchText?: SortOrder
+    categoryId?: SortOrder
+    userId?: SortOrder
+    usageCount?: SortOrder
+    lastUsedAt?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type ContentTemplateAvgOrderByAggregateInput = {
+    usageCount?: SortOrder
+  }
+
+  export type ContentTemplateMaxOrderByAggregateInput = {
+    id?: SortOrder
+    title?: SortOrder
+    searchText?: SortOrder
+    categoryId?: SortOrder
+    userId?: SortOrder
+    usageCount?: SortOrder
+    lastUsedAt?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type ContentTemplateMinOrderByAggregateInput = {
+    id?: SortOrder
+    title?: SortOrder
+    searchText?: SortOrder
+    categoryId?: SortOrder
+    userId?: SortOrder
+    usageCount?: SortOrder
+    lastUsedAt?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type ContentTemplateSumOrderByAggregateInput = {
+    usageCount?: SortOrder
+  }
+
+  export type SnippetCountOrderByAggregateInput = {
+    id?: SortOrder
+    title?: SortOrder
+    content?: SortOrder
+    tiptapJson?: SortOrder
+    searchText?: SortOrder
+    categoryId?: SortOrder
+    userId?: SortOrder
+    usageCount?: SortOrder
+    lastUsedAt?: SortOrder
+    isAiContext?: SortOrder
+    isVisibleInUI?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type SnippetAvgOrderByAggregateInput = {
+    usageCount?: SortOrder
+  }
+
+  export type SnippetMaxOrderByAggregateInput = {
+    id?: SortOrder
+    title?: SortOrder
+    content?: SortOrder
+    searchText?: SortOrder
+    categoryId?: SortOrder
+    userId?: SortOrder
+    usageCount?: SortOrder
+    lastUsedAt?: SortOrder
+    isAiContext?: SortOrder
+    isVisibleInUI?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type SnippetMinOrderByAggregateInput = {
+    id?: SortOrder
+    title?: SortOrder
+    content?: SortOrder
+    searchText?: SortOrder
+    categoryId?: SortOrder
+    userId?: SortOrder
+    usageCount?: SortOrder
+    lastUsedAt?: SortOrder
+    isAiContext?: SortOrder
+    isVisibleInUI?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type SnippetSumOrderByAggregateInput = {
+    usageCount?: SortOrder
+  }
+
+  export type PageTemplateCountOrderByAggregateInput = {
+    id?: SortOrder
+    title?: SortOrder
+    tiptapJson?: SortOrder
+    searchText?: SortOrder
+    categoryId?: SortOrder
+    userId?: SortOrder
+    defaultTitle?: SortOrder
+    customIcon?: SortOrder
+    iconColor?: SortOrder
+    usageCount?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type PageTemplateAvgOrderByAggregateInput = {
+    usageCount?: SortOrder
+  }
+
+  export type PageTemplateMaxOrderByAggregateInput = {
+    id?: SortOrder
+    title?: SortOrder
+    searchText?: SortOrder
+    categoryId?: SortOrder
+    userId?: SortOrder
+    defaultTitle?: SortOrder
+    customIcon?: SortOrder
+    iconColor?: SortOrder
+    usageCount?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type PageTemplateMinOrderByAggregateInput = {
+    id?: SortOrder
+    title?: SortOrder
+    searchText?: SortOrder
+    categoryId?: SortOrder
+    userId?: SortOrder
+    defaultTitle?: SortOrder
+    customIcon?: SortOrder
+    iconColor?: SortOrder
+    usageCount?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type PageTemplateSumOrderByAggregateInput = {
+    usageCount?: SortOrder
   }
 
   export type TagUserIdSlugCompoundUniqueInput = {
@@ -46292,11 +54714,6 @@ export namespace Prisma {
     _count?: NestedIntFilter<$PrismaModel>
     _min?: NestedEnumCalendarAttendeeResponseStatusFilter<$PrismaModel>
     _max?: NestedEnumCalendarAttendeeResponseStatusFilter<$PrismaModel>
-  }
-
-  export type UserNullableScalarRelationFilter = {
-    is?: UserWhereInput | null
-    isNot?: UserWhereInput | null
   }
 
   export type AuditLogCountOrderByAggregateInput = {
@@ -47638,6 +56055,41 @@ export namespace Prisma {
     connect?: CategoryWhereUniqueInput | CategoryWhereUniqueInput[]
   }
 
+  export type ReusableCategoryCreateNestedManyWithoutUserInput = {
+    create?: XOR<ReusableCategoryCreateWithoutUserInput, ReusableCategoryUncheckedCreateWithoutUserInput> | ReusableCategoryCreateWithoutUserInput[] | ReusableCategoryUncheckedCreateWithoutUserInput[]
+    connectOrCreate?: ReusableCategoryCreateOrConnectWithoutUserInput | ReusableCategoryCreateOrConnectWithoutUserInput[]
+    createMany?: ReusableCategoryCreateManyUserInputEnvelope
+    connect?: ReusableCategoryWhereUniqueInput | ReusableCategoryWhereUniqueInput[]
+  }
+
+  export type SavedBlockCreateNestedManyWithoutUserInput = {
+    create?: XOR<SavedBlockCreateWithoutUserInput, SavedBlockUncheckedCreateWithoutUserInput> | SavedBlockCreateWithoutUserInput[] | SavedBlockUncheckedCreateWithoutUserInput[]
+    connectOrCreate?: SavedBlockCreateOrConnectWithoutUserInput | SavedBlockCreateOrConnectWithoutUserInput[]
+    createMany?: SavedBlockCreateManyUserInputEnvelope
+    connect?: SavedBlockWhereUniqueInput | SavedBlockWhereUniqueInput[]
+  }
+
+  export type ContentTemplateCreateNestedManyWithoutUserInput = {
+    create?: XOR<ContentTemplateCreateWithoutUserInput, ContentTemplateUncheckedCreateWithoutUserInput> | ContentTemplateCreateWithoutUserInput[] | ContentTemplateUncheckedCreateWithoutUserInput[]
+    connectOrCreate?: ContentTemplateCreateOrConnectWithoutUserInput | ContentTemplateCreateOrConnectWithoutUserInput[]
+    createMany?: ContentTemplateCreateManyUserInputEnvelope
+    connect?: ContentTemplateWhereUniqueInput | ContentTemplateWhereUniqueInput[]
+  }
+
+  export type SnippetCreateNestedManyWithoutUserInput = {
+    create?: XOR<SnippetCreateWithoutUserInput, SnippetUncheckedCreateWithoutUserInput> | SnippetCreateWithoutUserInput[] | SnippetUncheckedCreateWithoutUserInput[]
+    connectOrCreate?: SnippetCreateOrConnectWithoutUserInput | SnippetCreateOrConnectWithoutUserInput[]
+    createMany?: SnippetCreateManyUserInputEnvelope
+    connect?: SnippetWhereUniqueInput | SnippetWhereUniqueInput[]
+  }
+
+  export type PageTemplateCreateNestedManyWithoutUserInput = {
+    create?: XOR<PageTemplateCreateWithoutUserInput, PageTemplateUncheckedCreateWithoutUserInput> | PageTemplateCreateWithoutUserInput[] | PageTemplateUncheckedCreateWithoutUserInput[]
+    connectOrCreate?: PageTemplateCreateOrConnectWithoutUserInput | PageTemplateCreateOrConnectWithoutUserInput[]
+    createMany?: PageTemplateCreateManyUserInputEnvelope
+    connect?: PageTemplateWhereUniqueInput | PageTemplateWhereUniqueInput[]
+  }
+
   export type CalendarConnectionCreateNestedManyWithoutUserInput = {
     create?: XOR<CalendarConnectionCreateWithoutUserInput, CalendarConnectionUncheckedCreateWithoutUserInput> | CalendarConnectionCreateWithoutUserInput[] | CalendarConnectionUncheckedCreateWithoutUserInput[]
     connectOrCreate?: CalendarConnectionCreateOrConnectWithoutUserInput | CalendarConnectionCreateOrConnectWithoutUserInput[]
@@ -47741,6 +56193,41 @@ export namespace Prisma {
     connectOrCreate?: CategoryCreateOrConnectWithoutOwnerInput | CategoryCreateOrConnectWithoutOwnerInput[]
     createMany?: CategoryCreateManyOwnerInputEnvelope
     connect?: CategoryWhereUniqueInput | CategoryWhereUniqueInput[]
+  }
+
+  export type ReusableCategoryUncheckedCreateNestedManyWithoutUserInput = {
+    create?: XOR<ReusableCategoryCreateWithoutUserInput, ReusableCategoryUncheckedCreateWithoutUserInput> | ReusableCategoryCreateWithoutUserInput[] | ReusableCategoryUncheckedCreateWithoutUserInput[]
+    connectOrCreate?: ReusableCategoryCreateOrConnectWithoutUserInput | ReusableCategoryCreateOrConnectWithoutUserInput[]
+    createMany?: ReusableCategoryCreateManyUserInputEnvelope
+    connect?: ReusableCategoryWhereUniqueInput | ReusableCategoryWhereUniqueInput[]
+  }
+
+  export type SavedBlockUncheckedCreateNestedManyWithoutUserInput = {
+    create?: XOR<SavedBlockCreateWithoutUserInput, SavedBlockUncheckedCreateWithoutUserInput> | SavedBlockCreateWithoutUserInput[] | SavedBlockUncheckedCreateWithoutUserInput[]
+    connectOrCreate?: SavedBlockCreateOrConnectWithoutUserInput | SavedBlockCreateOrConnectWithoutUserInput[]
+    createMany?: SavedBlockCreateManyUserInputEnvelope
+    connect?: SavedBlockWhereUniqueInput | SavedBlockWhereUniqueInput[]
+  }
+
+  export type ContentTemplateUncheckedCreateNestedManyWithoutUserInput = {
+    create?: XOR<ContentTemplateCreateWithoutUserInput, ContentTemplateUncheckedCreateWithoutUserInput> | ContentTemplateCreateWithoutUserInput[] | ContentTemplateUncheckedCreateWithoutUserInput[]
+    connectOrCreate?: ContentTemplateCreateOrConnectWithoutUserInput | ContentTemplateCreateOrConnectWithoutUserInput[]
+    createMany?: ContentTemplateCreateManyUserInputEnvelope
+    connect?: ContentTemplateWhereUniqueInput | ContentTemplateWhereUniqueInput[]
+  }
+
+  export type SnippetUncheckedCreateNestedManyWithoutUserInput = {
+    create?: XOR<SnippetCreateWithoutUserInput, SnippetUncheckedCreateWithoutUserInput> | SnippetCreateWithoutUserInput[] | SnippetUncheckedCreateWithoutUserInput[]
+    connectOrCreate?: SnippetCreateOrConnectWithoutUserInput | SnippetCreateOrConnectWithoutUserInput[]
+    createMany?: SnippetCreateManyUserInputEnvelope
+    connect?: SnippetWhereUniqueInput | SnippetWhereUniqueInput[]
+  }
+
+  export type PageTemplateUncheckedCreateNestedManyWithoutUserInput = {
+    create?: XOR<PageTemplateCreateWithoutUserInput, PageTemplateUncheckedCreateWithoutUserInput> | PageTemplateCreateWithoutUserInput[] | PageTemplateUncheckedCreateWithoutUserInput[]
+    connectOrCreate?: PageTemplateCreateOrConnectWithoutUserInput | PageTemplateCreateOrConnectWithoutUserInput[]
+    createMany?: PageTemplateCreateManyUserInputEnvelope
+    connect?: PageTemplateWhereUniqueInput | PageTemplateWhereUniqueInput[]
   }
 
   export type CalendarConnectionUncheckedCreateNestedManyWithoutUserInput = {
@@ -47885,6 +56372,76 @@ export namespace Prisma {
     update?: CategoryUpdateWithWhereUniqueWithoutOwnerInput | CategoryUpdateWithWhereUniqueWithoutOwnerInput[]
     updateMany?: CategoryUpdateManyWithWhereWithoutOwnerInput | CategoryUpdateManyWithWhereWithoutOwnerInput[]
     deleteMany?: CategoryScalarWhereInput | CategoryScalarWhereInput[]
+  }
+
+  export type ReusableCategoryUpdateManyWithoutUserNestedInput = {
+    create?: XOR<ReusableCategoryCreateWithoutUserInput, ReusableCategoryUncheckedCreateWithoutUserInput> | ReusableCategoryCreateWithoutUserInput[] | ReusableCategoryUncheckedCreateWithoutUserInput[]
+    connectOrCreate?: ReusableCategoryCreateOrConnectWithoutUserInput | ReusableCategoryCreateOrConnectWithoutUserInput[]
+    upsert?: ReusableCategoryUpsertWithWhereUniqueWithoutUserInput | ReusableCategoryUpsertWithWhereUniqueWithoutUserInput[]
+    createMany?: ReusableCategoryCreateManyUserInputEnvelope
+    set?: ReusableCategoryWhereUniqueInput | ReusableCategoryWhereUniqueInput[]
+    disconnect?: ReusableCategoryWhereUniqueInput | ReusableCategoryWhereUniqueInput[]
+    delete?: ReusableCategoryWhereUniqueInput | ReusableCategoryWhereUniqueInput[]
+    connect?: ReusableCategoryWhereUniqueInput | ReusableCategoryWhereUniqueInput[]
+    update?: ReusableCategoryUpdateWithWhereUniqueWithoutUserInput | ReusableCategoryUpdateWithWhereUniqueWithoutUserInput[]
+    updateMany?: ReusableCategoryUpdateManyWithWhereWithoutUserInput | ReusableCategoryUpdateManyWithWhereWithoutUserInput[]
+    deleteMany?: ReusableCategoryScalarWhereInput | ReusableCategoryScalarWhereInput[]
+  }
+
+  export type SavedBlockUpdateManyWithoutUserNestedInput = {
+    create?: XOR<SavedBlockCreateWithoutUserInput, SavedBlockUncheckedCreateWithoutUserInput> | SavedBlockCreateWithoutUserInput[] | SavedBlockUncheckedCreateWithoutUserInput[]
+    connectOrCreate?: SavedBlockCreateOrConnectWithoutUserInput | SavedBlockCreateOrConnectWithoutUserInput[]
+    upsert?: SavedBlockUpsertWithWhereUniqueWithoutUserInput | SavedBlockUpsertWithWhereUniqueWithoutUserInput[]
+    createMany?: SavedBlockCreateManyUserInputEnvelope
+    set?: SavedBlockWhereUniqueInput | SavedBlockWhereUniqueInput[]
+    disconnect?: SavedBlockWhereUniqueInput | SavedBlockWhereUniqueInput[]
+    delete?: SavedBlockWhereUniqueInput | SavedBlockWhereUniqueInput[]
+    connect?: SavedBlockWhereUniqueInput | SavedBlockWhereUniqueInput[]
+    update?: SavedBlockUpdateWithWhereUniqueWithoutUserInput | SavedBlockUpdateWithWhereUniqueWithoutUserInput[]
+    updateMany?: SavedBlockUpdateManyWithWhereWithoutUserInput | SavedBlockUpdateManyWithWhereWithoutUserInput[]
+    deleteMany?: SavedBlockScalarWhereInput | SavedBlockScalarWhereInput[]
+  }
+
+  export type ContentTemplateUpdateManyWithoutUserNestedInput = {
+    create?: XOR<ContentTemplateCreateWithoutUserInput, ContentTemplateUncheckedCreateWithoutUserInput> | ContentTemplateCreateWithoutUserInput[] | ContentTemplateUncheckedCreateWithoutUserInput[]
+    connectOrCreate?: ContentTemplateCreateOrConnectWithoutUserInput | ContentTemplateCreateOrConnectWithoutUserInput[]
+    upsert?: ContentTemplateUpsertWithWhereUniqueWithoutUserInput | ContentTemplateUpsertWithWhereUniqueWithoutUserInput[]
+    createMany?: ContentTemplateCreateManyUserInputEnvelope
+    set?: ContentTemplateWhereUniqueInput | ContentTemplateWhereUniqueInput[]
+    disconnect?: ContentTemplateWhereUniqueInput | ContentTemplateWhereUniqueInput[]
+    delete?: ContentTemplateWhereUniqueInput | ContentTemplateWhereUniqueInput[]
+    connect?: ContentTemplateWhereUniqueInput | ContentTemplateWhereUniqueInput[]
+    update?: ContentTemplateUpdateWithWhereUniqueWithoutUserInput | ContentTemplateUpdateWithWhereUniqueWithoutUserInput[]
+    updateMany?: ContentTemplateUpdateManyWithWhereWithoutUserInput | ContentTemplateUpdateManyWithWhereWithoutUserInput[]
+    deleteMany?: ContentTemplateScalarWhereInput | ContentTemplateScalarWhereInput[]
+  }
+
+  export type SnippetUpdateManyWithoutUserNestedInput = {
+    create?: XOR<SnippetCreateWithoutUserInput, SnippetUncheckedCreateWithoutUserInput> | SnippetCreateWithoutUserInput[] | SnippetUncheckedCreateWithoutUserInput[]
+    connectOrCreate?: SnippetCreateOrConnectWithoutUserInput | SnippetCreateOrConnectWithoutUserInput[]
+    upsert?: SnippetUpsertWithWhereUniqueWithoutUserInput | SnippetUpsertWithWhereUniqueWithoutUserInput[]
+    createMany?: SnippetCreateManyUserInputEnvelope
+    set?: SnippetWhereUniqueInput | SnippetWhereUniqueInput[]
+    disconnect?: SnippetWhereUniqueInput | SnippetWhereUniqueInput[]
+    delete?: SnippetWhereUniqueInput | SnippetWhereUniqueInput[]
+    connect?: SnippetWhereUniqueInput | SnippetWhereUniqueInput[]
+    update?: SnippetUpdateWithWhereUniqueWithoutUserInput | SnippetUpdateWithWhereUniqueWithoutUserInput[]
+    updateMany?: SnippetUpdateManyWithWhereWithoutUserInput | SnippetUpdateManyWithWhereWithoutUserInput[]
+    deleteMany?: SnippetScalarWhereInput | SnippetScalarWhereInput[]
+  }
+
+  export type PageTemplateUpdateManyWithoutUserNestedInput = {
+    create?: XOR<PageTemplateCreateWithoutUserInput, PageTemplateUncheckedCreateWithoutUserInput> | PageTemplateCreateWithoutUserInput[] | PageTemplateUncheckedCreateWithoutUserInput[]
+    connectOrCreate?: PageTemplateCreateOrConnectWithoutUserInput | PageTemplateCreateOrConnectWithoutUserInput[]
+    upsert?: PageTemplateUpsertWithWhereUniqueWithoutUserInput | PageTemplateUpsertWithWhereUniqueWithoutUserInput[]
+    createMany?: PageTemplateCreateManyUserInputEnvelope
+    set?: PageTemplateWhereUniqueInput | PageTemplateWhereUniqueInput[]
+    disconnect?: PageTemplateWhereUniqueInput | PageTemplateWhereUniqueInput[]
+    delete?: PageTemplateWhereUniqueInput | PageTemplateWhereUniqueInput[]
+    connect?: PageTemplateWhereUniqueInput | PageTemplateWhereUniqueInput[]
+    update?: PageTemplateUpdateWithWhereUniqueWithoutUserInput | PageTemplateUpdateWithWhereUniqueWithoutUserInput[]
+    updateMany?: PageTemplateUpdateManyWithWhereWithoutUserInput | PageTemplateUpdateManyWithWhereWithoutUserInput[]
+    deleteMany?: PageTemplateScalarWhereInput | PageTemplateScalarWhereInput[]
   }
 
   export type CalendarConnectionUpdateManyWithoutUserNestedInput = {
@@ -48097,6 +56654,76 @@ export namespace Prisma {
     deleteMany?: CategoryScalarWhereInput | CategoryScalarWhereInput[]
   }
 
+  export type ReusableCategoryUncheckedUpdateManyWithoutUserNestedInput = {
+    create?: XOR<ReusableCategoryCreateWithoutUserInput, ReusableCategoryUncheckedCreateWithoutUserInput> | ReusableCategoryCreateWithoutUserInput[] | ReusableCategoryUncheckedCreateWithoutUserInput[]
+    connectOrCreate?: ReusableCategoryCreateOrConnectWithoutUserInput | ReusableCategoryCreateOrConnectWithoutUserInput[]
+    upsert?: ReusableCategoryUpsertWithWhereUniqueWithoutUserInput | ReusableCategoryUpsertWithWhereUniqueWithoutUserInput[]
+    createMany?: ReusableCategoryCreateManyUserInputEnvelope
+    set?: ReusableCategoryWhereUniqueInput | ReusableCategoryWhereUniqueInput[]
+    disconnect?: ReusableCategoryWhereUniqueInput | ReusableCategoryWhereUniqueInput[]
+    delete?: ReusableCategoryWhereUniqueInput | ReusableCategoryWhereUniqueInput[]
+    connect?: ReusableCategoryWhereUniqueInput | ReusableCategoryWhereUniqueInput[]
+    update?: ReusableCategoryUpdateWithWhereUniqueWithoutUserInput | ReusableCategoryUpdateWithWhereUniqueWithoutUserInput[]
+    updateMany?: ReusableCategoryUpdateManyWithWhereWithoutUserInput | ReusableCategoryUpdateManyWithWhereWithoutUserInput[]
+    deleteMany?: ReusableCategoryScalarWhereInput | ReusableCategoryScalarWhereInput[]
+  }
+
+  export type SavedBlockUncheckedUpdateManyWithoutUserNestedInput = {
+    create?: XOR<SavedBlockCreateWithoutUserInput, SavedBlockUncheckedCreateWithoutUserInput> | SavedBlockCreateWithoutUserInput[] | SavedBlockUncheckedCreateWithoutUserInput[]
+    connectOrCreate?: SavedBlockCreateOrConnectWithoutUserInput | SavedBlockCreateOrConnectWithoutUserInput[]
+    upsert?: SavedBlockUpsertWithWhereUniqueWithoutUserInput | SavedBlockUpsertWithWhereUniqueWithoutUserInput[]
+    createMany?: SavedBlockCreateManyUserInputEnvelope
+    set?: SavedBlockWhereUniqueInput | SavedBlockWhereUniqueInput[]
+    disconnect?: SavedBlockWhereUniqueInput | SavedBlockWhereUniqueInput[]
+    delete?: SavedBlockWhereUniqueInput | SavedBlockWhereUniqueInput[]
+    connect?: SavedBlockWhereUniqueInput | SavedBlockWhereUniqueInput[]
+    update?: SavedBlockUpdateWithWhereUniqueWithoutUserInput | SavedBlockUpdateWithWhereUniqueWithoutUserInput[]
+    updateMany?: SavedBlockUpdateManyWithWhereWithoutUserInput | SavedBlockUpdateManyWithWhereWithoutUserInput[]
+    deleteMany?: SavedBlockScalarWhereInput | SavedBlockScalarWhereInput[]
+  }
+
+  export type ContentTemplateUncheckedUpdateManyWithoutUserNestedInput = {
+    create?: XOR<ContentTemplateCreateWithoutUserInput, ContentTemplateUncheckedCreateWithoutUserInput> | ContentTemplateCreateWithoutUserInput[] | ContentTemplateUncheckedCreateWithoutUserInput[]
+    connectOrCreate?: ContentTemplateCreateOrConnectWithoutUserInput | ContentTemplateCreateOrConnectWithoutUserInput[]
+    upsert?: ContentTemplateUpsertWithWhereUniqueWithoutUserInput | ContentTemplateUpsertWithWhereUniqueWithoutUserInput[]
+    createMany?: ContentTemplateCreateManyUserInputEnvelope
+    set?: ContentTemplateWhereUniqueInput | ContentTemplateWhereUniqueInput[]
+    disconnect?: ContentTemplateWhereUniqueInput | ContentTemplateWhereUniqueInput[]
+    delete?: ContentTemplateWhereUniqueInput | ContentTemplateWhereUniqueInput[]
+    connect?: ContentTemplateWhereUniqueInput | ContentTemplateWhereUniqueInput[]
+    update?: ContentTemplateUpdateWithWhereUniqueWithoutUserInput | ContentTemplateUpdateWithWhereUniqueWithoutUserInput[]
+    updateMany?: ContentTemplateUpdateManyWithWhereWithoutUserInput | ContentTemplateUpdateManyWithWhereWithoutUserInput[]
+    deleteMany?: ContentTemplateScalarWhereInput | ContentTemplateScalarWhereInput[]
+  }
+
+  export type SnippetUncheckedUpdateManyWithoutUserNestedInput = {
+    create?: XOR<SnippetCreateWithoutUserInput, SnippetUncheckedCreateWithoutUserInput> | SnippetCreateWithoutUserInput[] | SnippetUncheckedCreateWithoutUserInput[]
+    connectOrCreate?: SnippetCreateOrConnectWithoutUserInput | SnippetCreateOrConnectWithoutUserInput[]
+    upsert?: SnippetUpsertWithWhereUniqueWithoutUserInput | SnippetUpsertWithWhereUniqueWithoutUserInput[]
+    createMany?: SnippetCreateManyUserInputEnvelope
+    set?: SnippetWhereUniqueInput | SnippetWhereUniqueInput[]
+    disconnect?: SnippetWhereUniqueInput | SnippetWhereUniqueInput[]
+    delete?: SnippetWhereUniqueInput | SnippetWhereUniqueInput[]
+    connect?: SnippetWhereUniqueInput | SnippetWhereUniqueInput[]
+    update?: SnippetUpdateWithWhereUniqueWithoutUserInput | SnippetUpdateWithWhereUniqueWithoutUserInput[]
+    updateMany?: SnippetUpdateManyWithWhereWithoutUserInput | SnippetUpdateManyWithWhereWithoutUserInput[]
+    deleteMany?: SnippetScalarWhereInput | SnippetScalarWhereInput[]
+  }
+
+  export type PageTemplateUncheckedUpdateManyWithoutUserNestedInput = {
+    create?: XOR<PageTemplateCreateWithoutUserInput, PageTemplateUncheckedCreateWithoutUserInput> | PageTemplateCreateWithoutUserInput[] | PageTemplateUncheckedCreateWithoutUserInput[]
+    connectOrCreate?: PageTemplateCreateOrConnectWithoutUserInput | PageTemplateCreateOrConnectWithoutUserInput[]
+    upsert?: PageTemplateUpsertWithWhereUniqueWithoutUserInput | PageTemplateUpsertWithWhereUniqueWithoutUserInput[]
+    createMany?: PageTemplateCreateManyUserInputEnvelope
+    set?: PageTemplateWhereUniqueInput | PageTemplateWhereUniqueInput[]
+    disconnect?: PageTemplateWhereUniqueInput | PageTemplateWhereUniqueInput[]
+    delete?: PageTemplateWhereUniqueInput | PageTemplateWhereUniqueInput[]
+    connect?: PageTemplateWhereUniqueInput | PageTemplateWhereUniqueInput[]
+    update?: PageTemplateUpdateWithWhereUniqueWithoutUserInput | PageTemplateUpdateWithWhereUniqueWithoutUserInput[]
+    updateMany?: PageTemplateUpdateManyWithWhereWithoutUserInput | PageTemplateUpdateManyWithWhereWithoutUserInput[]
+    deleteMany?: PageTemplateScalarWhereInput | PageTemplateScalarWhereInput[]
+  }
+
   export type CalendarConnectionUncheckedUpdateManyWithoutUserNestedInput = {
     create?: XOR<CalendarConnectionCreateWithoutUserInput, CalendarConnectionUncheckedCreateWithoutUserInput> | CalendarConnectionCreateWithoutUserInput[] | CalendarConnectionUncheckedCreateWithoutUserInput[]
     connectOrCreate?: CalendarConnectionCreateOrConnectWithoutUserInput | CalendarConnectionCreateOrConnectWithoutUserInput[]
@@ -48291,6 +56918,368 @@ export namespace Prisma {
     update?: ContentNodeUpdateWithWhereUniqueWithoutCategoryInput | ContentNodeUpdateWithWhereUniqueWithoutCategoryInput[]
     updateMany?: ContentNodeUpdateManyWithWhereWithoutCategoryInput | ContentNodeUpdateManyWithWhereWithoutCategoryInput[]
     deleteMany?: ContentNodeScalarWhereInput | ContentNodeScalarWhereInput[]
+  }
+
+  export type UserCreateNestedOneWithoutReusableCategoriesInput = {
+    create?: XOR<UserCreateWithoutReusableCategoriesInput, UserUncheckedCreateWithoutReusableCategoriesInput>
+    connectOrCreate?: UserCreateOrConnectWithoutReusableCategoriesInput
+    connect?: UserWhereUniqueInput
+  }
+
+  export type ReusableCategoryCreateNestedOneWithoutChildrenInput = {
+    create?: XOR<ReusableCategoryCreateWithoutChildrenInput, ReusableCategoryUncheckedCreateWithoutChildrenInput>
+    connectOrCreate?: ReusableCategoryCreateOrConnectWithoutChildrenInput
+    connect?: ReusableCategoryWhereUniqueInput
+  }
+
+  export type ReusableCategoryCreateNestedManyWithoutParentInput = {
+    create?: XOR<ReusableCategoryCreateWithoutParentInput, ReusableCategoryUncheckedCreateWithoutParentInput> | ReusableCategoryCreateWithoutParentInput[] | ReusableCategoryUncheckedCreateWithoutParentInput[]
+    connectOrCreate?: ReusableCategoryCreateOrConnectWithoutParentInput | ReusableCategoryCreateOrConnectWithoutParentInput[]
+    createMany?: ReusableCategoryCreateManyParentInputEnvelope
+    connect?: ReusableCategoryWhereUniqueInput | ReusableCategoryWhereUniqueInput[]
+  }
+
+  export type SavedBlockCreateNestedManyWithoutCategoryInput = {
+    create?: XOR<SavedBlockCreateWithoutCategoryInput, SavedBlockUncheckedCreateWithoutCategoryInput> | SavedBlockCreateWithoutCategoryInput[] | SavedBlockUncheckedCreateWithoutCategoryInput[]
+    connectOrCreate?: SavedBlockCreateOrConnectWithoutCategoryInput | SavedBlockCreateOrConnectWithoutCategoryInput[]
+    createMany?: SavedBlockCreateManyCategoryInputEnvelope
+    connect?: SavedBlockWhereUniqueInput | SavedBlockWhereUniqueInput[]
+  }
+
+  export type ContentTemplateCreateNestedManyWithoutCategoryInput = {
+    create?: XOR<ContentTemplateCreateWithoutCategoryInput, ContentTemplateUncheckedCreateWithoutCategoryInput> | ContentTemplateCreateWithoutCategoryInput[] | ContentTemplateUncheckedCreateWithoutCategoryInput[]
+    connectOrCreate?: ContentTemplateCreateOrConnectWithoutCategoryInput | ContentTemplateCreateOrConnectWithoutCategoryInput[]
+    createMany?: ContentTemplateCreateManyCategoryInputEnvelope
+    connect?: ContentTemplateWhereUniqueInput | ContentTemplateWhereUniqueInput[]
+  }
+
+  export type SnippetCreateNestedManyWithoutCategoryInput = {
+    create?: XOR<SnippetCreateWithoutCategoryInput, SnippetUncheckedCreateWithoutCategoryInput> | SnippetCreateWithoutCategoryInput[] | SnippetUncheckedCreateWithoutCategoryInput[]
+    connectOrCreate?: SnippetCreateOrConnectWithoutCategoryInput | SnippetCreateOrConnectWithoutCategoryInput[]
+    createMany?: SnippetCreateManyCategoryInputEnvelope
+    connect?: SnippetWhereUniqueInput | SnippetWhereUniqueInput[]
+  }
+
+  export type PageTemplateCreateNestedManyWithoutCategoryInput = {
+    create?: XOR<PageTemplateCreateWithoutCategoryInput, PageTemplateUncheckedCreateWithoutCategoryInput> | PageTemplateCreateWithoutCategoryInput[] | PageTemplateUncheckedCreateWithoutCategoryInput[]
+    connectOrCreate?: PageTemplateCreateOrConnectWithoutCategoryInput | PageTemplateCreateOrConnectWithoutCategoryInput[]
+    createMany?: PageTemplateCreateManyCategoryInputEnvelope
+    connect?: PageTemplateWhereUniqueInput | PageTemplateWhereUniqueInput[]
+  }
+
+  export type ReusableCategoryUncheckedCreateNestedManyWithoutParentInput = {
+    create?: XOR<ReusableCategoryCreateWithoutParentInput, ReusableCategoryUncheckedCreateWithoutParentInput> | ReusableCategoryCreateWithoutParentInput[] | ReusableCategoryUncheckedCreateWithoutParentInput[]
+    connectOrCreate?: ReusableCategoryCreateOrConnectWithoutParentInput | ReusableCategoryCreateOrConnectWithoutParentInput[]
+    createMany?: ReusableCategoryCreateManyParentInputEnvelope
+    connect?: ReusableCategoryWhereUniqueInput | ReusableCategoryWhereUniqueInput[]
+  }
+
+  export type SavedBlockUncheckedCreateNestedManyWithoutCategoryInput = {
+    create?: XOR<SavedBlockCreateWithoutCategoryInput, SavedBlockUncheckedCreateWithoutCategoryInput> | SavedBlockCreateWithoutCategoryInput[] | SavedBlockUncheckedCreateWithoutCategoryInput[]
+    connectOrCreate?: SavedBlockCreateOrConnectWithoutCategoryInput | SavedBlockCreateOrConnectWithoutCategoryInput[]
+    createMany?: SavedBlockCreateManyCategoryInputEnvelope
+    connect?: SavedBlockWhereUniqueInput | SavedBlockWhereUniqueInput[]
+  }
+
+  export type ContentTemplateUncheckedCreateNestedManyWithoutCategoryInput = {
+    create?: XOR<ContentTemplateCreateWithoutCategoryInput, ContentTemplateUncheckedCreateWithoutCategoryInput> | ContentTemplateCreateWithoutCategoryInput[] | ContentTemplateUncheckedCreateWithoutCategoryInput[]
+    connectOrCreate?: ContentTemplateCreateOrConnectWithoutCategoryInput | ContentTemplateCreateOrConnectWithoutCategoryInput[]
+    createMany?: ContentTemplateCreateManyCategoryInputEnvelope
+    connect?: ContentTemplateWhereUniqueInput | ContentTemplateWhereUniqueInput[]
+  }
+
+  export type SnippetUncheckedCreateNestedManyWithoutCategoryInput = {
+    create?: XOR<SnippetCreateWithoutCategoryInput, SnippetUncheckedCreateWithoutCategoryInput> | SnippetCreateWithoutCategoryInput[] | SnippetUncheckedCreateWithoutCategoryInput[]
+    connectOrCreate?: SnippetCreateOrConnectWithoutCategoryInput | SnippetCreateOrConnectWithoutCategoryInput[]
+    createMany?: SnippetCreateManyCategoryInputEnvelope
+    connect?: SnippetWhereUniqueInput | SnippetWhereUniqueInput[]
+  }
+
+  export type PageTemplateUncheckedCreateNestedManyWithoutCategoryInput = {
+    create?: XOR<PageTemplateCreateWithoutCategoryInput, PageTemplateUncheckedCreateWithoutCategoryInput> | PageTemplateCreateWithoutCategoryInput[] | PageTemplateUncheckedCreateWithoutCategoryInput[]
+    connectOrCreate?: PageTemplateCreateOrConnectWithoutCategoryInput | PageTemplateCreateOrConnectWithoutCategoryInput[]
+    createMany?: PageTemplateCreateManyCategoryInputEnvelope
+    connect?: PageTemplateWhereUniqueInput | PageTemplateWhereUniqueInput[]
+  }
+
+  export type EnumReusableCategoryScopeFieldUpdateOperationsInput = {
+    set?: $Enums.ReusableCategoryScope
+  }
+
+  export type UserUpdateOneWithoutReusableCategoriesNestedInput = {
+    create?: XOR<UserCreateWithoutReusableCategoriesInput, UserUncheckedCreateWithoutReusableCategoriesInput>
+    connectOrCreate?: UserCreateOrConnectWithoutReusableCategoriesInput
+    upsert?: UserUpsertWithoutReusableCategoriesInput
+    disconnect?: UserWhereInput | boolean
+    delete?: UserWhereInput | boolean
+    connect?: UserWhereUniqueInput
+    update?: XOR<XOR<UserUpdateToOneWithWhereWithoutReusableCategoriesInput, UserUpdateWithoutReusableCategoriesInput>, UserUncheckedUpdateWithoutReusableCategoriesInput>
+  }
+
+  export type ReusableCategoryUpdateOneWithoutChildrenNestedInput = {
+    create?: XOR<ReusableCategoryCreateWithoutChildrenInput, ReusableCategoryUncheckedCreateWithoutChildrenInput>
+    connectOrCreate?: ReusableCategoryCreateOrConnectWithoutChildrenInput
+    upsert?: ReusableCategoryUpsertWithoutChildrenInput
+    disconnect?: ReusableCategoryWhereInput | boolean
+    delete?: ReusableCategoryWhereInput | boolean
+    connect?: ReusableCategoryWhereUniqueInput
+    update?: XOR<XOR<ReusableCategoryUpdateToOneWithWhereWithoutChildrenInput, ReusableCategoryUpdateWithoutChildrenInput>, ReusableCategoryUncheckedUpdateWithoutChildrenInput>
+  }
+
+  export type ReusableCategoryUpdateManyWithoutParentNestedInput = {
+    create?: XOR<ReusableCategoryCreateWithoutParentInput, ReusableCategoryUncheckedCreateWithoutParentInput> | ReusableCategoryCreateWithoutParentInput[] | ReusableCategoryUncheckedCreateWithoutParentInput[]
+    connectOrCreate?: ReusableCategoryCreateOrConnectWithoutParentInput | ReusableCategoryCreateOrConnectWithoutParentInput[]
+    upsert?: ReusableCategoryUpsertWithWhereUniqueWithoutParentInput | ReusableCategoryUpsertWithWhereUniqueWithoutParentInput[]
+    createMany?: ReusableCategoryCreateManyParentInputEnvelope
+    set?: ReusableCategoryWhereUniqueInput | ReusableCategoryWhereUniqueInput[]
+    disconnect?: ReusableCategoryWhereUniqueInput | ReusableCategoryWhereUniqueInput[]
+    delete?: ReusableCategoryWhereUniqueInput | ReusableCategoryWhereUniqueInput[]
+    connect?: ReusableCategoryWhereUniqueInput | ReusableCategoryWhereUniqueInput[]
+    update?: ReusableCategoryUpdateWithWhereUniqueWithoutParentInput | ReusableCategoryUpdateWithWhereUniqueWithoutParentInput[]
+    updateMany?: ReusableCategoryUpdateManyWithWhereWithoutParentInput | ReusableCategoryUpdateManyWithWhereWithoutParentInput[]
+    deleteMany?: ReusableCategoryScalarWhereInput | ReusableCategoryScalarWhereInput[]
+  }
+
+  export type SavedBlockUpdateManyWithoutCategoryNestedInput = {
+    create?: XOR<SavedBlockCreateWithoutCategoryInput, SavedBlockUncheckedCreateWithoutCategoryInput> | SavedBlockCreateWithoutCategoryInput[] | SavedBlockUncheckedCreateWithoutCategoryInput[]
+    connectOrCreate?: SavedBlockCreateOrConnectWithoutCategoryInput | SavedBlockCreateOrConnectWithoutCategoryInput[]
+    upsert?: SavedBlockUpsertWithWhereUniqueWithoutCategoryInput | SavedBlockUpsertWithWhereUniqueWithoutCategoryInput[]
+    createMany?: SavedBlockCreateManyCategoryInputEnvelope
+    set?: SavedBlockWhereUniqueInput | SavedBlockWhereUniqueInput[]
+    disconnect?: SavedBlockWhereUniqueInput | SavedBlockWhereUniqueInput[]
+    delete?: SavedBlockWhereUniqueInput | SavedBlockWhereUniqueInput[]
+    connect?: SavedBlockWhereUniqueInput | SavedBlockWhereUniqueInput[]
+    update?: SavedBlockUpdateWithWhereUniqueWithoutCategoryInput | SavedBlockUpdateWithWhereUniqueWithoutCategoryInput[]
+    updateMany?: SavedBlockUpdateManyWithWhereWithoutCategoryInput | SavedBlockUpdateManyWithWhereWithoutCategoryInput[]
+    deleteMany?: SavedBlockScalarWhereInput | SavedBlockScalarWhereInput[]
+  }
+
+  export type ContentTemplateUpdateManyWithoutCategoryNestedInput = {
+    create?: XOR<ContentTemplateCreateWithoutCategoryInput, ContentTemplateUncheckedCreateWithoutCategoryInput> | ContentTemplateCreateWithoutCategoryInput[] | ContentTemplateUncheckedCreateWithoutCategoryInput[]
+    connectOrCreate?: ContentTemplateCreateOrConnectWithoutCategoryInput | ContentTemplateCreateOrConnectWithoutCategoryInput[]
+    upsert?: ContentTemplateUpsertWithWhereUniqueWithoutCategoryInput | ContentTemplateUpsertWithWhereUniqueWithoutCategoryInput[]
+    createMany?: ContentTemplateCreateManyCategoryInputEnvelope
+    set?: ContentTemplateWhereUniqueInput | ContentTemplateWhereUniqueInput[]
+    disconnect?: ContentTemplateWhereUniqueInput | ContentTemplateWhereUniqueInput[]
+    delete?: ContentTemplateWhereUniqueInput | ContentTemplateWhereUniqueInput[]
+    connect?: ContentTemplateWhereUniqueInput | ContentTemplateWhereUniqueInput[]
+    update?: ContentTemplateUpdateWithWhereUniqueWithoutCategoryInput | ContentTemplateUpdateWithWhereUniqueWithoutCategoryInput[]
+    updateMany?: ContentTemplateUpdateManyWithWhereWithoutCategoryInput | ContentTemplateUpdateManyWithWhereWithoutCategoryInput[]
+    deleteMany?: ContentTemplateScalarWhereInput | ContentTemplateScalarWhereInput[]
+  }
+
+  export type SnippetUpdateManyWithoutCategoryNestedInput = {
+    create?: XOR<SnippetCreateWithoutCategoryInput, SnippetUncheckedCreateWithoutCategoryInput> | SnippetCreateWithoutCategoryInput[] | SnippetUncheckedCreateWithoutCategoryInput[]
+    connectOrCreate?: SnippetCreateOrConnectWithoutCategoryInput | SnippetCreateOrConnectWithoutCategoryInput[]
+    upsert?: SnippetUpsertWithWhereUniqueWithoutCategoryInput | SnippetUpsertWithWhereUniqueWithoutCategoryInput[]
+    createMany?: SnippetCreateManyCategoryInputEnvelope
+    set?: SnippetWhereUniqueInput | SnippetWhereUniqueInput[]
+    disconnect?: SnippetWhereUniqueInput | SnippetWhereUniqueInput[]
+    delete?: SnippetWhereUniqueInput | SnippetWhereUniqueInput[]
+    connect?: SnippetWhereUniqueInput | SnippetWhereUniqueInput[]
+    update?: SnippetUpdateWithWhereUniqueWithoutCategoryInput | SnippetUpdateWithWhereUniqueWithoutCategoryInput[]
+    updateMany?: SnippetUpdateManyWithWhereWithoutCategoryInput | SnippetUpdateManyWithWhereWithoutCategoryInput[]
+    deleteMany?: SnippetScalarWhereInput | SnippetScalarWhereInput[]
+  }
+
+  export type PageTemplateUpdateManyWithoutCategoryNestedInput = {
+    create?: XOR<PageTemplateCreateWithoutCategoryInput, PageTemplateUncheckedCreateWithoutCategoryInput> | PageTemplateCreateWithoutCategoryInput[] | PageTemplateUncheckedCreateWithoutCategoryInput[]
+    connectOrCreate?: PageTemplateCreateOrConnectWithoutCategoryInput | PageTemplateCreateOrConnectWithoutCategoryInput[]
+    upsert?: PageTemplateUpsertWithWhereUniqueWithoutCategoryInput | PageTemplateUpsertWithWhereUniqueWithoutCategoryInput[]
+    createMany?: PageTemplateCreateManyCategoryInputEnvelope
+    set?: PageTemplateWhereUniqueInput | PageTemplateWhereUniqueInput[]
+    disconnect?: PageTemplateWhereUniqueInput | PageTemplateWhereUniqueInput[]
+    delete?: PageTemplateWhereUniqueInput | PageTemplateWhereUniqueInput[]
+    connect?: PageTemplateWhereUniqueInput | PageTemplateWhereUniqueInput[]
+    update?: PageTemplateUpdateWithWhereUniqueWithoutCategoryInput | PageTemplateUpdateWithWhereUniqueWithoutCategoryInput[]
+    updateMany?: PageTemplateUpdateManyWithWhereWithoutCategoryInput | PageTemplateUpdateManyWithWhereWithoutCategoryInput[]
+    deleteMany?: PageTemplateScalarWhereInput | PageTemplateScalarWhereInput[]
+  }
+
+  export type ReusableCategoryUncheckedUpdateManyWithoutParentNestedInput = {
+    create?: XOR<ReusableCategoryCreateWithoutParentInput, ReusableCategoryUncheckedCreateWithoutParentInput> | ReusableCategoryCreateWithoutParentInput[] | ReusableCategoryUncheckedCreateWithoutParentInput[]
+    connectOrCreate?: ReusableCategoryCreateOrConnectWithoutParentInput | ReusableCategoryCreateOrConnectWithoutParentInput[]
+    upsert?: ReusableCategoryUpsertWithWhereUniqueWithoutParentInput | ReusableCategoryUpsertWithWhereUniqueWithoutParentInput[]
+    createMany?: ReusableCategoryCreateManyParentInputEnvelope
+    set?: ReusableCategoryWhereUniqueInput | ReusableCategoryWhereUniqueInput[]
+    disconnect?: ReusableCategoryWhereUniqueInput | ReusableCategoryWhereUniqueInput[]
+    delete?: ReusableCategoryWhereUniqueInput | ReusableCategoryWhereUniqueInput[]
+    connect?: ReusableCategoryWhereUniqueInput | ReusableCategoryWhereUniqueInput[]
+    update?: ReusableCategoryUpdateWithWhereUniqueWithoutParentInput | ReusableCategoryUpdateWithWhereUniqueWithoutParentInput[]
+    updateMany?: ReusableCategoryUpdateManyWithWhereWithoutParentInput | ReusableCategoryUpdateManyWithWhereWithoutParentInput[]
+    deleteMany?: ReusableCategoryScalarWhereInput | ReusableCategoryScalarWhereInput[]
+  }
+
+  export type SavedBlockUncheckedUpdateManyWithoutCategoryNestedInput = {
+    create?: XOR<SavedBlockCreateWithoutCategoryInput, SavedBlockUncheckedCreateWithoutCategoryInput> | SavedBlockCreateWithoutCategoryInput[] | SavedBlockUncheckedCreateWithoutCategoryInput[]
+    connectOrCreate?: SavedBlockCreateOrConnectWithoutCategoryInput | SavedBlockCreateOrConnectWithoutCategoryInput[]
+    upsert?: SavedBlockUpsertWithWhereUniqueWithoutCategoryInput | SavedBlockUpsertWithWhereUniqueWithoutCategoryInput[]
+    createMany?: SavedBlockCreateManyCategoryInputEnvelope
+    set?: SavedBlockWhereUniqueInput | SavedBlockWhereUniqueInput[]
+    disconnect?: SavedBlockWhereUniqueInput | SavedBlockWhereUniqueInput[]
+    delete?: SavedBlockWhereUniqueInput | SavedBlockWhereUniqueInput[]
+    connect?: SavedBlockWhereUniqueInput | SavedBlockWhereUniqueInput[]
+    update?: SavedBlockUpdateWithWhereUniqueWithoutCategoryInput | SavedBlockUpdateWithWhereUniqueWithoutCategoryInput[]
+    updateMany?: SavedBlockUpdateManyWithWhereWithoutCategoryInput | SavedBlockUpdateManyWithWhereWithoutCategoryInput[]
+    deleteMany?: SavedBlockScalarWhereInput | SavedBlockScalarWhereInput[]
+  }
+
+  export type ContentTemplateUncheckedUpdateManyWithoutCategoryNestedInput = {
+    create?: XOR<ContentTemplateCreateWithoutCategoryInput, ContentTemplateUncheckedCreateWithoutCategoryInput> | ContentTemplateCreateWithoutCategoryInput[] | ContentTemplateUncheckedCreateWithoutCategoryInput[]
+    connectOrCreate?: ContentTemplateCreateOrConnectWithoutCategoryInput | ContentTemplateCreateOrConnectWithoutCategoryInput[]
+    upsert?: ContentTemplateUpsertWithWhereUniqueWithoutCategoryInput | ContentTemplateUpsertWithWhereUniqueWithoutCategoryInput[]
+    createMany?: ContentTemplateCreateManyCategoryInputEnvelope
+    set?: ContentTemplateWhereUniqueInput | ContentTemplateWhereUniqueInput[]
+    disconnect?: ContentTemplateWhereUniqueInput | ContentTemplateWhereUniqueInput[]
+    delete?: ContentTemplateWhereUniqueInput | ContentTemplateWhereUniqueInput[]
+    connect?: ContentTemplateWhereUniqueInput | ContentTemplateWhereUniqueInput[]
+    update?: ContentTemplateUpdateWithWhereUniqueWithoutCategoryInput | ContentTemplateUpdateWithWhereUniqueWithoutCategoryInput[]
+    updateMany?: ContentTemplateUpdateManyWithWhereWithoutCategoryInput | ContentTemplateUpdateManyWithWhereWithoutCategoryInput[]
+    deleteMany?: ContentTemplateScalarWhereInput | ContentTemplateScalarWhereInput[]
+  }
+
+  export type SnippetUncheckedUpdateManyWithoutCategoryNestedInput = {
+    create?: XOR<SnippetCreateWithoutCategoryInput, SnippetUncheckedCreateWithoutCategoryInput> | SnippetCreateWithoutCategoryInput[] | SnippetUncheckedCreateWithoutCategoryInput[]
+    connectOrCreate?: SnippetCreateOrConnectWithoutCategoryInput | SnippetCreateOrConnectWithoutCategoryInput[]
+    upsert?: SnippetUpsertWithWhereUniqueWithoutCategoryInput | SnippetUpsertWithWhereUniqueWithoutCategoryInput[]
+    createMany?: SnippetCreateManyCategoryInputEnvelope
+    set?: SnippetWhereUniqueInput | SnippetWhereUniqueInput[]
+    disconnect?: SnippetWhereUniqueInput | SnippetWhereUniqueInput[]
+    delete?: SnippetWhereUniqueInput | SnippetWhereUniqueInput[]
+    connect?: SnippetWhereUniqueInput | SnippetWhereUniqueInput[]
+    update?: SnippetUpdateWithWhereUniqueWithoutCategoryInput | SnippetUpdateWithWhereUniqueWithoutCategoryInput[]
+    updateMany?: SnippetUpdateManyWithWhereWithoutCategoryInput | SnippetUpdateManyWithWhereWithoutCategoryInput[]
+    deleteMany?: SnippetScalarWhereInput | SnippetScalarWhereInput[]
+  }
+
+  export type PageTemplateUncheckedUpdateManyWithoutCategoryNestedInput = {
+    create?: XOR<PageTemplateCreateWithoutCategoryInput, PageTemplateUncheckedCreateWithoutCategoryInput> | PageTemplateCreateWithoutCategoryInput[] | PageTemplateUncheckedCreateWithoutCategoryInput[]
+    connectOrCreate?: PageTemplateCreateOrConnectWithoutCategoryInput | PageTemplateCreateOrConnectWithoutCategoryInput[]
+    upsert?: PageTemplateUpsertWithWhereUniqueWithoutCategoryInput | PageTemplateUpsertWithWhereUniqueWithoutCategoryInput[]
+    createMany?: PageTemplateCreateManyCategoryInputEnvelope
+    set?: PageTemplateWhereUniqueInput | PageTemplateWhereUniqueInput[]
+    disconnect?: PageTemplateWhereUniqueInput | PageTemplateWhereUniqueInput[]
+    delete?: PageTemplateWhereUniqueInput | PageTemplateWhereUniqueInput[]
+    connect?: PageTemplateWhereUniqueInput | PageTemplateWhereUniqueInput[]
+    update?: PageTemplateUpdateWithWhereUniqueWithoutCategoryInput | PageTemplateUpdateWithWhereUniqueWithoutCategoryInput[]
+    updateMany?: PageTemplateUpdateManyWithWhereWithoutCategoryInput | PageTemplateUpdateManyWithWhereWithoutCategoryInput[]
+    deleteMany?: PageTemplateScalarWhereInput | PageTemplateScalarWhereInput[]
+  }
+
+  export type ReusableCategoryCreateNestedOneWithoutSavedBlocksInput = {
+    create?: XOR<ReusableCategoryCreateWithoutSavedBlocksInput, ReusableCategoryUncheckedCreateWithoutSavedBlocksInput>
+    connectOrCreate?: ReusableCategoryCreateOrConnectWithoutSavedBlocksInput
+    connect?: ReusableCategoryWhereUniqueInput
+  }
+
+  export type UserCreateNestedOneWithoutSavedBlocksInput = {
+    create?: XOR<UserCreateWithoutSavedBlocksInput, UserUncheckedCreateWithoutSavedBlocksInput>
+    connectOrCreate?: UserCreateOrConnectWithoutSavedBlocksInput
+    connect?: UserWhereUniqueInput
+  }
+
+  export type ReusableCategoryUpdateOneRequiredWithoutSavedBlocksNestedInput = {
+    create?: XOR<ReusableCategoryCreateWithoutSavedBlocksInput, ReusableCategoryUncheckedCreateWithoutSavedBlocksInput>
+    connectOrCreate?: ReusableCategoryCreateOrConnectWithoutSavedBlocksInput
+    upsert?: ReusableCategoryUpsertWithoutSavedBlocksInput
+    connect?: ReusableCategoryWhereUniqueInput
+    update?: XOR<XOR<ReusableCategoryUpdateToOneWithWhereWithoutSavedBlocksInput, ReusableCategoryUpdateWithoutSavedBlocksInput>, ReusableCategoryUncheckedUpdateWithoutSavedBlocksInput>
+  }
+
+  export type UserUpdateOneWithoutSavedBlocksNestedInput = {
+    create?: XOR<UserCreateWithoutSavedBlocksInput, UserUncheckedCreateWithoutSavedBlocksInput>
+    connectOrCreate?: UserCreateOrConnectWithoutSavedBlocksInput
+    upsert?: UserUpsertWithoutSavedBlocksInput
+    disconnect?: UserWhereInput | boolean
+    delete?: UserWhereInput | boolean
+    connect?: UserWhereUniqueInput
+    update?: XOR<XOR<UserUpdateToOneWithWhereWithoutSavedBlocksInput, UserUpdateWithoutSavedBlocksInput>, UserUncheckedUpdateWithoutSavedBlocksInput>
+  }
+
+  export type ReusableCategoryCreateNestedOneWithoutContentTemplatesInput = {
+    create?: XOR<ReusableCategoryCreateWithoutContentTemplatesInput, ReusableCategoryUncheckedCreateWithoutContentTemplatesInput>
+    connectOrCreate?: ReusableCategoryCreateOrConnectWithoutContentTemplatesInput
+    connect?: ReusableCategoryWhereUniqueInput
+  }
+
+  export type UserCreateNestedOneWithoutContentTemplatesInput = {
+    create?: XOR<UserCreateWithoutContentTemplatesInput, UserUncheckedCreateWithoutContentTemplatesInput>
+    connectOrCreate?: UserCreateOrConnectWithoutContentTemplatesInput
+    connect?: UserWhereUniqueInput
+  }
+
+  export type ReusableCategoryUpdateOneRequiredWithoutContentTemplatesNestedInput = {
+    create?: XOR<ReusableCategoryCreateWithoutContentTemplatesInput, ReusableCategoryUncheckedCreateWithoutContentTemplatesInput>
+    connectOrCreate?: ReusableCategoryCreateOrConnectWithoutContentTemplatesInput
+    upsert?: ReusableCategoryUpsertWithoutContentTemplatesInput
+    connect?: ReusableCategoryWhereUniqueInput
+    update?: XOR<XOR<ReusableCategoryUpdateToOneWithWhereWithoutContentTemplatesInput, ReusableCategoryUpdateWithoutContentTemplatesInput>, ReusableCategoryUncheckedUpdateWithoutContentTemplatesInput>
+  }
+
+  export type UserUpdateOneRequiredWithoutContentTemplatesNestedInput = {
+    create?: XOR<UserCreateWithoutContentTemplatesInput, UserUncheckedCreateWithoutContentTemplatesInput>
+    connectOrCreate?: UserCreateOrConnectWithoutContentTemplatesInput
+    upsert?: UserUpsertWithoutContentTemplatesInput
+    connect?: UserWhereUniqueInput
+    update?: XOR<XOR<UserUpdateToOneWithWhereWithoutContentTemplatesInput, UserUpdateWithoutContentTemplatesInput>, UserUncheckedUpdateWithoutContentTemplatesInput>
+  }
+
+  export type ReusableCategoryCreateNestedOneWithoutSnippetsInput = {
+    create?: XOR<ReusableCategoryCreateWithoutSnippetsInput, ReusableCategoryUncheckedCreateWithoutSnippetsInput>
+    connectOrCreate?: ReusableCategoryCreateOrConnectWithoutSnippetsInput
+    connect?: ReusableCategoryWhereUniqueInput
+  }
+
+  export type UserCreateNestedOneWithoutSnippetsInput = {
+    create?: XOR<UserCreateWithoutSnippetsInput, UserUncheckedCreateWithoutSnippetsInput>
+    connectOrCreate?: UserCreateOrConnectWithoutSnippetsInput
+    connect?: UserWhereUniqueInput
+  }
+
+  export type ReusableCategoryUpdateOneRequiredWithoutSnippetsNestedInput = {
+    create?: XOR<ReusableCategoryCreateWithoutSnippetsInput, ReusableCategoryUncheckedCreateWithoutSnippetsInput>
+    connectOrCreate?: ReusableCategoryCreateOrConnectWithoutSnippetsInput
+    upsert?: ReusableCategoryUpsertWithoutSnippetsInput
+    connect?: ReusableCategoryWhereUniqueInput
+    update?: XOR<XOR<ReusableCategoryUpdateToOneWithWhereWithoutSnippetsInput, ReusableCategoryUpdateWithoutSnippetsInput>, ReusableCategoryUncheckedUpdateWithoutSnippetsInput>
+  }
+
+  export type UserUpdateOneRequiredWithoutSnippetsNestedInput = {
+    create?: XOR<UserCreateWithoutSnippetsInput, UserUncheckedCreateWithoutSnippetsInput>
+    connectOrCreate?: UserCreateOrConnectWithoutSnippetsInput
+    upsert?: UserUpsertWithoutSnippetsInput
+    connect?: UserWhereUniqueInput
+    update?: XOR<XOR<UserUpdateToOneWithWhereWithoutSnippetsInput, UserUpdateWithoutSnippetsInput>, UserUncheckedUpdateWithoutSnippetsInput>
+  }
+
+  export type ReusableCategoryCreateNestedOneWithoutPageTemplatesInput = {
+    create?: XOR<ReusableCategoryCreateWithoutPageTemplatesInput, ReusableCategoryUncheckedCreateWithoutPageTemplatesInput>
+    connectOrCreate?: ReusableCategoryCreateOrConnectWithoutPageTemplatesInput
+    connect?: ReusableCategoryWhereUniqueInput
+  }
+
+  export type UserCreateNestedOneWithoutPageTemplatesInput = {
+    create?: XOR<UserCreateWithoutPageTemplatesInput, UserUncheckedCreateWithoutPageTemplatesInput>
+    connectOrCreate?: UserCreateOrConnectWithoutPageTemplatesInput
+    connect?: UserWhereUniqueInput
+  }
+
+  export type ReusableCategoryUpdateOneRequiredWithoutPageTemplatesNestedInput = {
+    create?: XOR<ReusableCategoryCreateWithoutPageTemplatesInput, ReusableCategoryUncheckedCreateWithoutPageTemplatesInput>
+    connectOrCreate?: ReusableCategoryCreateOrConnectWithoutPageTemplatesInput
+    upsert?: ReusableCategoryUpsertWithoutPageTemplatesInput
+    connect?: ReusableCategoryWhereUniqueInput
+    update?: XOR<XOR<ReusableCategoryUpdateToOneWithWhereWithoutPageTemplatesInput, ReusableCategoryUpdateWithoutPageTemplatesInput>, ReusableCategoryUncheckedUpdateWithoutPageTemplatesInput>
+  }
+
+  export type UserUpdateOneWithoutPageTemplatesNestedInput = {
+    create?: XOR<UserCreateWithoutPageTemplatesInput, UserUncheckedCreateWithoutPageTemplatesInput>
+    connectOrCreate?: UserCreateOrConnectWithoutPageTemplatesInput
+    upsert?: UserUpsertWithoutPageTemplatesInput
+    disconnect?: UserWhereInput | boolean
+    delete?: UserWhereInput | boolean
+    connect?: UserWhereUniqueInput
+    update?: XOR<XOR<UserUpdateToOneWithWhereWithoutPageTemplatesInput, UserUpdateWithoutPageTemplatesInput>, UserUncheckedUpdateWithoutPageTemplatesInput>
   }
 
   export type ContentTagCreateNestedManyWithoutTagInput = {
@@ -49214,6 +58203,23 @@ export namespace Prisma {
     _max?: NestedEnumUserRoleFilter<$PrismaModel>
   }
 
+  export type NestedEnumReusableCategoryScopeFilter<$PrismaModel = never> = {
+    equals?: $Enums.ReusableCategoryScope | EnumReusableCategoryScopeFieldRefInput<$PrismaModel>
+    in?: $Enums.ReusableCategoryScope[] | ListEnumReusableCategoryScopeFieldRefInput<$PrismaModel>
+    notIn?: $Enums.ReusableCategoryScope[] | ListEnumReusableCategoryScopeFieldRefInput<$PrismaModel>
+    not?: NestedEnumReusableCategoryScopeFilter<$PrismaModel> | $Enums.ReusableCategoryScope
+  }
+
+  export type NestedEnumReusableCategoryScopeWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: $Enums.ReusableCategoryScope | EnumReusableCategoryScopeFieldRefInput<$PrismaModel>
+    in?: $Enums.ReusableCategoryScope[] | ListEnumReusableCategoryScopeFieldRefInput<$PrismaModel>
+    notIn?: $Enums.ReusableCategoryScope[] | ListEnumReusableCategoryScopeFieldRefInput<$PrismaModel>
+    not?: NestedEnumReusableCategoryScopeWithAggregatesFilter<$PrismaModel> | $Enums.ReusableCategoryScope
+    _count?: NestedIntFilter<$PrismaModel>
+    _min?: NestedEnumReusableCategoryScopeFilter<$PrismaModel>
+    _max?: NestedEnumReusableCategoryScopeFilter<$PrismaModel>
+  }
+
   export type NestedEnumCalendarProviderFilter<$PrismaModel = never> = {
     equals?: $Enums.CalendarProvider | EnumCalendarProviderFieldRefInput<$PrismaModel>
     in?: $Enums.CalendarProvider[] | ListEnumCalendarProviderFieldRefInput<$PrismaModel>
@@ -49772,6 +58778,11 @@ export namespace Prisma {
     auditTargets?: AuditLogCreateNestedManyWithoutTargetUserInput
     adminActions?: AuditLogCreateNestedManyWithoutUserInput
     categories?: CategoryCreateNestedManyWithoutOwnerInput
+    reusableCategories?: ReusableCategoryCreateNestedManyWithoutUserInput
+    savedBlocks?: SavedBlockCreateNestedManyWithoutUserInput
+    contentTemplates?: ContentTemplateCreateNestedManyWithoutUserInput
+    snippets?: SnippetCreateNestedManyWithoutUserInput
+    pageTemplates?: PageTemplateCreateNestedManyWithoutUserInput
     calendarConnections?: CalendarConnectionCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventCreateNestedManyWithoutUserInput
     calendarSources?: CalendarSourceCreateNestedManyWithoutUserInput
@@ -49798,6 +58809,11 @@ export namespace Prisma {
     auditTargets?: AuditLogUncheckedCreateNestedManyWithoutTargetUserInput
     adminActions?: AuditLogUncheckedCreateNestedManyWithoutUserInput
     categories?: CategoryUncheckedCreateNestedManyWithoutOwnerInput
+    reusableCategories?: ReusableCategoryUncheckedCreateNestedManyWithoutUserInput
+    savedBlocks?: SavedBlockUncheckedCreateNestedManyWithoutUserInput
+    contentTemplates?: ContentTemplateUncheckedCreateNestedManyWithoutUserInput
+    snippets?: SnippetUncheckedCreateNestedManyWithoutUserInput
+    pageTemplates?: PageTemplateUncheckedCreateNestedManyWithoutUserInput
     calendarConnections?: CalendarConnectionUncheckedCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutUserInput
     calendarSources?: CalendarSourceUncheckedCreateNestedManyWithoutUserInput
@@ -50649,6 +59665,11 @@ export namespace Prisma {
     auditTargets?: AuditLogUpdateManyWithoutTargetUserNestedInput
     adminActions?: AuditLogUpdateManyWithoutUserNestedInput
     categories?: CategoryUpdateManyWithoutOwnerNestedInput
+    reusableCategories?: ReusableCategoryUpdateManyWithoutUserNestedInput
+    savedBlocks?: SavedBlockUpdateManyWithoutUserNestedInput
+    contentTemplates?: ContentTemplateUpdateManyWithoutUserNestedInput
+    snippets?: SnippetUpdateManyWithoutUserNestedInput
+    pageTemplates?: PageTemplateUpdateManyWithoutUserNestedInput
     calendarConnections?: CalendarConnectionUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUpdateManyWithoutUserNestedInput
     calendarSources?: CalendarSourceUpdateManyWithoutUserNestedInput
@@ -50675,6 +59696,11 @@ export namespace Prisma {
     auditTargets?: AuditLogUncheckedUpdateManyWithoutTargetUserNestedInput
     adminActions?: AuditLogUncheckedUpdateManyWithoutUserNestedInput
     categories?: CategoryUncheckedUpdateManyWithoutOwnerNestedInput
+    reusableCategories?: ReusableCategoryUncheckedUpdateManyWithoutUserNestedInput
+    savedBlocks?: SavedBlockUncheckedUpdateManyWithoutUserNestedInput
+    contentTemplates?: ContentTemplateUncheckedUpdateManyWithoutUserNestedInput
+    snippets?: SnippetUncheckedUpdateManyWithoutUserNestedInput
+    pageTemplates?: PageTemplateUncheckedUpdateManyWithoutUserNestedInput
     calendarConnections?: CalendarConnectionUncheckedUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUncheckedUpdateManyWithoutUserNestedInput
     calendarSources?: CalendarSourceUncheckedUpdateManyWithoutUserNestedInput
@@ -51670,6 +60696,11 @@ export namespace Prisma {
     auditTargets?: AuditLogCreateNestedManyWithoutTargetUserInput
     adminActions?: AuditLogCreateNestedManyWithoutUserInput
     categories?: CategoryCreateNestedManyWithoutOwnerInput
+    reusableCategories?: ReusableCategoryCreateNestedManyWithoutUserInput
+    savedBlocks?: SavedBlockCreateNestedManyWithoutUserInput
+    contentTemplates?: ContentTemplateCreateNestedManyWithoutUserInput
+    snippets?: SnippetCreateNestedManyWithoutUserInput
+    pageTemplates?: PageTemplateCreateNestedManyWithoutUserInput
     calendarConnections?: CalendarConnectionCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventCreateNestedManyWithoutUserInput
     calendarSources?: CalendarSourceCreateNestedManyWithoutUserInput
@@ -51696,6 +60727,11 @@ export namespace Prisma {
     auditTargets?: AuditLogUncheckedCreateNestedManyWithoutTargetUserInput
     adminActions?: AuditLogUncheckedCreateNestedManyWithoutUserInput
     categories?: CategoryUncheckedCreateNestedManyWithoutOwnerInput
+    reusableCategories?: ReusableCategoryUncheckedCreateNestedManyWithoutUserInput
+    savedBlocks?: SavedBlockUncheckedCreateNestedManyWithoutUserInput
+    contentTemplates?: ContentTemplateUncheckedCreateNestedManyWithoutUserInput
+    snippets?: SnippetUncheckedCreateNestedManyWithoutUserInput
+    pageTemplates?: PageTemplateUncheckedCreateNestedManyWithoutUserInput
     calendarConnections?: CalendarConnectionUncheckedCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutUserInput
     calendarSources?: CalendarSourceUncheckedCreateNestedManyWithoutUserInput
@@ -51821,6 +60857,11 @@ export namespace Prisma {
     auditTargets?: AuditLogUpdateManyWithoutTargetUserNestedInput
     adminActions?: AuditLogUpdateManyWithoutUserNestedInput
     categories?: CategoryUpdateManyWithoutOwnerNestedInput
+    reusableCategories?: ReusableCategoryUpdateManyWithoutUserNestedInput
+    savedBlocks?: SavedBlockUpdateManyWithoutUserNestedInput
+    contentTemplates?: ContentTemplateUpdateManyWithoutUserNestedInput
+    snippets?: SnippetUpdateManyWithoutUserNestedInput
+    pageTemplates?: PageTemplateUpdateManyWithoutUserNestedInput
     calendarConnections?: CalendarConnectionUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUpdateManyWithoutUserNestedInput
     calendarSources?: CalendarSourceUpdateManyWithoutUserNestedInput
@@ -51847,6 +60888,11 @@ export namespace Prisma {
     auditTargets?: AuditLogUncheckedUpdateManyWithoutTargetUserNestedInput
     adminActions?: AuditLogUncheckedUpdateManyWithoutUserNestedInput
     categories?: CategoryUncheckedUpdateManyWithoutOwnerNestedInput
+    reusableCategories?: ReusableCategoryUncheckedUpdateManyWithoutUserNestedInput
+    savedBlocks?: SavedBlockUncheckedUpdateManyWithoutUserNestedInput
+    contentTemplates?: ContentTemplateUncheckedUpdateManyWithoutUserNestedInput
+    snippets?: SnippetUncheckedUpdateManyWithoutUserNestedInput
+    pageTemplates?: PageTemplateUncheckedUpdateManyWithoutUserNestedInput
     calendarConnections?: CalendarConnectionUncheckedUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUncheckedUpdateManyWithoutUserNestedInput
     calendarSources?: CalendarSourceUncheckedUpdateManyWithoutUserNestedInput
@@ -52785,6 +61831,11 @@ export namespace Prisma {
     auditTargets?: AuditLogCreateNestedManyWithoutTargetUserInput
     adminActions?: AuditLogCreateNestedManyWithoutUserInput
     categories?: CategoryCreateNestedManyWithoutOwnerInput
+    reusableCategories?: ReusableCategoryCreateNestedManyWithoutUserInput
+    savedBlocks?: SavedBlockCreateNestedManyWithoutUserInput
+    contentTemplates?: ContentTemplateCreateNestedManyWithoutUserInput
+    snippets?: SnippetCreateNestedManyWithoutUserInput
+    pageTemplates?: PageTemplateCreateNestedManyWithoutUserInput
     calendarConnections?: CalendarConnectionCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventCreateNestedManyWithoutUserInput
     calendarSources?: CalendarSourceCreateNestedManyWithoutUserInput
@@ -52811,6 +61862,11 @@ export namespace Prisma {
     auditTargets?: AuditLogUncheckedCreateNestedManyWithoutTargetUserInput
     adminActions?: AuditLogUncheckedCreateNestedManyWithoutUserInput
     categories?: CategoryUncheckedCreateNestedManyWithoutOwnerInput
+    reusableCategories?: ReusableCategoryUncheckedCreateNestedManyWithoutUserInput
+    savedBlocks?: SavedBlockUncheckedCreateNestedManyWithoutUserInput
+    contentTemplates?: ContentTemplateUncheckedCreateNestedManyWithoutUserInput
+    snippets?: SnippetUncheckedCreateNestedManyWithoutUserInput
+    pageTemplates?: PageTemplateUncheckedCreateNestedManyWithoutUserInput
     calendarConnections?: CalendarConnectionUncheckedCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutUserInput
     calendarSources?: CalendarSourceUncheckedCreateNestedManyWithoutUserInput
@@ -52942,6 +61998,11 @@ export namespace Prisma {
     auditTargets?: AuditLogUpdateManyWithoutTargetUserNestedInput
     adminActions?: AuditLogUpdateManyWithoutUserNestedInput
     categories?: CategoryUpdateManyWithoutOwnerNestedInput
+    reusableCategories?: ReusableCategoryUpdateManyWithoutUserNestedInput
+    savedBlocks?: SavedBlockUpdateManyWithoutUserNestedInput
+    contentTemplates?: ContentTemplateUpdateManyWithoutUserNestedInput
+    snippets?: SnippetUpdateManyWithoutUserNestedInput
+    pageTemplates?: PageTemplateUpdateManyWithoutUserNestedInput
     calendarConnections?: CalendarConnectionUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUpdateManyWithoutUserNestedInput
     calendarSources?: CalendarSourceUpdateManyWithoutUserNestedInput
@@ -52968,6 +62029,11 @@ export namespace Prisma {
     auditTargets?: AuditLogUncheckedUpdateManyWithoutTargetUserNestedInput
     adminActions?: AuditLogUncheckedUpdateManyWithoutUserNestedInput
     categories?: CategoryUncheckedUpdateManyWithoutOwnerNestedInput
+    reusableCategories?: ReusableCategoryUncheckedUpdateManyWithoutUserNestedInput
+    savedBlocks?: SavedBlockUncheckedUpdateManyWithoutUserNestedInput
+    contentTemplates?: ContentTemplateUncheckedUpdateManyWithoutUserNestedInput
+    snippets?: SnippetUncheckedUpdateManyWithoutUserNestedInput
+    pageTemplates?: PageTemplateUncheckedUpdateManyWithoutUserNestedInput
     calendarConnections?: CalendarConnectionUncheckedUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUncheckedUpdateManyWithoutUserNestedInput
     calendarSources?: CalendarSourceUncheckedUpdateManyWithoutUserNestedInput
@@ -52994,6 +62060,11 @@ export namespace Prisma {
     auditTargets?: AuditLogCreateNestedManyWithoutTargetUserInput
     adminActions?: AuditLogCreateNestedManyWithoutUserInput
     categories?: CategoryCreateNestedManyWithoutOwnerInput
+    reusableCategories?: ReusableCategoryCreateNestedManyWithoutUserInput
+    savedBlocks?: SavedBlockCreateNestedManyWithoutUserInput
+    contentTemplates?: ContentTemplateCreateNestedManyWithoutUserInput
+    snippets?: SnippetCreateNestedManyWithoutUserInput
+    pageTemplates?: PageTemplateCreateNestedManyWithoutUserInput
     calendarConnections?: CalendarConnectionCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventCreateNestedManyWithoutUserInput
     calendarSources?: CalendarSourceCreateNestedManyWithoutUserInput
@@ -53020,6 +62091,11 @@ export namespace Prisma {
     auditTargets?: AuditLogUncheckedCreateNestedManyWithoutTargetUserInput
     adminActions?: AuditLogUncheckedCreateNestedManyWithoutUserInput
     categories?: CategoryUncheckedCreateNestedManyWithoutOwnerInput
+    reusableCategories?: ReusableCategoryUncheckedCreateNestedManyWithoutUserInput
+    savedBlocks?: SavedBlockUncheckedCreateNestedManyWithoutUserInput
+    contentTemplates?: ContentTemplateUncheckedCreateNestedManyWithoutUserInput
+    snippets?: SnippetUncheckedCreateNestedManyWithoutUserInput
+    pageTemplates?: PageTemplateUncheckedCreateNestedManyWithoutUserInput
     calendarConnections?: CalendarConnectionUncheckedCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutUserInput
     calendarSources?: CalendarSourceUncheckedCreateNestedManyWithoutUserInput
@@ -53062,6 +62138,11 @@ export namespace Prisma {
     auditTargets?: AuditLogUpdateManyWithoutTargetUserNestedInput
     adminActions?: AuditLogUpdateManyWithoutUserNestedInput
     categories?: CategoryUpdateManyWithoutOwnerNestedInput
+    reusableCategories?: ReusableCategoryUpdateManyWithoutUserNestedInput
+    savedBlocks?: SavedBlockUpdateManyWithoutUserNestedInput
+    contentTemplates?: ContentTemplateUpdateManyWithoutUserNestedInput
+    snippets?: SnippetUpdateManyWithoutUserNestedInput
+    pageTemplates?: PageTemplateUpdateManyWithoutUserNestedInput
     calendarConnections?: CalendarConnectionUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUpdateManyWithoutUserNestedInput
     calendarSources?: CalendarSourceUpdateManyWithoutUserNestedInput
@@ -53088,6 +62169,11 @@ export namespace Prisma {
     auditTargets?: AuditLogUncheckedUpdateManyWithoutTargetUserNestedInput
     adminActions?: AuditLogUncheckedUpdateManyWithoutUserNestedInput
     categories?: CategoryUncheckedUpdateManyWithoutOwnerNestedInput
+    reusableCategories?: ReusableCategoryUncheckedUpdateManyWithoutUserNestedInput
+    savedBlocks?: SavedBlockUncheckedUpdateManyWithoutUserNestedInput
+    contentTemplates?: ContentTemplateUncheckedUpdateManyWithoutUserNestedInput
+    snippets?: SnippetUncheckedUpdateManyWithoutUserNestedInput
+    pageTemplates?: PageTemplateUncheckedUpdateManyWithoutUserNestedInput
     calendarConnections?: CalendarConnectionUncheckedUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUncheckedUpdateManyWithoutUserNestedInput
     calendarSources?: CalendarSourceUncheckedUpdateManyWithoutUserNestedInput
@@ -53113,6 +62199,11 @@ export namespace Prisma {
     auditTargets?: AuditLogCreateNestedManyWithoutTargetUserInput
     adminActions?: AuditLogCreateNestedManyWithoutUserInput
     categories?: CategoryCreateNestedManyWithoutOwnerInput
+    reusableCategories?: ReusableCategoryCreateNestedManyWithoutUserInput
+    savedBlocks?: SavedBlockCreateNestedManyWithoutUserInput
+    contentTemplates?: ContentTemplateCreateNestedManyWithoutUserInput
+    snippets?: SnippetCreateNestedManyWithoutUserInput
+    pageTemplates?: PageTemplateCreateNestedManyWithoutUserInput
     calendarConnections?: CalendarConnectionCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventCreateNestedManyWithoutUserInput
     calendarSources?: CalendarSourceCreateNestedManyWithoutUserInput
@@ -53139,6 +62230,11 @@ export namespace Prisma {
     auditTargets?: AuditLogUncheckedCreateNestedManyWithoutTargetUserInput
     adminActions?: AuditLogUncheckedCreateNestedManyWithoutUserInput
     categories?: CategoryUncheckedCreateNestedManyWithoutOwnerInput
+    reusableCategories?: ReusableCategoryUncheckedCreateNestedManyWithoutUserInput
+    savedBlocks?: SavedBlockUncheckedCreateNestedManyWithoutUserInput
+    contentTemplates?: ContentTemplateUncheckedCreateNestedManyWithoutUserInput
+    snippets?: SnippetUncheckedCreateNestedManyWithoutUserInput
+    pageTemplates?: PageTemplateUncheckedCreateNestedManyWithoutUserInput
     calendarConnections?: CalendarConnectionUncheckedCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutUserInput
     calendarSources?: CalendarSourceUncheckedCreateNestedManyWithoutUserInput
@@ -53181,6 +62277,11 @@ export namespace Prisma {
     auditTargets?: AuditLogUpdateManyWithoutTargetUserNestedInput
     adminActions?: AuditLogUpdateManyWithoutUserNestedInput
     categories?: CategoryUpdateManyWithoutOwnerNestedInput
+    reusableCategories?: ReusableCategoryUpdateManyWithoutUserNestedInput
+    savedBlocks?: SavedBlockUpdateManyWithoutUserNestedInput
+    contentTemplates?: ContentTemplateUpdateManyWithoutUserNestedInput
+    snippets?: SnippetUpdateManyWithoutUserNestedInput
+    pageTemplates?: PageTemplateUpdateManyWithoutUserNestedInput
     calendarConnections?: CalendarConnectionUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUpdateManyWithoutUserNestedInput
     calendarSources?: CalendarSourceUpdateManyWithoutUserNestedInput
@@ -53207,6 +62308,11 @@ export namespace Prisma {
     auditTargets?: AuditLogUncheckedUpdateManyWithoutTargetUserNestedInput
     adminActions?: AuditLogUncheckedUpdateManyWithoutUserNestedInput
     categories?: CategoryUncheckedUpdateManyWithoutOwnerNestedInput
+    reusableCategories?: ReusableCategoryUncheckedUpdateManyWithoutUserNestedInput
+    savedBlocks?: SavedBlockUncheckedUpdateManyWithoutUserNestedInput
+    contentTemplates?: ContentTemplateUncheckedUpdateManyWithoutUserNestedInput
+    snippets?: SnippetUncheckedUpdateManyWithoutUserNestedInput
+    pageTemplates?: PageTemplateUncheckedUpdateManyWithoutUserNestedInput
     calendarConnections?: CalendarConnectionUncheckedUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUncheckedUpdateManyWithoutUserNestedInput
     calendarSources?: CalendarSourceUncheckedUpdateManyWithoutUserNestedInput
@@ -53378,6 +62484,196 @@ export namespace Prisma {
 
   export type CategoryCreateManyOwnerInputEnvelope = {
     data: CategoryCreateManyOwnerInput | CategoryCreateManyOwnerInput[]
+    skipDuplicates?: boolean
+  }
+
+  export type ReusableCategoryCreateWithoutUserInput = {
+    id?: string
+    name: string
+    slug: string
+    scope: $Enums.ReusableCategoryScope
+    displayOrder?: number
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    parent?: ReusableCategoryCreateNestedOneWithoutChildrenInput
+    children?: ReusableCategoryCreateNestedManyWithoutParentInput
+    savedBlocks?: SavedBlockCreateNestedManyWithoutCategoryInput
+    contentTemplates?: ContentTemplateCreateNestedManyWithoutCategoryInput
+    snippets?: SnippetCreateNestedManyWithoutCategoryInput
+    pageTemplates?: PageTemplateCreateNestedManyWithoutCategoryInput
+  }
+
+  export type ReusableCategoryUncheckedCreateWithoutUserInput = {
+    id?: string
+    name: string
+    slug: string
+    scope: $Enums.ReusableCategoryScope
+    parentId?: string | null
+    displayOrder?: number
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    children?: ReusableCategoryUncheckedCreateNestedManyWithoutParentInput
+    savedBlocks?: SavedBlockUncheckedCreateNestedManyWithoutCategoryInput
+    contentTemplates?: ContentTemplateUncheckedCreateNestedManyWithoutCategoryInput
+    snippets?: SnippetUncheckedCreateNestedManyWithoutCategoryInput
+    pageTemplates?: PageTemplateUncheckedCreateNestedManyWithoutCategoryInput
+  }
+
+  export type ReusableCategoryCreateOrConnectWithoutUserInput = {
+    where: ReusableCategoryWhereUniqueInput
+    create: XOR<ReusableCategoryCreateWithoutUserInput, ReusableCategoryUncheckedCreateWithoutUserInput>
+  }
+
+  export type ReusableCategoryCreateManyUserInputEnvelope = {
+    data: ReusableCategoryCreateManyUserInput | ReusableCategoryCreateManyUserInput[]
+    skipDuplicates?: boolean
+  }
+
+  export type SavedBlockCreateWithoutUserInput = {
+    id?: string
+    title: string
+    blockType: string
+    tiptapJson: JsonNullValueInput | InputJsonValue
+    searchText?: string
+    usageCount?: number
+    lastUsedAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    category: ReusableCategoryCreateNestedOneWithoutSavedBlocksInput
+  }
+
+  export type SavedBlockUncheckedCreateWithoutUserInput = {
+    id?: string
+    title: string
+    blockType: string
+    tiptapJson: JsonNullValueInput | InputJsonValue
+    searchText?: string
+    categoryId: string
+    usageCount?: number
+    lastUsedAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type SavedBlockCreateOrConnectWithoutUserInput = {
+    where: SavedBlockWhereUniqueInput
+    create: XOR<SavedBlockCreateWithoutUserInput, SavedBlockUncheckedCreateWithoutUserInput>
+  }
+
+  export type SavedBlockCreateManyUserInputEnvelope = {
+    data: SavedBlockCreateManyUserInput | SavedBlockCreateManyUserInput[]
+    skipDuplicates?: boolean
+  }
+
+  export type ContentTemplateCreateWithoutUserInput = {
+    id?: string
+    title: string
+    tiptapJson: JsonNullValueInput | InputJsonValue
+    searchText?: string
+    usageCount?: number
+    lastUsedAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    category: ReusableCategoryCreateNestedOneWithoutContentTemplatesInput
+  }
+
+  export type ContentTemplateUncheckedCreateWithoutUserInput = {
+    id?: string
+    title: string
+    tiptapJson: JsonNullValueInput | InputJsonValue
+    searchText?: string
+    categoryId: string
+    usageCount?: number
+    lastUsedAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type ContentTemplateCreateOrConnectWithoutUserInput = {
+    where: ContentTemplateWhereUniqueInput
+    create: XOR<ContentTemplateCreateWithoutUserInput, ContentTemplateUncheckedCreateWithoutUserInput>
+  }
+
+  export type ContentTemplateCreateManyUserInputEnvelope = {
+    data: ContentTemplateCreateManyUserInput | ContentTemplateCreateManyUserInput[]
+    skipDuplicates?: boolean
+  }
+
+  export type SnippetCreateWithoutUserInput = {
+    id?: string
+    title?: string | null
+    content: string
+    tiptapJson?: NullableJsonNullValueInput | InputJsonValue
+    searchText?: string
+    usageCount?: number
+    lastUsedAt?: Date | string | null
+    isAiContext?: boolean
+    isVisibleInUI?: boolean
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    category: ReusableCategoryCreateNestedOneWithoutSnippetsInput
+  }
+
+  export type SnippetUncheckedCreateWithoutUserInput = {
+    id?: string
+    title?: string | null
+    content: string
+    tiptapJson?: NullableJsonNullValueInput | InputJsonValue
+    searchText?: string
+    categoryId: string
+    usageCount?: number
+    lastUsedAt?: Date | string | null
+    isAiContext?: boolean
+    isVisibleInUI?: boolean
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type SnippetCreateOrConnectWithoutUserInput = {
+    where: SnippetWhereUniqueInput
+    create: XOR<SnippetCreateWithoutUserInput, SnippetUncheckedCreateWithoutUserInput>
+  }
+
+  export type SnippetCreateManyUserInputEnvelope = {
+    data: SnippetCreateManyUserInput | SnippetCreateManyUserInput[]
+    skipDuplicates?: boolean
+  }
+
+  export type PageTemplateCreateWithoutUserInput = {
+    id?: string
+    title: string
+    tiptapJson: JsonNullValueInput | InputJsonValue
+    searchText?: string
+    defaultTitle?: string | null
+    customIcon?: string | null
+    iconColor?: string | null
+    usageCount?: number
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    category: ReusableCategoryCreateNestedOneWithoutPageTemplatesInput
+  }
+
+  export type PageTemplateUncheckedCreateWithoutUserInput = {
+    id?: string
+    title: string
+    tiptapJson: JsonNullValueInput | InputJsonValue
+    searchText?: string
+    categoryId: string
+    defaultTitle?: string | null
+    customIcon?: string | null
+    iconColor?: string | null
+    usageCount?: number
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type PageTemplateCreateOrConnectWithoutUserInput = {
+    where: PageTemplateWhereUniqueInput
+    create: XOR<PageTemplateCreateWithoutUserInput, PageTemplateUncheckedCreateWithoutUserInput>
+  }
+
+  export type PageTemplateCreateManyUserInputEnvelope = {
+    data: PageTemplateCreateManyUserInput | PageTemplateCreateManyUserInput[]
     skipDuplicates?: boolean
   }
 
@@ -53906,6 +63202,171 @@ export namespace Prisma {
     updatedAt?: DateTimeFilter<"Category"> | Date | string
   }
 
+  export type ReusableCategoryUpsertWithWhereUniqueWithoutUserInput = {
+    where: ReusableCategoryWhereUniqueInput
+    update: XOR<ReusableCategoryUpdateWithoutUserInput, ReusableCategoryUncheckedUpdateWithoutUserInput>
+    create: XOR<ReusableCategoryCreateWithoutUserInput, ReusableCategoryUncheckedCreateWithoutUserInput>
+  }
+
+  export type ReusableCategoryUpdateWithWhereUniqueWithoutUserInput = {
+    where: ReusableCategoryWhereUniqueInput
+    data: XOR<ReusableCategoryUpdateWithoutUserInput, ReusableCategoryUncheckedUpdateWithoutUserInput>
+  }
+
+  export type ReusableCategoryUpdateManyWithWhereWithoutUserInput = {
+    where: ReusableCategoryScalarWhereInput
+    data: XOR<ReusableCategoryUpdateManyMutationInput, ReusableCategoryUncheckedUpdateManyWithoutUserInput>
+  }
+
+  export type ReusableCategoryScalarWhereInput = {
+    AND?: ReusableCategoryScalarWhereInput | ReusableCategoryScalarWhereInput[]
+    OR?: ReusableCategoryScalarWhereInput[]
+    NOT?: ReusableCategoryScalarWhereInput | ReusableCategoryScalarWhereInput[]
+    id?: UuidFilter<"ReusableCategory"> | string
+    name?: StringFilter<"ReusableCategory"> | string
+    slug?: StringFilter<"ReusableCategory"> | string
+    scope?: EnumReusableCategoryScopeFilter<"ReusableCategory"> | $Enums.ReusableCategoryScope
+    userId?: UuidNullableFilter<"ReusableCategory"> | string | null
+    parentId?: UuidNullableFilter<"ReusableCategory"> | string | null
+    displayOrder?: IntFilter<"ReusableCategory"> | number
+    createdAt?: DateTimeFilter<"ReusableCategory"> | Date | string
+    updatedAt?: DateTimeFilter<"ReusableCategory"> | Date | string
+  }
+
+  export type SavedBlockUpsertWithWhereUniqueWithoutUserInput = {
+    where: SavedBlockWhereUniqueInput
+    update: XOR<SavedBlockUpdateWithoutUserInput, SavedBlockUncheckedUpdateWithoutUserInput>
+    create: XOR<SavedBlockCreateWithoutUserInput, SavedBlockUncheckedCreateWithoutUserInput>
+  }
+
+  export type SavedBlockUpdateWithWhereUniqueWithoutUserInput = {
+    where: SavedBlockWhereUniqueInput
+    data: XOR<SavedBlockUpdateWithoutUserInput, SavedBlockUncheckedUpdateWithoutUserInput>
+  }
+
+  export type SavedBlockUpdateManyWithWhereWithoutUserInput = {
+    where: SavedBlockScalarWhereInput
+    data: XOR<SavedBlockUpdateManyMutationInput, SavedBlockUncheckedUpdateManyWithoutUserInput>
+  }
+
+  export type SavedBlockScalarWhereInput = {
+    AND?: SavedBlockScalarWhereInput | SavedBlockScalarWhereInput[]
+    OR?: SavedBlockScalarWhereInput[]
+    NOT?: SavedBlockScalarWhereInput | SavedBlockScalarWhereInput[]
+    id?: UuidFilter<"SavedBlock"> | string
+    title?: StringFilter<"SavedBlock"> | string
+    blockType?: StringFilter<"SavedBlock"> | string
+    tiptapJson?: JsonFilter<"SavedBlock">
+    searchText?: StringFilter<"SavedBlock"> | string
+    categoryId?: UuidFilter<"SavedBlock"> | string
+    userId?: UuidNullableFilter<"SavedBlock"> | string | null
+    usageCount?: IntFilter<"SavedBlock"> | number
+    lastUsedAt?: DateTimeNullableFilter<"SavedBlock"> | Date | string | null
+    createdAt?: DateTimeFilter<"SavedBlock"> | Date | string
+    updatedAt?: DateTimeFilter<"SavedBlock"> | Date | string
+  }
+
+  export type ContentTemplateUpsertWithWhereUniqueWithoutUserInput = {
+    where: ContentTemplateWhereUniqueInput
+    update: XOR<ContentTemplateUpdateWithoutUserInput, ContentTemplateUncheckedUpdateWithoutUserInput>
+    create: XOR<ContentTemplateCreateWithoutUserInput, ContentTemplateUncheckedCreateWithoutUserInput>
+  }
+
+  export type ContentTemplateUpdateWithWhereUniqueWithoutUserInput = {
+    where: ContentTemplateWhereUniqueInput
+    data: XOR<ContentTemplateUpdateWithoutUserInput, ContentTemplateUncheckedUpdateWithoutUserInput>
+  }
+
+  export type ContentTemplateUpdateManyWithWhereWithoutUserInput = {
+    where: ContentTemplateScalarWhereInput
+    data: XOR<ContentTemplateUpdateManyMutationInput, ContentTemplateUncheckedUpdateManyWithoutUserInput>
+  }
+
+  export type ContentTemplateScalarWhereInput = {
+    AND?: ContentTemplateScalarWhereInput | ContentTemplateScalarWhereInput[]
+    OR?: ContentTemplateScalarWhereInput[]
+    NOT?: ContentTemplateScalarWhereInput | ContentTemplateScalarWhereInput[]
+    id?: UuidFilter<"ContentTemplate"> | string
+    title?: StringFilter<"ContentTemplate"> | string
+    tiptapJson?: JsonFilter<"ContentTemplate">
+    searchText?: StringFilter<"ContentTemplate"> | string
+    categoryId?: UuidFilter<"ContentTemplate"> | string
+    userId?: UuidFilter<"ContentTemplate"> | string
+    usageCount?: IntFilter<"ContentTemplate"> | number
+    lastUsedAt?: DateTimeNullableFilter<"ContentTemplate"> | Date | string | null
+    createdAt?: DateTimeFilter<"ContentTemplate"> | Date | string
+    updatedAt?: DateTimeFilter<"ContentTemplate"> | Date | string
+  }
+
+  export type SnippetUpsertWithWhereUniqueWithoutUserInput = {
+    where: SnippetWhereUniqueInput
+    update: XOR<SnippetUpdateWithoutUserInput, SnippetUncheckedUpdateWithoutUserInput>
+    create: XOR<SnippetCreateWithoutUserInput, SnippetUncheckedCreateWithoutUserInput>
+  }
+
+  export type SnippetUpdateWithWhereUniqueWithoutUserInput = {
+    where: SnippetWhereUniqueInput
+    data: XOR<SnippetUpdateWithoutUserInput, SnippetUncheckedUpdateWithoutUserInput>
+  }
+
+  export type SnippetUpdateManyWithWhereWithoutUserInput = {
+    where: SnippetScalarWhereInput
+    data: XOR<SnippetUpdateManyMutationInput, SnippetUncheckedUpdateManyWithoutUserInput>
+  }
+
+  export type SnippetScalarWhereInput = {
+    AND?: SnippetScalarWhereInput | SnippetScalarWhereInput[]
+    OR?: SnippetScalarWhereInput[]
+    NOT?: SnippetScalarWhereInput | SnippetScalarWhereInput[]
+    id?: UuidFilter<"Snippet"> | string
+    title?: StringNullableFilter<"Snippet"> | string | null
+    content?: StringFilter<"Snippet"> | string
+    tiptapJson?: JsonNullableFilter<"Snippet">
+    searchText?: StringFilter<"Snippet"> | string
+    categoryId?: UuidFilter<"Snippet"> | string
+    userId?: UuidFilter<"Snippet"> | string
+    usageCount?: IntFilter<"Snippet"> | number
+    lastUsedAt?: DateTimeNullableFilter<"Snippet"> | Date | string | null
+    isAiContext?: BoolFilter<"Snippet"> | boolean
+    isVisibleInUI?: BoolFilter<"Snippet"> | boolean
+    createdAt?: DateTimeFilter<"Snippet"> | Date | string
+    updatedAt?: DateTimeFilter<"Snippet"> | Date | string
+  }
+
+  export type PageTemplateUpsertWithWhereUniqueWithoutUserInput = {
+    where: PageTemplateWhereUniqueInput
+    update: XOR<PageTemplateUpdateWithoutUserInput, PageTemplateUncheckedUpdateWithoutUserInput>
+    create: XOR<PageTemplateCreateWithoutUserInput, PageTemplateUncheckedCreateWithoutUserInput>
+  }
+
+  export type PageTemplateUpdateWithWhereUniqueWithoutUserInput = {
+    where: PageTemplateWhereUniqueInput
+    data: XOR<PageTemplateUpdateWithoutUserInput, PageTemplateUncheckedUpdateWithoutUserInput>
+  }
+
+  export type PageTemplateUpdateManyWithWhereWithoutUserInput = {
+    where: PageTemplateScalarWhereInput
+    data: XOR<PageTemplateUpdateManyMutationInput, PageTemplateUncheckedUpdateManyWithoutUserInput>
+  }
+
+  export type PageTemplateScalarWhereInput = {
+    AND?: PageTemplateScalarWhereInput | PageTemplateScalarWhereInput[]
+    OR?: PageTemplateScalarWhereInput[]
+    NOT?: PageTemplateScalarWhereInput | PageTemplateScalarWhereInput[]
+    id?: UuidFilter<"PageTemplate"> | string
+    title?: StringFilter<"PageTemplate"> | string
+    tiptapJson?: JsonFilter<"PageTemplate">
+    searchText?: StringFilter<"PageTemplate"> | string
+    categoryId?: UuidFilter<"PageTemplate"> | string
+    userId?: UuidNullableFilter<"PageTemplate"> | string | null
+    defaultTitle?: StringNullableFilter<"PageTemplate"> | string | null
+    customIcon?: StringNullableFilter<"PageTemplate"> | string | null
+    iconColor?: StringNullableFilter<"PageTemplate"> | string | null
+    usageCount?: IntFilter<"PageTemplate"> | number
+    createdAt?: DateTimeFilter<"PageTemplate"> | Date | string
+    updatedAt?: DateTimeFilter<"PageTemplate"> | Date | string
+  }
+
   export type CalendarConnectionUpsertWithWhereUniqueWithoutUserInput = {
     where: CalendarConnectionWhereUniqueInput
     update: XOR<CalendarConnectionUpdateWithoutUserInput, CalendarConnectionUncheckedUpdateWithoutUserInput>
@@ -54172,6 +63633,11 @@ export namespace Prisma {
     aiProviderKeys?: AIProviderKeyCreateNestedManyWithoutUserInput
     auditTargets?: AuditLogCreateNestedManyWithoutTargetUserInput
     adminActions?: AuditLogCreateNestedManyWithoutUserInput
+    reusableCategories?: ReusableCategoryCreateNestedManyWithoutUserInput
+    savedBlocks?: SavedBlockCreateNestedManyWithoutUserInput
+    contentTemplates?: ContentTemplateCreateNestedManyWithoutUserInput
+    snippets?: SnippetCreateNestedManyWithoutUserInput
+    pageTemplates?: PageTemplateCreateNestedManyWithoutUserInput
     calendarConnections?: CalendarConnectionCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventCreateNestedManyWithoutUserInput
     calendarSources?: CalendarSourceCreateNestedManyWithoutUserInput
@@ -54198,6 +63664,11 @@ export namespace Prisma {
     aiProviderKeys?: AIProviderKeyUncheckedCreateNestedManyWithoutUserInput
     auditTargets?: AuditLogUncheckedCreateNestedManyWithoutTargetUserInput
     adminActions?: AuditLogUncheckedCreateNestedManyWithoutUserInput
+    reusableCategories?: ReusableCategoryUncheckedCreateNestedManyWithoutUserInput
+    savedBlocks?: SavedBlockUncheckedCreateNestedManyWithoutUserInput
+    contentTemplates?: ContentTemplateUncheckedCreateNestedManyWithoutUserInput
+    snippets?: SnippetUncheckedCreateNestedManyWithoutUserInput
+    pageTemplates?: PageTemplateUncheckedCreateNestedManyWithoutUserInput
     calendarConnections?: CalendarConnectionUncheckedCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutUserInput
     calendarSources?: CalendarSourceUncheckedCreateNestedManyWithoutUserInput
@@ -54328,6 +63799,11 @@ export namespace Prisma {
     aiProviderKeys?: AIProviderKeyUpdateManyWithoutUserNestedInput
     auditTargets?: AuditLogUpdateManyWithoutTargetUserNestedInput
     adminActions?: AuditLogUpdateManyWithoutUserNestedInput
+    reusableCategories?: ReusableCategoryUpdateManyWithoutUserNestedInput
+    savedBlocks?: SavedBlockUpdateManyWithoutUserNestedInput
+    contentTemplates?: ContentTemplateUpdateManyWithoutUserNestedInput
+    snippets?: SnippetUpdateManyWithoutUserNestedInput
+    pageTemplates?: PageTemplateUpdateManyWithoutUserNestedInput
     calendarConnections?: CalendarConnectionUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUpdateManyWithoutUserNestedInput
     calendarSources?: CalendarSourceUpdateManyWithoutUserNestedInput
@@ -54354,6 +63830,11 @@ export namespace Prisma {
     aiProviderKeys?: AIProviderKeyUncheckedUpdateManyWithoutUserNestedInput
     auditTargets?: AuditLogUncheckedUpdateManyWithoutTargetUserNestedInput
     adminActions?: AuditLogUncheckedUpdateManyWithoutUserNestedInput
+    reusableCategories?: ReusableCategoryUncheckedUpdateManyWithoutUserNestedInput
+    savedBlocks?: SavedBlockUncheckedUpdateManyWithoutUserNestedInput
+    contentTemplates?: ContentTemplateUncheckedUpdateManyWithoutUserNestedInput
+    snippets?: SnippetUncheckedUpdateManyWithoutUserNestedInput
+    pageTemplates?: PageTemplateUncheckedUpdateManyWithoutUserNestedInput
     calendarConnections?: CalendarConnectionUncheckedUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUncheckedUpdateManyWithoutUserNestedInput
     calendarSources?: CalendarSourceUncheckedUpdateManyWithoutUserNestedInput
@@ -54380,6 +63861,1376 @@ export namespace Prisma {
   export type ContentNodeUpdateManyWithWhereWithoutCategoryInput = {
     where: ContentNodeScalarWhereInput
     data: XOR<ContentNodeUpdateManyMutationInput, ContentNodeUncheckedUpdateManyWithoutCategoryInput>
+  }
+
+  export type UserCreateWithoutReusableCategoriesInput = {
+    id?: string
+    username: string
+    passwordHash?: string | null
+    email: string
+    role?: $Enums.UserRole
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: number
+    accounts?: AccountCreateNestedManyWithoutUserInput
+    aiProviderKeys?: AIProviderKeyCreateNestedManyWithoutUserInput
+    auditTargets?: AuditLogCreateNestedManyWithoutTargetUserInput
+    adminActions?: AuditLogCreateNestedManyWithoutUserInput
+    categories?: CategoryCreateNestedManyWithoutOwnerInput
+    savedBlocks?: SavedBlockCreateNestedManyWithoutUserInput
+    contentTemplates?: ContentTemplateCreateNestedManyWithoutUserInput
+    snippets?: SnippetCreateNestedManyWithoutUserInput
+    pageTemplates?: PageTemplateCreateNestedManyWithoutUserInput
+    calendarConnections?: CalendarConnectionCreateNestedManyWithoutUserInput
+    calendarEvents?: CalendarEventCreateNestedManyWithoutUserInput
+    calendarSources?: CalendarSourceCreateNestedManyWithoutUserInput
+    contentHistory?: ContentHistoryCreateNestedManyWithoutUserInput
+    contentNodes?: ContentNodeCreateNestedManyWithoutOwnerInput
+    sessions?: SessionCreateNestedManyWithoutUserInput
+    storageConfigs?: StorageProviderConfigCreateNestedManyWithoutUserInput
+    tags?: TagCreateNestedManyWithoutUserInput
+    trashedContent?: TrashBinCreateNestedManyWithoutDeletedByUserInput
+    viewGrants?: ViewGrantCreateNestedManyWithoutUserInput
+  }
+
+  export type UserUncheckedCreateWithoutReusableCategoriesInput = {
+    id?: string
+    username: string
+    passwordHash?: string | null
+    email: string
+    role?: $Enums.UserRole
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: number
+    accounts?: AccountUncheckedCreateNestedManyWithoutUserInput
+    aiProviderKeys?: AIProviderKeyUncheckedCreateNestedManyWithoutUserInput
+    auditTargets?: AuditLogUncheckedCreateNestedManyWithoutTargetUserInput
+    adminActions?: AuditLogUncheckedCreateNestedManyWithoutUserInput
+    categories?: CategoryUncheckedCreateNestedManyWithoutOwnerInput
+    savedBlocks?: SavedBlockUncheckedCreateNestedManyWithoutUserInput
+    contentTemplates?: ContentTemplateUncheckedCreateNestedManyWithoutUserInput
+    snippets?: SnippetUncheckedCreateNestedManyWithoutUserInput
+    pageTemplates?: PageTemplateUncheckedCreateNestedManyWithoutUserInput
+    calendarConnections?: CalendarConnectionUncheckedCreateNestedManyWithoutUserInput
+    calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutUserInput
+    calendarSources?: CalendarSourceUncheckedCreateNestedManyWithoutUserInput
+    contentHistory?: ContentHistoryUncheckedCreateNestedManyWithoutUserInput
+    contentNodes?: ContentNodeUncheckedCreateNestedManyWithoutOwnerInput
+    sessions?: SessionUncheckedCreateNestedManyWithoutUserInput
+    storageConfigs?: StorageProviderConfigUncheckedCreateNestedManyWithoutUserInput
+    tags?: TagUncheckedCreateNestedManyWithoutUserInput
+    trashedContent?: TrashBinUncheckedCreateNestedManyWithoutDeletedByUserInput
+    viewGrants?: ViewGrantUncheckedCreateNestedManyWithoutUserInput
+  }
+
+  export type UserCreateOrConnectWithoutReusableCategoriesInput = {
+    where: UserWhereUniqueInput
+    create: XOR<UserCreateWithoutReusableCategoriesInput, UserUncheckedCreateWithoutReusableCategoriesInput>
+  }
+
+  export type ReusableCategoryCreateWithoutChildrenInput = {
+    id?: string
+    name: string
+    slug: string
+    scope: $Enums.ReusableCategoryScope
+    displayOrder?: number
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    user?: UserCreateNestedOneWithoutReusableCategoriesInput
+    parent?: ReusableCategoryCreateNestedOneWithoutChildrenInput
+    savedBlocks?: SavedBlockCreateNestedManyWithoutCategoryInput
+    contentTemplates?: ContentTemplateCreateNestedManyWithoutCategoryInput
+    snippets?: SnippetCreateNestedManyWithoutCategoryInput
+    pageTemplates?: PageTemplateCreateNestedManyWithoutCategoryInput
+  }
+
+  export type ReusableCategoryUncheckedCreateWithoutChildrenInput = {
+    id?: string
+    name: string
+    slug: string
+    scope: $Enums.ReusableCategoryScope
+    userId?: string | null
+    parentId?: string | null
+    displayOrder?: number
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    savedBlocks?: SavedBlockUncheckedCreateNestedManyWithoutCategoryInput
+    contentTemplates?: ContentTemplateUncheckedCreateNestedManyWithoutCategoryInput
+    snippets?: SnippetUncheckedCreateNestedManyWithoutCategoryInput
+    pageTemplates?: PageTemplateUncheckedCreateNestedManyWithoutCategoryInput
+  }
+
+  export type ReusableCategoryCreateOrConnectWithoutChildrenInput = {
+    where: ReusableCategoryWhereUniqueInput
+    create: XOR<ReusableCategoryCreateWithoutChildrenInput, ReusableCategoryUncheckedCreateWithoutChildrenInput>
+  }
+
+  export type ReusableCategoryCreateWithoutParentInput = {
+    id?: string
+    name: string
+    slug: string
+    scope: $Enums.ReusableCategoryScope
+    displayOrder?: number
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    user?: UserCreateNestedOneWithoutReusableCategoriesInput
+    children?: ReusableCategoryCreateNestedManyWithoutParentInput
+    savedBlocks?: SavedBlockCreateNestedManyWithoutCategoryInput
+    contentTemplates?: ContentTemplateCreateNestedManyWithoutCategoryInput
+    snippets?: SnippetCreateNestedManyWithoutCategoryInput
+    pageTemplates?: PageTemplateCreateNestedManyWithoutCategoryInput
+  }
+
+  export type ReusableCategoryUncheckedCreateWithoutParentInput = {
+    id?: string
+    name: string
+    slug: string
+    scope: $Enums.ReusableCategoryScope
+    userId?: string | null
+    displayOrder?: number
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    children?: ReusableCategoryUncheckedCreateNestedManyWithoutParentInput
+    savedBlocks?: SavedBlockUncheckedCreateNestedManyWithoutCategoryInput
+    contentTemplates?: ContentTemplateUncheckedCreateNestedManyWithoutCategoryInput
+    snippets?: SnippetUncheckedCreateNestedManyWithoutCategoryInput
+    pageTemplates?: PageTemplateUncheckedCreateNestedManyWithoutCategoryInput
+  }
+
+  export type ReusableCategoryCreateOrConnectWithoutParentInput = {
+    where: ReusableCategoryWhereUniqueInput
+    create: XOR<ReusableCategoryCreateWithoutParentInput, ReusableCategoryUncheckedCreateWithoutParentInput>
+  }
+
+  export type ReusableCategoryCreateManyParentInputEnvelope = {
+    data: ReusableCategoryCreateManyParentInput | ReusableCategoryCreateManyParentInput[]
+    skipDuplicates?: boolean
+  }
+
+  export type SavedBlockCreateWithoutCategoryInput = {
+    id?: string
+    title: string
+    blockType: string
+    tiptapJson: JsonNullValueInput | InputJsonValue
+    searchText?: string
+    usageCount?: number
+    lastUsedAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    user?: UserCreateNestedOneWithoutSavedBlocksInput
+  }
+
+  export type SavedBlockUncheckedCreateWithoutCategoryInput = {
+    id?: string
+    title: string
+    blockType: string
+    tiptapJson: JsonNullValueInput | InputJsonValue
+    searchText?: string
+    userId?: string | null
+    usageCount?: number
+    lastUsedAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type SavedBlockCreateOrConnectWithoutCategoryInput = {
+    where: SavedBlockWhereUniqueInput
+    create: XOR<SavedBlockCreateWithoutCategoryInput, SavedBlockUncheckedCreateWithoutCategoryInput>
+  }
+
+  export type SavedBlockCreateManyCategoryInputEnvelope = {
+    data: SavedBlockCreateManyCategoryInput | SavedBlockCreateManyCategoryInput[]
+    skipDuplicates?: boolean
+  }
+
+  export type ContentTemplateCreateWithoutCategoryInput = {
+    id?: string
+    title: string
+    tiptapJson: JsonNullValueInput | InputJsonValue
+    searchText?: string
+    usageCount?: number
+    lastUsedAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    user: UserCreateNestedOneWithoutContentTemplatesInput
+  }
+
+  export type ContentTemplateUncheckedCreateWithoutCategoryInput = {
+    id?: string
+    title: string
+    tiptapJson: JsonNullValueInput | InputJsonValue
+    searchText?: string
+    userId: string
+    usageCount?: number
+    lastUsedAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type ContentTemplateCreateOrConnectWithoutCategoryInput = {
+    where: ContentTemplateWhereUniqueInput
+    create: XOR<ContentTemplateCreateWithoutCategoryInput, ContentTemplateUncheckedCreateWithoutCategoryInput>
+  }
+
+  export type ContentTemplateCreateManyCategoryInputEnvelope = {
+    data: ContentTemplateCreateManyCategoryInput | ContentTemplateCreateManyCategoryInput[]
+    skipDuplicates?: boolean
+  }
+
+  export type SnippetCreateWithoutCategoryInput = {
+    id?: string
+    title?: string | null
+    content: string
+    tiptapJson?: NullableJsonNullValueInput | InputJsonValue
+    searchText?: string
+    usageCount?: number
+    lastUsedAt?: Date | string | null
+    isAiContext?: boolean
+    isVisibleInUI?: boolean
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    user: UserCreateNestedOneWithoutSnippetsInput
+  }
+
+  export type SnippetUncheckedCreateWithoutCategoryInput = {
+    id?: string
+    title?: string | null
+    content: string
+    tiptapJson?: NullableJsonNullValueInput | InputJsonValue
+    searchText?: string
+    userId: string
+    usageCount?: number
+    lastUsedAt?: Date | string | null
+    isAiContext?: boolean
+    isVisibleInUI?: boolean
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type SnippetCreateOrConnectWithoutCategoryInput = {
+    where: SnippetWhereUniqueInput
+    create: XOR<SnippetCreateWithoutCategoryInput, SnippetUncheckedCreateWithoutCategoryInput>
+  }
+
+  export type SnippetCreateManyCategoryInputEnvelope = {
+    data: SnippetCreateManyCategoryInput | SnippetCreateManyCategoryInput[]
+    skipDuplicates?: boolean
+  }
+
+  export type PageTemplateCreateWithoutCategoryInput = {
+    id?: string
+    title: string
+    tiptapJson: JsonNullValueInput | InputJsonValue
+    searchText?: string
+    defaultTitle?: string | null
+    customIcon?: string | null
+    iconColor?: string | null
+    usageCount?: number
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    user?: UserCreateNestedOneWithoutPageTemplatesInput
+  }
+
+  export type PageTemplateUncheckedCreateWithoutCategoryInput = {
+    id?: string
+    title: string
+    tiptapJson: JsonNullValueInput | InputJsonValue
+    searchText?: string
+    userId?: string | null
+    defaultTitle?: string | null
+    customIcon?: string | null
+    iconColor?: string | null
+    usageCount?: number
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type PageTemplateCreateOrConnectWithoutCategoryInput = {
+    where: PageTemplateWhereUniqueInput
+    create: XOR<PageTemplateCreateWithoutCategoryInput, PageTemplateUncheckedCreateWithoutCategoryInput>
+  }
+
+  export type PageTemplateCreateManyCategoryInputEnvelope = {
+    data: PageTemplateCreateManyCategoryInput | PageTemplateCreateManyCategoryInput[]
+    skipDuplicates?: boolean
+  }
+
+  export type UserUpsertWithoutReusableCategoriesInput = {
+    update: XOR<UserUpdateWithoutReusableCategoriesInput, UserUncheckedUpdateWithoutReusableCategoriesInput>
+    create: XOR<UserCreateWithoutReusableCategoriesInput, UserUncheckedCreateWithoutReusableCategoriesInput>
+    where?: UserWhereInput
+  }
+
+  export type UserUpdateToOneWithWhereWithoutReusableCategoriesInput = {
+    where?: UserWhereInput
+    data: XOR<UserUpdateWithoutReusableCategoriesInput, UserUncheckedUpdateWithoutReusableCategoriesInput>
+  }
+
+  export type UserUpdateWithoutReusableCategoriesInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    username?: StringFieldUpdateOperationsInput | string
+    passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
+    email?: StringFieldUpdateOperationsInput | string
+    role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: IntFieldUpdateOperationsInput | number
+    accounts?: AccountUpdateManyWithoutUserNestedInput
+    aiProviderKeys?: AIProviderKeyUpdateManyWithoutUserNestedInput
+    auditTargets?: AuditLogUpdateManyWithoutTargetUserNestedInput
+    adminActions?: AuditLogUpdateManyWithoutUserNestedInput
+    categories?: CategoryUpdateManyWithoutOwnerNestedInput
+    savedBlocks?: SavedBlockUpdateManyWithoutUserNestedInput
+    contentTemplates?: ContentTemplateUpdateManyWithoutUserNestedInput
+    snippets?: SnippetUpdateManyWithoutUserNestedInput
+    pageTemplates?: PageTemplateUpdateManyWithoutUserNestedInput
+    calendarConnections?: CalendarConnectionUpdateManyWithoutUserNestedInput
+    calendarEvents?: CalendarEventUpdateManyWithoutUserNestedInput
+    calendarSources?: CalendarSourceUpdateManyWithoutUserNestedInput
+    contentHistory?: ContentHistoryUpdateManyWithoutUserNestedInput
+    contentNodes?: ContentNodeUpdateManyWithoutOwnerNestedInput
+    sessions?: SessionUpdateManyWithoutUserNestedInput
+    storageConfigs?: StorageProviderConfigUpdateManyWithoutUserNestedInput
+    tags?: TagUpdateManyWithoutUserNestedInput
+    trashedContent?: TrashBinUpdateManyWithoutDeletedByUserNestedInput
+    viewGrants?: ViewGrantUpdateManyWithoutUserNestedInput
+  }
+
+  export type UserUncheckedUpdateWithoutReusableCategoriesInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    username?: StringFieldUpdateOperationsInput | string
+    passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
+    email?: StringFieldUpdateOperationsInput | string
+    role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: IntFieldUpdateOperationsInput | number
+    accounts?: AccountUncheckedUpdateManyWithoutUserNestedInput
+    aiProviderKeys?: AIProviderKeyUncheckedUpdateManyWithoutUserNestedInput
+    auditTargets?: AuditLogUncheckedUpdateManyWithoutTargetUserNestedInput
+    adminActions?: AuditLogUncheckedUpdateManyWithoutUserNestedInput
+    categories?: CategoryUncheckedUpdateManyWithoutOwnerNestedInput
+    savedBlocks?: SavedBlockUncheckedUpdateManyWithoutUserNestedInput
+    contentTemplates?: ContentTemplateUncheckedUpdateManyWithoutUserNestedInput
+    snippets?: SnippetUncheckedUpdateManyWithoutUserNestedInput
+    pageTemplates?: PageTemplateUncheckedUpdateManyWithoutUserNestedInput
+    calendarConnections?: CalendarConnectionUncheckedUpdateManyWithoutUserNestedInput
+    calendarEvents?: CalendarEventUncheckedUpdateManyWithoutUserNestedInput
+    calendarSources?: CalendarSourceUncheckedUpdateManyWithoutUserNestedInput
+    contentHistory?: ContentHistoryUncheckedUpdateManyWithoutUserNestedInput
+    contentNodes?: ContentNodeUncheckedUpdateManyWithoutOwnerNestedInput
+    sessions?: SessionUncheckedUpdateManyWithoutUserNestedInput
+    storageConfigs?: StorageProviderConfigUncheckedUpdateManyWithoutUserNestedInput
+    tags?: TagUncheckedUpdateManyWithoutUserNestedInput
+    trashedContent?: TrashBinUncheckedUpdateManyWithoutDeletedByUserNestedInput
+    viewGrants?: ViewGrantUncheckedUpdateManyWithoutUserNestedInput
+  }
+
+  export type ReusableCategoryUpsertWithoutChildrenInput = {
+    update: XOR<ReusableCategoryUpdateWithoutChildrenInput, ReusableCategoryUncheckedUpdateWithoutChildrenInput>
+    create: XOR<ReusableCategoryCreateWithoutChildrenInput, ReusableCategoryUncheckedCreateWithoutChildrenInput>
+    where?: ReusableCategoryWhereInput
+  }
+
+  export type ReusableCategoryUpdateToOneWithWhereWithoutChildrenInput = {
+    where?: ReusableCategoryWhereInput
+    data: XOR<ReusableCategoryUpdateWithoutChildrenInput, ReusableCategoryUncheckedUpdateWithoutChildrenInput>
+  }
+
+  export type ReusableCategoryUpdateWithoutChildrenInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    slug?: StringFieldUpdateOperationsInput | string
+    scope?: EnumReusableCategoryScopeFieldUpdateOperationsInput | $Enums.ReusableCategoryScope
+    displayOrder?: IntFieldUpdateOperationsInput | number
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    user?: UserUpdateOneWithoutReusableCategoriesNestedInput
+    parent?: ReusableCategoryUpdateOneWithoutChildrenNestedInput
+    savedBlocks?: SavedBlockUpdateManyWithoutCategoryNestedInput
+    contentTemplates?: ContentTemplateUpdateManyWithoutCategoryNestedInput
+    snippets?: SnippetUpdateManyWithoutCategoryNestedInput
+    pageTemplates?: PageTemplateUpdateManyWithoutCategoryNestedInput
+  }
+
+  export type ReusableCategoryUncheckedUpdateWithoutChildrenInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    slug?: StringFieldUpdateOperationsInput | string
+    scope?: EnumReusableCategoryScopeFieldUpdateOperationsInput | $Enums.ReusableCategoryScope
+    userId?: NullableStringFieldUpdateOperationsInput | string | null
+    parentId?: NullableStringFieldUpdateOperationsInput | string | null
+    displayOrder?: IntFieldUpdateOperationsInput | number
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    savedBlocks?: SavedBlockUncheckedUpdateManyWithoutCategoryNestedInput
+    contentTemplates?: ContentTemplateUncheckedUpdateManyWithoutCategoryNestedInput
+    snippets?: SnippetUncheckedUpdateManyWithoutCategoryNestedInput
+    pageTemplates?: PageTemplateUncheckedUpdateManyWithoutCategoryNestedInput
+  }
+
+  export type ReusableCategoryUpsertWithWhereUniqueWithoutParentInput = {
+    where: ReusableCategoryWhereUniqueInput
+    update: XOR<ReusableCategoryUpdateWithoutParentInput, ReusableCategoryUncheckedUpdateWithoutParentInput>
+    create: XOR<ReusableCategoryCreateWithoutParentInput, ReusableCategoryUncheckedCreateWithoutParentInput>
+  }
+
+  export type ReusableCategoryUpdateWithWhereUniqueWithoutParentInput = {
+    where: ReusableCategoryWhereUniqueInput
+    data: XOR<ReusableCategoryUpdateWithoutParentInput, ReusableCategoryUncheckedUpdateWithoutParentInput>
+  }
+
+  export type ReusableCategoryUpdateManyWithWhereWithoutParentInput = {
+    where: ReusableCategoryScalarWhereInput
+    data: XOR<ReusableCategoryUpdateManyMutationInput, ReusableCategoryUncheckedUpdateManyWithoutParentInput>
+  }
+
+  export type SavedBlockUpsertWithWhereUniqueWithoutCategoryInput = {
+    where: SavedBlockWhereUniqueInput
+    update: XOR<SavedBlockUpdateWithoutCategoryInput, SavedBlockUncheckedUpdateWithoutCategoryInput>
+    create: XOR<SavedBlockCreateWithoutCategoryInput, SavedBlockUncheckedCreateWithoutCategoryInput>
+  }
+
+  export type SavedBlockUpdateWithWhereUniqueWithoutCategoryInput = {
+    where: SavedBlockWhereUniqueInput
+    data: XOR<SavedBlockUpdateWithoutCategoryInput, SavedBlockUncheckedUpdateWithoutCategoryInput>
+  }
+
+  export type SavedBlockUpdateManyWithWhereWithoutCategoryInput = {
+    where: SavedBlockScalarWhereInput
+    data: XOR<SavedBlockUpdateManyMutationInput, SavedBlockUncheckedUpdateManyWithoutCategoryInput>
+  }
+
+  export type ContentTemplateUpsertWithWhereUniqueWithoutCategoryInput = {
+    where: ContentTemplateWhereUniqueInput
+    update: XOR<ContentTemplateUpdateWithoutCategoryInput, ContentTemplateUncheckedUpdateWithoutCategoryInput>
+    create: XOR<ContentTemplateCreateWithoutCategoryInput, ContentTemplateUncheckedCreateWithoutCategoryInput>
+  }
+
+  export type ContentTemplateUpdateWithWhereUniqueWithoutCategoryInput = {
+    where: ContentTemplateWhereUniqueInput
+    data: XOR<ContentTemplateUpdateWithoutCategoryInput, ContentTemplateUncheckedUpdateWithoutCategoryInput>
+  }
+
+  export type ContentTemplateUpdateManyWithWhereWithoutCategoryInput = {
+    where: ContentTemplateScalarWhereInput
+    data: XOR<ContentTemplateUpdateManyMutationInput, ContentTemplateUncheckedUpdateManyWithoutCategoryInput>
+  }
+
+  export type SnippetUpsertWithWhereUniqueWithoutCategoryInput = {
+    where: SnippetWhereUniqueInput
+    update: XOR<SnippetUpdateWithoutCategoryInput, SnippetUncheckedUpdateWithoutCategoryInput>
+    create: XOR<SnippetCreateWithoutCategoryInput, SnippetUncheckedCreateWithoutCategoryInput>
+  }
+
+  export type SnippetUpdateWithWhereUniqueWithoutCategoryInput = {
+    where: SnippetWhereUniqueInput
+    data: XOR<SnippetUpdateWithoutCategoryInput, SnippetUncheckedUpdateWithoutCategoryInput>
+  }
+
+  export type SnippetUpdateManyWithWhereWithoutCategoryInput = {
+    where: SnippetScalarWhereInput
+    data: XOR<SnippetUpdateManyMutationInput, SnippetUncheckedUpdateManyWithoutCategoryInput>
+  }
+
+  export type PageTemplateUpsertWithWhereUniqueWithoutCategoryInput = {
+    where: PageTemplateWhereUniqueInput
+    update: XOR<PageTemplateUpdateWithoutCategoryInput, PageTemplateUncheckedUpdateWithoutCategoryInput>
+    create: XOR<PageTemplateCreateWithoutCategoryInput, PageTemplateUncheckedCreateWithoutCategoryInput>
+  }
+
+  export type PageTemplateUpdateWithWhereUniqueWithoutCategoryInput = {
+    where: PageTemplateWhereUniqueInput
+    data: XOR<PageTemplateUpdateWithoutCategoryInput, PageTemplateUncheckedUpdateWithoutCategoryInput>
+  }
+
+  export type PageTemplateUpdateManyWithWhereWithoutCategoryInput = {
+    where: PageTemplateScalarWhereInput
+    data: XOR<PageTemplateUpdateManyMutationInput, PageTemplateUncheckedUpdateManyWithoutCategoryInput>
+  }
+
+  export type ReusableCategoryCreateWithoutSavedBlocksInput = {
+    id?: string
+    name: string
+    slug: string
+    scope: $Enums.ReusableCategoryScope
+    displayOrder?: number
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    user?: UserCreateNestedOneWithoutReusableCategoriesInput
+    parent?: ReusableCategoryCreateNestedOneWithoutChildrenInput
+    children?: ReusableCategoryCreateNestedManyWithoutParentInput
+    contentTemplates?: ContentTemplateCreateNestedManyWithoutCategoryInput
+    snippets?: SnippetCreateNestedManyWithoutCategoryInput
+    pageTemplates?: PageTemplateCreateNestedManyWithoutCategoryInput
+  }
+
+  export type ReusableCategoryUncheckedCreateWithoutSavedBlocksInput = {
+    id?: string
+    name: string
+    slug: string
+    scope: $Enums.ReusableCategoryScope
+    userId?: string | null
+    parentId?: string | null
+    displayOrder?: number
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    children?: ReusableCategoryUncheckedCreateNestedManyWithoutParentInput
+    contentTemplates?: ContentTemplateUncheckedCreateNestedManyWithoutCategoryInput
+    snippets?: SnippetUncheckedCreateNestedManyWithoutCategoryInput
+    pageTemplates?: PageTemplateUncheckedCreateNestedManyWithoutCategoryInput
+  }
+
+  export type ReusableCategoryCreateOrConnectWithoutSavedBlocksInput = {
+    where: ReusableCategoryWhereUniqueInput
+    create: XOR<ReusableCategoryCreateWithoutSavedBlocksInput, ReusableCategoryUncheckedCreateWithoutSavedBlocksInput>
+  }
+
+  export type UserCreateWithoutSavedBlocksInput = {
+    id?: string
+    username: string
+    passwordHash?: string | null
+    email: string
+    role?: $Enums.UserRole
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: number
+    accounts?: AccountCreateNestedManyWithoutUserInput
+    aiProviderKeys?: AIProviderKeyCreateNestedManyWithoutUserInput
+    auditTargets?: AuditLogCreateNestedManyWithoutTargetUserInput
+    adminActions?: AuditLogCreateNestedManyWithoutUserInput
+    categories?: CategoryCreateNestedManyWithoutOwnerInput
+    reusableCategories?: ReusableCategoryCreateNestedManyWithoutUserInput
+    contentTemplates?: ContentTemplateCreateNestedManyWithoutUserInput
+    snippets?: SnippetCreateNestedManyWithoutUserInput
+    pageTemplates?: PageTemplateCreateNestedManyWithoutUserInput
+    calendarConnections?: CalendarConnectionCreateNestedManyWithoutUserInput
+    calendarEvents?: CalendarEventCreateNestedManyWithoutUserInput
+    calendarSources?: CalendarSourceCreateNestedManyWithoutUserInput
+    contentHistory?: ContentHistoryCreateNestedManyWithoutUserInput
+    contentNodes?: ContentNodeCreateNestedManyWithoutOwnerInput
+    sessions?: SessionCreateNestedManyWithoutUserInput
+    storageConfigs?: StorageProviderConfigCreateNestedManyWithoutUserInput
+    tags?: TagCreateNestedManyWithoutUserInput
+    trashedContent?: TrashBinCreateNestedManyWithoutDeletedByUserInput
+    viewGrants?: ViewGrantCreateNestedManyWithoutUserInput
+  }
+
+  export type UserUncheckedCreateWithoutSavedBlocksInput = {
+    id?: string
+    username: string
+    passwordHash?: string | null
+    email: string
+    role?: $Enums.UserRole
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: number
+    accounts?: AccountUncheckedCreateNestedManyWithoutUserInput
+    aiProviderKeys?: AIProviderKeyUncheckedCreateNestedManyWithoutUserInput
+    auditTargets?: AuditLogUncheckedCreateNestedManyWithoutTargetUserInput
+    adminActions?: AuditLogUncheckedCreateNestedManyWithoutUserInput
+    categories?: CategoryUncheckedCreateNestedManyWithoutOwnerInput
+    reusableCategories?: ReusableCategoryUncheckedCreateNestedManyWithoutUserInput
+    contentTemplates?: ContentTemplateUncheckedCreateNestedManyWithoutUserInput
+    snippets?: SnippetUncheckedCreateNestedManyWithoutUserInput
+    pageTemplates?: PageTemplateUncheckedCreateNestedManyWithoutUserInput
+    calendarConnections?: CalendarConnectionUncheckedCreateNestedManyWithoutUserInput
+    calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutUserInput
+    calendarSources?: CalendarSourceUncheckedCreateNestedManyWithoutUserInput
+    contentHistory?: ContentHistoryUncheckedCreateNestedManyWithoutUserInput
+    contentNodes?: ContentNodeUncheckedCreateNestedManyWithoutOwnerInput
+    sessions?: SessionUncheckedCreateNestedManyWithoutUserInput
+    storageConfigs?: StorageProviderConfigUncheckedCreateNestedManyWithoutUserInput
+    tags?: TagUncheckedCreateNestedManyWithoutUserInput
+    trashedContent?: TrashBinUncheckedCreateNestedManyWithoutDeletedByUserInput
+    viewGrants?: ViewGrantUncheckedCreateNestedManyWithoutUserInput
+  }
+
+  export type UserCreateOrConnectWithoutSavedBlocksInput = {
+    where: UserWhereUniqueInput
+    create: XOR<UserCreateWithoutSavedBlocksInput, UserUncheckedCreateWithoutSavedBlocksInput>
+  }
+
+  export type ReusableCategoryUpsertWithoutSavedBlocksInput = {
+    update: XOR<ReusableCategoryUpdateWithoutSavedBlocksInput, ReusableCategoryUncheckedUpdateWithoutSavedBlocksInput>
+    create: XOR<ReusableCategoryCreateWithoutSavedBlocksInput, ReusableCategoryUncheckedCreateWithoutSavedBlocksInput>
+    where?: ReusableCategoryWhereInput
+  }
+
+  export type ReusableCategoryUpdateToOneWithWhereWithoutSavedBlocksInput = {
+    where?: ReusableCategoryWhereInput
+    data: XOR<ReusableCategoryUpdateWithoutSavedBlocksInput, ReusableCategoryUncheckedUpdateWithoutSavedBlocksInput>
+  }
+
+  export type ReusableCategoryUpdateWithoutSavedBlocksInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    slug?: StringFieldUpdateOperationsInput | string
+    scope?: EnumReusableCategoryScopeFieldUpdateOperationsInput | $Enums.ReusableCategoryScope
+    displayOrder?: IntFieldUpdateOperationsInput | number
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    user?: UserUpdateOneWithoutReusableCategoriesNestedInput
+    parent?: ReusableCategoryUpdateOneWithoutChildrenNestedInput
+    children?: ReusableCategoryUpdateManyWithoutParentNestedInput
+    contentTemplates?: ContentTemplateUpdateManyWithoutCategoryNestedInput
+    snippets?: SnippetUpdateManyWithoutCategoryNestedInput
+    pageTemplates?: PageTemplateUpdateManyWithoutCategoryNestedInput
+  }
+
+  export type ReusableCategoryUncheckedUpdateWithoutSavedBlocksInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    slug?: StringFieldUpdateOperationsInput | string
+    scope?: EnumReusableCategoryScopeFieldUpdateOperationsInput | $Enums.ReusableCategoryScope
+    userId?: NullableStringFieldUpdateOperationsInput | string | null
+    parentId?: NullableStringFieldUpdateOperationsInput | string | null
+    displayOrder?: IntFieldUpdateOperationsInput | number
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    children?: ReusableCategoryUncheckedUpdateManyWithoutParentNestedInput
+    contentTemplates?: ContentTemplateUncheckedUpdateManyWithoutCategoryNestedInput
+    snippets?: SnippetUncheckedUpdateManyWithoutCategoryNestedInput
+    pageTemplates?: PageTemplateUncheckedUpdateManyWithoutCategoryNestedInput
+  }
+
+  export type UserUpsertWithoutSavedBlocksInput = {
+    update: XOR<UserUpdateWithoutSavedBlocksInput, UserUncheckedUpdateWithoutSavedBlocksInput>
+    create: XOR<UserCreateWithoutSavedBlocksInput, UserUncheckedCreateWithoutSavedBlocksInput>
+    where?: UserWhereInput
+  }
+
+  export type UserUpdateToOneWithWhereWithoutSavedBlocksInput = {
+    where?: UserWhereInput
+    data: XOR<UserUpdateWithoutSavedBlocksInput, UserUncheckedUpdateWithoutSavedBlocksInput>
+  }
+
+  export type UserUpdateWithoutSavedBlocksInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    username?: StringFieldUpdateOperationsInput | string
+    passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
+    email?: StringFieldUpdateOperationsInput | string
+    role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: IntFieldUpdateOperationsInput | number
+    accounts?: AccountUpdateManyWithoutUserNestedInput
+    aiProviderKeys?: AIProviderKeyUpdateManyWithoutUserNestedInput
+    auditTargets?: AuditLogUpdateManyWithoutTargetUserNestedInput
+    adminActions?: AuditLogUpdateManyWithoutUserNestedInput
+    categories?: CategoryUpdateManyWithoutOwnerNestedInput
+    reusableCategories?: ReusableCategoryUpdateManyWithoutUserNestedInput
+    contentTemplates?: ContentTemplateUpdateManyWithoutUserNestedInput
+    snippets?: SnippetUpdateManyWithoutUserNestedInput
+    pageTemplates?: PageTemplateUpdateManyWithoutUserNestedInput
+    calendarConnections?: CalendarConnectionUpdateManyWithoutUserNestedInput
+    calendarEvents?: CalendarEventUpdateManyWithoutUserNestedInput
+    calendarSources?: CalendarSourceUpdateManyWithoutUserNestedInput
+    contentHistory?: ContentHistoryUpdateManyWithoutUserNestedInput
+    contentNodes?: ContentNodeUpdateManyWithoutOwnerNestedInput
+    sessions?: SessionUpdateManyWithoutUserNestedInput
+    storageConfigs?: StorageProviderConfigUpdateManyWithoutUserNestedInput
+    tags?: TagUpdateManyWithoutUserNestedInput
+    trashedContent?: TrashBinUpdateManyWithoutDeletedByUserNestedInput
+    viewGrants?: ViewGrantUpdateManyWithoutUserNestedInput
+  }
+
+  export type UserUncheckedUpdateWithoutSavedBlocksInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    username?: StringFieldUpdateOperationsInput | string
+    passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
+    email?: StringFieldUpdateOperationsInput | string
+    role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: IntFieldUpdateOperationsInput | number
+    accounts?: AccountUncheckedUpdateManyWithoutUserNestedInput
+    aiProviderKeys?: AIProviderKeyUncheckedUpdateManyWithoutUserNestedInput
+    auditTargets?: AuditLogUncheckedUpdateManyWithoutTargetUserNestedInput
+    adminActions?: AuditLogUncheckedUpdateManyWithoutUserNestedInput
+    categories?: CategoryUncheckedUpdateManyWithoutOwnerNestedInput
+    reusableCategories?: ReusableCategoryUncheckedUpdateManyWithoutUserNestedInput
+    contentTemplates?: ContentTemplateUncheckedUpdateManyWithoutUserNestedInput
+    snippets?: SnippetUncheckedUpdateManyWithoutUserNestedInput
+    pageTemplates?: PageTemplateUncheckedUpdateManyWithoutUserNestedInput
+    calendarConnections?: CalendarConnectionUncheckedUpdateManyWithoutUserNestedInput
+    calendarEvents?: CalendarEventUncheckedUpdateManyWithoutUserNestedInput
+    calendarSources?: CalendarSourceUncheckedUpdateManyWithoutUserNestedInput
+    contentHistory?: ContentHistoryUncheckedUpdateManyWithoutUserNestedInput
+    contentNodes?: ContentNodeUncheckedUpdateManyWithoutOwnerNestedInput
+    sessions?: SessionUncheckedUpdateManyWithoutUserNestedInput
+    storageConfigs?: StorageProviderConfigUncheckedUpdateManyWithoutUserNestedInput
+    tags?: TagUncheckedUpdateManyWithoutUserNestedInput
+    trashedContent?: TrashBinUncheckedUpdateManyWithoutDeletedByUserNestedInput
+    viewGrants?: ViewGrantUncheckedUpdateManyWithoutUserNestedInput
+  }
+
+  export type ReusableCategoryCreateWithoutContentTemplatesInput = {
+    id?: string
+    name: string
+    slug: string
+    scope: $Enums.ReusableCategoryScope
+    displayOrder?: number
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    user?: UserCreateNestedOneWithoutReusableCategoriesInput
+    parent?: ReusableCategoryCreateNestedOneWithoutChildrenInput
+    children?: ReusableCategoryCreateNestedManyWithoutParentInput
+    savedBlocks?: SavedBlockCreateNestedManyWithoutCategoryInput
+    snippets?: SnippetCreateNestedManyWithoutCategoryInput
+    pageTemplates?: PageTemplateCreateNestedManyWithoutCategoryInput
+  }
+
+  export type ReusableCategoryUncheckedCreateWithoutContentTemplatesInput = {
+    id?: string
+    name: string
+    slug: string
+    scope: $Enums.ReusableCategoryScope
+    userId?: string | null
+    parentId?: string | null
+    displayOrder?: number
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    children?: ReusableCategoryUncheckedCreateNestedManyWithoutParentInput
+    savedBlocks?: SavedBlockUncheckedCreateNestedManyWithoutCategoryInput
+    snippets?: SnippetUncheckedCreateNestedManyWithoutCategoryInput
+    pageTemplates?: PageTemplateUncheckedCreateNestedManyWithoutCategoryInput
+  }
+
+  export type ReusableCategoryCreateOrConnectWithoutContentTemplatesInput = {
+    where: ReusableCategoryWhereUniqueInput
+    create: XOR<ReusableCategoryCreateWithoutContentTemplatesInput, ReusableCategoryUncheckedCreateWithoutContentTemplatesInput>
+  }
+
+  export type UserCreateWithoutContentTemplatesInput = {
+    id?: string
+    username: string
+    passwordHash?: string | null
+    email: string
+    role?: $Enums.UserRole
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: number
+    accounts?: AccountCreateNestedManyWithoutUserInput
+    aiProviderKeys?: AIProviderKeyCreateNestedManyWithoutUserInput
+    auditTargets?: AuditLogCreateNestedManyWithoutTargetUserInput
+    adminActions?: AuditLogCreateNestedManyWithoutUserInput
+    categories?: CategoryCreateNestedManyWithoutOwnerInput
+    reusableCategories?: ReusableCategoryCreateNestedManyWithoutUserInput
+    savedBlocks?: SavedBlockCreateNestedManyWithoutUserInput
+    snippets?: SnippetCreateNestedManyWithoutUserInput
+    pageTemplates?: PageTemplateCreateNestedManyWithoutUserInput
+    calendarConnections?: CalendarConnectionCreateNestedManyWithoutUserInput
+    calendarEvents?: CalendarEventCreateNestedManyWithoutUserInput
+    calendarSources?: CalendarSourceCreateNestedManyWithoutUserInput
+    contentHistory?: ContentHistoryCreateNestedManyWithoutUserInput
+    contentNodes?: ContentNodeCreateNestedManyWithoutOwnerInput
+    sessions?: SessionCreateNestedManyWithoutUserInput
+    storageConfigs?: StorageProviderConfigCreateNestedManyWithoutUserInput
+    tags?: TagCreateNestedManyWithoutUserInput
+    trashedContent?: TrashBinCreateNestedManyWithoutDeletedByUserInput
+    viewGrants?: ViewGrantCreateNestedManyWithoutUserInput
+  }
+
+  export type UserUncheckedCreateWithoutContentTemplatesInput = {
+    id?: string
+    username: string
+    passwordHash?: string | null
+    email: string
+    role?: $Enums.UserRole
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: number
+    accounts?: AccountUncheckedCreateNestedManyWithoutUserInput
+    aiProviderKeys?: AIProviderKeyUncheckedCreateNestedManyWithoutUserInput
+    auditTargets?: AuditLogUncheckedCreateNestedManyWithoutTargetUserInput
+    adminActions?: AuditLogUncheckedCreateNestedManyWithoutUserInput
+    categories?: CategoryUncheckedCreateNestedManyWithoutOwnerInput
+    reusableCategories?: ReusableCategoryUncheckedCreateNestedManyWithoutUserInput
+    savedBlocks?: SavedBlockUncheckedCreateNestedManyWithoutUserInput
+    snippets?: SnippetUncheckedCreateNestedManyWithoutUserInput
+    pageTemplates?: PageTemplateUncheckedCreateNestedManyWithoutUserInput
+    calendarConnections?: CalendarConnectionUncheckedCreateNestedManyWithoutUserInput
+    calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutUserInput
+    calendarSources?: CalendarSourceUncheckedCreateNestedManyWithoutUserInput
+    contentHistory?: ContentHistoryUncheckedCreateNestedManyWithoutUserInput
+    contentNodes?: ContentNodeUncheckedCreateNestedManyWithoutOwnerInput
+    sessions?: SessionUncheckedCreateNestedManyWithoutUserInput
+    storageConfigs?: StorageProviderConfigUncheckedCreateNestedManyWithoutUserInput
+    tags?: TagUncheckedCreateNestedManyWithoutUserInput
+    trashedContent?: TrashBinUncheckedCreateNestedManyWithoutDeletedByUserInput
+    viewGrants?: ViewGrantUncheckedCreateNestedManyWithoutUserInput
+  }
+
+  export type UserCreateOrConnectWithoutContentTemplatesInput = {
+    where: UserWhereUniqueInput
+    create: XOR<UserCreateWithoutContentTemplatesInput, UserUncheckedCreateWithoutContentTemplatesInput>
+  }
+
+  export type ReusableCategoryUpsertWithoutContentTemplatesInput = {
+    update: XOR<ReusableCategoryUpdateWithoutContentTemplatesInput, ReusableCategoryUncheckedUpdateWithoutContentTemplatesInput>
+    create: XOR<ReusableCategoryCreateWithoutContentTemplatesInput, ReusableCategoryUncheckedCreateWithoutContentTemplatesInput>
+    where?: ReusableCategoryWhereInput
+  }
+
+  export type ReusableCategoryUpdateToOneWithWhereWithoutContentTemplatesInput = {
+    where?: ReusableCategoryWhereInput
+    data: XOR<ReusableCategoryUpdateWithoutContentTemplatesInput, ReusableCategoryUncheckedUpdateWithoutContentTemplatesInput>
+  }
+
+  export type ReusableCategoryUpdateWithoutContentTemplatesInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    slug?: StringFieldUpdateOperationsInput | string
+    scope?: EnumReusableCategoryScopeFieldUpdateOperationsInput | $Enums.ReusableCategoryScope
+    displayOrder?: IntFieldUpdateOperationsInput | number
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    user?: UserUpdateOneWithoutReusableCategoriesNestedInput
+    parent?: ReusableCategoryUpdateOneWithoutChildrenNestedInput
+    children?: ReusableCategoryUpdateManyWithoutParentNestedInput
+    savedBlocks?: SavedBlockUpdateManyWithoutCategoryNestedInput
+    snippets?: SnippetUpdateManyWithoutCategoryNestedInput
+    pageTemplates?: PageTemplateUpdateManyWithoutCategoryNestedInput
+  }
+
+  export type ReusableCategoryUncheckedUpdateWithoutContentTemplatesInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    slug?: StringFieldUpdateOperationsInput | string
+    scope?: EnumReusableCategoryScopeFieldUpdateOperationsInput | $Enums.ReusableCategoryScope
+    userId?: NullableStringFieldUpdateOperationsInput | string | null
+    parentId?: NullableStringFieldUpdateOperationsInput | string | null
+    displayOrder?: IntFieldUpdateOperationsInput | number
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    children?: ReusableCategoryUncheckedUpdateManyWithoutParentNestedInput
+    savedBlocks?: SavedBlockUncheckedUpdateManyWithoutCategoryNestedInput
+    snippets?: SnippetUncheckedUpdateManyWithoutCategoryNestedInput
+    pageTemplates?: PageTemplateUncheckedUpdateManyWithoutCategoryNestedInput
+  }
+
+  export type UserUpsertWithoutContentTemplatesInput = {
+    update: XOR<UserUpdateWithoutContentTemplatesInput, UserUncheckedUpdateWithoutContentTemplatesInput>
+    create: XOR<UserCreateWithoutContentTemplatesInput, UserUncheckedCreateWithoutContentTemplatesInput>
+    where?: UserWhereInput
+  }
+
+  export type UserUpdateToOneWithWhereWithoutContentTemplatesInput = {
+    where?: UserWhereInput
+    data: XOR<UserUpdateWithoutContentTemplatesInput, UserUncheckedUpdateWithoutContentTemplatesInput>
+  }
+
+  export type UserUpdateWithoutContentTemplatesInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    username?: StringFieldUpdateOperationsInput | string
+    passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
+    email?: StringFieldUpdateOperationsInput | string
+    role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: IntFieldUpdateOperationsInput | number
+    accounts?: AccountUpdateManyWithoutUserNestedInput
+    aiProviderKeys?: AIProviderKeyUpdateManyWithoutUserNestedInput
+    auditTargets?: AuditLogUpdateManyWithoutTargetUserNestedInput
+    adminActions?: AuditLogUpdateManyWithoutUserNestedInput
+    categories?: CategoryUpdateManyWithoutOwnerNestedInput
+    reusableCategories?: ReusableCategoryUpdateManyWithoutUserNestedInput
+    savedBlocks?: SavedBlockUpdateManyWithoutUserNestedInput
+    snippets?: SnippetUpdateManyWithoutUserNestedInput
+    pageTemplates?: PageTemplateUpdateManyWithoutUserNestedInput
+    calendarConnections?: CalendarConnectionUpdateManyWithoutUserNestedInput
+    calendarEvents?: CalendarEventUpdateManyWithoutUserNestedInput
+    calendarSources?: CalendarSourceUpdateManyWithoutUserNestedInput
+    contentHistory?: ContentHistoryUpdateManyWithoutUserNestedInput
+    contentNodes?: ContentNodeUpdateManyWithoutOwnerNestedInput
+    sessions?: SessionUpdateManyWithoutUserNestedInput
+    storageConfigs?: StorageProviderConfigUpdateManyWithoutUserNestedInput
+    tags?: TagUpdateManyWithoutUserNestedInput
+    trashedContent?: TrashBinUpdateManyWithoutDeletedByUserNestedInput
+    viewGrants?: ViewGrantUpdateManyWithoutUserNestedInput
+  }
+
+  export type UserUncheckedUpdateWithoutContentTemplatesInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    username?: StringFieldUpdateOperationsInput | string
+    passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
+    email?: StringFieldUpdateOperationsInput | string
+    role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: IntFieldUpdateOperationsInput | number
+    accounts?: AccountUncheckedUpdateManyWithoutUserNestedInput
+    aiProviderKeys?: AIProviderKeyUncheckedUpdateManyWithoutUserNestedInput
+    auditTargets?: AuditLogUncheckedUpdateManyWithoutTargetUserNestedInput
+    adminActions?: AuditLogUncheckedUpdateManyWithoutUserNestedInput
+    categories?: CategoryUncheckedUpdateManyWithoutOwnerNestedInput
+    reusableCategories?: ReusableCategoryUncheckedUpdateManyWithoutUserNestedInput
+    savedBlocks?: SavedBlockUncheckedUpdateManyWithoutUserNestedInput
+    snippets?: SnippetUncheckedUpdateManyWithoutUserNestedInput
+    pageTemplates?: PageTemplateUncheckedUpdateManyWithoutUserNestedInput
+    calendarConnections?: CalendarConnectionUncheckedUpdateManyWithoutUserNestedInput
+    calendarEvents?: CalendarEventUncheckedUpdateManyWithoutUserNestedInput
+    calendarSources?: CalendarSourceUncheckedUpdateManyWithoutUserNestedInput
+    contentHistory?: ContentHistoryUncheckedUpdateManyWithoutUserNestedInput
+    contentNodes?: ContentNodeUncheckedUpdateManyWithoutOwnerNestedInput
+    sessions?: SessionUncheckedUpdateManyWithoutUserNestedInput
+    storageConfigs?: StorageProviderConfigUncheckedUpdateManyWithoutUserNestedInput
+    tags?: TagUncheckedUpdateManyWithoutUserNestedInput
+    trashedContent?: TrashBinUncheckedUpdateManyWithoutDeletedByUserNestedInput
+    viewGrants?: ViewGrantUncheckedUpdateManyWithoutUserNestedInput
+  }
+
+  export type ReusableCategoryCreateWithoutSnippetsInput = {
+    id?: string
+    name: string
+    slug: string
+    scope: $Enums.ReusableCategoryScope
+    displayOrder?: number
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    user?: UserCreateNestedOneWithoutReusableCategoriesInput
+    parent?: ReusableCategoryCreateNestedOneWithoutChildrenInput
+    children?: ReusableCategoryCreateNestedManyWithoutParentInput
+    savedBlocks?: SavedBlockCreateNestedManyWithoutCategoryInput
+    contentTemplates?: ContentTemplateCreateNestedManyWithoutCategoryInput
+    pageTemplates?: PageTemplateCreateNestedManyWithoutCategoryInput
+  }
+
+  export type ReusableCategoryUncheckedCreateWithoutSnippetsInput = {
+    id?: string
+    name: string
+    slug: string
+    scope: $Enums.ReusableCategoryScope
+    userId?: string | null
+    parentId?: string | null
+    displayOrder?: number
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    children?: ReusableCategoryUncheckedCreateNestedManyWithoutParentInput
+    savedBlocks?: SavedBlockUncheckedCreateNestedManyWithoutCategoryInput
+    contentTemplates?: ContentTemplateUncheckedCreateNestedManyWithoutCategoryInput
+    pageTemplates?: PageTemplateUncheckedCreateNestedManyWithoutCategoryInput
+  }
+
+  export type ReusableCategoryCreateOrConnectWithoutSnippetsInput = {
+    where: ReusableCategoryWhereUniqueInput
+    create: XOR<ReusableCategoryCreateWithoutSnippetsInput, ReusableCategoryUncheckedCreateWithoutSnippetsInput>
+  }
+
+  export type UserCreateWithoutSnippetsInput = {
+    id?: string
+    username: string
+    passwordHash?: string | null
+    email: string
+    role?: $Enums.UserRole
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: number
+    accounts?: AccountCreateNestedManyWithoutUserInput
+    aiProviderKeys?: AIProviderKeyCreateNestedManyWithoutUserInput
+    auditTargets?: AuditLogCreateNestedManyWithoutTargetUserInput
+    adminActions?: AuditLogCreateNestedManyWithoutUserInput
+    categories?: CategoryCreateNestedManyWithoutOwnerInput
+    reusableCategories?: ReusableCategoryCreateNestedManyWithoutUserInput
+    savedBlocks?: SavedBlockCreateNestedManyWithoutUserInput
+    contentTemplates?: ContentTemplateCreateNestedManyWithoutUserInput
+    pageTemplates?: PageTemplateCreateNestedManyWithoutUserInput
+    calendarConnections?: CalendarConnectionCreateNestedManyWithoutUserInput
+    calendarEvents?: CalendarEventCreateNestedManyWithoutUserInput
+    calendarSources?: CalendarSourceCreateNestedManyWithoutUserInput
+    contentHistory?: ContentHistoryCreateNestedManyWithoutUserInput
+    contentNodes?: ContentNodeCreateNestedManyWithoutOwnerInput
+    sessions?: SessionCreateNestedManyWithoutUserInput
+    storageConfigs?: StorageProviderConfigCreateNestedManyWithoutUserInput
+    tags?: TagCreateNestedManyWithoutUserInput
+    trashedContent?: TrashBinCreateNestedManyWithoutDeletedByUserInput
+    viewGrants?: ViewGrantCreateNestedManyWithoutUserInput
+  }
+
+  export type UserUncheckedCreateWithoutSnippetsInput = {
+    id?: string
+    username: string
+    passwordHash?: string | null
+    email: string
+    role?: $Enums.UserRole
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: number
+    accounts?: AccountUncheckedCreateNestedManyWithoutUserInput
+    aiProviderKeys?: AIProviderKeyUncheckedCreateNestedManyWithoutUserInput
+    auditTargets?: AuditLogUncheckedCreateNestedManyWithoutTargetUserInput
+    adminActions?: AuditLogUncheckedCreateNestedManyWithoutUserInput
+    categories?: CategoryUncheckedCreateNestedManyWithoutOwnerInput
+    reusableCategories?: ReusableCategoryUncheckedCreateNestedManyWithoutUserInput
+    savedBlocks?: SavedBlockUncheckedCreateNestedManyWithoutUserInput
+    contentTemplates?: ContentTemplateUncheckedCreateNestedManyWithoutUserInput
+    pageTemplates?: PageTemplateUncheckedCreateNestedManyWithoutUserInput
+    calendarConnections?: CalendarConnectionUncheckedCreateNestedManyWithoutUserInput
+    calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutUserInput
+    calendarSources?: CalendarSourceUncheckedCreateNestedManyWithoutUserInput
+    contentHistory?: ContentHistoryUncheckedCreateNestedManyWithoutUserInput
+    contentNodes?: ContentNodeUncheckedCreateNestedManyWithoutOwnerInput
+    sessions?: SessionUncheckedCreateNestedManyWithoutUserInput
+    storageConfigs?: StorageProviderConfigUncheckedCreateNestedManyWithoutUserInput
+    tags?: TagUncheckedCreateNestedManyWithoutUserInput
+    trashedContent?: TrashBinUncheckedCreateNestedManyWithoutDeletedByUserInput
+    viewGrants?: ViewGrantUncheckedCreateNestedManyWithoutUserInput
+  }
+
+  export type UserCreateOrConnectWithoutSnippetsInput = {
+    where: UserWhereUniqueInput
+    create: XOR<UserCreateWithoutSnippetsInput, UserUncheckedCreateWithoutSnippetsInput>
+  }
+
+  export type ReusableCategoryUpsertWithoutSnippetsInput = {
+    update: XOR<ReusableCategoryUpdateWithoutSnippetsInput, ReusableCategoryUncheckedUpdateWithoutSnippetsInput>
+    create: XOR<ReusableCategoryCreateWithoutSnippetsInput, ReusableCategoryUncheckedCreateWithoutSnippetsInput>
+    where?: ReusableCategoryWhereInput
+  }
+
+  export type ReusableCategoryUpdateToOneWithWhereWithoutSnippetsInput = {
+    where?: ReusableCategoryWhereInput
+    data: XOR<ReusableCategoryUpdateWithoutSnippetsInput, ReusableCategoryUncheckedUpdateWithoutSnippetsInput>
+  }
+
+  export type ReusableCategoryUpdateWithoutSnippetsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    slug?: StringFieldUpdateOperationsInput | string
+    scope?: EnumReusableCategoryScopeFieldUpdateOperationsInput | $Enums.ReusableCategoryScope
+    displayOrder?: IntFieldUpdateOperationsInput | number
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    user?: UserUpdateOneWithoutReusableCategoriesNestedInput
+    parent?: ReusableCategoryUpdateOneWithoutChildrenNestedInput
+    children?: ReusableCategoryUpdateManyWithoutParentNestedInput
+    savedBlocks?: SavedBlockUpdateManyWithoutCategoryNestedInput
+    contentTemplates?: ContentTemplateUpdateManyWithoutCategoryNestedInput
+    pageTemplates?: PageTemplateUpdateManyWithoutCategoryNestedInput
+  }
+
+  export type ReusableCategoryUncheckedUpdateWithoutSnippetsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    slug?: StringFieldUpdateOperationsInput | string
+    scope?: EnumReusableCategoryScopeFieldUpdateOperationsInput | $Enums.ReusableCategoryScope
+    userId?: NullableStringFieldUpdateOperationsInput | string | null
+    parentId?: NullableStringFieldUpdateOperationsInput | string | null
+    displayOrder?: IntFieldUpdateOperationsInput | number
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    children?: ReusableCategoryUncheckedUpdateManyWithoutParentNestedInput
+    savedBlocks?: SavedBlockUncheckedUpdateManyWithoutCategoryNestedInput
+    contentTemplates?: ContentTemplateUncheckedUpdateManyWithoutCategoryNestedInput
+    pageTemplates?: PageTemplateUncheckedUpdateManyWithoutCategoryNestedInput
+  }
+
+  export type UserUpsertWithoutSnippetsInput = {
+    update: XOR<UserUpdateWithoutSnippetsInput, UserUncheckedUpdateWithoutSnippetsInput>
+    create: XOR<UserCreateWithoutSnippetsInput, UserUncheckedCreateWithoutSnippetsInput>
+    where?: UserWhereInput
+  }
+
+  export type UserUpdateToOneWithWhereWithoutSnippetsInput = {
+    where?: UserWhereInput
+    data: XOR<UserUpdateWithoutSnippetsInput, UserUncheckedUpdateWithoutSnippetsInput>
+  }
+
+  export type UserUpdateWithoutSnippetsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    username?: StringFieldUpdateOperationsInput | string
+    passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
+    email?: StringFieldUpdateOperationsInput | string
+    role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: IntFieldUpdateOperationsInput | number
+    accounts?: AccountUpdateManyWithoutUserNestedInput
+    aiProviderKeys?: AIProviderKeyUpdateManyWithoutUserNestedInput
+    auditTargets?: AuditLogUpdateManyWithoutTargetUserNestedInput
+    adminActions?: AuditLogUpdateManyWithoutUserNestedInput
+    categories?: CategoryUpdateManyWithoutOwnerNestedInput
+    reusableCategories?: ReusableCategoryUpdateManyWithoutUserNestedInput
+    savedBlocks?: SavedBlockUpdateManyWithoutUserNestedInput
+    contentTemplates?: ContentTemplateUpdateManyWithoutUserNestedInput
+    pageTemplates?: PageTemplateUpdateManyWithoutUserNestedInput
+    calendarConnections?: CalendarConnectionUpdateManyWithoutUserNestedInput
+    calendarEvents?: CalendarEventUpdateManyWithoutUserNestedInput
+    calendarSources?: CalendarSourceUpdateManyWithoutUserNestedInput
+    contentHistory?: ContentHistoryUpdateManyWithoutUserNestedInput
+    contentNodes?: ContentNodeUpdateManyWithoutOwnerNestedInput
+    sessions?: SessionUpdateManyWithoutUserNestedInput
+    storageConfigs?: StorageProviderConfigUpdateManyWithoutUserNestedInput
+    tags?: TagUpdateManyWithoutUserNestedInput
+    trashedContent?: TrashBinUpdateManyWithoutDeletedByUserNestedInput
+    viewGrants?: ViewGrantUpdateManyWithoutUserNestedInput
+  }
+
+  export type UserUncheckedUpdateWithoutSnippetsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    username?: StringFieldUpdateOperationsInput | string
+    passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
+    email?: StringFieldUpdateOperationsInput | string
+    role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: IntFieldUpdateOperationsInput | number
+    accounts?: AccountUncheckedUpdateManyWithoutUserNestedInput
+    aiProviderKeys?: AIProviderKeyUncheckedUpdateManyWithoutUserNestedInput
+    auditTargets?: AuditLogUncheckedUpdateManyWithoutTargetUserNestedInput
+    adminActions?: AuditLogUncheckedUpdateManyWithoutUserNestedInput
+    categories?: CategoryUncheckedUpdateManyWithoutOwnerNestedInput
+    reusableCategories?: ReusableCategoryUncheckedUpdateManyWithoutUserNestedInput
+    savedBlocks?: SavedBlockUncheckedUpdateManyWithoutUserNestedInput
+    contentTemplates?: ContentTemplateUncheckedUpdateManyWithoutUserNestedInput
+    pageTemplates?: PageTemplateUncheckedUpdateManyWithoutUserNestedInput
+    calendarConnections?: CalendarConnectionUncheckedUpdateManyWithoutUserNestedInput
+    calendarEvents?: CalendarEventUncheckedUpdateManyWithoutUserNestedInput
+    calendarSources?: CalendarSourceUncheckedUpdateManyWithoutUserNestedInput
+    contentHistory?: ContentHistoryUncheckedUpdateManyWithoutUserNestedInput
+    contentNodes?: ContentNodeUncheckedUpdateManyWithoutOwnerNestedInput
+    sessions?: SessionUncheckedUpdateManyWithoutUserNestedInput
+    storageConfigs?: StorageProviderConfigUncheckedUpdateManyWithoutUserNestedInput
+    tags?: TagUncheckedUpdateManyWithoutUserNestedInput
+    trashedContent?: TrashBinUncheckedUpdateManyWithoutDeletedByUserNestedInput
+    viewGrants?: ViewGrantUncheckedUpdateManyWithoutUserNestedInput
+  }
+
+  export type ReusableCategoryCreateWithoutPageTemplatesInput = {
+    id?: string
+    name: string
+    slug: string
+    scope: $Enums.ReusableCategoryScope
+    displayOrder?: number
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    user?: UserCreateNestedOneWithoutReusableCategoriesInput
+    parent?: ReusableCategoryCreateNestedOneWithoutChildrenInput
+    children?: ReusableCategoryCreateNestedManyWithoutParentInput
+    savedBlocks?: SavedBlockCreateNestedManyWithoutCategoryInput
+    contentTemplates?: ContentTemplateCreateNestedManyWithoutCategoryInput
+    snippets?: SnippetCreateNestedManyWithoutCategoryInput
+  }
+
+  export type ReusableCategoryUncheckedCreateWithoutPageTemplatesInput = {
+    id?: string
+    name: string
+    slug: string
+    scope: $Enums.ReusableCategoryScope
+    userId?: string | null
+    parentId?: string | null
+    displayOrder?: number
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    children?: ReusableCategoryUncheckedCreateNestedManyWithoutParentInput
+    savedBlocks?: SavedBlockUncheckedCreateNestedManyWithoutCategoryInput
+    contentTemplates?: ContentTemplateUncheckedCreateNestedManyWithoutCategoryInput
+    snippets?: SnippetUncheckedCreateNestedManyWithoutCategoryInput
+  }
+
+  export type ReusableCategoryCreateOrConnectWithoutPageTemplatesInput = {
+    where: ReusableCategoryWhereUniqueInput
+    create: XOR<ReusableCategoryCreateWithoutPageTemplatesInput, ReusableCategoryUncheckedCreateWithoutPageTemplatesInput>
+  }
+
+  export type UserCreateWithoutPageTemplatesInput = {
+    id?: string
+    username: string
+    passwordHash?: string | null
+    email: string
+    role?: $Enums.UserRole
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: number
+    accounts?: AccountCreateNestedManyWithoutUserInput
+    aiProviderKeys?: AIProviderKeyCreateNestedManyWithoutUserInput
+    auditTargets?: AuditLogCreateNestedManyWithoutTargetUserInput
+    adminActions?: AuditLogCreateNestedManyWithoutUserInput
+    categories?: CategoryCreateNestedManyWithoutOwnerInput
+    reusableCategories?: ReusableCategoryCreateNestedManyWithoutUserInput
+    savedBlocks?: SavedBlockCreateNestedManyWithoutUserInput
+    contentTemplates?: ContentTemplateCreateNestedManyWithoutUserInput
+    snippets?: SnippetCreateNestedManyWithoutUserInput
+    calendarConnections?: CalendarConnectionCreateNestedManyWithoutUserInput
+    calendarEvents?: CalendarEventCreateNestedManyWithoutUserInput
+    calendarSources?: CalendarSourceCreateNestedManyWithoutUserInput
+    contentHistory?: ContentHistoryCreateNestedManyWithoutUserInput
+    contentNodes?: ContentNodeCreateNestedManyWithoutOwnerInput
+    sessions?: SessionCreateNestedManyWithoutUserInput
+    storageConfigs?: StorageProviderConfigCreateNestedManyWithoutUserInput
+    tags?: TagCreateNestedManyWithoutUserInput
+    trashedContent?: TrashBinCreateNestedManyWithoutDeletedByUserInput
+    viewGrants?: ViewGrantCreateNestedManyWithoutUserInput
+  }
+
+  export type UserUncheckedCreateWithoutPageTemplatesInput = {
+    id?: string
+    username: string
+    passwordHash?: string | null
+    email: string
+    role?: $Enums.UserRole
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: number
+    accounts?: AccountUncheckedCreateNestedManyWithoutUserInput
+    aiProviderKeys?: AIProviderKeyUncheckedCreateNestedManyWithoutUserInput
+    auditTargets?: AuditLogUncheckedCreateNestedManyWithoutTargetUserInput
+    adminActions?: AuditLogUncheckedCreateNestedManyWithoutUserInput
+    categories?: CategoryUncheckedCreateNestedManyWithoutOwnerInput
+    reusableCategories?: ReusableCategoryUncheckedCreateNestedManyWithoutUserInput
+    savedBlocks?: SavedBlockUncheckedCreateNestedManyWithoutUserInput
+    contentTemplates?: ContentTemplateUncheckedCreateNestedManyWithoutUserInput
+    snippets?: SnippetUncheckedCreateNestedManyWithoutUserInput
+    calendarConnections?: CalendarConnectionUncheckedCreateNestedManyWithoutUserInput
+    calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutUserInput
+    calendarSources?: CalendarSourceUncheckedCreateNestedManyWithoutUserInput
+    contentHistory?: ContentHistoryUncheckedCreateNestedManyWithoutUserInput
+    contentNodes?: ContentNodeUncheckedCreateNestedManyWithoutOwnerInput
+    sessions?: SessionUncheckedCreateNestedManyWithoutUserInput
+    storageConfigs?: StorageProviderConfigUncheckedCreateNestedManyWithoutUserInput
+    tags?: TagUncheckedCreateNestedManyWithoutUserInput
+    trashedContent?: TrashBinUncheckedCreateNestedManyWithoutDeletedByUserInput
+    viewGrants?: ViewGrantUncheckedCreateNestedManyWithoutUserInput
+  }
+
+  export type UserCreateOrConnectWithoutPageTemplatesInput = {
+    where: UserWhereUniqueInput
+    create: XOR<UserCreateWithoutPageTemplatesInput, UserUncheckedCreateWithoutPageTemplatesInput>
+  }
+
+  export type ReusableCategoryUpsertWithoutPageTemplatesInput = {
+    update: XOR<ReusableCategoryUpdateWithoutPageTemplatesInput, ReusableCategoryUncheckedUpdateWithoutPageTemplatesInput>
+    create: XOR<ReusableCategoryCreateWithoutPageTemplatesInput, ReusableCategoryUncheckedCreateWithoutPageTemplatesInput>
+    where?: ReusableCategoryWhereInput
+  }
+
+  export type ReusableCategoryUpdateToOneWithWhereWithoutPageTemplatesInput = {
+    where?: ReusableCategoryWhereInput
+    data: XOR<ReusableCategoryUpdateWithoutPageTemplatesInput, ReusableCategoryUncheckedUpdateWithoutPageTemplatesInput>
+  }
+
+  export type ReusableCategoryUpdateWithoutPageTemplatesInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    slug?: StringFieldUpdateOperationsInput | string
+    scope?: EnumReusableCategoryScopeFieldUpdateOperationsInput | $Enums.ReusableCategoryScope
+    displayOrder?: IntFieldUpdateOperationsInput | number
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    user?: UserUpdateOneWithoutReusableCategoriesNestedInput
+    parent?: ReusableCategoryUpdateOneWithoutChildrenNestedInput
+    children?: ReusableCategoryUpdateManyWithoutParentNestedInput
+    savedBlocks?: SavedBlockUpdateManyWithoutCategoryNestedInput
+    contentTemplates?: ContentTemplateUpdateManyWithoutCategoryNestedInput
+    snippets?: SnippetUpdateManyWithoutCategoryNestedInput
+  }
+
+  export type ReusableCategoryUncheckedUpdateWithoutPageTemplatesInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    slug?: StringFieldUpdateOperationsInput | string
+    scope?: EnumReusableCategoryScopeFieldUpdateOperationsInput | $Enums.ReusableCategoryScope
+    userId?: NullableStringFieldUpdateOperationsInput | string | null
+    parentId?: NullableStringFieldUpdateOperationsInput | string | null
+    displayOrder?: IntFieldUpdateOperationsInput | number
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    children?: ReusableCategoryUncheckedUpdateManyWithoutParentNestedInput
+    savedBlocks?: SavedBlockUncheckedUpdateManyWithoutCategoryNestedInput
+    contentTemplates?: ContentTemplateUncheckedUpdateManyWithoutCategoryNestedInput
+    snippets?: SnippetUncheckedUpdateManyWithoutCategoryNestedInput
+  }
+
+  export type UserUpsertWithoutPageTemplatesInput = {
+    update: XOR<UserUpdateWithoutPageTemplatesInput, UserUncheckedUpdateWithoutPageTemplatesInput>
+    create: XOR<UserCreateWithoutPageTemplatesInput, UserUncheckedCreateWithoutPageTemplatesInput>
+    where?: UserWhereInput
+  }
+
+  export type UserUpdateToOneWithWhereWithoutPageTemplatesInput = {
+    where?: UserWhereInput
+    data: XOR<UserUpdateWithoutPageTemplatesInput, UserUncheckedUpdateWithoutPageTemplatesInput>
+  }
+
+  export type UserUpdateWithoutPageTemplatesInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    username?: StringFieldUpdateOperationsInput | string
+    passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
+    email?: StringFieldUpdateOperationsInput | string
+    role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: IntFieldUpdateOperationsInput | number
+    accounts?: AccountUpdateManyWithoutUserNestedInput
+    aiProviderKeys?: AIProviderKeyUpdateManyWithoutUserNestedInput
+    auditTargets?: AuditLogUpdateManyWithoutTargetUserNestedInput
+    adminActions?: AuditLogUpdateManyWithoutUserNestedInput
+    categories?: CategoryUpdateManyWithoutOwnerNestedInput
+    reusableCategories?: ReusableCategoryUpdateManyWithoutUserNestedInput
+    savedBlocks?: SavedBlockUpdateManyWithoutUserNestedInput
+    contentTemplates?: ContentTemplateUpdateManyWithoutUserNestedInput
+    snippets?: SnippetUpdateManyWithoutUserNestedInput
+    calendarConnections?: CalendarConnectionUpdateManyWithoutUserNestedInput
+    calendarEvents?: CalendarEventUpdateManyWithoutUserNestedInput
+    calendarSources?: CalendarSourceUpdateManyWithoutUserNestedInput
+    contentHistory?: ContentHistoryUpdateManyWithoutUserNestedInput
+    contentNodes?: ContentNodeUpdateManyWithoutOwnerNestedInput
+    sessions?: SessionUpdateManyWithoutUserNestedInput
+    storageConfigs?: StorageProviderConfigUpdateManyWithoutUserNestedInput
+    tags?: TagUpdateManyWithoutUserNestedInput
+    trashedContent?: TrashBinUpdateManyWithoutDeletedByUserNestedInput
+    viewGrants?: ViewGrantUpdateManyWithoutUserNestedInput
+  }
+
+  export type UserUncheckedUpdateWithoutPageTemplatesInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    username?: StringFieldUpdateOperationsInput | string
+    passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
+    email?: StringFieldUpdateOperationsInput | string
+    role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: IntFieldUpdateOperationsInput | number
+    accounts?: AccountUncheckedUpdateManyWithoutUserNestedInput
+    aiProviderKeys?: AIProviderKeyUncheckedUpdateManyWithoutUserNestedInput
+    auditTargets?: AuditLogUncheckedUpdateManyWithoutTargetUserNestedInput
+    adminActions?: AuditLogUncheckedUpdateManyWithoutUserNestedInput
+    categories?: CategoryUncheckedUpdateManyWithoutOwnerNestedInput
+    reusableCategories?: ReusableCategoryUncheckedUpdateManyWithoutUserNestedInput
+    savedBlocks?: SavedBlockUncheckedUpdateManyWithoutUserNestedInput
+    contentTemplates?: ContentTemplateUncheckedUpdateManyWithoutUserNestedInput
+    snippets?: SnippetUncheckedUpdateManyWithoutUserNestedInput
+    calendarConnections?: CalendarConnectionUncheckedUpdateManyWithoutUserNestedInput
+    calendarEvents?: CalendarEventUncheckedUpdateManyWithoutUserNestedInput
+    calendarSources?: CalendarSourceUncheckedUpdateManyWithoutUserNestedInput
+    contentHistory?: ContentHistoryUncheckedUpdateManyWithoutUserNestedInput
+    contentNodes?: ContentNodeUncheckedUpdateManyWithoutOwnerNestedInput
+    sessions?: SessionUncheckedUpdateManyWithoutUserNestedInput
+    storageConfigs?: StorageProviderConfigUncheckedUpdateManyWithoutUserNestedInput
+    tags?: TagUncheckedUpdateManyWithoutUserNestedInput
+    trashedContent?: TrashBinUncheckedUpdateManyWithoutDeletedByUserNestedInput
+    viewGrants?: ViewGrantUncheckedUpdateManyWithoutUserNestedInput
   }
 
   export type ContentTagCreateWithoutTagInput = {
@@ -54421,6 +65272,11 @@ export namespace Prisma {
     auditTargets?: AuditLogCreateNestedManyWithoutTargetUserInput
     adminActions?: AuditLogCreateNestedManyWithoutUserInput
     categories?: CategoryCreateNestedManyWithoutOwnerInput
+    reusableCategories?: ReusableCategoryCreateNestedManyWithoutUserInput
+    savedBlocks?: SavedBlockCreateNestedManyWithoutUserInput
+    contentTemplates?: ContentTemplateCreateNestedManyWithoutUserInput
+    snippets?: SnippetCreateNestedManyWithoutUserInput
+    pageTemplates?: PageTemplateCreateNestedManyWithoutUserInput
     calendarConnections?: CalendarConnectionCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventCreateNestedManyWithoutUserInput
     calendarSources?: CalendarSourceCreateNestedManyWithoutUserInput
@@ -54447,6 +65303,11 @@ export namespace Prisma {
     auditTargets?: AuditLogUncheckedCreateNestedManyWithoutTargetUserInput
     adminActions?: AuditLogUncheckedCreateNestedManyWithoutUserInput
     categories?: CategoryUncheckedCreateNestedManyWithoutOwnerInput
+    reusableCategories?: ReusableCategoryUncheckedCreateNestedManyWithoutUserInput
+    savedBlocks?: SavedBlockUncheckedCreateNestedManyWithoutUserInput
+    contentTemplates?: ContentTemplateUncheckedCreateNestedManyWithoutUserInput
+    snippets?: SnippetUncheckedCreateNestedManyWithoutUserInput
+    pageTemplates?: PageTemplateUncheckedCreateNestedManyWithoutUserInput
     calendarConnections?: CalendarConnectionUncheckedCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutUserInput
     calendarSources?: CalendarSourceUncheckedCreateNestedManyWithoutUserInput
@@ -54505,6 +65366,11 @@ export namespace Prisma {
     auditTargets?: AuditLogUpdateManyWithoutTargetUserNestedInput
     adminActions?: AuditLogUpdateManyWithoutUserNestedInput
     categories?: CategoryUpdateManyWithoutOwnerNestedInput
+    reusableCategories?: ReusableCategoryUpdateManyWithoutUserNestedInput
+    savedBlocks?: SavedBlockUpdateManyWithoutUserNestedInput
+    contentTemplates?: ContentTemplateUpdateManyWithoutUserNestedInput
+    snippets?: SnippetUpdateManyWithoutUserNestedInput
+    pageTemplates?: PageTemplateUpdateManyWithoutUserNestedInput
     calendarConnections?: CalendarConnectionUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUpdateManyWithoutUserNestedInput
     calendarSources?: CalendarSourceUpdateManyWithoutUserNestedInput
@@ -54531,6 +65397,11 @@ export namespace Prisma {
     auditTargets?: AuditLogUncheckedUpdateManyWithoutTargetUserNestedInput
     adminActions?: AuditLogUncheckedUpdateManyWithoutUserNestedInput
     categories?: CategoryUncheckedUpdateManyWithoutOwnerNestedInput
+    reusableCategories?: ReusableCategoryUncheckedUpdateManyWithoutUserNestedInput
+    savedBlocks?: SavedBlockUncheckedUpdateManyWithoutUserNestedInput
+    contentTemplates?: ContentTemplateUncheckedUpdateManyWithoutUserNestedInput
+    snippets?: SnippetUncheckedUpdateManyWithoutUserNestedInput
+    pageTemplates?: PageTemplateUncheckedUpdateManyWithoutUserNestedInput
     calendarConnections?: CalendarConnectionUncheckedUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUncheckedUpdateManyWithoutUserNestedInput
     calendarSources?: CalendarSourceUncheckedUpdateManyWithoutUserNestedInput
@@ -54640,6 +65511,11 @@ export namespace Prisma {
     auditTargets?: AuditLogCreateNestedManyWithoutTargetUserInput
     adminActions?: AuditLogCreateNestedManyWithoutUserInput
     categories?: CategoryCreateNestedManyWithoutOwnerInput
+    reusableCategories?: ReusableCategoryCreateNestedManyWithoutUserInput
+    savedBlocks?: SavedBlockCreateNestedManyWithoutUserInput
+    contentTemplates?: ContentTemplateCreateNestedManyWithoutUserInput
+    snippets?: SnippetCreateNestedManyWithoutUserInput
+    pageTemplates?: PageTemplateCreateNestedManyWithoutUserInput
     calendarConnections?: CalendarConnectionCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventCreateNestedManyWithoutUserInput
     calendarSources?: CalendarSourceCreateNestedManyWithoutUserInput
@@ -54666,6 +65542,11 @@ export namespace Prisma {
     auditTargets?: AuditLogUncheckedCreateNestedManyWithoutTargetUserInput
     adminActions?: AuditLogUncheckedCreateNestedManyWithoutUserInput
     categories?: CategoryUncheckedCreateNestedManyWithoutOwnerInput
+    reusableCategories?: ReusableCategoryUncheckedCreateNestedManyWithoutUserInput
+    savedBlocks?: SavedBlockUncheckedCreateNestedManyWithoutUserInput
+    contentTemplates?: ContentTemplateUncheckedCreateNestedManyWithoutUserInput
+    snippets?: SnippetUncheckedCreateNestedManyWithoutUserInput
+    pageTemplates?: PageTemplateUncheckedCreateNestedManyWithoutUserInput
     calendarConnections?: CalendarConnectionUncheckedCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutUserInput
     calendarSources?: CalendarSourceUncheckedCreateNestedManyWithoutUserInput
@@ -54797,6 +65678,11 @@ export namespace Prisma {
     auditTargets?: AuditLogUpdateManyWithoutTargetUserNestedInput
     adminActions?: AuditLogUpdateManyWithoutUserNestedInput
     categories?: CategoryUpdateManyWithoutOwnerNestedInput
+    reusableCategories?: ReusableCategoryUpdateManyWithoutUserNestedInput
+    savedBlocks?: SavedBlockUpdateManyWithoutUserNestedInput
+    contentTemplates?: ContentTemplateUpdateManyWithoutUserNestedInput
+    snippets?: SnippetUpdateManyWithoutUserNestedInput
+    pageTemplates?: PageTemplateUpdateManyWithoutUserNestedInput
     calendarConnections?: CalendarConnectionUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUpdateManyWithoutUserNestedInput
     calendarSources?: CalendarSourceUpdateManyWithoutUserNestedInput
@@ -54823,6 +65709,11 @@ export namespace Prisma {
     auditTargets?: AuditLogUncheckedUpdateManyWithoutTargetUserNestedInput
     adminActions?: AuditLogUncheckedUpdateManyWithoutUserNestedInput
     categories?: CategoryUncheckedUpdateManyWithoutOwnerNestedInput
+    reusableCategories?: ReusableCategoryUncheckedUpdateManyWithoutUserNestedInput
+    savedBlocks?: SavedBlockUncheckedUpdateManyWithoutUserNestedInput
+    contentTemplates?: ContentTemplateUncheckedUpdateManyWithoutUserNestedInput
+    snippets?: SnippetUncheckedUpdateManyWithoutUserNestedInput
+    pageTemplates?: PageTemplateUncheckedUpdateManyWithoutUserNestedInput
     calendarConnections?: CalendarConnectionUncheckedUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUncheckedUpdateManyWithoutUserNestedInput
     calendarSources?: CalendarSourceUncheckedUpdateManyWithoutUserNestedInput
@@ -54849,6 +65740,11 @@ export namespace Prisma {
     auditTargets?: AuditLogCreateNestedManyWithoutTargetUserInput
     adminActions?: AuditLogCreateNestedManyWithoutUserInput
     categories?: CategoryCreateNestedManyWithoutOwnerInput
+    reusableCategories?: ReusableCategoryCreateNestedManyWithoutUserInput
+    savedBlocks?: SavedBlockCreateNestedManyWithoutUserInput
+    contentTemplates?: ContentTemplateCreateNestedManyWithoutUserInput
+    snippets?: SnippetCreateNestedManyWithoutUserInput
+    pageTemplates?: PageTemplateCreateNestedManyWithoutUserInput
     calendarConnections?: CalendarConnectionCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventCreateNestedManyWithoutUserInput
     calendarSources?: CalendarSourceCreateNestedManyWithoutUserInput
@@ -54875,6 +65771,11 @@ export namespace Prisma {
     auditTargets?: AuditLogUncheckedCreateNestedManyWithoutTargetUserInput
     adminActions?: AuditLogUncheckedCreateNestedManyWithoutUserInput
     categories?: CategoryUncheckedCreateNestedManyWithoutOwnerInput
+    reusableCategories?: ReusableCategoryUncheckedCreateNestedManyWithoutUserInput
+    savedBlocks?: SavedBlockUncheckedCreateNestedManyWithoutUserInput
+    contentTemplates?: ContentTemplateUncheckedCreateNestedManyWithoutUserInput
+    snippets?: SnippetUncheckedCreateNestedManyWithoutUserInput
+    pageTemplates?: PageTemplateUncheckedCreateNestedManyWithoutUserInput
     calendarConnections?: CalendarConnectionUncheckedCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutUserInput
     calendarSources?: CalendarSourceUncheckedCreateNestedManyWithoutUserInput
@@ -54917,6 +65818,11 @@ export namespace Prisma {
     auditTargets?: AuditLogUpdateManyWithoutTargetUserNestedInput
     adminActions?: AuditLogUpdateManyWithoutUserNestedInput
     categories?: CategoryUpdateManyWithoutOwnerNestedInput
+    reusableCategories?: ReusableCategoryUpdateManyWithoutUserNestedInput
+    savedBlocks?: SavedBlockUpdateManyWithoutUserNestedInput
+    contentTemplates?: ContentTemplateUpdateManyWithoutUserNestedInput
+    snippets?: SnippetUpdateManyWithoutUserNestedInput
+    pageTemplates?: PageTemplateUpdateManyWithoutUserNestedInput
     calendarConnections?: CalendarConnectionUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUpdateManyWithoutUserNestedInput
     calendarSources?: CalendarSourceUpdateManyWithoutUserNestedInput
@@ -54943,6 +65849,11 @@ export namespace Prisma {
     auditTargets?: AuditLogUncheckedUpdateManyWithoutTargetUserNestedInput
     adminActions?: AuditLogUncheckedUpdateManyWithoutUserNestedInput
     categories?: CategoryUncheckedUpdateManyWithoutOwnerNestedInput
+    reusableCategories?: ReusableCategoryUncheckedUpdateManyWithoutUserNestedInput
+    savedBlocks?: SavedBlockUncheckedUpdateManyWithoutUserNestedInput
+    contentTemplates?: ContentTemplateUncheckedUpdateManyWithoutUserNestedInput
+    snippets?: SnippetUncheckedUpdateManyWithoutUserNestedInput
+    pageTemplates?: PageTemplateUncheckedUpdateManyWithoutUserNestedInput
     calendarConnections?: CalendarConnectionUncheckedUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUncheckedUpdateManyWithoutUserNestedInput
     calendarSources?: CalendarSourceUncheckedUpdateManyWithoutUserNestedInput
@@ -54968,6 +65879,11 @@ export namespace Prisma {
     auditTargets?: AuditLogCreateNestedManyWithoutTargetUserInput
     adminActions?: AuditLogCreateNestedManyWithoutUserInput
     categories?: CategoryCreateNestedManyWithoutOwnerInput
+    reusableCategories?: ReusableCategoryCreateNestedManyWithoutUserInput
+    savedBlocks?: SavedBlockCreateNestedManyWithoutUserInput
+    contentTemplates?: ContentTemplateCreateNestedManyWithoutUserInput
+    snippets?: SnippetCreateNestedManyWithoutUserInput
+    pageTemplates?: PageTemplateCreateNestedManyWithoutUserInput
     calendarConnections?: CalendarConnectionCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventCreateNestedManyWithoutUserInput
     calendarSources?: CalendarSourceCreateNestedManyWithoutUserInput
@@ -54994,6 +65910,11 @@ export namespace Prisma {
     auditTargets?: AuditLogUncheckedCreateNestedManyWithoutTargetUserInput
     adminActions?: AuditLogUncheckedCreateNestedManyWithoutUserInput
     categories?: CategoryUncheckedCreateNestedManyWithoutOwnerInput
+    reusableCategories?: ReusableCategoryUncheckedCreateNestedManyWithoutUserInput
+    savedBlocks?: SavedBlockUncheckedCreateNestedManyWithoutUserInput
+    contentTemplates?: ContentTemplateUncheckedCreateNestedManyWithoutUserInput
+    snippets?: SnippetUncheckedCreateNestedManyWithoutUserInput
+    pageTemplates?: PageTemplateUncheckedCreateNestedManyWithoutUserInput
     calendarConnections?: CalendarConnectionUncheckedCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutUserInput
     calendarSources?: CalendarSourceUncheckedCreateNestedManyWithoutUserInput
@@ -55036,6 +65957,11 @@ export namespace Prisma {
     auditTargets?: AuditLogUpdateManyWithoutTargetUserNestedInput
     adminActions?: AuditLogUpdateManyWithoutUserNestedInput
     categories?: CategoryUpdateManyWithoutOwnerNestedInput
+    reusableCategories?: ReusableCategoryUpdateManyWithoutUserNestedInput
+    savedBlocks?: SavedBlockUpdateManyWithoutUserNestedInput
+    contentTemplates?: ContentTemplateUpdateManyWithoutUserNestedInput
+    snippets?: SnippetUpdateManyWithoutUserNestedInput
+    pageTemplates?: PageTemplateUpdateManyWithoutUserNestedInput
     calendarConnections?: CalendarConnectionUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUpdateManyWithoutUserNestedInput
     calendarSources?: CalendarSourceUpdateManyWithoutUserNestedInput
@@ -55062,6 +65988,11 @@ export namespace Prisma {
     auditTargets?: AuditLogUncheckedUpdateManyWithoutTargetUserNestedInput
     adminActions?: AuditLogUncheckedUpdateManyWithoutUserNestedInput
     categories?: CategoryUncheckedUpdateManyWithoutOwnerNestedInput
+    reusableCategories?: ReusableCategoryUncheckedUpdateManyWithoutUserNestedInput
+    savedBlocks?: SavedBlockUncheckedUpdateManyWithoutUserNestedInput
+    contentTemplates?: ContentTemplateUncheckedUpdateManyWithoutUserNestedInput
+    snippets?: SnippetUncheckedUpdateManyWithoutUserNestedInput
+    pageTemplates?: PageTemplateUncheckedUpdateManyWithoutUserNestedInput
     calendarConnections?: CalendarConnectionUncheckedUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUncheckedUpdateManyWithoutUserNestedInput
     calendarSources?: CalendarSourceUncheckedUpdateManyWithoutUserNestedInput
@@ -55137,6 +66068,11 @@ export namespace Prisma {
     auditTargets?: AuditLogCreateNestedManyWithoutTargetUserInput
     adminActions?: AuditLogCreateNestedManyWithoutUserInput
     categories?: CategoryCreateNestedManyWithoutOwnerInput
+    reusableCategories?: ReusableCategoryCreateNestedManyWithoutUserInput
+    savedBlocks?: SavedBlockCreateNestedManyWithoutUserInput
+    contentTemplates?: ContentTemplateCreateNestedManyWithoutUserInput
+    snippets?: SnippetCreateNestedManyWithoutUserInput
+    pageTemplates?: PageTemplateCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventCreateNestedManyWithoutUserInput
     calendarSources?: CalendarSourceCreateNestedManyWithoutUserInput
     contentHistory?: ContentHistoryCreateNestedManyWithoutUserInput
@@ -55163,6 +66099,11 @@ export namespace Prisma {
     auditTargets?: AuditLogUncheckedCreateNestedManyWithoutTargetUserInput
     adminActions?: AuditLogUncheckedCreateNestedManyWithoutUserInput
     categories?: CategoryUncheckedCreateNestedManyWithoutOwnerInput
+    reusableCategories?: ReusableCategoryUncheckedCreateNestedManyWithoutUserInput
+    savedBlocks?: SavedBlockUncheckedCreateNestedManyWithoutUserInput
+    contentTemplates?: ContentTemplateUncheckedCreateNestedManyWithoutUserInput
+    snippets?: SnippetUncheckedCreateNestedManyWithoutUserInput
+    pageTemplates?: PageTemplateUncheckedCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutUserInput
     calendarSources?: CalendarSourceUncheckedCreateNestedManyWithoutUserInput
     contentHistory?: ContentHistoryUncheckedCreateNestedManyWithoutUserInput
@@ -55221,6 +66162,11 @@ export namespace Prisma {
     auditTargets?: AuditLogUpdateManyWithoutTargetUserNestedInput
     adminActions?: AuditLogUpdateManyWithoutUserNestedInput
     categories?: CategoryUpdateManyWithoutOwnerNestedInput
+    reusableCategories?: ReusableCategoryUpdateManyWithoutUserNestedInput
+    savedBlocks?: SavedBlockUpdateManyWithoutUserNestedInput
+    contentTemplates?: ContentTemplateUpdateManyWithoutUserNestedInput
+    snippets?: SnippetUpdateManyWithoutUserNestedInput
+    pageTemplates?: PageTemplateUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUpdateManyWithoutUserNestedInput
     calendarSources?: CalendarSourceUpdateManyWithoutUserNestedInput
     contentHistory?: ContentHistoryUpdateManyWithoutUserNestedInput
@@ -55247,6 +66193,11 @@ export namespace Prisma {
     auditTargets?: AuditLogUncheckedUpdateManyWithoutTargetUserNestedInput
     adminActions?: AuditLogUncheckedUpdateManyWithoutUserNestedInput
     categories?: CategoryUncheckedUpdateManyWithoutOwnerNestedInput
+    reusableCategories?: ReusableCategoryUncheckedUpdateManyWithoutUserNestedInput
+    savedBlocks?: SavedBlockUncheckedUpdateManyWithoutUserNestedInput
+    contentTemplates?: ContentTemplateUncheckedUpdateManyWithoutUserNestedInput
+    snippets?: SnippetUncheckedUpdateManyWithoutUserNestedInput
+    pageTemplates?: PageTemplateUncheckedUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUncheckedUpdateManyWithoutUserNestedInput
     calendarSources?: CalendarSourceUncheckedUpdateManyWithoutUserNestedInput
     contentHistory?: ContentHistoryUncheckedUpdateManyWithoutUserNestedInput
@@ -55366,6 +66317,11 @@ export namespace Prisma {
     auditTargets?: AuditLogCreateNestedManyWithoutTargetUserInput
     adminActions?: AuditLogCreateNestedManyWithoutUserInput
     categories?: CategoryCreateNestedManyWithoutOwnerInput
+    reusableCategories?: ReusableCategoryCreateNestedManyWithoutUserInput
+    savedBlocks?: SavedBlockCreateNestedManyWithoutUserInput
+    contentTemplates?: ContentTemplateCreateNestedManyWithoutUserInput
+    snippets?: SnippetCreateNestedManyWithoutUserInput
+    pageTemplates?: PageTemplateCreateNestedManyWithoutUserInput
     calendarConnections?: CalendarConnectionCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventCreateNestedManyWithoutUserInput
     contentHistory?: ContentHistoryCreateNestedManyWithoutUserInput
@@ -55392,6 +66348,11 @@ export namespace Prisma {
     auditTargets?: AuditLogUncheckedCreateNestedManyWithoutTargetUserInput
     adminActions?: AuditLogUncheckedCreateNestedManyWithoutUserInput
     categories?: CategoryUncheckedCreateNestedManyWithoutOwnerInput
+    reusableCategories?: ReusableCategoryUncheckedCreateNestedManyWithoutUserInput
+    savedBlocks?: SavedBlockUncheckedCreateNestedManyWithoutUserInput
+    contentTemplates?: ContentTemplateUncheckedCreateNestedManyWithoutUserInput
+    snippets?: SnippetUncheckedCreateNestedManyWithoutUserInput
+    pageTemplates?: PageTemplateUncheckedCreateNestedManyWithoutUserInput
     calendarConnections?: CalendarConnectionUncheckedCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutUserInput
     contentHistory?: ContentHistoryUncheckedCreateNestedManyWithoutUserInput
@@ -55491,6 +66452,11 @@ export namespace Prisma {
     auditTargets?: AuditLogUpdateManyWithoutTargetUserNestedInput
     adminActions?: AuditLogUpdateManyWithoutUserNestedInput
     categories?: CategoryUpdateManyWithoutOwnerNestedInput
+    reusableCategories?: ReusableCategoryUpdateManyWithoutUserNestedInput
+    savedBlocks?: SavedBlockUpdateManyWithoutUserNestedInput
+    contentTemplates?: ContentTemplateUpdateManyWithoutUserNestedInput
+    snippets?: SnippetUpdateManyWithoutUserNestedInput
+    pageTemplates?: PageTemplateUpdateManyWithoutUserNestedInput
     calendarConnections?: CalendarConnectionUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUpdateManyWithoutUserNestedInput
     contentHistory?: ContentHistoryUpdateManyWithoutUserNestedInput
@@ -55517,6 +66483,11 @@ export namespace Prisma {
     auditTargets?: AuditLogUncheckedUpdateManyWithoutTargetUserNestedInput
     adminActions?: AuditLogUncheckedUpdateManyWithoutUserNestedInput
     categories?: CategoryUncheckedUpdateManyWithoutOwnerNestedInput
+    reusableCategories?: ReusableCategoryUncheckedUpdateManyWithoutUserNestedInput
+    savedBlocks?: SavedBlockUncheckedUpdateManyWithoutUserNestedInput
+    contentTemplates?: ContentTemplateUncheckedUpdateManyWithoutUserNestedInput
+    snippets?: SnippetUncheckedUpdateManyWithoutUserNestedInput
+    pageTemplates?: PageTemplateUncheckedUpdateManyWithoutUserNestedInput
     calendarConnections?: CalendarConnectionUncheckedUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUncheckedUpdateManyWithoutUserNestedInput
     contentHistory?: ContentHistoryUncheckedUpdateManyWithoutUserNestedInput
@@ -55701,6 +66672,11 @@ export namespace Prisma {
     auditTargets?: AuditLogCreateNestedManyWithoutTargetUserInput
     adminActions?: AuditLogCreateNestedManyWithoutUserInput
     categories?: CategoryCreateNestedManyWithoutOwnerInput
+    reusableCategories?: ReusableCategoryCreateNestedManyWithoutUserInput
+    savedBlocks?: SavedBlockCreateNestedManyWithoutUserInput
+    contentTemplates?: ContentTemplateCreateNestedManyWithoutUserInput
+    snippets?: SnippetCreateNestedManyWithoutUserInput
+    pageTemplates?: PageTemplateCreateNestedManyWithoutUserInput
     calendarConnections?: CalendarConnectionCreateNestedManyWithoutUserInput
     calendarSources?: CalendarSourceCreateNestedManyWithoutUserInput
     contentHistory?: ContentHistoryCreateNestedManyWithoutUserInput
@@ -55727,6 +66703,11 @@ export namespace Prisma {
     auditTargets?: AuditLogUncheckedCreateNestedManyWithoutTargetUserInput
     adminActions?: AuditLogUncheckedCreateNestedManyWithoutUserInput
     categories?: CategoryUncheckedCreateNestedManyWithoutOwnerInput
+    reusableCategories?: ReusableCategoryUncheckedCreateNestedManyWithoutUserInput
+    savedBlocks?: SavedBlockUncheckedCreateNestedManyWithoutUserInput
+    contentTemplates?: ContentTemplateUncheckedCreateNestedManyWithoutUserInput
+    snippets?: SnippetUncheckedCreateNestedManyWithoutUserInput
+    pageTemplates?: PageTemplateUncheckedCreateNestedManyWithoutUserInput
     calendarConnections?: CalendarConnectionUncheckedCreateNestedManyWithoutUserInput
     calendarSources?: CalendarSourceUncheckedCreateNestedManyWithoutUserInput
     contentHistory?: ContentHistoryUncheckedCreateNestedManyWithoutUserInput
@@ -55938,6 +66919,11 @@ export namespace Prisma {
     auditTargets?: AuditLogUpdateManyWithoutTargetUserNestedInput
     adminActions?: AuditLogUpdateManyWithoutUserNestedInput
     categories?: CategoryUpdateManyWithoutOwnerNestedInput
+    reusableCategories?: ReusableCategoryUpdateManyWithoutUserNestedInput
+    savedBlocks?: SavedBlockUpdateManyWithoutUserNestedInput
+    contentTemplates?: ContentTemplateUpdateManyWithoutUserNestedInput
+    snippets?: SnippetUpdateManyWithoutUserNestedInput
+    pageTemplates?: PageTemplateUpdateManyWithoutUserNestedInput
     calendarConnections?: CalendarConnectionUpdateManyWithoutUserNestedInput
     calendarSources?: CalendarSourceUpdateManyWithoutUserNestedInput
     contentHistory?: ContentHistoryUpdateManyWithoutUserNestedInput
@@ -55964,6 +66950,11 @@ export namespace Prisma {
     auditTargets?: AuditLogUncheckedUpdateManyWithoutTargetUserNestedInput
     adminActions?: AuditLogUncheckedUpdateManyWithoutUserNestedInput
     categories?: CategoryUncheckedUpdateManyWithoutOwnerNestedInput
+    reusableCategories?: ReusableCategoryUncheckedUpdateManyWithoutUserNestedInput
+    savedBlocks?: SavedBlockUncheckedUpdateManyWithoutUserNestedInput
+    contentTemplates?: ContentTemplateUncheckedUpdateManyWithoutUserNestedInput
+    snippets?: SnippetUncheckedUpdateManyWithoutUserNestedInput
+    pageTemplates?: PageTemplateUncheckedUpdateManyWithoutUserNestedInput
     calendarConnections?: CalendarConnectionUncheckedUpdateManyWithoutUserNestedInput
     calendarSources?: CalendarSourceUncheckedUpdateManyWithoutUserNestedInput
     contentHistory?: ContentHistoryUncheckedUpdateManyWithoutUserNestedInput
@@ -56184,6 +67175,11 @@ export namespace Prisma {
     aiProviderKeys?: AIProviderKeyCreateNestedManyWithoutUserInput
     adminActions?: AuditLogCreateNestedManyWithoutUserInput
     categories?: CategoryCreateNestedManyWithoutOwnerInput
+    reusableCategories?: ReusableCategoryCreateNestedManyWithoutUserInput
+    savedBlocks?: SavedBlockCreateNestedManyWithoutUserInput
+    contentTemplates?: ContentTemplateCreateNestedManyWithoutUserInput
+    snippets?: SnippetCreateNestedManyWithoutUserInput
+    pageTemplates?: PageTemplateCreateNestedManyWithoutUserInput
     calendarConnections?: CalendarConnectionCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventCreateNestedManyWithoutUserInput
     calendarSources?: CalendarSourceCreateNestedManyWithoutUserInput
@@ -56210,6 +67206,11 @@ export namespace Prisma {
     aiProviderKeys?: AIProviderKeyUncheckedCreateNestedManyWithoutUserInput
     adminActions?: AuditLogUncheckedCreateNestedManyWithoutUserInput
     categories?: CategoryUncheckedCreateNestedManyWithoutOwnerInput
+    reusableCategories?: ReusableCategoryUncheckedCreateNestedManyWithoutUserInput
+    savedBlocks?: SavedBlockUncheckedCreateNestedManyWithoutUserInput
+    contentTemplates?: ContentTemplateUncheckedCreateNestedManyWithoutUserInput
+    snippets?: SnippetUncheckedCreateNestedManyWithoutUserInput
+    pageTemplates?: PageTemplateUncheckedCreateNestedManyWithoutUserInput
     calendarConnections?: CalendarConnectionUncheckedCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutUserInput
     calendarSources?: CalendarSourceUncheckedCreateNestedManyWithoutUserInput
@@ -56241,6 +67242,11 @@ export namespace Prisma {
     aiProviderKeys?: AIProviderKeyCreateNestedManyWithoutUserInput
     auditTargets?: AuditLogCreateNestedManyWithoutTargetUserInput
     categories?: CategoryCreateNestedManyWithoutOwnerInput
+    reusableCategories?: ReusableCategoryCreateNestedManyWithoutUserInput
+    savedBlocks?: SavedBlockCreateNestedManyWithoutUserInput
+    contentTemplates?: ContentTemplateCreateNestedManyWithoutUserInput
+    snippets?: SnippetCreateNestedManyWithoutUserInput
+    pageTemplates?: PageTemplateCreateNestedManyWithoutUserInput
     calendarConnections?: CalendarConnectionCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventCreateNestedManyWithoutUserInput
     calendarSources?: CalendarSourceCreateNestedManyWithoutUserInput
@@ -56267,6 +67273,11 @@ export namespace Prisma {
     aiProviderKeys?: AIProviderKeyUncheckedCreateNestedManyWithoutUserInput
     auditTargets?: AuditLogUncheckedCreateNestedManyWithoutTargetUserInput
     categories?: CategoryUncheckedCreateNestedManyWithoutOwnerInput
+    reusableCategories?: ReusableCategoryUncheckedCreateNestedManyWithoutUserInput
+    savedBlocks?: SavedBlockUncheckedCreateNestedManyWithoutUserInput
+    contentTemplates?: ContentTemplateUncheckedCreateNestedManyWithoutUserInput
+    snippets?: SnippetUncheckedCreateNestedManyWithoutUserInput
+    pageTemplates?: PageTemplateUncheckedCreateNestedManyWithoutUserInput
     calendarConnections?: CalendarConnectionUncheckedCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutUserInput
     calendarSources?: CalendarSourceUncheckedCreateNestedManyWithoutUserInput
@@ -56398,6 +67409,11 @@ export namespace Prisma {
     aiProviderKeys?: AIProviderKeyUpdateManyWithoutUserNestedInput
     adminActions?: AuditLogUpdateManyWithoutUserNestedInput
     categories?: CategoryUpdateManyWithoutOwnerNestedInput
+    reusableCategories?: ReusableCategoryUpdateManyWithoutUserNestedInput
+    savedBlocks?: SavedBlockUpdateManyWithoutUserNestedInput
+    contentTemplates?: ContentTemplateUpdateManyWithoutUserNestedInput
+    snippets?: SnippetUpdateManyWithoutUserNestedInput
+    pageTemplates?: PageTemplateUpdateManyWithoutUserNestedInput
     calendarConnections?: CalendarConnectionUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUpdateManyWithoutUserNestedInput
     calendarSources?: CalendarSourceUpdateManyWithoutUserNestedInput
@@ -56424,6 +67440,11 @@ export namespace Prisma {
     aiProviderKeys?: AIProviderKeyUncheckedUpdateManyWithoutUserNestedInput
     adminActions?: AuditLogUncheckedUpdateManyWithoutUserNestedInput
     categories?: CategoryUncheckedUpdateManyWithoutOwnerNestedInput
+    reusableCategories?: ReusableCategoryUncheckedUpdateManyWithoutUserNestedInput
+    savedBlocks?: SavedBlockUncheckedUpdateManyWithoutUserNestedInput
+    contentTemplates?: ContentTemplateUncheckedUpdateManyWithoutUserNestedInput
+    snippets?: SnippetUncheckedUpdateManyWithoutUserNestedInput
+    pageTemplates?: PageTemplateUncheckedUpdateManyWithoutUserNestedInput
     calendarConnections?: CalendarConnectionUncheckedUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUncheckedUpdateManyWithoutUserNestedInput
     calendarSources?: CalendarSourceUncheckedUpdateManyWithoutUserNestedInput
@@ -56461,6 +67482,11 @@ export namespace Prisma {
     aiProviderKeys?: AIProviderKeyUpdateManyWithoutUserNestedInput
     auditTargets?: AuditLogUpdateManyWithoutTargetUserNestedInput
     categories?: CategoryUpdateManyWithoutOwnerNestedInput
+    reusableCategories?: ReusableCategoryUpdateManyWithoutUserNestedInput
+    savedBlocks?: SavedBlockUpdateManyWithoutUserNestedInput
+    contentTemplates?: ContentTemplateUpdateManyWithoutUserNestedInput
+    snippets?: SnippetUpdateManyWithoutUserNestedInput
+    pageTemplates?: PageTemplateUpdateManyWithoutUserNestedInput
     calendarConnections?: CalendarConnectionUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUpdateManyWithoutUserNestedInput
     calendarSources?: CalendarSourceUpdateManyWithoutUserNestedInput
@@ -56487,6 +67513,11 @@ export namespace Prisma {
     aiProviderKeys?: AIProviderKeyUncheckedUpdateManyWithoutUserNestedInput
     auditTargets?: AuditLogUncheckedUpdateManyWithoutTargetUserNestedInput
     categories?: CategoryUncheckedUpdateManyWithoutOwnerNestedInput
+    reusableCategories?: ReusableCategoryUncheckedUpdateManyWithoutUserNestedInput
+    savedBlocks?: SavedBlockUncheckedUpdateManyWithoutUserNestedInput
+    contentTemplates?: ContentTemplateUncheckedUpdateManyWithoutUserNestedInput
+    snippets?: SnippetUncheckedUpdateManyWithoutUserNestedInput
+    pageTemplates?: PageTemplateUncheckedUpdateManyWithoutUserNestedInput
     calendarConnections?: CalendarConnectionUncheckedUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUncheckedUpdateManyWithoutUserNestedInput
     calendarSources?: CalendarSourceUncheckedUpdateManyWithoutUserNestedInput
@@ -58174,6 +69205,71 @@ export namespace Prisma {
     updatedAt?: Date | string
   }
 
+  export type ReusableCategoryCreateManyUserInput = {
+    id?: string
+    name: string
+    slug: string
+    scope: $Enums.ReusableCategoryScope
+    parentId?: string | null
+    displayOrder?: number
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type SavedBlockCreateManyUserInput = {
+    id?: string
+    title: string
+    blockType: string
+    tiptapJson: JsonNullValueInput | InputJsonValue
+    searchText?: string
+    categoryId: string
+    usageCount?: number
+    lastUsedAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type ContentTemplateCreateManyUserInput = {
+    id?: string
+    title: string
+    tiptapJson: JsonNullValueInput | InputJsonValue
+    searchText?: string
+    categoryId: string
+    usageCount?: number
+    lastUsedAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type SnippetCreateManyUserInput = {
+    id?: string
+    title?: string | null
+    content: string
+    tiptapJson?: NullableJsonNullValueInput | InputJsonValue
+    searchText?: string
+    categoryId: string
+    usageCount?: number
+    lastUsedAt?: Date | string | null
+    isAiContext?: boolean
+    isVisibleInUI?: boolean
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type PageTemplateCreateManyUserInput = {
+    id?: string
+    title: string
+    tiptapJson: JsonNullValueInput | InputJsonValue
+    searchText?: string
+    categoryId: string
+    defaultTitle?: string | null
+    customIcon?: string | null
+    iconColor?: string | null
+    usageCount?: number
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
   export type CalendarConnectionCreateManyUserInput = {
     id?: string
     provider: $Enums.CalendarProvider
@@ -58462,6 +69558,211 @@ export namespace Prisma {
     description?: NullableStringFieldUpdateOperationsInput | string | null
     displayOrder?: IntFieldUpdateOperationsInput | number
     isPublished?: BoolFieldUpdateOperationsInput | boolean
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type ReusableCategoryUpdateWithoutUserInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    slug?: StringFieldUpdateOperationsInput | string
+    scope?: EnumReusableCategoryScopeFieldUpdateOperationsInput | $Enums.ReusableCategoryScope
+    displayOrder?: IntFieldUpdateOperationsInput | number
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    parent?: ReusableCategoryUpdateOneWithoutChildrenNestedInput
+    children?: ReusableCategoryUpdateManyWithoutParentNestedInput
+    savedBlocks?: SavedBlockUpdateManyWithoutCategoryNestedInput
+    contentTemplates?: ContentTemplateUpdateManyWithoutCategoryNestedInput
+    snippets?: SnippetUpdateManyWithoutCategoryNestedInput
+    pageTemplates?: PageTemplateUpdateManyWithoutCategoryNestedInput
+  }
+
+  export type ReusableCategoryUncheckedUpdateWithoutUserInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    slug?: StringFieldUpdateOperationsInput | string
+    scope?: EnumReusableCategoryScopeFieldUpdateOperationsInput | $Enums.ReusableCategoryScope
+    parentId?: NullableStringFieldUpdateOperationsInput | string | null
+    displayOrder?: IntFieldUpdateOperationsInput | number
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    children?: ReusableCategoryUncheckedUpdateManyWithoutParentNestedInput
+    savedBlocks?: SavedBlockUncheckedUpdateManyWithoutCategoryNestedInput
+    contentTemplates?: ContentTemplateUncheckedUpdateManyWithoutCategoryNestedInput
+    snippets?: SnippetUncheckedUpdateManyWithoutCategoryNestedInput
+    pageTemplates?: PageTemplateUncheckedUpdateManyWithoutCategoryNestedInput
+  }
+
+  export type ReusableCategoryUncheckedUpdateManyWithoutUserInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    slug?: StringFieldUpdateOperationsInput | string
+    scope?: EnumReusableCategoryScopeFieldUpdateOperationsInput | $Enums.ReusableCategoryScope
+    parentId?: NullableStringFieldUpdateOperationsInput | string | null
+    displayOrder?: IntFieldUpdateOperationsInput | number
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type SavedBlockUpdateWithoutUserInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    title?: StringFieldUpdateOperationsInput | string
+    blockType?: StringFieldUpdateOperationsInput | string
+    tiptapJson?: JsonNullValueInput | InputJsonValue
+    searchText?: StringFieldUpdateOperationsInput | string
+    usageCount?: IntFieldUpdateOperationsInput | number
+    lastUsedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    category?: ReusableCategoryUpdateOneRequiredWithoutSavedBlocksNestedInput
+  }
+
+  export type SavedBlockUncheckedUpdateWithoutUserInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    title?: StringFieldUpdateOperationsInput | string
+    blockType?: StringFieldUpdateOperationsInput | string
+    tiptapJson?: JsonNullValueInput | InputJsonValue
+    searchText?: StringFieldUpdateOperationsInput | string
+    categoryId?: StringFieldUpdateOperationsInput | string
+    usageCount?: IntFieldUpdateOperationsInput | number
+    lastUsedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type SavedBlockUncheckedUpdateManyWithoutUserInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    title?: StringFieldUpdateOperationsInput | string
+    blockType?: StringFieldUpdateOperationsInput | string
+    tiptapJson?: JsonNullValueInput | InputJsonValue
+    searchText?: StringFieldUpdateOperationsInput | string
+    categoryId?: StringFieldUpdateOperationsInput | string
+    usageCount?: IntFieldUpdateOperationsInput | number
+    lastUsedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type ContentTemplateUpdateWithoutUserInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    title?: StringFieldUpdateOperationsInput | string
+    tiptapJson?: JsonNullValueInput | InputJsonValue
+    searchText?: StringFieldUpdateOperationsInput | string
+    usageCount?: IntFieldUpdateOperationsInput | number
+    lastUsedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    category?: ReusableCategoryUpdateOneRequiredWithoutContentTemplatesNestedInput
+  }
+
+  export type ContentTemplateUncheckedUpdateWithoutUserInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    title?: StringFieldUpdateOperationsInput | string
+    tiptapJson?: JsonNullValueInput | InputJsonValue
+    searchText?: StringFieldUpdateOperationsInput | string
+    categoryId?: StringFieldUpdateOperationsInput | string
+    usageCount?: IntFieldUpdateOperationsInput | number
+    lastUsedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type ContentTemplateUncheckedUpdateManyWithoutUserInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    title?: StringFieldUpdateOperationsInput | string
+    tiptapJson?: JsonNullValueInput | InputJsonValue
+    searchText?: StringFieldUpdateOperationsInput | string
+    categoryId?: StringFieldUpdateOperationsInput | string
+    usageCount?: IntFieldUpdateOperationsInput | number
+    lastUsedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type SnippetUpdateWithoutUserInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    title?: NullableStringFieldUpdateOperationsInput | string | null
+    content?: StringFieldUpdateOperationsInput | string
+    tiptapJson?: NullableJsonNullValueInput | InputJsonValue
+    searchText?: StringFieldUpdateOperationsInput | string
+    usageCount?: IntFieldUpdateOperationsInput | number
+    lastUsedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    isAiContext?: BoolFieldUpdateOperationsInput | boolean
+    isVisibleInUI?: BoolFieldUpdateOperationsInput | boolean
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    category?: ReusableCategoryUpdateOneRequiredWithoutSnippetsNestedInput
+  }
+
+  export type SnippetUncheckedUpdateWithoutUserInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    title?: NullableStringFieldUpdateOperationsInput | string | null
+    content?: StringFieldUpdateOperationsInput | string
+    tiptapJson?: NullableJsonNullValueInput | InputJsonValue
+    searchText?: StringFieldUpdateOperationsInput | string
+    categoryId?: StringFieldUpdateOperationsInput | string
+    usageCount?: IntFieldUpdateOperationsInput | number
+    lastUsedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    isAiContext?: BoolFieldUpdateOperationsInput | boolean
+    isVisibleInUI?: BoolFieldUpdateOperationsInput | boolean
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type SnippetUncheckedUpdateManyWithoutUserInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    title?: NullableStringFieldUpdateOperationsInput | string | null
+    content?: StringFieldUpdateOperationsInput | string
+    tiptapJson?: NullableJsonNullValueInput | InputJsonValue
+    searchText?: StringFieldUpdateOperationsInput | string
+    categoryId?: StringFieldUpdateOperationsInput | string
+    usageCount?: IntFieldUpdateOperationsInput | number
+    lastUsedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    isAiContext?: BoolFieldUpdateOperationsInput | boolean
+    isVisibleInUI?: BoolFieldUpdateOperationsInput | boolean
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type PageTemplateUpdateWithoutUserInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    title?: StringFieldUpdateOperationsInput | string
+    tiptapJson?: JsonNullValueInput | InputJsonValue
+    searchText?: StringFieldUpdateOperationsInput | string
+    defaultTitle?: NullableStringFieldUpdateOperationsInput | string | null
+    customIcon?: NullableStringFieldUpdateOperationsInput | string | null
+    iconColor?: NullableStringFieldUpdateOperationsInput | string | null
+    usageCount?: IntFieldUpdateOperationsInput | number
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    category?: ReusableCategoryUpdateOneRequiredWithoutPageTemplatesNestedInput
+  }
+
+  export type PageTemplateUncheckedUpdateWithoutUserInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    title?: StringFieldUpdateOperationsInput | string
+    tiptapJson?: JsonNullValueInput | InputJsonValue
+    searchText?: StringFieldUpdateOperationsInput | string
+    categoryId?: StringFieldUpdateOperationsInput | string
+    defaultTitle?: NullableStringFieldUpdateOperationsInput | string | null
+    customIcon?: NullableStringFieldUpdateOperationsInput | string | null
+    iconColor?: NullableStringFieldUpdateOperationsInput | string | null
+    usageCount?: IntFieldUpdateOperationsInput | number
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type PageTemplateUncheckedUpdateManyWithoutUserInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    title?: StringFieldUpdateOperationsInput | string
+    tiptapJson?: JsonNullValueInput | InputJsonValue
+    searchText?: StringFieldUpdateOperationsInput | string
+    categoryId?: StringFieldUpdateOperationsInput | string
+    defaultTitle?: NullableStringFieldUpdateOperationsInput | string | null
+    customIcon?: NullableStringFieldUpdateOperationsInput | string | null
+    iconColor?: NullableStringFieldUpdateOperationsInput | string | null
+    usageCount?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -59003,6 +70304,276 @@ export namespace Prisma {
     deletedBy?: NullableStringFieldUpdateOperationsInput | string | null
     customIcon?: NullableStringFieldUpdateOperationsInput | string | null
     iconColor?: NullableStringFieldUpdateOperationsInput | string | null
+  }
+
+  export type ReusableCategoryCreateManyParentInput = {
+    id?: string
+    name: string
+    slug: string
+    scope: $Enums.ReusableCategoryScope
+    userId?: string | null
+    displayOrder?: number
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type SavedBlockCreateManyCategoryInput = {
+    id?: string
+    title: string
+    blockType: string
+    tiptapJson: JsonNullValueInput | InputJsonValue
+    searchText?: string
+    userId?: string | null
+    usageCount?: number
+    lastUsedAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type ContentTemplateCreateManyCategoryInput = {
+    id?: string
+    title: string
+    tiptapJson: JsonNullValueInput | InputJsonValue
+    searchText?: string
+    userId: string
+    usageCount?: number
+    lastUsedAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type SnippetCreateManyCategoryInput = {
+    id?: string
+    title?: string | null
+    content: string
+    tiptapJson?: NullableJsonNullValueInput | InputJsonValue
+    searchText?: string
+    userId: string
+    usageCount?: number
+    lastUsedAt?: Date | string | null
+    isAiContext?: boolean
+    isVisibleInUI?: boolean
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type PageTemplateCreateManyCategoryInput = {
+    id?: string
+    title: string
+    tiptapJson: JsonNullValueInput | InputJsonValue
+    searchText?: string
+    userId?: string | null
+    defaultTitle?: string | null
+    customIcon?: string | null
+    iconColor?: string | null
+    usageCount?: number
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type ReusableCategoryUpdateWithoutParentInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    slug?: StringFieldUpdateOperationsInput | string
+    scope?: EnumReusableCategoryScopeFieldUpdateOperationsInput | $Enums.ReusableCategoryScope
+    displayOrder?: IntFieldUpdateOperationsInput | number
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    user?: UserUpdateOneWithoutReusableCategoriesNestedInput
+    children?: ReusableCategoryUpdateManyWithoutParentNestedInput
+    savedBlocks?: SavedBlockUpdateManyWithoutCategoryNestedInput
+    contentTemplates?: ContentTemplateUpdateManyWithoutCategoryNestedInput
+    snippets?: SnippetUpdateManyWithoutCategoryNestedInput
+    pageTemplates?: PageTemplateUpdateManyWithoutCategoryNestedInput
+  }
+
+  export type ReusableCategoryUncheckedUpdateWithoutParentInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    slug?: StringFieldUpdateOperationsInput | string
+    scope?: EnumReusableCategoryScopeFieldUpdateOperationsInput | $Enums.ReusableCategoryScope
+    userId?: NullableStringFieldUpdateOperationsInput | string | null
+    displayOrder?: IntFieldUpdateOperationsInput | number
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    children?: ReusableCategoryUncheckedUpdateManyWithoutParentNestedInput
+    savedBlocks?: SavedBlockUncheckedUpdateManyWithoutCategoryNestedInput
+    contentTemplates?: ContentTemplateUncheckedUpdateManyWithoutCategoryNestedInput
+    snippets?: SnippetUncheckedUpdateManyWithoutCategoryNestedInput
+    pageTemplates?: PageTemplateUncheckedUpdateManyWithoutCategoryNestedInput
+  }
+
+  export type ReusableCategoryUncheckedUpdateManyWithoutParentInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    slug?: StringFieldUpdateOperationsInput | string
+    scope?: EnumReusableCategoryScopeFieldUpdateOperationsInput | $Enums.ReusableCategoryScope
+    userId?: NullableStringFieldUpdateOperationsInput | string | null
+    displayOrder?: IntFieldUpdateOperationsInput | number
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type SavedBlockUpdateWithoutCategoryInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    title?: StringFieldUpdateOperationsInput | string
+    blockType?: StringFieldUpdateOperationsInput | string
+    tiptapJson?: JsonNullValueInput | InputJsonValue
+    searchText?: StringFieldUpdateOperationsInput | string
+    usageCount?: IntFieldUpdateOperationsInput | number
+    lastUsedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    user?: UserUpdateOneWithoutSavedBlocksNestedInput
+  }
+
+  export type SavedBlockUncheckedUpdateWithoutCategoryInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    title?: StringFieldUpdateOperationsInput | string
+    blockType?: StringFieldUpdateOperationsInput | string
+    tiptapJson?: JsonNullValueInput | InputJsonValue
+    searchText?: StringFieldUpdateOperationsInput | string
+    userId?: NullableStringFieldUpdateOperationsInput | string | null
+    usageCount?: IntFieldUpdateOperationsInput | number
+    lastUsedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type SavedBlockUncheckedUpdateManyWithoutCategoryInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    title?: StringFieldUpdateOperationsInput | string
+    blockType?: StringFieldUpdateOperationsInput | string
+    tiptapJson?: JsonNullValueInput | InputJsonValue
+    searchText?: StringFieldUpdateOperationsInput | string
+    userId?: NullableStringFieldUpdateOperationsInput | string | null
+    usageCount?: IntFieldUpdateOperationsInput | number
+    lastUsedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type ContentTemplateUpdateWithoutCategoryInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    title?: StringFieldUpdateOperationsInput | string
+    tiptapJson?: JsonNullValueInput | InputJsonValue
+    searchText?: StringFieldUpdateOperationsInput | string
+    usageCount?: IntFieldUpdateOperationsInput | number
+    lastUsedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    user?: UserUpdateOneRequiredWithoutContentTemplatesNestedInput
+  }
+
+  export type ContentTemplateUncheckedUpdateWithoutCategoryInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    title?: StringFieldUpdateOperationsInput | string
+    tiptapJson?: JsonNullValueInput | InputJsonValue
+    searchText?: StringFieldUpdateOperationsInput | string
+    userId?: StringFieldUpdateOperationsInput | string
+    usageCount?: IntFieldUpdateOperationsInput | number
+    lastUsedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type ContentTemplateUncheckedUpdateManyWithoutCategoryInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    title?: StringFieldUpdateOperationsInput | string
+    tiptapJson?: JsonNullValueInput | InputJsonValue
+    searchText?: StringFieldUpdateOperationsInput | string
+    userId?: StringFieldUpdateOperationsInput | string
+    usageCount?: IntFieldUpdateOperationsInput | number
+    lastUsedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type SnippetUpdateWithoutCategoryInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    title?: NullableStringFieldUpdateOperationsInput | string | null
+    content?: StringFieldUpdateOperationsInput | string
+    tiptapJson?: NullableJsonNullValueInput | InputJsonValue
+    searchText?: StringFieldUpdateOperationsInput | string
+    usageCount?: IntFieldUpdateOperationsInput | number
+    lastUsedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    isAiContext?: BoolFieldUpdateOperationsInput | boolean
+    isVisibleInUI?: BoolFieldUpdateOperationsInput | boolean
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    user?: UserUpdateOneRequiredWithoutSnippetsNestedInput
+  }
+
+  export type SnippetUncheckedUpdateWithoutCategoryInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    title?: NullableStringFieldUpdateOperationsInput | string | null
+    content?: StringFieldUpdateOperationsInput | string
+    tiptapJson?: NullableJsonNullValueInput | InputJsonValue
+    searchText?: StringFieldUpdateOperationsInput | string
+    userId?: StringFieldUpdateOperationsInput | string
+    usageCount?: IntFieldUpdateOperationsInput | number
+    lastUsedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    isAiContext?: BoolFieldUpdateOperationsInput | boolean
+    isVisibleInUI?: BoolFieldUpdateOperationsInput | boolean
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type SnippetUncheckedUpdateManyWithoutCategoryInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    title?: NullableStringFieldUpdateOperationsInput | string | null
+    content?: StringFieldUpdateOperationsInput | string
+    tiptapJson?: NullableJsonNullValueInput | InputJsonValue
+    searchText?: StringFieldUpdateOperationsInput | string
+    userId?: StringFieldUpdateOperationsInput | string
+    usageCount?: IntFieldUpdateOperationsInput | number
+    lastUsedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    isAiContext?: BoolFieldUpdateOperationsInput | boolean
+    isVisibleInUI?: BoolFieldUpdateOperationsInput | boolean
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type PageTemplateUpdateWithoutCategoryInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    title?: StringFieldUpdateOperationsInput | string
+    tiptapJson?: JsonNullValueInput | InputJsonValue
+    searchText?: StringFieldUpdateOperationsInput | string
+    defaultTitle?: NullableStringFieldUpdateOperationsInput | string | null
+    customIcon?: NullableStringFieldUpdateOperationsInput | string | null
+    iconColor?: NullableStringFieldUpdateOperationsInput | string | null
+    usageCount?: IntFieldUpdateOperationsInput | number
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    user?: UserUpdateOneWithoutPageTemplatesNestedInput
+  }
+
+  export type PageTemplateUncheckedUpdateWithoutCategoryInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    title?: StringFieldUpdateOperationsInput | string
+    tiptapJson?: JsonNullValueInput | InputJsonValue
+    searchText?: StringFieldUpdateOperationsInput | string
+    userId?: NullableStringFieldUpdateOperationsInput | string | null
+    defaultTitle?: NullableStringFieldUpdateOperationsInput | string | null
+    customIcon?: NullableStringFieldUpdateOperationsInput | string | null
+    iconColor?: NullableStringFieldUpdateOperationsInput | string | null
+    usageCount?: IntFieldUpdateOperationsInput | number
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type PageTemplateUncheckedUpdateManyWithoutCategoryInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    title?: StringFieldUpdateOperationsInput | string
+    tiptapJson?: JsonNullValueInput | InputJsonValue
+    searchText?: StringFieldUpdateOperationsInput | string
+    userId?: NullableStringFieldUpdateOperationsInput | string | null
+    defaultTitle?: NullableStringFieldUpdateOperationsInput | string | null
+    customIcon?: NullableStringFieldUpdateOperationsInput | string | null
+    iconColor?: NullableStringFieldUpdateOperationsInput | string | null
+    usageCount?: IntFieldUpdateOperationsInput | number
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
   export type ContentTagCreateManyTagInput = {

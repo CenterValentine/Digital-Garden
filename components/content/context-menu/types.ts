@@ -25,12 +25,41 @@ export interface ContextMenuAction {
   onClick?: () => void | Promise<void>;
   /** Sub-menu actions (nested menu) */
   submenu?: ContextMenuAction[];
+  /** When true, submenu renders a search input that filters items by label */
+  searchable?: boolean;
   /** Disabled state */
   disabled?: boolean;
   /** Destructive action (shows in red) */
   destructive?: boolean;
   /** Divider after this item */
   divider?: boolean;
+  /**
+   * Inline input mode — clicking this action transforms it into a text input.
+   * Used for compact creation flows (e.g., "New Category..." in context menus).
+   *
+   * If `onSubmit` returns a `ContextMenuAction[]`, the submenu replaces its
+   * items with those actions (used for multi-step flows like create-category →
+   * name-template). Returning void/undefined closes the menu as usual.
+   */
+  inlineInput?: {
+    placeholder: string;
+    /** Label shown above the input when active (e.g., "Template Name") */
+    inputLabel?: string;
+    onSubmit: (value: string) => void | Promise<void | ContextMenuAction[]>;
+    /** Auto-enter input mode immediately (for chained flows) */
+    autoFocus?: boolean;
+  };
+  /** Section label rendered above this action (like a group header) */
+  sectionLabel?: string;
+  /**
+   * Secondary action shown as a small "x" button on the right side.
+   * Used for inline deletion (e.g., removing a category from the submenu).
+   */
+  secondaryAction?: {
+    icon: "x";
+    onClick: () => void | Promise<void>;
+    confirmLabel?: string;
+  };
 }
 
 /**

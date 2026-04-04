@@ -1,8 +1,8 @@
 ---
-last_updated: 2026-03-13
-current_epoch: 10
-current_sprint: 42
-sprint_status: complete
+last_updated: 2026-04-02
+current_epoch: 11
+current_sprint: 48
+sprint_status: planned
 ---
 
 # Digital Garden Content IDE - Status
@@ -35,18 +35,74 @@ before planning and executing. There may be additions or modifications.
 
 ## Current Work
 
-### Active Epoch: Epoch 10 - AI TipTap (Injected Before Remaining Epoch 9)
-**Duration**: 5 sprints (38-42)
-**Theme**: AI-powered document editing, provider expansion, edit highlighting
+### Active Epoch: Epoch 11 - Block Builder + Templates + Snippets + Input Blocks + Tech Debt
+**Duration**: 7 sprints (43-49)
+**Theme**: Block system, content templates, snippets, page templates, input blocks, UI polish, error handling
 
 **Sprint Plan**:
-- Sprint 38: Providers + BYOK Persistence + Rich Bot Responses (complete)
-- Sprint 39: AI Text-Editing Tools — Client-Side Architecture (complete)
-- Sprint 40: AI Edit Highlighting + AI Image Insert (complete)
-- Sprint 41: Chat Content Outlines (complete)
-- Sprint 42: AI Image Generation (complete)
+- Sprint 43: Block Infrastructure (complete)
+- Sprint 44: Block Extensions + Refinements (complete)
+- Sprint 45: Content Templates + Snippets (complete)
+- Sprint 46: Page Templates (complete)
+- Sprint 47: Input Blocks (complete)
+- Sprint 48: UI Cleanups + Tech Debt (planned)
+- Sprint 49: Error Handling + Auth Redirects (planned)
 
 ## Recent Completions (Last 30 Days)
+
+**Apr 2, 2026**: Sprint 47 Input Blocks — COMPLETE
+- 7 input block extensions: TextInput, SelectInput, CheckboxInput, DateInput, NumberInput, RatingInput, PromptInput (AI)
+- All blocks: `family: "form"`, `group: "input"`, `atom: true` with `createBlockNodeView()` factory
+- Text input: single-line + textarea modes, auto-expanding, character counter
+- Select input: dropdown (native `<select>`) + multi-select (checkbox list)
+- Checkbox: single toggle + group mode with multiple options
+- Date input: native date/datetime-local picker
+- Number input: min/max/step constraints, optional unit suffix
+- Rating: stars/hearts/numbers styles, click-to-toggle (re-click = reset)
+- Prompt input: AI-powered with prompt textarea, Generate button, response display, snippet context config
+- All registered in extensions-client.ts (with NodeView) and extensions-server.ts (server-safe)
+- Input block CSS in globals.css (fields, labels, ratings, checkboxes, prompt sections)
+- Export converters updated: plaintext + markdown strip input chrome to plain text values
+- Blocks searchable via `/input`, `/text`, `/rating`, etc. in slash commands
+
+**Apr 2, 2026**: Sprint 46 Page Templates — COMPLETE
+- PageTemplate database table + CRUD API routes (`/api/content/page-templates`)
+- Creation flow: "New > Note" submenu with Blank Note + templates grouped by category
+- Recursive 3-level submenu support in both header menu and context menu
+- `fromTemplateId` in content creation API — deep-clones template tiptapJson, uses defaultTitle
+- "Save as Template" toolbar button via Tool Surfaces registry + SaveAsPageTemplateDialog
+- Inline create from template: placeholder node with defaultTitle pre-filled, user confirms name
+- Page template settings: `/settings/templates` — category + template management with rename/delete
+- CustomEvent pattern (`dg:create-from-template`) for cross-component communication
+- Page template Zustand store (`page-template-store.ts`)
+- Build gate passed
+
+**Mar 21, 2026**: Sprint 45 Content Templates + Snippets — COMPLETE
+- ContentTemplate + Snippet database tables with full-text search indexes
+- CRUD API routes: `/api/content/templates`, `/api/content/snippets` with usage tracking
+- Domain types: `ContentTemplateWithCategory`, `SnippetWithCategory`, `getSnippetDisplayTitle()`
+- Editor context menu: right-click selected text to save as template or snippet
+- `/template` and `/snippet` slash commands with categorized pickers (TemplatePicker, SnippetPicker)
+- AI snippet integration: `getSnippets` tool + auto-inject top 20 snippets into system prompt
+- Chat snippet menu: Paperclip button in ChatInput → ChatSnippetMenu multi-select → snippetIds in request body
+- Zustand stores: `template-store.ts`, `snippet-store.ts`
+- Settings page: `/settings/templates` — category management for templates and snippets
+- Build gate passed
+
+**Mar 21, 2026**: Sprint 43-44 Block Infrastructure + Extensions — COMPLETE
+- Block schema framework: `createBlockSchema()` (Zod v4), `registry.ts`, `types.ts`, `json-schema.ts`
+- NodeView factory: shared block chrome (drag handle, type badge, +/- buttons, properties menu)
+- Properties Panel: auto-generated from Zod schemas, CustomEvent bridge for attrs sync
+- Block focus plugin + block store (Zustand)
+- SavedBlock database table + CRUD API + SavedBlockPicker
+- 6 block extensions: SectionHeader, Card/Panel, Divider, Accordion, Columns, Tabs
+- Accordion: custom NodeView with inline-editable title, chevron toggle, `#` heading-level shorthand, heading conversion from slash commands
+- Columns: Tab key navigation, border styles (none/subtle/solid/dashed), background toggle, container visibility
+- Tabs: double-click tab name editing, tab delete button, cursor-jump plugin for hidden panels
+- Card/Panel: simplified to border style + background toggle (collapsible removed, use accordion)
+- All blocks registered in client + server extension sets
+- Slash commands for all block types + SavedBlock picker
+- Block CSS with light-theme colors
 
 **Mar 13, 2026**: Sprint 42 AI Image Generation — COMPLETE
 - 8-provider image generation system: OpenAI (DALL·E 3, GPT Image 1), Google (Imagen 3), DeepAI, fal.ai (FLUX.1 Dev/Schnell), Together AI (FLUX/SDXL), Fireworks AI, RunwayML (Gen-3), Artbreeder
