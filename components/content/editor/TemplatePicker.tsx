@@ -45,7 +45,7 @@ export function TemplatePicker() {
   }, [isOpen]);
 
   const handleSelect = useCallback((template: ContentTemplateWithCategory) => {
-    const editor = useEditorInstanceStore.getState().editor;
+    const editor = Object.values(useEditorInstanceStore.getState().editorsByContentId).find(Boolean) ?? null;
     if (!editor) return;
 
     const tiptapJson = template.tiptapJson as { content?: unknown[] };

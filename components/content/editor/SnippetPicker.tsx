@@ -44,7 +44,7 @@ export function SnippetPicker() {
   }, [isOpen]);
 
   const handleSelect = useCallback((snippet: SnippetWithCategory) => {
-    const editor = useEditorInstanceStore.getState().editor;
+    const editor = Object.values(useEditorInstanceStore.getState().editorsByContentId).find(Boolean) ?? null;
     if (!editor) return;
 
     // If snippet has tiptapJson, use that; otherwise insert plain text
