@@ -39,53 +39,6 @@ enum FolderViewMode {
   canvas // Visual graph (mind map style)
 }
 
-// Epoch 11: Block system categories
-enum ReusableCategoryScope {
-  content_template
-  snippet
-  page_template
-  saved_block
-}
-
-enum CalendarProvider {
-  local
-  google
-  ical
-}
-
-enum CalendarConnectionStatus {
-  active
-  disconnected
-  error
-  reconnect_required
-}
-
-enum CalendarSyncStatus {
-  idle
-  syncing
-  success
-  error
-}
-
-enum CalendarSourceSyncMode {
-  local
-  imported
-  subscription
-}
-
-enum CalendarEventStatus {
-  confirmed
-  tentative
-  cancelled
-}
-
-enum CalendarAttendeeResponseStatus {
-  needs_action
-  accepted
-  tentative
-  declined
-}
-
 model ContentNode {
   id           String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   ownerId      String      @db.Uuid
@@ -120,18 +73,18 @@ model ContentNode {
   hopePayload          HopePayload?
   workflowPayload      WorkflowPayload?
 
-  history              ContentHistory[]
-  sourceLinks          ContentLink[]    @relation("SourceContent")
-  targetLinks          ContentLink[]    @relation("TargetContent")
-  category             Category?        @relation(fields: [categoryId], references: [id])
-  owner                User             @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  parent               ContentNode?     @relation("Hierarchy", fields: [parentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  children             ContentNode[]    @relation("Hierarchy")
-  contentPath          ContentPath?
-  contentTags          ContentTag[]
-  linkedCalendarEvents CalendarEvent[]
-  trashBinEntry        TrashBin?
-  viewGrants           ViewGrant[]
+  history        ContentHistory[]
+  sourceLinks    ContentLink[]    @relation("SourceContent")
+  targetLinks    ContentLink[]    @relation("TargetContent")
+  category       Category?        @relation(fields: [categoryId], references: [id])
+  owner          User             @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  parent         ContentNode?     @relation("Hierarchy", fields: [parentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  children       ContentNode[]    @relation("Hierarchy")
+  contentPath    ContentPath?
+  contentTags    ContentTag[]
+  trashBinEntry  TrashBin?
+  viewGrants     ViewGrant[]
+  calendarEvents CalendarEvent[]
 
   @@unique([ownerId, slug])
   @@index([ownerId, deletedAt])
@@ -336,14 +289,6 @@ model User {
   auditTargets        AuditLog[]              @relation("AuditTargets")
   adminActions        AuditLog[]              @relation("AdminActions")
   categories          Category[]
-  reusableCategories  ReusableCategory[]
-  savedBlocks         SavedBlock[]
-  contentTemplates    ContentTemplate[]
-  snippets            Snippet[]
-  pageTemplates       PageTemplate[]
-  calendarConnections CalendarConnection[]
-  calendarEvents      CalendarEvent[]
-  calendarSources     CalendarSource[]
   contentHistory      ContentHistory[]
   contentNodes        ContentNode[]
   sessions            Session[]
@@ -351,6 +296,14 @@ model User {
   tags                Tag[]
   trashedContent      TrashBin[]
   viewGrants          ViewGrant[]
+  reusableCategories  ReusableCategory[]
+  savedBlocks         SavedBlock[]
+  contentTemplates    ContentTemplate[]
+  snippets            Snippet[]
+  pageTemplates       PageTemplate[]
+  calendarConnections CalendarConnection[]
+  calendarSources     CalendarSource[]
+  calendarEvents      CalendarEvent[]
 
   @@index([email])
 }
@@ -369,115 +322,6 @@ model Category {
   contentNodes ContentNode[]
 
   @@index([ownerId, displayOrder])
-}
-
-// ============================================================
-// Epoch 11: Reusable Categories, Saved Blocks
-// ============================================================
-
-model ReusableCategory {
-  id               String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  name             String                @db.VarChar(100)
-  slug             String                @db.VarChar(100)
-  scope            ReusableCategoryScope
-  userId           String?               @db.Uuid // null = system-wide pre-curated
-  parentId         String?               @db.Uuid // future subcategory support (not implemented yet)
-  displayOrder     Int                   @default(0)
-  createdAt        DateTime              @default(now()) @db.Timestamptz(6)
-  updatedAt        DateTime              @updatedAt @db.Timestamptz(6)
-  user             User?                 @relation(fields: [userId], references: [id], onDelete: Cascade)
-  parent           ReusableCategory?     @relation("CategoryHierarchy", fields: [parentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  children         ReusableCategory[]    @relation("CategoryHierarchy")
-  savedBlocks      SavedBlock[]
-  contentTemplates ContentTemplate[]
-  snippets         Snippet[]
-  pageTemplates    PageTemplate[]
-
-  @@unique([userId, scope, slug])
-  @@index([userId, scope, displayOrder])
-  @@index([parentId])
-}
-
-model SavedBlock {
-  id         String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  title      String           @db.VarChar(255)
-  blockType  String           @db.VarChar(100) // which block extension type
-  tiptapJson Json // the block node's TipTap JSON
-  searchText String           @default("")
-  categoryId String           @db.Uuid
-  userId     String?          @db.Uuid // null = system-curated
-  usageCount Int              @default(0)
-  lastUsedAt DateTime?        @db.Timestamptz(6)
-  createdAt  DateTime         @default(now()) @db.Timestamptz(6)
-  updatedAt  DateTime         @updatedAt @db.Timestamptz(6)
-  category   ReusableCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
-  user       User?            @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId, categoryId])
-  @@index([userId, blockType])
-  @@index([searchText(ops: raw("gin_trgm_ops"))], type: Gin)
-}
-
-model ContentTemplate {
-  id         String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  title      String           @db.VarChar(255)
-  tiptapJson Json
-  searchText String           @default("")
-  categoryId String           @db.Uuid
-  userId     String           @db.Uuid
-  usageCount Int              @default(0)
-  lastUsedAt DateTime?        @db.Timestamptz(6)
-  createdAt  DateTime         @default(now()) @db.Timestamptz(6)
-  updatedAt  DateTime         @updatedAt @db.Timestamptz(6)
-  category   ReusableCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
-  user       User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId, categoryId])
-  @@index([userId, lastUsedAt(sort: Desc)])
-  @@index([searchText(ops: raw("gin_trgm_ops"))], type: Gin)
-}
-
-model Snippet {
-  id            String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  title         String?          @db.VarChar(255)
-  content       String
-  tiptapJson    Json?
-  searchText    String           @default("")
-  categoryId    String           @db.Uuid
-  userId        String           @db.Uuid
-  usageCount    Int              @default(0)
-  lastUsedAt    DateTime?        @db.Timestamptz(6)
-  isAiContext   Boolean          @default(true)
-  isVisibleInUI Boolean          @default(true)
-  createdAt     DateTime         @default(now()) @db.Timestamptz(6)
-  updatedAt     DateTime         @updatedAt @db.Timestamptz(6)
-  category      ReusableCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
-  user          User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId, categoryId])
-  @@index([userId, isAiContext])
-  @@index([userId, isVisibleInUI])
-  @@index([searchText(ops: raw("gin_trgm_ops"))], type: Gin)
-}
-
-model PageTemplate {
-  id           String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  title        String           @db.VarChar(255)
-  tiptapJson   Json // stored as TipTap JSON — lossless
-  searchText   String           @default("")
-  categoryId   String           @db.Uuid
-  userId       String?          @db.Uuid // null = system-curated
-  defaultTitle String?          @db.VarChar(255) // pre-filled title on creation
-  customIcon   String?          @db.VarChar(100)
-  iconColor    String?          @db.VarChar(20)
-  usageCount   Int              @default(0)
-  createdAt    DateTime         @default(now()) @db.Timestamptz(6)
-  updatedAt    DateTime         @updatedAt @db.Timestamptz(6)
-  category     ReusableCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
-  user         User?            @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId, categoryId])
-  @@index([searchText(ops: raw("gin_trgm_ops"))], type: Gin)
 }
 
 model Tag {
@@ -527,110 +371,16 @@ model Account {
   providerAccountId String    @db.VarChar(255)
   refreshToken      String?
   accessToken       String?
+  scope             String?   @db.Text
   expiresAt         DateTime? @db.Timestamptz(6)
-  scope             String?
   createdAt         DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt         DateTime  @updatedAt @db.Timestamptz(6)
   user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([provider, providerAccountId])
   @@unique([provider, providerAccountId], map: "Account_provider_providerAccId_key")
   @@index([userId])
   @@index([provider])
-}
-
-model CalendarConnection {
-  id             String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  userId         String                   @db.Uuid
-  provider       CalendarProvider
-  displayName    String                   @db.VarChar(100)
-  status         CalendarConnectionStatus @default(active)
-  syncStatus     CalendarSyncStatus       @default(idle)
-  providerConfig Json                     @default("{}")
-  syncCursor     String?
-  lastSyncedAt   DateTime?                @db.Timestamptz(6)
-  lastSyncError  String?
-  createdAt      DateTime                 @default(now()) @db.Timestamptz(6)
-  updatedAt      DateTime                 @updatedAt @db.Timestamptz(6)
-  sources        CalendarSource[]
-  user           User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId, provider])
-  @@index([userId, status])
-}
-
-model CalendarSource {
-  id                 String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  userId             String                 @db.Uuid
-  connectionId       String?                @db.Uuid
-  title              String                 @db.VarChar(120)
-  color              String                 @default("#2563EB") @db.VarChar(16)
-  timezone           String?                @db.VarChar(64)
-  visible            Boolean                @default(true)
-  isReadOnly         Boolean                @default(false)
-  isPrimary          Boolean                @default(false)
-  syncMode           CalendarSourceSyncMode @default(local)
-  externalCalendarId String?                @db.VarChar(255)
-  metadata           Json                   @default("{}")
-  lastSyncedAt       DateTime?              @db.Timestamptz(6)
-  lastSyncError      String?
-  createdAt          DateTime               @default(now()) @db.Timestamptz(6)
-  updatedAt          DateTime               @updatedAt @db.Timestamptz(6)
-  connection         CalendarConnection?    @relation(fields: [connectionId], references: [id], onDelete: Cascade)
-  events             CalendarEvent[]
-  user               User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, externalCalendarId])
-  @@index([userId, visible])
-  @@index([connectionId])
-}
-
-model CalendarEvent {
-  id                  String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  userId              String                  @db.Uuid
-  sourceId            String                  @db.Uuid
-  externalEventId     String?                 @db.VarChar(255)
-  title               String                  @db.VarChar(255)
-  description         String?
-  location            String?                 @db.VarChar(255)
-  startAt             DateTime                @db.Timestamptz(6)
-  endAt               DateTime                @db.Timestamptz(6)
-  allDay              Boolean                 @default(false)
-  timezone            String?                 @db.VarChar(64)
-  recurrenceRule      String?
-  recurrenceExDates   Json                    @default("[]")
-  recurrenceOverrides Json                    @default("{}")
-  status              CalendarEventStatus     @default(confirmed)
-  meetingUrl          String?                 @db.VarChar(1024)
-  linkedContentId     String?                 @db.Uuid
-  providerMetadata    Json                    @default("{}")
-  lastSyncedAt        DateTime?               @db.Timestamptz(6)
-  createdAt           DateTime                @default(now()) @db.Timestamptz(6)
-  updatedAt           DateTime                @updatedAt @db.Timestamptz(6)
-  attendees           CalendarEventAttendee[]
-  linkedContent       ContentNode?            @relation(fields: [linkedContentId], references: [id], onDelete: SetNull)
-  source              CalendarSource          @relation(fields: [sourceId], references: [id], onDelete: Cascade)
-  user                User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([sourceId, externalEventId])
-  @@index([userId, startAt, endAt])
-  @@index([sourceId, startAt])
-  @@index([linkedContentId])
-}
-
-model CalendarEventAttendee {
-  id             String                         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  eventId        String                         @db.Uuid
-  email          String                         @db.VarChar(255)
-  displayName    String?                        @db.VarChar(255)
-  isOrganizer    Boolean                        @default(false)
-  responseStatus CalendarAttendeeResponseStatus @default(needs_action)
-  metadata       Json                           @default("{}")
-  createdAt      DateTime                       @default(now()) @db.Timestamptz(6)
-  updatedAt      DateTime                       @updatedAt @db.Timestamptz(6)
-  event          CalendarEvent                  @relation(fields: [eventId], references: [id], onDelete: Cascade)
-
-  @@unique([eventId, email])
-  @@index([eventId, responseStatus])
 }
 
 model AuditLog {
@@ -767,4 +517,216 @@ model WorkflowPayload {
   content ContentNode @relation(fields: [contentId], references: [id], onDelete: Cascade)
 
   @@index([enabled])
+}
+
+// ============================================================
+// Epoch 11: Reusable Content (Sprint 43-46)
+// ============================================================
+
+enum ReusableCategoryScope {
+  content_template
+  snippet
+  page_template
+  saved_block
+}
+
+model ReusableCategory {
+  id               String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name             String                @db.VarChar(100)
+  slug             String                @db.VarChar(100)
+  scope            ReusableCategoryScope
+  userId           String?               @db.Uuid
+  parentId         String?               @db.Uuid
+  displayOrder     Int                   @default(0)
+  createdAt        DateTime              @default(now()) @db.Timestamptz(6)
+  updatedAt        DateTime              @updatedAt @db.Timestamptz(6)
+  user             User?                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parent           ReusableCategory?     @relation("CategoryHierarchy", fields: [parentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  children         ReusableCategory[]    @relation("CategoryHierarchy")
+  contentTemplates ContentTemplate[]
+  snippets         Snippet[]
+  pageTemplates    PageTemplate[]
+  savedBlocks      SavedBlock[]
+
+  @@unique([userId, scope, slug])
+  @@index([userId, scope, displayOrder])
+  @@index([parentId])
+}
+
+model SavedBlock {
+  id         String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  title      String           @db.VarChar(255)
+  blockType  String           @db.VarChar(100)
+  tiptapJson Json
+  searchText String           @default("")
+  categoryId String           @db.Uuid
+  userId     String?          @db.Uuid
+  usageCount Int              @default(0)
+  lastUsedAt DateTime?        @db.Timestamptz(6)
+  createdAt  DateTime         @default(now()) @db.Timestamptz(6)
+  updatedAt  DateTime         @updatedAt @db.Timestamptz(6)
+  category   ReusableCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  user       User?            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, categoryId])
+  @@index([userId, blockType])
+  @@index([searchText(ops: raw("gin_trgm_ops"))], type: Gin)
+}
+
+model ContentTemplate {
+  id         String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  title      String           @db.VarChar(255)
+  tiptapJson Json
+  searchText String           @default("")
+  categoryId String           @db.Uuid
+  userId     String           @db.Uuid
+  usageCount Int              @default(0)
+  lastUsedAt DateTime?        @db.Timestamptz(6)
+  createdAt  DateTime         @default(now()) @db.Timestamptz(6)
+  updatedAt  DateTime         @updatedAt @db.Timestamptz(6)
+  category   ReusableCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  user       User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, categoryId])
+  @@index([userId, lastUsedAt(sort: Desc)])
+  @@index([searchText(ops: raw("gin_trgm_ops"))], type: Gin)
+}
+
+model Snippet {
+  id            String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  title         String?          @db.VarChar(255)
+  content       String
+  tiptapJson    Json?
+  searchText    String           @default("")
+  categoryId    String           @db.Uuid
+  userId        String           @db.Uuid
+  usageCount    Int              @default(0)
+  lastUsedAt    DateTime?        @db.Timestamptz(6)
+  isAiContext   Boolean          @default(true)
+  isVisibleInUI Boolean          @default(true)
+  createdAt     DateTime         @default(now()) @db.Timestamptz(6)
+  updatedAt     DateTime         @updatedAt @db.Timestamptz(6)
+  category      ReusableCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  user          User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, categoryId])
+  @@index([userId, isAiContext])
+  @@index([userId, isVisibleInUI])
+  @@index([searchText(ops: raw("gin_trgm_ops"))], type: Gin)
+}
+
+model PageTemplate {
+  id           String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  title        String           @db.VarChar(255)
+  tiptapJson   Json
+  searchText   String           @default("")
+  categoryId   String           @db.Uuid
+  userId       String?          @db.Uuid
+  defaultTitle String?          @db.VarChar(255)
+  customIcon   String?          @db.VarChar(100)
+  iconColor    String?          @db.VarChar(20)
+  usageCount   Int              @default(0)
+  createdAt    DateTime         @default(now()) @db.Timestamptz(6)
+  updatedAt    DateTime         @updatedAt @db.Timestamptz(6)
+  category     ReusableCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  user         User?            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, categoryId])
+  @@index([searchText(ops: raw("gin_trgm_ops"))], type: Gin)
+}
+
+// ============================================================
+// Epoch 11: Calendar Integration (Sprint 50-52)
+// ============================================================
+
+model CalendarConnection {
+  id             String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId         String           @db.Uuid
+  provider       String           @db.VarChar(20)
+  displayName    String           @db.VarChar(255)
+  status         String           @default("active") @db.VarChar(30)
+  syncStatus     String           @default("idle") @db.VarChar(20)
+  providerConfig Json             @default("{}")
+  syncCursor     String?
+  lastSyncedAt   DateTime?        @db.Timestamptz(6)
+  lastSyncError  String?
+  createdAt      DateTime         @default(now()) @db.Timestamptz(6)
+  updatedAt      DateTime         @updatedAt @db.Timestamptz(6)
+  user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sources        CalendarSource[]
+
+  @@index([userId, provider])
+}
+
+model CalendarSource {
+  id                 String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId             String              @db.Uuid
+  connectionId       String?             @db.Uuid
+  title              String              @db.VarChar(255)
+  color              String              @default("#2563EB") @db.VarChar(7)
+  timezone           String?             @db.VarChar(100)
+  visible            Boolean             @default(true)
+  isReadOnly         Boolean             @default(false)
+  isPrimary          Boolean             @default(false)
+  syncMode           String              @default("local") @db.VarChar(20)
+  externalCalendarId String?             @db.VarChar(255)
+  metadata           Json                @default("{}")
+  lastSyncedAt       DateTime?           @db.Timestamptz(6)
+  lastSyncError      String?
+  createdAt          DateTime            @default(now()) @db.Timestamptz(6)
+  updatedAt          DateTime            @updatedAt @db.Timestamptz(6)
+  user               User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  connection         CalendarConnection? @relation(fields: [connectionId], references: [id], onDelete: SetNull)
+  events             CalendarEvent[]
+
+  @@unique([userId, externalCalendarId])
+  @@index([userId, connectionId])
+  @@index([userId, syncMode])
+  @@index([userId, isPrimary])
+}
+
+model CalendarEvent {
+  id                  String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId              String                  @db.Uuid
+  sourceId            String                  @db.Uuid
+  externalEventId     String?                 @db.VarChar(512)
+  title               String                  @db.VarChar(255)
+  description         String?
+  location            String?                 @db.VarChar(512)
+  startAt             DateTime                @db.Timestamptz(6)
+  endAt               DateTime                @db.Timestamptz(6)
+  allDay              Boolean                 @default(false)
+  timezone            String?                 @db.VarChar(100)
+  recurrenceRule      String?
+  recurrenceExDates   Json                    @default("[]")
+  recurrenceOverrides Json                    @default("{}")
+  status              String                  @default("confirmed") @db.VarChar(20)
+  meetingUrl          String?                 @db.VarChar(512)
+  linkedContentId     String?                 @db.Uuid
+  providerMetadata    Json                    @default("{}")
+  lastSyncedAt        DateTime?               @db.Timestamptz(6)
+  createdAt           DateTime                @default(now()) @db.Timestamptz(6)
+  updatedAt           DateTime                @updatedAt @db.Timestamptz(6)
+  user                User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  source              CalendarSource          @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  linkedContent       ContentNode?            @relation(fields: [linkedContentId], references: [id], onDelete: SetNull)
+  attendees           CalendarEventAttendee[]
+
+  @@unique([sourceId, externalEventId])
+  @@index([userId, startAt, endAt])
+  @@index([sourceId, startAt])
+  @@index([linkedContentId])
+}
+
+model CalendarEventAttendee {
+  id             String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  eventId        String        @db.Uuid
+  email          String        @db.VarChar(255)
+  displayName    String?       @db.VarChar(255)
+  isOrganizer    Boolean       @default(false)
+  responseStatus String        @default("needs_action") @db.VarChar(20)
+  event          CalendarEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([eventId])
+  @@index([email])
 }

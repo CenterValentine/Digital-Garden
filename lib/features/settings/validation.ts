@@ -52,6 +52,7 @@ const editorSettingsSchema = z
     autoSaveDelay: z.number().min(1000).max(10000).optional(),
     spellCheck: z.boolean().optional(),
     wordWrap: z.boolean().optional(),
+    betaBlocks: z.boolean().optional(),
   })
   .optional();
 

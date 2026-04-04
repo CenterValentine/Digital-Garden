@@ -37,8 +37,11 @@ export interface ContextMenuAction {
   inlineInput?: {
     placeholder?: string;
     inputLabel?: string;
-    onSubmit: (value: string) => void | Promise<void>;
+    autoFocus?: boolean;
+    onSubmit: (value: string) => void | ContextMenuAction[] | Promise<void | ContextMenuAction[]>;
   };
+  /** Whether this action renders a searchable sub-list */
+  searchable?: boolean;
   /** Secondary icon action (e.g. delete button on the right) */
   secondaryAction?: {
     icon: string;
