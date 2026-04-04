@@ -314,3 +314,20 @@ export async function linkOAuthAccount(
 
   return account as Account;
 }
+
+/**
+ * Get Google OAuth account for a user
+ */
+export async function getGoogleAccount(userId: string) {
+  return prisma.account.findFirst({
+    where: { userId, provider: "google" },
+  });
+}
+
+/**
+ * Check if a scope string contains a target scope
+ */
+export function hasGoogleScope(scope: string | null | undefined, targetScope: string): boolean {
+  if (!scope) return false;
+  return scope.split(" ").includes(targetScope);
+}
