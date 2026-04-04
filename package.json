@@ -4,7 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "prisma generate && pnpm build:tokens && next build --webpack",
+    "typecheck": "tsc --noEmit",
+    "build": "prisma generate && pnpm build:tokens && tsc --noEmit && next build --webpack",
     "vercel-build": "prisma generate && pnpm build:tokens && next build --webpack",
     "start": "next start",
     "lint": "eslint",
