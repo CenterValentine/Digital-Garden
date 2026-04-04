@@ -1,22 +1,26 @@
 /**
- * Columns Layout Block
+ * Block Column Layout
  *
- * Multi-column layout using CSS Grid.
- * Parent node (columns) contains child nodes (column), each with block+ content.
+ * Multi-column layout specifically designed for block content.
+ * Each column shows a "+" insert button only when empty (first block intro).
+ * Subsequent blocks are added via the per-block chrome (+above/+below).
  *
- * Sprint 44: Layout Blocks (simplified Sprint 44b — resize handles deferred)
+ * Distinct from the text-focused `columns` block — block columns are
+ * intended as containers for other blocks rather than inline text.
+ * Layout blocks (columns, blockColumns, tabs) are excluded from the column insert menu.
+ *
+ * Sprint 47: Block Column
  */
 
 import { Node, mergeAttributes } from "@tiptap/core";
-import { TextSelection } from "@tiptap/pm/state";
 import { z } from "zod";
 import { createBlockSchema } from "@/lib/domain/blocks/schema";
 import { registerBlock } from "@/lib/domain/blocks/registry";
-import { useBlockStore } from "@/state/block-store";
 import { openBlockInsertMenu, syncAttrsToPanel } from "@/lib/domain/blocks/node-view-factory";
+import { useBlockStore } from "@/state/block-store";
 
-const { schema: columnsSchema, defaults: columnsDefaults } =
-  createBlockSchema("columns", {
+const { schema: blockColumnsSchema, defaults: blockColumnsDefaults } =
+  createBlockSchema("blockColumns", {
     columnCount: z.number().int().min(2).max(4).default(2).describe("Number of columns"),
     gapSize: z
       .enum(["none", "small", "medium", "large"])
@@ -25,69 +29,127 @@ const { schema: columnsSchema, defaults: columnsDefaults } =
     columnBorder: z
       .enum(["none", "subtle", "solid", "dashed"])
       .default("subtle")
-      .describe("Inner column border style"),
+      .describe("Column border style"),
     showContainer: z
       .boolean()
       .default(true)
       .describe("Show outer container border"),
-    showBackground: z
-      .boolean()
-      .default(true)
-      .describe("Show column background fill"),
   });
 
 registerBlock({
-  type: "columns",
-  label: "Columns",
-  description: "Multi-column layout (2-4 columns)",
-  iconName: "Columns3",
+  type: "blockColumns",
+  label: "Block Column",
+  description: "Multi-column layout for inserting blocks (2-4 columns)",
+  iconName: "LayoutGrid",
   family: "layout",
   group: "container",
-  contentModel: "column+",
+  contentModel: "blockColumn+",
   atom: false,
-  attrsSchema: columnsSchema,
-  defaultAttrs: columnsDefaults(),
-  slashCommand: "/columns",
-  searchTerms: ["columns", "col", "layout", "grid", "side", "split"],
+  attrsSchema: blockColumnsSchema,
+  defaultAttrs: blockColumnsDefaults(),
+  slashCommand: "/block-columns",
+  searchTerms: ["block column", "layout", "grid", "split", "blocks", "container"],
 });
 
+/** Returns true if the node is an empty blockColumn (single empty paragraph) */
+function isColumnEmpty(node: { childCount: number; firstChild: { type: { name: string }; content: { size: number } } | null }): boolean {
+  return (
+    node.childCount === 1 &&
+    node.firstChild?.type.name === "paragraph" &&
+    node.firstChild?.content.size === 0
+  );
+}
+
 /**
- * Column child node — each column in a columns layout.
- * Not registered in the block registry (not independently insertable).
+ * BlockColumn child node — individual column in a block column layout.
+ * Custom NodeView adds a "+" insert button that is only visible when the column is empty.
+ * Not independently insertable — always a child of blockColumns.
  */
-export const Column = Node.create({
-  name: "column",
+export const BlockColumn = Node.create({
+  name: "blockColumn",
   content: "block+",
   defining: true,
   isolating: true,
 
   parseHTML() {
-    return [{ tag: "div.block-column" }];
+    return [{ tag: "div.block-column-cell" }];
   },
 
   renderHTML({ HTMLAttributes }) {
     return [
       "div",
-      mergeAttributes(HTMLAttributes, { class: "block-column" }),
+      mergeAttributes(HTMLAttributes, { class: "block-column-cell" }),
       0,
     ];
+  },
+
+  addNodeView() {
+    return ({ node, getPos, editor }) => {
+      const dom = document.createElement("div");
+      dom.classList.add("block-column-cell");
+
+      // Track empty state via data attribute (CSS shows/hides the + button)
+      const updateEmptyState = (n: typeof node) => {
+        dom.setAttribute("data-empty", isColumnEmpty(n) ? "true" : "false");
+      };
+      updateEmptyState(node);
+
+      // ProseMirror renders block children into this element
+      const contentDOM = document.createElement("div");
+      contentDOM.classList.add("block-column-cell-content");
+      dom.appendChild(contentDOM);
+
+      // "+" button — only visible via CSS when data-empty="true"
+      const insertBtn = document.createElement("button");
+      insertBtn.classList.add("block-column-insert-btn");
+      insertBtn.textContent = "+";
+      insertBtn.title = "Add block";
+      insertBtn.contentEditable = "false";
+      insertBtn.addEventListener("mousedown", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (typeof getPos === "function") {
+          const pos = getPos();
+          if (pos !== undefined) {
+            // Insert at the start of the column content (pos + 1 = before first child)
+            openBlockInsertMenu(editor, pos + 1, insertBtn, ["layout"]);
+          }
+        }
+      });
+      dom.appendChild(insertBtn);
+
+      return {
+        dom,
+        contentDOM,
+        update(updatedNode) {
+          if (updatedNode.type.name !== "blockColumn") return false;
+          updateEmptyState(updatedNode);
+          return true;
+        },
+        stopEvent(event) {
+          const target = event.target as HTMLElement;
+          return target === insertBtn || insertBtn.contains(target);
+        },
+      };
+    };
   },
 });
 
 /**
- * Columns parent node.
- * Uses a custom NodeView with CSS Grid layout and shared block chrome.
+ * BlockColumns parent node.
+ * Renders a CSS Grid with shared block chrome (badge, menu, delete, insert above/below).
+ * When columnCount attr changes, syncs the actual blockColumn child count.
  */
-export const Columns = Node.create({
-  name: "columns",
+export const BlockColumns = Node.create({
+  name: "blockColumns",
   group: "block",
-  content: "column+",
+  content: "blockColumn+",
   defining: true,
 
   addAttributes() {
     return {
       blockId: { default: null },
-      blockType: { default: "columns" },
+      blockType: { default: "blockColumns" },
       columnCount: {
         default: 2,
         parseHTML: (el) => parseInt(el.getAttribute("data-columns") || "2"),
@@ -108,91 +170,22 @@ export const Columns = Node.create({
         parseHTML: (el) => el.getAttribute("data-show-container") !== "false",
         renderHTML: (attrs) => ({ "data-show-container": String(attrs.showContainer) }),
       },
-      showBackground: {
-        default: true,
-        parseHTML: (el) => el.getAttribute("data-col-bg") !== "hidden",
-        renderHTML: (attrs) => attrs.showBackground ? {} : { "data-col-bg": "hidden" },
-      },
     };
   },
 
   parseHTML() {
-    return [{ tag: 'div[data-block-type="columns"]' }];
+    return [{ tag: 'div[data-block-type="blockColumns"]' }];
   },
 
   renderHTML({ HTMLAttributes }) {
     return [
       "div",
       mergeAttributes(HTMLAttributes, {
-        class: "block-columns",
-        "data-block-type": "columns",
+        class: "block-block-columns",
+        "data-block-type": "blockColumns",
       }),
       0,
     ];
-  },
-
-  addCommands() {
-    return {
-      insertColumns:
-        (count: number = 2) =>
-        ({ commands }: { commands: any }) => {
-          const columnNodes = Array.from({ length: count }, () => ({
-            type: "column",
-            content: [{ type: "paragraph" }],
-          }));
-
-          return commands.insertContent({
-            type: "columns",
-            attrs: { columnCount: count },
-            content: columnNodes,
-          });
-        },
-    } as any;
-  },
-
-  addKeyboardShortcuts() {
-    return {
-      Tab: ({ editor }) => {
-        const { selection, doc } = editor.state;
-        const $from = selection.$from;
-
-        // Check if cursor is inside a column → columns structure
-        for (let depth = $from.depth; depth > 0; depth--) {
-          const node = $from.node(depth);
-          if (node.type.name === "column") {
-            const parentDepth = depth - 1;
-            const parent = $from.node(parentDepth);
-            if (parent.type.name === "columns") {
-              // Find which column index we're in
-              const columnPos = $from.before(depth);
-              const columnsPos = $from.before(parentDepth);
-              let childIndex = 0;
-              let offset = 1;
-              for (let i = 0; i < parent.childCount; i++) {
-                if (columnsPos + offset === columnPos) {
-                  childIndex = i;
-                  break;
-                }
-                offset += parent.child(i).nodeSize;
-              }
-
-              // Move to next column (wrap around)
-              const nextIndex = (childIndex + 1) % parent.childCount;
-              let nextOffset = 1;
-              for (let i = 0; i < nextIndex; i++) {
-                nextOffset += parent.child(i).nodeSize;
-              }
-              const nextColStart = columnsPos + nextOffset + 1;
-              const $pos = doc.resolve(nextColStart);
-              const tr = editor.state.tr.setSelection(TextSelection.near($pos));
-              editor.view.dispatch(tr);
-              return true;
-            }
-          }
-        }
-        return false;
-      },
-    };
   },
 
   addNodeView() {
@@ -211,15 +204,12 @@ export const Columns = Node.create({
       }
 
       const dom = document.createElement("div");
-      dom.classList.add("block-node", "block-columns");
-      dom.setAttribute("data-block-type", "columns");
+      dom.classList.add("block-node", "block-block-columns");
+      dom.setAttribute("data-block-type", "blockColumns");
       dom.setAttribute("data-block-id", currentNode.attrs.blockId || "");
       dom.setAttribute("data-columns", String(currentNode.attrs.columnCount));
       dom.setAttribute("data-gap", currentNode.attrs.gapSize);
       dom.setAttribute("data-col-border", currentNode.attrs.columnBorder || "subtle");
-      if (!currentNode.attrs.showBackground) {
-        dom.setAttribute("data-col-bg", "hidden");
-      }
       if (currentNode.attrs.showContainer === false) {
         dom.classList.add("block-container-hidden");
       }
@@ -240,25 +230,25 @@ export const Columns = Node.create({
       });
       dom.appendChild(insertAbove);
 
-      // Block chrome (hover-only: ⋯ menu + delete)
+      // Block chrome
       const chrome = document.createElement("div");
       chrome.classList.add("block-chrome");
       chrome.contentEditable = "false";
 
       const badge = document.createElement("span");
       badge.classList.add("block-type-badge");
-      badge.textContent = "Text Columns";
+      badge.textContent = "Block Column";
       chrome.appendChild(badge);
 
       const menuBtn = document.createElement("button");
       menuBtn.classList.add("block-menu-btn");
       menuBtn.textContent = "⋯";
-      menuBtn.title = "Column properties";
+      menuBtn.title = "Block Column properties";
       menuBtn.addEventListener("click", (e) => {
         e.preventDefault();
         e.stopPropagation();
         const blockId = currentNode.attrs.blockId || "";
-        useBlockStore.getState().setSelectedBlock(blockId, "columns");
+        useBlockStore.getState().setSelectedBlock(blockId, "blockColumns");
         useBlockStore.getState().openProperties();
         syncAttrsToPanel(blockId, currentNode.attrs);
       });
@@ -285,7 +275,7 @@ export const Columns = Node.create({
       chrome.appendChild(deleteBtn);
       dom.appendChild(chrome);
 
-      // Content area — CSS Grid, ProseMirror manages column children here
+      // CSS Grid content area — ProseMirror renders blockColumn children here
       const contentDOM = document.createElement("div");
       contentDOM.classList.add("block-columns-grid");
       dom.appendChild(contentDOM);
@@ -302,41 +292,84 @@ export const Columns = Node.create({
         if (typeof getPos === "function") {
           const pos = getPos();
           if (pos !== undefined) {
-            const after = pos + currentNode.nodeSize;
-            openBlockInsertMenu(editor, after, insertBelow);
+            openBlockInsertMenu(editor, pos + currentNode.nodeSize, insertBelow);
           }
         }
       });
       dom.appendChild(insertBelow);
 
-      // Click on chrome to select for properties
       chrome.addEventListener("click", () => {
         const blockId = currentNode.attrs.blockId || "";
-        useBlockStore.getState().setSelectedBlock(blockId, "columns");
+        useBlockStore.getState().setSelectedBlock(blockId, "blockColumns");
       });
+
+      /** Sync blockColumn child count to match the columnCount attr */
+      function syncColumnCount(targetCount: number, atPos: number) {
+        const freshNode = editor.state.doc.nodeAt(atPos);
+        if (!freshNode || freshNode.type.name !== "blockColumns") return;
+        const actualCount = freshNode.childCount;
+        if (actualCount === targetCount) return;
+
+        const { tr } = editor.state;
+
+        if (targetCount > actualCount) {
+          // Append new empty blockColumn nodes at the end
+          let insertOffset = 1;
+          for (let i = 0; i < actualCount; i++) {
+            insertOffset += freshNode.child(i).nodeSize;
+          }
+          for (let i = actualCount; i < targetCount; i++) {
+            const newCol = editor.state.schema.nodes.blockColumn.create(
+              null,
+              [editor.state.schema.nodes.paragraph.create()]
+            );
+            tr.insert(atPos + insertOffset, newCol);
+            insertOffset += newCol.nodeSize;
+          }
+        } else {
+          // Remove trailing columns (work backwards to preserve positions)
+          for (let i = actualCount - 1; i >= targetCount; i--) {
+            let offset = 1;
+            for (let j = 0; j < i; j++) offset += freshNode.child(j).nodeSize;
+            tr.delete(atPos + offset, atPos + offset + freshNode.child(i).nodeSize);
+          }
+        }
+
+        if (tr.steps.length > 0) {
+          editor.view.dispatch(tr);
+        }
+      }
 
       return {
         dom,
         contentDOM,
         update(updatedNode) {
-          if (updatedNode.type.name !== "columns") return false;
-          currentNode = updatedNode;
+          if (updatedNode.type.name !== "blockColumns") return false;
+
           dom.setAttribute("data-block-id", updatedNode.attrs.blockId || "");
           dom.setAttribute("data-columns", String(updatedNode.attrs.columnCount));
           dom.setAttribute("data-gap", updatedNode.attrs.gapSize);
           dom.setAttribute("data-col-border", updatedNode.attrs.columnBorder || "subtle");
-          if (updatedNode.attrs.showBackground === false) {
-            dom.setAttribute("data-col-bg", "hidden");
-          } else {
-            dom.removeAttribute("data-col-bg");
-          }
           dom.classList.toggle("block-container-hidden", updatedNode.attrs.showContainer === false);
+
+          // Sync column count when attr changes
+          if (
+            updatedNode.attrs.columnCount !== currentNode.attrs.columnCount &&
+            typeof getPos === "function"
+          ) {
+            const pos = getPos();
+            if (pos !== undefined) {
+              requestAnimationFrame(() => syncColumnCount(updatedNode.attrs.columnCount, pos));
+            }
+          }
+
+          currentNode = updatedNode;
           return true;
         },
         selectNode() {
           dom.classList.add("block-selected", "ProseMirror-selectednode");
           const blockId = currentNode.attrs.blockId || "";
-          useBlockStore.getState().setSelectedBlock(blockId, "columns");
+          useBlockStore.getState().setSelectedBlock(blockId, "blockColumns");
         },
         deselectNode() {
           dom.classList.remove("block-selected", "ProseMirror-selectednode");
@@ -346,36 +379,36 @@ export const Columns = Node.create({
   },
 });
 
-/** Server-safe versions */
-export const ServerColumn = Node.create({
-  name: "column",
+/** Server-safe versions (no NodeViews) */
+export const ServerBlockColumn = Node.create({
+  name: "blockColumn",
   content: "block+",
   defining: true,
   isolating: true,
 
   parseHTML() {
-    return [{ tag: "div.block-column" }];
+    return [{ tag: "div.block-column-cell" }];
   },
 
   renderHTML({ HTMLAttributes }) {
     return [
       "div",
-      mergeAttributes(HTMLAttributes, { class: "block-column" }),
+      mergeAttributes(HTMLAttributes, { class: "block-column-cell" }),
       0,
     ];
   },
 });
 
-export const ServerColumns = Node.create({
-  name: "columns",
+export const ServerBlockColumns = Node.create({
+  name: "blockColumns",
   group: "block",
-  content: "column+",
+  content: "blockColumn+",
   defining: true,
 
   addAttributes() {
     return {
       blockId: { default: null },
-      blockType: { default: "columns" },
+      blockType: { default: "blockColumns" },
       columnCount: {
         default: 2,
         parseHTML: (el) => parseInt(el.getAttribute("data-columns") || "2"),
@@ -396,24 +429,19 @@ export const ServerColumns = Node.create({
         parseHTML: (el) => el.getAttribute("data-show-container") !== "false",
         renderHTML: (attrs) => ({ "data-show-container": String(attrs.showContainer) }),
       },
-      showBackground: {
-        default: true,
-        parseHTML: (el) => el.getAttribute("data-col-bg") !== "hidden",
-        renderHTML: (attrs) => attrs.showBackground ? {} : { "data-col-bg": "hidden" },
-      },
     };
   },
 
   parseHTML() {
-    return [{ tag: 'div[data-block-type="columns"]' }];
+    return [{ tag: 'div[data-block-type="blockColumns"]' }];
   },
 
   renderHTML({ HTMLAttributes }) {
     return [
       "div",
       mergeAttributes(HTMLAttributes, {
-        class: "block-columns",
-        "data-block-type": "columns",
+        class: "block-block-columns",
+        "data-block-type": "blockColumns",
       }),
       0,
     ];

@@ -276,8 +276,8 @@ export function getSlashCommands(editor: Editor): SlashCommand[] {
     },
     // Sprint 44: Layout blocks
     {
-      title: "Columns",
-      description: "Multi-column layout (2-4 columns)",
+      title: "Text Columns",
+      description: "Multi-column text layout (2-4 columns)",
       icon: "▦",
       command: ({ editor, range }) => {
         editor.chain().focus().deleteRange(range).insertContent({
@@ -290,6 +290,22 @@ export function getSlashCommands(editor: Editor): SlashCommand[] {
         }).run();
       },
       aliases: ["col", "columns", "layout", "grid", "split", "side"],
+    },
+    {
+      title: "Block Column",
+      description: "Multi-column layout for inserting blocks",
+      icon: "⊞",
+      command: ({ editor, range }) => {
+        editor.chain().focus().deleteRange(range).insertContent({
+          type: "blockColumns",
+          attrs: { columnCount: 2 },
+          content: [
+            { type: "blockColumn", content: [{ type: "paragraph" }] },
+            { type: "blockColumn", content: [{ type: "paragraph" }] },
+          ],
+        }).run();
+      },
+      aliases: ["block-columns", "bcol", "block col", "blocks layout"],
     },
     {
       title: "Tabs",
@@ -395,7 +411,7 @@ export function getSlashCommands(editor: Editor): SlashCommand[] {
       aliases: ["checkbox", "check", "boolean"],
     },
     {
-      title: "Date Picker",
+      title: "Date Input",
       description: "Date or date-time field",
       icon: "📅",
       command: ({ editor, range }) => {

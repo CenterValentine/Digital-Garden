@@ -9,6 +9,7 @@
  */
 
 import { Node, mergeAttributes } from "@tiptap/core";
+import { TextSelection } from "@tiptap/pm/state";
 import { z } from "zod";
 import { createBlockSchema } from "@/lib/domain/blocks/schema";
 import { registerBlock } from "@/lib/domain/blocks/registry";
@@ -253,12 +254,40 @@ export const Accordion = Node.create({
       title.addEventListener("keydown", (e) => {
         if (e.key === "Enter") {
           e.preventDefault();
-          // Move focus into the body content
-          const firstP = contentDOM.querySelector("p, [contenteditable]");
-          if (firstP instanceof HTMLElement) firstP.focus();
-          else title.blur();
+          e.stopPropagation();
+          // Open accordion if closed, then move ProseMirror cursor into content
+          if (!isOpen) toggleAccordion();
+          if (typeof getPos === "function") {
+            const pos = getPos();
+            if (pos !== undefined) {
+              requestAnimationFrame(() => {
+                try {
+                  // accordion content starts at pos+1 (inside node), first block at pos+2
+                  const contentStart = pos + 2;
+                  const $pos = editor.state.doc.resolve(
+                    Math.min(contentStart, editor.state.doc.content.size - 1)
+                  );
+                  const sel = TextSelection.near($pos);
+                  editor.view.dispatch(editor.state.tr.setSelection(sel).scrollIntoView());
+                  editor.view.focus();
+                } catch { /* ignore if position is invalid */ }
+              });
+            }
+          }
+          return;
         }
         e.stopPropagation();
+      });
+      // Final sync on blur — ensures headerText attr is up-to-date before
+      // ProseMirror fires update() from the subsequent selection-change transaction.
+      title.addEventListener("focusout", () => {
+        const text = title.textContent || "";
+        const blockId = currentNode.attrs.blockId || "";
+        if (blockId) {
+          window.dispatchEvent(new CustomEvent("block-attrs-change", {
+            detail: { blockId, key: "headerText", value: text },
+          }));
+        }
       });
       // Stop beforeinput/input from reaching ProseMirror's input handler
       title.addEventListener("beforeinput", (e) => {

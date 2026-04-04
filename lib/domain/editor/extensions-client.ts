@@ -40,6 +40,7 @@ import { CardPanel } from "./extensions/blocks/card-panel";
 import { BlockDivider } from "./extensions/blocks/divider";
 import { Accordion } from "./extensions/blocks/accordion";
 import { Column, Columns } from "./extensions/blocks/columns";
+import { BlockColumn, BlockColumns } from "./extensions/blocks/block-columns";
 import { TabPanel, Tabs } from "./extensions/blocks/tabs";
 import { ListContainer } from "./extensions/blocks/list-container";
 import { TextInput } from "./extensions/blocks/text-input";
@@ -201,6 +202,8 @@ export function getEditorExtensions(options?: EditorExtensionsOptions): Extensio
     Accordion,
     Column,
     Columns,
+    BlockColumn,
+    BlockColumns,
     TabPanel,
     Tabs,
     ListContainer,

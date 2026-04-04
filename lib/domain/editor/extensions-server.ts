@@ -28,6 +28,7 @@ import { ServerCardPanel } from "./extensions/blocks/card-panel";
 import { ServerBlockDivider } from "./extensions/blocks/divider";
 import { ServerAccordion } from "./extensions/blocks/accordion";
 import { ServerColumn, ServerColumns } from "./extensions/blocks/columns";
+import { ServerBlockColumn, ServerBlockColumns } from "./extensions/blocks/block-columns";
 import { ServerTabPanel, ServerTabs } from "./extensions/blocks/tabs";
 import { ServerListContainer } from "./extensions/blocks/list-container";
 import { ServerTextInput } from "./extensions/blocks/text-input";
@@ -128,6 +129,8 @@ export function getServerExtensions(): Extensions {
     ServerAccordion,
     ServerColumn,
     ServerColumns,
+    ServerBlockColumn,
+    ServerBlockColumns,
     ServerTabPanel,
     ServerTabs,
     ServerListContainer,

@@ -24,11 +24,11 @@ const { schema: sectionHeaderSchema, defaults: sectionHeaderDefaults } =
   createBlockSchema("sectionHeader", {
     level: z.number().int().min(1).max(3).default(1).describe("Heading level (1-3)"),
     label: z.string().default("").describe("Section heading text"),
-    showDivider: z.boolean().default(true).describe("Show decorative line below heading"),
     dividerStyle: z
-      .enum(["solid", "dashed", "dotted"])
+      .enum(["none", "solid", "dashed", "dotted"])
       .default("solid")
-      .describe("Decorative line style (only when line is enabled)"),
+      .describe("Decorative line below heading (none = hidden)"),
+    showContainer: z.boolean().default(false).describe("Show outer container border"),
   });
 
 // Register in block registry
@@ -70,15 +70,15 @@ export const SectionHeader = Node.create({
           return { "data-label": attrs.label };
         },
       },
-      showDivider: {
-        default: true,
-        parseHTML: (el) => el.getAttribute("data-show-divider") !== "false",
-        renderHTML: (attrs) => ({ "data-show-divider": String(attrs.showDivider) }),
-      },
       dividerStyle: {
         default: "solid",
         parseHTML: (el) => el.getAttribute("data-divider-style") || "solid",
         renderHTML: (attrs) => ({ "data-divider-style": attrs.dividerStyle }),
+      },
+      showContainer: {
+        default: false,
+        parseHTML: (el) => el.getAttribute("data-show-container") === "true",
+        renderHTML: (attrs) => attrs.showContainer ? { "data-show-container": "true" } : {},
       },
     };
   },
@@ -104,19 +104,22 @@ export const SectionHeader = Node.create({
       label: "Section Header",
       iconName: "Heading",
       atom: false,
+      containerAttr: "showContainer",
       renderContent(node, contentDom) {
         contentDom.classList.add("block-section-header-content");
         contentDom.setAttribute("data-level", String(node.attrs.level));
-        if (node.attrs.showDivider) {
+        const style = node.attrs.dividerStyle || "solid";
+        if (style !== "none") {
           contentDom.setAttribute("data-show-divider", "true");
-          contentDom.setAttribute("data-divider-style", node.attrs.dividerStyle);
+          contentDom.setAttribute("data-divider-style", style);
         }
       },
       updateContent(node, contentDom) {
         contentDom.setAttribute("data-level", String(node.attrs.level));
-        if (node.attrs.showDivider) {
+        const style = node.attrs.dividerStyle || "solid";
+        if (style !== "none") {
           contentDom.setAttribute("data-show-divider", "true");
-          contentDom.setAttribute("data-divider-style", node.attrs.dividerStyle);
+          contentDom.setAttribute("data-divider-style", style);
         } else {
           contentDom.removeAttribute("data-show-divider");
         }
@@ -150,15 +153,15 @@ export const ServerSectionHeader = Node.create({
           return { "data-label": attrs.label };
         },
       },
-      showDivider: {
-        default: true,
-        parseHTML: (el) => el.getAttribute("data-show-divider") !== "false",
-        renderHTML: (attrs) => ({ "data-show-divider": String(attrs.showDivider) }),
-      },
       dividerStyle: {
         default: "solid",
         parseHTML: (el) => el.getAttribute("data-divider-style") || "solid",
         renderHTML: (attrs) => ({ "data-divider-style": attrs.dividerStyle }),
+      },
+      showContainer: {
+        default: false,
+        parseHTML: (el) => el.getAttribute("data-show-container") === "true",
+        renderHTML: (attrs) => attrs.showContainer ? { "data-show-container": "true" } : {},
       },
     };
   },

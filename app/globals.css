@@ -1506,10 +1506,17 @@ mark {
 
 .ProseMirror .block-tabs-bar {
   display: flex;
+  flex-wrap: nowrap;
   gap: 0;
   border-bottom: 1px solid rgba(0, 0, 0, 0.12);
   margin-bottom: 0.5rem;
   padding: 0 0.25rem;
+  overflow-x: auto;
+  scrollbar-width: none; /* Firefox */
+}
+
+.ProseMirror .block-tabs-bar::-webkit-scrollbar {
+  display: none; /* Chrome/Safari */
 }
 
 .ProseMirror .block-tab-btn {
@@ -1896,4 +1903,188 @@ mark {
   color: var(--text-tertiary, #999);
   font-style: italic;
   padding: 0.25rem 0;
+}
+
+/* ─── Date Input format row ─── */
+
+.ProseMirror .input-block-date-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.ProseMirror .input-block-date-row .input-block-field {
+  flex: 1;
+  min-width: 140px;
+}
+
+.ProseMirror .input-block-format-select {
+  padding: 0.35rem 0.5rem;
+  font-size: 0.8rem;
+  border: 1px solid var(--border-secondary, rgba(0, 0, 0, 0.15));
+  border-radius: 5px;
+  background: var(--surface-input, rgba(0, 0, 0, 0.03));
+  color: var(--text-primary, #333);
+  cursor: pointer;
+  min-width: 160px;
+  flex-shrink: 0;
+}
+
+.ProseMirror .input-block-format-select:focus {
+  border-color: var(--intent-primary, #3b82f6);
+  outline: none;
+}
+
+.ProseMirror .input-block-custom-format-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  margin-top: 0.25rem;
+}
+
+.ProseMirror .input-block-custom-format-input {
+  flex: 1;
+  font-family: monospace;
+  font-size: 0.85rem;
+}
+
+.ProseMirror .input-block-format-docs-link {
+  font-size: 0.75rem;
+  color: var(--intent-primary, #3b82f6);
+  text-decoration: none;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.ProseMirror .input-block-format-docs-link:hover {
+  text-decoration: underline;
+}
+
+/* ─── Block Columns (Sprint 47) ─── */
+
+/* Parent wrapper — mirrors .block-columns for data-columns / gap / col-border */
+.ProseMirror .block-block-columns {
+  position: relative;
+}
+
+/* The CSS Grid inside block columns reuses .block-columns-grid */
+.ProseMirror .block-block-columns[data-columns="2"] .block-columns-grid {
+  --col-count: 2;
+}
+
+.ProseMirror .block-block-columns[data-columns="3"] .block-columns-grid {
+  --col-count: 3;
+}
+
+.ProseMirror .block-block-columns[data-columns="4"] .block-columns-grid {
+  --col-count: 4;
+}
+
+.ProseMirror .block-block-columns[data-gap="none"] .block-columns-grid { gap: 0; }
+.ProseMirror .block-block-columns[data-gap="small"] .block-columns-grid { gap: 0.5rem; }
+.ProseMirror .block-block-columns[data-gap="medium"] .block-columns-grid { gap: 1rem; }
+.ProseMirror .block-block-columns[data-gap="large"] .block-columns-grid { gap: 1.5rem; }
+
+/* Column cell — block column counterpart to .block-column */
+.ProseMirror .block-column-cell {
+  min-height: 3rem;
+  min-width: 0;
+  border-radius: 6px;
+  padding: 0.5rem 0.5rem 2rem;   /* bottom padding makes room for the + button */
+  border: 1px solid transparent;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  transition: border-color 0.15s ease;
+}
+
+.ProseMirror .block-block-columns[data-col-border="subtle"] .block-column-cell {
+  border-color: rgba(0, 0, 0, 0.1);
+  background: rgba(0, 0, 0, 0.015);
+}
+.ProseMirror .block-block-columns[data-col-border="subtle"] .block-column-cell:hover {
+  border-color: rgba(0, 0, 0, 0.18);
+}
+
+.ProseMirror .block-block-columns[data-col-border="solid"] .block-column-cell {
+  border-color: rgba(0, 0, 0, 0.2);
+}
+.ProseMirror .block-block-columns[data-col-border="solid"] .block-column-cell:hover {
+  border-color: rgba(0, 0, 0, 0.3);
+}
+
+.ProseMirror .block-block-columns[data-col-border="dashed"] .block-column-cell {
+  border-style: dashed;
+  border-color: rgba(0, 0, 0, 0.15);
+}
+.ProseMirror .block-block-columns[data-col-border="dashed"] .block-column-cell:hover {
+  border-color: rgba(0, 0, 0, 0.25);
+}
+
+.ProseMirror .block-block-columns[data-col-border="none"] .block-column-cell {
+  border-color: transparent;
+  background: transparent;
+}
+.ProseMirror .block-block-columns[data-col-border="none"]:hover .block-column-cell {
+  border-color: rgba(0, 0, 0, 0.06);
+  border-style: dashed;
+}
+
+/* ProseMirror content area inside a block column */
+.ProseMirror .block-column-cell-content {
+  flex: 1;
+  min-height: 2rem;
+}
+
+.ProseMirror .block-column-cell-content > p.is-empty:first-child:last-child::before {
+  content: "Drop a block or type /";
+  color: rgba(0, 0, 0, 0.3);
+  font-style: italic;
+  pointer-events: none;
+}
+
+/* In-column "+" insert button — only shown when column is empty (data-empty="true") */
+.ProseMirror .block-column-insert-btn {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1px dashed rgba(0, 0, 0, 0.25);
+  background: transparent;
+  color: rgba(0, 0, 0, 0.35);
+  font-size: 1rem;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s ease, background 0.1s ease, border-color 0.1s ease, color 0.1s ease;
+  padding: 0;
+  line-height: 1;
+  pointer-events: none;
+}
+
+/* Only show the button when the column is empty */
+.ProseMirror .block-column-cell[data-empty="true"] .block-column-insert-btn {
+  pointer-events: auto;
+}
+
+.ProseMirror .block-column-cell[data-empty="true"]:hover .block-column-insert-btn {
+  opacity: 1;
+}
+
+.ProseMirror .block-column-insert-btn:hover {
+  background: var(--intent-primary, #3b82f6);
+  border-color: var(--intent-primary, #3b82f6);
+  color: #fff;
+  opacity: 1;
+}
+
+/* Empty column: center vertically (flex, align center) */
+.ProseMirror .block-column-cell[data-empty="true"] {
+  justify-content: center;
 }
