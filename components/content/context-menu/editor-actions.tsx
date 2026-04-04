@@ -297,7 +297,7 @@ async function deleteSnippet(snippetId: string): Promise<boolean> {
  * Insert a template's tiptapJson at the current cursor position.
  */
 function insertTemplate(templateId: string) {
-  const editor = useEditorInstanceStore.getState().editor;
+  const editor = Object.values(useEditorInstanceStore.getState().editorsByContentId).find(Boolean) ?? null;
   if (!editor) return;
 
   const store = useTemplateStore.getState();
@@ -318,7 +318,7 @@ function insertTemplate(templateId: string) {
  * Insert a snippet's content at the current cursor position.
  */
 function insertSnippet(snippetId: string) {
-  const editor = useEditorInstanceStore.getState().editor;
+  const editor = Object.values(useEditorInstanceStore.getState().editorsByContentId).find(Boolean) ?? null;
   if (!editor) return;
 
   const store = useSnippetStore.getState();
@@ -342,7 +342,7 @@ function insertSnippet(snippetId: string) {
  * Insert a snippet as plain text (strips all formatting).
  */
 function insertSnippetAsText(snippetId: string) {
-  const editor = useEditorInstanceStore.getState().editor;
+  const editor = Object.values(useEditorInstanceStore.getState().editorsByContentId).find(Boolean) ?? null;
   if (!editor) return;
 
   const store = useSnippetStore.getState();
@@ -569,7 +569,7 @@ export const editorActionProvider: ContextMenuActionProvider = (ctx) => {
 
   // --- Undo / Redo ---
   const historyActions: ContextMenuAction[] = [];
-  const editorRef = useEditorInstanceStore.getState().editor;
+  const editorRef = Object.values(useEditorInstanceStore.getState().editorsByContentId).find(Boolean) ?? null;
 
   historyActions.push({
     id: "undo",
@@ -607,7 +607,7 @@ export const editorActionProvider: ContextMenuActionProvider = (ctx) => {
       label: "Cut",
       shortcut: "⌘X",
       onClick: async () => {
-        const editor = useEditorInstanceStore.getState().editor;
+        const editor = Object.values(useEditorInstanceStore.getState().editorsByContentId).find(Boolean) ?? null;
         if (!editor) return;
         await navigator.clipboard.writeText(capture.plainText);
         editor.chain().focus().deleteSelection().run();
@@ -620,7 +620,7 @@ export const editorActionProvider: ContextMenuActionProvider = (ctx) => {
     label: "Paste",
     shortcut: "⌘V",
     onClick: async () => {
-      const editor = useEditorInstanceStore.getState().editor;
+      const editor = Object.values(useEditorInstanceStore.getState().editorsByContentId).find(Boolean) ?? null;
       if (!editor) return;
       try {
         const text = await navigator.clipboard.readText();
