@@ -25,7 +25,8 @@ interface SelectionCapture {
  * Must be called while the selection is still active (before menu closes).
  */
 function captureSelection(): SelectionCapture | null {
-  const editor = useEditorInstanceStore.getState().editor;
+  const { editorsByContentId } = useEditorInstanceStore.getState();
+  const editor = Object.values(editorsByContentId).find(Boolean) ?? null;
   if (!editor) return null;
 
   const { from, to } = editor.state.selection;
