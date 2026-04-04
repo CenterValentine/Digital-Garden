@@ -29,7 +29,6 @@ export type Account = {
   accessToken: string | null;
   refreshToken: string | null;
   expiresAt: bigint | null;
-  scope: string | null;
   createdAt: Date;
   updatedAt: Date;
 };

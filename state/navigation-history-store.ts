@@ -1,133 +1,218 @@
 /**
  * Navigation History Store
  *
- * Manages back/forward navigation history for the main content panel.
- * Features:
- * - Browser-like history stack with back/forward support
- * - Deduplication (only most recent visit counts)
- * - Max 100 items to prevent memory issues
- * - localStorage persistence
+ * Maintains independent back/forward stacks per pane so split layouts can add
+ * local navigation without rewriting the API later.
  */
 
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { TOP_LEFT_PANE_ID, type WorkspacePaneId } from "./content-store";
 
 const MAX_HISTORY_ITEMS = 100;
+const CURRENT_VERSION = 3;
 
 export interface NavigationHistoryItem {
   contentId: string | null;
   timestamp: number;
 }
 
-interface NavigationHistoryStore {
-  // State
+export interface PaneHistoryState {
   history: NavigationHistoryItem[];
   currentIndex: number;
+}
 
-  // Actions
-  addToHistory: (contentId: string | null) => void;
-  goBack: () => string | null;
-  goForward: () => string | null;
-  canGoBack: () => boolean;
-  canGoForward: () => boolean;
-  getBackHistory: () => NavigationHistoryItem[];
-  clearHistory: () => void;
+interface NavigationHistoryStore {
+  byPaneId: Record<string, PaneHistoryState>;
+  addToHistory: (contentId: string | null, paneId?: string | null) => void;
+  goBack: (paneId?: string | null) => string | null;
+  goForward: (paneId?: string | null) => string | null;
+  getPaneHistory: (paneId?: string | null) => PaneHistoryState;
+  getBackHistory: (paneId?: string | null) => NavigationHistoryItem[];
+  clearHistory: (paneId?: string | null) => void;
+}
+
+const EMPTY_PANE_HISTORY: PaneHistoryState = {
+  history: [],
+  currentIndex: -1,
+};
+
+function resolvePaneId(paneId?: string | null): WorkspacePaneId {
+  return (paneId as WorkspacePaneId | null | undefined) ?? TOP_LEFT_PANE_ID;
+}
+
+function getPaneState(
+  byPaneId: Record<string, PaneHistoryState>,
+  paneId?: string | null
+) {
+  return byPaneId[resolvePaneId(paneId)] ?? EMPTY_PANE_HISTORY;
+}
+
+function sanitizePaneHistoryState(
+  paneState: PaneHistoryState | undefined
+): PaneHistoryState {
+  if (!paneState) {
+    return EMPTY_PANE_HISTORY;
+  }
+
+  const history = paneState.history.filter(
+    (item): item is NavigationHistoryItem => Boolean(item.contentId)
+  );
+
+  if (history.length === 0) {
+    return EMPTY_PANE_HISTORY;
+  }
+
+  return {
+    history,
+    currentIndex: Math.min(
+      Math.max(paneState.currentIndex, 0),
+      history.length - 1
+    ),
+  };
 }
 
 export const useNavigationHistoryStore = create<NavigationHistoryStore>()(
   persist(
     (set, get) => ({
-      history: [],
-      currentIndex: -1,
+      byPaneId: {},
 
-      addToHistory: (contentId: string | null) => {
+      addToHistory: (contentId, paneId) => {
+        if (!contentId) {
+          return;
+        }
+
+        const resolvedPaneId = resolvePaneId(paneId);
         set((state) => {
-          // Get current state
-          const { history, currentIndex } = state;
+          const paneState = getPaneState(state.byPaneId, resolvedPaneId);
+          const truncatedHistory = paneState.history.slice(
+            0,
+            paneState.currentIndex + 1
+          );
 
-          // If we're in the middle of history (user went back), truncate forward history
-          const truncatedHistory = history.slice(0, currentIndex + 1);
-
-          // Check if the new content is the same as current (avoid duplicate consecutive entries)
           if (
-            history.length > 0 &&
-            currentIndex >= 0 &&
-            history[currentIndex].contentId === contentId
+            paneState.history.length > 0 &&
+            paneState.currentIndex >= 0 &&
+            paneState.history[paneState.currentIndex]?.contentId === contentId
           ) {
-            // Same content at current index, just update timestamp WITHOUT truncating forward history
-            const updatedHistory = [...history];
-            updatedHistory[currentIndex] = { contentId, timestamp: Date.now() };
+            const updatedHistory = [...paneState.history];
+            updatedHistory[paneState.currentIndex] = {
+              contentId,
+              timestamp: Date.now(),
+            };
+
             return {
-              history: updatedHistory,
-              currentIndex: currentIndex,
+              byPaneId: {
+                ...state.byPaneId,
+                [resolvedPaneId]: {
+                  history: updatedHistory,
+                  currentIndex: paneState.currentIndex,
+                },
+              },
             };
           }
 
-          // Remove older duplicate entries of this contentId (keep only most recent)
           const deduplicated = truncatedHistory.filter(
             (item) => item.contentId !== contentId
           );
-
-          // Add new entry
-          const newHistory = [
+          const nextHistory = [
             ...deduplicated,
             { contentId, timestamp: Date.now() },
           ];
-
-          // Enforce max limit (keep most recent items)
           const limitedHistory =
-            newHistory.length > MAX_HISTORY_ITEMS
-              ? newHistory.slice(newHistory.length - MAX_HISTORY_ITEMS)
-              : newHistory;
+            nextHistory.length > MAX_HISTORY_ITEMS
+              ? nextHistory.slice(nextHistory.length - MAX_HISTORY_ITEMS)
+              : nextHistory;
 
           return {
-            history: limitedHistory,
-            currentIndex: limitedHistory.length - 1,
+            byPaneId: {
+              ...state.byPaneId,
+              [resolvedPaneId]: {
+                history: limitedHistory,
+                currentIndex: limitedHistory.length - 1,
+              },
+            },
           };
         });
       },
 
-      goBack: () => {
-        const { history, currentIndex } = get();
-        if (currentIndex <= 0) return null;
+      goBack: (paneId) => {
+        const resolvedPaneId = resolvePaneId(paneId);
+        const paneState = getPaneState(get().byPaneId, resolvedPaneId);
+        if (paneState.currentIndex <= 0) return null;
 
-        const newIndex = currentIndex - 1;
-        set({ currentIndex: newIndex });
-        return history[newIndex].contentId;
+        const newIndex = paneState.currentIndex - 1;
+        set((state) => ({
+          byPaneId: {
+            ...state.byPaneId,
+            [resolvedPaneId]: {
+              ...paneState,
+              currentIndex: newIndex,
+            },
+          },
+        }));
+        return paneState.history[newIndex]?.contentId ?? null;
       },
 
-      goForward: () => {
-        const { history, currentIndex } = get();
-        if (currentIndex >= history.length - 1) return null;
+      goForward: (paneId) => {
+        const resolvedPaneId = resolvePaneId(paneId);
+        const paneState = getPaneState(get().byPaneId, resolvedPaneId);
+        if (paneState.currentIndex >= paneState.history.length - 1) return null;
 
-        const newIndex = currentIndex + 1;
-        set({ currentIndex: newIndex });
-        return history[newIndex].contentId;
+        const newIndex = paneState.currentIndex + 1;
+        set((state) => ({
+          byPaneId: {
+            ...state.byPaneId,
+            [resolvedPaneId]: {
+              ...paneState,
+              currentIndex: newIndex,
+            },
+          },
+        }));
+        return paneState.history[newIndex]?.contentId ?? null;
       },
 
-      canGoBack: () => {
-        const { currentIndex } = get();
-        return currentIndex > 0;
+      getPaneHistory: (paneId) => getPaneState(get().byPaneId, paneId),
+
+      getBackHistory: (paneId) => {
+        const paneState = getPaneState(get().byPaneId, paneId);
+        return paneState.history
+          .slice(0, paneState.currentIndex)
+          .filter((item): item is NavigationHistoryItem => Boolean(item.contentId))
+          .reverse();
       },
 
-      canGoForward: () => {
-        const { history, currentIndex } = get();
-        return currentIndex < history.length - 1;
-      },
-
-      getBackHistory: () => {
-        const { history, currentIndex } = get();
-        // Return items before current index in reverse order (most recent first)
-        return history.slice(0, currentIndex).reverse();
-      },
-
-      clearHistory: () => {
-        set({ history: [], currentIndex: -1 });
+      clearHistory: (paneId) => {
+        const resolvedPaneId = resolvePaneId(paneId);
+        set((state) => {
+          const nextState = { ...state.byPaneId };
+          delete nextState[resolvedPaneId];
+          return { byPaneId: nextState };
+        });
       },
     }),
     {
       name: "navigation-history",
-      version: 1,
+      version: CURRENT_VERSION,
+      migrate: (persistedState) => {
+        if (!persistedState || typeof persistedState !== "object") {
+          return { byPaneId: {} };
+        }
+
+        const state = persistedState as Partial<NavigationHistoryStore>;
+
+        return {
+          ...state,
+          byPaneId: Object.fromEntries(
+            Object.entries(state.byPaneId ?? {}).map(([paneId, paneState]) => [
+              paneId,
+              sanitizePaneHistoryState(paneState),
+            ])
+          ),
+        };
+      },
     }
   )
 );
+
+export { EMPTY_PANE_HISTORY };

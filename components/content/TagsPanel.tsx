@@ -9,7 +9,7 @@
 
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useContentStore } from "@/state/content-store";
 import { useEditorStatsStore } from "@/state/editor-stats-store";
@@ -23,14 +23,18 @@ interface Tag {
   linkedAt: string;
 }
 
-export function TagsPanel() {
-  const { selectedContentId, clearSelection } = useContentStore();
+interface TagsPanelProps {
+  contentId?: string | null;
+}
+
+export function TagsPanel({ contentId }: TagsPanelProps) {
+  const clearSelection = useContentStore((state) => state.clearSelection);
   const { lastSaved } = useEditorStatsStore();
   const [tags, setTags] = useState<Tag[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
-  const [isInitialLoad, setIsInitialLoad] = useState(true);
+  const hasLoadedRef = useRef(false);
 
   // Prevent hydration mismatch by only rendering after mount
   useEffect(() => {
@@ -38,14 +42,14 @@ export function TagsPanel() {
   }, []);
 
   useEffect(() => {
-    if (!selectedContentId) {
+    if (!contentId) {
       setTags([]);
-      setIsInitialLoad(true);
+      hasLoadedRef.current = false;
       return;
     }
 
     // Skip fetching for temporary IDs (files being created)
-    if (selectedContentId.startsWith("temp-")) {
+    if (contentId.startsWith("temp-")) {
       setTags([]);
       setIsLoading(false);
       return;
@@ -53,17 +57,17 @@ export function TagsPanel() {
 
     const fetchTags = async () => {
       // Only show loading spinner on initial load, not on refreshes
-      if (isInitialLoad) {
+      if (!hasLoadedRef.current) {
         setIsLoading(true);
       }
       setError(null);
 
       try {
-        const response = await fetch(`/api/content/tags/content/${selectedContentId}`);
+        const response = await fetch(`/api/content/tags/content/${contentId}`);
 
         // Handle 404 - content no longer exists (stale localStorage/URL)
         if (response.status === 404) {
-          console.warn(`Content ${selectedContentId} not found (404). Clearing stale selection.`);
+          console.warn(`Content ${contentId} not found (404). Clearing stale selection.`);
           toast.error("Note not found. It may have been deleted.");
           clearSelection();
           return;
@@ -75,7 +79,7 @@ export function TagsPanel() {
 
         const data = await response.json();
         setTags(data);
-        setIsInitialLoad(false);
+        hasLoadedRef.current = true;
       } catch (err) {
         console.error("Error fetching tags:", err);
         setError(err instanceof Error ? err.message : "Failed to load tags");
@@ -85,7 +89,7 @@ export function TagsPanel() {
     };
 
     fetchTags();
-  }, [selectedContentId, lastSaved]); // ← Refetch when note is saved
+  }, [clearSelection, contentId, lastSaved]); // Refetch when content changes or note is saved
 
   // Show skeleton during SSR to prevent hydration mismatch
   if (!mounted) {
@@ -96,7 +100,7 @@ export function TagsPanel() {
     );
   }
 
-  if (!selectedContentId) {
+  if (!contentId) {
     return (
       <div className="flex items-center justify-center h-full text-sm text-gray-500">
         No content selected

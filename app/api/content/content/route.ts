@@ -272,10 +272,10 @@ export async function POST(request: NextRequest) {
     const body = (await request.json()) as CreateContentRequest;
 
     const {
-      title: rawTitle,
+      title,
       parentId,
       categoryId,
-      tiptapJson: rawTiptapJson,
+      tiptapJson,
       markdown,
       html,
       isTemplate,
@@ -297,44 +297,7 @@ export async function POST(request: NextRequest) {
       contentType: requestedContentType,
       chatMessages,
       chatMetadata,
-      fromTemplateId,
     } = body;
-
-    // If creating from a page template, fetch the template and use its content
-    let title = rawTitle;
-    let tiptapJson = rawTiptapJson;
-    if (fromTemplateId) {
-      const pageTemplate = await prisma.pageTemplate.findUnique({
-        where: { id: fromTemplateId },
-      });
-
-      if (!pageTemplate) {
-        return NextResponse.json(
-          {
-            success: false,
-            error: {
-              code: "NOT_FOUND",
-              message: "Page template not found",
-            },
-          },
-          { status: 404 }
-        );
-      }
-
-      // Use template content — deep clone to detach from original
-      tiptapJson = JSON.parse(JSON.stringify(pageTemplate.tiptapJson)) as JSONContent;
-
-      // Use defaultTitle or template title if no title provided
-      if (!title || !title.trim()) {
-        title = pageTemplate.defaultTitle || pageTemplate.title;
-      }
-
-      // Increment usage count (fire-and-forget)
-      prisma.pageTemplate.update({
-        where: { id: fromTemplateId },
-        data: { usageCount: { increment: 1 } },
-      }).catch(() => {});
-    }
 
     // Validation
     if (!title || title.trim().length === 0) {

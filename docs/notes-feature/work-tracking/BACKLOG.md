@@ -1,5 +1,5 @@
 ---
-last_updated: 2026-04-02
+last_updated: 2026-03-12
 ---
 
 # Sprint Backlog
@@ -128,101 +128,58 @@ The following sprints were originally 38-42 in Epoch 9 but are deferred to Epoch
 
 ---
 
-## Epoch 11: Block Builder + Templates + Snippets + Resume (Sprints 43-47)
-
-**Goal**: Block system, content templates, snippets, page templates, resume/cover letter.
-**Detailed plan**: See plan file (federated-leaping-widget.md)
-
-### Sprint 43: Block Infrastructure ✅
-- [x] ReusableCategory + SavedBlock database tables, full CRUD API routes
-- [x] Block schema framework: `createBlockSchema()` (Zod v4), `registry.ts`, `types.ts`, `json-schema.ts`
-- [x] NodeView factory: shared block chrome (drag handle, type badge, +/- insert buttons, properties menu)
-- [x] Properties Panel: auto-generated from Zod schemas, CustomEvent bridge for attrs sync
-- [x] Block focus plugin + block store (Zustand)
-- [x] SavedBlockPicker component
-- [x] Slash commands: `/block` and individual block types from registry
-
-### Sprint 44: Block Extensions + Refinements ✅
-- [x] SectionHeader: `inline*` content, level(1-3), divider styles
-- [x] Card/Panel: `block+` container, border styles (none/subtle/solid/dashed), background toggle
-- [x] Divider: atom, 4 line styles, spacing, optional label
-- [x] Accordion: custom NodeView, inline-editable title with `#` heading-level shorthand, chevron toggle, collapsible body
-- [x] Columns: parent+child NodeViews, CSS Grid (2-4 cols), Tab key navigation, border/background/container settings
-- [x] Tabs: parent+child NodeViews, 3 tab styles, cursor-jump plugin, double-click rename, tab delete
-- [x] All registered in extensions-client.ts and extensions-server.ts (Server* versions)
-- [x] Block CSS with light-theme colors, compact block chrome
-
-### Sprint 44b: Block Builder — DEFERRED
-- User rejected modal builder approach in favor of inline insertion + right-panel properties
-- Slash commands insert blocks directly, properties edited via side panel
-- SavedBlockPicker handles block library
-
-### Sprint 45: Content Templates + Snippets ✅
-- [x] ContentTemplate + Snippet database tables
-- [x] API routes for both
-- [x] Editor context menu (right-click selected text → save as template/snippet)
-- [x] `/template` and `/snippet` slash commands
-- [x] AI snippet integration (tool + auto-injection into system prompt)
-- [x] Chat area snippet menu
-- [x] Zustand stores + settings pages
-
-### Sprint 46: Page Templates ✅
-- [x] PageTemplate database table + CRUD API
-- [x] "New > Note" submenu with page templates (recursive 3-level submenus)
-- [x] Save as Template toolbar button + dialog
-- [x] Inline create from template (placeholder + name confirm)
-- [x] Page template settings (category + template management)
-- [x] Page template Zustand store
-
-### Sprint 47: Input Blocks ✅
-- [x] 7 input block extensions: text, select, checkbox, date, number, rating, prompt (AI)
-- [x] All blocks registered in extensions-client.ts and extensions-server.ts
-- [x] Input block CSS in globals.css
-- [x] Properties panel: character limits, auto-expanding input size
-- [x] Input blocks work inside layout blocks (columns, tabs, accordion, card)
-- [x] Prompt input: AI-powered input with snippet category selection, output response limits
-- [x] Export: strip input chrome, convert to plain text values (plaintext + markdown converters)
-
-### Sprint 48: UI Cleanups + Tech Debt (PLANNED)
-Adhoc tech debt sprint. Gated: resolve one issue before moving to next. Skip if blocked.
-
-- [ ] **Logo GIF not showing**: Fix the animated tree logo inside the gold medallion (NotesNavBar → CompactLogo). Desktop renders the ring but SVG tree is invisible.
-- [ ] **Favicon + tab metadata**: Copy logo for favicon. Update tab title to "Digital Garden". Review/update OG metadata.
-- [ ] **Neon formatting removal**: Replace neon/debug styling (JSON viewer, debug panels) with glass-ui design system tokens.
-- [ ] **Double scroll fix**: File tree requires two separate scrolls to view bottom content. Single scroll should cover the full tree even when folders are expanded. Scroll alignment breaks on folder expansion.
-- [ ] **Panel header toggle cutoff**: Left and right sidebar headers clip the panel toggle buttons. User can correct manually but shouldn't have to.
-- [ ] **"+" button repositioning**: Move the "+" action button to the left of the extensions/calendar icons. Horizontal overflow scrollable, but expansion toggle must persist outside the scroll.
-- [ ] **Root pseudo-selectable**: Make "Root" feel like part of the file tree (clickable, highlights). Selecting Root shows total file count in status bar.
-- [ ] **Status bar file count**: Selecting a file shows "1 file selected" in the bottom status bar. Multi-select shows count.
-- [ ] **Inline file rename via H1**: Clicking the H1 document header enters rename mode. Changing the name updates the file tree in real-time, and vice versa.
-- [ ] **Content scroll issue**: Document content can't scroll to the bottom without moving cursor to end via keyboard. Should be scrollable naturally.
-
-### Sprint 49: Error Handling + Auth Redirects (PLANNED)
-- [ ] **Auth error redirects**: All authorization/authentication errors (401, 403, session expired) redirect to login page instead of showing "Failed to load content" errors.
-- [ ] **Graceful signed-out handling**: User should never see raw error states from being signed out. Detect auth failures at fetch/API layer and redirect.
-
----
-
-## Deferred: Resume/Cover Letter (Unscheduled)
-
-**Goal**: Pre-curated page templates for career documents with PDF export and public sharing.
-
-- [ ] System seed data (Career category, Resume + Cover Letter page templates)
-- [ ] PDF export via html2pdf.js (client-side)
-- [ ] Public sharing at /resume/[slug] (read-only, no auth)
-- [ ] AI resume enhancement prompts (context-aware system prompt)
-
----
-
-## Deferred: Editor Enhancements (Remaining Epoch 9 — Unscheduled)
+## Epoch 11: Editor Enhancements (Remaining Epoch 9 — Unscheduled)
 
 **Goal**: Complete the editor enhancements deferred from Epoch 9.
 
 - [ ] URL/OG Embeds + YouTube + Bubble Menu (text color, highlight, subscript, superscript, strikethrough, alignment)
 - [ ] Outline click → autofocus with CSS flash animation
 - [ ] Notion-style drag/reorder: blocks, list items
+- [ ] Template builder UI in settings + apply on new/existing notes
 - [ ] Snapshots / Document History (diff-based or full snapshot, 30-day retention)
 - [ ] Editor context menu, enhanced syntax highlighting, Excalidraw drawing
+
+---
+
+## Epoch 12: Main Panel Tabs + Split Workspace
+
+**Goal**: Introduce tabbed main-panel content first, then build split workspace on the same pane-aware state model.
+**Detailed plan**: [epoch-12-main-panel-tabs-and-split-workspace.md](epochs/epoch-12-main-panel-tabs-and-split-workspace.md)
+
+### Sprint 50: Tab Foundation
+- [x] Pane-aware workspace state (`panes`, `tabs`, `activePaneId`, `openContentIds`)
+- [x] Main-panel tabs with activate/reuse/close behavior
+- [x] URL reflects active content and open tabs
+- [x] Delete closes matching tabs
+- [x] Preview-tab reuse until explicit pin/focus
+- [x] Tree distinguishes active content from open content
+- [x] Sidebar active tab restored per content
+- [ ] Build + smoke gate on port `3001`
+
+### Sprint 51: Sidebar Isolation + Workspace Preservation
+- [x] Scope outline state by content/view
+- [x] Scope editor instance / AI editing state by content/view
+- [x] Scope navigation history by pane
+- [x] Restore sidebar state without bleed between tabs
+- [x] Preserve workspace restoration when leaving content and returning
+
+### Sprint 52: Dual-Pane Split
+- [x] Render dual-pane split on the same workspace model
+- [x] Focused pane drives shared sidebar state
+- [x] Maintain save and tree-highlight correctness across both panes
+- [x] Manual smoke on port `3001`
+
+### Sprint 53: Quad Split
+- [x] Expand to four-corner layout
+- [x] Keep pane activation and shared-sidebar behavior deterministic
+- [x] Pass final stability gate under rapid pane/tab switching
+
+### Sprint 54: Tab Drag + Adaptive Pane Reshaping
+- [x] Drag tabs between existing panes
+- [x] When only one pane is visible, drag tabs into standardized viewport targets to create vertical, horizontal, or quad splits
+- [x] Collapse the workspace to the simplest valid layout when panes are emptied by tab moves
+- [x] Treat explicit drag-and-drop as the source of truth for tab placement, separate from toolbar-driven layout memory
+- [ ] Manual smoke on port `3001`
 
 ---
 
@@ -237,12 +194,6 @@ Adhoc tech debt sprint. Gated: resolve one issue before moving to next. Skip if 
 
 ### UI Revisions
 - Default themes + custom user themes, editor styling, font/color customization
-
-### Main Panel Multiple Tabs + Workspace Preservation
-- Multi-document editing, Obsidian-like tabs (file name as tab label), collaboration-friendly
-- **Workspace preservation**: Navigating away (e.g., to Settings) and back restores the full tab state — all open tabs, active tab, scroll positions
-- Tabs show file names; the existing title header in the content area remains as-is
-- User can view multiple content nodes simultaneously via tabs
 
 ### YouTube Playlists & Summarizing (much later)
 - Playlist support, AI video summarization, transcript indexing
@@ -274,7 +225,7 @@ Adhoc tech debt sprint. Gated: resolve one issue before moving to next. Skip if 
 - [ ] **Storage Settings: show existing providers** — The Providers tab should list all currently configured storage providers (with status, type, default indicator) and allow editing/removing them. Currently only shows "+ Add Provider" with no visibility into what's already configured. (3 pts)
 
 ### Bug Fixes
-- [x] **Desktop logo missing in content layout** — Moved to Sprint 48 (UI Cleanups)
+- [ ] **Desktop logo missing in content layout** — The Digital Garden tree logo inside the gold medallion (NotesNavBar → NotesLogo → CompactLogo) renders on mobile and the home page but is invisible on desktop in the content layout. The gold medallion ring appears but the animated SVG tree inside is blank. Likely a `useLogoAnimation` issue where SVG paths stay at `opacity: 0` if the draw animation fails silently on desktop. (2 pts)
 
 ### Performance & UX
 - [ ] Folder view performance tuning for large folders
@@ -309,5 +260,5 @@ Adhoc tech debt sprint. Gated: resolve one issue before moving to next. Skip if 
 
 ---
 
-**Last Updated**: Apr 2, 2026
-**Next Review**: Sprint 48 kickoff
+**Last Updated**: Mar 12, 2026
+**Next Review**: Sprint 41 kickoff

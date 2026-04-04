@@ -1,163 +1,191 @@
 /**
  * Main Panel Content-View Header
  *
- * Navigation and management toolbar for the active content view.
- * Spans the full content-view width and will house multiple control components.
- *
- * Current Features:
- * - Back/forward navigation buttons (left-aligned)
- * - Hold-down back button (250ms) shows history dropdown
- * - Persistent navigation history (max 100 items, no duplicates)
- * - Click history item to navigate directly
- *
- * Planned Features:
- * - Content search bar (for multi-note views)
- * - Metadata editor for non-note content (tags, categories)
- * - Content-view management tools (split view, focus mode, etc.)
- *
- * Note: This header is specific to the content-view. For multi-note views
- * within the main panel, each view will have its own instance of this header.
+ * Shared workspace navigation for the currently focused pane.
  */
 
 "use client";
 
+import type { ComponentType, RefObject } from "react";
 import { useEffect, useState, useCallback, useRef, memo } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
-import { useContentStore } from "@/state/content-store";
-import { useNavigationHistoryStore } from "@/state/navigation-history-store";
+import {
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  Columns2,
+  Grid2x2,
+  Rows2,
+  Square,
+} from "lucide-react";
+import {
+  getPaneActiveContentId,
+  useContentStore,
+  type WorkspaceLayoutMode,
+  type WorkspacePaneId,
+} from "@/state/content-store";
+import {
+  EMPTY_PANE_HISTORY,
+  useNavigationHistoryStore,
+} from "@/state/navigation-history-store";
 import { NavigationHistoryDropdown } from "./NavigationHistoryDropdown";
 
-const HOLD_THRESHOLD_MS = 250; // 250ms for comfortable hold detection
+const HOLD_THRESHOLD_MS = 250;
 
-// Memoized button component to prevent re-renders
-const NavigationButtons = memo(({
-  canGoBack,
-  canGoForward,
-  onBackMouseDown,
-  onBackMouseUp,
-  onBackMouseLeave,
-  onForwardClick,
-  backButtonRef
-}: {
+const LAYOUT_OPTIONS: Array<{
+  mode: WorkspaceLayoutMode;
+  label: string;
+  icon: ComponentType<{ className?: string }>;
+}> = [
+  { mode: "single", label: "Single Pane", icon: Square },
+  { mode: "dual-vertical", label: "Vertical Split", icon: Columns2 },
+  { mode: "dual-horizontal", label: "Horizontal Split", icon: Rows2 },
+  { mode: "quad", label: "Quad Split", icon: Grid2x2 },
+];
+
+interface NavigationButtonsProps {
   canGoBack: boolean;
   canGoForward: boolean;
   onBackMouseDown: () => void;
   onBackMouseUp: () => void;
   onBackMouseLeave: () => void;
   onForwardClick: () => void;
-  backButtonRef: React.RefObject<HTMLButtonElement | null>;
-}) => (
-  <div className="flex items-center gap-0.5 border-b border-white/10 px-2 py-1">
-    <button
-      ref={backButtonRef}
-      onMouseDown={onBackMouseDown}
-      onMouseUp={onBackMouseUp}
-      onMouseLeave={onBackMouseLeave}
-      disabled={!canGoBack}
-      className="rounded p-1 hover:bg-white/10 active:bg-white/5 focus:outline-none disabled:opacity-30 disabled:cursor-not-allowed"
-      title="Go back • Hold for history"
-    >
-      <ChevronLeft className="h-4 w-4" />
-    </button>
-    <button
-      onClick={onForwardClick}
-      disabled={!canGoForward}
-      className="rounded p-1 hover:bg-white/10 active:bg-white/5 focus:outline-none disabled:opacity-30 disabled:cursor-not-allowed"
-      title="Go forward"
-    >
-      <ChevronRight className="h-4 w-4" />
-    </button>
-  </div>
-));
+  backButtonRef: RefObject<HTMLButtonElement | null>;
+}
+
+const NavigationButtons = memo(function NavigationButtons({
+  canGoBack,
+  canGoForward,
+  onBackMouseDown,
+  onBackMouseUp,
+  onBackMouseLeave,
+  onForwardClick,
+  backButtonRef,
+}: NavigationButtonsProps) {
+  return (
+    <div className="flex items-center gap-0.5">
+      <button
+        ref={backButtonRef}
+        onMouseDown={onBackMouseDown}
+        onMouseUp={onBackMouseUp}
+        onMouseLeave={onBackMouseLeave}
+        disabled={!canGoBack}
+        className="rounded p-1 hover:bg-white/10 active:bg-white/5 focus:outline-none disabled:cursor-not-allowed disabled:opacity-30"
+        title="Go back • Hold for history"
+      >
+        <ChevronLeft className="h-4 w-4" />
+      </button>
+      <button
+        onClick={onForwardClick}
+        disabled={!canGoForward}
+        className="rounded p-1 hover:bg-white/10 active:bg-white/5 focus:outline-none disabled:cursor-not-allowed disabled:opacity-30"
+        title="Go forward"
+      >
+        <ChevronRight className="h-4 w-4" />
+      </button>
+    </div>
+  );
+});
+
+interface MainPanelNavigationProps {
+  paneId: WorkspacePaneId;
+}
 
 NavigationButtons.displayName = "NavigationButtons";
 
-export function MainPanelNavigation() {
-  const selectedContentId = useContentStore((state) => state.selectedContentId);
+export function MainPanelNavigation({ paneId }: MainPanelNavigationProps) {
+  const layoutMode = useContentStore((state) => state.layoutMode);
+  const paneContentId = useContentStore((state) => getPaneActiveContentId(state, paneId));
   const setSelectedContentId = useContentStore((state) => state.setSelectedContentId);
+  const setLayoutMode = useContentStore((state) => state.setLayoutMode);
 
-  // Subscribe to store state for reactive button states
-  const history = useNavigationHistoryStore((state) => state.history);
-  const currentIndex = useNavigationHistoryStore((state) => state.currentIndex);
+  const paneHistory = useNavigationHistoryStore((state) =>
+    state.byPaneId[paneId] ?? EMPTY_PANE_HISTORY
+  );
   const addToHistory = useNavigationHistoryStore((state) => state.addToHistory);
   const historyGoBack = useNavigationHistoryStore((state) => state.goBack);
   const historyGoForward = useNavigationHistoryStore((state) => state.goForward);
   const getBackHistory = useNavigationHistoryStore((state) => state.getBackHistory);
 
-  // Dropdown state
   const [showDropdown, setShowDropdown] = useState(false);
   const [dropdownPosition, setDropdownPosition] = useState({ x: 0, y: 0 });
+  const [isLayoutMenuOpen, setIsLayoutMenuOpen] = useState(false);
 
-  // Hold detection state
   const holdTimerRef = useRef<NodeJS.Timeout | null>(null);
   const isHoldingRef = useRef(false);
   const backButtonRef = useRef<HTMLButtonElement>(null);
-
-  // Use ref instead of state to prevent double-triggering the effect
+  const layoutMenuRef = useRef<HTMLDivElement>(null);
+  const layoutButtonRef = useRef<HTMLButtonElement>(null);
   const isNavigatingRef = useRef(false);
 
-  // Track content ID changes and add to history
   useEffect(() => {
-    // Don't update history if we're actively navigating (back/forward)
     if (isNavigatingRef.current) {
       isNavigatingRef.current = false;
       return;
     }
 
-    // Add to history when content changes
-    addToHistory(selectedContentId);
-  }, [selectedContentId, addToHistory]);
+    addToHistory(paneContentId, paneId);
+  }, [paneContentId, paneId, addToHistory]);
 
-  // Derived state (computed from store)
-  const canGoBack = currentIndex > 0;
-  const canGoForward = currentIndex < history.length - 1;
+  useEffect(() => {
+    if (!isLayoutMenuOpen) return;
 
-  // Navigation handlers
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Node;
+      const isClickInsideMenu = layoutMenuRef.current?.contains(target);
+      const isClickInsideButton = layoutButtonRef.current?.contains(target);
+
+      if (!isClickInsideMenu && !isClickInsideButton) {
+        setIsLayoutMenuOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [isLayoutMenuOpen]);
+
+  const canGoBack = paneHistory.currentIndex > 0;
+  const canGoForward = paneHistory.currentIndex < paneHistory.history.length - 1;
+
   const goBack = useCallback(() => {
-    const contentId = historyGoBack();
+    const contentId = historyGoBack(paneId);
     if (contentId !== null) {
       isNavigatingRef.current = true;
-      setSelectedContentId(contentId);
+      setSelectedContentId(contentId, { paneId });
     }
-  }, [historyGoBack, setSelectedContentId]);
+  }, [historyGoBack, paneId, setSelectedContentId]);
 
   const goForward = useCallback(() => {
-    const contentId = historyGoForward();
+    const contentId = historyGoForward(paneId);
     if (contentId !== null) {
       isNavigatingRef.current = true;
-      setSelectedContentId(contentId);
+      setSelectedContentId(contentId, { paneId });
     }
-  }, [historyGoForward, setSelectedContentId]);
+  }, [historyGoForward, paneId, setSelectedContentId]);
 
-  // Navigate to specific history item
   const navigateToHistoryItem = useCallback(
     (contentId: string | null) => {
+      if (!contentId) return;
       isNavigatingRef.current = true;
-      setSelectedContentId(contentId);
-      // This will add to history via the useEffect above
+      setSelectedContentId(contentId, { paneId });
     },
-    [setSelectedContentId]
+    [paneId, setSelectedContentId]
   );
 
-  // Hold-down detection for back button
   const handleBackMouseDown = useCallback(() => {
     if (!canGoBack) return;
 
     isHoldingRef.current = true;
 
-    // Store position for dropdown
     const rect = backButtonRef.current?.getBoundingClientRect();
     if (rect) {
       setDropdownPosition({
         x: rect.left,
-        y: rect.bottom + 4, // 4px below button
+        y: rect.bottom + 4,
       });
     }
 
-    // Start hold timer
     holdTimerRef.current = setTimeout(() => {
       if (isHoldingRef.current) {
-        // Show dropdown on hold
         setShowDropdown(true);
       }
     }, HOLD_THRESHOLD_MS);
@@ -166,22 +194,19 @@ export function MainPanelNavigation() {
   const handleBackMouseUp = useCallback(() => {
     if (!canGoBack) return;
 
-    // Clear hold timer
     if (holdTimerRef.current) {
       clearTimeout(holdTimerRef.current);
       holdTimerRef.current = null;
     }
 
-    // If not showing dropdown (regular click), navigate back
     if (!showDropdown && isHoldingRef.current) {
       goBack();
     }
 
     isHoldingRef.current = false;
-  }, [canGoBack, showDropdown, goBack]);
+  }, [canGoBack, goBack, showDropdown]);
 
   const handleBackMouseLeave = useCallback(() => {
-    // Clear hold timer if user moves mouse away
     if (holdTimerRef.current) {
       clearTimeout(holdTimerRef.current);
       holdTimerRef.current = null;
@@ -189,7 +214,6 @@ export function MainPanelNavigation() {
     isHoldingRef.current = false;
   }, []);
 
-  // Cleanup timer on unmount
   useEffect(() => {
     return () => {
       if (holdTimerRef.current) {
@@ -198,23 +222,79 @@ export function MainPanelNavigation() {
     };
   }, []);
 
+  const currentLayout =
+    LAYOUT_OPTIONS.find((option) => option.mode === layoutMode) ?? LAYOUT_OPTIONS[0];
+  const CurrentLayoutIcon = currentLayout.icon;
+
   return (
     <>
-      <NavigationButtons
-        canGoBack={canGoBack}
-        canGoForward={canGoForward}
-        onBackMouseDown={handleBackMouseDown}
-        onBackMouseUp={handleBackMouseUp}
-        onBackMouseLeave={handleBackMouseLeave}
-        onForwardClick={goForward}
-        backButtonRef={backButtonRef}
-      />
+      <div className="flex items-center border-b border-white/10 px-2 py-1">
+        <div className="flex items-center gap-2">
+          <NavigationButtons
+            canGoBack={canGoBack}
+            canGoForward={canGoForward}
+            onBackMouseDown={handleBackMouseDown}
+            onBackMouseUp={handleBackMouseUp}
+            onBackMouseLeave={handleBackMouseLeave}
+            onForwardClick={goForward}
+            backButtonRef={backButtonRef}
+          />
+          <div className="h-4 w-px bg-black/10 dark:bg-white/10" />
+          <div className="relative">
+            <button
+              ref={layoutButtonRef}
+              type="button"
+              onClick={() => setIsLayoutMenuOpen((value) => !value)}
+              className="inline-flex items-center gap-1.5 rounded-md border border-white/10 px-2.5 py-1 text-xs font-medium text-gray-600 transition-colors hover:bg-black/5 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-white/10 dark:hover:text-white"
+              title="Choose workspace layout"
+            >
+              <CurrentLayoutIcon className="h-3.5 w-3.5" />
+              <span>{currentLayout.label}</span>
+              <ChevronDown
+                className={`h-3.5 w-3.5 transition-transform ${
+                  isLayoutMenuOpen ? "rotate-180" : ""
+                }`}
+              />
+            </button>
 
-      {/* History Dropdown */}
+            {isLayoutMenuOpen && (
+              <div
+                ref={layoutMenuRef}
+                className="absolute left-0 top-full z-40 mt-2 min-w-48 rounded-md border border-white/10 bg-white/95 p-1 shadow-lg backdrop-blur-sm dark:bg-gray-900/95"
+              >
+                {LAYOUT_OPTIONS.map((option) => {
+                  const Icon = option.icon;
+                  const isActive = option.mode === layoutMode;
+
+                  return (
+                    <button
+                      key={option.mode}
+                      type="button"
+                      onClick={() => {
+                        setLayoutMode(option.mode);
+                        setIsLayoutMenuOpen(false);
+                      }}
+                      className={`flex w-full items-center gap-2 rounded px-2.5 py-2 text-left text-sm transition-colors ${
+                        isActive
+                          ? "bg-gold-primary/10 text-gold-primary"
+                          : "text-gray-700 hover:bg-black/5 hover:text-gray-900 dark:text-gray-200 dark:hover:bg-white/5 dark:hover:text-white"
+                      }`}
+                    >
+                      <Icon className="h-4 w-4 shrink-0" />
+                      <span>{option.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
       <NavigationHistoryDropdown
         isOpen={showDropdown}
         triggerPosition={dropdownPosition}
-        historyItems={getBackHistory()}
+        historyItems={getBackHistory(paneId)}
         onSelectItem={navigateToHistoryItem}
         onClose={() => setShowDropdown(false)}
       />

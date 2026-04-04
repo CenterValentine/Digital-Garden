@@ -21,7 +21,6 @@ import { useEditorInstanceStore } from "@/state/editor-instance-store";
 import { AiEditOrchestrator, parseEditPayload } from "@/lib/domain/editor/ai";
 import { ChatMessage } from "./ChatMessage";
 import { ChatInput } from "./ChatInput";
-import { ChatSnippetMenu } from "./ChatSnippetMenu";
 import { ModelPicker, useModelSelection } from "./ModelPicker";
 import { BASE_TOOL_METADATA, BASE_TOOL_IDS } from "@/lib/domain/ai/tools/metadata";
 import type { SuggestionItem } from "./ChatSuggestionMenu";
@@ -35,9 +34,12 @@ function getMessageText(message: { parts: Array<{ type: string; text?: string }>
     .trim();
 }
 
-export function ChatPanel() {
+interface ChatPanelProps {
+  contentId?: string | null;
+}
+
+export function ChatPanel({ contentId }: ChatPanelProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
-  const selectedContentId = useContentStore((s) => s.selectedContentId);
   const [input, setInput] = useState("");
 
   // Model selection — defaults from user settings, overridable per-session
@@ -47,23 +49,9 @@ export function ChatPanel() {
   const modelIdRef = useRef(modelId);
   modelIdRef.current = modelId;
 
-  // ─── Attached snippets (Sprint 45) ───
-  const [attachedSnippetIds, setAttachedSnippetIds] = useState<string[]>([]);
-  const snippetIdsRef = useRef<string[]>([]);
-
-  const handleSnippetAttached = useCallback((snippetId: string) => {
-    setAttachedSnippetIds((prev) => {
-      const next = prev.includes(snippetId)
-        ? prev.filter((id) => id !== snippetId)
-        : [...prev, snippetId];
-      snippetIdsRef.current = next;
-      return next;
-    });
-  }, []);
-
   // Keep refs for the memoized transport closure
-  const contentIdRef = useRef(selectedContentId);
-  contentIdRef.current = selectedContentId;
+  const contentIdRef = useRef(contentId);
+  contentIdRef.current = contentId;
   const mentionedIdsRef = useRef<string[]>([]);
 
   const transport = useMemo(
@@ -75,10 +63,8 @@ export function ChatPanel() {
           providerId: providerIdRef.current,
           modelId: modelIdRef.current,
           mentionedContentIds: mentionedIdsRef.current,
-          snippetIds: snippetIdsRef.current,
         }),
       }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     []
   );
 
@@ -142,7 +128,7 @@ export function ChatPanel() {
     setMessages,
   } = useChat({
     transport,
-    id: "sidebar-chat",
+    id: contentId ? `sidebar-chat:${contentId}` : "sidebar-chat",
     // Batch UI updates every 100ms for smooth, readable streaming
     experimental_throttle: 100,
     onError: (err) => {
@@ -151,17 +137,23 @@ export function ChatPanel() {
   });
 
   // ─── AI Edit Orchestrator ───
-  const isAiEditing = useEditorInstanceStore((s) => s.isAiEditing);
+  const isAiEditing = useEditorInstanceStore((s) =>
+    s.isAiEditingFor(contentId)
+  );
 
   const orchestratorRef = useRef<AiEditOrchestrator | null>(null);
 
   // Create orchestrator on mount, destroy on unmount
   useEffect(() => {
     const orchestrator = new AiEditOrchestrator(
-      () => useEditorInstanceStore.getState().editor,
+      () => useEditorInstanceStore.getState().getEditor(contentIdRef.current),
       {
         onStateChange: (editing) => {
-          useEditorInstanceStore.getState().setAiEditing(editing);
+          if (contentIdRef.current) {
+            useEditorInstanceStore
+              .getState()
+              .setAiEditing(contentIdRef.current, editing);
+          }
         },
         onEditResult: (result) => {
           if (!result.success && result.error) {
@@ -218,19 +210,17 @@ export function ChatPanel() {
   }, [messages]);
 
   // Reset chat when switching content nodes
-  const prevContentIdRef = useRef(selectedContentId);
+  const prevContentIdRef = useRef(contentId);
   useEffect(() => {
-    if (selectedContentId !== prevContentIdRef.current) {
-      prevContentIdRef.current = selectedContentId;
+    if (contentId !== prevContentIdRef.current) {
+      prevContentIdRef.current = contentId;
       // Abort any in-progress AI edits when switching documents
       orchestratorRef.current?.abort();
       processedToolIdsRef.current.clear();
       setMessages([]);
       setInput("");
-      setAttachedSnippetIds([]);
-      snippetIdsRef.current = [];
     }
-  }, [selectedContentId, setMessages]);
+  }, [contentId, setMessages]);
 
   // Auto-scroll to bottom on new messages
   useEffect(() => {
@@ -266,10 +256,6 @@ export function ChatPanel() {
 
     setInput("");
     sendMessage({ text });
-
-    // Clear attached snippets after send — they're per-message context
-    setAttachedSnippetIds([]);
-    snippetIdsRef.current = [];
   }, [input, sendMessage]);
 
   // Save conversation — creates a chat ContentNode
@@ -361,7 +347,11 @@ export function ChatPanel() {
         action: {
           label: "Open",
           onClick: () => {
-            useContentStore.getState().setSelectedContentId(data.data.id);
+            useContentStore.getState().setSelectedContentId(data.data.id, {
+              title: data.data.title,
+              contentType: "chat",
+              pin: true,
+            });
           },
         },
       });
@@ -379,6 +369,16 @@ export function ChatPanel() {
 
   const hasMessages = messages.length > 0;
   const isActive = status === "streaming" || status === "submitted";
+
+  if (!contentId) {
+    return (
+      <div className="flex h-full items-center justify-center p-4 text-center">
+        <div className="text-sm text-gray-400">
+          Select content to start an AI chat
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-full flex-col">
@@ -458,12 +458,6 @@ export function ChatPanel() {
         mentionResults={mentionResults}
         commandItems={commandItems}
         onMentionInserted={handleMentionInserted}
-        onSnippetAttached={handleSnippetAttached}
-        attachedSnippetIds={attachedSnippetIds}
-      />
-      <ChatSnippetMenu
-        onSelect={handleSnippetAttached}
-        selectedIds={attachedSnippetIds}
       />
 
       {/* Model picker — compact, below input */}

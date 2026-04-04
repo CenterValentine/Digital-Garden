@@ -39,16 +39,9 @@ export interface NewContentMenuItem {
   submenu?: NewContentMenuItem[]; // NEW: Support for submenus
 }
 
-/** Page template data passed to the menu for submenu generation */
-export interface PageTemplateMenuData {
-  categories: { id: string; name: string; isSystem: boolean }[];
-  templates: { id: string; title: string; categoryId: string; defaultTitle?: string | null }[];
-}
-
 export interface NewContentCallbacks {
   onCreateFolder?: (parentId: string | null) => void | Promise<void>;
   onCreateNote?: (parentId: string | null) => void | Promise<void>;
-  onCreateNoteFromTemplate?: (parentId: string | null, templateId: string, defaultTitle?: string) => void | Promise<void>;
   onCreateFile?: (parentId: string | null) => void | Promise<void>;
   onCreateCode?: (parentId: string | null) => void | Promise<void>;
   onCreateHtml?: (parentId: string | null) => void | Promise<void>;
@@ -75,8 +68,7 @@ export interface NewContentCallbacks {
  */
 export function getNewContentMenuItems(
   callbacks: NewContentCallbacks,
-  parentId?: string | null,
-  pageTemplateData?: PageTemplateMenuData,
+  parentId?: string | null
 ): NewContentMenuItem[] {
   const items: NewContentMenuItem[] = [];
   // Normalize parentId: undefined becomes null
@@ -84,59 +76,14 @@ export function getNewContentMenuItems(
 
   // Phase 1: Core content types
   if (callbacks.onCreateNote) {
-    const hasTemplates = pageTemplateData && pageTemplateData.templates.length > 0;
-
-    if (hasTemplates && callbacks.onCreateNoteFromTemplate) {
-      // Build submenu: Blank Note + templates grouped by category
-      const submenu: NewContentMenuItem[] = [
-        {
-          id: "new-note-blank",
-          label: "Blank Note",
-          icon: <File className="h-4 w-4" />,
-          shortcut: "A",
-          onClick: () => callbacks.onCreateNote?.(normalizedParentId),
-        },
-      ];
-
-      // Group templates by category
-      const byCategory = new Map<string, { name: string; isSystem: boolean; templates: typeof pageTemplateData.templates }>();
-      for (const cat of pageTemplateData.categories) {
-        const catTemplates = pageTemplateData.templates.filter((t) => t.categoryId === cat.id);
-        if (catTemplates.length > 0) {
-          byCategory.set(cat.id, { name: cat.name, isSystem: cat.isSystem, templates: catTemplates });
-        }
-      }
-
-      for (const [catId, { name, templates }] of byCategory) {
-        submenu.push({
-          id: `new-note-cat-${catId}`,
-          label: name,
-          icon: <Folder className="h-4 w-4" />,
-          submenu: templates.map((t) => ({
-            id: `new-note-tpl-${t.id}`,
-            label: t.title,
-            icon: <FileText className="h-4 w-4" />,
-            onClick: () => callbacks.onCreateNoteFromTemplate?.(normalizedParentId, t.id, t.defaultTitle || t.title),
-          })),
-        });
-      }
-
-      items.push({
-        id: "new-note",
-        label: "Note (Markdown)",
-        icon: <File className="h-4 w-4" />,
-        submenu,
-      });
-    } else {
-      items.push({
-        id: "new-note",
-        label: "Note (Markdown)",
-        icon: <File className="h-4 w-4" />,
-        shortcut: "A",
-        onClick: () => callbacks.onCreateNote?.(normalizedParentId),
-        disabled: !callbacks.onCreateNote,
-      });
-    }
+    items.push({
+      id: "new-note",
+      label: "Note (Markdown)",
+      icon: <File className="h-4 w-4" />,
+      shortcut: "A",
+      onClick: () => callbacks.onCreateNote?.(normalizedParentId),
+      disabled: !callbacks.onCreateNote,
+    });
   }
 
   if (callbacks.onCreateFolder) {

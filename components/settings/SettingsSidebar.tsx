@@ -150,45 +150,6 @@ const UserIcon = () => (
   </svg>
 );
 
-const ScissorsIcon = () => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    width="16"
-    height="16"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <circle cx="6" cy="6" r="3" />
-    <path d="M8.12 8.12 12 12" />
-    <path d="M20 4 8.12 15.88" />
-    <circle cx="6" cy="18" r="3" />
-    <path d="M14.8 14.8 20 20" />
-  </svg>
-);
-
-const CalendarIcon = () => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    width="16"
-    height="16"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <path d="M8 2v4" />
-    <path d="M16 2v4" />
-    <rect width="18" height="18" x="3" y="4" rx="2" />
-    <path d="M3 10h18" />
-  </svg>
-);
-
 interface NavItem {
   href: string;
   label: string;
@@ -226,21 +187,9 @@ const navItems: NavItem[] = [
     badge: "New",
   },
   {
-    href: "/settings/templates",
-    label: "Templates & Snippets",
-    icon: <ScissorsIcon />,
-    badge: "New",
-  },
-  {
     href: "/settings/preferences",
     label: "Preferences",
     icon: <SlidersIcon />,
-  },
-  {
-    href: "/settings/calendar",
-    label: "Calendar",
-    icon: <CalendarIcon />,
-    badge: "New",
   },
   {
     href: "/settings/account",

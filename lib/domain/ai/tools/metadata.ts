@@ -18,7 +18,6 @@ export const BASE_TOOL_IDS = [
   "getCurrentNote",
   "createNote",
   "generate_image",
-  "getSnippets",
 ] as const;
 
 export type BaseToolId = (typeof BASE_TOOL_IDS)[number];
@@ -44,11 +43,6 @@ export const BASE_TOOL_METADATA: Record<
     name: "Generate Image",
     description:
       "Generate an AI image from a text prompt using DALL·E, Imagen, FLUX, and other providers",
-  },
-  getSnippets: {
-    name: "Get Snippets",
-    description:
-      "Search the user's knowledge snippets for facts, ideas, and notes",
   },
 };
 

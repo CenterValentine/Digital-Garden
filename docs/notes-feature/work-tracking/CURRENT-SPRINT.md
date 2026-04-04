@@ -1,85 +1,38 @@
 ---
-sprint: 48
-epoch: 11 (Block Builder + Templates + Snippets + Input Blocks + Tech Debt)
-duration: 2026-04-02
-branch: main
-status: planned
+sprint: 54
+epoch: 12 (Main Panel Tabs + Split Workspace)
+duration: multi-session
+branch: codex/epoch-12-sprint-54
+status: in_progress
 ---
 
-# Sprint 48: UI Cleanups + Tech Debt
+# Sprint 54: Tab Drag + Adaptive Pane Reshaping
 
 ## Sprint Goal
-Adhoc tech debt sprint addressing visual bugs, UX inconsistencies, and design system alignment. Each issue is gated — resolve before moving to next. Skip if blocked.
+Make tab drag-and-drop a first-class workspace interaction so users can move tabs between panes, create new splits directly from a drag, and trust the workspace to reshape itself to the simplest valid layout when pane occupancy changes.
 
-**Status**: Planned
+**Status**: In Progress
 
 ## Success Criteria
-- [ ] `pnpm build` passes after each fix
-- [ ] Logo GIF visible on desktop
-- [ ] Favicon and tab metadata updated
-- [ ] Neon/debug styling replaced with glass-ui tokens
-- [ ] File tree scrollable with single scroll
-- [ ] Panel header toggles not clipped
-- [ ] "+" button repositioned
-- [ ] Root pseudo-selectable with file count in status bar
-- [ ] Inline file rename via H1 header
-- [ ] Content scrollable to bottom without keyboard workaround
+- [x] `pnpm build` passes
+- [x] Tabs can be dragged between existing visible panes
+- [x] Single-pane workspace exposes standardized drop targets to create vertical, horizontal, or quad splits
+- [x] Direct tab dragging updates pane preference as the source of truth for future layout derivation
+- [x] Workspace collapses to the simplest valid layout when tab moves empty panes
+- [ ] Manual smoke on `http://localhost:3001`
 
-## Work Items (Gated — sequential)
+## Implemented
+- `state/content-store.ts`
+  - adds `moveContentTabToPane()` for drag-driven pane reassignment
+  - derives the next layout from persistent tab axis preferences after direct moves
+  - collapses the workspace to the simplest valid layout consistent with the updated tab placement
+- `components/content/MainPanelWorkspace.tsx`
+  - makes pane shells droppable for tab moves
+  - adds single-pane standardized drag targets for right split, bottom split, and quad split creation
+- `components/content/headers/MainPanelHeader.tsx`
+  - makes tabs draggable and keeps drag styling conservative within the existing tab system
 
-### 1. Logo GIF Fix
-- [ ] Fix animated tree logo inside gold medallion (NotesNavBar → CompactLogo)
-- [ ] Desktop renders ring but SVG tree is invisible
-- [ ] Likely `useLogoAnimation` issue: SVG paths stay at `opacity: 0` if draw animation fails
-
-### 2. Favicon + Tab Metadata
-- [ ] Copy logo to make it a favicon
-- [ ] Update tab title to "Digital Garden"
-- [ ] Review/update OG metadata (og:title, og:description, og:image)
-
-### 3. Neon Formatting Removal
-- [ ] Replace neon/debug styling (JSON viewer, debug panels) with glass-ui design system
-- [ ] Convert any remaining neon formatting to glass surfaces/intents
-
-### 4. Double Scroll Fix
-- [ ] File tree requires two scrolls to view bottom content
-- [ ] Single scroll should cover full tree even when folders are expanded
-- [ ] Scroll alignment breaks on folder expansion
-
-### 5. Panel Header Toggle Cutoff
-- [ ] Left and right sidebar headers clip panel toggle buttons
-- [ ] User shouldn't need to manually correct this
-
-### 6. "+" Button Repositioning
-- [ ] Move "+" action button to the left of extensions/calendar icons
-- [ ] Horizontal overflow scrollable but expansion toggle must persist outside scroll area
-
-### 7. Root Pseudo-Selectable
-- [ ] Make "Root" clickable and highlightable like a tree node
-- [ ] Selecting Root shows total file count in status bar
-
-### 8. Status Bar File Count
-- [ ] Selecting a file shows "1 file selected" in bottom status bar
-- [ ] Multi-select shows count of selected files
-
-### 9. Inline File Rename via H1
-- [ ] Clicking H1 document header enters rename mode
-- [ ] Name change updates file tree in real-time
-- [ ] File tree rename updates H1 header in real-time
-
-### 10. Content Scroll Issue
-- [ ] Document content can't scroll to bottom without moving cursor via keyboard
-- [ ] Should be scrollable naturally with mouse/trackpad
-
----
-
-# Sprint 49: Error Handling + Auth Redirects (Planned)
-
-## Sprint Goal
-Improve error handling so users never see raw error states from auth failures.
-
-### Work Items
-- [ ] All 401/403/session-expired errors redirect to login page
-- [ ] "Failed to load content" errors from signed-out state replaced with graceful redirect
-- [ ] Detect auth failures at fetch/API layer and redirect
-- [ ] No raw error states visible to signed-out users
+## Notes
+- This worktree runs on port `3001`.
+- Sprint 53 is committed at `99f48ba` before Sprint 54 work began.
+- Full interaction smoke is still pending; current verification is build-only.

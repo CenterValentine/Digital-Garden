@@ -333,32 +333,6 @@ export class MarkdownConverter implements DocumentConverter {
           ""
         );
 
-      // Sprint 47: Input blocks → plain text values (no chrome)
-      case "textInput":
-        return node.attrs?.value ? `${node.attrs.label ? `${node.attrs.label}: ` : ""}${node.attrs.value}` : "";
-      case "numberInput":
-        return `${node.attrs?.label ? `${node.attrs.label}: ` : ""}${node.attrs?.value ?? 0}${node.attrs?.unit ? ` ${node.attrs.unit}` : ""}`;
-      case "dateInput":
-        return node.attrs?.value ? `${node.attrs.label ? `${node.attrs.label}: ` : ""}${node.attrs.value}` : "";
-      case "selectInput": {
-        const selLabel = node.attrs?.label ? `${node.attrs.label}: ` : "";
-        if (node.attrs?.allowMultiple && node.attrs?.selectedValues?.length) {
-          return `${selLabel}${node.attrs.selectedValues.join(", ")}`;
-        }
-        return node.attrs?.selectedValue ? `${selLabel}${node.attrs.selectedValue}` : "";
-      }
-      case "checkboxInput": {
-        const cbLabel = node.attrs?.label ? `${node.attrs.label}: ` : "";
-        if (node.attrs?.groupMode && node.attrs?.selectedValues?.length) {
-          return `${cbLabel}${node.attrs.selectedValues.join(", ")}`;
-        }
-        return `${cbLabel}${node.attrs?.checked ? "Yes" : "No"}`;
-      }
-      case "ratingInput":
-        return `${node.attrs?.label ? `${node.attrs.label}: ` : ""}${node.attrs?.value ?? 0}/${node.attrs?.maxRating ?? 5}`;
-      case "promptInput":
-        return node.attrs?.response ? `${node.attrs.label ? `${node.attrs.label}: ` : ""}${node.attrs.response}` : "";
-
       default:
         // Unknown node type - try to serialize children
         return (

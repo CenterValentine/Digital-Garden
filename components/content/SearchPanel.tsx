@@ -211,8 +211,11 @@ export function SearchPanel() {
         selectPrevious();
       } else if (e.key === "Enter" && results.length > 0 && selectedIndex >= 0) {
         e.preventDefault();
-        // Set the selected content ID - this will trigger the main panel to load the content
-        setSelectedContentId(results[selectedIndex].id);
+        const result = results[selectedIndex];
+        setSelectedContentId(result.id, {
+          title: result.title,
+          contentType: result.type,
+        });
         // Close search after a brief delay to allow state updates to propagate
         setTimeout(() => {
           closeSearch();
@@ -227,15 +230,17 @@ export function SearchPanel() {
     console.log('[SearchPanel] Clicking result:', result.id, result.title, 'type:', result.type);
 
     if (result.type === 'folder') {
-      // For folders: select in tree and expand
-      console.log('[SearchPanel] Selecting folder in tree');
       setSelectedIds([result.id]); // Select folder in file tree
       setExpanded(result.id, true); // Expand the folder
-      setSelectedContentId(null); // Clear editor (don't try to open folder)
+      setSelectedContentId(result.id, {
+        title: result.title,
+        contentType: result.type,
+      });
     } else {
-      // For notes: open in editor
-      console.log('[SearchPanel] Opening note in editor');
-      setSelectedContentId(result.id);
+      setSelectedContentId(result.id, {
+        title: result.title,
+        contentType: result.type,
+      });
 
       // If autoScrollToMatch is enabled, add the search query to the URL
       if (filter.autoScrollToMatch && filter.query.trim()) {

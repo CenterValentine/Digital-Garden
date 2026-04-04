@@ -14,7 +14,6 @@ import { LeftSidebar } from "./LeftSidebar";
 import { CollapsibleRightPanel } from "./CollapsibleRightPanel";
 import { StatusBar } from "./StatusBar";
 import NotesNavBar from "@/components/client/nav/NotesNavBar";
-import { CalendarQuickAddDialog } from "@/components/calendar/CalendarQuickAddDialog";
 
 interface ConditionalNotesLayoutProps {
   children: React.ReactNode;
@@ -61,7 +60,7 @@ export function ConditionalNotesLayout({
             </div>
 
             {/* Main Panel */}
-            <div className="h-full">{children}</div>
+            <div className="flex h-full min-h-0 flex-col overflow-hidden">{children}</div>
 
             {/* Right Panel - Collapsible with smooth transitions */}
             <CollapsibleRightPanel />
@@ -79,8 +78,6 @@ export function ConditionalNotesLayout({
           <StatusBar />
         </div>
       </div>
-
-      <CalendarQuickAddDialog />
     </>
   );
 }

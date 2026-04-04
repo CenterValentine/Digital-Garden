@@ -26,6 +26,7 @@ interface ContentChild {
 
 export function ListView({
   folderId,
+  paneId,
   folderTitle,
   sortMode,
   includeReferencedContent,
@@ -33,7 +34,8 @@ export function ListView({
   const glass0 = getSurfaceStyles("glass-0");
   const [children, setChildren] = useState<ContentChild[]>([]);
   const [loading, setLoading] = useState(true);
-  const { selectedContentId } = useContentStore();
+  const selectedContentId = useContentStore((state) => state.selectedContentId);
+  const setSelectedContentId = useContentStore((state) => state.setSelectedContentId);
 
   useEffect(() => {
     loadChildren();
@@ -99,12 +101,11 @@ export function ListView({
   };
 
   const handleItemClick = (child: ContentChild) => {
-    // Trigger content selection
-    window.dispatchEvent(
-      new CustomEvent("content-selected", {
-        detail: { contentId: child.id },
-      })
-    );
+    setSelectedContentId(child.id, {
+      title: child.title,
+      contentType: child.contentType,
+      paneId,
+    });
   };
 
   if (loading) {

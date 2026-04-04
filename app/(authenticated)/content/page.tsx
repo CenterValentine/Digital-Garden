@@ -5,20 +5,16 @@
  */
 
 // app/(authenticated)/content/page.tsx
-import { MainPanelHeader } from "@/components/content/headers/MainPanelHeader";
-import { MainPanelContent } from "@/components/content/content/MainPanelContent";
+import { MainPanelWorkspace } from "@/components/content/MainPanelWorkspace";
 import { EditorSkeleton } from "@/components/content/skeletons/EditorSkeleton";
 import { Suspense } from "react";
 
 export default function NotesPage() {
   return (
-    <div className="flex h-full flex-col">
-      {/* Header renders immediately */}
-      <MainPanelHeader />
-
-      {/* Content loads progressively */}
+    <div className="flex h-full min-h-0 flex-col overflow-hidden">
+      {/* Workspace loads progressively */}
       <Suspense fallback={<EditorSkeleton />}>
-        <MainPanelContent />
+        <MainPanelWorkspace />
       </Suspense>
     </div>
   );

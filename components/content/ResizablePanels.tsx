@@ -17,7 +17,6 @@ import { useLeftPanelCollapseStore } from "@/state/left-panel-collapse-store";
 import { useRightPanelCollapseStore } from "@/state/right-panel-collapse-store";
 import { ContextMenu } from "./context-menu/ContextMenu";
 import { fileTreeActionProvider } from "./context-menu/file-tree-actions";
-import { editorActionProvider } from "./context-menu/editor-actions";
 
 interface ResizablePanelsProps {
   children: [
@@ -146,7 +145,6 @@ export function ResizablePanels({ children }: ResizablePanelsProps) {
     <ContextMenu
       actionProviders={{
         "file-tree": fileTreeActionProvider,
-        "main-editor": editorActionProvider,
       }}
     />
   </>

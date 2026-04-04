@@ -16,7 +16,6 @@ import { LeftSidebarExtensions } from "./content/LeftSidebarExtensions";
 import { FileUploadDialog } from "./dialogs/FileUploadDialog";
 import { useLeftPanelCollapseStore } from "@/state/left-panel-collapse-store";
 import { useLeftPanelViewStore } from "@/state/left-panel-view-store";
-import { CalendarCompanionPanel } from "@/components/calendar/CalendarCompanionPanel";
 
 export function LeftSidebar() {
   const { mode } = useLeftPanelCollapseStore();
@@ -190,8 +189,6 @@ export function LeftSidebar() {
         )}
 
         {activeView === "extensions" && <LeftSidebarExtensions />}
-
-        {activeView === "calendar" && <CalendarCompanionPanel />}
 
         {/* Search view is handled by LeftSidebarContent with isSearchOpen state */}
         {activeView === "search" && (

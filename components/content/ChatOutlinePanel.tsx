@@ -12,33 +12,37 @@
 
 "use client";
 
-import { useEffect } from "react";
-import { useContentStore } from "@/state/content-store";
 import { useOutlineStore } from "@/state/outline-store";
 import type { ChatOutlineEntry } from "@/lib/domain/ai/chat-outline";
 
 interface ChatOutlinePanelProps {
+  /** Content id this chat outline belongs to */
+  contentId?: string | null;
   /** Callback when an outline entry is clicked — scrolls chat to that message */
   onEntryClick?: (entry: ChatOutlineEntry) => void;
 }
 
-export function ChatOutlinePanel({ onEntryClick }: ChatOutlinePanelProps) {
-  const selectedContentId = useContentStore((s) => s.selectedContentId);
-  const chatOutline = useOutlineStore((s) => s.chatOutline);
-  const activeChatEntryId = useOutlineStore((s) => s.activeChatEntryId);
+export function ChatOutlinePanel({
+  contentId,
+  onEntryClick,
+}: ChatOutlinePanelProps) {
+  const chatOutline = useOutlineStore((s) =>
+    s.getViewState(contentId).chatOutline
+  );
+  const activeChatEntryId = useOutlineStore((s) =>
+    s.getViewState(contentId).activeChatEntryId
+  );
   const setActiveChatEntryId = useOutlineStore((s) => s.setActiveChatEntryId);
-  const granularity = useOutlineStore((s) => s.chatOutlineGranularity);
+  const granularity = useOutlineStore((s) =>
+    s.getViewState(contentId).chatOutlineGranularity
+  );
   const toggleGranularity = useOutlineStore(
     (s) => s.toggleChatOutlineGranularity
   );
 
-  // Reset active entry when switching content
-  useEffect(() => {
-    setActiveChatEntryId(null);
-  }, [selectedContentId, setActiveChatEntryId]);
-
   const handleEntryClick = (entry: ChatOutlineEntry) => {
-    setActiveChatEntryId(entry.id);
+    if (!contentId) return;
+    setActiveChatEntryId(contentId, entry.id);
     onEntryClick?.(entry);
   };
 
@@ -48,7 +52,7 @@ export function ChatOutlinePanel({ onEntryClick }: ChatOutlinePanelProps) {
   ).length;
 
   // Empty state — no content selected
-  if (!selectedContentId) {
+  if (!contentId) {
     return (
       <div className="flex h-full flex-col items-center justify-center p-8 text-center">
         <svg
@@ -106,7 +110,11 @@ export function ChatOutlinePanel({ onEntryClick }: ChatOutlinePanelProps) {
         </h2>
         {/* Granularity toggle */}
         <button
-          onClick={toggleGranularity}
+          onClick={() => {
+            if (contentId) {
+              toggleGranularity(contentId);
+            }
+          }}
           className="rounded px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider transition-colors text-gray-500 hover:text-gray-300 hover:bg-white/5 border border-white/10"
           title={`Switch to ${granularity === "compact" ? "expanded" : "compact"} view`}
         >
