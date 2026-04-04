@@ -186,6 +186,7 @@ const calendarSettingsSchema = z
     defaultEventDurationMinutes: z.number().min(5).max(480).optional(),
     showWeekends: z.boolean().optional(),
     showDeclinedEvents: z.boolean().optional(),
+    firstDayOfWeek: z.number().min(0).max(6).optional(),
   })
   .optional();
 
