@@ -24,6 +24,7 @@ const { schema: dividerSchema, defaults: dividerDefaults } =
       .default("normal")
       .describe("Vertical spacing"),
     label: z.string().default("").describe("Optional center label text"),
+    showContainer: z.boolean().default(false).describe("Show outer container border"),
   });
 
 registerBlock({
@@ -68,6 +69,11 @@ export const BlockDivider = Node.create({
           return { "data-label": attrs.label };
         },
       },
+      showContainer: {
+        default: false,
+        parseHTML: (el) => el.getAttribute("data-show-container") === "true",
+        renderHTML: (attrs) => attrs.showContainer ? { "data-show-container": "true" } : {},
+      },
     };
   },
 
@@ -91,6 +97,7 @@ export const BlockDivider = Node.create({
       label: "Divider",
       iconName: "Minus",
       atom: true,
+      containerAttr: "showContainer",
       renderContent(node, contentDom) {
         contentDom.classList.add("block-divider-content");
         const line = document.createElement("hr");

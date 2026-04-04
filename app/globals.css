@@ -270,50 +270,40 @@ nav[class*="fixed"] {
 .ProseMirror {
   outline: none;
   color: #1a1a1a;
+  /* Extra bottom padding ensures block "+" buttons and margins don't create dead grey space near overflow edge */
+  padding-bottom: 4rem;
 }
 
-/* Placeholder text for empty editor */
-.ProseMirror p.is-editor-empty:first-child::before {
-  color: rgba(255, 255, 255, 0.3);
-  content: attr(data-placeholder);
+/* Placeholder text ONLY for completely empty document (first and only paragraph) */
+.ProseMirror p.is-editor-empty:first-child:last-child::before {
+  color: rgba(0, 0, 0, 0.3);
+  content: "Start writing..." !important;
   float: left;
   height: 0;
   pointer-events: none;
 }
 
-/* Placeholder for all empty nodes - generic fallback */
+/* Placeholder: ONLY show on the very first paragraph of an entirely empty document.
+   All other empty paragraphs just show a blinking cursor — no text. */
 .ProseMirror .is-empty::before {
-  color: rgba(255, 255, 255, 0.3);
-  content: attr(data-placeholder);
-  float: left;
-  height: 0;
-  pointer-events: none;
+  content: none !important;
 }
 
-/* Placeholder for empty paragraphs - white color, higher specificity */
 .ProseMirror p.is-empty::before {
-  color: rgba(255, 255, 255, 0.3) !important;
-  content: attr(data-placeholder) !important;
-  float: left !important;
-  height: 0 !important;
-  pointer-events: none !important;
+  content: none !important;
 }
 
-/* Placeholder for empty headings - gold color to match heading style */
+/* Empty headings — no placeholder text */
 .ProseMirror h1.is-empty::before,
 .ProseMirror h2.is-empty::before,
 .ProseMirror h3.is-empty::before,
 .ProseMirror h4.is-empty::before,
 .ProseMirror h5.is-empty::before,
 .ProseMirror h6.is-empty::before {
-  color: rgba(255, 215, 0, 0.3) !important;
-  content: attr(data-placeholder) !important;
-  float: left !important;
-  height: 0 !important;
-  pointer-events: none !important;
+  content: none !important;
 }
 
-/* Suppress placeholder inside tables — float:left ::before on tr/th/td breaks row layout */
+/* Tables — no placeholder */
 .ProseMirror table tr.is-empty::before,
 .ProseMirror table th.is-empty::before,
 .ProseMirror table td.is-empty::before,
@@ -745,13 +735,13 @@ mark {
   padding: 0;
   border-left: 4px solid;
   border-radius: 6px;
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(0, 0, 0, 0.03);
   overflow: hidden;
   transition: all 0.2s ease;
 }
 
 .ProseMirror .callout:hover {
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(0, 0, 0, 0.05);
 }
 
 .ProseMirror .callout-title {
@@ -882,4 +872,1134 @@ mark {
   font-size: 16px;
   line-height: 20px;
   text-align: center;
+}
+
+/* ─── Block System (Sprint 43) ─── */
+
+.ProseMirror .block-node {
+  position: relative;
+  margin: 0.25rem 0;
+  padding: 0.25rem 0.375rem 0.25rem 0.375rem;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.03);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.ProseMirror .block-node:hover {
+  border-color: rgba(0, 0, 0, 0.2);
+}
+
+.ProseMirror .block-node.block-selected,
+.ProseMirror .block-node.ProseMirror-selectednode {
+  border-color: rgba(59, 130, 246, 0.5);
+  box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.2);
+}
+
+.ProseMirror .block-node.block-focused {
+  border-color: rgba(59, 130, 246, 0.4);
+}
+
+/* Drag handle — hidden until drag-and-drop is implemented */
+.ProseMirror .block-drag-handle {
+  display: none;
+}
+
+/* Block chrome (type badge + menu) — hover-only */
+.ProseMirror .block-chrome {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  pointer-events: none;
+}
+
+.ProseMirror .block-node:hover > .block-chrome,
+.ProseMirror .block-node.block-selected > .block-chrome,
+.ProseMirror .block-node.ProseMirror-selectednode > .block-chrome {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.ProseMirror .block-type-badge {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: rgba(0, 0, 0, 0.5);
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.06);
+  font-weight: 500;
+}
+
+.ProseMirror .block-menu-btn {
+  font-size: 14px;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  margin-left: auto;
+  opacity: 0;
+  cursor: pointer;
+  color: rgba(0, 0, 0, 0.4);
+  background: none;
+  border: none;
+  transition: opacity 0.15s ease, background 0.15s ease;
+}
+
+.ProseMirror .block-node:hover .block-menu-btn {
+  opacity: 1;
+}
+
+.ProseMirror .block-menu-btn:hover {
+  background: rgba(0, 0, 0, 0.08);
+  color: rgba(0, 0, 0, 0.7);
+}
+
+/* Delete button */
+.ProseMirror .block-delete-btn {
+  font-size: 16px;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  opacity: 0;
+  cursor: pointer;
+  color: rgba(0, 0, 0, 0.35);
+  background: none;
+  border: none;
+  transition: opacity 0.15s ease, background 0.15s ease, color 0.15s ease;
+  line-height: 1;
+}
+
+.ProseMirror .block-node:hover .block-delete-btn {
+  opacity: 1;
+}
+
+.ProseMirror .block-delete-btn:hover {
+  background: rgba(220, 38, 38, 0.12);
+  color: rgba(220, 38, 38, 0.8);
+}
+
+/* Block content area */
+.ProseMirror .block-content {
+  min-height: 1.5em;
+}
+
+/* ─── Inline "+" Insertion Buttons ─── */
+.ProseMirror .block-insert-btn {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  background: white;
+  color: rgba(0, 0, 0, 0.4);
+  font-size: 16px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s ease, background 0.15s ease, color 0.15s ease;
+  z-index: 10;
+  pointer-events: none;
+}
+
+.ProseMirror .block-insert-above {
+  top: -12px;
+}
+
+.ProseMirror .block-insert-below {
+  bottom: -12px;
+}
+
+.ProseMirror .block-node:hover .block-insert-btn {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.ProseMirror .block-insert-btn:hover {
+  background: rgba(59, 130, 246, 0.1);
+  border-color: rgba(59, 130, 246, 0.4);
+  color: rgba(59, 130, 246, 0.8);
+}
+
+/* ─── Block Insert Menu (dropdown) ─── */
+.block-insert-menu {
+  background: white;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  padding: 4px;
+  min-width: 180px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.block-insert-menu-group {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: rgba(0, 0, 0, 0.4);
+  padding: 6px 8px 2px;
+}
+
+.block-insert-menu-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 6px 8px;
+  border: none;
+  background: none;
+  border-radius: 4px;
+  font-size: 13px;
+  color: rgba(0, 0, 0, 0.75);
+  cursor: pointer;
+  transition: background 0.1s ease;
+}
+
+.block-insert-menu-item:hover {
+  background: rgba(59, 130, 246, 0.08);
+  color: rgba(0, 0, 0, 0.9);
+}
+
+/* ─── Shared visual container for consecutive blocks ─── */
+/* Adjacent blocks merge into a single card — connected borders, shared background */
+
+/* First block that has a sibling below: remove bottom radius */
+.ProseMirror .block-node:has(+ .block-node) {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+  margin-bottom: 0;
+  border-bottom-color: rgba(0, 0, 0, 0.06);
+}
+
+/* Subsequent adjacent blocks: remove top radius, overlap border */
+.ProseMirror .block-node + .block-node {
+  margin-top: -1px;
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+}
+
+/* Last block in a group (has no block sibling after): restore bottom radius */
+.ProseMirror .block-node + .block-node:not(:has(+ .block-node)) {
+  border-bottom-left-radius: 8px;
+  border-bottom-right-radius: 8px;
+}
+
+/* ─── Section Header (Sprint 44) ─── */
+
+.ProseMirror .block-section-header-content {
+  font-weight: 600;
+  color: rgba(0, 0, 0, 0.85);
+  padding-bottom: 0.5rem;
+  min-height: 1.5em;
+  cursor: text;
+}
+
+.ProseMirror .block-section-header-content:empty::before,
+.ProseMirror .block-section-header-content > .is-empty::before {
+  content: none;
+}
+
+.ProseMirror .block-section-header-content[data-level="1"] {
+  font-size: 1.5rem;
+  line-height: 1.3;
+}
+
+.ProseMirror .block-section-header-content[data-level="2"] {
+  font-size: 1.25rem;
+  line-height: 1.35;
+}
+
+.ProseMirror .block-section-header-content[data-level="3"] {
+  font-size: 1.1rem;
+  line-height: 1.4;
+}
+
+.ProseMirror .block-section-header-content[data-show-divider="true"] {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.12);
+}
+
+.ProseMirror .block-section-header-content[data-show-divider="true"][data-divider-style="dashed"] {
+  border-bottom-style: dashed;
+}
+
+.ProseMirror .block-section-header-content[data-show-divider="true"][data-divider-style="dotted"] {
+  border-bottom-style: dotted;
+}
+
+/* ─── Card / Panel (Sprint 44) ─── */
+
+.ProseMirror .block-card-panel-content {
+  padding: 0.75rem;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.02);
+}
+
+/* Card border styles */
+.ProseMirror .block-card-panel-content[data-card-border="none"] {
+  border: 1px solid transparent;
+}
+.ProseMirror .block-card-panel-content[data-card-border="subtle"] {
+  border: 1px solid rgba(0, 0, 0, 0.1);
+}
+.ProseMirror .block-card-panel-content[data-card-border="solid"] {
+  border: 1px solid rgba(0, 0, 0, 0.25);
+}
+.ProseMirror .block-card-panel-content[data-card-border="dashed"] {
+  border: 1px dashed rgba(0, 0, 0, 0.2);
+}
+
+/* Hover guide when border is "none" */
+.ProseMirror .block-card-panel-content[data-card-border="none"]:hover {
+  border-color: rgba(0, 0, 0, 0.06);
+}
+
+/* Card background hidden */
+.ProseMirror .block-card-panel-content[data-card-bg="hidden"] {
+  background: transparent;
+}
+
+.ProseMirror .block-card-header {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: rgba(0, 0, 0, 0.8);
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+  margin-bottom: 0.25rem;
+}
+
+/* ─── Divider (Sprint 44) ─── */
+
+.ProseMirror .block-divider-content {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ProseMirror .block-divider-content[data-spacing="compact"] {
+  padding: 0.25rem 0;
+}
+
+.ProseMirror .block-divider-content[data-spacing="normal"] {
+  padding: 0.75rem 0;
+}
+
+.ProseMirror .block-divider-content[data-spacing="spacious"] {
+  padding: 1.5rem 0;
+}
+
+.ProseMirror .block-divider-line {
+  flex: 1;
+  border: none;
+  border-top: 1px solid rgba(0, 0, 0, 0.15);
+  margin: 0;
+}
+
+.ProseMirror .block-divider-dashed {
+  border-top-style: dashed;
+}
+
+.ProseMirror .block-divider-dotted {
+  border-top-style: dotted;
+}
+
+.ProseMirror .block-divider-gradient {
+  border: none;
+  height: 1px;
+  background: linear-gradient(to right, transparent, rgba(0, 0, 0, 0.15), transparent);
+}
+
+.ProseMirror .block-divider-label {
+  position: absolute;
+  padding: 0 0.75rem;
+  font-size: 0.75rem;
+  color: rgba(0, 0, 0, 0.45);
+  background: var(--color-background, #ffffff);
+}
+
+/* ─── Accordion (Sprint 44) ─── */
+
+.ProseMirror .block-accordion-summary {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.25rem 0.125rem;
+  cursor: default;
+  font-weight: 500;
+  color: inherit;
+  user-select: none;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.ProseMirror .block-accordion-summary.block-accordion-no-divider {
+  border-bottom-color: transparent;
+}
+
+.ProseMirror .block-accordion-title {
+  flex: 1;
+  outline: none;
+  cursor: text;
+  min-width: 2rem;
+  padding: 0;
+  color: inherit;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+/* Header level sizing — matches TipTap heading sizes */
+.ProseMirror .block-accordion-title[data-header-level="1"] {
+  font-size: 1.75rem;
+}
+.ProseMirror .block-accordion-title[data-header-level="2"] {
+  font-size: 1.35rem;
+}
+.ProseMirror .block-accordion-title[data-header-level="3"] {
+  font-size: 1.1rem;
+}
+
+.ProseMirror .block-accordion-title:empty::before {
+  content: attr(data-placeholder);
+  color: rgba(0, 0, 0, 0.25);
+  pointer-events: none;
+}
+
+.ProseMirror .block-accordion-chevron {
+  font-size: 0.75rem;
+  transition: transform 0.2s ease;
+  color: rgba(0, 0, 0, 0.4);
+  flex-shrink: 0;
+  width: 1.25rem;
+  height: 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 3px;
+}
+
+.ProseMirror .block-accordion-chevron:hover {
+  background: rgba(0, 0, 0, 0.06);
+  color: rgba(0, 0, 0, 0.6);
+}
+
+.ProseMirror .block-accordion-chevron-open {
+  transform: rotate(90deg);
+}
+
+.ProseMirror .block-accordion-body.block-accordion-closed {
+  display: none;
+}
+
+.ProseMirror .block-accordion-body.block-accordion-open {
+  display: block;
+  padding-top: 0.25rem;
+}
+
+/* ─── Columns (Sprint 44) ─── */
+
+.ProseMirror .block-columns-grid {
+  display: grid;
+  min-height: 3rem;
+  grid-template-columns: repeat(var(--col-count, 2), 1fr);
+}
+
+.ProseMirror .block-columns[data-columns="2"] .block-columns-grid {
+  --col-count: 2;
+}
+
+.ProseMirror .block-columns[data-columns="3"] .block-columns-grid {
+  --col-count: 3;
+}
+
+.ProseMirror .block-columns[data-columns="4"] .block-columns-grid {
+  --col-count: 4;
+}
+
+.ProseMirror .block-columns[data-gap="none"] .block-columns-grid {
+  gap: 0;
+}
+
+.ProseMirror .block-columns[data-gap="small"] .block-columns-grid {
+  gap: 0.5rem;
+}
+
+.ProseMirror .block-columns[data-gap="medium"] .block-columns-grid {
+  gap: 1rem;
+}
+
+.ProseMirror .block-columns[data-gap="large"] .block-columns-grid {
+  gap: 1.5rem;
+}
+
+.ProseMirror .block-columns {
+  position: relative;
+}
+
+/* Column inner cells — border style controlled by data-col-border on parent */
+.ProseMirror .block-column {
+  min-height: 2rem;
+  min-width: 0;
+  padding: 0.5rem;
+  cursor: text;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.ProseMirror .block-columns[data-col-border="subtle"] .block-column {
+  border-color: rgba(0, 0, 0, 0.1);
+  background: rgba(0, 0, 0, 0.015);
+}
+.ProseMirror .block-columns[data-col-border="subtle"] .block-column:hover {
+  border-color: rgba(0, 0, 0, 0.18);
+}
+
+.ProseMirror .block-columns[data-col-border="solid"] .block-column {
+  border-color: rgba(0, 0, 0, 0.2);
+}
+.ProseMirror .block-columns[data-col-border="solid"] .block-column:hover {
+  border-color: rgba(0, 0, 0, 0.3);
+}
+
+.ProseMirror .block-columns[data-col-border="dashed"] .block-column {
+  border-style: dashed;
+  border-color: rgba(0, 0, 0, 0.15);
+}
+.ProseMirror .block-columns[data-col-border="dashed"] .block-column:hover {
+  border-color: rgba(0, 0, 0, 0.25);
+}
+
+.ProseMirror .block-columns[data-col-border="none"] .block-column {
+  border-color: transparent;
+  background: transparent;
+}
+.ProseMirror .block-columns[data-col-border="none"]:hover .block-column {
+  border-color: rgba(0, 0, 0, 0.06);
+  border-style: dashed;
+}
+
+.ProseMirror .block-column p {
+  min-height: 1.5em;
+}
+
+.ProseMirror .block-column > p.is-empty:first-child:last-child::before {
+  content: "Type here...";
+  color: rgba(0, 0, 0, 0.3);
+  pointer-events: none;
+  font-style: italic;
+}
+
+/* Column background visibility */
+.ProseMirror .block-columns[data-col-bg="hidden"] .block-column {
+  background: transparent !important;
+}
+
+/* Container hidden mode — outer block wrapper invisible */
+.ProseMirror .block-node.block-container-hidden {
+  border-color: transparent;
+  background: transparent;
+  padding: 0.125rem;
+}
+.ProseMirror .block-node.block-container-hidden:hover {
+  border-color: rgba(0, 0, 0, 0.06);
+}
+
+/* ─── Tabs (Sprint 44) ─── */
+
+.ProseMirror .block-tabs-bar {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 0;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.12);
+  margin-bottom: 0.5rem;
+  padding: 0 0.25rem;
+  overflow-x: auto;
+  scrollbar-width: none; /* Firefox */
+}
+
+.ProseMirror .block-tabs-bar::-webkit-scrollbar {
+  display: none; /* Chrome/Safari */
+}
+
+.ProseMirror .block-tab-btn {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0.375rem 0.75rem;
+  font-size: 0.8rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: rgba(0, 0, 0, 0.5);
+  transition: color 0.15s ease;
+  position: relative;
+}
+
+/* Tab label (editable on double-click) */
+.ProseMirror .block-tab-label {
+  outline: none;
+  cursor: inherit;
+}
+.ProseMirror .block-tab-label[contenteditable="true"] {
+  cursor: text;
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 2px;
+  padding: 0 2px;
+  min-width: 1ch;
+}
+
+/* Tab delete button */
+.ProseMirror .block-tab-delete {
+  font-size: 0.7rem;
+  line-height: 1;
+  color: rgba(0, 0, 0, 0.25);
+  cursor: pointer;
+  padding: 0 2px;
+  margin-left: 2px;
+  border-radius: 2px;
+  opacity: 0;
+  transition: opacity 0.15s ease, color 0.15s ease;
+}
+.ProseMirror .block-tab-btn:hover .block-tab-delete {
+  opacity: 1;
+}
+.ProseMirror .block-tab-delete:hover {
+  color: rgba(220, 38, 38, 0.7);
+  background: rgba(220, 38, 38, 0.08);
+}
+
+.ProseMirror .block-tab-btn:hover {
+  color: rgba(0, 0, 0, 0.75);
+}
+
+.ProseMirror .block-tab-active {
+  color: rgba(0, 0, 0, 0.9);
+}
+
+/* Underline style (default) */
+.ProseMirror .block-tabs[data-tab-style="underline"] .block-tab-active::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: rgba(59, 130, 246, 0.7);
+  border-radius: 1px;
+}
+
+/* Pills style */
+.ProseMirror .block-tabs[data-tab-style="pills"] .block-tab-active {
+  background: rgba(59, 130, 246, 0.15);
+  border-radius: 4px;
+}
+
+/* Boxed style */
+.ProseMirror .block-tabs[data-tab-style="boxed"] .block-tab-btn {
+  border: 1px solid transparent;
+  border-bottom: none;
+  margin-bottom: -1px;
+}
+
+.ProseMirror .block-tabs[data-tab-style="boxed"] .block-tab-active {
+  border-color: rgba(0, 0, 0, 0.12);
+  background: rgba(0, 0, 0, 0.03);
+  border-radius: 4px 4px 0 0;
+}
+
+/* Add tab button */
+.ProseMirror .block-tab-add-btn {
+  padding: 0.375rem 0.5rem;
+  font-size: 0.85rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: rgba(0, 0, 0, 0.3);
+  transition: color 0.15s ease;
+  line-height: 1;
+}
+
+.ProseMirror .block-tab-add-btn:hover {
+  color: rgba(59, 130, 246, 0.7);
+}
+
+.ProseMirror .block-tabs-content {
+  min-height: 2rem;
+  padding: 0.25rem;
+}
+
+.ProseMirror .block-tab-panel {
+  min-height: 2rem;
+}
+
+/* Tab panel visibility — display:none approach.
+   Hidden panels are removed from layout entirely. A cursor-jump ProseMirror plugin
+   prevents selection from landing inside hidden panels, so coordsAtPos() is never
+   called on them. This eliminates all overlap/bleed issues. */
+.ProseMirror .block-tab-panel-hidden {
+  display: none;
+}
+
+.ProseMirror .block-tab-panel-active {
+  display: block;
+}
+
+/* No placeholder inside tab panels — cursor is sufficient */
+.ProseMirror .block-tab-panel > p.is-empty:first-child:last-child::before {
+  content: none !important;
+}
+
+/* ─── List Container (Sprint 44b) ─── */
+
+.ProseMirror .block-list-content {
+  padding: 0.25rem 0;
+}
+
+/* Horizontal layout — items flow inline */
+.ProseMirror .block-list-content[data-layout="horizontal"] ul,
+.ProseMirror .block-list-content[data-layout="horizontal"] ol {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1.5rem;
+  list-style-position: inside;
+}
+
+.ProseMirror .block-list-content[data-layout="horizontal"] li {
+  flex: 0 0 auto;
+}
+
+/* Multi-column vertical layout */
+.ProseMirror .block-list-content[data-columns="2"] ul,
+.ProseMirror .block-list-content[data-columns="2"] ol {
+  column-count: 2;
+  column-gap: 1.5rem;
+}
+
+.ProseMirror .block-list-content[data-columns="3"] ul,
+.ProseMirror .block-list-content[data-columns="3"] ol {
+  column-count: 3;
+  column-gap: 1.5rem;
+}
+
+.ProseMirror .block-list-content[data-columns="4"] ul,
+.ProseMirror .block-list-content[data-columns="4"] ol {
+  column-count: 4;
+  column-gap: 1.5rem;
+}
+
+/* Prevent column breaks inside list items */
+.ProseMirror .block-list-content[data-columns] li {
+  break-inside: avoid;
+}
+
+/* Marker styles */
+.ProseMirror .block-list-content[data-marker="disc"] ul { list-style-type: disc; }
+.ProseMirror .block-list-content[data-marker="circle"] ul { list-style-type: circle; }
+.ProseMirror .block-list-content[data-marker="square"] ul { list-style-type: square; }
+.ProseMirror .block-list-content[data-marker="none"] ul,
+.ProseMirror .block-list-content[data-marker="none"] ol { list-style-type: none; }
+.ProseMirror .block-list-content[data-marker="decimal"] ol { list-style-type: decimal; }
+.ProseMirror .block-list-content[data-marker="alpha"] ol { list-style-type: lower-alpha; }
+.ProseMirror .block-list-content[data-marker="roman"] ol { list-style-type: lower-roman; }
+
+/* No placeholder inside list container — cursor is sufficient */
+.ProseMirror .block-list-content p.is-empty::before {
+  content: none !important;
+}
+
+/* ─── Input Blocks (Sprint 47) ─── */
+
+.ProseMirror .input-block-content {
+  padding: 0.5rem 0;
+}
+
+.ProseMirror .input-block-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-secondary, #666);
+  margin-bottom: 0.35rem;
+}
+
+.ProseMirror .input-block-required {
+  color: var(--intent-danger, #ef4444);
+  font-weight: 700;
+}
+
+.ProseMirror .input-block-field {
+  width: 100%;
+  padding: 0.4rem 0.6rem;
+  font-size: 0.9rem;
+  font-family: inherit;
+  border: 1px solid var(--border-secondary, rgba(0, 0, 0, 0.12));
+  border-radius: 6px;
+  background: var(--surface-input, rgba(255, 255, 255, 0.5));
+  color: inherit;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.ProseMirror .input-block-field:focus {
+  border-color: var(--intent-primary, #3b82f6);
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15);
+}
+
+.ProseMirror .input-block-field::placeholder {
+  color: var(--text-tertiary, #999);
+}
+
+.ProseMirror .input-block-counter {
+  font-size: 0.75rem;
+  color: var(--text-tertiary, #999);
+  text-align: right;
+  margin-top: 0.2rem;
+}
+
+.ProseMirror .input-block-unit {
+  font-size: 0.85rem;
+  color: var(--text-secondary, #666);
+  margin-left: 0.4rem;
+  flex-shrink: 0;
+}
+
+.ProseMirror .input-block-number-wrapper {
+  display: flex;
+  align-items: center;
+}
+
+.ProseMirror .input-block-number-wrapper .input-block-field {
+  max-width: 160px;
+}
+
+/* Checkbox styles */
+.ProseMirror .input-block-checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.2rem 0;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.ProseMirror .input-block-checkbox-row input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--intent-primary, #3b82f6);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.ProseMirror .input-block-checkbox-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+/* Multi-select */
+.ProseMirror .input-block-multi-select {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+/* Rating styles */
+.ProseMirror .input-block-rating {
+  display: flex;
+  gap: 0.25rem;
+  align-items: center;
+}
+
+.ProseMirror .input-block-rating-item {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1.4rem;
+  padding: 0.1rem 0.15rem;
+  line-height: 1;
+  color: var(--text-tertiary, #ccc);
+  transition: transform 0.1s ease, color 0.1s ease;
+}
+
+.ProseMirror .input-block-rating-item:hover {
+  transform: scale(1.15);
+}
+
+.ProseMirror .input-block-rating-item.active {
+  color: var(--intent-warning, #f59e0b);
+}
+
+.ProseMirror .input-block-rating[data-style="hearts"] .input-block-rating-item.active {
+  color: var(--intent-danger, #ef4444);
+}
+
+.ProseMirror .input-block-rating[data-style="numbers"] .input-block-rating-item {
+  font-size: 0.85rem;
+  min-width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  border: 1px solid var(--border-secondary, rgba(0, 0, 0, 0.12));
+}
+
+.ProseMirror .input-block-rating[data-style="numbers"] .input-block-rating-item.active {
+  background: var(--intent-primary, #3b82f6);
+  color: #fff;
+  border-color: var(--intent-primary, #3b82f6);
+}
+
+/* Prompt input styles */
+.ProseMirror .input-block-prompt {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.ProseMirror .input-block-prompt-section-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-tertiary, #999);
+  margin-bottom: 0.15rem;
+}
+
+.ProseMirror .input-block-prompt-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.ProseMirror .input-block-prompt-generate-btn {
+  padding: 0.35rem 0.85rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  border: none;
+  border-radius: 6px;
+  background: var(--intent-primary, #3b82f6);
+  color: #fff;
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+
+.ProseMirror .input-block-prompt-generate-btn:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+.ProseMirror .input-block-prompt-generate-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.ProseMirror .input-block-prompt-response {
+  padding: 0.5rem 0.6rem;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  background: var(--surface-input, rgba(0, 0, 0, 0.03));
+  border-radius: 6px;
+  border: 1px solid var(--border-secondary, rgba(0, 0, 0, 0.08));
+  white-space: pre-wrap;
+}
+
+.ProseMirror .input-block-prompt-loading {
+  font-size: 0.8rem;
+  color: var(--text-tertiary, #999);
+  font-style: italic;
+  padding: 0.25rem 0;
+}
+
+/* ─── Date Input format row ─── */
+
+.ProseMirror .input-block-date-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.ProseMirror .input-block-date-row .input-block-field {
+  flex: 1;
+  min-width: 140px;
+}
+
+.ProseMirror .input-block-format-select {
+  padding: 0.35rem 0.5rem;
+  font-size: 0.8rem;
+  border: 1px solid var(--border-secondary, rgba(0, 0, 0, 0.15));
+  border-radius: 5px;
+  background: var(--surface-input, rgba(0, 0, 0, 0.03));
+  color: var(--text-primary, #333);
+  cursor: pointer;
+  min-width: 160px;
+  flex-shrink: 0;
+}
+
+.ProseMirror .input-block-format-select:focus {
+  border-color: var(--intent-primary, #3b82f6);
+  outline: none;
+}
+
+.ProseMirror .input-block-custom-format-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  margin-top: 0.25rem;
+}
+
+.ProseMirror .input-block-custom-format-input {
+  flex: 1;
+  font-family: monospace;
+  font-size: 0.85rem;
+}
+
+.ProseMirror .input-block-format-docs-link {
+  font-size: 0.75rem;
+  color: var(--intent-primary, #3b82f6);
+  text-decoration: none;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.ProseMirror .input-block-format-docs-link:hover {
+  text-decoration: underline;
+}
+
+/* ─── Block Columns (Sprint 47) ─── */
+
+/* Parent wrapper — mirrors .block-columns for data-columns / gap / col-border */
+.ProseMirror .block-block-columns {
+  position: relative;
+}
+
+/* The CSS Grid inside block columns reuses .block-columns-grid */
+.ProseMirror .block-block-columns[data-columns="2"] .block-columns-grid {
+  --col-count: 2;
+}
+
+.ProseMirror .block-block-columns[data-columns="3"] .block-columns-grid {
+  --col-count: 3;
+}
+
+.ProseMirror .block-block-columns[data-columns="4"] .block-columns-grid {
+  --col-count: 4;
+}
+
+.ProseMirror .block-block-columns[data-gap="none"] .block-columns-grid { gap: 0; }
+.ProseMirror .block-block-columns[data-gap="small"] .block-columns-grid { gap: 0.5rem; }
+.ProseMirror .block-block-columns[data-gap="medium"] .block-columns-grid { gap: 1rem; }
+.ProseMirror .block-block-columns[data-gap="large"] .block-columns-grid { gap: 1.5rem; }
+
+/* Column cell — block column counterpart to .block-column */
+.ProseMirror .block-column-cell {
+  min-height: 3rem;
+  min-width: 0;
+  border-radius: 6px;
+  padding: 0.5rem 0.5rem 2rem;   /* bottom padding makes room for the + button */
+  border: 1px solid transparent;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  transition: border-color 0.15s ease;
+}
+
+.ProseMirror .block-block-columns[data-col-border="subtle"] .block-column-cell {
+  border-color: rgba(0, 0, 0, 0.1);
+  background: rgba(0, 0, 0, 0.015);
+}
+.ProseMirror .block-block-columns[data-col-border="subtle"] .block-column-cell:hover {
+  border-color: rgba(0, 0, 0, 0.18);
+}
+
+.ProseMirror .block-block-columns[data-col-border="solid"] .block-column-cell {
+  border-color: rgba(0, 0, 0, 0.2);
+}
+.ProseMirror .block-block-columns[data-col-border="solid"] .block-column-cell:hover {
+  border-color: rgba(0, 0, 0, 0.3);
+}
+
+.ProseMirror .block-block-columns[data-col-border="dashed"] .block-column-cell {
+  border-style: dashed;
+  border-color: rgba(0, 0, 0, 0.15);
+}
+.ProseMirror .block-block-columns[data-col-border="dashed"] .block-column-cell:hover {
+  border-color: rgba(0, 0, 0, 0.25);
+}
+
+.ProseMirror .block-block-columns[data-col-border="none"] .block-column-cell {
+  border-color: transparent;
+  background: transparent;
+}
+.ProseMirror .block-block-columns[data-col-border="none"]:hover .block-column-cell {
+  border-color: rgba(0, 0, 0, 0.06);
+  border-style: dashed;
+}
+
+/* ProseMirror content area inside a block column */
+.ProseMirror .block-column-cell-content {
+  flex: 1;
+  min-height: 2rem;
+}
+
+.ProseMirror .block-column-cell-content > p.is-empty:first-child:last-child::before {
+  content: "Drop a block or type /";
+  color: rgba(0, 0, 0, 0.3);
+  font-style: italic;
+  pointer-events: none;
+}
+
+/* In-column "+" insert button — only shown when column is empty (data-empty="true") */
+.ProseMirror .block-column-insert-btn {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1px dashed rgba(0, 0, 0, 0.25);
+  background: transparent;
+  color: rgba(0, 0, 0, 0.35);
+  font-size: 1rem;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s ease, background 0.1s ease, border-color 0.1s ease, color 0.1s ease;
+  padding: 0;
+  line-height: 1;
+  pointer-events: none;
+}
+
+/* Only show the button when the column is empty */
+.ProseMirror .block-column-cell[data-empty="true"] .block-column-insert-btn {
+  pointer-events: auto;
+}
+
+.ProseMirror .block-column-cell[data-empty="true"]:hover .block-column-insert-btn {
+  opacity: 1;
+}
+
+.ProseMirror .block-column-insert-btn:hover {
+  background: var(--intent-primary, #3b82f6);
+  border-color: var(--intent-primary, #3b82f6);
+  color: #fff;
+  opacity: 1;
+}
+
+/* Empty column: center vertically (flex, align center) */
+.ProseMirror .block-column-cell[data-empty="true"] {
+  justify-content: center;
 }

@@ -8,7 +8,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
-export type RightSidebarTab = "backlinks" | "outline" | "tags" | "chat";
+export type RightSidebarTab = "backlinks" | "outline" | "tags" | "chat" | "properties";
 
 export const DEFAULT_RIGHT_SIDEBAR_TAB: RightSidebarTab = "backlinks";
 

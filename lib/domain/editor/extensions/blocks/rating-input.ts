@@ -22,6 +22,7 @@ const { schema: ratingInputSchema, defaults: ratingInputDefaults } =
       .enum(["stars", "hearts", "numbers"])
       .default("stars")
       .describe("Rating style"),
+    showContainer: z.boolean().default(false).describe("Show outer container border"),
   });
 
 registerBlock({
@@ -49,7 +50,7 @@ const STYLE_SYMBOLS: Record<string, { filled: string; empty: string }> = {
 function renderRatingInput(
   node: Parameters<Parameters<typeof createBlockNodeView>[0]["renderContent"]>[0],
   contentDom: HTMLElement,
-  editor: Parameters<Parameters<typeof createBlockNodeView>[0]["renderContent"]>[2]
+  _editor: Parameters<Parameters<typeof createBlockNodeView>[0]["renderContent"]>[2]
 ) {
   contentDom.classList.add("input-block-content");
 
@@ -70,13 +71,13 @@ function renderRatingInput(
   const symbols = STYLE_SYMBOLS[style] || STYLE_SYMBOLS.stars;
 
   const updateValue = (newValue: number) => {
-    const pos = editor.view.posAtDOM(contentDom, 0);
-    if (pos !== undefined) {
-      const resolved = editor.state.doc.resolve(pos);
-      const nodePos = resolved.before(resolved.depth);
-      const { tr } = editor.state;
-      tr.setNodeMarkup(nodePos, undefined, { ...node.attrs, value: newValue });
-      editor.view.dispatch(tr);
+    const blockId = node.attrs.blockId as string | undefined;
+    if (blockId) {
+      window.dispatchEvent(
+        new CustomEvent("block-attrs-change", {
+          detail: { blockId, key: "value", value: newValue },
+        })
+      );
     }
   };
 
@@ -116,6 +117,7 @@ export const RatingInput = Node.create({
       value: { default: 0, parseHTML: (el) => parseInt(el.getAttribute("data-value") || "0", 10), renderHTML: (attrs) => ({ "data-value": String(attrs.value) }) },
       maxRating: { default: 5, parseHTML: (el) => parseInt(el.getAttribute("data-max-rating") || "5", 10), renderHTML: (attrs) => ({ "data-max-rating": String(attrs.maxRating) }) },
       style: { default: "stars", parseHTML: (el) => el.getAttribute("data-style") || "stars", renderHTML: (attrs) => ({ "data-style": attrs.style }) },
+      showContainer: { default: false, parseHTML: (el) => el.getAttribute("data-show-container") === "true", renderHTML: (attrs) => attrs.showContainer ? { "data-show-container": "true" } : {} },
     };
   },
 
@@ -128,6 +130,7 @@ export const RatingInput = Node.create({
       label: "Rating",
       iconName: "Star",
       atom: true,
+      containerAttr: "showContainer",
       renderContent: renderRatingInput,
       updateContent(node, contentDom, editor) {
         contentDom.innerHTML = "";

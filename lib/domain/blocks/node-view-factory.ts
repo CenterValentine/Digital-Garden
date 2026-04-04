@@ -18,7 +18,7 @@ import type { Node as ProseMirrorNode } from "@tiptap/pm/model";
 import type { EditorView } from "@tiptap/pm/view";
 import type { Editor } from "@tiptap/core";
 import { useBlockStore } from "@/state/block-store";
-import { getAllSlashBlocks } from "./registry";
+import { getAllSlashBlocks, getBlockDefinition } from "./registry";
 import { calculateMenuPosition } from "@/lib/core/menu-positioning";
 
 /**
@@ -58,15 +58,24 @@ export interface BlockNodeViewOptions {
     contentDom: HTMLElement,
     editor: Editor
   ) => boolean;
+  /**
+   * If provided, the named attr (boolean) controls whether block-container-hidden
+   * is applied to the outer dom element. When false → hidden; when true → visible.
+   */
+  containerAttr?: string;
 }
 
 /** Open the block insertion menu at a specific position */
 export function openBlockInsertMenu(
   editor: Editor,
   position: number,
-  triggerEl: HTMLElement
+  triggerEl: HTMLElement,
+  excludeFamilies?: string[]
 ) {
-  const blocks = getAllSlashBlocks();
+  const allBlocks = getAllSlashBlocks();
+  const blocks = excludeFamilies
+    ? allBlocks.filter((b) => !excludeFamilies.includes(b.family))
+    : allBlocks;
   // Remove any existing menu
   const existing = document.querySelector(".block-insert-menu");
   if (existing) existing.remove();
@@ -177,12 +186,27 @@ export function buildBlockInsertJson(blockType: string): Record<string, unknown>
           { type: "tabPanel", attrs: { label: "Tab 2" }, content: [{ type: "paragraph" }] },
         ],
       };
-    default:
+    case "blockColumns":
+      return {
+        type: "blockColumns",
+        attrs: { blockId: id, blockType: "blockColumns", columnCount: 2 },
+        content: [
+          { type: "blockColumn", content: [{ type: "paragraph" }] },
+          { type: "blockColumn", content: [{ type: "paragraph" }] },
+        ],
+      };
+    default: {
+      // Atom blocks have no content children — only include content for non-atoms
+      const def = getBlockDefinition(blockType);
+      if (def?.atom) {
+        return { type: blockType, attrs: { blockId: id, blockType } };
+      }
       return {
         type: blockType,
         attrs: { blockId: id, blockType },
         content: [{ type: "paragraph" }],
       };
+    }
   }
 }
 
@@ -216,6 +240,10 @@ export function createBlockNodeView(options: BlockNodeViewOptions) {
     dom.classList.add("block-node", `block-${options.blockType}`);
     dom.setAttribute("data-block-type", options.blockType);
     dom.setAttribute("data-block-id", node.attrs.blockId || "");
+    // containerAttr: toggle block-container-hidden based on a boolean attr
+    if (options.containerAttr) {
+      dom.classList.toggle("block-container-hidden", !node.attrs[options.containerAttr]);
+    }
 
     // --- "+" button ABOVE block ---
     const insertAbove = document.createElement("button");
@@ -363,6 +391,11 @@ export function createBlockNodeView(options: BlockNodeViewOptions) {
           "data-block-id",
           updatedNode.attrs.blockId || ""
         );
+
+        // Sync containerAttr-driven visibility
+        if (options.containerAttr) {
+          dom.classList.toggle("block-container-hidden", !updatedNode.attrs[options.containerAttr]);
+        }
 
         // Let the block handle its own content update
         if (options.updateContent) {

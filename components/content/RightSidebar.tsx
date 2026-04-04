@@ -7,10 +7,11 @@
 
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { RightSidebarHeader } from "./headers/RightSidebarHeader";
 import { RightSidebarContent } from "./content/RightSidebarContent";
 import { useContentStore } from "@/state/content-store";
+import { useBlockStore } from "@/state/block-store";
 import { queryTools } from "@/lib/domain/tools";
 import type { ContentType } from "@/lib/domain/tools";
 import {
@@ -22,6 +23,9 @@ import type { RightSidebarTab } from "@/state/right-sidebar-state-store";
 export function RightSidebar() {
   const selectedContentId = useContentStore((state) => state.selectedContentId);
   const selectedContentType = useContentStore((state) => state.selectedContentType);
+  const selectedBlockId = useBlockStore((s) => s.selectedBlockId);
+  const prevBlockIdRef = useRef<string | null>(null);
+
   const savedTab = useRightSidebarStateStore((state) =>
     selectedContentId
       ? state.activeTabByContentId[selectedContentId] ?? null
@@ -49,6 +53,17 @@ export function RightSidebar() {
     if (!selectedContentId || savedTab === activeTab) return;
     setActiveTab(selectedContentId, activeTab);
   }, [activeTab, savedTab, selectedContentId, setActiveTab]);
+
+  // Auto-switch to properties tab when a block is selected
+  useEffect(() => {
+    if (!selectedContentId) return;
+    if (selectedBlockId && selectedBlockId !== prevBlockIdRef.current) {
+      setActiveTab(selectedContentId, "properties");
+    } else if (!selectedBlockId && prevBlockIdRef.current && savedTab === "properties") {
+      setActiveTab(selectedContentId, "backlinks");
+    }
+    prevBlockIdRef.current = selectedBlockId;
+  }, [selectedBlockId, selectedContentId, savedTab, setActiveTab]);
 
   const handleTabChange = (tab: RightSidebarTab) => {
     if (!selectedContentId) return;

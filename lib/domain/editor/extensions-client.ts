@@ -32,6 +32,24 @@ import { createWikiLinkSuggestion } from "./extensions/wiki-link-suggestion";
 import { Tag } from "./extensions/tag";
 import { EditorImage } from "./extensions/image";
 import { AiHighlight } from "./extensions/ai-highlight";
+import { BlockFocusExtension } from "./extensions/block-focus-ext";
+
+// Sprint 43-47: Block extensions (import triggers registerBlock() side effect)
+import { SectionHeader } from "./extensions/blocks/section-header";
+import { CardPanel } from "./extensions/blocks/card-panel";
+import { BlockDivider } from "./extensions/blocks/divider";
+import { Accordion } from "./extensions/blocks/accordion";
+import { Column, Columns } from "./extensions/blocks/columns";
+import { BlockColumn, BlockColumns } from "./extensions/blocks/block-columns";
+import { TabPanel, Tabs } from "./extensions/blocks/tabs";
+import { ListContainer } from "./extensions/blocks/list-container";
+import { TextInput } from "./extensions/blocks/text-input";
+import { SelectInput } from "./extensions/blocks/select-input";
+import { CheckboxInput } from "./extensions/blocks/checkbox-input";
+import { DateInput } from "./extensions/blocks/date-input";
+import { NumberInput } from "./extensions/blocks/number-input";
+import { RatingInput } from "./extensions/blocks/rating-input";
+import { PromptInput } from "./extensions/blocks/prompt-input";
 
 // Create lowlight instance with common languages
 const lowlight = createLowlight(common);
@@ -175,6 +193,27 @@ export function getEditorExtensions(options?: EditorExtensionsOptions): Extensio
 
     // Sprint 40: AI content highlighting
     AiHighlight,
+
+    // Sprint 43-47: Block extensions
+    BlockFocusExtension,
+    SectionHeader,
+    CardPanel,
+    BlockDivider,
+    Accordion,
+    Column,
+    Columns,
+    BlockColumn,
+    BlockColumns,
+    TabPanel,
+    Tabs,
+    ListContainer,
+    TextInput,
+    SelectInput,
+    CheckboxInput,
+    DateInput,
+    NumberInput,
+    RatingInput,
+    PromptInput,
 
     // M6: Tags with autocomplete
     Tag.configure({

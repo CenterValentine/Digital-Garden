@@ -28,6 +28,7 @@ const { schema: tabsSchema, defaults: tabsDefaults } =
       .enum(["underline", "pills", "boxed"])
       .default("underline")
       .describe("Tab header visual style"),
+    showContainer: z.boolean().default(false).describe("Show outer container border"),
   });
 
 registerBlock({
@@ -165,6 +166,11 @@ export const Tabs = Node.create({
         parseHTML: (el) => el.getAttribute("data-tab-style") || "underline",
         renderHTML: (attrs) => ({ "data-tab-style": attrs.tabStyle }),
       },
+      showContainer: {
+        default: false,
+        parseHTML: (el) => el.getAttribute("data-show-container") === "true",
+        renderHTML: (attrs) => attrs.showContainer ? { "data-show-container": "true" } : {},
+      },
     };
   },
 
@@ -281,6 +287,7 @@ export const Tabs = Node.create({
       dom.setAttribute("data-block-type", "tabs");
       dom.setAttribute("data-block-id", currentNode.attrs.blockId || "");
       dom.setAttribute("data-tab-style", currentNode.attrs.tabStyle);
+      if (!currentNode.attrs.showContainer) dom.classList.add("block-container-hidden");
 
       // "+" button ABOVE block
       const insertAbove = document.createElement("button");
@@ -621,6 +628,7 @@ export const Tabs = Node.create({
           currentNode = updatedNode;
           dom.setAttribute("data-block-id", updatedNode.attrs.blockId || "");
           dom.setAttribute("data-tab-style", updatedNode.attrs.tabStyle);
+          dom.classList.toggle("block-container-hidden", !updatedNode.attrs.showContainer);
 
           // Sync activeTabIndex from the attr (handles undo/redo of tab switches)
           activeTabIndex = updatedNode.attrs.activeTab || 0;

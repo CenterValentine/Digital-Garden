@@ -274,6 +274,190 @@ export function getSlashCommands(editor: Editor): SlashCommand[] {
       },
       aliases: ["hashtag", "label"],
     },
+    // Sprint 44: Layout blocks
+    {
+      title: "Text Columns",
+      description: "Multi-column text layout (2-4 columns)",
+      icon: "▦",
+      command: ({ editor, range }) => {
+        editor.chain().focus().deleteRange(range).insertContent({
+          type: "columns",
+          attrs: { columnCount: 2 },
+          content: [
+            { type: "column", content: [{ type: "paragraph" }] },
+            { type: "column", content: [{ type: "paragraph" }] },
+          ],
+        }).run();
+      },
+      aliases: ["col", "columns", "layout", "grid", "split", "side"],
+    },
+    {
+      title: "Block Column",
+      description: "Multi-column layout for inserting blocks",
+      icon: "⊞",
+      command: ({ editor, range }) => {
+        editor.chain().focus().deleteRange(range).insertContent({
+          type: "blockColumns",
+          attrs: { columnCount: 2 },
+          content: [
+            { type: "blockColumn", content: [{ type: "paragraph" }] },
+            { type: "blockColumn", content: [{ type: "paragraph" }] },
+          ],
+        }).run();
+      },
+      aliases: ["block-columns", "bcol", "block col", "blocks layout"],
+    },
+    {
+      title: "Tabs",
+      description: "Tabbed content panels",
+      icon: "⊟",
+      command: ({ editor, range }) => {
+        editor.chain().focus().deleteRange(range).insertContent({
+          type: "tabs",
+          attrs: { tabLabels: ["Tab 1", "Tab 2"] },
+          content: [
+            { type: "tabPanel", attrs: { label: "Tab 1" }, content: [{ type: "paragraph" }] },
+            { type: "tabPanel", attrs: { label: "Tab 2" }, content: [{ type: "paragraph" }] },
+          ],
+        }).run();
+      },
+      aliases: ["tab", "tabs", "panel", "panels"],
+    },
+    {
+      title: "Accordion",
+      description: "Collapsible content section",
+      icon: "▼",
+      command: ({ editor, range }) => {
+        editor.chain().focus().deleteRange(range).insertContent({
+          type: "accordion",
+          attrs: {},
+          content: [{ type: "paragraph" }],
+        }).run();
+      },
+      aliases: ["accordion", "collapse", "expand", "toggle"],
+    },
+    {
+      title: "Card",
+      description: "Styled content card panel",
+      icon: "▭",
+      command: ({ editor, range }) => {
+        editor.chain().focus().deleteRange(range).insertContent({
+          type: "cardPanel",
+          attrs: {},
+          content: [{ type: "paragraph" }],
+        }).run();
+      },
+      aliases: ["card", "panel", "box", "container"],
+    },
+    {
+      title: "Section Header",
+      description: "Section heading with divider",
+      icon: "§",
+      command: ({ editor, range }) => {
+        editor.chain().focus().deleteRange(range).insertContent({
+          type: "sectionHeader",
+          attrs: { level: 1 },
+        }).run();
+      },
+      aliases: ["section", "header", "sectionheader", "sh"],
+    },
+    {
+      title: "Block Divider",
+      description: "Decorative block separator",
+      icon: "—",
+      command: ({ editor, range }) => {
+        editor.chain().focus().deleteRange(range).insertContent({
+          type: "blockDivider",
+          attrs: {},
+        }).run();
+      },
+      aliases: ["divider", "blockdivider", "separator", "line"],
+    },
+    // Sprint 46: Form/input blocks
+    {
+      title: "Text Input",
+      description: "Single-line or multi-line text field",
+      icon: "Aa",
+      command: ({ editor, range }) => {
+        editor.chain().focus().deleteRange(range).insertContent({
+          type: "textInput",
+          attrs: { label: "Label", placeholder: "Enter text..." },
+        }).run();
+      },
+      aliases: ["input", "text", "field", "textinput"],
+    },
+    {
+      title: "Select / Dropdown",
+      description: "Dropdown selection field",
+      icon: "▾",
+      command: ({ editor, range }) => {
+        editor.chain().focus().deleteRange(range).insertContent({
+          type: "selectInput",
+          attrs: { label: "Choose", options: ["Option 1", "Option 2"] },
+        }).run();
+      },
+      aliases: ["select", "dropdown", "choice", "options"],
+    },
+    {
+      title: "Checkbox",
+      description: "Checkbox or checkbox group",
+      icon: "☑",
+      command: ({ editor, range }) => {
+        editor.chain().focus().deleteRange(range).insertContent({
+          type: "checkboxInput",
+          attrs: { label: "Check this" },
+        }).run();
+      },
+      aliases: ["checkbox", "check", "boolean"],
+    },
+    {
+      title: "Date Input",
+      description: "Date or date-time field",
+      icon: "📅",
+      command: ({ editor, range }) => {
+        editor.chain().focus().deleteRange(range).insertContent({
+          type: "dateInput",
+          attrs: { label: "Date" },
+        }).run();
+      },
+      aliases: ["date", "datepicker", "calendar", "time"],
+    },
+    {
+      title: "Number Input",
+      description: "Numeric input field",
+      icon: "#",
+      command: ({ editor, range }) => {
+        editor.chain().focus().deleteRange(range).insertContent({
+          type: "numberInput",
+          attrs: { label: "Value" },
+        }).run();
+      },
+      aliases: ["number", "numeric", "quantity", "count"],
+    },
+    {
+      title: "Rating",
+      description: "Star rating or score field",
+      icon: "★",
+      command: ({ editor, range }) => {
+        editor.chain().focus().deleteRange(range).insertContent({
+          type: "ratingInput",
+          attrs: { label: "Rating", maxRating: 5 },
+        }).run();
+      },
+      aliases: ["rating", "stars", "score", "review"],
+    },
+    {
+      title: "Prompt / AI Prompt",
+      description: "AI prompt or instruction block",
+      icon: "✦",
+      command: ({ editor, range }) => {
+        editor.chain().focus().deleteRange(range).insertContent({
+          type: "promptInput",
+          attrs: {},
+        }).run();
+      },
+      aliases: ["prompt", "ai", "instruction", "template"],
+    },
     // Report Issue - Always at the bottom
     {
       title: "Report an Issue",
