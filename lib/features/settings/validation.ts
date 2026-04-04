@@ -177,6 +177,18 @@ const exportBackupSettingsSchema = z
   })
   .optional();
 
+// Calendar Settings Schema (Epoch 11: Calendar Integration)
+const calendarSettingsSchema = z
+  .object({
+    defaultView: z
+      .enum(["dayGridMonth", "timeGridWeek", "timeGridDay", "listWeek"])
+      .optional(),
+    defaultEventDurationMinutes: z.number().min(5).max(480).optional(),
+    showWeekends: z.boolean().optional(),
+    showDeclinedEvents: z.boolean().optional(),
+  })
+  .optional();
+
 // Complete Settings Schema
 export const userSettingsSchema = z.object({
   version: z.number().default(1),
@@ -188,6 +200,7 @@ export const userSettingsSchema = z.object({
   editor: editorSettingsSchema,
   ai: aiSettingsSchema,
   exportBackup: exportBackupSettingsSchema,
+  calendar: calendarSettingsSchema,
 });
 
 export type UserSettings = z.infer<typeof userSettingsSchema>;

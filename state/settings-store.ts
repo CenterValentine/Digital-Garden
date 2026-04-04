@@ -28,6 +28,7 @@ interface SettingsStore extends UserSettings {
   setSearchSettings: (search: Partial<UserSettings["search"]>) => Promise<void>;
   setEditorSettings: (editor: Partial<UserSettings["editor"]>) => Promise<void>;
   setAISettings: (ai: Partial<UserSettings["ai"]>) => Promise<void>;
+  setCalendarSettings: (calendar: Partial<NonNullable<UserSettings["calendar"]>>) => Promise<void>;
 }
 
 export const useSettingsStore = create<SettingsStore>()(
@@ -167,6 +168,14 @@ export const useSettingsStore = create<SettingsStore>()(
       setAISettings: async (ai) => {
         set((state) => ({
           ai: { ...state.ai, ...ai },
+          hasPendingChanges: true,
+        }));
+        await get().saveToBackend();
+      },
+
+      setCalendarSettings: async (calendar) => {
+        set((state) => ({
+          calendar: { ...state.calendar, ...calendar },
           hasPendingChanges: true,
         }));
         await get().saveToBackend();
