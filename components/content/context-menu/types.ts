@@ -31,6 +31,20 @@ export interface ContextMenuAction {
   destructive?: boolean;
   /** Divider after this item */
   divider?: boolean;
+  /** Section label shown above this item */
+  sectionLabel?: string;
+  /** Inline text input rendered inside the menu item */
+  inlineInput?: {
+    placeholder?: string;
+    inputLabel?: string;
+    onSubmit: (value: string) => void | Promise<void>;
+  };
+  /** Secondary icon action (e.g. delete button on the right) */
+  secondaryAction?: {
+    icon: string;
+    onClick: () => void | Promise<void>;
+    confirmLabel?: string;
+  };
 }
 
 /**
