@@ -43,6 +43,7 @@ import type { JSONContent } from "@tiptap/core";
 import type { EditorStats } from "../editor/MarkdownEditor";
 import type { OutlineHeading } from "@/lib/domain/content/outline-extractor";
 import { extractOutline } from "@/lib/domain/content/outline-extractor";
+import { SaveAsTemplateDialog } from "../dialogs/SaveAsTemplateDialog";
 
 interface ContentResponse {
   success: boolean;
@@ -123,6 +124,7 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
   const isMultiPane = layoutMode !== "single";
   const [noteContent, setNoteContent] = useState<JSONContent | null>(null);
   const [noteTitle, setNoteTitle] = useState<string>("");
+  const [templateDialogOpen, setTemplateDialogOpen] = useState(false);
   const [contentType, setContentType] = useState<string | null>(null);
   const [contentParentId, setContentParentId] = useState<string | null>(null);
   const [contentData, setContentData] = useState<any>(null); // Phase 2: Store payload data
@@ -731,6 +733,10 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
     toast.success("Chat exported as Markdown");
   }, [contentData, noteTitle]);
 
+  const handleSaveAsTemplate = useCallback(() => {
+    setTemplateDialogOpen(true);
+  }, []);
+
   // Handlers passed as prop to ToolSurfaceProvider (can't use useRegisterToolHandler
   // here because this component renders the provider — useContext sees the parent, not self)
   const toolHandlers = useMemo(() => ({
@@ -738,7 +744,8 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
     "export-markdown": handleExportMarkdown,
     "export-chat": handleExportChat,
     "copy-link": handleCopyLink,
-  }), [handleImportMarkdown, handleExportMarkdown, handleExportChat, handleCopyLink]);
+    "save-as-template": handleSaveAsTemplate,
+  }), [handleImportMarkdown, handleExportMarkdown, handleExportChat, handleCopyLink, handleSaveAsTemplate]);
 
   // Welcome screen when no note selected
   if (!selectedContentId) {
@@ -944,6 +951,12 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
         )}
         {process.env.NODE_ENV === "development" && !isMultiPane && <ToolDebugPanel />}
       </div>
+      <SaveAsTemplateDialog
+        isOpen={templateDialogOpen}
+        onClose={() => setTemplateDialogOpen(false)}
+        tiptapJson={noteContent}
+        suggestedTitle={noteTitle}
+      />
     </ToolSurfaceProvider>
   );
 }

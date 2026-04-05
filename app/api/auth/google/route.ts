@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { cookies } from 'next/headers'
 import { v4 as uuidv4 } from 'uuid'
 
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID
@@ -15,16 +14,6 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
   // Generate state for CSRF protection
   const state = uuidv4()
-  const cookieStore = await cookies()
-
-  // Store state in cookie (expires in 10 minutes)
-  cookieStore.set('oauth_state', state, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
-    maxAge: 600, // 10 minutes
-    path: '/',
-  })
 
   // Get redirect URI
   const redirectUri = new URL('/api/auth/google/callback', request.url).toString()
@@ -45,6 +34,18 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
   const authUrl = `${GOOGLE_AUTH_URL}?${params.toString()}`
 
-  return NextResponse.redirect(authUrl)
+  const response = NextResponse.redirect(authUrl)
+
+  // Set cookie on the response directly — cookies().set() in a redirect handler
+  // may not attach to the redirect response in all Next.js App Router versions.
+  response.cookies.set('oauth_state', state, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    maxAge: 600,
+    path: '/',
+  })
+
+  return response
 }
 

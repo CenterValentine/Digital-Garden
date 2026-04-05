@@ -7,12 +7,13 @@
  * Returns null when no toolbar tools are available.
  */
 
-import { Download, Link2, Upload } from "lucide-react";
+import { BookmarkPlus, Download, Link2, Upload } from "lucide-react";
 import { useToolSurface } from "@/lib/domain/tools";
 import type { ComponentType } from "react";
 
 /** Map iconName strings to lucide-react components */
 const ICON_MAP: Record<string, ComponentType<{ className?: string }>> = {
+  BookmarkPlus,
   Download,
   Link2,
   Upload,
