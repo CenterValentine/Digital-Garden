@@ -127,6 +127,9 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
   const isMultiPane = layoutMode !== "single";
   const [noteContent, setNoteContent] = useState<JSONContent | null>(null);
   const [noteTitle, setNoteTitle] = useState<string>("");
+  const [isTitleEditing, setIsTitleEditing] = useState(false);
+  const [titleDraft, setTitleDraft] = useState("");
+  const titleInputRef = useRef<HTMLInputElement>(null);
   const [templateDialogOpen, setTemplateDialogOpen] = useState(false);
   const [contentType, setContentType] = useState<string | null>(null);
   const [contentParentId, setContentParentId] = useState<string | null>(null);
@@ -740,6 +743,41 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
     setTemplateDialogOpen(true);
   }, []);
 
+  const handleTitleEditStart = useCallback(() => {
+    setTitleDraft(noteTitle);
+    setIsTitleEditing(true);
+    setTimeout(() => {
+      titleInputRef.current?.select();
+    }, 0);
+  }, [noteTitle]);
+
+  const handleTitleCommit = useCallback(async () => {
+    setIsTitleEditing(false);
+    const newTitle = titleDraft.trim();
+    if (!newTitle || newTitle === noteTitle || !selectedContentId) return;
+
+    // Optimistic update
+    setNoteTitle(newTitle);
+    updateContentTab(selectedContentId, { title: newTitle });
+
+    try {
+      const response = await fetch(`/api/content/content/${selectedContentId}`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: newTitle }),
+      });
+      if (!response.ok) throw new Error("Failed to rename");
+      // Refresh file tree to reflect new name
+      window.dispatchEvent(new CustomEvent("dg:tree-refresh"));
+    } catch {
+      // Revert
+      setNoteTitle(noteTitle);
+      updateContentTab(selectedContentId, { title: noteTitle });
+      toast.error("Failed to rename");
+    }
+  }, [titleDraft, noteTitle, selectedContentId, updateContentTab]);
+
   // Handlers passed as prop to ToolSurfaceProvider (can't use useRegisterToolHandler
   // here because this component renders the provider — useContext sees the parent, not self)
   const toolHandlers = useMemo(() => ({
@@ -886,7 +924,28 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
       <div className="flex flex-col h-full">
         {/* Note title header with debug toggle */}
         <div className="flex-none px-6 pt-6 pb-2 flex items-start justify-between">
-          <h1 className="text-3xl font-semibold text-foreground mb-0">{noteTitle}</h1>
+          {isTitleEditing ? (
+            <input
+              ref={titleInputRef}
+              type="text"
+              value={titleDraft}
+              onChange={(e) => setTitleDraft(e.target.value)}
+              onBlur={handleTitleCommit}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") { e.preventDefault(); handleTitleCommit(); }
+                if (e.key === "Escape") { e.preventDefault(); setIsTitleEditing(false); }
+              }}
+              className="flex-1 text-3xl font-semibold text-foreground bg-transparent border-b border-primary/40 focus:border-primary focus:outline-none mb-0 mr-4"
+            />
+          ) : (
+            <h1
+              className="text-3xl font-semibold text-foreground mb-0 cursor-text hover:opacity-80 transition-opacity"
+              title="Click to rename"
+              onClick={handleTitleEditStart}
+            >
+              {noteTitle}
+            </h1>
+          )}
           {process.env.NODE_ENV === "development" && !isMultiPane && <DebugViewToggle />}
         </div>
 
