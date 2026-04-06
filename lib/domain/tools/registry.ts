@@ -65,7 +65,7 @@ const TOOL_REGISTRY: ToolDefinition[] = [
     contentTypes: ["note"],
     order: 10,
     group: "text-format",
-    shortcut: "Cmd+B",
+    shortcut: "Cmd+B",  // TipTap bold (not the sidebar toggle)
     isToggle: true,
   },
   {

@@ -294,12 +294,20 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
     // Folders: single click does nothing — double-click opens (see handleDoubleClick)
   };
 
-  // Double-click on a folder: expand/collapse AND open it in the main panel.
-  // node.toggle() does both — it toggles the open state and fires onSelect.
+  // Double-click on a folder: expand it AND navigate to it.
+  // We use explicit open/close instead of toggle() to avoid react-arborist's
+  // internal dblclick handler (which starts rename mode). stopPropagation()
+  // prevents the event from reaching tree-level handlers.
   const handleDoubleClick = (e: React.MouseEvent) => {
     if (isFolder) {
       e.preventDefault();
-      node.toggle();
+      e.stopPropagation();
+      if (isOpen) {
+        node.close();
+      } else {
+        node.open();
+      }
+      node.select();
     }
   };
 
