@@ -53,7 +53,7 @@ export function DashboardView({
   const loadItems = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`/api/content/content?parentId=${folderId}`);
+      const response = await fetch(`/api/content/content?parentId=${folderId}`, { credentials: "include" });
 
       if (!response.ok) {
         throw new Error("Failed to load folder contents");

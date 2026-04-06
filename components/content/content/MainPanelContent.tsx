@@ -21,6 +21,8 @@ import {
   useContentStore,
   type WorkspacePaneId,
 } from "@/state/content-store";
+import { useLeftPanelViewStore } from "@/state/left-panel-view-store";
+import { CalendarWorkspace } from "@/components/calendar/CalendarWorkspace";
 import { useEditorStatsStore } from "@/state/editor-stats-store";
 import { useOutlineStore } from "@/state/outline-store";
 import { useDebugViewStore } from "@/state/debug-view-store";
@@ -104,6 +106,7 @@ interface MainPanelContentProps {
 }
 
 export function MainPanelContent({ paneId }: MainPanelContentProps) {
+  const { activeView } = useLeftPanelViewStore();
   const activePaneId = useContentStore((state) => state.activePaneId);
   const layoutMode = useContentStore((state) => state.layoutMode);
   const selectedContentId = useContentStore((state) =>
@@ -746,6 +749,16 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
     "copy-link": handleCopyLink,
     "save-as-template": handleSaveAsTemplate,
   }), [handleImportMarkdown, handleExportMarkdown, handleExportChat, handleCopyLink, handleSaveAsTemplate]);
+
+  // Calendar workspace — shown in pane 1 when calendar view is active
+  if (activeView === "calendar" && paneId === "top-left") {
+    return (
+      <ToolSurfaceProvider contentType={null} handlers={toolHandlers}>
+        <CalendarWorkspace />
+        {process.env.NODE_ENV === "development" && <ToolDebugPanel />}
+      </ToolSurfaceProvider>
+    );
+  }
 
   // Welcome screen when no note selected
   if (!selectedContentId) {

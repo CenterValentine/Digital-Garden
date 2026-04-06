@@ -84,6 +84,20 @@ export function LeftSidebarContent({
 
   // Ref to temporarily store visualization engine when creating from context menu
   const pendingVisualizationEngine = useRef<"diagrams-net" | "excalidraw" | "mermaid" | null>(null);
+
+  // Measure tree container height for virtualized tree (eliminates double scrollbar)
+  const treeContainerRef = useRef<HTMLDivElement>(null);
+  const [treeHeight, setTreeHeight] = useState(600);
+  useEffect(() => {
+    const el = treeContainerRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => {
+      setTreeHeight(el.clientHeight);
+    });
+    ro.observe(el);
+    setTreeHeight(el.clientHeight);
+    return () => ro.disconnect();
+  }, []);
   const [iconSelector, setIconSelector] = useState<{
     open: boolean;
     contentId: string;
@@ -1780,11 +1794,16 @@ export function LeftSidebarContent({
   return (
     <>
       <div className="flex-1 flex flex-col overflow-hidden">
-        {/* File tree with drag-and-drop zone */}
-        <div className="flex-1 min-h-0 overflow-scroll scrollbar-hidden">
+        {/* File tree with drag-and-drop zone — single scroll plane via measured height */}
+        <div ref={treeContainerRef} className="flex-1 min-h-0 overflow-hidden flex flex-col">
           <RootNodeHeader
             workspaceName="root"
             totalFiles={countTotalNodes(treeData)}
+            isSelected={!selectedContentId}
+            onClick={() => {
+              setSelectedContentId(null);
+              setSelectedIds([]);
+            }}
           />
           <FileTreeWithDropZone
             data={treeData}
@@ -1801,7 +1820,7 @@ export function LeftSidebarContent({
             onCreateVisualizationMermaid={handleCreateVisualizationMermaid}
             onCreateVisualizationExcalidraw={handleCreateVisualizationExcalidraw}
             onCreateVisualizationDiagramsNet={handleCreateVisualizationDiagramsNet}
-            height={800}
+            height={Math.max(treeHeight - 36, 100)}
             editingNodeId={creatingItem?.tempId}
             expandNodeId={expandNodeId}
             onExpandComplete={() => setExpandNodeId(null)}

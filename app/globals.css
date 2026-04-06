@@ -883,11 +883,13 @@ mark {
   border: 1px solid rgba(0, 0, 0, 0.12);
   border-radius: 6px;
   background: rgba(0, 0, 0, 0.03);
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
 }
 
 .ProseMirror .block-node:hover {
-  border-color: rgba(0, 0, 0, 0.2);
+  border-color: rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.04);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
 }
 
 .ProseMirror .block-node.block-selected,

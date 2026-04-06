@@ -11,7 +11,7 @@ import { useSearchStore } from "@/state/search-store";
 import { useLeftPanelCollapseStore } from "@/state/left-panel-collapse-store";
 import { useLeftPanelViewStore } from "@/state/left-panel-view-store";
 import { LeftSidebarHeaderActions } from "./LeftSidebarHeaderActions";
-import { PanelLeftClose, PanelLeft } from "lucide-react";
+import { PanelLeftClose, PanelLeft, CalendarDays } from "lucide-react";
 
 interface LeftSidebarHeaderProps {
   onCreateFolder: () => void;
@@ -128,6 +128,23 @@ export function LeftSidebarHeader({
               d="M11 4a2 2 0 114 0v1a1 1 0 001 1h3a1 1 0 011 1v3a1 1 0 01-1 1h-1a2 2 0 100 4h1a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1v-1a2 2 0 10-4 0v1a1 1 0 01-1 1H7a1 1 0 01-1-1v-3a1 1 0 00-1-1H4a2 2 0 110-4h1a1 1 0 001-1V7a1 1 0 011-1h3a1 1 0 001-1V4z"
             />
           </svg>
+        </button>
+
+        {/* Calendar icon button */}
+        <button
+          onClick={() => {
+            setActiveView("calendar");
+            if (isSearchOpen) toggleSearch();
+          }}
+          className={`rounded p-1.5 transition-colors ${
+            activeView === "calendar"
+              ? "text-gold-primary hover:bg-white/10"
+              : "text-gray-400 hover:bg-white/10 hover:text-gold-primary"
+          }`}
+          title="Calendar"
+          type="button"
+        >
+          <CalendarDays className="h-5 w-5" />
         </button>
       </div>
 

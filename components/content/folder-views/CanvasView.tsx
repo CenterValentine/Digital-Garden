@@ -64,7 +64,7 @@ export function CanvasView({
       setLoading(true);
 
       // Load folder contents
-      const contentResponse = await fetch(`/api/content/content?parentId=${folderId}`);
+      const contentResponse = await fetch(`/api/content/content?parentId=${folderId}`, { credentials: "include" });
       if (!contentResponse.ok) {
         throw new Error("Failed to load folder contents");
       }
