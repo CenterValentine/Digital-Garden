@@ -232,7 +232,8 @@ export function KanbanView({
     try {
       setLoading(true);
       const response = await fetch(
-        `/api/content/content?parentId=${folderId}&type=note`
+        `/api/content/content?parentId=${folderId}&type=note`,
+        { credentials: "include" }
       );
 
       if (!response.ok) {

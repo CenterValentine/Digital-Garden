@@ -69,11 +69,12 @@ export function ResizablePanels({ children }: ResizablePanelsProps) {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [toggleSearch, panelMode, setPanelMode]);
 
-  // Global keyboard shortcut: Cmd+B to toggle left panel collapse
+  // Global keyboard shortcut: Cmd+Shift+L to toggle left panel collapse
+  // Avoids: Cmd+B (TipTap bold), Cmd+/ (search), Cmd+\ (search)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Check for Cmd+B (Mac) or Ctrl+B (Windows/Linux)
-      if ((e.metaKey || e.ctrlKey) && e.key === "b") {
+      // Check for Cmd+Shift+L (Mac) or Ctrl+Shift+L (Windows/Linux)
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === "l") {
         e.preventDefault();
         togglePanelCollapse();
       }

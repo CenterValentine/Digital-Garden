@@ -46,6 +46,15 @@ const TOOL_REGISTRY: ToolDefinition[] = [
     order: 200,
     group: "share",
   },
+  {
+    id: "save-as-template",
+    label: "Save as Template",
+    iconName: "BookmarkPlus",
+    surfaces: ["toolbar"],
+    contentTypes: ["note"],
+    order: 110,
+    group: "templates",
+  },
 
   // ─── TOOLBELT: Text formatting (matches current BubbleMenu) ───
   {
@@ -56,7 +65,7 @@ const TOOL_REGISTRY: ToolDefinition[] = [
     contentTypes: ["note"],
     order: 10,
     group: "text-format",
-    shortcut: "Cmd+B",
+    shortcut: "Cmd+B",  // TipTap bold (not the sidebar toggle)
     isToggle: true,
   },
   {

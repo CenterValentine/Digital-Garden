@@ -19,6 +19,10 @@ interface SaveAsPageTemplateDialogProps {
   onOpenChange: (open: boolean) => void;
   noteTitle: string;
   tiptapJson: unknown;
+  /** Icon emoji/string to carry over from the source content node */
+  customIcon?: string | null;
+  /** Icon color to carry over from the source content node */
+  iconColor?: string | null;
 }
 
 export function SaveAsPageTemplateDialog({
@@ -26,6 +30,8 @@ export function SaveAsPageTemplateDialog({
   onOpenChange,
   noteTitle,
   tiptapJson,
+  customIcon,
+  iconColor,
 }: SaveAsPageTemplateDialogProps) {
   const [title, setTitle] = useState("");
   const [defaultTitle, setDefaultTitle] = useState("");
@@ -120,6 +126,8 @@ export function SaveAsPageTemplateDialog({
           tiptapJson,
           categoryId,
           defaultTitle: defaultTitle.trim() || null,
+          customIcon: customIcon ?? null,
+          iconColor: iconColor ?? null,
         }),
       });
 

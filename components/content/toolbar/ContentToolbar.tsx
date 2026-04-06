@@ -7,12 +7,13 @@
  * Returns null when no toolbar tools are available.
  */
 
-import { Download, Link2, Upload } from "lucide-react";
+import { BookmarkPlus, Download, Link2, Upload } from "lucide-react";
 import { useToolSurface } from "@/lib/domain/tools";
 import type { ComponentType } from "react";
 
 /** Map iconName strings to lucide-react components */
 const ICON_MAP: Record<string, ComponentType<{ className?: string }>> = {
+  BookmarkPlus,
   Download,
   Link2,
   Upload,
@@ -28,7 +29,7 @@ export function ContentToolbar() {
   }
 
   return (
-    <div className="flex items-center gap-1 border-b border-white/10 bg-white/[0.02] px-4 py-1">
+    <div className="flex items-center gap-1 border-b border-white/10 bg-white/[0.02] px-4 py-1 overflow-hidden flex-wrap">
       {tools.map((tool) => {
         const Icon = ICON_MAP[tool.definition.iconName];
         return (

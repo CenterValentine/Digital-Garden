@@ -62,7 +62,7 @@ export function GalleryView({
       await Promise.all(
         batch.map(async (item) => {
           try {
-            const response = await fetch(`/api/content/content/${item.id}/download`);
+            const response = await fetch(`/api/content/content/${item.id}/download`, { credentials: "include" });
             if (response.ok) {
               const result = await response.json();
               batchUrls[item.id] = result.data.url;
@@ -82,7 +82,8 @@ export function GalleryView({
     try {
       setLoading(true);
       const response = await fetch(
-        `/api/content/content?parentId=${folderId}&type=file`
+        `/api/content/content?parentId=${folderId}&type=file`,
+        { credentials: "include" }
       );
 
       if (!response.ok) {

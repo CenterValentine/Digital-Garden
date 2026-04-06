@@ -32,7 +32,7 @@ export interface ButtonProps
 export const Button = React.forwardRef<
   HTMLButtonElement,
   ButtonProps
->(({ className, effect = "glow", variant = "glass", glass, ...props }, ref) => {
+>(({ className, effect = "none", variant = "glass", glass, ...props }, ref) => {
   // Note: glass prop is not used by BaseButton, kept for API compatibility
   return (
     <BaseButton

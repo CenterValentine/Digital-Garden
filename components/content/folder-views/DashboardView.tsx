@@ -8,7 +8,7 @@
 
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import GridLayout, { Layout, verticalCompactor } from "react-grid-layout";
 import "react-grid-layout/css/styles.css";
 import { FileText, Folder, File as FileIcon, Image as ImageIcon, ExternalLink } from "lucide-react";
@@ -45,6 +45,9 @@ export function DashboardView({
   const [items, setItems] = useState<ContentChild[]>([]);
   const [loading, setLoading] = useState(true);
   const [layout, setLayout] = useState<Layout>([]);
+  // Tracks whether the initial layout has settled so we don't fire onUpdateView
+  // on the first react-grid-layout onLayoutChange that fires during initialization.
+  const isLayoutInitializedRef = useRef(false);
 
   useEffect(() => {
     loadItems();
@@ -53,7 +56,7 @@ export function DashboardView({
   const loadItems = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`/api/content/content?parentId=${folderId}`);
+      const response = await fetch(`/api/content/content?parentId=${folderId}`, { credentials: "include" });
 
       if (!response.ok) {
         throw new Error("Failed to load folder contents");
@@ -78,6 +81,8 @@ export function DashboardView({
         }));
         setLayout(defaultLayout);
       }
+      // Allow onLayoutChange saves only AFTER initialization settles
+      setTimeout(() => { isLayoutInitializedRef.current = true; }, 300);
     } catch (error) {
       console.error("[DashboardView] Error loading items:", error);
       toast.error("Failed to load dashboard");
@@ -89,22 +94,22 @@ export function DashboardView({
   const handleLayoutChange = (newLayout: Layout) => {
     setLayout(newLayout);
 
-    // Save layout to viewPrefs (debounced)
-    if (onUpdateView) {
-      // Use setTimeout to debounce saves during drag
-      setTimeout(async () => {
-        try {
-          await onUpdateView({
-            viewPrefs: {
-              ...viewPrefs,
-              layout: newLayout,
-            },
-          });
-        } catch (error) {
-          console.error("[DashboardView] Failed to save layout:", error);
-        }
-      }, 500);
-    }
+    // Only persist layout changes triggered by real user interaction,
+    // not the initial onLayoutChange that react-grid-layout fires on mount.
+    if (!isLayoutInitializedRef.current || !onUpdateView) return;
+
+    setTimeout(async () => {
+      try {
+        await onUpdateView({
+          viewPrefs: {
+            ...viewPrefs,
+            layout: newLayout,
+          },
+        });
+      } catch (error) {
+        console.error("[DashboardView] Failed to save layout:", error);
+      }
+    }, 500);
   };
 
   const handleItemClick = (item: ContentChild) => {

@@ -21,9 +21,37 @@ const geistMono = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "Create Next App",
+  title: {
+    default: "Digital Garden",
+    template: "%s · Digital Garden",
+  },
   description:
-    "Generatehttps://www.youtube.com/watch?v=-g1yKRo5XtYd by create next app",
+    "A personal knowledge space for notes, ideas, and connected thinking.",
+  applicationName: "Digital Garden",
+  keywords: ["notes", "knowledge management", "second brain", "digital garden"],
+  authors: [{ name: "David Valentine" }],
+  openGraph: {
+    type: "website",
+    siteName: "Digital Garden",
+    title: "Digital Garden",
+    description:
+      "A personal knowledge space for notes, ideas, and connected thinking.",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Digital Garden",
+    description:
+      "A personal knowledge space for notes, ideas, and connected thinking.",
+  },
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/favicon-32x32.png", type: "image/png", sizes: "32x32" },
+      { url: "/favicon-16x16.png", type: "image/png", sizes: "16x16" },
+    ],
+    apple: [{ url: "/apple-touch-icon.png", sizes: "180x180" }],
+  },
+  manifest: "/site.webmanifest",
 };
 
 export default function RootLayout({

@@ -33,16 +33,21 @@ export function RightSidebar() {
   );
   const setActiveTab = useRightSidebarStateStore((state) => state.setActiveTab);
 
-  const availableTabs = useMemo(
-    () =>
-      queryTools({
-        surface: "sidebar-tab",
-        contentType: (selectedContentType as ContentType) ?? undefined,
-      })
-        .map((tool) => tool.tabKey)
-        .filter(Boolean) as RightSidebarTab[],
-    [selectedContentType]
-  );
+  const availableTabs = useMemo(() => {
+    const tabs = queryTools({
+      surface: "sidebar-tab",
+      contentType: (selectedContentType as ContentType) ?? undefined,
+    })
+      .map((tool) => tool.tabKey)
+      .filter(Boolean) as RightSidebarTab[];
+
+    // Properties tab is available when a block is selected (injected by RightSidebarHeader)
+    if (selectedBlockId && !tabs.includes("properties")) {
+      tabs.push("properties");
+    }
+
+    return tabs;
+  }, [selectedContentType, selectedBlockId]);
 
   const activeTab = useMemo(
     () => resolveRightSidebarTab(savedTab, availableTabs),

@@ -4,60 +4,40 @@ const baseUrl =
 export default function Head() {
   return (
     <>
-      {/* Additional meta tags for PWA support */}
-      <meta name="application-name" content="David's Digital Garden" />
+      {/* PWA / mobile */}
+      <meta name="application-name" content="Digital Garden" />
       <meta name="apple-mobile-web-app-capable" content="yes" />
       <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-      <meta
-        name="apple-mobile-web-app-title"
-        content="David's Digital Garden"
-      />
+      <meta name="apple-mobile-web-app-title" content="Digital Garden" />
       <meta name="mobile-web-app-capable" content="yes" />
-      <meta name="msapplication-TileColor" content="#4f46e5" />
+      <meta name="msapplication-TileColor" content="#1a1a1a" />
       <meta name="msapplication-tap-highlight" content="no" />
-      <meta name="theme-color" content="#4f46e5" />
+      <meta name="theme-color" content="#1a1a1a" />
 
-      {/* Explicit OpenGraph tags for better compatibility */}
-      <meta property="og:title" content="David's Digital Garden" />
+      {/* OpenGraph */}
+      <meta property="og:title" content="Digital Garden" />
       <meta
         property="og:description"
-        content="David's Digital Garden is an applied learning space with thoughts, ideas, applications, and projects."
+        content="A personal knowledge space for notes, ideas, and connected thinking."
       />
-      <meta property="og:image" content={`${baseUrl}/images/AxioQuan.jpg`} />
       <meta property="og:url" content={baseUrl} />
       <meta property="og:type" content="website" />
-      <meta property="og:site_name" content="AxioQuan" />
+      <meta property="og:site_name" content="Digital Garden" />
 
-      {/* Explicit Twitter Card tags */}
+      {/* Twitter */}
       <meta name="twitter:card" content="summary_large_image" />
-      <meta name="twitter:title" content="AxioQuan - Learn, Grow, Succeed" />
+      <meta name="twitter:title" content="Digital Garden" />
       <meta
         name="twitter:description"
-        content="AxioQuan is a comprehensive learning platform offering expert-led courses, interactive curriculum, and career advancement opportunities."
+        content="A personal knowledge space for notes, ideas, and connected thinking."
       />
-      <meta name="twitter:image" content={`${baseUrl}/images/AxioQuan.jpg`} />
-      <meta name="twitter:site" content="@axioquan" />
 
-      {/* Additional link tags for icons */}
-      <link rel="shortcut icon" href={`${baseUrl}/favicon.ico`} />
-      <link
-        rel="apple-touch-icon"
-        sizes="180x180"
-        href={`${baseUrl}/apple-touch-icon.png`}
-      />
-      <link
-        rel="icon"
-        type="image/png"
-        sizes="32x32"
-        href={`${baseUrl}/favicon-32x32.png`}
-      />
-      <link
-        rel="icon"
-        type="image/png"
-        sizes="16x16"
-        href={`${baseUrl}/favicon-16x16.png`}
-      />
-      <link rel="manifest" href={`${baseUrl}/site.webmanifest`} />
+      {/* Icons */}
+      <link rel="shortcut icon" href="/favicon.ico" />
+      <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+      <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+      <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+      <link rel="manifest" href="/site.webmanifest" />
     </>
   );
 }

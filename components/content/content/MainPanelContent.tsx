@@ -21,6 +21,8 @@ import {
   useContentStore,
   type WorkspacePaneId,
 } from "@/state/content-store";
+import { useLeftPanelViewStore } from "@/state/left-panel-view-store";
+import { CalendarWorkspace } from "@/components/calendar/CalendarWorkspace";
 import { useEditorStatsStore } from "@/state/editor-stats-store";
 import { useOutlineStore } from "@/state/outline-store";
 import { useDebugViewStore } from "@/state/debug-view-store";
@@ -43,6 +45,8 @@ import type { JSONContent } from "@tiptap/core";
 import type { EditorStats } from "../editor/MarkdownEditor";
 import type { OutlineHeading } from "@/lib/domain/content/outline-extractor";
 import { extractOutline } from "@/lib/domain/content/outline-extractor";
+import { SaveAsPageTemplateDialog } from "../dialogs/SaveAsPageTemplateDialog";
+import { useNotesPanelStore } from "@/state/notes-panel-store";
 
 interface ContentResponse {
   success: boolean;
@@ -52,6 +56,8 @@ interface ContentResponse {
     slug: string;
     parentId: string | null;
     contentType: string;
+    customIcon?: string | null;
+    iconColor?: string | null;
     note?: {
       tiptapJson: any; // Prisma Json type
       searchText: string;
@@ -103,6 +109,8 @@ interface MainPanelContentProps {
 }
 
 export function MainPanelContent({ paneId }: MainPanelContentProps) {
+  const { activeView } = useLeftPanelViewStore();
+  const { position: notesPanelPosition } = useNotesPanelStore();
   const activePaneId = useContentStore((state) => state.activePaneId);
   const layoutMode = useContentStore((state) => state.layoutMode);
   const selectedContentId = useContentStore((state) =>
@@ -123,6 +131,12 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
   const isMultiPane = layoutMode !== "single";
   const [noteContent, setNoteContent] = useState<JSONContent | null>(null);
   const [noteTitle, setNoteTitle] = useState<string>("");
+  const [isTitleEditing, setIsTitleEditing] = useState(false);
+  const [titleDraft, setTitleDraft] = useState("");
+  const titleInputRef = useRef<HTMLInputElement>(null);
+  const [templateDialogOpen, setTemplateDialogOpen] = useState(false);
+  const [contentCustomIcon, setContentCustomIcon] = useState<string | null>(null);
+  const [contentIconColor, setContentIconColor] = useState<string | null>(null);
   const [contentType, setContentType] = useState<string | null>(null);
   const [contentParentId, setContentParentId] = useState<string | null>(null);
   const [contentData, setContentData] = useState<any>(null); // Phase 2: Store payload data
@@ -153,16 +167,22 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
       setNoteTitle("");
       setContentType(null);
       setContentParentId(null);
-      setContentData(null); // Clear Phase 2 payload data
+      setContentData(null);
+      setContentCustomIcon(null);
+      setContentIconColor(null);
       return;
     }
 
-    // If this is a temporary ID (being created), show loading state but don't fetch
+    // If this is a temporary ID (being created), show loading and clear contentType.
+    // Without clearing contentType, the previous FolderViewer stays mounted with
+    // the temp ID as its folderId, causing ListView to fetch a non-existent parentId.
     if (selectedContentId.startsWith("temp-")) {
       setIsLoading(true);
       setError(null);
       setNoteContent(null);
       setNoteTitle("");
+      setContentType(null);
+      setContentData(null);
       return;
     }
 
@@ -200,6 +220,8 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
         setNoteTitle(result.data.title);
         setContentParentId(result.data.parentId);
         setContentType(result.data.contentType);
+        setContentCustomIcon(result.data.customIcon ?? null);
+        setContentIconColor(result.data.iconColor ?? null);
         updateContentTab(selectedContentId, {
           title: result.data.title,
           contentType: result.data.contentType,
@@ -731,6 +753,45 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
     toast.success("Chat exported as Markdown");
   }, [contentData, noteTitle]);
 
+  const handleSaveAsTemplate = useCallback(() => {
+    setTemplateDialogOpen(true);
+  }, []);
+
+  const handleTitleEditStart = useCallback(() => {
+    setTitleDraft(noteTitle);
+    setIsTitleEditing(true);
+    setTimeout(() => {
+      titleInputRef.current?.select();
+    }, 0);
+  }, [noteTitle]);
+
+  const handleTitleCommit = useCallback(async () => {
+    setIsTitleEditing(false);
+    const newTitle = titleDraft.trim();
+    if (!newTitle || newTitle === noteTitle || !selectedContentId) return;
+
+    // Optimistic update
+    setNoteTitle(newTitle);
+    updateContentTab(selectedContentId, { title: newTitle });
+
+    try {
+      const response = await fetch(`/api/content/content/${selectedContentId}`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: newTitle }),
+      });
+      if (!response.ok) throw new Error("Failed to rename");
+      // Refresh file tree to reflect new name
+      window.dispatchEvent(new CustomEvent("dg:tree-refresh"));
+    } catch {
+      // Revert
+      setNoteTitle(noteTitle);
+      updateContentTab(selectedContentId, { title: noteTitle });
+      toast.error("Failed to rename");
+    }
+  }, [titleDraft, noteTitle, selectedContentId, updateContentTab]);
+
   // Handlers passed as prop to ToolSurfaceProvider (can't use useRegisterToolHandler
   // here because this component renders the provider — useContext sees the parent, not self)
   const toolHandlers = useMemo(() => ({
@@ -738,7 +799,18 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
     "export-markdown": handleExportMarkdown,
     "export-chat": handleExportChat,
     "copy-link": handleCopyLink,
-  }), [handleImportMarkdown, handleExportMarkdown, handleExportChat, handleCopyLink]);
+    "save-as-template": handleSaveAsTemplate,
+  }), [handleImportMarkdown, handleExportMarkdown, handleExportChat, handleCopyLink, handleSaveAsTemplate]);
+
+  // Calendar workspace — shown in pane 1 when calendar view is active
+  if (activeView === "calendar" && paneId === "top-left") {
+    return (
+      <ToolSurfaceProvider contentType={null} handlers={toolHandlers}>
+        <CalendarWorkspace />
+        {process.env.NODE_ENV === "development" && <ToolDebugPanel />}
+      </ToolSurfaceProvider>
+    );
+  }
 
   // Welcome screen when no note selected
   if (!selectedContentId) {
@@ -866,7 +938,28 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
       <div className="flex flex-col h-full">
         {/* Note title header with debug toggle */}
         <div className="flex-none px-6 pt-6 pb-2 flex items-start justify-between">
-          <h1 className="text-3xl font-semibold text-foreground mb-0">{noteTitle}</h1>
+          {isTitleEditing ? (
+            <input
+              ref={titleInputRef}
+              type="text"
+              value={titleDraft}
+              onChange={(e) => setTitleDraft(e.target.value)}
+              onBlur={handleTitleCommit}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") { e.preventDefault(); handleTitleCommit(); }
+                if (e.key === "Escape") { e.preventDefault(); setIsTitleEditing(false); }
+              }}
+              className="flex-1 text-3xl font-semibold text-foreground bg-transparent border-b border-primary/40 focus:border-primary focus:outline-none mb-0 mr-4"
+            />
+          ) : (
+            <h1
+              className="text-3xl font-semibold text-foreground mb-0 cursor-text hover:opacity-80 transition-opacity"
+              title="Click to rename"
+              onClick={handleTitleEditStart}
+            >
+              {noteTitle}
+            </h1>
+          )}
           {process.env.NODE_ENV === "development" && !isMultiPane && <DebugViewToggle />}
         </div>
 
@@ -926,24 +1019,48 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
       >
         {selectedContentId && <ContentToolbar />}
         {isNonNoteContent ? (
-          <div className="flex flex-1 min-h-0 flex-col overflow-y-auto">
-            <div className="flex-1 min-h-0">{contentElement}</div>
-            <ExpandableEditor
-              contentId={selectedContentId}
-              contentType={contentType}
-              noteContent={noteContent}
-              onSave={handleSave}
-              onWikiLinkClick={handleWikiLinkClick}
-              fetchNotesForWikiLink={fetchNotesForWikiLink}
-              fetchTags={fetchTags}
-              createTag={createTag}
-            />
+          <div className="flex flex-1 min-h-0 flex-col overflow-hidden">
+            {notesPanelPosition === "above" && (
+              <ExpandableEditor
+                contentId={selectedContentId}
+                contentType={contentType}
+                noteContent={noteContent}
+                onSave={handleSave}
+                onWikiLinkClick={handleWikiLinkClick}
+                fetchNotesForWikiLink={fetchNotesForWikiLink}
+                fetchTags={fetchTags}
+                createTag={createTag}
+                onSaveAsPageTemplate={handleSaveAsTemplate}
+              />
+            )}
+            <div className="flex-1 min-h-0 overflow-hidden">{contentElement}</div>
+            {notesPanelPosition !== "above" && (
+              <ExpandableEditor
+                contentId={selectedContentId}
+                contentType={contentType}
+                noteContent={noteContent}
+                onSave={handleSave}
+                onWikiLinkClick={handleWikiLinkClick}
+                fetchNotesForWikiLink={fetchNotesForWikiLink}
+                fetchTags={fetchTags}
+                createTag={createTag}
+                onSaveAsPageTemplate={handleSaveAsTemplate}
+              />
+            )}
           </div>
         ) : (
           contentElement
         )}
         {process.env.NODE_ENV === "development" && !isMultiPane && <ToolDebugPanel />}
       </div>
+      <SaveAsPageTemplateDialog
+        open={templateDialogOpen}
+        onOpenChange={setTemplateDialogOpen}
+        noteTitle={noteTitle}
+        tiptapJson={noteContent}
+        customIcon={contentCustomIcon}
+        iconColor={contentIconColor}
+      />
     </ToolSurfaceProvider>
   );
 }

@@ -239,28 +239,39 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
     }
   };
 
-  // Get chevron for folders
+  // Get chevron for folders — wrapped in its own button so clicks
+  // expand/collapse without selecting the folder or bubbling to the row.
   const getChevron = () => {
     if (!isFolder || !node.children || node.children.length === 0) {
       return <div className="h-4 w-4" />; // Empty space for alignment
     }
 
-    return isOpen ? (
-      <ChevronDown className="h-4 w-4 text-gray-400" />
-    ) : (
-      <ChevronRight className="h-4 w-4 text-gray-400" />
+    return (
+      <button
+        type="button"
+        className="h-4 w-4 flex items-center justify-center rounded hover:bg-white/10 transition-colors"
+        onClick={(e) => {
+          e.stopPropagation(); // Prevent row onClick / onDoubleClick
+          node.toggle();       // Expand/collapse only — no selection
+        }}
+        tabIndex={-1}
+        aria-label={isOpen ? "Collapse folder" : "Expand folder"}
+      >
+        {isOpen ? (
+          <ChevronDown className="h-4 w-4 text-gray-400" />
+        ) : (
+          <ChevronRight className="h-4 w-4 text-gray-400" />
+        )}
+      </button>
     );
   };
 
-  // Handle click - handle both selection and folder toggle
+  // Handle click — modifier keys for multi-selection; files select on single click.
+  // Folders do NOT select on single click (use double-click via handleDoubleClick).
   const handleClick = (e: React.MouseEvent) => {
-    // Multi-selection with modifiers
     if (e.metaKey || e.ctrlKey) {
-      // Cmd/Ctrl+Click: toggle this node in multi-selection
       e.preventDefault();
       e.stopPropagation();
-
-      // Manual toggle: deselect if already selected, otherwise add to selection
       if (node.isSelected) {
         node.deselect();
       } else {
@@ -270,20 +281,33 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
     }
 
     if (e.shiftKey) {
-      // Shift+Click: range selection
       e.preventDefault();
       e.stopPropagation();
       node.selectContiguous();
       return;
     }
 
-    // Normal click
-    // - For folders: toggle open/closed AND select
-    // - For files: just select
+    // Files: select on single click (unchanged behaviour)
+    if (!isFolder) {
+      node.select();
+    }
+    // Folders: single click does nothing — double-click opens (see handleDoubleClick)
+  };
+
+  // Double-click on a folder: expand it AND navigate to it.
+  // We use explicit open/close instead of toggle() to avoid react-arborist's
+  // internal dblclick handler (which starts rename mode). stopPropagation()
+  // prevents the event from reaching tree-level handlers.
+  const handleDoubleClick = (e: React.MouseEvent) => {
     if (isFolder) {
-      node.toggle(); // This will both select and toggle the folder
-    } else {
-      node.select(); // Just select the file
+      e.preventDefault();
+      e.stopPropagation();
+      if (isOpen) {
+        node.close();
+      } else {
+        node.open();
+      }
+      node.select();
     }
   };
 
@@ -459,6 +483,7 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
         ${node.state.isDragging ? "opacity-50" : ""}
       `}
       onClick={handleClick}
+      onDoubleClick={handleDoubleClick}
       onContextMenu={handleContextMenu}
     >
       <div className="flex items-center gap-1">

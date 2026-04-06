@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState, useRef, useCallback } from "react";
 import {
   ExternalLink,
   File,
@@ -10,6 +10,7 @@ import {
   MessageCircle,
   X,
 } from "lucide-react";
+import { toast } from "sonner";
 import { getSurfaceStyles } from "@/lib/design/system";
 import {
   getPaneLabel,
@@ -57,6 +58,46 @@ export function MainPanelHeader({
   const activateContentTab = useContentStore((state) => state.activateContentTab);
   const closeContentTab = useContentStore((state) => state.closeContentTab);
   const updateContentTab = useContentStore((state) => state.updateContentTab);
+
+  const [editingTabId, setEditingTabId] = useState<string | null>(null);
+  const [editingTitle, setEditingTitle] = useState("");
+  const renameInputRef = useRef<HTMLInputElement>(null);
+
+  const startRename = useCallback((tabId: string, currentTitle: string) => {
+    setEditingTabId(tabId);
+    setEditingTitle(currentTitle);
+    // Focus input on next tick after render
+    setTimeout(() => renameInputRef.current?.select(), 0);
+  }, []);
+
+  const commitRename = useCallback(async (tab: { id: string; contentId: string; title: string }) => {
+    const newTitle = editingTitle.trim();
+    setEditingTabId(null);
+    if (!newTitle || newTitle === tab.title) return;
+
+    // Optimistic update
+    updateContentTab(tab.contentId, { title: newTitle });
+
+    try {
+      const response = await fetch(`/api/content/content/${tab.contentId}`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: newTitle }),
+      });
+      if (!response.ok) throw new Error("Failed to rename");
+      // Notify tree to refresh title
+      window.dispatchEvent(new CustomEvent("dg:tree-refresh"));
+    } catch {
+      // Revert on failure
+      updateContentTab(tab.contentId, { title: tab.title });
+      toast.error("Failed to rename");
+    }
+  }, [editingTitle, updateContentTab]);
+
+  const cancelRename = useCallback(() => {
+    setEditingTabId(null);
+  }, []);
 
   const tabs = useMemo(
     () =>
@@ -106,7 +147,7 @@ export function MainPanelHeader({
         backdropFilter: glass1.backdropFilter,
       }}
     >
-      <div className="flex min-w-0 flex-1 items-stretch overflow-x-auto scrollbar-hidden">
+      <div className="flex min-w-0 flex-1 items-stretch overflow-x-hidden">
         {tabs.length === 0 ? (
           <div className="flex items-center px-3 py-2 text-xs font-medium uppercase tracking-[0.18em] text-gray-500">
             {getPaneLabel(layoutMode, paneId)}
@@ -145,14 +186,31 @@ export function MainPanelHeader({
                 onTabDrop(paneId, tab.id);
               }}
             >
-              <button
-                type="button"
-                className="flex min-w-0 flex-1 items-center gap-2 text-left"
-                onClick={() => activateContentTab(tab.id)}
-              >
-                <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
-                <span className="truncate">{tab.title}</span>
-              </button>
+              {editingTabId === tab.id ? (
+                <input
+                  ref={renameInputRef}
+                  type="text"
+                  value={editingTitle}
+                  onChange={(e) => setEditingTitle(e.target.value)}
+                  onBlur={() => commitRename(tab)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") { e.preventDefault(); commitRename(tab); }
+                    if (e.key === "Escape") { e.preventDefault(); cancelRename(); }
+                  }}
+                  className="min-w-0 flex-1 bg-transparent text-sm outline-none border-b border-gold-primary/60 focus:border-gold-primary"
+                  onClick={(e) => e.stopPropagation()}
+                />
+              ) : (
+                <button
+                  type="button"
+                  className="flex min-w-0 flex-1 items-center gap-2 text-left"
+                  onClick={() => activateContentTab(tab.id)}
+                  onDoubleClick={(e) => { e.preventDefault(); startRename(tab.id, tab.title); }}
+                >
+                  <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
+                  <span className="truncate">{tab.title}</span>
+                </button>
+              )}
               <span
                 className={`ml-auto flex shrink-0 items-center ${
                   isActive ? "opacity-100" : "opacity-70 group-hover:opacity-100"

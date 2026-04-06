@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
   try {
     const session = await requireAuth();
     const body = await request.json();
-    const { title, tiptapJson, categoryId, defaultTitle, searchText } = body;
+    const { title, tiptapJson, categoryId, defaultTitle, searchText, customIcon, iconColor } = body;
 
     if (!title?.trim()) {
       return NextResponse.json({ error: "Title is required" }, { status: 400 });
@@ -86,6 +86,8 @@ export async function POST(request: NextRequest) {
         userId: session.user.id,
         defaultTitle: defaultTitle?.trim() || null,
         searchText: searchText || title.trim().toLowerCase(),
+        customIcon: customIcon || null,
+        iconColor: iconColor || null,
       },
       include: {
         category: { select: { id: true, name: true, slug: true } },
