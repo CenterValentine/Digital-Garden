@@ -183,6 +183,35 @@ The following sprints were originally 38-42 in Epoch 9 but are deferred to Epoch
 
 ---
 
+## Sprint 48: UI Polish + Bug Fixes
+
+**Goal**: Address visual regressions, interaction polish, and minor bugs observed in the live app post-Sprint 55.
+
+### Items
+- [ ] **1. Calendar widget missing** — Left panel header previously had a calendar widget; it is no longer showing. Restore it.
+- [ ] **2. Logo missing (non-mobile)** — Logo (gold ring) appears on mobile but not on desktop. Fix so it renders consistently.
+- [ ] **3. Double scrollbar in file tree** — Two scroll planes appear when the file tree expands past the viewport. Only one scroll container should exist; it must cover all expanded content without clipping.
+- [ ] **4. Block Properties auto-load** — Selecting a block should automatically load its Properties in the right sidebar. The ⋯ menu should allow selecting a non-focused block to edit its properties without leaving current focus. (Verify already implemented; fix if not.)
+- [ ] **5. Inline file rename from header** — Clicking the document title displayed as the content header should make it editable inline. Saving updates the filename in the file tree in real time, optimistically (no flash).
+- [ ] **6. File click error ("folder is...")** — Frequent bug: clicking any file shows an error mentioning a folder. Diagnose and fix. (User message was cut off — investigate error in console/network.)
+- [ ] **7. Settings hover white-on-white** — Hovering over settings items shows white text on white background. Fix contrast.
+- [ ] **8. Neon purple buttons → glass style** — Any buttons/UI elements styled with neon purple (e.g. "Save External Link Settings") should be restyled to match the glass node design system.
+- [ ] **9. Block container hover transition** — Add a subtle CSS transition on block containers so hovering feels more polished.
+- [ ] **10. Root placeholder selectable** — The "root" entry in the file tree should be selectable/clickable like any other tree item.
+
+---
+
+## Sprint 56: UI Polish + Bug Fixes (Continued)
+
+**Goal**: Resolve remaining bugs from Sprint 49/55 that could not be fixed before context limit.
+
+### Items
+- [ ] **1. Folder double-click not expanding** — `node.open()`/`node.close()` + `node.select()` attempted but react-arborist is still not reliably expanding. Root cause: `node.open()` may not exist on the `NodeApi` — need to verify the exact API surface on the installed version, or handle via `onToggle` callback. Also check whether `e.stopPropagation()` is preventing the tree's internal click handler from running `select` (which triggers `onSelect` / navigation).
+- [ ] **2. Scrollbar still visible in content panel** — Overflow is being set to `overflow-hidden` on the wrapper but FolderViewer (and potentially other viewers) have internal `overflow-auto` that are escaping. Check the full ancestor chain: `MainPanel → MainPanelContent → isNonNoteContent wrapper → content div → FolderViewer` — ensure every level in the chain has `overflow-hidden` or `min-h-0` as appropriate. The scrollbar appears most visibly when a folder is open.
+- [ ] **3. "Failed to load content" on new note creation** — After creating a new note, the main panel shows "Failed to load content / Failed to fetch content". The temp-ID guard in MainPanelContent was added but the error persists. Likely the GET `/api/content/content/[id]` is firing before the real ID is swapped in — check console logs for the actual status code and response body to confirm root cause.
+
+---
+
 ## Future Epochs (Unplanned)
 
 **Detailed stubs**: [future-epochs.md](epochs/future-epochs.md)
