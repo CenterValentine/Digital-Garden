@@ -1,38 +1,72 @@
 ---
-sprint: 54
+sprint: 55
 epoch: 12 (Main Panel Tabs + Split Workspace)
 duration: multi-session
-branch: codex/epoch-12-sprint-54
-status: in_progress
+branch: epoch-12/sprint-55-wire-blocks
+status: complete
 ---
 
-# Sprint 54: Tab Drag + Adaptive Pane Reshaping
+# Sprint 55: Block Wiring + UI Fixes + Auth
 
 ## Sprint Goal
-Make tab drag-and-drop a first-class workspace interaction so users can move tabs between panes, create new splits directly from a drag, and trust the workspace to reshape itself to the simplest valid layout when pane occupancy changes.
+Wire all Epoch 11 block extensions into the live editor, fix block interaction bugs, and resolve auth/settings regressions introduced by the SettingsInitializer.
 
-**Status**: In Progress
+**Status**: Complete ✅
 
 ## Success Criteria
 - [x] `pnpm build` passes
-- [x] Tabs can be dragged between existing visible panes
-- [x] Single-pane workspace exposes standardized drop targets to create vertical, horizontal, or quad splits
-- [x] Direct tab dragging updates pane preference as the source of truth for future layout derivation
-- [x] Workspace collapses to the simplest valid layout when tab moves empty panes
-- [ ] Manual smoke on `http://localhost:3001`
+- [x] All 6 layout/content blocks accessible via slash commands
+- [x] All 6 form/input blocks accessible via slash commands
+- [x] Block Column insert button works (empty columns only)
+- [x] Form blocks insertable from Block Column `+` menu
+- [x] Rating block clickable (no RangeError)
+- [x] Date format setting in Properties Panel (not in block UI)
+- [x] Tabs bar scrolls on overflow
+- [x] "Save as Template" toolbar button in content header
+- [x] OAuth redirect loop fixed (cookie on response object)
+- [x] "Failed to fetch settings" on sign-in page fixed (silent 401)
+- [x] Merge conflicts with main resolved (11 files — sidebar architecture)
+- [x] Properties tab auto-appears in right sidebar when block selected
 
 ## Implemented
-- `state/content-store.ts`
-  - adds `moveContentTabToPane()` for drag-driven pane reassignment
-  - derives the next layout from persistent tab axis preferences after direct moves
-  - collapses the workspace to the simplest valid layout consistent with the updated tab placement
-- `components/content/MainPanelWorkspace.tsx`
-  - makes pane shells droppable for tab moves
-  - adds single-pane standardized drag targets for right split, bottom split, and quad split creation
-- `components/content/headers/MainPanelHeader.tsx`
-  - makes tabs draggable and keeps drag styling conservative within the existing tab system
+
+### Block Extensions (Sprint 55a)
+- Registered all 6 content/layout blocks + 6 form/input blocks in `extensions-client.ts` + `extensions-server.ts`
+- Added `/block` family + `/input` family to slash commands
+- `block-columns.ts` (new): `blockColumns` + `blockColumn` node pair with:
+  - `+` button visible only when column is empty (`data-empty="true"` CSS toggle)
+  - Column count sync via `syncColumnCount()` in `update()` hook
+  - `buildBlockInsertJson` default case now skips `content` for atom blocks
+
+### Block UI Fixes
+- **Rating RangeError**: switched `posAtDOM` → `block-attrs-change` CustomEvent
+- **Date Input**: moved format selector from block DOM → Properties Panel (changed `displayFormat` to `z.enum()`)
+- **Divider + Date Input**: added `showContainer` toggle in Properties Panel
+- **Tabs**: added `overflow-x: auto; scrollbar-width: none` for horizontal scroll on overflow
+- **Renamed**: "Date Picker" → "Date Input", "Columns" → "Text Columns", "Block Columns" → "Block Column"
+
+### Right Sidebar — Properties Tab
+- `state/right-sidebar-state-store.ts`: added `"properties"` to `RightSidebarTab` union
+- `RightSidebar.tsx`: auto-switches to Properties tab on block select; reverts to Backlinks on deselect
+- `RightSidebarHeader.tsx`: injects Properties tab entry dynamically when block selected
+- `RightSidebarContent.tsx`: renders `<PropertiesPanel />` for `activeTab === "properties"`
+
+### Save as Template
+- `lib/domain/tools/registry.ts`: added `save-as-template` tool (surfaces: `["toolbar"]`, contentTypes: `["note"]`)
+- `components/content/dialogs/SaveAsTemplateDialog.tsx`: dialog with name, default title, category picker + inline create
+- `MainPanelContent.tsx`: wired `handleSaveAsTemplate` → `toolHandlers`
+- `ContentToolbar.tsx`: added `BookmarkPlus` to icon map
+
+### Auth Fixes
+- `app/api/auth/google/route.ts`: set `oauth_state` cookie on `response.cookies` (not `cookieStore`) — ensures cookie attaches to redirect response
+- `app/api/user/settings/route.ts`: broadened auth error check to catch `"Authentication required"` + `includes("auth")`
+- `state/settings-store.ts`: added silent 401 return — uses defaults, no error logged (fixes sign-in page flash)
+
+## Merge Conflict Resolution
+- 11 files merged with `main` (which had the new `useRightSidebarStateStore` per-content-id tab architecture)
+- Block files kept with sprint branch changes
+- Sidebar files taken from main then Properties tab re-integrated on top
 
 ## Notes
-- This worktree runs on port `3001`.
-- Sprint 53 is committed at `99f48ba` before Sprint 54 work began.
-- Full interaction smoke is still pending; current verification is build-only.
+- Block Builder modal approach was pivoted — blocks now use inline insertion + right-panel Properties (per memory)
+- `pnpm build` passes as of final commit `ab52261`
