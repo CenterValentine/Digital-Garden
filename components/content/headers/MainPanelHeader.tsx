@@ -147,7 +147,7 @@ export function MainPanelHeader({
         backdropFilter: glass1.backdropFilter,
       }}
     >
-      <div className="flex min-w-0 flex-1 items-stretch overflow-x-auto scrollbar-hidden">
+      <div className="flex min-w-0 flex-1 items-stretch overflow-x-hidden">
         {tabs.length === 0 ? (
           <div className="flex items-center px-3 py-2 text-xs font-medium uppercase tracking-[0.18em] text-gray-500">
             {getPaneLabel(layoutMode, paneId)}
