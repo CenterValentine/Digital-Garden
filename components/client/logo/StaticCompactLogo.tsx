@@ -22,8 +22,8 @@ export default function StaticCompactLogo() {
     >
       <LogoDefs />
       <style>{`
-  .shoot { stroke: url(#grad-shoot) !important; }
-  .root  { stroke: url(#grad-root)  !important; }
+  .shoot { stroke: #4FAE8A !important; }
+  .root  { stroke: #E2C27A !important; }
 `}</style>
 
       {/* Root system - fully visible */}
