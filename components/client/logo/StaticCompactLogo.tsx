@@ -1,7 +1,6 @@
 "use client";
 
 import React from "react";
-import LogoDefs from "@/components/client/logo/logo-parts/Logo-Defs";
 import { Crown } from "@/components/client/logo/logo-parts";
 
 /**
@@ -20,12 +19,6 @@ export default function StaticCompactLogo() {
       height="48"
       className="w-full h-full"
     >
-      <LogoDefs />
-      <style>{`
-  .shoot { stroke: #4FAE8A !important; }
-  .root  { stroke: #E2C27A !important; }
-`}</style>
-
       {/* Root system - fully visible */}
       <g id="_rootSystem_" data-name="&lt;rootSystem&gt;">
         <polyline
@@ -795,7 +788,7 @@ export default function StaticCompactLogo() {
           y2="400.8"
           style={{
             fill: "none",
-            stroke: "#24415f",
+            stroke: "#4FAE8A",
             strokeLinecap: "round",
             strokeLinejoin: "round",
             strokeWidth: "5px",
@@ -808,7 +801,7 @@ export default function StaticCompactLogo() {
           points="279.73 378.91 283.12 381.92 304.95 402.44"
           style={{
             fill: "none",
-            stroke: "#24415f",
+            stroke: "#4FAE8A",
             strokeLinecap: "round",
             strokeLinejoin: "round",
             strokeWidth: "5px",
@@ -824,7 +817,7 @@ export default function StaticCompactLogo() {
           y2="356.88"
           style={{
             fill: "none",
-            stroke: "#24415f",
+            stroke: "#4FAE8A",
             strokeLinecap: "round",
             strokeLinejoin: "round",
             strokeWidth: "7px",
@@ -837,7 +830,7 @@ export default function StaticCompactLogo() {
           points="279.54 360.74 279.54 279.01 316.77 247.9"
           style={{
             fill: "none",
-            stroke: "#24415f",
+            stroke: "#4FAE8A",
             strokeLinecap: "round",
             strokeLinejoin: "round",
             strokeWidth: "7px",
@@ -852,7 +845,7 @@ export default function StaticCompactLogo() {
           r="10.46"
           style={{
             fill: "none",
-            stroke: "#24415f",
+            stroke: "#4FAE8A",
             strokeLinecap: "round",
             strokeLinejoin: "round",
             strokeWidth: "5px",
@@ -865,7 +858,7 @@ export default function StaticCompactLogo() {
           points="279.54 323.57 279.73 272.56 253.56 246.77 227.96 268.98"
           style={{
             fill: "none",
-            stroke: "#24415f",
+            stroke: "#4FAE8A",
             strokeLinecap: "round",
             strokeLinejoin: "round",
             strokeWidth: "7px",
@@ -880,7 +873,7 @@ export default function StaticCompactLogo() {
           r="10.46"
           style={{
             fill: "none",
-            stroke: "#24415f",
+            stroke: "#4FAE8A",
             strokeLinecap: "round",
             strokeLinejoin: "round",
             strokeWidth: "4px",
@@ -896,7 +889,7 @@ export default function StaticCompactLogo() {
           y2="202.85"
           style={{
             fill: "none",
-            stroke: "#24415f",
+            stroke: "#4FAE8A",
             strokeLinecap: "round",
             strokeLinejoin: "round",
             strokeWidth: "6px",
@@ -912,7 +905,7 @@ export default function StaticCompactLogo() {
           y2="203.38"
           style={{
             fill: "none",
-            stroke: "#24415f",
+            stroke: "#4FAE8A",
             strokeLinecap: "round",
             strokeLinejoin: "round",
             strokeWidth: "5px",
@@ -925,7 +918,7 @@ export default function StaticCompactLogo() {
           points="279.54 278.16 279.54 224.51 331.68 180.7 331.68 135.71"
           style={{
             fill: "none",
-            stroke: "#24415f",
+            stroke: "#4FAE8A",
             strokeLinecap: "round",
             strokeLinejoin: "round",
             strokeWidth: "7px",
@@ -940,7 +933,7 @@ export default function StaticCompactLogo() {
           r="10.46"
           style={{
             fill: "none",
-            stroke: "#24415f",
+            stroke: "#4FAE8A",
             strokeLinecap: "round",
             strokeLinejoin: "round",
             strokeWidth: "5px",
@@ -953,7 +946,7 @@ export default function StaticCompactLogo() {
           points="279.54 228.02 279.54 169.74 243.69 134.02"
           style={{
             fill: "none",
-            stroke: "#24415f",
+            stroke: "#4FAE8A",
             strokeLinecap: "round",
             strokeLinejoin: "round",
             strokeWidth: "7px",
@@ -968,7 +961,7 @@ export default function StaticCompactLogo() {
           r="10.46"
           style={{
             fill: "none",
-            stroke: "#24415f",
+            stroke: "#4FAE8A",
             strokeLinecap: "round",
             strokeLinejoin: "round",
             strokeWidth: "5px",
@@ -981,7 +974,7 @@ export default function StaticCompactLogo() {
           points="279.54 176.94 279.54 124.42 280.11 98.63"
           style={{
             fill: "none",
-            stroke: "#24415f",
+            stroke: "#4FAE8A",
             strokeLinecap: "round",
             strokeLinejoin: "round",
             strokeWidth: "7px",
@@ -994,7 +987,7 @@ export default function StaticCompactLogo() {
           points="277.28 122.73 280.11 124.42 284.81 121.78 333.36 85.87"
           style={{
             fill: "none",
-            stroke: "#24415f",
+            stroke: "#4FAE8A",
             strokeLinecap: "round",
             strokeLinejoin: "round",
             strokeWidth: "6px",
@@ -1010,7 +1003,7 @@ export default function StaticCompactLogo() {
           y2="75.28"
           style={{
             fill: "none",
-            stroke: "#24415f",
+            stroke: "#4FAE8A",
             strokeLinecap: "round",
             strokeLinejoin: "round",
             strokeWidth: "6px",
@@ -1025,7 +1018,7 @@ export default function StaticCompactLogo() {
           r="10.32"
           style={{
             fill: "none",
-            stroke: "#24415f",
+            stroke: "#4FAE8A",
             strokeLinecap: "round",
             strokeLinejoin: "round",
             strokeWidth: "5px",
@@ -1040,7 +1033,7 @@ export default function StaticCompactLogo() {
           r="10.46"
           style={{
             fill: "none",
-            stroke: "#24415f",
+            stroke: "#4FAE8A",
             strokeLinecap: "round",
             strokeLinejoin: "round",
             strokeWidth: "5px",
@@ -1055,7 +1048,7 @@ export default function StaticCompactLogo() {
           r="10.46"
           style={{
             fill: "none",
-            stroke: "#24415f",
+            stroke: "#4FAE8A",
             strokeLinecap: "round",
             strokeLinejoin: "round",
             strokeWidth: "5px",
@@ -1070,7 +1063,7 @@ export default function StaticCompactLogo() {
           r="15.68"
           style={{
             fill: "none",
-            stroke: "#24415f",
+            stroke: "#4FAE8A",
             strokeLinecap: "round",
             strokeLinejoin: "round",
             strokeWidth: "7px",
@@ -1085,7 +1078,7 @@ export default function StaticCompactLogo() {
           r="4.22"
           style={{
             fill: "none",
-            stroke: "#24415f",
+            stroke: "#4FAE8A",
             strokeLinecap: "round",
             strokeLinejoin: "round",
             strokeWidth: "3px",
@@ -1100,7 +1093,7 @@ export default function StaticCompactLogo() {
           r="4.22"
           style={{
             fill: "none",
-            stroke: "#24415f",
+            stroke: "#4FAE8A",
             strokeLinecap: "round",
             strokeLinejoin: "round",
             strokeWidth: "3px",
@@ -1113,7 +1106,7 @@ export default function StaticCompactLogo() {
           points="317.52 378.77 296.86 359.34 296.86 235.29 391.35 159.05 421.09 143.81 422.98 142.87"
           style={{
             fill: "none",
-            stroke: "#24415f",
+            stroke: "#4FAE8A",
             strokeLinecap: "round",
             strokeLinejoin: "round",
             strokeWidth: "5px",
@@ -1128,7 +1121,7 @@ export default function StaticCompactLogo() {
           r="12.47"
           style={{
             fill: "none",
-            stroke: "#24415f",
+            stroke: "#4FAE8A",
             strokeLinecap: "round",
             strokeLinejoin: "round",
             strokeWidth: "5px",
@@ -1141,7 +1134,7 @@ export default function StaticCompactLogo() {
           points="241.71 378.91 262.6 359.71 263.54 286.89 225.33 247.9 164.34 247.9"
           style={{
             fill: "none",
-            stroke: "#24415f",
+            stroke: "#4FAE8A",
             strokeLinecap: "round",
             strokeLinejoin: "round",
             strokeWidth: "5px",
@@ -1156,7 +1149,7 @@ export default function StaticCompactLogo() {
           r="9.94"
           style={{
             fill: "none",
-            stroke: "#24415f",
+            stroke: "#4FAE8A",
             strokeLinecap: "round",
             strokeLinejoin: "round",
             strokeWidth: "4px",
@@ -1169,7 +1162,7 @@ export default function StaticCompactLogo() {
           points="354.83 187.29 354.83 159.24 364.25 132.51 364.25 130.82"
           style={{
             fill: "none",
-            stroke: "#24415f",
+            stroke: "#4FAE8A",
             strokeLinecap: "round",
             strokeLinejoin: "round",
             strokeWidth: "5px",
@@ -1185,7 +1178,7 @@ export default function StaticCompactLogo() {
           y2="194.5"
           style={{
             fill: "none",
-            stroke: "#24415f",
+            stroke: "#4FAE8A",
             strokeLinecap: "round",
             strokeLinejoin: "round",
             strokeWidth: "5px",
@@ -1201,7 +1194,7 @@ export default function StaticCompactLogo() {
           y2="182.53"
           style={{
             fill: "none",
-            stroke: "#24415f",
+            stroke: "#4FAE8A",
             strokeLinecap: "round",
             strokeLinejoin: "round",
             strokeWidth: "6px",
@@ -1216,7 +1209,7 @@ export default function StaticCompactLogo() {
           r="8.62"
           style={{
             fill: "none",
-            stroke: "#24415f",
+            stroke: "#4FAE8A",
             strokeLinecap: "round",
             strokeLinejoin: "round",
             strokeWidth: "5px",
@@ -1231,7 +1224,7 @@ export default function StaticCompactLogo() {
           r="9.13"
           style={{
             fill: "none",
-            stroke: "#24415f",
+            stroke: "#4FAE8A",
             strokeLinecap: "round",
             strokeLinejoin: "round",
             strokeWidth: "5px",
@@ -1247,7 +1240,7 @@ export default function StaticCompactLogo() {
           y2="93.36"
           style={{
             fill: "none",
-            stroke: "#24415f",
+            stroke: "#4FAE8A",
             strokeLinecap: "round",
             strokeLinejoin: "round",
             strokeWidth: "5px",
@@ -1262,7 +1255,7 @@ export default function StaticCompactLogo() {
           r="10.79"
           style={{
             fill: "none",
-            stroke: "#24415f",
+            stroke: "#4FAE8A",
             strokeLinecap: "round",
             strokeLinejoin: "round",
             strokeWidth: "5px",
@@ -1275,7 +1268,7 @@ export default function StaticCompactLogo() {
           points="210.08 202.85 210.08 173.55 196.53 132.14"
           style={{
             fill: "none",
-            stroke: "#24415f",
+            stroke: "#4FAE8A",
             strokeLinecap: "round",
             strokeLinejoin: "round",
             strokeWidth: "6px",
@@ -1288,7 +1281,7 @@ export default function StaticCompactLogo() {
           points="209.33 203.23 179.21 171.48 133.47 148.89 131.59 147.95"
           style={{
             fill: "none",
-            stroke: "#24415f",
+            stroke: "#4FAE8A",
             strokeLinecap: "round",
             strokeLinejoin: "round",
             strokeWidth: "6px",
@@ -1303,7 +1296,7 @@ export default function StaticCompactLogo() {
           r="12.82"
           style={{
             fill: "none",
-            stroke: "#24415f",
+            stroke: "#4FAE8A",
             strokeLinecap: "round",
             strokeLinejoin: "round",
             strokeWidth: "5px",
@@ -1318,7 +1311,7 @@ export default function StaticCompactLogo() {
           r="9.32"
           style={{
             fill: "none",
-            stroke: "#24415f",
+            stroke: "#4FAE8A",
             strokeLinecap: "round",
             strokeLinejoin: "round",
             strokeWidth: "5px",
@@ -1334,7 +1327,7 @@ export default function StaticCompactLogo() {
           y2="104.47"
           style={{
             fill: "none",
-            stroke: "#24415f",
+            stroke: "#4FAE8A",
             strokeLinecap: "round",
             strokeLinejoin: "round",
             strokeWidth: "6px",
@@ -1349,7 +1342,7 @@ export default function StaticCompactLogo() {
           r="11.76"
           style={{
             fill: "none",
-            stroke: "#24415f",
+            stroke: "#4FAE8A",
             strokeLinecap: "round",
             strokeLinejoin: "round",
             strokeWidth: "5px",
@@ -1365,7 +1358,7 @@ export default function StaticCompactLogo() {
           y2="23.9"
           style={{
             fill: "none",
-            stroke: "#24415f",
+            stroke: "#4FAE8A",
             strokeLinecap: "round",
             strokeLinejoin: "round",
             strokeWidth: "5px",
@@ -1380,7 +1373,7 @@ export default function StaticCompactLogo() {
           r="10.7"
           style={{
             fill: "none",
-            stroke: "#24415f",
+            stroke: "#4FAE8A",
             strokeLinecap: "round",
             strokeLinejoin: "round",
             strokeWidth: "5px",
@@ -1396,7 +1389,7 @@ export default function StaticCompactLogo() {
         r="3.29"
         style={{
           fill: "none",
-          stroke: "#24415f",
+          stroke: "#4FAE8A",
           strokeLinecap: "round",
           strokeLinejoin: "round",
           strokeWidth: "3px",
@@ -1411,7 +1404,7 @@ export default function StaticCompactLogo() {
         r="3.29"
         style={{
           fill: "none",
-          stroke: "#24415f",
+          stroke: "#4FAE8A",
           strokeLinecap: "round",
           strokeLinejoin: "round",
           strokeWidth: "3px",
