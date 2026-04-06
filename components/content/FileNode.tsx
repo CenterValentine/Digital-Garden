@@ -294,12 +294,12 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
     // Folders: single click does nothing — double-click opens (see handleDoubleClick)
   };
 
-  // Double-click on a folder selects it (opens it in the main panel)
+  // Double-click on a folder: expand/collapse AND open it in the main panel.
+  // node.toggle() does both — it toggles the open state and fires onSelect.
   const handleDoubleClick = (e: React.MouseEvent) => {
     if (isFolder) {
       e.preventDefault();
-      e.stopPropagation();
-      node.select();
+      node.toggle();
     }
   };
 

@@ -173,12 +173,16 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
       return;
     }
 
-    // If this is a temporary ID (being created), show loading state but don't fetch
+    // If this is a temporary ID (being created), show loading and clear contentType.
+    // Without clearing contentType, the previous FolderViewer stays mounted with
+    // the temp ID as its folderId, causing ListView to fetch a non-existent parentId.
     if (selectedContentId.startsWith("temp-")) {
       setIsLoading(true);
       setError(null);
       setNoteContent(null);
       setNoteTitle("");
+      setContentType(null);
+      setContentData(null);
       return;
     }
 
@@ -1015,7 +1019,7 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
       >
         {selectedContentId && <ContentToolbar />}
         {isNonNoteContent ? (
-          <div className="flex flex-1 min-h-0 flex-col overflow-y-auto">
+          <div className="flex flex-1 min-h-0 flex-col overflow-hidden">
             {notesPanelPosition === "above" && (
               <ExpandableEditor
                 contentId={selectedContentId}
