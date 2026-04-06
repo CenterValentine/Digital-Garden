@@ -46,6 +46,15 @@ const TOOL_REGISTRY: ToolDefinition[] = [
     order: 200,
     group: "share",
   },
+  {
+    id: "save-as-template",
+    label: "Save as Template",
+    iconName: "BookmarkPlus",
+    surfaces: ["toolbar"],
+    contentTypes: ["note"],
+    order: 110,
+    group: "templates",
+  },
 
   // ─── TOOLBELT: Text formatting (matches current BubbleMenu) ───
   {

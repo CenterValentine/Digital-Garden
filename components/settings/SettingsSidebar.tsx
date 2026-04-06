@@ -222,7 +222,7 @@ export function SettingsSidebar() {
               ${
                 isActive
                   ? "text-primary font-medium"
-                  : "text-gray-300 hover:text-white"
+                  : "text-gray-300 hover:text-gray-100 hover:bg-white/10"
               }
             `}
             style={

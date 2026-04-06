@@ -1,14 +1,7 @@
 {
   "permissions": {
     "allow": [
-      "Bash(npm run build:*)",
-            "Read",
-      "Edit",
-      "Write",
-      "MultiEdit",
-      "Grep",
-      "LS",
-      "Bash(cd:*)"
+      "Bash(npm run build:*)"
     ]
   }
 }

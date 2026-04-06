@@ -30,7 +30,13 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error("[Settings API] GET error:", error);
 
-    if (error instanceof Error && error.message === "Unauthorized") {
+    const isAuthError =
+      error instanceof Error &&
+      (error.message === "Unauthorized" ||
+        error.message === "Authentication required" ||
+        error.message.toLowerCase().includes("auth"));
+
+    if (isAuthError) {
       return NextResponse.json(
         { success: false, error: "Unauthorized" },
         { status: 401 }

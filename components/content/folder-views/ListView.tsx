@@ -45,7 +45,8 @@ export function ListView({
     try {
       setLoading(true);
       const response = await fetch(
-        `/api/content/content?parentId=${folderId}`
+        `/api/content/content?parentId=${folderId}`,
+        { credentials: "include" }
       );
 
       if (!response.ok) {

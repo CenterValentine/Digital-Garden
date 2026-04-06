@@ -46,6 +46,13 @@ export const useSettingsStore = create<SettingsStore>()(
         set({ isSyncing: true, error: null });
         try {
           const response = await fetch("/api/user/settings");
+
+          // Not authenticated — use defaults silently (sign-in page fires this too)
+          if (response.status === 401) {
+            set({ isSyncing: false, error: null });
+            return;
+          }
+
           const data = await response.json();
 
           if (data.success) {
