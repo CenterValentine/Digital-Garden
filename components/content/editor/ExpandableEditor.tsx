@@ -6,18 +6,20 @@
  * rich-text notes via the shared NotePayload relation.
  *
  * Features:
- * - Per-node expansion state persisted in localStorage
- * - Word count badge when content exists
+ * - Universal expansion state (global, not per-node) via useNotesPanelStore
+ * - Position toggle: notes can be above or below the main content
+ * - Inline toolbar: Save as page template
  * - Compact MarkdownEditor for secondary editing
  * - Context-aware placeholder text
  */
 
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { ChevronRight } from "lucide-react";
+import { useCallback } from "react";
+import { ChevronRight, ArrowUp, ArrowDown, BookmarkPlus } from "lucide-react";
 import { cn } from "@/lib/core/utils";
 import { MarkdownEditor } from "./MarkdownEditor";
+import { useNotesPanelStore } from "@/state/notes-panel-store";
 import type { JSONContent } from "@tiptap/core";
 
 interface ExpandableEditorProps {
@@ -39,24 +41,8 @@ interface ExpandableEditorProps {
   fetchTags?: (query: string) => Promise<Array<{ id: string; name: string; slug: string; color: string | null; usageCount: number }>>;
   /** Create a new tag */
   createTag?: (tagName: string) => Promise<{ id: string; name: string; slug: string; color: string | null; usageCount: number }>;
-}
-
-/**
- * Hook for per-node expansion persistence.
- * Reads initial state from localStorage synchronously to avoid flash.
- */
-function useExpandedState(contentId: string): [boolean, (expanded: boolean) => void] {
-  const [isExpanded, setIsExpanded] = useState(() => {
-    if (typeof window === "undefined") return false;
-    const stored = localStorage.getItem(`editor-expanded-${contentId}`);
-    return stored === "true";
-  });
-
-  useEffect(() => {
-    localStorage.setItem(`editor-expanded-${contentId}`, String(isExpanded));
-  }, [contentId, isExpanded]);
-
-  return [isExpanded, setIsExpanded];
+  /** Callback to open Save as Page Template dialog */
+  onSaveAsPageTemplate?: () => void;
 }
 
 /** Extract word count from TipTap JSON content */
@@ -95,8 +81,9 @@ export function ExpandableEditor({
   fetchNotesForWikiLink,
   fetchTags,
   createTag,
+  onSaveAsPageTemplate,
 }: ExpandableEditorProps) {
-  const [isExpanded, setIsExpanded] = useExpandedState(contentId);
+  const { isExpanded, toggleExpanded, position, togglePosition } = useNotesPanelStore();
   const hasContent = hasNonEmptyContent(noteContent);
   const wordCount = hasContent ? getWordCount(noteContent) : 0;
 
@@ -116,34 +103,67 @@ export function ExpandableEditor({
   return (
     <div className="border-t border-white/10">
       {/* Collapsible Header */}
-      <button
-        onClick={() => setIsExpanded(!isExpanded)}
+      <div
         className={cn(
-          "flex items-center gap-2 w-full px-4 py-2 text-left",
-          "hover:bg-white/5 transition-colors duration-150",
+          "flex items-center w-full px-3",
           isExpanded && "border-b border-white/5"
         )}
       >
-        <ChevronRight
-          className={cn(
-            "w-4 h-4 text-gray-400 transition-transform duration-200",
-            isExpanded && "rotate-90"
-          )}
-        />
-        <span className="text-sm font-medium text-gray-300">
-          {hasContent ? "Notes" : "Add notes"}
-        </span>
-        {hasContent && (
-          <span className="ml-auto text-xs text-gray-500">
-            {wordCount} {wordCount === 1 ? "word" : "words"}
+        {/* Toggle button — takes remaining space */}
+        <button
+          onClick={toggleExpanded}
+          className="flex flex-1 items-center gap-2 py-1.5 text-left hover:bg-white/5 transition-colors duration-150 rounded"
+        >
+          <ChevronRight
+            className={cn(
+              "w-3.5 h-3.5 text-gray-400 transition-transform duration-200 flex-shrink-0",
+              isExpanded && "rotate-90"
+            )}
+          />
+          <span className="text-xs font-medium text-gray-400">
+            {hasContent ? "Notes" : "Add notes"}
           </span>
+          {hasContent && (
+            <span className="text-xs text-gray-600">
+              {wordCount} {wordCount === 1 ? "word" : "words"}
+            </span>
+          )}
+        </button>
+
+        {/* Inline toolbar — only visible when expanded */}
+        {isExpanded && (
+          <div className="flex items-center gap-0.5 ml-1">
+            {onSaveAsPageTemplate && (
+              <button
+                onClick={(e) => { e.stopPropagation(); onSaveAsPageTemplate(); }}
+                className="flex items-center gap-1 rounded px-1.5 py-1 text-[11px] text-gray-500 hover:bg-white/5 hover:text-gray-300 transition-colors"
+                title="Save as page template"
+                type="button"
+              >
+                <BookmarkPlus className="h-3 w-3" />
+                <span className="hidden sm:inline">Save as page template</span>
+              </button>
+            )}
+            <button
+              onClick={(e) => { e.stopPropagation(); togglePosition(); }}
+              className="rounded p-1 text-gray-500 hover:bg-white/5 hover:text-gray-300 transition-colors"
+              title={position === "below" ? "Move notes above content" : "Move notes below content"}
+              type="button"
+            >
+              {position === "below" ? (
+                <ArrowUp className="h-3 w-3" />
+              ) : (
+                <ArrowDown className="h-3 w-3" />
+              )}
+            </button>
+          </div>
         )}
-      </button>
+      </div>
 
       {/* Expandable Editor */}
       {isExpanded && (
         <div
-          className="px-2 py-1"
+          className="px-2 pt-0 pb-1"
           onKeyDown={(e) => e.stopPropagation()}
         >
           <MarkdownEditor

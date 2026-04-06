@@ -29,7 +29,7 @@ export function ContentToolbar() {
   }
 
   return (
-    <div className="flex items-center gap-1 border-b border-white/10 bg-white/[0.02] px-4 py-1">
+    <div className="flex items-center gap-1 border-b border-white/10 bg-white/[0.02] px-4 py-1 overflow-x-auto overflow-y-hidden scrollbar-thin scrollbar-thumb-white/10">
       {tools.map((tool) => {
         const Icon = ICON_MAP[tool.definition.iconName];
         return (

@@ -45,7 +45,8 @@ import type { JSONContent } from "@tiptap/core";
 import type { EditorStats } from "../editor/MarkdownEditor";
 import type { OutlineHeading } from "@/lib/domain/content/outline-extractor";
 import { extractOutline } from "@/lib/domain/content/outline-extractor";
-import { SaveAsTemplateDialog } from "../dialogs/SaveAsTemplateDialog";
+import { SaveAsPageTemplateDialog } from "../dialogs/SaveAsPageTemplateDialog";
+import { useNotesPanelStore } from "@/state/notes-panel-store";
 
 interface ContentResponse {
   success: boolean;
@@ -55,6 +56,8 @@ interface ContentResponse {
     slug: string;
     parentId: string | null;
     contentType: string;
+    customIcon?: string | null;
+    iconColor?: string | null;
     note?: {
       tiptapJson: any; // Prisma Json type
       searchText: string;
@@ -107,6 +110,7 @@ interface MainPanelContentProps {
 
 export function MainPanelContent({ paneId }: MainPanelContentProps) {
   const { activeView } = useLeftPanelViewStore();
+  const { position: notesPanelPosition } = useNotesPanelStore();
   const activePaneId = useContentStore((state) => state.activePaneId);
   const layoutMode = useContentStore((state) => state.layoutMode);
   const selectedContentId = useContentStore((state) =>
@@ -131,6 +135,8 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
   const [titleDraft, setTitleDraft] = useState("");
   const titleInputRef = useRef<HTMLInputElement>(null);
   const [templateDialogOpen, setTemplateDialogOpen] = useState(false);
+  const [contentCustomIcon, setContentCustomIcon] = useState<string | null>(null);
+  const [contentIconColor, setContentIconColor] = useState<string | null>(null);
   const [contentType, setContentType] = useState<string | null>(null);
   const [contentParentId, setContentParentId] = useState<string | null>(null);
   const [contentData, setContentData] = useState<any>(null); // Phase 2: Store payload data
@@ -161,7 +167,9 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
       setNoteTitle("");
       setContentType(null);
       setContentParentId(null);
-      setContentData(null); // Clear Phase 2 payload data
+      setContentData(null);
+      setContentCustomIcon(null);
+      setContentIconColor(null);
       return;
     }
 
@@ -208,6 +216,8 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
         setNoteTitle(result.data.title);
         setContentParentId(result.data.parentId);
         setContentType(result.data.contentType);
+        setContentCustomIcon(result.data.customIcon ?? null);
+        setContentIconColor(result.data.iconColor ?? null);
         updateContentTab(selectedContentId, {
           title: result.data.title,
           contentType: result.data.contentType,
@@ -1006,28 +1016,46 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
         {selectedContentId && <ContentToolbar />}
         {isNonNoteContent ? (
           <div className="flex flex-1 min-h-0 flex-col overflow-y-auto">
+            {notesPanelPosition === "above" && (
+              <ExpandableEditor
+                contentId={selectedContentId}
+                contentType={contentType}
+                noteContent={noteContent}
+                onSave={handleSave}
+                onWikiLinkClick={handleWikiLinkClick}
+                fetchNotesForWikiLink={fetchNotesForWikiLink}
+                fetchTags={fetchTags}
+                createTag={createTag}
+                onSaveAsPageTemplate={handleSaveAsTemplate}
+              />
+            )}
             <div className="flex-1 min-h-0">{contentElement}</div>
-            <ExpandableEditor
-              contentId={selectedContentId}
-              contentType={contentType}
-              noteContent={noteContent}
-              onSave={handleSave}
-              onWikiLinkClick={handleWikiLinkClick}
-              fetchNotesForWikiLink={fetchNotesForWikiLink}
-              fetchTags={fetchTags}
-              createTag={createTag}
-            />
+            {notesPanelPosition !== "above" && (
+              <ExpandableEditor
+                contentId={selectedContentId}
+                contentType={contentType}
+                noteContent={noteContent}
+                onSave={handleSave}
+                onWikiLinkClick={handleWikiLinkClick}
+                fetchNotesForWikiLink={fetchNotesForWikiLink}
+                fetchTags={fetchTags}
+                createTag={createTag}
+                onSaveAsPageTemplate={handleSaveAsTemplate}
+              />
+            )}
           </div>
         ) : (
           contentElement
         )}
         {process.env.NODE_ENV === "development" && !isMultiPane && <ToolDebugPanel />}
       </div>
-      <SaveAsTemplateDialog
-        isOpen={templateDialogOpen}
-        onClose={() => setTemplateDialogOpen(false)}
+      <SaveAsPageTemplateDialog
+        open={templateDialogOpen}
+        onOpenChange={setTemplateDialogOpen}
+        noteTitle={noteTitle}
         tiptapJson={noteContent}
-        suggestedTitle={noteTitle}
+        customIcon={contentCustomIcon}
+        iconColor={contentIconColor}
       />
     </ToolSurfaceProvider>
   );
