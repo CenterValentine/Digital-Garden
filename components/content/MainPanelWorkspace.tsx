@@ -12,9 +12,14 @@ import {
   type WorkspaceLayoutMode,
   type WorkspacePaneId,
 } from "@/state/content-store";
+import {
+  installWorkspaceOpenGuard,
+  useWorkspaceStore,
+} from "@/state/workspace-store";
 import { MainPanelNavigation } from "./MainPanelNavigation";
 import { MainPanelHeader } from "./headers/MainPanelHeader";
 import { MainPanelContent } from "./content/MainPanelContent";
+import { WorkspaceConflictDialog } from "./workspaces/WorkspaceConflictDialog";
 
 interface TabDropRequest {
   paneId: WorkspacePaneId;
@@ -405,9 +410,17 @@ export function MainPanelWorkspace() {
   const layoutMode = useContentStore((state) => state.layoutMode);
   const activePaneId = useContentStore((state) => state.activePaneId);
   const openContentIds = useContentStore((state) => state.openContentIds);
+  const workspaceSnapshotKey = useContentStore((state) =>
+    JSON.stringify(state.getWorkspaceStateSnapshot())
+  );
   const moveContentTabToPane = useContentStore((state) => state.moveContentTabToPane);
   const restoreWorkspace = useContentStore((state) => state.restoreWorkspace);
   const setSelectedContentId = useContentStore((state) => state.setSelectedContentId);
+  const activeWorkspaceId = useWorkspaceStore((state) => state.activeWorkspaceId);
+  const loadWorkspaces = useWorkspaceStore((state) => state.loadWorkspaces);
+  const persistActiveWorkspace = useWorkspaceStore(
+    (state) => state.persistActiveWorkspace
+  );
   const [draggedTabId, setDraggedTabId] = useState<string | null>(null);
   const [draggedFromPaneId, setDraggedFromPaneId] = useState<WorkspacePaneId | null>(null);
   const [hoveredSinglePaneTargetId, setHoveredSinglePaneTargetId] = useState<string | null>(null);
@@ -445,10 +458,28 @@ export function MainPanelWorkspace() {
     resetDragState();
   };
 
+  useEffect(() => installWorkspaceOpenGuard(), []);
+
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    void loadWorkspaces(urlParams.get("workspace"));
+  }, [loadWorkspaces]);
+
+  useEffect(() => {
+    if (!activeWorkspaceId) return;
+
+    const timeoutId = window.setTimeout(() => {
+      void persistActiveWorkspace();
+    }, 600);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [activeWorkspaceId, workspaceSnapshotKey, persistActiveWorkspace]);
+
   useEffect(() => {
     if (openContentIds.length > 0) return;
 
     const urlParams = new URLSearchParams(window.location.search);
+    const workspaceIdFromUrl = urlParams.get("workspace");
     const contentIdFromUrl = urlParams.get("content");
     const layoutModeFromUrl = urlParams.get("layout");
     const activePaneIdFromUrl = urlParams.get("pane");
@@ -489,6 +520,16 @@ export function MainPanelWorkspace() {
     const hasPaneTabs = Object.values(paneTabContentIds).some(
       (contentIds) => contentIds && contentIds.length > 0
     );
+
+    if (
+      workspaceIdFromUrl &&
+      !contentIdFromUrl &&
+      !hasPaneTabs &&
+      (!tabsFromUrl || tabsFromUrl.length === 0) &&
+      (!secondaryTabsFromUrl || secondaryTabsFromUrl.length === 0)
+    ) {
+      return;
+    }
 
     if (
       contentIdFromUrl ||
@@ -653,6 +694,7 @@ export function MainPanelWorkspace() {
           />
         )}
       </div>
+      <WorkspaceConflictDialog />
     </div>
   );
 }

@@ -28,6 +28,7 @@ import {
   useNavigationHistoryStore,
 } from "@/state/navigation-history-store";
 import { NavigationHistoryDropdown } from "./NavigationHistoryDropdown";
+import { WorkspaceSelector } from "./workspaces/WorkspaceSelector";
 
 const HOLD_THRESHOLD_MS = 250;
 
@@ -239,6 +240,7 @@ export function MainPanelNavigation({ paneId }: MainPanelNavigationProps) {
             onForwardClick={goForward}
             backButtonRef={backButtonRef}
           />
+          <WorkspaceSelector />
           <div className="h-4 w-px bg-black/10 dark:bg-white/10" />
           <div className="relative">
             <button
