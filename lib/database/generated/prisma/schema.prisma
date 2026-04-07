@@ -39,6 +39,22 @@ enum FolderViewMode {
   canvas // Visual graph (mind map style)
 }
 
+enum ContentWorkspaceStatus {
+  active
+  archived
+}
+
+enum ContentWorkspaceItemAssignmentType {
+  primary
+  shared
+  borrowed
+}
+
+enum ContentWorkspaceItemScope {
+  item
+  recursive
+}
+
 model ContentNode {
   id           String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   ownerId      String      @db.Uuid
@@ -74,17 +90,18 @@ model ContentNode {
   workflowPayload      WorkflowPayload?
 
   history        ContentHistory[]
-  sourceLinks    ContentLink[]    @relation("SourceContent")
-  targetLinks    ContentLink[]    @relation("TargetContent")
-  category       Category?        @relation(fields: [categoryId], references: [id])
-  owner          User             @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  parent         ContentNode?     @relation("Hierarchy", fields: [parentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  children       ContentNode[]    @relation("Hierarchy")
+  sourceLinks    ContentLink[]          @relation("SourceContent")
+  targetLinks    ContentLink[]          @relation("TargetContent")
+  category       Category?              @relation(fields: [categoryId], references: [id])
+  owner          User                   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  parent         ContentNode?           @relation("Hierarchy", fields: [parentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  children       ContentNode[]          @relation("Hierarchy")
   contentPath    ContentPath?
   contentTags    ContentTag[]
   trashBinEntry  TrashBin?
   viewGrants     ViewGrant[]
   calendarEvents CalendarEvent[]
+  workspaceItems ContentWorkspaceItem[]
 
   @@unique([ownerId, slug])
   @@index([ownerId, deletedAt])
@@ -304,8 +321,54 @@ model User {
   calendarConnections CalendarConnection[]
   calendarSources     CalendarSource[]
   calendarEvents      CalendarEvent[]
+  contentWorkspaces   ContentWorkspace[]
 
   @@index([email])
+}
+
+model ContentWorkspace {
+  id           String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ownerId      String                 @db.Uuid
+  name         String                 @db.VarChar(120)
+  slug         String                 @db.VarChar(120)
+  isMain       Boolean                @default(false)
+  isLocked     Boolean                @default(false)
+  status       ContentWorkspaceStatus @default(active)
+  expiresAt    DateTime?              @db.Timestamptz(6)
+  archivedAt   DateTime?              @db.Timestamptz(6)
+  layoutMode   String                 @default("single") @db.VarChar(32)
+  activePaneId String                 @default("top-left") @db.VarChar(32)
+  paneState    Json                   @default("{}")
+  settings     Json                   @default("{}")
+  createdAt    DateTime               @default(now()) @db.Timestamptz(6)
+  updatedAt    DateTime               @updatedAt @db.Timestamptz(6)
+
+  owner User                   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  items ContentWorkspaceItem[]
+
+  @@unique([ownerId, slug])
+  @@index([ownerId, status])
+  @@index([ownerId, isMain])
+  @@index([expiresAt])
+}
+
+model ContentWorkspaceItem {
+  id             String                             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workspaceId    String                             @db.Uuid
+  contentId      String                             @db.Uuid
+  assignmentType ContentWorkspaceItemAssignmentType @default(primary)
+  scope          ContentWorkspaceItemScope          @default(item)
+  expiresAt      DateTime?                          @db.Timestamptz(6)
+  createdAt      DateTime                           @default(now()) @db.Timestamptz(6)
+  updatedAt      DateTime                           @updatedAt @db.Timestamptz(6)
+
+  workspace ContentWorkspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  content   ContentNode      @relation(fields: [contentId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, contentId])
+  @@index([contentId, assignmentType, expiresAt])
+  @@index([workspaceId, assignmentType])
+  @@index([expiresAt])
 }
 
 model Category {
