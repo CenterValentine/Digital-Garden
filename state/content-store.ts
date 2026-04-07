@@ -77,6 +77,32 @@ interface WorkspaceRestoreOptions {
   secondaryTabContentIds?: string[];
 }
 
+export interface WorkspaceStateSnapshot {
+  layoutMode: WorkspaceLayoutMode;
+  activePaneId: WorkspacePaneId;
+  activeContentId: string | null;
+  paneTabContentIds: Partial<
+    Record<
+      WorkspacePaneId,
+      {
+        contentIds: string[];
+        activeContentId: string | null;
+      }
+    >
+  >;
+}
+
+type WorkspaceOpenGuard = (request: {
+  contentId: string;
+  options: ContentSelectionOptions;
+}) => boolean;
+
+declare global {
+  interface Window {
+    __dgWorkspaceOpenGuard?: WorkspaceOpenGuard;
+  }
+}
+
 export interface ContentState {
   selectedContentId: string | null;
   selectedContentType: string | null;
@@ -127,6 +153,7 @@ export interface ContentState {
   pinContentTab: (tabId?: string | null) => void;
   closeContentTab: (tabId: string) => void;
   closeContentTabs: (contentIds: string[]) => void;
+  getWorkspaceStateSnapshot: () => WorkspaceStateSnapshot;
   restoreWorkspace: (workspace: WorkspaceRestoreOptions) => void;
   clearSelection: () => void;
   toggleMultiSelect: (id: string) => void;
@@ -268,6 +295,46 @@ function getVisibleOpenContentIds(
         .filter((value): value is string => Boolean(value))
     )
     .filter((contentId, index, allIds) => allIds.indexOf(contentId) === index);
+}
+
+function createWorkspaceStateSnapshot(
+  state: Pick<
+    ContentState,
+    "layoutMode" | "activePaneId" | "panes" | "tabs" | "selectedContentId"
+  >
+): WorkspaceStateSnapshot {
+  const paneTabContentIds = WORKSPACE_PANE_IDS.reduce<
+    WorkspaceStateSnapshot["paneTabContentIds"]
+  >((snapshot, paneId) => {
+    const pane = state.panes[paneId];
+    const contentIds =
+      pane?.tabIds
+        .map((tabId) => state.tabs[tabId]?.contentId ?? null)
+        .filter((contentId): contentId is string => Boolean(contentId)) ?? [];
+    snapshot[paneId] = {
+      contentIds,
+      activeContentId: pane?.activeTabId
+        ? state.tabs[pane.activeTabId]?.contentId ?? null
+        : null,
+    };
+    return snapshot;
+  }, {});
+
+  const activeTab = getActiveTab(state);
+  return {
+    layoutMode: state.layoutMode,
+    activePaneId: state.activePaneId,
+    activeContentId: state.selectedContentId ?? activeTab?.contentId ?? null,
+    paneTabContentIds,
+  };
+}
+
+function shouldAllowWorkspaceOpen(
+  id: string,
+  options: ContentSelectionOptions
+) {
+  if (typeof window === "undefined") return true;
+  return window.__dgWorkspaceOpenGuard?.({ contentId: id, options }) !== false;
 }
 
 function getOrderedVisibleTabIds(
@@ -880,6 +947,16 @@ export const useContentStore = create<ContentState>((set, get) => ({
   },
 
   openContentInPane: (id, paneId, options = {}) => {
+    if (
+      id &&
+      !shouldAllowWorkspaceOpen(id, {
+        ...options,
+        paneId,
+      })
+    ) {
+      return;
+    }
+
     const nextLayoutMode = resolveLayoutModeForPane(
       get().layoutMode,
       paneId
@@ -900,6 +977,8 @@ export const useContentStore = create<ContentState>((set, get) => ({
   },
 
   setSelectedContentId: (id, options = {}) => {
+    if (id && !shouldAllowWorkspaceOpen(id, options)) return;
+
     commitWorkspace(set, (state) => {
       if (!id) {
         return {
@@ -1380,6 +1459,8 @@ export const useContentStore = create<ContentState>((set, get) => ({
       get().closeContentTab(tabId);
     });
   },
+
+  getWorkspaceStateSnapshot: () => createWorkspaceStateSnapshot(get()),
 
   restoreWorkspace: (workspace) => {
     commitWorkspace(set, (state) => {
