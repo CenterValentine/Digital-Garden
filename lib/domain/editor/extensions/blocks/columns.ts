@@ -7,12 +7,13 @@
  * Sprint 44: Layout Blocks (simplified Sprint 44b — resize handles deferred)
  */
 
-import { Node, mergeAttributes } from "@tiptap/core";
+import { Node, mergeAttributes, type CommandProps, type RawCommands } from "@tiptap/core";
 import { TextSelection } from "@tiptap/pm/state";
 import { z } from "zod";
 import { createBlockSchema } from "@/lib/domain/blocks/schema";
 import { registerBlock } from "@/lib/domain/blocks/registry";
 import { useBlockStore } from "@/state/block-store";
+import { useRightPanelCollapseStore } from "@/state/right-panel-collapse-store";
 import { openBlockInsertMenu, syncAttrsToPanel } from "@/lib/domain/blocks/node-view-factory";
 
 const { schema: columnsSchema, defaults: columnsDefaults } =
@@ -28,8 +29,8 @@ const { schema: columnsSchema, defaults: columnsDefaults } =
       .describe("Inner column border style"),
     showContainer: z
       .boolean()
-      .default(true)
-      .describe("Show outer container border"),
+      .default(false)
+      .describe("Show border"),
     showBackground: z
       .boolean()
       .default(true)
@@ -104,7 +105,7 @@ export const Columns = Node.create({
         renderHTML: (attrs) => ({ "data-col-border": attrs.columnBorder }),
       },
       showContainer: {
-        default: true,
+        default: false,
         parseHTML: (el) => el.getAttribute("data-show-container") !== "false",
         renderHTML: (attrs) => ({ "data-show-container": String(attrs.showContainer) }),
       },
@@ -135,7 +136,7 @@ export const Columns = Node.create({
     return {
       insertColumns:
         (count: number = 2) =>
-        ({ commands }: { commands: any }) => {
+        ({ commands }: CommandProps) => {
           const columnNodes = Array.from({ length: count }, () => ({
             type: "column",
             content: [{ type: "paragraph" }],
@@ -147,7 +148,7 @@ export const Columns = Node.create({
             content: columnNodes,
           });
         },
-    } as any;
+    } as Partial<RawCommands>;
   },
 
   addKeyboardShortcuts() {
@@ -260,6 +261,7 @@ export const Columns = Node.create({
         const blockId = currentNode.attrs.blockId || "";
         useBlockStore.getState().setSelectedBlock(blockId, "columns");
         useBlockStore.getState().openProperties();
+        useRightPanelCollapseStore.getState().setCollapsed(false);
         syncAttrsToPanel(blockId, currentNode.attrs);
       });
       chrome.appendChild(menuBtn);

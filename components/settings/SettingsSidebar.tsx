@@ -10,6 +10,10 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { getSurfaceStyles } from "@/lib/design/system";
+import {
+  getExtensionSettingsEntries,
+  renderExtensionIcon,
+} from "@/lib/extensions";
 
 // Inline SVG icons (server-compatible)
 const SettingsIcon = () => (
@@ -201,6 +205,14 @@ const navItems: NavItem[] = [
 export function SettingsSidebar() {
   const pathname = usePathname();
   const glass1 = getSurfaceStyles("glass-1");
+  const extensionSettingsItems: NavItem[] = getExtensionSettingsEntries().map(
+    (entry) => ({
+      href: entry.path,
+      label: entry.label,
+      icon: renderExtensionIcon(entry.iconName, "h-4 w-4"),
+    })
+  );
+  const allItems = [...navItems, ...extensionSettingsItems];
 
   return (
     <div className="p-4 space-y-2">
@@ -210,7 +222,7 @@ export function SettingsSidebar() {
         </h2>
       </div>
 
-      {navItems.map((item) => {
+      {allItems.map((item) => {
         const isActive = pathname === item.href;
 
         return (

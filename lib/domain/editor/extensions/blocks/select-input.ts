@@ -22,6 +22,7 @@ const { schema: selectInputSchema, defaults: selectInputDefaults } =
     selectedValues: z.array(z.string()).default([]).describe("Selected values (multi-select)"),
     allowMultiple: z.boolean().default(false).describe("Allow multiple selections"),
     required: z.boolean().default(false).describe("Required field"),
+    showContainer: z.boolean().default(false).describe("Show border"),
   });
 
 registerBlock({
@@ -183,6 +184,11 @@ export const SelectInput = Node.create({
         parseHTML: (el) => el.getAttribute("data-required") === "true",
         renderHTML: (attrs) => attrs.required ? { "data-required": "true" } : {},
       },
+      showContainer: {
+        default: false,
+        parseHTML: (el) => el.getAttribute("data-show-container") === "true",
+        renderHTML: (attrs) => attrs.showContainer ? { "data-show-container": "true" } : {},
+      },
     };
   },
 
@@ -200,6 +206,7 @@ export const SelectInput = Node.create({
       label: "Select Input",
       iconName: "ChevronDown",
       atom: true,
+      containerAttr: "showContainer",
       renderContent: renderSelectInput,
       updateContent(node, contentDom, editor) {
         contentDom.innerHTML = "";
@@ -226,6 +233,7 @@ export const ServerSelectInput = Node.create({
       selectedValues: { default: [], parseHTML: (el) => { try { return JSON.parse(el.getAttribute("data-selected-values") || "[]"); } catch { return []; } }, renderHTML: (attrs) => { if (!attrs.selectedValues?.length) return {}; return { "data-selected-values": JSON.stringify(attrs.selectedValues) }; } },
       allowMultiple: { default: false, parseHTML: (el) => el.getAttribute("data-allow-multiple") === "true", renderHTML: (attrs) => attrs.allowMultiple ? { "data-allow-multiple": "true" } : {} },
       required: { default: false, parseHTML: (el) => el.getAttribute("data-required") === "true", renderHTML: (attrs) => attrs.required ? { "data-required": "true" } : {} },
+      showContainer: { default: false, parseHTML: (el) => el.getAttribute("data-show-container") === "true", renderHTML: (attrs) => attrs.showContainer ? { "data-show-container": "true" } : {} },
     };
   },
 

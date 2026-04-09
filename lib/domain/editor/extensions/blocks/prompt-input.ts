@@ -32,6 +32,7 @@ const { schema: promptInputSchema, defaults: promptInputDefaults } =
       .describe("Snippet category ID for AI context"),
     snippetId: z.string().default("").describe("Specific snippet ID for AI context"),
     isLoading: z.boolean().default(false).describe("Loading state"),
+    showContainer: z.boolean().default(false).describe("Show border"),
   });
 
 registerBlock({
@@ -188,6 +189,7 @@ export const PromptInput = Node.create({
       snippetCategoryId: { default: "", parseHTML: (el) => el.getAttribute("data-snippet-category-id") || "", renderHTML: (attrs) => attrs.snippetCategoryId ? { "data-snippet-category-id": attrs.snippetCategoryId } : {} },
       snippetId: { default: "", parseHTML: (el) => el.getAttribute("data-snippet-id") || "", renderHTML: (attrs) => attrs.snippetId ? { "data-snippet-id": attrs.snippetId } : {} },
       isLoading: { default: false, parseHTML: (el) => el.getAttribute("data-is-loading") === "true", renderHTML: (attrs) => attrs.isLoading ? { "data-is-loading": "true" } : {} },
+      showContainer: { default: false, parseHTML: (el) => el.getAttribute("data-show-container") === "true", renderHTML: (attrs) => attrs.showContainer ? { "data-show-container": "true" } : {} },
     };
   },
 
@@ -200,6 +202,7 @@ export const PromptInput = Node.create({
       label: "AI Prompt",
       iconName: "Sparkles",
       atom: true,
+      containerAttr: "showContainer",
       renderContent: renderPromptInput,
       updateContent(node, contentDom, editor) {
         contentDom.innerHTML = "";
@@ -226,6 +229,7 @@ export const ServerPromptInput = Node.create({
       snippetCategoryId: { default: "", parseHTML: (el) => el.getAttribute("data-snippet-category-id") || "", renderHTML: (attrs) => attrs.snippetCategoryId ? { "data-snippet-category-id": attrs.snippetCategoryId } : {} },
       snippetId: { default: "", parseHTML: (el) => el.getAttribute("data-snippet-id") || "", renderHTML: (attrs) => attrs.snippetId ? { "data-snippet-id": attrs.snippetId } : {} },
       isLoading: { default: false, parseHTML: (el) => el.getAttribute("data-is-loading") === "true", renderHTML: (attrs) => attrs.isLoading ? { "data-is-loading": "true" } : {} },
+      showContainer: { default: false, parseHTML: (el) => el.getAttribute("data-show-container") === "true", renderHTML: (attrs) => attrs.showContainer ? { "data-show-container": "true" } : {} },
     };
   },
 

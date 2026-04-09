@@ -7,7 +7,7 @@
 
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { createElement, useState, useCallback, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { LeftSidebarHeader } from "./headers/LeftSidebarHeader";
 import { LeftSidebarContent } from "./content/LeftSidebarContent";
@@ -16,11 +16,12 @@ import { LeftSidebarExtensions } from "./content/LeftSidebarExtensions";
 import { FileUploadDialog } from "./dialogs/FileUploadDialog";
 import { useLeftPanelCollapseStore } from "@/state/left-panel-collapse-store";
 import { useLeftPanelViewStore } from "@/state/left-panel-view-store";
-import { CalendarCompanionPanel } from "@/components/calendar/CalendarCompanionPanel";
+import { getExtensionLeftSidebarPanel } from "@/lib/extensions/client-registry";
 
 export function LeftSidebar() {
   const { mode } = useLeftPanelCollapseStore();
   const { activeView } = useLeftPanelViewStore();
+  const ExtensionPanel = getExtensionLeftSidebarPanel(activeView);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [createTrigger, setCreateTrigger] = useState<{
     type: "folder" | "note" | "docx" | "xlsx" | "json" | "code" | "html" | "external" | "chat" | "visualization" | "data" | "hope" | "workflow";
@@ -191,7 +192,7 @@ export function LeftSidebar() {
 
         {activeView === "extensions" && <LeftSidebarExtensions />}
 
-        {activeView === "calendar" && <CalendarCompanionPanel />}
+        {ExtensionPanel && createElement(ExtensionPanel)}
 
         {/* Search view is handled by LeftSidebarContent with isSearchOpen state */}
         {activeView === "search" && (

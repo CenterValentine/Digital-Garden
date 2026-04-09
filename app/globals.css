@@ -663,21 +663,22 @@ nav[class*="fixed"] {
 /* Resize handle — bottom-right corner, only visible on selection */
 .ProseMirror .image-resize-handle {
   position: absolute;
-  bottom: 4px;
-  right: 4px;
-  width: 12px;
-  height: 12px;
-  background: #4a9eff;
-  border: 2px solid white;
-  border-radius: 2px;
+  right: 0.2rem;
+  bottom: 0.2rem;
+  width: 0.9rem;
+  height: 0.9rem;
   cursor: nwse-resize;
   opacity: 0;
+  border-right: 2px solid rgba(70, 94, 115, 0.45);
+  border-bottom: 2px solid rgba(70, 94, 115, 0.45);
+  border-bottom-right-radius: 0.15rem;
   transition: opacity 0.15s;
   z-index: 1;
 }
 
+.ProseMirror .image-resize-wrapper:hover .image-resize-handle,
 .ProseMirror .image-resize-wrapper.ProseMirror-selectednode .image-resize-handle {
-  opacity: 1;
+  opacity: 0.75;
 }
 
 /* Upload placeholder animation */
@@ -882,15 +883,15 @@ mark {
   padding: 0.25rem 0.375rem 0.25rem 0.375rem;
   border: 1px solid rgba(0, 0, 0, 0.12);
   border-radius: 6px;
-  background: rgba(0, 0, 0, 0.03);
+  background: transparent;
 
   transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
 }
 
 .ProseMirror .block-node:hover {
-  border-color: rgba(255, 255, 255, 0.15);
-  background: rgba(255, 255, 255, 0.04);
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+  border-color: rgba(0, 0, 0, 0.18);
+  background: transparent;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.025);
 
 }
 
@@ -912,29 +913,58 @@ mark {
 /* Block chrome (type badge + menu) — hover-only */
 .ProseMirror .block-chrome {
   display: flex;
-  align-items: center;
+  position: absolute;
+  top: 0.35rem;
+  left: 0.35rem;
+  right: 0.35rem;
+  bottom: 0.35rem;
+  z-index: 4;
+  align-items: flex-start;
+  justify-content: flex-end;
   gap: 4px;
-  opacity: 0;
-  transition: opacity 0.15s ease;
   pointer-events: none;
 }
 
 .ProseMirror .block-node:hover > .block-chrome,
 .ProseMirror .block-node.block-selected > .block-chrome,
 .ProseMirror .block-node.ProseMirror-selectednode > .block-chrome {
-  opacity: 1;
-  pointer-events: auto;
+  pointer-events: none;
 }
 
 .ProseMirror .block-type-badge {
+  position: absolute;
+  right: 0;
+  bottom: 0;
   font-size: 10px;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: rgba(0, 0, 0, 0.5);
+  color: rgba(0, 0, 0, 0.38);
   padding: 1px 6px;
   border-radius: 4px;
-  background: rgba(0, 0, 0, 0.06);
+  background: rgba(255, 255, 255, 0.48);
   font-weight: 500;
+  opacity: 0;
+  pointer-events: none;
+  user-select: none;
+}
+
+.ProseMirror .block-node:hover .block-type-badge {
+  animation: block-badge-peek 2.2s ease-out forwards;
+}
+
+@keyframes block-badge-peek {
+  0% {
+    opacity: 0;
+  }
+  10% {
+    opacity: 0.64;
+  }
+  70% {
+    opacity: 0.64;
+  }
+  100% {
+    opacity: 0;
+  }
 }
 
 .ProseMirror .block-menu-btn {
@@ -952,6 +982,7 @@ mark {
   background: none;
   border: none;
   transition: opacity 0.15s ease, background 0.15s ease;
+  pointer-events: auto;
 }
 
 .ProseMirror .block-node:hover .block-menu-btn {
@@ -959,7 +990,7 @@ mark {
 }
 
 .ProseMirror .block-menu-btn:hover {
-  background: rgba(0, 0, 0, 0.08);
+  background: rgba(0, 0, 0, 0.035);
   color: rgba(0, 0, 0, 0.7);
 }
 
@@ -979,6 +1010,7 @@ mark {
   border: none;
   transition: opacity 0.15s ease, background 0.15s ease, color 0.15s ease;
   line-height: 1;
+  pointer-events: auto;
 }
 
 .ProseMirror .block-node:hover .block-delete-btn {
@@ -986,7 +1018,7 @@ mark {
 }
 
 .ProseMirror .block-delete-btn:hover {
-  background: rgba(220, 38, 38, 0.12);
+  background: rgba(220, 38, 38, 0.06);
   color: rgba(220, 38, 38, 0.8);
 }
 
@@ -1032,7 +1064,7 @@ mark {
 }
 
 .ProseMirror .block-insert-btn:hover {
-  background: rgba(59, 130, 246, 0.1);
+  background: rgba(59, 130, 246, 0.055);
   border-color: rgba(59, 130, 246, 0.4);
   color: rgba(59, 130, 246, 0.8);
 }
@@ -1294,7 +1326,7 @@ mark {
 }
 
 .ProseMirror .block-accordion-chevron:hover {
-  background: rgba(0, 0, 0, 0.06);
+  background: rgba(0, 0, 0, 0.025);
   color: rgba(0, 0, 0, 0.6);
 }
 
@@ -1416,9 +1448,42 @@ mark {
   border-color: transparent;
   background: transparent;
   padding: 0.125rem;
+  box-shadow: none;
 }
+
+.ProseMirror .block-calendarViewBlock.block-container-hidden {
+  padding: 0;
+}
+
+.ProseMirror .block-calendarViewBlock.block-container-hidden > .block-chrome {
+  position: absolute;
+  top: 0.25rem;
+  right: 0.25rem;
+  left: 0.25rem;
+  z-index: 4;
+}
+
 .ProseMirror .block-node.block-container-hidden:hover {
-  border-color: rgba(0, 0, 0, 0.06);
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.ProseMirror .block-node.block-container-hidden.block-selected,
+.ProseMirror .block-node.block-container-hidden.ProseMirror-selectednode,
+.ProseMirror .block-node.block-container-hidden.block-focused {
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.ProseMirror .block-calendarViewBlock.block-container-hidden:hover {
+  border-color: transparent;
+}
+
+.ProseMirror .block-column .block-calendarViewBlock > .block-insert-btn,
+.ProseMirror .block-column-cell .block-calendarViewBlock > .block-insert-btn,
+.ProseMirror .block-tab-panel-content .block-calendarViewBlock > .block-insert-btn,
+.ProseMirror .block-accordion-body .block-calendarViewBlock > .block-insert-btn {
+  display: none !important;
 }
 
 /* ─── Tabs (Sprint 44) ─── */
@@ -2006,4 +2071,423 @@ mark {
 /* Empty column: center vertically (flex, align center) */
 .ProseMirror .block-column-cell[data-empty="true"] {
   justify-content: center;
+}
+
+.ProseMirror .calendar-view-block-content {
+  display: block;
+  width: fit-content;
+  max-width: 100%;
+}
+
+.ProseMirror .block-calendarViewBlock {
+  width: fit-content;
+  max-width: 100%;
+  background: transparent;
+}
+
+.ProseMirror .block-calendarViewBlock:hover,
+.ProseMirror .block-calendarViewBlock.block-selected,
+.ProseMirror .block-calendarViewBlock.ProseMirror-selectednode {
+  background: transparent;
+}
+
+.ProseMirror .calendar-view-block-shell {
+  --calendar-block-border: rgba(70, 94, 115, 0.22);
+  --calendar-block-accent: #c9a86c;
+  --calendar-block-paper: rgba(250, 244, 234, 0.92);
+  --calendar-block-text: #465e73;
+  --calendar-block-muted: rgba(70, 94, 115, 0.62);
+  --calendar-block-blue: #2f63dc;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: min(100%, 30rem);
+  max-width: 100%;
+  overflow: hidden;
+  border: 1px solid var(--calendar-block-border);
+  border-radius: 1rem;
+  background: transparent;
+  box-shadow: 0 6px 20px rgba(15, 23, 42, 0.04);
+  color: var(--calendar-block-text);
+}
+
+.ProseMirror .calendar-view-block-shell.no-frame {
+  border-color: transparent;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.ProseMirror .calendar-view-block-shell.view-month {
+  width: min(100%, 27rem);
+  aspect-ratio: 1 / 1;
+}
+
+.ProseMirror .calendar-view-block-shell.view-day,
+.ProseMirror .calendar-view-block-shell.view-agenda {
+  width: min(100%, 26rem);
+}
+
+.ProseMirror .calendar-view-block-shell.view-week {
+  width: min(100%, 42rem);
+}
+
+.ProseMirror .calendar-view-block-toolbar {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 0.35rem;
+  align-items: center;
+  border-bottom: 1px solid rgba(70, 94, 115, 0.16);
+  padding: 0.55rem;
+}
+
+.ProseMirror .calendar-view-block-nav,
+.ProseMirror .calendar-view-block-tabs {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.ProseMirror .calendar-view-block-nav {
+  flex: 0 0 auto;
+  gap: 0;
+  overflow: hidden;
+  border: 1px solid rgba(70, 94, 115, 0.18);
+  border-radius: 0.7rem;
+  background: rgba(255, 255, 255, 0.82);
+}
+
+.ProseMirror .calendar-view-block-nav-button,
+.ProseMirror .calendar-view-block-today-button,
+.ProseMirror .calendar-view-block-tab,
+.ProseMirror .calendar-view-block-day-button,
+.ProseMirror .calendar-view-block-day-number,
+.ProseMirror .calendar-view-block-event {
+  font: inherit;
+  cursor: pointer;
+}
+
+.ProseMirror .calendar-view-block-nav-button,
+.ProseMirror .calendar-view-block-today-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.55rem;
+  height: 1.7rem;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--calendar-block-text);
+  font-size: 0.72rem;
+  font-weight: 650;
+}
+
+.ProseMirror .calendar-view-block-nav-button + .calendar-view-block-nav-button {
+  border-left: 1px solid rgba(70, 94, 115, 0.18);
+}
+
+.ProseMirror .calendar-view-block-today-button {
+  padding: 0 0.65rem;
+}
+
+.ProseMirror .calendar-view-block-title,
+.ProseMirror .calendar-view-block-tabs {
+  min-width: 0;
+}
+
+.ProseMirror .calendar-view-block-nav-button:hover,
+.ProseMirror .calendar-view-block-today-button:hover {
+  background: rgba(201, 168, 108, 0.14);
+}
+
+.ProseMirror .calendar-view-block-title {
+  flex: 1 1 auto;
+  overflow: hidden;
+  font-size: clamp(0.72rem, 2vw, 0.88rem);
+  font-weight: 750;
+  letter-spacing: clamp(0.01em, 0.3vw, 0.05em);
+  min-width: 0;
+  padding: 0 0.15rem;
+  text-align: left;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.ProseMirror .calendar-view-block-tabs {
+  flex: 0 1 auto;
+  gap: 0.2rem;
+  justify-content: flex-end;
+  margin-left: auto;
+  max-width: 55%;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.ProseMirror .calendar-view-block-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.ProseMirror .calendar-view-block-tab {
+  flex: 0 0 auto;
+  border: 1px solid transparent;
+  border-radius: 0.55rem;
+  background: transparent;
+  color: rgba(70, 94, 115, 0.35);
+  font-size: clamp(0.72rem, 1.9vw, 0.78rem);
+  font-weight: 750;
+  padding: 0.3rem 0.42rem;
+}
+
+.ProseMirror .calendar-view-block-tab.active {
+  border-color: rgba(0, 92, 197, 0.9);
+  color: #111827;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: inset 0 0 0 1px rgba(0, 92, 197, 0.9);
+}
+
+.ProseMirror .calendar-view-block-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  background: var(--calendar-block-paper);
+}
+
+.ProseMirror .calendar-view-block-resize-handle {
+  position: absolute;
+  right: 0.2rem;
+  bottom: 0.2rem;
+  width: 0.9rem;
+  height: 0.9rem;
+  opacity: 0;
+  border-right: 2px solid rgba(70, 94, 115, 0.45);
+  border-bottom: 2px solid rgba(70, 94, 115, 0.45);
+  border-bottom-right-radius: 0.15rem;
+  cursor: nwse-resize;
+  z-index: 5;
+}
+
+.ProseMirror .block-calendarViewBlock:hover .calendar-view-block-resize-handle,
+.ProseMirror .block-calendarViewBlock.block-selected .calendar-view-block-resize-handle,
+.ProseMirror .block-calendarViewBlock.ProseMirror-selectednode .calendar-view-block-resize-handle {
+  opacity: 0.75;
+}
+
+.ProseMirror .calendar-view-block-shell.view-month .calendar-view-block-body {
+  overflow: hidden;
+}
+
+.ProseMirror .calendar-view-block-loading,
+.ProseMirror .calendar-view-block-error {
+  margin: 0.75rem;
+  border-radius: 0.65rem;
+  font-size: 0.75rem;
+  padding: 0.55rem 0.7rem;
+}
+
+.ProseMirror .calendar-view-block-loading {
+  background: rgba(70, 94, 115, 0.08);
+  color: var(--calendar-block-muted);
+}
+
+.ProseMirror .calendar-view-block-error {
+  background: rgba(239, 68, 68, 0.12);
+  color: rgb(185, 28, 28);
+}
+
+.ProseMirror .calendar-view-block-weekdays,
+.ProseMirror .calendar-view-block-month-grid {
+  display: grid;
+}
+
+.ProseMirror .calendar-view-block-month-grid.cols-7,
+.ProseMirror .calendar-view-block-weekdays.cols-7 {
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+
+.ProseMirror .calendar-view-block-month-grid.cols-5,
+.ProseMirror .calendar-view-block-weekdays.cols-5 {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.ProseMirror .calendar-view-block-weekday {
+  border-bottom: 1px solid rgba(70, 94, 115, 0.14);
+  color: var(--calendar-block-muted);
+  font-size: 0.62rem;
+  font-weight: 750;
+  letter-spacing: 0.08em;
+  padding: 0.45rem 0.2rem;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.ProseMirror .calendar-view-block-month-grid {
+  height: 100%;
+  grid-template-rows: auto repeat(6, minmax(0, 1fr));
+}
+
+.ProseMirror .calendar-view-block-month-day {
+  overflow: hidden;
+  border-right: 1px solid rgba(70, 94, 115, 0.12);
+  border-bottom: 1px solid rgba(70, 94, 115, 0.12);
+  background: rgba(255, 255, 255, 0.34);
+  padding: 0.35rem;
+}
+
+.ProseMirror .calendar-view-block-month-day.muted {
+  opacity: 0.44;
+}
+
+.ProseMirror .calendar-view-block-day-button,
+.ProseMirror .calendar-view-block-day-number {
+  display: inline-flex;
+  width: 1.35rem;
+  height: 1.35rem;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--calendar-block-text);
+  font-size: 0.68rem;
+  font-weight: 750;
+  padding: 0;
+}
+
+.ProseMirror .calendar-view-block-day-button:hover,
+.ProseMirror .calendar-view-block-day-number:hover {
+  background: rgba(201, 168, 108, 0.24);
+}
+
+.ProseMirror .calendar-view-block-day-events {
+  display: grid;
+  gap: 0.2rem;
+  margin-top: 0.25rem;
+}
+
+.ProseMirror .calendar-view-block-event {
+  overflow: hidden;
+  width: 100%;
+  border: 0;
+  border-left: 3px solid rgba(47, 99, 220, 0.9);
+  border-radius: 0.3rem;
+  background: var(--calendar-block-blue);
+  color: #fff;
+  font-size: 0.62rem;
+  font-weight: 650;
+  line-height: 1.2;
+  padding: 0.18rem 0.3rem;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ProseMirror .calendar-view-block-event:hover {
+  filter: brightness(1.05);
+}
+
+.ProseMirror .calendar-view-block-event.compact {
+  border-left-width: 2px;
+  font-size: 0.58rem;
+  padding: 0.14rem 0.24rem;
+}
+
+.ProseMirror .calendar-view-block-day-view {
+  display: grid;
+  grid-template-columns: 3.4rem minmax(0, 1fr);
+  min-width: 0;
+}
+
+.ProseMirror .calendar-view-block-day-header {
+  grid-column: 1 / -1;
+  border-bottom: 1px solid rgba(70, 94, 115, 0.16);
+  background: rgba(255, 255, 255, 0.72);
+  color: var(--calendar-block-text);
+  font-size: 0.92rem;
+  font-weight: 800;
+  padding: 0.65rem;
+  text-align: center;
+}
+
+.ProseMirror .calendar-view-block-hour-label,
+.ProseMirror .calendar-view-block-hour-lane {
+  min-height: 3.25rem;
+  border-bottom: 1px dotted rgba(70, 94, 115, 0.28);
+}
+
+.ProseMirror .calendar-view-block-hour-label {
+  border-right: 1px solid rgba(70, 94, 115, 0.18);
+  background: rgba(255, 255, 255, 0.52);
+  color: var(--calendar-block-text);
+  font-size: 0.74rem;
+  font-weight: 750;
+  padding: 0.4rem 0.45rem;
+  text-align: right;
+}
+
+.ProseMirror .calendar-view-block-hour-lane {
+  display: grid;
+  align-content: start;
+  gap: 0.25rem;
+  min-width: 0;
+  padding: 0.35rem;
+}
+
+.ProseMirror .calendar-view-block-hour-row {
+  display: contents;
+}
+
+.ProseMirror .calendar-view-block-week-grid {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(6rem, 1fr);
+  min-width: 42rem;
+}
+
+.ProseMirror .calendar-view-block-week-day {
+  display: grid;
+  align-content: start;
+  gap: 0.25rem;
+  min-height: 18rem;
+  border-right: 1px solid rgba(70, 94, 115, 0.12);
+  background: rgba(255, 255, 255, 0.32);
+  padding: 0.4rem;
+}
+
+.ProseMirror .calendar-view-block-week-head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  margin: -0.4rem -0.4rem 0.1rem;
+  border-bottom: 1px solid rgba(70, 94, 115, 0.16);
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--calendar-block-text);
+  font-size: 0.7rem;
+  font-weight: 800;
+  padding: 0.55rem 0.3rem;
+  text-align: center;
+}
+
+.ProseMirror .calendar-view-block-agenda {
+  display: grid;
+  gap: 0.75rem;
+  padding: 0.75rem;
+}
+
+.ProseMirror .calendar-view-block-agenda-section {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.ProseMirror .calendar-view-block-agenda-date {
+  color: var(--calendar-block-text);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.ProseMirror .calendar-view-block-empty {
+  border: 1px dashed rgba(70, 94, 115, 0.25);
+  border-radius: 0.55rem;
+  color: var(--calendar-block-muted);
+  font-size: 0.72rem;
+  padding: 0.5rem;
 }

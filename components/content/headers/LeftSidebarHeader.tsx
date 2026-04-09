@@ -11,7 +11,8 @@ import { useSearchStore } from "@/state/search-store";
 import { useLeftPanelCollapseStore } from "@/state/left-panel-collapse-store";
 import { useLeftPanelViewStore } from "@/state/left-panel-view-store";
 import { LeftSidebarHeaderActions } from "./LeftSidebarHeaderActions";
-import { PanelLeftClose, PanelLeft, CalendarDays } from "lucide-react";
+import { PanelLeftClose, PanelLeft } from "lucide-react";
+import { getExtensionNavItems, renderExtensionIcon } from "@/lib/extensions";
 
 interface LeftSidebarHeaderProps {
   onCreateFolder: () => void;
@@ -54,6 +55,7 @@ export function LeftSidebarHeader({
   const { isSearchOpen, toggleSearch } = useSearchStore();
   const { mode, toggleMode } = useLeftPanelCollapseStore();
   const { activeView, setActiveView } = useLeftPanelViewStore();
+  const extensionNavItems = getExtensionNavItems();
 
   return (
     <div className="flex h-12 shrink-0 items-center justify-between border-b border-white/10 px-4">
@@ -106,7 +108,7 @@ export function LeftSidebarHeader({
           </svg>
         </button>
 
-        {/* Extensions icon button - placeholder for future features */}
+        {/* Extensions app button */}
         <button
           onClick={() => {
             setActiveView("extensions");
@@ -117,7 +119,7 @@ export function LeftSidebarHeader({
               ? "text-gold-primary hover:bg-white/10"
               : "text-gray-400 hover:bg-white/10 hover:text-gold-primary"
           }`}
-          title="Extensions (Coming Soon)"
+          title="Extensions"
           type="button"
         >
           <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -130,22 +132,26 @@ export function LeftSidebarHeader({
           </svg>
         </button>
 
-        {/* Calendar icon button */}
-        <button
-          onClick={() => {
-            setActiveView("calendar");
-            if (isSearchOpen) toggleSearch();
-          }}
-          className={`rounded p-1.5 transition-colors ${
-            activeView === "calendar"
-              ? "text-gold-primary hover:bg-white/10"
-              : "text-gray-400 hover:bg-white/10 hover:text-gold-primary"
-          }`}
-          title="Calendar"
-          type="button"
-        >
-          <CalendarDays className="h-5 w-5" />
-        </button>
+        {extensionNavItems.map((item) => {
+          return (
+            <button
+              key={item.view}
+              onClick={() => {
+                setActiveView(item.view);
+                if (isSearchOpen) toggleSearch();
+              }}
+              className={`rounded p-1.5 transition-colors ${
+                activeView === item.view
+                  ? "text-gold-primary hover:bg-white/10"
+                  : "text-gray-400 hover:bg-white/10 hover:text-gold-primary"
+              }`}
+              title={item.title ?? item.label}
+              type="button"
+            >
+              {renderExtensionIcon(item.iconName, "h-5 w-5")}
+            </button>
+          );
+        })}
       </div>
 
       {/* Right side: Actions + Toggle */}

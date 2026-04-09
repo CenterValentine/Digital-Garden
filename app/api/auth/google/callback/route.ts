@@ -8,6 +8,11 @@ import {
 import { createSession } from '@/lib/infrastructure/auth/session'
 import { extractUsername } from '@/lib/infrastructure/auth/types'
 
+function safeRedirectPath(value: string | null | undefined): string {
+  if (!value || !value.startsWith('/') || value.startsWith('//')) return '/content'
+  return value
+}
+
 export async function GET(
   request: NextRequest
 ): Promise<NextResponse> {
@@ -27,6 +32,7 @@ export async function GET(
     // Validate state (CSRF protection)
     const cookieStore = await cookies()
     const storedState = cookieStore.get('oauth_state')?.value
+    const storedRedirect = cookieStore.get('oauth_redirect')?.value
 
     if (!state || !storedState || state !== storedState) {
       return NextResponse.redirect(
@@ -36,6 +42,7 @@ export async function GET(
 
     // Clear state cookie
     cookieStore.delete('oauth_state')
+    cookieStore.delete('oauth_redirect')
 
     if (!code) {
       return NextResponse.redirect(
@@ -47,7 +54,7 @@ export async function GET(
     const redirectUri = new URL('/api/auth/google/callback', request.url).toString()
 
     // Exchange code for tokens
-    const { idToken, accessToken, refreshToken, expiresIn } = await exchangeCodeForTokens(
+    const { idToken, accessToken, refreshToken, expiresIn, scope } = await exchangeCodeForTokens(
       code,
       redirectUri
     )
@@ -72,14 +79,15 @@ export async function GET(
       username,
       accessToken,
       refreshToken,
-      expiresIn
+      expiresIn,
+      scope
     )
 
     // Create session
     await createSession(user.id)
 
     // Get redirect URL (default to content page)
-    const redirectTo = searchParams.get('redirect') || '/content'
+    const redirectTo = safeRedirectPath(storedRedirect || searchParams.get('redirect'))
 
     return NextResponse.redirect(new URL(redirectTo, request.url))
   } catch (error) {
@@ -94,4 +102,3 @@ export async function GET(
     )
   }
 }
-

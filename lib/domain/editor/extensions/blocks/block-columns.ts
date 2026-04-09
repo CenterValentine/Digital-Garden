@@ -18,6 +18,7 @@ import { createBlockSchema } from "@/lib/domain/blocks/schema";
 import { registerBlock } from "@/lib/domain/blocks/registry";
 import { openBlockInsertMenu, syncAttrsToPanel } from "@/lib/domain/blocks/node-view-factory";
 import { useBlockStore } from "@/state/block-store";
+import { useRightPanelCollapseStore } from "@/state/right-panel-collapse-store";
 
 const { schema: blockColumnsSchema, defaults: blockColumnsDefaults } =
   createBlockSchema("blockColumns", {
@@ -32,8 +33,8 @@ const { schema: blockColumnsSchema, defaults: blockColumnsDefaults } =
       .describe("Column border style"),
     showContainer: z
       .boolean()
-      .default(true)
-      .describe("Show outer container border"),
+      .default(false)
+      .describe("Show border"),
   });
 
 registerBlock({
@@ -166,7 +167,7 @@ export const BlockColumns = Node.create({
         renderHTML: (attrs) => ({ "data-col-border": attrs.columnBorder }),
       },
       showContainer: {
-        default: true,
+        default: false,
         parseHTML: (el) => el.getAttribute("data-show-container") !== "false",
         renderHTML: (attrs) => ({ "data-show-container": String(attrs.showContainer) }),
       },
@@ -250,6 +251,7 @@ export const BlockColumns = Node.create({
         const blockId = currentNode.attrs.blockId || "";
         useBlockStore.getState().setSelectedBlock(blockId, "blockColumns");
         useBlockStore.getState().openProperties();
+        useRightPanelCollapseStore.getState().setCollapsed(false);
         syncAttrsToPanel(blockId, currentNode.attrs);
       });
       chrome.appendChild(menuBtn);

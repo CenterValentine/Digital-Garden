@@ -28,7 +28,7 @@ const { schema: sectionHeaderSchema, defaults: sectionHeaderDefaults } =
       .enum(["none", "solid", "dashed", "dotted"])
       .default("solid")
       .describe("Decorative line below heading (none = hidden)"),
-    showContainer: z.boolean().default(false).describe("Show outer container border"),
+    showContainer: z.boolean().default(false).describe("Show border"),
   });
 
 // Register in block registry

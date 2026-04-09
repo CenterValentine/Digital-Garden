@@ -8,7 +8,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
-type LeftPanelView = "files" | "search" | "extensions" | "calendar";
+export type LeftPanelView = "files" | "search" | "extensions" | string;
 
 interface LeftPanelViewState {
   activeView: LeftPanelView;

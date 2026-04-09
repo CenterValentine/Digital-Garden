@@ -8,7 +8,7 @@
 
 "use client";
 
-import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { createElement, useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { ToolSurfaceProvider } from "@/lib/domain/tools";
 import { ContentToolbar } from "../toolbar";
 import { ToolDebugPanel } from "../toolbar/ToolDebugPanel";
@@ -22,7 +22,7 @@ import {
   type WorkspacePaneId,
 } from "@/state/content-store";
 import { useLeftPanelViewStore } from "@/state/left-panel-view-store";
-import { CalendarWorkspace } from "@/components/calendar/CalendarWorkspace";
+import { getExtensionMainWorkspace } from "@/lib/extensions/client-registry";
 import { useEditorStatsStore } from "@/state/editor-stats-store";
 import { useOutlineStore } from "@/state/outline-store";
 import { useDebugViewStore } from "@/state/debug-view-store";
@@ -803,10 +803,11 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
   }), [handleImportMarkdown, handleExportMarkdown, handleExportChat, handleCopyLink, handleSaveAsTemplate]);
 
   // Calendar workspace — shown in pane 1 when calendar view is active
-  if (activeView === "calendar" && paneId === "top-left") {
+  const ExtensionMainWorkspace = getExtensionMainWorkspace(activeView);
+  if (ExtensionMainWorkspace && paneId === "top-left") {
     return (
       <ToolSurfaceProvider contentType={null} handlers={toolHandlers}>
-        <CalendarWorkspace />
+        {createElement(ExtensionMainWorkspace)}
         {process.env.NODE_ENV === "development" && <ToolDebugPanel />}
       </ToolSurfaceProvider>
     );
