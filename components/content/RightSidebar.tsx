@@ -54,8 +54,12 @@ export function RightSidebar() {
   }, [selectedContentType, selectedBlockId]);
 
   const activeTab = useMemo(() => {
-    if (selectedBlockId) return resolveRightSidebarTab("properties", availableTabs);
-    if (extensionManifest?.surfaces.includes("right-sidebar")) return "extension";
+    if (!savedTab && selectedBlockId) {
+      return resolveRightSidebarTab("properties", availableTabs);
+    }
+    if (!savedTab && extensionManifest?.surfaces.includes("right-sidebar")) {
+      return resolveRightSidebarTab("extension", availableTabs);
+    }
     return resolveRightSidebarTab(savedTab, availableTabs);
   }, [availableTabs, extensionManifest, savedTab, selectedBlockId]);
 

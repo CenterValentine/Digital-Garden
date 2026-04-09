@@ -9,7 +9,8 @@
 
 import { BubbleMenu as TipTapBubbleMenu } from "@tiptap/react/menus";
 import type { Editor } from "@tiptap/core";
-import { PluginKey } from "@tiptap/pm/state";
+import { CellSelection } from "@tiptap/pm/tables";
+import { NodeSelection, PluginKey } from "@tiptap/pm/state";
 
 const tableBubbleMenuKey = new PluginKey("tableBubbleMenu");
 
@@ -24,11 +25,16 @@ const preventFocusLoss = (e: React.MouseEvent) => {
  */
 const tableShouldShow = ({
   editor,
+  state,
 }: {
   editor: Editor;
-  [key: string]: any;
+  state: import("@tiptap/pm/state").EditorState;
 }): boolean => {
-  return editor.isActive("table");
+  const { selection } = state;
+  if (!editor.isActive("table")) return false;
+  if (selection instanceof NodeSelection) return false;
+  if (!selection.empty && !(selection instanceof CellSelection)) return false;
+  return true;
 };
 
 export interface TableBubbleMenuProps {

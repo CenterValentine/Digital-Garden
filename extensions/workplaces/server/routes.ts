@@ -11,6 +11,7 @@ import {
   duplicateWorkspace,
   getWorkspace,
   listWorkspaces,
+  resetWorkspaces,
   resolveOpenIntent,
   saveWorkspaceState,
   unassignContentFromWorkspace,
@@ -61,6 +62,17 @@ export async function handleCreateWorkplace(request: NextRequest) {
   } catch (error) {
     console.error("[Workplaces API] POST error:", error);
     return errorResponse(error, "Failed to create workspace");
+  }
+}
+
+export async function handleResetWorkplaces() {
+  try {
+    const session = await requireAuth();
+    const data = await resetWorkspaces(session.user.id);
+    return NextResponse.json({ success: true, data });
+  } catch (error) {
+    console.error("[Workplaces API] RESET error:", error);
+    return errorResponse(error, "Failed to reset workplaces");
   }
 }
 

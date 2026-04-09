@@ -55,33 +55,41 @@ export function RightSidebarHeader({ activeTab, onTabChange }: RightSidebarHeade
   const activeView = useLeftPanelViewStore((state) => state.activeView);
   const extensionManifest = getExtensionManifestForView(activeView);
 
+  const extensionTool = extensionManifest?.surfaces.includes("right-sidebar")
+    ? ({
+        id: `${extensionManifest.id}-right-sidebar`,
+        label: extensionManifest.label,
+        tabKey: "extension",
+      } as ToolDefinition)
+    : null;
+
   // Get visible tabs from registry, filtered by current content type
   const registryTabs = queryTools({
     surface: "sidebar-tab",
     contentType: (selectedContentType as ContentType) ?? undefined,
   });
 
-  // Inject properties tab when a block is selected
-  const tabs =
-    !selectedBlockId && extensionManifest?.surfaces.includes("right-sidebar")
-      ? [
-          {
-            id: `${extensionManifest.id}-right-sidebar`,
-            label: extensionManifest.label,
-            tabKey: "extension",
-          } as ToolDefinition,
-        ]
-      : selectedBlockId
-        ? [
-            ...registryTabs,
-            { id: "properties-tab", label: "Block Properties", tabKey: "properties" } as ToolDefinition,
-          ]
-        : registryTabs;
+  const tabs = [...registryTabs];
+  if (extensionTool) {
+    tabs.push(extensionTool);
+  }
+  if (selectedBlockId) {
+    tabs.push({
+      id: "properties-tab",
+      label: "Block Properties",
+      tabKey: "properties",
+    } as ToolDefinition);
+  }
+
+  const uniqueTabs = tabs.filter((tool, index, list) => {
+    const tabKey = tool.tabKey as RightSidebarTab | undefined;
+    return Boolean(tabKey) && list.findIndex((candidate) => candidate.tabKey === tabKey) === index;
+  });
 
   return (
     <div className="flex h-12 shrink-0 items-center justify-between border-b border-white/10 px-4">
       <div className="flex flex-1 items-center justify-around">
-        {tabs.map((tool: ToolDefinition) => {
+        {uniqueTabs.map((tool: ToolDefinition) => {
           const tabKey = tool.tabKey as RightSidebarTab | undefined;
           if (!tabKey) return null;
 

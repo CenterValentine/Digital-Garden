@@ -9,7 +9,6 @@
  */
 
 import type { ZodObject, ZodRawShape } from "zod";
-import type { ReactNode } from "react";
 
 /** Block family determines UI grouping in the slash menu and block picker */
 export type BlockFamily = "content" | "layout" | "form";
@@ -104,4 +103,6 @@ export interface PropertiesField {
   step?: number;
   /** Field description/tooltip */
   description?: string;
+  /** Optional helper text shown in a tooltip icon next to the label */
+  tooltip?: string;
 }

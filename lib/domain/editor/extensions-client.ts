@@ -23,6 +23,8 @@ import { common, createLowlight } from "lowlight";
 import { SlashCommands } from "./commands/slash-commands";
 import { TaskListInputRule } from "./extensions/task-list";
 import { BulletListBackspace } from "./extensions/bullet-list";
+import { BlockBoundaryInsert } from "./extensions/block-boundary-insert";
+import { BlockSpacerGuard } from "./extensions/block-spacer-guard";
 import { HeadingBackspace } from "./extensions/heading-backspace";
 import { HeadingHardbreakSplit } from "./extensions/heading-hardbreak-split";
 import { BlockquoteLineOnly } from "./extensions/blockquote-line-only";
@@ -146,6 +148,8 @@ export function getEditorExtensions(options?: EditorExtensionsOptions): Extensio
 
     // M6: Bullet list backspace behavior (Obsidian-style)
     BulletListBackspace, // Backspace in empty bullet → plain text "-"
+    BlockBoundaryInsert, // Enter/Shift+Enter from selected block creates editable space after/before it
+    BlockSpacerGuard, // Empty spacer paragraphs next to custom blocks delete themselves, not the block
     HeadingBackspace, // Backspace in empty heading → paragraph with # chain
 
     // M6: External links

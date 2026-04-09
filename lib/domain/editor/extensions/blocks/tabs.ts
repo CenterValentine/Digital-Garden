@@ -20,7 +20,12 @@ import { createBlockSchema } from "@/lib/domain/blocks/schema";
 import { registerBlock } from "@/lib/domain/blocks/registry";
 import { useBlockStore } from "@/state/block-store";
 import { useRightPanelCollapseStore } from "@/state/right-panel-collapse-store";
-import { openBlockInsertMenu, syncAttrsToPanel } from "@/lib/domain/blocks/node-view-factory";
+import {
+  moveCursorToAdjacentParagraphAroundBlock,
+  openBlockInsertMenu,
+  selectBlockNode,
+  syncAttrsToPanel,
+} from "@/lib/domain/blocks/node-view-factory";
 
 const { schema: tabsSchema, defaults: tabsDefaults } =
   createBlockSchema("tabs", {
@@ -356,6 +361,7 @@ export const Tabs = Node.create({
       const tabBar = document.createElement("div");
       tabBar.classList.add("block-tabs-bar");
       tabBar.contentEditable = "false";
+      tabBar.tabIndex = -1;
       dom.appendChild(tabBar);
 
       // "+" button to add new tab
@@ -407,11 +413,102 @@ export const Tabs = Node.create({
       let lastRenderedChildCount = -1;
       let lastRenderedLabels: string[] = [];
 
+      function clearKeyboardTabSurface() {
+        dom.removeAttribute("data-keyboard-tab-mode");
+        dom.removeAttribute("data-keyboard-tab-index");
+      }
+
+      function moveSelectionIntoTabContent(index: number) {
+        if (typeof getPos !== "function") return false;
+        const pos = getPos();
+        if (pos === undefined) return false;
+
+        const range = getTabPanelRange(currentNode, pos, index);
+        if (!range) return false;
+
+        const tr = editor.state.tr.setSelection(
+          TextSelection.near(editor.state.doc.resolve(range.from + 1), 1)
+        );
+        editor.view.dispatch(tr);
+        editor.view.focus();
+        clearKeyboardTabSurface();
+        return true;
+      }
+
+      function focusTabSurfaceButton(index: number) {
+        const buttons = tabBar.querySelectorAll<HTMLButtonElement>(".block-tab-btn");
+        const button = buttons[index];
+        if (!button) return false;
+        dom.setAttribute("data-keyboard-tab-mode", "tab");
+        dom.setAttribute("data-keyboard-tab-index", String(index));
+        requestAnimationFrame(() => {
+          button.focus({ preventScroll: true });
+        });
+        return true;
+      }
+
+      function focusTabSurfaceSelector() {
+        dom.setAttribute("data-keyboard-tab-mode", "selector");
+        dom.removeAttribute("data-keyboard-tab-index");
+        requestAnimationFrame(() => {
+          tabBar.focus({ preventScroll: true });
+        });
+        return true;
+      }
+
+      function handleKeyboardTabSurfaceNavigation(
+        key: "ArrowUp" | "ArrowDown" | "ArrowLeft" | "ArrowRight"
+      ) {
+        const mode = dom.getAttribute("data-keyboard-tab-mode");
+        const indexAttr = dom.getAttribute("data-keyboard-tab-index");
+        const parsedIndex = indexAttr == null ? NaN : Number.parseInt(indexAttr, 10);
+        const surfaceIndex = Number.isFinite(parsedIndex) ? parsedIndex : activeTabIndex;
+
+        if (key === "ArrowLeft") {
+          const label = tabBar.querySelectorAll<HTMLElement>(".block-tab-label")[surfaceIndex];
+          if (!label) return false;
+          label.contentEditable = "true";
+          label.focus();
+          const range = document.createRange();
+          range.selectNodeContents(label);
+          const selection = window.getSelection();
+          selection?.removeAllRanges();
+          selection?.addRange(range);
+          clearKeyboardTabSurface();
+          return true;
+        }
+
+        if (key === "ArrowRight") {
+          return moveSelectionIntoTabContent(surfaceIndex);
+        }
+
+        if (mode === "selector") {
+          clearKeyboardTabSurface();
+          return moveCursorToAdjacentParagraphAroundBlock(
+            editor,
+            getPos,
+            currentNode,
+            key === "ArrowUp" ? "before" : "after"
+          );
+        }
+
+        const nextIndex = surfaceIndex + (key === "ArrowUp" ? -1 : 1);
+        if (nextIndex >= 0 && nextIndex < currentNode.childCount) {
+          switchToTab(nextIndex);
+          return focusTabSurfaceButton(nextIndex);
+        }
+
+        return focusTabSurfaceSelector();
+      }
+
       /** Switch to a tab by updating the ProseMirror attr + local state */
       function switchToTab(index: number) {
         activeTabIndex = index;
 
-        // Update the ProseMirror attr so it persists in the document
+        // Update the ProseMirror attr so it persists in the document.
+        // Do not move the editor selection into the panel here. Keyboard
+        // traversal across the tab rail needs focus to stay on the tab
+        // buttons; entering content is a separate explicit action.
         if (typeof getPos === "function") {
           const pos = getPos();
           if (pos !== undefined) {
@@ -420,15 +517,6 @@ export const Tabs = Node.create({
               ...currentNode.attrs,
               activeTab: index,
             });
-            // Also move cursor into the active panel
-            const tabsNode = tr.doc.nodeAt(pos);
-            if (tabsNode) {
-              const range = getTabPanelRange(tabsNode, pos, index);
-              if (range) {
-                const $pos = tr.doc.resolve(range.from + 1);
-                tr.setSelection(TextSelection.near($pos));
-              }
-            }
             editor.view.dispatch(tr);
           }
         }
@@ -514,6 +602,9 @@ export const Tabs = Node.create({
         for (let i = 0; i < panelCount; i++) {
           const tabBtn = document.createElement("button");
           tabBtn.classList.add("block-tab-btn");
+          tabBtn.type = "button";
+          tabBtn.tabIndex = -1;
+          tabBtn.setAttribute("data-tab-index", String(i));
           if (i === activeTabIndex) tabBtn.classList.add("block-tab-active");
 
           // Tab label span (editable on double-click)
@@ -545,6 +636,47 @@ export const Tabs = Node.create({
             e.preventDefault();
             e.stopPropagation();
             switchToTab(tabIndex);
+          });
+
+          tabBtn.addEventListener("keydown", (e) => {
+            if (e.key === "ArrowUp" || e.key === "ArrowDown") {
+              e.preventDefault();
+              e.stopPropagation();
+
+              const nextIndex = activeTabIndex + (e.key === "ArrowUp" ? -1 : 1);
+              if (nextIndex >= 0 && nextIndex < currentNode.childCount) {
+                switchToTab(nextIndex);
+                focusTabSurfaceButton(nextIndex);
+                return;
+              }
+
+              focusTabSurfaceSelector();
+              return;
+            }
+
+            if (e.key === "ArrowLeft") {
+              e.preventDefault();
+              e.stopPropagation();
+              const targetIndex = activeTabIndex;
+              const targetLabel =
+                tabBar.querySelectorAll<HTMLElement>(".block-tab-label")[targetIndex];
+              if (!targetLabel) return;
+              targetLabel.contentEditable = "true";
+              targetLabel.focus();
+              const range = document.createRange();
+              range.selectNodeContents(targetLabel);
+              const sel = window.getSelection();
+              sel?.removeAllRanges();
+              sel?.addRange(range);
+              clearKeyboardTabSurface();
+              return;
+            }
+
+            if (e.key === "ArrowRight") {
+              e.preventDefault();
+              e.stopPropagation();
+              moveSelectionIntoTabContent(activeTabIndex);
+            }
           });
 
           // Double-click to edit tab name
@@ -611,9 +743,58 @@ export const Tabs = Node.create({
         }
       }
 
+      tabBar.addEventListener("keydown", (e) => {
+        if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
+        e.preventDefault();
+        e.stopPropagation();
+
+        clearKeyboardTabSurface();
+        moveCursorToAdjacentParagraphAroundBlock(
+          editor,
+          getPos,
+          currentNode,
+          e.key === "ArrowUp" ? "before" : "after"
+        );
+      });
+
+      const handleDocumentKeyDown = (event: KeyboardEvent) => {
+        const mode = dom.getAttribute("data-keyboard-tab-mode");
+        if (!mode) return;
+        if (
+          event.key !== "ArrowUp" &&
+          event.key !== "ArrowDown" &&
+          event.key !== "ArrowLeft" &&
+          event.key !== "ArrowRight"
+        ) {
+          return;
+        }
+
+        console.debug("[TabsSurface] keydown", {
+          key: event.key,
+          mode,
+          index: dom.getAttribute("data-keyboard-tab-index"),
+          activeTabIndex,
+          activeElement:
+            document.activeElement instanceof HTMLElement
+              ? {
+                  tag: document.activeElement.tagName,
+                  className: document.activeElement.className,
+                }
+              : null,
+        });
+        event.preventDefault();
+        event.stopPropagation();
+        handleKeyboardTabSurfaceNavigation(
+          event.key as "ArrowUp" | "ArrowDown" | "ArrowLeft" | "ArrowRight"
+        );
+      };
+
+      document.addEventListener("keydown", handleDocumentKeyDown, true);
+
       // Click on chrome to select for properties
       chrome.addEventListener("click", () => {
         const blockId = currentNode.attrs.blockId || "";
+        selectBlockNode(editor, getPos);
         useBlockStore.getState().setSelectedBlock(blockId, "tabs");
       });
 
@@ -650,6 +831,18 @@ export const Tabs = Node.create({
         },
         selectNode() {
           dom.classList.add("block-selected", "ProseMirror-selectednode");
+          const mode = dom.getAttribute("data-keyboard-tab-mode");
+          const indexAttr = dom.getAttribute("data-keyboard-tab-index");
+          if (mode === "tab" && indexAttr != null) {
+            const index = Number.parseInt(indexAttr, 10);
+            if (Number.isFinite(index)) {
+              focusTabSurfaceButton(index);
+              return;
+            }
+          }
+          if (mode === "selector") {
+            focusTabSurfaceSelector();
+          }
         },
         deselectNode() {
           dom.classList.remove("block-selected", "ProseMirror-selectednode");
@@ -668,6 +861,9 @@ export const Tabs = Node.create({
             return true;
           }
           return false;
+        },
+        destroy() {
+          document.removeEventListener("keydown", handleDocumentKeyDown, true);
         },
       };
     };

@@ -28,7 +28,10 @@ import {
   useNavigationHistoryStore,
 } from "@/state/navigation-history-store";
 import { NavigationHistoryDropdown } from "./NavigationHistoryDropdown";
-import { useExtensionShellNavigationControls } from "@/lib/extensions/client-registry";
+import {
+  useExtensionShellNavigationControls,
+  useExtensionShellNavigationTrailingControls,
+} from "@/lib/extensions/client-registry";
 
 const HOLD_THRESHOLD_MS = 250;
 
@@ -99,6 +102,7 @@ export function MainPanelNavigation({ paneId }: MainPanelNavigationProps) {
   const setSelectedContentId = useContentStore((state) => state.setSelectedContentId);
   const setLayoutMode = useContentStore((state) => state.setLayoutMode);
   const shellNavigationControls = useExtensionShellNavigationControls();
+  const shellNavigationTrailingControls = useExtensionShellNavigationTrailingControls();
 
   const paneHistory = useNavigationHistoryStore((state) =>
     state.byPaneId[paneId] ?? EMPTY_PANE_HISTORY
@@ -230,8 +234,8 @@ export function MainPanelNavigation({ paneId }: MainPanelNavigationProps) {
 
   return (
     <>
-      <div className="flex items-center border-b border-white/10 px-2 py-1">
-        <div className="flex items-center gap-2">
+      <div className="flex items-center justify-between gap-3 border-b border-white/10 px-2 py-1">
+        <div className="flex min-w-0 items-center gap-2">
           <NavigationButtons
             canGoBack={canGoBack}
             canGoForward={canGoForward}
@@ -295,6 +299,12 @@ export function MainPanelNavigation({ paneId }: MainPanelNavigationProps) {
               </div>
             )}
           </div>
+          {shellNavigationTrailingControls.map((Control) =>
+            createElement(Control, {
+              key: Control.displayName ?? Control.name,
+              paneId,
+            })
+          )}
         </div>
       </div>
 

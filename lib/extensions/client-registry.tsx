@@ -13,6 +13,8 @@ import {
 } from "@/lib/extensions";
 import { useExtensionActivationStore } from "@/state/extension-activation-store";
 import type {
+  ExtensionContentViewerMatch,
+  ExtensionContentViewerProps,
   ExtensionNavItem,
   ExtensionShellNavigationProps,
   ExtensionShellTabMenuSectionProps,
@@ -128,6 +130,21 @@ export function useExtensionMainWorkspace(
   return runtimes.find((runtime) => runtime.id === extensionId)?.mainWorkspace;
 }
 
+export function useExtensionContentViewer(
+  input: ExtensionContentViewerMatch
+): ComponentType<ExtensionContentViewerProps> | undefined {
+  const runtimes = useEnabledExtensionRuntimes();
+  return useMemo(
+    () =>
+      runtimes.find(
+        (runtime) =>
+          runtime.contentViewer &&
+          runtime.matchesContentViewer?.(input)
+      )?.contentViewer,
+    [input, runtimes]
+  );
+}
+
 export function useExtensionRightSidebarPanel(
   view: string
 ): ComponentType | undefined {
@@ -189,6 +206,14 @@ export function useExtensionShellNavigationControls(): Array<
 > {
   return useEnabledExtensionRuntimes().flatMap(
     (runtime) => runtime.shellNavigationControls ?? []
+  );
+}
+
+export function useExtensionShellNavigationTrailingControls(): Array<
+  ComponentType<ExtensionShellNavigationProps>
+> {
+  return useEnabledExtensionRuntimes().flatMap(
+    (runtime) => runtime.shellNavigationTrailingControls ?? []
   );
 }
 

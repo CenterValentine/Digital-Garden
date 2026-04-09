@@ -15,12 +15,20 @@
  */
 
 import type { Node as ProseMirrorNode } from "@tiptap/pm/model";
+import { NodeSelection, TextSelection } from "@tiptap/pm/state";
 import type { EditorView } from "@tiptap/pm/view";
 import type { Editor } from "@tiptap/core";
 import { useBlockStore } from "@/state/block-store";
 import { useRightPanelCollapseStore } from "@/state/right-panel-collapse-store";
 import { getAllSlashBlocks, getBlockDefinition } from "./registry";
 import { calculateMenuPosition } from "@/lib/core/menu-positioning";
+
+function focusEditorView(view: EditorView) {
+  const element = view.dom as HTMLElement;
+  if (typeof element.focus === "function") {
+    element.focus({ preventScroll: true });
+  }
+}
 
 /**
  * Dispatch real node attrs to PropertiesPanel after it mounts.
@@ -66,6 +74,102 @@ export interface BlockNodeViewOptions {
    * is applied to the outer dom element. When false → hidden; when true → visible.
    */
   containerAttr?: string;
+}
+
+function isEmptyParagraph(node: ProseMirrorNode | null | undefined) {
+  return Boolean(
+    node &&
+      node.type.name === "paragraph" &&
+      node.content.size === 0 &&
+      node.textContent.length === 0
+  );
+}
+
+export function placeCursorAroundBlock(
+  editor: Editor,
+  getPos: (() => number | undefined) | undefined,
+  node: ProseMirrorNode,
+  side: "before" | "after"
+) {
+  if (!getPos) return;
+  const pos = getPos();
+  if (pos === undefined) return;
+
+  const { state, view } = editor;
+  const boundary = side === "before" ? pos : pos + node.nodeSize;
+  const $boundary = state.doc.resolve(boundary);
+  const adjacentNode = side === "before" ? $boundary.nodeBefore : $boundary.nodeAfter;
+  const tr = state.tr;
+
+  if (isEmptyParagraph(adjacentNode)) {
+    const targetPos =
+      side === "before"
+        ? Math.max(0, boundary - 1)
+        : Math.min(boundary + 1, tr.doc.content.size);
+    tr.setSelection(TextSelection.near(tr.doc.resolve(targetPos), side === "before" ? -1 : 1));
+    view.dispatch(tr);
+    focusEditorView(view);
+    return;
+  }
+
+  const paragraph = state.schema.nodes.paragraph?.create();
+  if (!paragraph) return;
+
+  tr.insert(boundary, paragraph);
+  const targetPos = Math.min(boundary + 1, tr.doc.content.size);
+  tr.setSelection(TextSelection.near(tr.doc.resolve(targetPos), 1));
+  view.dispatch(tr);
+  focusEditorView(view);
+}
+
+export function selectBlockNode(
+  editor: Editor,
+  getPos: (() => number | undefined) | undefined
+) {
+  if (!getPos) return false;
+  const pos = getPos();
+  if (pos === undefined) return false;
+
+  editor.view.dispatch(
+    editor.state.tr.setSelection(NodeSelection.create(editor.state.doc, pos))
+  );
+  focusEditorView(editor.view);
+  return true;
+}
+
+export function moveCursorToAdjacentParagraphAroundBlock(
+  editor: Editor,
+  getPos: (() => number | undefined) | undefined,
+  node: ProseMirrorNode,
+  side: "before" | "after"
+) {
+  if (!getPos) return false;
+  const pos = getPos();
+  if (pos === undefined) return false;
+
+  const { state, view } = editor;
+  const boundary = side === "before" ? pos : pos + node.nodeSize;
+  const $boundary = state.doc.resolve(boundary);
+  const adjacentNode = side === "before" ? $boundary.nodeBefore : $boundary.nodeAfter;
+  if (!adjacentNode || adjacentNode.type.name !== "paragraph") {
+    return false;
+  }
+
+  const targetPos =
+    side === "before"
+      ? Math.max(0, boundary - 1)
+      : Math.min(boundary + 1, state.doc.content.size);
+
+  view.dispatch(
+    state.tr.setSelection(
+      TextSelection.near(
+        state.doc.resolve(targetPos),
+        side === "before" ? -1 : 1
+      )
+    )
+  );
+  focusEditorView(view);
+  return true;
 }
 
 /** Open the block insertion menu at a specific position */
@@ -174,7 +278,15 @@ export function buildBlockInsertJson(blockType: string): Record<string, unknown>
     case "accordion":
       return {
         type: "accordion",
-        attrs: { ...baseAttrs, headerText: "", headerLevel: "2", defaultOpen: true, showContainer: false },
+        attrs: {
+          ...baseAttrs,
+          headerText: "",
+          headerLevel: "2",
+          openBehavior: "lastInteraction",
+          openState: true,
+          showContainer: false,
+          showDivider: false,
+        },
         content: [{ type: "paragraph" }],
       };
     case "columns":
@@ -292,6 +404,19 @@ export function createBlockNodeView(options: BlockNodeViewOptions) {
       dom.classList.toggle("block-container-hidden", !node.attrs[options.containerAttr]);
     }
 
+    const getNodePos = typeof getPos === "function" ? getPos : undefined;
+
+    const cursorBefore = document.createElement("button");
+    cursorBefore.classList.add("block-cursor-anchor", "block-cursor-anchor-before");
+    cursorBefore.type = "button";
+    cursorBefore.title = "Place cursor above";
+    cursorBefore.addEventListener("mousedown", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      selectBlockNode(editor, getNodePos);
+    });
+    dom.appendChild(cursorBefore);
+
     // --- "+" button ABOVE block ---
     const insertAbove = document.createElement("button");
     insertAbove.classList.add("block-insert-btn", "block-insert-above");
@@ -374,7 +499,6 @@ export function createBlockNodeView(options: BlockNodeViewOptions) {
     dom.appendChild(contentDom);
 
     // Render block-specific content (may insert siblings via parentElement)
-    const getNodePos = typeof getPos === "function" ? getPos : undefined;
     options.renderContent(node, contentDom, editor, getNodePos);
 
     // --- "+" button BELOW block ---
@@ -397,13 +521,41 @@ export function createBlockNodeView(options: BlockNodeViewOptions) {
     });
     dom.appendChild(insertBelow);
 
+    const cursorAfter = document.createElement("button");
+    cursorAfter.classList.add("block-cursor-anchor", "block-cursor-anchor-after");
+    cursorAfter.type = "button";
+    cursorAfter.title = "Place cursor below";
+    cursorAfter.addEventListener("mousedown", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      selectBlockNode(editor, getNodePos);
+    });
+    dom.appendChild(cursorAfter);
+
     // --- Selection handling (chrome only, not content area) ---
-    // Using chrome instead of dom prevents React re-renders from interfering
-    // with ProseMirror's cursor placement in the content area.
-    chrome.addEventListener("click", () => {
+    const syncBlockSelection = () => {
       const blockId = node.attrs.blockId || "";
       useBlockStore.getState().setSelectedBlock(blockId, options.blockType);
-    });
+      syncAttrsToPanel(blockId, node.attrs);
+    };
+
+    // Clicking anywhere inside a block should update the selected block in the
+    // properties sidebar, but should not force the right panel open.
+    dom.addEventListener(
+      "mousedown",
+      (event) => {
+        const target = event.target as HTMLElement;
+        const interactive =
+          target.closest(".block-menu-btn") ||
+          target.closest(".block-delete-btn") ||
+          target.closest(".block-insert-btn");
+        if (interactive) return;
+        syncBlockSelection();
+      },
+      true
+    );
+
+    chrome.addEventListener("click", syncBlockSelection);
 
     return {
       dom,
@@ -412,8 +564,7 @@ export function createBlockNodeView(options: BlockNodeViewOptions) {
 
       selectNode() {
         dom.classList.add("block-selected", "ProseMirror-selectednode");
-        const blockId = node.attrs.blockId || "";
-        useBlockStore.getState().setSelectedBlock(blockId, options.blockType);
+        syncBlockSelection();
       },
 
       deselectNode() {

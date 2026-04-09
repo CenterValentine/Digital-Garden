@@ -10,6 +10,7 @@ import type {
 export type ExtensionSurface =
   | "left-sidebar"
   | "main-workspace"
+  | "content-viewer"
   | "right-sidebar"
   | "global-dialog"
   | "shell";
@@ -64,12 +65,27 @@ export interface ExtensionShellTabMenuSectionProps {
   closeMenu: () => void;
 }
 
+export interface ExtensionContentViewerMatch {
+  selectedContentId: string | null;
+  contentType: string | null;
+}
+
+export interface ExtensionContentViewerProps
+  extends ExtensionContentViewerMatch {
+  paneId: WorkspacePaneId;
+}
+
 export interface ExtensionRuntime {
   id: string;
   leftSidebarPanel?: ComponentType;
   mainWorkspace?: ComponentType;
+  contentViewer?: ComponentType<ExtensionContentViewerProps>;
+  matchesContentViewer?: (
+    input: ExtensionContentViewerMatch
+  ) => boolean;
   rightSidebarPanel?: ComponentType;
   shellNavigationControls?: ComponentType<ExtensionShellNavigationProps>[];
+  shellNavigationTrailingControls?: ComponentType<ExtensionShellNavigationProps>[];
   shellControllers?: ComponentType[];
   shellTabMenuSections?: ComponentType<ExtensionShellTabMenuSectionProps>[];
   globalDialogs?: ComponentType[];

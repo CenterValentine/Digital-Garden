@@ -78,6 +78,7 @@ interface WorkspaceState {
     workspaceId: string,
     contentId: string
   ) => Promise<void>;
+  resetWorkspaces: () => Promise<void>;
 }
 
 let isBypassingWorkspaceGuard = false;
@@ -822,6 +823,29 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
         candidate.id === workspace.id ? workspace : candidate
       ),
     }));
+  },
+
+  resetWorkspaces: async () => {
+    const response = await fetch("/api/content/workspaces/reset", {
+      method: "POST",
+      credentials: "include",
+    });
+    const workspaces = await parseResponse<ContentWorkspaceResponse[]>(
+      response,
+      "Failed to reset workplaces"
+    );
+    const nextWorkspace = getMainWorkspace(workspaces);
+    set({
+      workspaces,
+      activeWorkspaceId: nextWorkspace?.id ?? null,
+      conflict: null,
+      pendingOpenIntent: null,
+    });
+    if (nextWorkspace) {
+      syncWorkspaceUrl(nextWorkspace.id);
+      restoreContentWorkspace(nextWorkspace);
+      restoreTreeSnapshotForWorkspace(nextWorkspace.id);
+    }
   },
 }));
 

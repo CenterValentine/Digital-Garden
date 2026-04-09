@@ -1069,6 +1069,47 @@ mark {
   color: rgba(59, 130, 246, 0.8);
 }
 
+.ProseMirror .block-cursor-anchor {
+  position: absolute;
+  left: 0.5rem;
+  right: 0.5rem;
+  height: 10px;
+  border: 0;
+  background: transparent;
+  cursor: text;
+  opacity: 0;
+  z-index: 3;
+}
+
+.ProseMirror .block-cursor-anchor::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 1px;
+  background: rgba(59, 130, 246, 0.2);
+  transform: translateY(-50%);
+}
+
+.ProseMirror .block-cursor-anchor-before {
+  top: -5px;
+}
+
+.ProseMirror .block-cursor-anchor-after {
+  bottom: -5px;
+}
+
+.ProseMirror .block-node:hover .block-cursor-anchor,
+.ProseMirror .block-node.block-selected .block-cursor-anchor,
+.ProseMirror .block-node.ProseMirror-selectednode .block-cursor-anchor {
+  opacity: 0.4;
+}
+
+.ProseMirror .block-cursor-anchor:hover {
+  opacity: 0.8 !important;
+}
+
 /* ─── Block Insert Menu (dropdown) ─── */
 .block-insert-menu {
   background: white;
@@ -1281,7 +1322,7 @@ mark {
 }
 
 .ProseMirror .block-accordion-summary.block-accordion-no-divider {
-  border-bottom-color: transparent;
+  border-bottom: none;
 }
 
 .ProseMirror .block-accordion-title {
@@ -1341,6 +1382,10 @@ mark {
 .ProseMirror .block-accordion-body.block-accordion-open {
   display: block;
   padding-top: 0.25rem;
+}
+
+.ProseMirror .block-accordion-summary.block-accordion-no-divider + .block-accordion-body.block-accordion-open {
+  padding-top: 0;
 }
 
 /* ─── Columns (Sprint 44) ─── */

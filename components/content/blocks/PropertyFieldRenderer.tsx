@@ -12,8 +12,15 @@
 "use client";
 
 import { useState, useRef } from "react";
+import { Info } from "lucide-react";
 import type { PropertiesField } from "@/lib/domain/blocks/types";
 import { IconSelector } from "@/components/content/IconSelector";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/client/ui/tooltip";
 
 /** Renders a single property field based on its fieldType */
 export function PropertyField({
@@ -29,7 +36,27 @@ export function PropertyField({
 
   return (
     <div className="space-y-1">
-      <label className="text-xs font-medium text-gray-400">{field.label}</label>
+      <div className="flex items-center gap-1">
+        <label className="text-xs font-medium text-gray-400">{field.label}</label>
+        {field.tooltip ? (
+          <TooltipProvider delayDuration={150}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  className="inline-flex h-4 w-4 items-center justify-center rounded-full text-gray-500 transition-colors hover:text-gray-300"
+                  aria-label={`${field.label} help`}
+                >
+                  <Info className="h-3.5 w-3.5" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="max-w-56 text-xs leading-relaxed">
+                {field.tooltip}
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        ) : null}
+      </div>
 
       {field.fieldType === "text" && (
         <input

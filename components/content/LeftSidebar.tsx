@@ -13,9 +13,9 @@ import { LeftSidebarHeader } from "./headers/LeftSidebarHeader";
 import { LeftSidebarContent } from "./content/LeftSidebarContent";
 import { LeftSidebarCollapsed } from "./LeftSidebarCollapsed";
 import { LeftSidebarExtensions } from "./content/LeftSidebarExtensions";
-import { PeoplePanel } from "./people/PeoplePanel";
 import { PeopleMountPickerDialog } from "./people/PeopleMountPickerDialog";
 import { FileUploadDialog } from "./dialogs/FileUploadDialog";
+import { PEOPLE_VIEW_KEY } from "@/extensions/people/manifest";
 import { useLeftPanelCollapseStore } from "@/state/left-panel-collapse-store";
 import { useLeftPanelViewStore } from "@/state/left-panel-view-store";
 import { useExtensionLeftSidebarPanel } from "@/lib/extensions/client-registry";
@@ -205,21 +205,21 @@ export function LeftSidebar() {
       <div className="flex h-full flex-col">
         {/* Header with create actions */}
         <LeftSidebarHeader
-          onCreateFolder={activeView === "people" ? handleCreatePeopleFolder : handleCreateFolder}
-          onCreateNote={activeView === "people" ? handleCreatePeopleNote : handleCreateNote}
-          onCreateFile={activeView === "people" ? handleCreatePeopleUpload : handleCreateFile}
-          onCreateDocument={activeView === "people" ? handleCreatePeopleDocument : hasGoogleAuth ? handleCreateDocument : undefined}
-          onCreateSpreadsheet={activeView === "people" ? handleCreatePeopleSpreadsheet : hasGoogleAuth ? handleCreateSpreadsheet : undefined}
-          onCreateCode={activeView === "people" ? undefined : handleCreateCode}
-          onCreateHtml={activeView === "people" ? undefined : handleCreateHtml}
-          onCreateJson={activeView === "people" ? handleCreatePeopleJson : handleCreateJson}
-          onCreateExternal={activeView === "people" ? undefined : handleCreateExternal}
-          onCreateVisualizationMermaid={activeView === "people" ? undefined : handleCreateVisualizationMermaid}
-          onCreateVisualizationExcalidraw={activeView === "people" ? undefined : handleCreateVisualizationExcalidraw}
-          onCreateVisualizationDiagramsNet={activeView === "people" ? undefined : handleCreateVisualizationDiagramsNet}
-          onCreateChat={activeView === "people" ? undefined : handleCreateChat}
-          onAddPeopleTarget={activeView === "people" ? handleCreatePeopleContact : () => handleAddPeopleTarget(null)}
-          isCreateDisabled={activeView === "people" ? false : isCreateDisabled}
+          onCreateFolder={activeView === PEOPLE_VIEW_KEY ? handleCreatePeopleFolder : handleCreateFolder}
+          onCreateNote={activeView === PEOPLE_VIEW_KEY ? handleCreatePeopleNote : handleCreateNote}
+          onCreateFile={activeView === PEOPLE_VIEW_KEY ? handleCreatePeopleUpload : handleCreateFile}
+          onCreateDocument={activeView === PEOPLE_VIEW_KEY ? handleCreatePeopleDocument : hasGoogleAuth ? handleCreateDocument : undefined}
+          onCreateSpreadsheet={activeView === PEOPLE_VIEW_KEY ? handleCreatePeopleSpreadsheet : hasGoogleAuth ? handleCreateSpreadsheet : undefined}
+          onCreateCode={activeView === PEOPLE_VIEW_KEY ? undefined : handleCreateCode}
+          onCreateHtml={activeView === PEOPLE_VIEW_KEY ? undefined : handleCreateHtml}
+          onCreateJson={activeView === PEOPLE_VIEW_KEY ? handleCreatePeopleJson : handleCreateJson}
+          onCreateExternal={activeView === PEOPLE_VIEW_KEY ? undefined : handleCreateExternal}
+          onCreateVisualizationMermaid={activeView === PEOPLE_VIEW_KEY ? undefined : handleCreateVisualizationMermaid}
+          onCreateVisualizationExcalidraw={activeView === PEOPLE_VIEW_KEY ? undefined : handleCreateVisualizationExcalidraw}
+          onCreateVisualizationDiagramsNet={activeView === PEOPLE_VIEW_KEY ? undefined : handleCreateVisualizationDiagramsNet}
+          onCreateChat={activeView === PEOPLE_VIEW_KEY ? undefined : handleCreateChat}
+          onAddPeopleTarget={activeView === PEOPLE_VIEW_KEY ? handleCreatePeopleContact : () => handleAddPeopleTarget(null)}
+          isCreateDisabled={activeView === PEOPLE_VIEW_KEY ? false : isCreateDisabled}
         />
 
         {/* Content area - conditionally render based on active view */}
@@ -235,7 +235,6 @@ export function LeftSidebar() {
 
         {activeView === "extensions" && <LeftSidebarExtensions />}
 
-        {activeView === "people" && <PeoplePanel />}
         {ExtensionPanel && createElement(ExtensionPanel)}
 
         {/* Search view is handled by LeftSidebarContent with isSearchOpen state */}

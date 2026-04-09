@@ -445,6 +445,39 @@ export async function archiveWorkspace(ownerId: string, workspaceId: string) {
   return getWorkspace(ownerId, workspaceId);
 }
 
+export async function resetWorkspaces(ownerId: string) {
+  const mainWorkspace = await ensureMainWorkspace(ownerId);
+
+  await prisma.$transaction([
+    prisma.contentWorkspaceItem.deleteMany({
+      where: {
+        workspace: { ownerId },
+      },
+    }),
+    prisma.contentWorkspace.update({
+      where: { id: mainWorkspace.id },
+      data: {
+        isLocked: false,
+        layoutMode: DEFAULT_LAYOUT_MODE,
+        activePaneId: DEFAULT_PANE_ID,
+        paneState: {},
+        settings: {},
+        expiresAt: null,
+        archivedAt: null,
+        status: "active",
+      },
+    }),
+    prisma.contentWorkspace.deleteMany({
+      where: {
+        ownerId,
+        isMain: false,
+      },
+    }),
+  ]);
+
+  return listWorkspaces(ownerId);
+}
+
 function getStateContentIds(state: WorkspaceStatePayload) {
   const contentIds = new Set<string>();
   Object.values(state.paneTabContentIds ?? {}).forEach((pane) => {

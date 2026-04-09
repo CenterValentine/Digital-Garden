@@ -101,14 +101,15 @@ function zodToField(
   description?: string
 ): PropertiesField | null {
   const label = humanize(key);
+  const tooltip = key === "openBehavior" ? description : undefined;
   const typeName = getZodTypeName(def);
 
   // String — detect icon fields by key name
   if (typeName === "string") {
     if (key === "icon" || key.endsWith("Icon") || key === "customIcon") {
-      return { key, label, fieldType: "icon", value: value ?? "", description };
+      return { key, label, fieldType: "icon", value: value ?? "", description, tooltip };
     }
-    return { key, label, fieldType: "text", value: value ?? "", description };
+    return { key, label, fieldType: "text", value: value ?? "", description, tooltip };
   }
 
   // Number
@@ -131,6 +132,7 @@ function zodToField(
       min,
       max,
       description,
+      tooltip,
     };
   }
 
@@ -142,6 +144,7 @@ function zodToField(
       fieldType: "boolean",
       value: value ?? false,
       description,
+      tooltip,
     };
   }
 
@@ -163,6 +166,7 @@ function zodToField(
       value: value ?? options[0]?.value,
       options,
       description,
+      tooltip,
     };
   }
 
@@ -174,16 +178,18 @@ function zodToField(
       fieldType: "array",
       value: value ?? [],
       description,
+      tooltip,
     };
   }
 
   // Fallback: render as text
-  return { key, label, fieldType: "text", value: value ?? "", description };
+  return { key, label, fieldType: "text", value: value ?? "", description, tooltip };
 }
 
 /** Convert camelCase to "Camel Case" */
 function humanize(key: string): string {
   if (key === "showContainer" || key === "showBorder") return "Border";
+  if (key === "openBehavior") return "Expand/Collapse Default";
   return key
     .replace(/([A-Z])/g, " $1")
     .replace(/^./, (s) => s.toUpperCase())

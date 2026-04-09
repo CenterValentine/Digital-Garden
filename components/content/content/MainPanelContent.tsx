@@ -23,7 +23,10 @@ import {
 } from "@/state/content-store";
 import { useLeftPanelViewStore } from "@/state/left-panel-view-store";
 import { useTreeStateStore } from "@/state/tree-state-store";
-import { useExtensionMainWorkspace } from "@/lib/extensions/client-registry";
+import {
+  useExtensionContentViewer,
+  useExtensionMainWorkspace,
+} from "@/lib/extensions/client-registry";
 import { useEditorStatsStore } from "@/state/editor-stats-store";
 import { useOutlineStore } from "@/state/outline-store";
 import { useDebugViewStore } from "@/state/debug-view-store";
@@ -42,7 +45,6 @@ import { JSONDebugView } from "../viewer/debug/JSONDebugView";
 import { TreeDebugView } from "../viewer/debug/TreeDebugView";
 import { MarkdownDebugView } from "../viewer/debug/MarkdownDebugView";
 import { MetadataDebugView } from "../viewer/debug/MetadataDebugView";
-import { PersonWorkspace } from "../people/PersonWorkspace";
 import type { JSONContent } from "@tiptap/core";
 import type { EditorStats } from "../editor/MarkdownEditor";
 import type { OutlineHeading } from "@/lib/domain/content/outline-extractor";
@@ -896,6 +898,10 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
 
   // Calendar workspace — shown in pane 1 when calendar view is active
   const ExtensionMainWorkspace = useExtensionMainWorkspace(activeView);
+  const ExtensionContentViewer = useExtensionContentViewer({
+    selectedContentId,
+    contentType,
+  });
   if (ExtensionMainWorkspace && paneId === "top-left") {
     return (
       <ToolSurfaceProvider contentType={null} handlers={toolHandlers}>
@@ -937,11 +943,12 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
         </div>
       </div>
     );
-  } else if (contentType === "person-profile" && selectedContentId.startsWith("person:")) {
+  } else if (ExtensionContentViewer && selectedContentId) {
     contentElement = (
-      <PersonWorkspace
-        personId={selectedContentId.replace("person:", "")}
+      <ExtensionContentViewer
         paneId={paneId}
+        selectedContentId={selectedContentId}
+        contentType={contentType}
       />
     );
   } else if (contentType === "file" && selectedContentId) {

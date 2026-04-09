@@ -331,7 +331,14 @@ export function getSlashCommands(editor: Editor): SlashCommand[] {
       command: ({ editor, range }) => {
         editor.chain().focus().deleteRange(range).insertContent({
           type: "accordion",
-          attrs: {},
+          attrs: {
+            headerText: "",
+            headerLevel: "2",
+            openBehavior: "lastInteraction",
+            openState: true,
+            showContainer: false,
+            showDivider: false,
+          },
           content: [{ type: "paragraph" }],
         }).run();
       },

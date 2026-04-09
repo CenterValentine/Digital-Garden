@@ -8,10 +8,12 @@ Built-in extensions are first-party feature modules with clear ownership boundar
 - Register the extension once in `lib/extensions/installed.ts`
 - If the extension should be user-toggleable, set `canDisable: true` in the manifest
 - If the extension needs top-level shell UI, contribute it through the runtime shell slots instead of importing the feature directly into shared shell code
+- If the extension owns a content-specific workspace, contribute it through the runtime content viewer hook instead of hardcoding it in `MainPanelContent`
 
 ## Expected Structure
 - `manifest.ts`: metadata, nav items, settings metadata, auth metadata
 - `client.tsx`: client runtime contributions such as surfaces, shell controls, dialogs, slash commands, editor blocks
+- `client.tsx` may also declare a content viewer matcher when the extension owns rendering for a specific content selection
 - `server-runtime.ts`: server-safe editor/runtime contributions
 - `components/`: UI owned by the extension
 - `server/`: services, types, parsers, and thin route handlers owned by the extension
