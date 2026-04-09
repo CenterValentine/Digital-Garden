@@ -74,6 +74,8 @@ export interface WorkspaceOpenConflict {
   claimContentId: string;
   claimContentTitle: string;
   scope: ContentWorkspaceItemScope;
+  folderScopeContentId: string | null;
+  folderScopeContentTitle: string | null;
 }
 
 export interface WorkspaceOpenIntentResponse {

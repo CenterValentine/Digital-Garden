@@ -153,6 +153,7 @@ export interface ContentState {
   pinContentTab: (tabId?: string | null) => void;
   closeContentTab: (tabId: string) => void;
   closeContentTabs: (contentIds: string[]) => void;
+  clearAllWorkspaceTabs: () => void;
   getWorkspaceStateSnapshot: () => WorkspaceStateSnapshot;
   restoreWorkspace: (workspace: WorkspaceRestoreOptions) => void;
   clearSelection: () => void;
@@ -1457,6 +1458,28 @@ export const useContentStore = create<ContentState>((set, get) => ({
 
     tabIds.forEach((tabId) => {
       get().closeContentTab(tabId);
+    });
+  },
+
+  clearAllWorkspaceTabs: () => {
+    commitWorkspace(set, (state) => {
+      const activePaneId = isPaneVisible(state.layoutMode, state.activePaneId)
+        ? state.activePaneId
+        : TOP_LEFT_PANE_ID;
+      return {
+        panes: createPaneRecord(),
+        layoutSnapshots: {
+          single: createSnapshot(activePaneId),
+          "dual-vertical": createSnapshot(activePaneId),
+          "dual-horizontal": createSnapshot(activePaneId),
+          quad: createSnapshot(activePaneId),
+        },
+        tabs: {},
+        selectedContentId: null,
+        selectedContentType: null,
+        activePaneId,
+        openContentIds: [],
+      };
     });
   },
 

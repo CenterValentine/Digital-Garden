@@ -174,13 +174,13 @@ export function MainPanelHeader({
   return (
     <>
       <div
-        className="flex shrink-0 items-center border-b border-white/10"
+        className="flex w-full max-w-full shrink-0 items-center overflow-hidden border-b border-white/10"
         style={{
           background: glass1.background,
           backdropFilter: glass1.backdropFilter,
         }}
       >
-        <div className="flex min-w-0 flex-1 items-stretch overflow-x-hidden">
+        <div className="flex min-w-0 max-w-full flex-1 items-stretch overflow-hidden pr-1">
           {tabs.length === 0 ? (
             <div className="flex items-center px-3 py-2 text-xs font-medium uppercase tracking-[0.18em] text-gray-500">
               {getPaneLabel(layoutMode, paneId)}
@@ -193,7 +193,7 @@ export function MainPanelHeader({
             return (
               <div
                 key={tab.id}
-                className={`group flex min-w-0 max-w-64 items-center gap-2 border-r border-white/10 px-3 py-2 text-sm transition-colors ${
+                className={`group flex min-w-0 max-w-[14rem] shrink items-center gap-2 overflow-hidden border-r border-white/10 px-3 py-2 text-sm transition-colors ${
                   isActive
                     ? "-mb-px border-b-2 border-gold-primary bg-black/[0.04] text-gold-primary shadow-[0_1px_2px_rgba(15,23,42,0.04)]"
                     : "text-gray-600 hover:bg-black/[0.035] hover:text-gray-900"
@@ -240,7 +240,7 @@ export function MainPanelHeader({
               ) : (
                 <button
                   type="button"
-                  className="flex min-w-0 flex-1 items-center gap-2 text-left"
+                  className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden text-left"
                   onClick={() => activateContentTab(tab.id)}
                   onDoubleClick={(e) => { e.preventDefault(); startRename(tab.id, tab.title); }}
                 >

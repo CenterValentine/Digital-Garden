@@ -19,7 +19,7 @@ function errorResponse(error: unknown, fallback: string) {
       success: false,
       error: {
         code: isAuthError ? "UNAUTHORIZED" : "INTERNAL_ERROR",
-        message: isAuthError ? "Authentication required" : fallback,
+        message: isAuthError ? "Authentication required" : message,
       },
     },
     { status: isAuthError ? 401 : 500 }

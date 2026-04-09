@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -8,6 +8,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/client/ui/dialog";
+import { Checkbox } from "@/components/client/ui/checkbox";
+import { Label } from "@/components/client/ui/label";
 import { useWorkspaceStore } from "@/state/workspace-store";
 
 type BorrowPreset = "1h" | "3h" | "eod" | "custom";
@@ -58,6 +60,16 @@ export function WorkspaceConflictDialog() {
   );
   const [borrowPreset, setBorrowPreset] = useState<BorrowPreset>("3h");
   const [borrowUntil, setBorrowUntil] = useState(() => borrowUntilForPreset("3h"));
+  const [useFolderScope, setUseFolderScope] = useState(false);
+
+  useEffect(() => {
+    setUseFolderScope(false);
+  }, [conflict?.workspaceId, conflict?.contentId, conflict?.folderScopeContentId]);
+
+  const folderScopeLabel = useMemo(() => {
+    if (!conflict?.folderScopeContentTitle) return null;
+    return `Also apply this to ${conflict.folderScopeContentTitle} and all descendants`;
+  }, [conflict]);
 
   const description = useMemo(() => {
     if (!conflict) return "";
@@ -88,6 +100,30 @@ export function WorkspaceConflictDialog() {
         </DialogHeader>
 
         <div className="space-y-3">
+          {folderScopeLabel ? (
+            <div className="rounded-md border border-black/10 bg-black/[0.02] px-3 py-3 dark:border-white/10 dark:bg-white/[0.03]">
+              <div className="flex items-start gap-3">
+                <Checkbox
+                  id="workspace-conflict-folder-scope"
+                  checked={useFolderScope}
+                  onCheckedChange={(checked) => setUseFolderScope(checked === true)}
+                  className="mt-0.5 border-gold-primary/35 data-[state=checked]:bg-gold-primary data-[state=checked]:text-white"
+                />
+                <div className="space-y-1">
+                  <Label
+                    htmlFor="workspace-conflict-folder-scope"
+                    className="cursor-pointer text-sm font-medium text-gray-900 dark:text-white"
+                  >
+                    {folderScopeLabel}
+                  </Label>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    Use this when you want one decision here to cover future files in the same area.
+                  </p>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
           <div>
             <div className="mb-2 text-sm font-medium">Borrow for</div>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -156,14 +192,16 @@ export function WorkspaceConflictDialog() {
           </button>
           <button
             type="button"
-            onClick={() => void borrowPendingContent(toIso(borrowUntil))}
+            onClick={() =>
+              void borrowPendingContent(toIso(borrowUntil), { useFolderScope })
+            }
             className="whitespace-nowrap rounded-md border border-gold-primary/30 bg-gold-primary/10 px-3 py-2 text-sm font-medium text-gold-primary transition-colors hover:bg-gold-primary/15"
           >
             Borrow
           </button>
           <button
             type="button"
-            onClick={() => void sharePendingContent()}
+            onClick={() => void sharePendingContent({ useFolderScope })}
             className="whitespace-nowrap rounded-md border border-gold-primary/30 bg-gold-primary px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-gold-primary/90"
           >
             Always share

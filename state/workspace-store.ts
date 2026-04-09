@@ -1,6 +1,7 @@
 "use client";
 
 import { create } from "zustand";
+import { toast } from "sonner";
 import {
   useContentStore,
   type ContentSelectionOptions,
@@ -39,6 +40,7 @@ interface WorkspaceState {
   loadWorkspaces: (initialWorkspaceId?: string | null) => Promise<void>;
   activateWorkspace: (workspaceId: string) => Promise<void>;
   createWorkspace: (name: string) => Promise<ContentWorkspaceResponse>;
+  duplicateWorkspace: (workspaceId: string) => Promise<ContentWorkspaceResponse>;
   updateWorkspace: (
     workspaceId: string,
     updates: {
@@ -55,8 +57,11 @@ interface WorkspaceState {
     contentId: string,
     options?: ContentSelectionOptions
   ) => Promise<void>;
-  borrowPendingContent: (expiresAt: string) => Promise<void>;
-  sharePendingContent: () => Promise<void>;
+  borrowPendingContent: (
+    expiresAt: string,
+    options?: { useFolderScope?: boolean }
+  ) => Promise<void>;
+  sharePendingContent: (options?: { useFolderScope?: boolean }) => Promise<void>;
   switchToConflictWorkspace: () => Promise<void>;
   cancelOpenConflict: () => void;
   assignContentToWorkspace: (
@@ -76,6 +81,29 @@ interface WorkspaceState {
 }
 
 let isBypassingWorkspaceGuard = false;
+const WORKSPACE_EXPIRATION_WARNINGS_DISABLED_KEY =
+  "workspace-expiration-warnings-disabled";
+
+function expirationWarningsDisabled() {
+  if (typeof window === "undefined") return false;
+  return window.localStorage.getItem(WORKSPACE_EXPIRATION_WARNINGS_DISABLED_KEY) === "true";
+}
+
+function disableExpirationWarnings() {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(WORKSPACE_EXPIRATION_WARNINGS_DISABLED_KEY, "true");
+}
+
+function notifyExpirationWarning(title: string, description: string) {
+  if (expirationWarningsDisabled()) return;
+  toast.warning(title, {
+    description,
+    action: {
+      label: "Don't warn again",
+      onClick: () => disableExpirationWarnings(),
+    },
+  });
+}
 
 function getTreeSnapshotByWorkspace() {
   if (typeof window === "undefined") return {};
@@ -155,6 +183,22 @@ function getWorkspace(
   );
 }
 
+function hasWorkspace(
+  workspaces: ContentWorkspaceResponse[],
+  workspaceId: string | null
+) {
+  return Boolean(
+    workspaceId && workspaces.some((workspace) => workspace.id === workspaceId)
+  );
+}
+
+function isWorkspaceNotFoundError(error: unknown) {
+  return (
+    error instanceof Error &&
+    error.message.toLowerCase().includes("workspace not found")
+  );
+}
+
 function restoreContentWorkspace(workspace: ContentWorkspaceResponse) {
   const paneTabContentIds = Object.fromEntries(
     Object.entries(workspace.paneState.paneTabContentIds).map(([paneId, pane]) => [
@@ -227,6 +271,52 @@ function closeReleasedBorrowedTabs(
   if (releasedBorrowedContentIds.length > 0) {
     useContentStore.getState().closeContentTabs(releasedBorrowedContentIds);
   }
+
+  const expiredBorrowedItems = previous.items.filter(
+    (item) =>
+      item.assignmentType === "borrowed" &&
+      item.expiresAt &&
+      new Date(item.expiresAt).getTime() <= Date.now() &&
+      !nextItemIds.has(item.contentId)
+  );
+
+  if (expiredBorrowedItems.length > 0) {
+    const firstTitle = expiredBorrowedItems[0]?.content.title ?? "A borrowed tab";
+    const suffix =
+      expiredBorrowedItems.length > 1
+        ? ` and ${expiredBorrowedItems.length - 1} more`
+        : "";
+    notifyExpirationWarning(
+      "Borrowed tab expired",
+      `${firstTitle}${suffix} was released because its borrow window ended.`
+    );
+  }
+}
+
+function notifyExpiredWorkspaceRemoval(
+  previousWorkspaces: ContentWorkspaceResponse[],
+  nextWorkspaces: ContentWorkspaceResponse[]
+) {
+  const nextWorkspaceIds = new Set(nextWorkspaces.map((workspace) => workspace.id));
+  const expiredWorkspaces = previousWorkspaces.filter(
+    (workspace) =>
+      !workspace.isMain &&
+      !nextWorkspaceIds.has(workspace.id) &&
+      workspace.expiresAt &&
+      new Date(workspace.expiresAt).getTime() <= Date.now()
+  );
+
+  if (expiredWorkspaces.length === 0) return;
+
+  const firstName = expiredWorkspaces[0]?.name ?? "A workspace";
+  const suffix =
+    expiredWorkspaces.length > 1
+      ? ` and ${expiredWorkspaces.length - 1} more`
+      : "";
+  notifyExpirationWarning(
+    "Workspace expired",
+    `${firstName}${suffix} reached its expiration time and was closed. Workspace sessions cannot be recovered.`
+  );
 }
 
 async function fetchWorkspaces() {
@@ -237,6 +327,23 @@ async function fetchWorkspaces() {
     response,
     "Failed to fetch workspaces"
   ).then(applyWorkspaceOrder);
+}
+
+async function persistWorkspaceStateById(
+  workspaceId: string,
+  snapshot: WorkspaceStatePayload
+) {
+  const response = await fetch(`/api/content/workspaces/${workspaceId}/state`, {
+    method: "PATCH",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(snapshot),
+  });
+
+  return parseResponse<ContentWorkspaceResponse>(
+    response,
+    "Failed to save workspace state"
+  );
 }
 
 export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
@@ -251,6 +358,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     const previousWorkspaces = get().workspaces;
     try {
       const workspaces = await fetchWorkspaces();
+      notifyExpiredWorkspaceRemoval(previousWorkspaces, workspaces);
       const requestedWorkspace =
         (initialWorkspaceId &&
           workspaces.find((workspace) => workspace.id === initialWorkspaceId)) ||
@@ -283,10 +391,20 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   },
 
   activateWorkspace: async (workspaceId) => {
-    saveTreeSnapshotForWorkspace(get().activeWorkspaceId);
-    await get().persistActiveWorkspace();
-    const workspace = getWorkspace(get().workspaces, workspaceId);
-    if (!workspace) return;
+    const previousActiveWorkspaceId = get().activeWorkspaceId;
+    const previousSnapshot = useContentStore.getState().getWorkspaceStateSnapshot();
+    saveTreeSnapshotForWorkspace(previousActiveWorkspaceId);
+
+    const currentWorkspaces = get().workspaces;
+    let workspace = currentWorkspaces.find((candidate) => candidate.id === workspaceId);
+    if (!workspace) {
+      const refreshedWorkspaces = await fetchWorkspaces();
+      set({ workspaces: refreshedWorkspaces });
+      workspace = refreshedWorkspaces.find((candidate) => candidate.id === workspaceId);
+    }
+    if (!workspace) {
+      throw new Error("Workspace not found");
+    }
 
     set({
       activeWorkspaceId: workspace.id,
@@ -296,6 +414,35 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     syncWorkspaceUrl(workspace.id);
     restoreContentWorkspace(workspace);
     restoreTreeSnapshotForWorkspace(workspace.id);
+
+    if (
+      previousActiveWorkspaceId &&
+      hasWorkspace(currentWorkspaces, previousActiveWorkspaceId) &&
+      previousActiveWorkspaceId !== workspace.id
+    ) {
+      void persistWorkspaceStateById(previousActiveWorkspaceId, previousSnapshot)
+        .then((persistedWorkspace) => {
+          set((state) => ({
+            workspaces: state.workspaces.map((candidate) =>
+              candidate.id === persistedWorkspace.id ? persistedWorkspace : candidate
+            ),
+          }));
+        })
+        .catch(async (error) => {
+          if (!isWorkspaceNotFoundError(error)) {
+            console.error("[Workspace Store] Failed to persist previous workspace:", error);
+            return;
+          }
+
+          const refreshedWorkspaces = await fetchWorkspaces();
+          set((state) => ({
+            workspaces: refreshedWorkspaces,
+            activeWorkspaceId: hasWorkspace(refreshedWorkspaces, state.activeWorkspaceId)
+              ? state.activeWorkspaceId
+              : getMainWorkspace(refreshedWorkspaces)?.id ?? null,
+          }));
+        });
+    }
   },
 
   createWorkspace: async (name) => {
@@ -309,30 +456,90 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       response,
       "Failed to create workspace"
     );
-    set((state) => ({ workspaces: [workspace, ...state.workspaces] }));
+    set((state) => ({
+      workspaces: applyWorkspaceOrder([
+        workspace,
+        ...state.workspaces.filter((candidate) => candidate.id !== workspace.id),
+      ]),
+    }));
     await get().activateWorkspace(workspace.id);
-    return workspace;
+    return get().workspaces.find((candidate) => candidate.id === workspace.id) ?? workspace;
+  },
+
+  duplicateWorkspace: async (workspaceId) => {
+    const response = await fetch(`/api/content/workspaces/${workspaceId}/duplicate`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    });
+    const workspace = await parseResponse<ContentWorkspaceResponse>(
+      response,
+      "Failed to duplicate workspace"
+    );
+    set((state) => ({
+      workspaces: applyWorkspaceOrder([
+        workspace,
+        ...state.workspaces.filter((candidate) => candidate.id !== workspace.id),
+      ]),
+    }));
+    await get().activateWorkspace(workspace.id);
+    return get().workspaces.find((candidate) => candidate.id === workspace.id) ?? workspace;
   },
 
   updateWorkspace: async (workspaceId, updates) => {
+    const previousWorkspaces = get().workspaces;
+    const existingWorkspace = previousWorkspaces.find(
+      (candidate) => candidate.id === workspaceId
+    );
+
+    if (existingWorkspace) {
+      const optimisticWorkspace: ContentWorkspaceResponse = {
+        ...existingWorkspace,
+        name: updates.name ?? existingWorkspace.name,
+        isLocked: updates.isLocked ?? existingWorkspace.isLocked,
+        expiresAt:
+          "expiresAt" in updates
+            ? updates.expiresAt ?? null
+            : existingWorkspace.expiresAt,
+        settings: updates.settings
+          ? {
+              ...existingWorkspace.settings,
+              ...updates.settings,
+            }
+          : existingWorkspace.settings,
+      };
+
+      set((state) => ({
+        workspaces: applyWorkspaceOrder(
+          state.workspaces.map((candidate) =>
+            candidate.id === workspaceId ? optimisticWorkspace : candidate
+          )
+        ),
+      }));
+    }
+
     const response = await fetch(`/api/content/workspaces/${workspaceId}`, {
       method: "PATCH",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(updates),
     });
-    const workspace = await parseResponse<ContentWorkspaceResponse>(
-      response,
-      "Failed to update workspace"
-    );
-    set((state) => ({
-      workspaces: state.workspaces.map((candidate) =>
-        candidate.id === workspace.id ? workspace : candidate
-      ),
-    }));
-    if (workspaceId === get().activeWorkspaceId) {
-      const workspaces = await fetchWorkspaces();
-      set({ workspaces });
+    try {
+      const workspace = await parseResponse<ContentWorkspaceResponse>(
+        response,
+        "Failed to update workspace"
+      );
+      set((state) => ({
+        workspaces: applyWorkspaceOrder(
+          state.workspaces.map((candidate) =>
+            candidate.id === workspace.id ? workspace : candidate
+          )
+        ),
+      }));
+    } catch (error) {
+      set({ workspaces: previousWorkspaces });
+      throw error;
     }
   },
 
@@ -421,6 +628,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   persistActiveWorkspace: async () => {
     const activeWorkspaceId = get().activeWorkspaceId;
     if (!activeWorkspaceId) return;
+    if (!hasWorkspace(get().workspaces, activeWorkspaceId)) return;
 
     const snapshot = useContentStore.getState().getWorkspaceStateSnapshot();
     const response = await fetch(`/api/content/workspaces/${activeWorkspaceId}/state`, {
@@ -429,10 +637,28 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(snapshot satisfies WorkspaceStatePayload),
     });
-    const workspace = await parseResponse<ContentWorkspaceResponse>(
-      response,
-      "Failed to save workspace state"
-    );
+    let workspace: ContentWorkspaceResponse;
+    try {
+      workspace = await parseResponse<ContentWorkspaceResponse>(
+        response,
+        "Failed to save workspace state"
+      );
+    } catch (error) {
+      if (!isWorkspaceNotFoundError(error)) throw error;
+
+      const workspaces = await fetchWorkspaces();
+      const fallbackWorkspace = getWorkspace(workspaces, null);
+      set({
+        workspaces,
+        activeWorkspaceId: fallbackWorkspace?.id ?? null,
+      });
+      if (fallbackWorkspace) {
+        syncWorkspaceUrl(fallbackWorkspace.id);
+        restoreContentWorkspace(fallbackWorkspace);
+        restoreTreeSnapshotForWorkspace(fallbackWorkspace.id);
+      }
+      return;
+    }
     set((state) => ({
       workspaces: state.workspaces.map((candidate) =>
         candidate.id === workspace.id ? workspace : candidate
@@ -483,28 +709,46 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     });
   },
 
-  borrowPendingContent: async (expiresAt) => {
+  borrowPendingContent: async (expiresAt, options) => {
     const state = get();
     const activeWorkspaceId = state.activeWorkspaceId;
     const pending = state.pendingOpenIntent;
+    const conflict = state.conflict;
     if (!activeWorkspaceId || !pending) return;
 
-    await get().assignContentToWorkspace(activeWorkspaceId, pending.contentId, {
+    const targetContentId =
+      options?.useFolderScope && conflict?.folderScopeContentId
+        ? conflict.folderScopeContentId
+        : pending.contentId;
+    const targetScope =
+      options?.useFolderScope && conflict?.folderScopeContentId ? "recursive" : undefined;
+
+    await get().assignContentToWorkspace(activeWorkspaceId, targetContentId, {
       assignmentType: "borrowed",
+      scope: targetScope,
       expiresAt,
     });
     directOpenContent(pending.contentId, pending.options);
     set({ conflict: null, pendingOpenIntent: null });
   },
 
-  sharePendingContent: async () => {
+  sharePendingContent: async (options) => {
     const state = get();
     const activeWorkspaceId = state.activeWorkspaceId;
     const pending = state.pendingOpenIntent;
+    const conflict = state.conflict;
     if (!activeWorkspaceId || !pending) return;
 
-    await get().assignContentToWorkspace(activeWorkspaceId, pending.contentId, {
+    const targetContentId =
+      options?.useFolderScope && conflict?.folderScopeContentId
+        ? conflict.folderScopeContentId
+        : pending.contentId;
+    const targetScope =
+      options?.useFolderScope && conflict?.folderScopeContentId ? "recursive" : undefined;
+
+    await get().assignContentToWorkspace(activeWorkspaceId, targetContentId, {
       assignmentType: "shared",
+      scope: targetScope,
     });
     directOpenContent(pending.contentId, pending.options);
     set({ conflict: null, pendingOpenIntent: null });
@@ -540,11 +784,16 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       response,
       "Failed to assign content to workspace"
     );
-    set((state) => ({
-      workspaces: state.workspaces.map((candidate) =>
-        candidate.id === workspace.id ? workspace : candidate
-      ),
-    }));
+    if (options.moveFromWorkspaceId && options.moveFromWorkspaceId !== workspaceId) {
+      const workspaces = await fetchWorkspaces();
+      set({ workspaces });
+    } else {
+      set((state) => ({
+        workspaces: state.workspaces.map((candidate) =>
+          candidate.id === workspace.id ? workspace : candidate
+        ),
+      }));
+    }
 
     if (
       options.moveFromWorkspaceId &&

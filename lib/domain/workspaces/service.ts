@@ -81,6 +81,23 @@ function normalizeSettings(value: Prisma.JsonValue): Record<string, unknown> {
     : {};
 }
 
+function workspaceStateHasContent(
+  workspace: Pick<ContentWorkspace, "paneState" | "layoutMode" | "activePaneId">,
+  contentId: string
+) {
+  const normalizedState = normalizeWorkspaceState(workspace as ContentWorkspace);
+
+  if (normalizedState.activeContentId === contentId) return true;
+
+  return Object.values(normalizedState.paneTabContentIds).some((pane) => {
+    if (!pane) return false;
+    return (
+      pane.activeContentId === contentId ||
+      (pane.contentIds ?? []).includes(contentId)
+    );
+  });
+}
+
 export function formatWorkspace(workspace: WorkspaceWithItems): ContentWorkspaceResponse {
   return {
     id: workspace.id,
@@ -281,6 +298,81 @@ export async function createWorkspace(ownerId: string, name: string) {
   return formatWorkspace(workspace);
 }
 
+export async function duplicateWorkspace(
+  ownerId: string,
+  workspaceId: string,
+  name?: string
+) {
+  await ensureMainWorkspace(ownerId);
+
+  const source = await prisma.contentWorkspace.findFirst({
+    where: { id: workspaceId, ownerId, status: "active" },
+    include: {
+      items: true,
+    },
+  });
+
+  if (!source) return null;
+
+  const normalizedName = name?.trim() || `${source.name} Copy`;
+  const slug = await uniqueWorkspaceSlug(ownerId, normalizedName);
+
+  const duplicated = await prisma.$transaction(async (tx) => {
+    const workspace = await tx.contentWorkspace.create({
+      data: {
+        ownerId,
+        name: normalizedName,
+        slug,
+        isMain: false,
+        isLocked: source.isLocked,
+        layoutMode: source.layoutMode,
+        activePaneId: source.activePaneId,
+        paneState: source.paneState as Prisma.InputJsonValue,
+        settings: source.settings as Prisma.InputJsonValue,
+      },
+      include: {
+        items: {
+          include: {
+            content: {
+              select: { id: true, title: true, contentType: true, parentId: true },
+            },
+          },
+        },
+      },
+    });
+
+    if (source.items.length > 0) {
+      await tx.contentWorkspaceItem.createMany({
+        data: source.items.map((item) => ({
+          workspaceId: workspace.id,
+          contentId: item.contentId,
+          assignmentType:
+            item.assignmentType === "borrowed" ? "borrowed" : "shared",
+          scope: item.scope,
+          expiresAt: item.expiresAt,
+        })),
+        skipDuplicates: true,
+      });
+    }
+
+    return tx.contentWorkspace.findFirst({
+      where: { id: workspace.id, ownerId },
+      include: {
+        items: {
+          include: {
+            content: {
+              select: { id: true, title: true, contentType: true, parentId: true },
+            },
+          },
+          orderBy: { updatedAt: "desc" },
+        },
+      },
+    });
+  });
+
+  return duplicated ? formatWorkspace(duplicated) : null;
+}
+
 export async function updateWorkspace(
   ownerId: string,
   workspaceId: string,
@@ -386,6 +478,15 @@ export async function saveWorkspaceState(
       },
     });
 
+    await tx.contentWorkspaceItem.deleteMany({
+      where: {
+        workspaceId,
+        assignmentType: "primary",
+        scope: "item",
+        contentId: contentIds.length > 0 ? { notIn: contentIds } : undefined,
+      },
+    });
+
     if (contentIds.length === 0) return;
 
     const ownedContent = await tx.contentNode.findMany({
@@ -437,6 +538,58 @@ async function getAncestorIds(ownerId: string, contentId: string) {
   return ancestors;
 }
 
+async function findOverlappingPrimaryRecursiveClaims(
+  ownerId: string,
+  workspaceId: string,
+  contentId: string,
+  excludeWorkspaceIds: string[] = []
+) {
+  const ancestorIds = await getAncestorIds(ownerId, contentId);
+  const claims = await prisma.contentWorkspaceItem.findMany({
+    where: {
+      assignmentType: "primary",
+      scope: "recursive",
+      workspaceId: {
+        notIn: [workspaceId, ...excludeWorkspaceIds],
+      },
+      workspace: {
+        ownerId,
+        status: "active",
+      },
+    },
+    include: {
+      workspace: {
+        select: {
+          id: true,
+          name: true,
+        },
+      },
+      content: {
+        select: {
+          id: true,
+          title: true,
+        },
+      },
+    },
+  });
+
+  const overlaps = [];
+
+  for (const claim of claims) {
+    if (claim.contentId === contentId || ancestorIds.includes(claim.contentId)) {
+      overlaps.push(claim);
+      continue;
+    }
+
+    const claimAncestorIds = await getAncestorIds(ownerId, claim.contentId);
+    if (claimAncestorIds.includes(contentId)) {
+      overlaps.push(claim);
+    }
+  }
+
+  return overlaps;
+}
+
 export async function resolveOpenIntent(
   ownerId: string,
   workspaceId: string,
@@ -447,7 +600,19 @@ export async function resolveOpenIntent(
   const [content, currentAssignment] = await Promise.all([
     prisma.contentNode.findFirst({
       where: { id: contentId, ownerId, deletedAt: null },
-      select: { id: true, title: true },
+      select: {
+        id: true,
+        title: true,
+        contentType: true,
+        parentId: true,
+        parent: {
+          select: {
+            id: true,
+            title: true,
+            contentType: true,
+          },
+        },
+      },
     }),
     prisma.contentWorkspaceItem.findUnique({
       where: { workspaceId_contentId: { workspaceId, contentId } },
@@ -484,15 +649,36 @@ export async function resolveOpenIntent(
     include: {
       workspace: true,
       content: {
-        select: { id: true, title: true },
+        select: { id: true, title: true, contentType: true, parentId: true },
       },
     },
     orderBy: { updatedAt: "desc" },
-    take: 1,
+    take: 25,
   });
 
-  const claim = candidates[0];
+  const claim = candidates.find((candidate) => {
+    if (candidate.scope === "recursive") return true;
+    return workspaceStateHasContent(candidate.workspace, candidate.contentId);
+  });
   if (!claim) return { allowed: true, conflict: null };
+
+  const folderScopeCandidate =
+    claim.scope === "recursive"
+      ? {
+          id: claim.content.id,
+          title: claim.content.title,
+        }
+      : content.contentType === "folder"
+        ? {
+            id: content.id,
+            title: content.title,
+          }
+        : content.parent && content.parent.contentType === "folder"
+          ? {
+              id: content.parent.id,
+              title: content.parent.title,
+            }
+          : null;
 
   return {
     allowed: false,
@@ -504,6 +690,8 @@ export async function resolveOpenIntent(
       claimContentId: claim.contentId,
       claimContentTitle: claim.content.title,
       scope: claim.scope,
+      folderScopeContentId: folderScopeCandidate?.id ?? null,
+      folderScopeContentTitle: folderScopeCandidate?.title ?? null,
     },
   };
 }
@@ -531,6 +719,28 @@ export async function assignContentToWorkspace(
   ]);
 
   if (!workspace || !content) return null;
+
+  if (
+    options.assignmentType === "primary" &&
+    (options.scope ?? "item") === "recursive"
+  ) {
+    const overlaps = await findOverlappingPrimaryRecursiveClaims(
+      ownerId,
+      workspaceId,
+      contentId,
+      options.moveFromWorkspaceId ? [options.moveFromWorkspaceId] : []
+    );
+
+    if (overlaps.length > 0) {
+      const labels = overlaps
+        .map((claim) => `${claim.workspace.name} (${claim.content.title})`)
+        .slice(0, 3)
+        .join(", ");
+      throw new Error(
+        `This folder overlaps with existing workspace claims: ${labels}. Resolve the overlap before saving.`
+      );
+    }
+  }
 
   const expiresAt =
     options.assignmentType === "borrowed" && options.expiresAt

@@ -9,6 +9,7 @@
 import type { ComponentType, RefObject } from "react";
 import { useEffect, useState, useCallback, useRef, memo } from "react";
 import {
+  CircleX,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -17,6 +18,7 @@ import {
   Rows2,
   Square,
 } from "lucide-react";
+import { toast } from "sonner";
 import {
   getPaneActiveContentId,
   useContentStore,
@@ -27,6 +29,7 @@ import {
   EMPTY_PANE_HISTORY,
   useNavigationHistoryStore,
 } from "@/state/navigation-history-store";
+import { useWorkspaceStore } from "@/state/workspace-store";
 import { NavigationHistoryDropdown } from "./NavigationHistoryDropdown";
 import { WorkspaceSelector } from "./workspaces/WorkspaceSelector";
 
@@ -98,6 +101,13 @@ export function MainPanelNavigation({ paneId }: MainPanelNavigationProps) {
   const paneContentId = useContentStore((state) => getPaneActiveContentId(state, paneId));
   const setSelectedContentId = useContentStore((state) => state.setSelectedContentId);
   const setLayoutMode = useContentStore((state) => state.setLayoutMode);
+  const clearAllWorkspaceTabs = useContentStore((state) => state.clearAllWorkspaceTabs);
+  const workspaceTabCount = useContentStore(
+    (state) => Object.keys(state.tabs).length
+  );
+  const persistActiveWorkspace = useWorkspaceStore(
+    (state) => state.persistActiveWorkspace
+  );
 
   const paneHistory = useNavigationHistoryStore((state) =>
     state.byPaneId[paneId] ?? EMPTY_PANE_HISTORY
@@ -227,6 +237,23 @@ export function MainPanelNavigation({ paneId }: MainPanelNavigationProps) {
     LAYOUT_OPTIONS.find((option) => option.mode === layoutMode) ?? LAYOUT_OPTIONS[0];
   const CurrentLayoutIcon = currentLayout.icon;
 
+  const handleClearWorkspaceTabs = useCallback(() => {
+    if (workspaceTabCount === 0) return;
+    clearAllWorkspaceTabs();
+    void persistActiveWorkspace()
+      .then(() => {
+        toast.success("Cleared all workspace tabs");
+      })
+      .catch((error) => {
+        console.error("[MainPanelNavigation] Failed to persist cleared workspace:", error);
+        toast.error(
+          error instanceof Error
+            ? error.message
+            : "Failed to persist cleared workspace tabs"
+        );
+      });
+  }, [clearAllWorkspaceTabs, persistActiveWorkspace, workspaceTabCount]);
+
   return (
     <>
       <div className="flex items-center border-b border-white/10 px-2 py-1">
@@ -290,6 +317,15 @@ export function MainPanelNavigation({ paneId }: MainPanelNavigationProps) {
               </div>
             )}
           </div>
+          <button
+            type="button"
+            onClick={handleClearWorkspaceTabs}
+            disabled={workspaceTabCount === 0}
+            className="inline-flex items-center justify-center rounded-md border border-white/10 p-1.5 text-gray-500 transition-colors hover:bg-black/5 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-35 dark:text-gray-400 dark:hover:bg-white/10 dark:hover:text-red-400"
+            title="Clear all tabs in this workspace"
+          >
+            <CircleX className="h-3.5 w-3.5" />
+          </button>
         </div>
       </div>
 
