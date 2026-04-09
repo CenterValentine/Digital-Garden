@@ -77,8 +77,8 @@ export function LeftSidebarExtensions() {
             if (!open) closeExtensionDialog();
           }}
         >
-          <DialogContent className="max-h-[88vh] w-[min(1100px,92vw)] max-w-[1100px] overflow-hidden border-white/10 bg-[#0f1115] p-0 text-white">
-            <div className="flex h-full max-h-[88vh] flex-col">
+          <DialogContent className="top-[52%] max-h-[calc(100vh-5rem)] w-[min(1100px,92vw)] max-w-[1100px] overflow-hidden border-white/10 bg-[#0f1115] p-0 text-white">
+            <div className="flex h-full max-h-[calc(100vh-5rem)] flex-col">
               <DialogHeader className="border-b border-white/10 px-6 py-5 text-left">
                 <div className="flex items-start gap-4">
                   <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-gold-primary/25 bg-gold-primary/10 text-gold-primary">
