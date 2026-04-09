@@ -14,6 +14,8 @@ import { useContentStore } from "@/state/content-store";
 import { useBlockStore } from "@/state/block-store";
 import { queryTools } from "@/lib/domain/tools";
 import type { ContentType } from "@/lib/domain/tools";
+import { useLeftPanelViewStore } from "@/state/left-panel-view-store";
+import { getExtensionManifestForView } from "@/lib/extensions";
 import {
   resolveRightSidebarTab,
   useRightSidebarStateStore,
@@ -24,7 +26,9 @@ export function RightSidebar() {
   const selectedContentId = useContentStore((state) => state.selectedContentId);
   const selectedContentType = useContentStore((state) => state.selectedContentType);
   const selectedBlockId = useBlockStore((s) => s.selectedBlockId);
+  const activeView = useLeftPanelViewStore((state) => state.activeView);
   const prevBlockIdRef = useRef<string | null>(null);
+  const extensionManifest = getExtensionManifestForView(activeView);
 
   const savedTab = useRightSidebarStateStore((state) =>
     selectedContentId
@@ -49,12 +53,14 @@ export function RightSidebar() {
     return tabs;
   }, [selectedContentType, selectedBlockId]);
 
-  const activeTab = useMemo(
-    () => resolveRightSidebarTab(savedTab, availableTabs),
-    [availableTabs, savedTab]
-  );
+  const activeTab = useMemo(() => {
+    if (selectedBlockId) return resolveRightSidebarTab("properties", availableTabs);
+    if (extensionManifest?.surfaces.includes("right-sidebar")) return "extension";
+    return resolveRightSidebarTab(savedTab, availableTabs);
+  }, [availableTabs, extensionManifest, savedTab, selectedBlockId]);
 
   useEffect(() => {
+    if (activeTab === "extension") return;
     if (!selectedContentId || savedTab === activeTab) return;
     setActiveTab(selectedContentId, activeTab);
   }, [activeTab, savedTab, selectedContentId, setActiveTab]);
@@ -71,6 +77,7 @@ export function RightSidebar() {
   }, [selectedBlockId, selectedContentId, savedTab, setActiveTab]);
 
   const handleTabChange = (tab: RightSidebarTab) => {
+    if (tab === "extension") return;
     if (!selectedContentId) return;
     setActiveTab(selectedContentId, tab);
   };

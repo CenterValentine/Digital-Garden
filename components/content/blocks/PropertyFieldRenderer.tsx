@@ -62,7 +62,7 @@ export function PropertyField({
             className="rounded"
           />
           <span className="text-xs text-gray-400">
-            {field.description || "Enabled"}
+            {field.description || field.label}
           </span>
         </label>
       )}

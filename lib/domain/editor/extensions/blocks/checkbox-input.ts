@@ -20,6 +20,7 @@ const { schema: checkboxInputSchema, defaults: checkboxInputDefaults } =
     groupMode: z.boolean().default(false).describe("Group mode (multiple checkboxes)"),
     options: z.array(z.string()).default(["Option 1", "Option 2"]).describe("Options (group mode)"),
     selectedValues: z.array(z.string()).default([]).describe("Selected values (group mode)"),
+    showContainer: z.boolean().default(false).describe("Show border"),
   });
 
 registerBlock({
@@ -125,6 +126,7 @@ export const CheckboxInput = Node.create({
       groupMode: { default: false, parseHTML: (el) => el.getAttribute("data-group-mode") === "true", renderHTML: (attrs) => attrs.groupMode ? { "data-group-mode": "true" } : {} },
       options: { default: ["Option 1", "Option 2"], parseHTML: (el) => { try { return JSON.parse(el.getAttribute("data-options") || "[]"); } catch { return []; } }, renderHTML: (attrs) => ({ "data-options": JSON.stringify(attrs.options) }) },
       selectedValues: { default: [], parseHTML: (el) => { try { return JSON.parse(el.getAttribute("data-selected-values") || "[]"); } catch { return []; } }, renderHTML: (attrs) => { if (!attrs.selectedValues?.length) return {}; return { "data-selected-values": JSON.stringify(attrs.selectedValues) }; } },
+      showContainer: { default: false, parseHTML: (el) => el.getAttribute("data-show-container") === "true", renderHTML: (attrs) => attrs.showContainer ? { "data-show-container": "true" } : {} },
     };
   },
 
@@ -137,6 +139,7 @@ export const CheckboxInput = Node.create({
       label: "Checkbox",
       iconName: "CheckSquare",
       atom: true,
+      containerAttr: "showContainer",
       renderContent: renderCheckboxInput,
       updateContent(node, contentDom, editor) {
         contentDom.innerHTML = "";
@@ -161,6 +164,7 @@ export const ServerCheckboxInput = Node.create({
       groupMode: { default: false, parseHTML: (el) => el.getAttribute("data-group-mode") === "true", renderHTML: (attrs) => attrs.groupMode ? { "data-group-mode": "true" } : {} },
       options: { default: ["Option 1", "Option 2"], parseHTML: (el) => { try { return JSON.parse(el.getAttribute("data-options") || "[]"); } catch { return []; } }, renderHTML: (attrs) => ({ "data-options": JSON.stringify(attrs.options) }) },
       selectedValues: { default: [], parseHTML: (el) => { try { return JSON.parse(el.getAttribute("data-selected-values") || "[]"); } catch { return []; } }, renderHTML: (attrs) => { if (!attrs.selectedValues?.length) return {}; return { "data-selected-values": JSON.stringify(attrs.selectedValues) }; } },
+      showContainer: { default: false, parseHTML: (el) => el.getAttribute("data-show-container") === "true", renderHTML: (attrs) => attrs.showContainer ? { "data-show-container": "true" } : {} },
     };
   },
 

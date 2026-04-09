@@ -14,6 +14,7 @@ import { LeftSidebar } from "./LeftSidebar";
 import { CollapsibleRightPanel } from "./CollapsibleRightPanel";
 import { StatusBar } from "./StatusBar";
 import NotesNavBar from "@/components/client/nav/NotesNavBar";
+import { ExtensionGlobalDialogs } from "@/lib/extensions/ExtensionGlobalDialogs";
 
 interface ConditionalNotesLayoutProps {
   children: React.ReactNode;
@@ -78,6 +79,7 @@ export function ConditionalNotesLayout({
           <StatusBar />
         </div>
       </div>
+      <ExtensionGlobalDialogs />
     </>
   );
 }

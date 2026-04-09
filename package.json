@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev --port 3015",
     "typecheck": "tsc --noEmit",
     "build": "prisma generate && pnpm build:tokens && tsc --noEmit && next build --webpack",
     "vercel-build": "prisma generate && pnpm build:tokens && next build --webpack",

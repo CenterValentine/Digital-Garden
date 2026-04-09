@@ -62,7 +62,7 @@ export async function verifyGoogleToken(idToken: string): Promise<{
 export async function exchangeCodeForTokens(
   code: string,
   redirectUri: string
-): Promise<{ accessToken: string; idToken: string; refreshToken?: string; expiresIn?: number }> {
+): Promise<{ accessToken: string; idToken: string; refreshToken?: string; expiresIn?: number; scope?: string }> {
   if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) {
     throw new Error("Google OAuth not configured");
   }
@@ -86,6 +86,7 @@ export async function exchangeCodeForTokens(
       expiresIn: tokens.expiry_date
         ? Math.floor((tokens.expiry_date - Date.now()) / 1000)
         : 3600, // Default to 1 hour
+      scope: tokens.scope || undefined,
     };
   } catch (error) {
     throw new Error(`Failed to exchange code for tokens: ${error}`);
@@ -110,7 +111,8 @@ export async function findOrCreateOAuthUser(
   username: string,
   accessToken?: string,
   refreshToken?: string,
-  expiresIn?: number
+  expiresIn?: number,
+  scope?: string
 ): Promise<{ user: User; account: Account }> {
   // Check if account already exists
   const existingAccount = await prisma.account.findUnique({
@@ -132,7 +134,8 @@ export async function findOrCreateOAuthUser(
         where: { id: existingAccount.id },
         data: {
           accessToken,
-          refreshToken,
+          refreshToken: refreshToken || existingAccount.refreshToken,
+          scope: scope || existingAccount.scope,
           expiresAt: expiresIn ? new Date(Date.now() + expiresIn * 1000) : null,
         },
         include: {
@@ -175,6 +178,7 @@ export async function findOrCreateOAuthUser(
       providerAccountId,
       accessToken,
       refreshToken,
+      scope,
       expiresAt: expiresIn ? new Date(Date.now() + expiresIn * 1000) : null,
     },
   });
@@ -277,7 +281,7 @@ export async function getValidGoogleAccessToken(userId: string): Promise<string>
     });
 
     return accessToken;
-  } catch (error) {
+  } catch {
     // Refresh failed, user needs to re-authenticate
     throw new Error("Token refresh failed. Please re-authenticate with Google.");
   }
@@ -290,7 +294,7 @@ export async function getValidGoogleAccessToken(userId: string): Promise<string>
  * @param providerAccountId - Provider account ID
  * @param accessToken - Access token
  * @param refreshToken - Refresh token (optional)
- * @param expiresAt - Token expiration timestamp (optional)
+ * @param expiresAt - Token expiration date (optional)
  * @returns Account
  */
 export async function linkOAuthAccount(
@@ -299,7 +303,7 @@ export async function linkOAuthAccount(
   providerAccountId: string,
   accessToken?: string,
   refreshToken?: string,
-  expiresAt?: bigint
+  expiresAt?: Date
 ): Promise<Account> {
   const account = await prisma.account.create({
     data: {
@@ -308,7 +312,7 @@ export async function linkOAuthAccount(
       providerAccountId,
       accessToken,
       refreshToken,
-      expiresAt: expiresAt as any,
+      expiresAt,
     },
   });
 

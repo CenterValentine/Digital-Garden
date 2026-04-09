@@ -8,11 +8,21 @@
  * Epoch 11 Sprint 43
  */
 
-import { Plugin, PluginKey } from "@tiptap/pm/state";
+import { NodeSelection, Plugin, PluginKey } from "@tiptap/pm/state";
 import { Decoration, DecorationSet } from "@tiptap/pm/view";
 import { useBlockStore } from "@/state/block-store";
 
 export const blockFocusPluginKey = new PluginKey("blockFocus");
+
+function syncSelectedBlockAttrs(blockId: string, attrs: Record<string, unknown>) {
+  requestAnimationFrame(() => {
+    window.dispatchEvent(
+      new CustomEvent("block-attrs-update", {
+        detail: { blockId, attrs },
+      })
+    );
+  });
+}
 
 /**
  * Creates a ProseMirror plugin that:
@@ -32,13 +42,11 @@ export function createBlockFocusPlugin() {
       apply(tr, oldDecorations, _oldState, newState) {
         // Check if selection is a NodeSelection on a block node
         const { selection } = newState;
-        const node = selection instanceof Object && "node" in selection
-          ? (selection as any).node
-          : null;
+        const node = selection instanceof NodeSelection ? selection.node : null;
 
         if (node && node.attrs && typeof node.attrs.blockType === "string") {
           // Block node is selected — add decoration and update store
-          const pos = (selection as any).from;
+          const pos = selection.from;
           const decoration = Decoration.node(pos, pos + node.nodeSize, {
             class: "block-focused",
           });
@@ -49,6 +57,9 @@ export function createBlockFocusPlugin() {
             useBlockStore
               .getState()
               .setSelectedBlock(node.attrs.blockId, node.attrs.blockType);
+          }
+          if (node.attrs.blockId) {
+            syncSelectedBlockAttrs(node.attrs.blockId, node.attrs);
           }
 
           return DecorationSet.create(newState.doc, [decoration]);

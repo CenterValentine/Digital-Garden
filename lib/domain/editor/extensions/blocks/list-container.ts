@@ -12,7 +12,7 @@
  * Sprint 44b: Block Parts
  */
 
-import { Node, mergeAttributes } from "@tiptap/core";
+import { Node, mergeAttributes, type CommandProps, type RawCommands } from "@tiptap/core";
 import { z } from "zod";
 import { createBlockSchema } from "@/lib/domain/blocks/schema";
 import { registerBlock } from "@/lib/domain/blocks/registry";
@@ -40,6 +40,7 @@ const { schema: listSchema, defaults: listDefaults } = createBlockSchema(
       .enum(["disc", "circle", "square", "decimal", "alpha", "roman", "none"])
       .default("disc")
       .describe("List marker style"),
+    showContainer: z.boolean().default(false).describe("Show border"),
   }
 );
 
@@ -94,6 +95,11 @@ export const ListContainer = Node.create({
         parseHTML: (el) => el.getAttribute("data-marker") || "disc",
         renderHTML: (attrs) => ({ "data-marker": attrs.markerStyle }),
       },
+      showContainer: {
+        default: false,
+        parseHTML: (el) => el.getAttribute("data-show-container") === "true",
+        renderHTML: (attrs) => attrs.showContainer ? { "data-show-container": "true" } : {},
+      },
     };
   },
 
@@ -116,7 +122,7 @@ export const ListContainer = Node.create({
     return {
       insertListContainer:
         (listType: "bullet" | "ordered" = "bullet") =>
-        ({ commands }: { commands: any }) => {
+        ({ commands }: CommandProps) => {
           const listNodeType =
             listType === "ordered" ? "orderedList" : "bulletList";
           return commands.insertContent({
@@ -135,7 +141,7 @@ export const ListContainer = Node.create({
             ],
           });
         },
-    } as any;
+    } as Partial<RawCommands>;
   },
 
   addNodeView() {
@@ -144,6 +150,7 @@ export const ListContainer = Node.create({
       label: "List",
       iconName: "List",
       atom: false,
+      containerAttr: "showContainer",
       renderContent(node, contentDom) {
         // Apply layout data attributes to the content container
         contentDom.classList.add("block-list-content");
@@ -198,6 +205,11 @@ export const ServerListContainer = Node.create({
         default: "disc",
         parseHTML: (el) => el.getAttribute("data-marker") || "disc",
         renderHTML: (attrs) => ({ "data-marker": attrs.markerStyle }),
+      },
+      showContainer: {
+        default: false,
+        parseHTML: (el) => el.getAttribute("data-show-container") === "true",
+        renderHTML: (attrs) => attrs.showContainer ? { "data-show-container": "true" } : {},
       },
     };
   },
