@@ -29,7 +29,7 @@ interface FileTreeProps {
   }) => Promise<void>;
   onSelect?: (nodes: TreeNode[]) => void;
   onRename?: (id: string, name: string) => Promise<void>;
-  onCreate?: (parentId: string | null, type: "folder" | "note" | "file" | "code" | "html") => Promise<void>;
+  onCreate?: (parentId: string | null, type: "folder" | "note" | "file" | "code" | "html" | "docx" | "xlsx" | "json" | "external" | "chat" | "visualization" | "data" | "hope" | "workflow") => Promise<void>;
   onDelete?: (ids: string | string[]) => Promise<void>; // Support both single ID and batch delete
   onDuplicate?: (ids: string[]) => Promise<void>; // Duplicate content node(s)
   onDownload?: (ids: string[]) => Promise<void>; // Download file(s)
@@ -42,6 +42,7 @@ interface FileTreeProps {
   onCreateVisualizationMermaid?: (parentId: string | null) => Promise<void>;
   onCreateVisualizationExcalidraw?: (parentId: string | null) => Promise<void>;
   onCreateVisualizationDiagramsNet?: (parentId: string | null) => Promise<void>;
+  onAddPeopleTarget?: (parentId: string | null) => Promise<void>;
   height?: number;
   editingNodeId?: string; // If set, automatically triggers edit mode on this node
   expandNodeId?: string | null; // If set, imperatively expands this node
@@ -64,6 +65,7 @@ export function FileTree({
   onCreateVisualizationMermaid,
   onCreateVisualizationExcalidraw,
   onCreateVisualizationDiagramsNet,
+  onAddPeopleTarget,
   height = 600,
   editingNodeId,
   expandNodeId,
@@ -191,7 +193,7 @@ export function FileTree({
 
   // Create a wrapper component that has access to callbacks
   const NodeWithCallbacks = (props: any) => {
-    return <FileNode {...props} onRename={onRename} onCreate={onCreate} onDelete={onDelete} onDuplicate={onDuplicate} onDownload={onDownload} onChangeIcon={onChangeIcon} onSetFolderView={onSetFolderView} onToggleReferencedContent={onToggleReferencedContent} onCreateVisualizationMermaid={onCreateVisualizationMermaid} onCreateVisualizationExcalidraw={onCreateVisualizationExcalidraw} onCreateVisualizationDiagramsNet={onCreateVisualizationDiagramsNet} />;
+    return <FileNode {...props} onRename={onRename} onCreate={onCreate} onDelete={onDelete} onDuplicate={onDuplicate} onDownload={onDownload} onChangeIcon={onChangeIcon} onSetFolderView={onSetFolderView} onToggleReferencedContent={onToggleReferencedContent} onCreateVisualizationMermaid={onCreateVisualizationMermaid} onCreateVisualizationExcalidraw={onCreateVisualizationExcalidraw} onCreateVisualizationDiagramsNet={onCreateVisualizationDiagramsNet} onAddPeopleTarget={onAddPeopleTarget} />;
   };
 
   // Get initial open state from persisted IDs
@@ -247,6 +249,10 @@ export function FileTree({
 
     // Only allow dropping into folders
     if (parentNode.data.contentType !== "folder") {
+      return false;
+    }
+
+    if (parentNode.data.treeNodeKind && parentNode.data.treeNodeKind !== "content") {
       return false;
     }
 

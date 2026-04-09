@@ -1,5 +1,5 @@
 ---
-last_updated: 2026-03-12
+last_updated: 2026-04-07
 ---
 
 # Sprint Backlog
@@ -209,6 +209,49 @@ The following sprints were originally 38-42 in Epoch 9 but are deferred to Epoch
 - [ ] **1. Folder double-click not expanding** — `node.open()`/`node.close()` + `node.select()` attempted but react-arborist is still not reliably expanding. Root cause: `node.open()` may not exist on the `NodeApi` — need to verify the exact API surface on the installed version, or handle via `onToggle` callback. Also check whether `e.stopPropagation()` is preventing the tree's internal click handler from running `select` (which triggers `onSelect` / navigation).
 - [ ] **2. Scrollbar still visible in content panel** — Overflow is being set to `overflow-hidden` on the wrapper but FolderViewer (and potentially other viewers) have internal `overflow-auto` that are escaping. Check the full ancestor chain: `MainPanel → MainPanelContent → isNonNoteContent wrapper → content div → FolderViewer` — ensure every level in the chain has `overflow-hidden` or `min-h-0` as appropriate. The scrollbar appears most visibly when a folder is open.
 - [ ] **3. "Failed to load content" on new note creation** — After creating a new note, the main panel shows "Failed to load content / Failed to fetch content". The temp-ID guard in MainPanelContent was added but the error persists. Likely the GET `/api/content/content/[id]` is firing before the real ID is swapped in — check console logs for the actual status code and response body to confirm root cause.
+
+---
+
+## Epoch 13: People + Collaboration (Starts Sprint 58)
+
+**Goal**: Add a People system with safe file-tree representations, person mentions, and Hocuspocus-backed collaboration.
+**Detailed plan**: [epoch-13-people-and-collaboration.md](epochs/epoch-13-people-and-collaboration.md)
+
+### Sprint 58: Foundations
+- [ ] Work from `/Users/davidvalentine/Documents/Digital-Garden/.worktrees/epoch-13-people-collab`
+- [ ] Rename file-tree creation menu wording from `New` to `Add`
+- [ ] Add People schema foundations: default `People` group, group/subgroup, person, mount, mention planning
+- [ ] Keep group/subgroup as People-domain mount nodes rendered folder-like; do not add `ContentType.group`
+- [ ] Add server-side People tree policy scaffolding for create/move/duplicate/delete/mount APIs
+- [ ] Add collaboration access planning for owner, signed-in `view`/`edit`, and public `/share` view-only paths
+
+### Sprint 59: People View + Mount UX
+- [ ] Build People view with canonical group/subgroup tree
+- [ ] Build person detail surface with person-scoped content
+- [ ] Add `Add -> Person/Group` searchable mount flow in file-tree context menu and `+` menu
+- [ ] Add conflict detection for already-mounted people/groups/subgroups
+
+### Sprint 60: Tree Policy Hardening
+- [ ] Enforce exactly-one file-tree representation per person/group/subgroup
+- [ ] Implement confirmed remount transactions for conflicting group/subgroup mounts
+- [ ] Implement controlled-content reassignment inside People mirrored areas
+- [ ] Implement warning + preference when moving controlled content out to normal folder jurisdiction
+
+### Sprint 61: Person Mentions
+- [ ] Add `@person` TipTap extension and autocomplete
+- [ ] Sync mentions to normalized storage
+- [ ] Clicking an `@person` opens the person and focuses their file-tree mount if present
+
+### Sprint 62: Hocuspocus Collaboration
+- [ ] Add same-repo Hocuspocus service and Yjs persistence
+- [ ] Support owner `/content` collaboration access
+- [ ] Support signed-in collaborator `/content` access with `view` and `edit`
+- [ ] Prevent legacy autosave from racing collaboration persistence
+
+### Sprint 63: Share + Media Prototype
+- [ ] Add public `/share` view-only access for non-users
+- [ ] Preserve expected signed-in `view`/`edit` access when entering through `/share`
+- [ ] Prototype small P2P WebRTC rooms only after Hocuspocus stability gates pass
 
 ---
 

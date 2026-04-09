@@ -19,6 +19,7 @@ import {
 } from "@/lib/domain/content";
 import { syncContentTags } from "@/lib/domain/content/tag-sync";
 import { syncImageReferences } from "@/lib/domain/content/image-refs";
+import { syncPersonMentions } from "@/lib/domain/content/person-mention-sync";
 import type { JSONContent } from "@tiptap/core";
 import type {
   ContentDetailResponse,
@@ -348,6 +349,8 @@ export async function PATCH(
 
       // Sprint 37: Sync image references (ContentLink with linkType "image-ref")
       await syncImageReferences(id, json, session.user.id);
+
+      await syncPersonMentions(id, json, session.user.id);
     }
 
     if (existing.htmlPayload && html !== undefined) {

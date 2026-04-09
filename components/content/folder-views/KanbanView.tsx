@@ -33,6 +33,7 @@ import { getSurfaceStyles } from "@/lib/design/system";
 import type { FolderViewProps } from "./FolderViewContainer";
 import { getDisplayExtension } from "@/lib/domain/content/file-extension-utils";
 import { useContentStore, type WorkspacePaneId } from "@/state/content-store";
+import { buildContentListUrl } from "./content-query";
 
 interface ContentChild {
   id: string;
@@ -162,6 +163,7 @@ export function KanbanView({
   folderId,
   paneId,
   folderTitle: _folderTitle,
+  contentQuery,
   viewPrefs = {},
   onUpdateView,
 }: FolderViewProps) {
@@ -169,6 +171,8 @@ export function KanbanView({
   const [loading, setLoading] = useState(true);
   const [activeId, setActiveId] = useState<string | null>(null);
   const kanbanPrefs = viewPrefs as KanbanViewPrefs;
+  const contentQueryKey = JSON.stringify(contentQuery ?? { parentId: folderId });
+  const kanbanPrefsKey = JSON.stringify(kanbanPrefs);
 
   // Kanban view preferences
   const columnTitles = kanbanPrefs.columnTitles ?? ["To Do", "In Progress", "Done"];
@@ -183,7 +187,7 @@ export function KanbanView({
 
   useEffect(() => {
     loadColumns();
-  }, [folderId]);
+  }, [folderId, contentQueryKey, kanbanPrefsKey]);
 
   const saveKanbanState = async (updatedColumns: Column[]) => {
     if (!onUpdateView) return;
@@ -232,7 +236,10 @@ export function KanbanView({
     try {
       setLoading(true);
       const response = await fetch(
-        `/api/content/content?parentId=${folderId}&type=note`,
+        buildContentListUrl({
+          ...(contentQuery ?? { parentId: folderId }),
+          type: "note",
+        }),
         { credentials: "include" }
       );
 

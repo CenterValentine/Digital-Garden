@@ -19,6 +19,8 @@ export interface ContentListItem {
   slug: string;
   parentId: string | null;
   categoryId: string | null;
+  peopleGroupId?: string | null;
+  personId?: string | null;
   displayOrder: number;
   isPublished: boolean;
   createdAt: Date;
@@ -85,6 +87,8 @@ export interface ContentDetailResponse {
   slug: string;
   parentId: string | null;
   categoryId: string | null;
+  peopleGroupId?: string | null;
+  personId?: string | null;
   displayOrder: number;
   isPublished: boolean;
   customIcon: string | null;
@@ -177,6 +181,8 @@ export interface CreateContentRequest {
   title: string;
   parentId?: string | null;
   categoryId?: string | null;
+  peopleGroupId?: string | null;
+  personId?: string | null;
   customIcon?: string | null;
   iconColor?: string | null;
 
@@ -334,4 +340,3 @@ export type CreatePayloadData =
   | { visualizationPayload: { create: Prisma.VisualizationPayloadCreateWithoutContentInput } }
   | { chatPayload: { create: Prisma.ChatPayloadCreateWithoutContentInput } }
   | Record<string, never>; // Empty object for backward compatibility only
-

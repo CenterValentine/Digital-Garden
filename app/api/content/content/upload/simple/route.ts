@@ -21,6 +21,8 @@ export async function POST(request: NextRequest) {
 
     const file = formData.get("file") as File;
     const parentId = formData.get("parentId") as string | null;
+    const peopleGroupId = formData.get("peopleGroupId") as string | null;
+    const personId = formData.get("personId") as string | null;
     const provider = formData.get("provider") as "r2" | "s3" | "vercel" | null;
     const enableOCR = formData.get("enableOCR") === "true";
     const role = formData.get("role") as "primary" | "referenced" | null;
@@ -36,6 +38,144 @@ export async function POST(request: NextRequest) {
         },
         { status: 400 }
       );
+    }
+
+    if (peopleGroupId && personId) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: {
+            code: "VALIDATION_ERROR",
+            message: "Content can only be assigned to one People target.",
+          },
+        },
+        { status: 400 }
+      );
+    }
+
+    let resolvedPeopleGroupId = peopleGroupId || null;
+    let resolvedPersonId = personId || null;
+
+    if (resolvedPeopleGroupId) {
+      const group = await prisma.peopleGroup.findFirst({
+        where: {
+          id: resolvedPeopleGroupId,
+          ownerId: session.user.id,
+          deletedAt: null,
+        },
+        select: { id: true },
+      });
+
+      if (!group) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: {
+              code: "NOT_FOUND",
+              message: "People group not found",
+            },
+          },
+          { status: 404 }
+        );
+      }
+    }
+
+    if (resolvedPersonId) {
+      const person = await prisma.person.findFirst({
+        where: {
+          id: resolvedPersonId,
+          ownerId: session.user.id,
+          deletedAt: null,
+        },
+        select: { id: true },
+      });
+
+      if (!person) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: {
+              code: "NOT_FOUND",
+              message: "Person not found",
+            },
+          },
+          { status: 404 }
+        );
+      }
+    }
+
+    if (parentId) {
+      const parent = await prisma.contentNode.findUnique({
+        where: { id: parentId },
+        select: {
+          id: true,
+          ownerId: true,
+          contentType: true,
+          deletedAt: true,
+          peopleGroupId: true,
+          personId: true,
+        },
+      });
+
+      if (!parent || parent.ownerId !== session.user.id) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: {
+              code: "NOT_FOUND",
+              message: "Parent not found",
+            },
+          },
+          { status: 404 }
+        );
+      }
+
+      if (parent.deletedAt) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: {
+              code: "VALIDATION_ERROR",
+              message: "Cannot add content to deleted parent",
+            },
+          },
+          { status: 400 }
+        );
+      }
+
+      if (parent.contentType !== "folder") {
+        return NextResponse.json(
+          {
+            success: false,
+            error: {
+              code: "VALIDATION_ERROR",
+              message: "Parent must be a folder",
+            },
+          },
+          { status: 400 }
+        );
+      }
+
+      if (parent.peopleGroupId || parent.personId) {
+        if (
+          (resolvedPeopleGroupId && resolvedPeopleGroupId !== parent.peopleGroupId) ||
+          (resolvedPersonId && resolvedPersonId !== parent.personId)
+        ) {
+          return NextResponse.json(
+            {
+              success: false,
+              error: {
+                code: "VALIDATION_ERROR",
+                message: "People assignment must match the parent folder.",
+              },
+            },
+            { status: 400 }
+          );
+        }
+
+        resolvedPeopleGroupId = parent.peopleGroupId;
+        resolvedPersonId = parent.personId;
+      }
     }
 
     // Convert file to buffer
@@ -150,6 +290,8 @@ export async function POST(request: NextRequest) {
             slug,
             contentType: "file",
             parentId: parentId || null,
+            peopleGroupId: resolvedPeopleGroupId,
+            personId: resolvedPersonId,
             role: role || "primary",
             displayOrder: 0,
             filePayload: {

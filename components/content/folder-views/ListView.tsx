@@ -14,6 +14,7 @@ import { getSurfaceStyles } from "@/lib/design/system";
 import type { FolderViewProps } from "./FolderViewContainer";
 import { useContentStore } from "@/state/content-store";
 import { getDisplayExtension } from "@/lib/domain/content/file-extension-utils";
+import { buildContentListUrl } from "./content-query";
 
 interface ContentChild {
   id: string;
@@ -28,6 +29,7 @@ export function ListView({
   folderId,
   paneId,
   folderTitle,
+  contentQuery,
   sortMode,
   includeReferencedContent,
 }: FolderViewProps) {
@@ -36,16 +38,17 @@ export function ListView({
   const [loading, setLoading] = useState(true);
   const selectedContentId = useContentStore((state) => state.selectedContentId);
   const setSelectedContentId = useContentStore((state) => state.setSelectedContentId);
+  const contentQueryKey = JSON.stringify(contentQuery ?? { parentId: folderId });
 
   useEffect(() => {
     loadChildren();
-  }, [folderId, sortMode, includeReferencedContent]);
+  }, [folderId, contentQueryKey, sortMode, includeReferencedContent]);
 
   const loadChildren = async () => {
     try {
       setLoading(true);
       const response = await fetch(
-        `/api/content/content?parentId=${folderId}`,
+        buildContentListUrl(contentQuery ?? { parentId: folderId }),
         { credentials: "include" }
       );
 
@@ -123,7 +126,7 @@ export function ListView({
         <Folder className="h-16 w-16 text-gray-400 mb-4" />
         <p className="text-sm text-gray-600 mb-2">This folder is empty</p>
         <p className="text-xs text-gray-500">
-          Create new content using the "+" button or context menu
+          Add content using the plus button or context menu
         </p>
       </div>
     );

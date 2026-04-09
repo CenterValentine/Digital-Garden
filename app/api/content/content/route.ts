@@ -38,6 +38,8 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const type = searchParams.get("type") || "all";
     const parentId = searchParams.get("parentId");
+    const personId = searchParams.get("personId");
+    const peopleGroupId = searchParams.get("peopleGroupId");
     const search = searchParams.get("search");
     const tags = searchParams.get("tags"); // M6: Tag filter
     const includeDeleted = searchParams.get("includeDeleted") === "true";
@@ -60,6 +62,14 @@ export async function GET(request: NextRequest) {
 
     if (parentId !== null) {
       whereClause.parentId = parentId === "null" ? null : parentId;
+    }
+
+    if (personId) {
+      whereClause.personId = personId;
+    }
+
+    if (peopleGroupId) {
+      whereClause.peopleGroupId = peopleGroupId;
     }
 
     // Type filtering (by contentType field)
@@ -275,6 +285,8 @@ export async function POST(request: NextRequest) {
       title,
       parentId,
       categoryId,
+      peopleGroupId,
+      personId,
       tiptapJson,
       markdown,
       html,
@@ -326,6 +338,70 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (peopleGroupId && personId) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: {
+            code: "VALIDATION_ERROR",
+            message: "Content can only be assigned to one People target.",
+          },
+        },
+        { status: 400 }
+      );
+    }
+
+    let resolvedPeopleGroupId = peopleGroupId ?? null;
+    let resolvedPersonId = personId ?? null;
+
+    if (resolvedPeopleGroupId) {
+      const group = await prisma.peopleGroup.findFirst({
+        where: {
+          id: resolvedPeopleGroupId,
+          ownerId: session.user.id,
+          deletedAt: null,
+        },
+        select: { id: true },
+      });
+
+      if (!group) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: {
+              code: "NOT_FOUND",
+              message: "People group not found",
+            },
+          },
+          { status: 404 }
+        );
+      }
+    }
+
+    if (resolvedPersonId) {
+      const person = await prisma.person.findFirst({
+        where: {
+          id: resolvedPersonId,
+          ownerId: session.user.id,
+          deletedAt: null,
+        },
+        select: { id: true },
+      });
+
+      if (!person) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: {
+              code: "NOT_FOUND",
+              message: "Person not found",
+            },
+          },
+          { status: 404 }
+        );
+      }
+    }
+
     // Validate parent exists
     if (parentId) {
       const parent = await prisma.contentNode.findUnique({
@@ -356,6 +432,27 @@ export async function POST(request: NextRequest) {
           },
           { status: 400 }
         );
+      }
+
+      if (parent.peopleGroupId || parent.personId) {
+        if (
+          (resolvedPeopleGroupId && resolvedPeopleGroupId !== parent.peopleGroupId) ||
+          (resolvedPersonId && resolvedPersonId !== parent.personId)
+        ) {
+          return NextResponse.json(
+            {
+              success: false,
+              error: {
+                code: "VALIDATION_ERROR",
+                message: "People assignment must match the parent folder.",
+              },
+            },
+            { status: 400 }
+          );
+        }
+
+        resolvedPeopleGroupId = parent.peopleGroupId;
+        resolvedPersonId = parent.personId;
       }
     }
 
@@ -496,6 +593,8 @@ export async function POST(request: NextRequest) {
         contentType,
         parentId: parentId || null,
         categoryId: categoryId || null,
+        peopleGroupId: resolvedPeopleGroupId,
+        personId: resolvedPersonId,
         customIcon: customIcon || null,
         iconColor: iconColor || null,
         ...payloadData,
@@ -511,6 +610,8 @@ export async function POST(request: NextRequest) {
       slug: content.slug,
       parentId: content.parentId,
       categoryId: content.categoryId,
+      peopleGroupId: content.peopleGroupId,
+      personId: content.personId,
       displayOrder: content.displayOrder,
       isPublished: content.isPublished,
       customIcon: content.customIcon,

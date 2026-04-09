@@ -30,6 +30,7 @@ import { Callout } from "./extensions/callout";
 import { WikiLink } from "./extensions/wiki-link";
 import { createWikiLinkSuggestion } from "./extensions/wiki-link-suggestion";
 import { Tag } from "./extensions/tag";
+import { PersonMention } from "./extensions/person-mention";
 import { EditorImage } from "./extensions/image";
 import { AiHighlight } from "./extensions/ai-highlight";
 import { BlockFocusExtension } from "./extensions/block-focus-ext";
@@ -70,6 +71,10 @@ export interface EditorExtensionsOptions {
   createTag?: (tagName: string) => Promise<{ id: string; name: string; slug: string; color: string | null; usageCount: number }>;
   /** Callback when a tag is selected from autocomplete */
   onTagSelect?: (tag: { id: string; name: string; slug: string; color: string | null }) => void;
+  /** Fetch people for @ mentions */
+  fetchPeopleMentions?: (query: string) => Promise<Array<{ id: string; personId: string; label: string; slug: string; email: string | null; phone: string | null; avatarUrl: string | null }>>;
+  /** Callback when a person mention is clicked */
+  onPersonMentionClick?: (personId: string) => void;
 }
 
 /**
@@ -221,6 +226,11 @@ export function getEditorExtensions(options?: EditorExtensionsOptions): Extensio
       createTag: options?.createTag,
       onTagClick: options?.onTagClick,
       onTagSelect: options?.onTagSelect,
+    }),
+
+    PersonMention.configure({
+      fetchPeople: options?.fetchPeopleMentions || (async () => []),
+      onPersonClick: options?.onPersonMentionClick,
     }),
   ];
 }

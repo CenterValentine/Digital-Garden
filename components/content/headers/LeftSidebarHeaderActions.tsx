@@ -334,7 +334,7 @@ export function LeftSidebarHeaderActions({
         onClick={() => !disabled && setShowMenu(!showMenu)}
         disabled={disabled}
         className="rounded p-1 transition-colors hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed"
-        title={disabled ? "Cannot create when multiple items are selected" : "New file or folder"}
+        title={disabled ? "Cannot add when multiple items are selected" : "Add file or folder"}
       >
         <Plus className="h-4 w-4" />
       </button>

@@ -7,7 +7,7 @@
 
 "use client";
 
-import { Folder, Search, Puzzle } from "lucide-react";
+import { Folder, Search, Puzzle, Users } from "lucide-react";
 import { useSearchStore } from "@/state/search-store";
 import { useLeftPanelCollapseStore } from "@/state/left-panel-collapse-store";
 import { useLeftPanelViewStore } from "@/state/left-panel-view-store";
@@ -39,6 +39,15 @@ export function LeftSidebarCollapsed() {
     // Expand panel and show extensions
     setMode("full");
     setActiveView("extensions");
+    if (isSearchOpen) {
+      toggleSearch();
+    }
+  };
+
+  const handlePeopleClick = () => {
+    // Expand panel and show People
+    setMode("full");
+    setActiveView("people");
     if (isSearchOpen) {
       toggleSearch();
     }
@@ -86,6 +95,20 @@ export function LeftSidebarCollapsed() {
         type="button"
       >
         <Puzzle className="h-5 w-5" />
+      </button>
+
+      {/* People icon */}
+      <button
+        onClick={handlePeopleClick}
+        className={`rounded p-2 transition-colors ${
+          activeView === "people"
+            ? "text-gold-primary bg-white/10"
+            : "text-gray-400 hover:bg-white/10 hover:text-gold-primary"
+        }`}
+        title="People"
+        type="button"
+      >
+        <Users className="h-5 w-5" />
       </button>
     </div>
   );
