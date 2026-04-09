@@ -1,11 +1,12 @@
 "use client";
 
-import { getExtensionGlobalDialogs } from "./client-registry";
+import { useExtensionGlobalDialogs } from "./client-registry";
 
 export function ExtensionGlobalDialogs() {
+  const dialogs = useExtensionGlobalDialogs();
   return (
     <>
-      {getExtensionGlobalDialogs().map((Dialog) => (
+      {dialogs.map((Dialog) => (
         <Dialog key={Dialog.displayName ?? Dialog.name} />
       ))}
     </>

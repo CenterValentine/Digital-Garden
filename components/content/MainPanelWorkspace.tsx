@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { createElement, useEffect, useState, type ReactNode } from "react";
 import { Allotment } from "allotment";
 import {
   BOTTOM_LEFT_PANE_ID,
@@ -12,14 +12,10 @@ import {
   type WorkspaceLayoutMode,
   type WorkspacePaneId,
 } from "@/state/content-store";
-import {
-  installWorkspaceOpenGuard,
-  useWorkspaceStore,
-} from "@/state/workspace-store";
 import { MainPanelNavigation } from "./MainPanelNavigation";
 import { MainPanelHeader } from "./headers/MainPanelHeader";
 import { MainPanelContent } from "./content/MainPanelContent";
-import { WorkspaceConflictDialog } from "./workspaces/WorkspaceConflictDialog";
+import { useExtensionShellControllers } from "@/lib/extensions/client-registry";
 
 interface TabDropRequest {
   paneId: WorkspacePaneId;
@@ -410,17 +406,10 @@ export function MainPanelWorkspace() {
   const layoutMode = useContentStore((state) => state.layoutMode);
   const activePaneId = useContentStore((state) => state.activePaneId);
   const openContentIds = useContentStore((state) => state.openContentIds);
-  const workspaceSnapshotKey = useContentStore((state) =>
-    JSON.stringify(state.getWorkspaceStateSnapshot())
-  );
   const moveContentTabToPane = useContentStore((state) => state.moveContentTabToPane);
   const restoreWorkspace = useContentStore((state) => state.restoreWorkspace);
   const setSelectedContentId = useContentStore((state) => state.setSelectedContentId);
-  const activeWorkspaceId = useWorkspaceStore((state) => state.activeWorkspaceId);
-  const loadWorkspaces = useWorkspaceStore((state) => state.loadWorkspaces);
-  const persistActiveWorkspace = useWorkspaceStore(
-    (state) => state.persistActiveWorkspace
-  );
+  const shellControllers = useExtensionShellControllers();
   const [draggedTabId, setDraggedTabId] = useState<string | null>(null);
   const [draggedFromPaneId, setDraggedFromPaneId] = useState<WorkspacePaneId | null>(null);
   const [hoveredSinglePaneTargetId, setHoveredSinglePaneTargetId] = useState<string | null>(null);
@@ -457,23 +446,6 @@ export function MainPanelWorkspace() {
     });
     resetDragState();
   };
-
-  useEffect(() => installWorkspaceOpenGuard(), []);
-
-  useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    void loadWorkspaces(urlParams.get("workspace"));
-  }, [loadWorkspaces]);
-
-  useEffect(() => {
-    if (!activeWorkspaceId) return;
-
-    const timeoutId = window.setTimeout(() => {
-      void persistActiveWorkspace();
-    }, 600);
-
-    return () => window.clearTimeout(timeoutId);
-  }, [activeWorkspaceId, workspaceSnapshotKey, persistActiveWorkspace]);
 
   useEffect(() => {
     if (openContentIds.length > 0) return;
@@ -694,7 +666,11 @@ export function MainPanelWorkspace() {
           />
         )}
       </div>
-      <WorkspaceConflictDialog />
+      {shellControllers.map((Controller) =>
+        createElement(Controller, {
+          key: Controller.displayName ?? Controller.name,
+        })
+      )}
     </div>
   );
 }

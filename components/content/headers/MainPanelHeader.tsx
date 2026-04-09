@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useRef, useCallback } from "react";
+import { createElement, useEffect, useMemo, useState, useRef, useCallback } from "react";
 import {
   ExternalLink,
   File,
@@ -17,7 +17,7 @@ import {
   useContentStore,
   type WorkspacePaneId,
 } from "@/state/content-store";
-import { useWorkspaceStore } from "@/state/workspace-store";
+import { useExtensionShellTabMenuSections } from "@/lib/extensions/client-registry";
 
 function getTabIcon(contentType: string | null) {
   switch (contentType) {
@@ -59,11 +59,7 @@ export function MainPanelHeader({
   const activateContentTab = useContentStore((state) => state.activateContentTab);
   const closeContentTab = useContentStore((state) => state.closeContentTab);
   const updateContentTab = useContentStore((state) => state.updateContentTab);
-  const workspaces = useWorkspaceStore((state) => state.workspaces);
-  const activeWorkspaceId = useWorkspaceStore((state) => state.activeWorkspaceId);
-  const assignContentToWorkspace = useWorkspaceStore(
-    (state) => state.assignContentToWorkspace
-  );
+  const shellTabMenuSections = useExtensionShellTabMenuSections();
 
   const [editingTabId, setEditingTabId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState("");
@@ -118,10 +114,6 @@ export function MainPanelHeader({
     [pane?.tabIds, tabsById]
   );
   const tabMenuTab = tabMenu ? tabsById[tabMenu.tabId] : null;
-  const targetWorkspaces = useMemo(
-    () => workspaces.filter((workspace) => workspace.id !== activeWorkspaceId),
-    [activeWorkspaceId, workspaces]
-  );
 
   useEffect(() => {
     if (!tabMenu) return;
@@ -201,6 +193,7 @@ export function MainPanelHeader({
                 data-pane-id={paneId}
                 draggable
                 onContextMenu={(event) => {
+                  if (shellTabMenuSections.length === 0) return;
                   event.preventDefault();
                   setTabMenu({ tabId: tab.id, x: event.clientX, y: event.clientY });
                 }}
@@ -282,52 +275,13 @@ export function MainPanelHeader({
           style={{ left: tabMenu.x, top: tabMenu.y }}
           onClick={(event) => event.stopPropagation()}
         >
-          <div className="px-2 py-1.5 text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
-            Move to workspace
-          </div>
-          {targetWorkspaces.length === 0 ? (
-            <div className="px-2 py-1.5 text-xs text-gray-500">
-              Create another workspace first.
-            </div>
-          ) : (
-            targetWorkspaces.map((workspace) => (
-              <button
-                key={`move-${workspace.id}`}
-                type="button"
-                className="flex w-full items-center rounded px-2 py-1.5 text-left transition-colors hover:bg-black/5 dark:hover:bg-white/10"
-                onClick={() => {
-                  setTabMenu(null);
-                  void assignContentToWorkspace(workspace.id, tabMenuTab.contentId, {
-                    assignmentType: "primary",
-                    scope: tabMenuTab.contentType === "folder" ? "recursive" : "item",
-                    moveFromWorkspaceId: activeWorkspaceId,
-                  });
-                }}
-              >
-                {workspace.name}
-              </button>
-            ))
+          {shellTabMenuSections.map((Section) =>
+            createElement(Section, {
+              key: Section.displayName ?? Section.name,
+              tab: tabMenuTab,
+              closeMenu: () => setTabMenu(null),
+            })
           )}
-          <div className="my-1 h-px bg-black/10 dark:bg-white/10" />
-          <div className="px-2 py-1.5 text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
-            Share permanently
-          </div>
-          {targetWorkspaces.map((workspace) => (
-            <button
-              key={`share-${workspace.id}`}
-              type="button"
-              className="flex w-full items-center rounded px-2 py-1.5 text-left transition-colors hover:bg-black/5 dark:hover:bg-white/10"
-              onClick={() => {
-                setTabMenu(null);
-                void assignContentToWorkspace(workspace.id, tabMenuTab.contentId, {
-                  assignmentType: "shared",
-                  scope: tabMenuTab.contentType === "folder" ? "recursive" : "item",
-                });
-              }}
-            >
-              {workspace.name}
-            </button>
-          ))}
         </div>
       ) : null}
     </>

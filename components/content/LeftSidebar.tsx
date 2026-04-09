@@ -16,12 +16,12 @@ import { LeftSidebarExtensions } from "./content/LeftSidebarExtensions";
 import { FileUploadDialog } from "./dialogs/FileUploadDialog";
 import { useLeftPanelCollapseStore } from "@/state/left-panel-collapse-store";
 import { useLeftPanelViewStore } from "@/state/left-panel-view-store";
-import { getExtensionLeftSidebarPanel } from "@/lib/extensions/client-registry";
+import { useExtensionLeftSidebarPanel } from "@/lib/extensions/client-registry";
 
 export function LeftSidebar() {
   const { mode } = useLeftPanelCollapseStore();
   const { activeView } = useLeftPanelViewStore();
-  const ExtensionPanel = getExtensionLeftSidebarPanel(activeView);
+  const ExtensionPanel = useExtensionLeftSidebarPanel(activeView);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [createTrigger, setCreateTrigger] = useState<{
     type: "folder" | "note" | "docx" | "xlsx" | "json" | "code" | "html" | "external" | "chat" | "visualization" | "data" | "hope" | "workflow";

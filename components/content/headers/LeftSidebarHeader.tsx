@@ -12,7 +12,8 @@ import { useLeftPanelCollapseStore } from "@/state/left-panel-collapse-store";
 import { useLeftPanelViewStore } from "@/state/left-panel-view-store";
 import { LeftSidebarHeaderActions } from "./LeftSidebarHeaderActions";
 import { PanelLeftClose, PanelLeft } from "lucide-react";
-import { getExtensionNavItems, renderExtensionIcon } from "@/lib/extensions";
+import { renderExtensionIcon } from "@/lib/extensions";
+import { useExtensionNavItems } from "@/lib/extensions/client-registry";
 
 interface LeftSidebarHeaderProps {
   onCreateFolder: () => void;
@@ -55,7 +56,7 @@ export function LeftSidebarHeader({
   const { isSearchOpen, toggleSearch } = useSearchStore();
   const { mode, toggleMode } = useLeftPanelCollapseStore();
   const { activeView, setActiveView } = useLeftPanelViewStore();
-  const extensionNavItems = getExtensionNavItems();
+  const extensionNavItems = useExtensionNavItems();
 
   return (
     <div className="flex h-12 shrink-0 items-center justify-between border-b border-white/10 px-4">

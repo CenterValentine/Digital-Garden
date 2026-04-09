@@ -1,2 +1,1 @@
-export * from "./service";
-export * from "./types";
+export * from "@/extensions/workplaces/server";

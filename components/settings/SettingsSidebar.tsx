@@ -11,9 +11,9 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { getSurfaceStyles } from "@/lib/design/system";
 import {
-  getExtensionSettingsEntries,
   renderExtensionIcon,
 } from "@/lib/extensions";
+import { useExtensionSettingsEntries } from "@/lib/extensions/client-registry";
 
 // Inline SVG icons (server-compatible)
 const SettingsIcon = () => (
@@ -205,7 +205,7 @@ const navItems: NavItem[] = [
 export function SettingsSidebar() {
   const pathname = usePathname();
   const glass1 = getSurfaceStyles("glass-1");
-  const extensionSettingsItems: NavItem[] = getExtensionSettingsEntries().map(
+  const extensionSettingsItems: NavItem[] = useExtensionSettingsEntries().map(
     (entry) => ({
       href: entry.path,
       label: entry.label,

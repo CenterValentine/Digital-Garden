@@ -2,12 +2,17 @@ import type { Extensions } from "@tiptap/core";
 import type { ComponentType } from "react";
 import type { ToolDefinition } from "@/lib/domain/tools";
 import type { SlashCommand } from "@/lib/domain/editor/commands/slash-commands";
+import type {
+  WorkspacePaneId,
+  WorkspaceTabState,
+} from "@/state/content-store";
 
 export type ExtensionSurface =
   | "left-sidebar"
   | "main-workspace"
   | "right-sidebar"
-  | "global-dialog";
+  | "global-dialog"
+  | "shell";
 
 export interface ExtensionNavItem {
   view: string;
@@ -37,6 +42,7 @@ export interface ExtensionManifest {
   description?: string;
   iconName: string;
   enabledByDefault: boolean;
+  canDisable?: boolean;
   navItems: ExtensionNavItem[];
   surfaces: ExtensionSurface[];
   settings?: ExtensionSettingsEntry;
@@ -49,11 +55,23 @@ export interface ExtensionManifest {
   editorServerExtensions?: string[];
 }
 
+export interface ExtensionShellNavigationProps {
+  paneId: WorkspacePaneId;
+}
+
+export interface ExtensionShellTabMenuSectionProps {
+  tab: WorkspaceTabState;
+  closeMenu: () => void;
+}
+
 export interface ExtensionRuntime {
   id: string;
   leftSidebarPanel?: ComponentType;
   mainWorkspace?: ComponentType;
   rightSidebarPanel?: ComponentType;
+  shellNavigationControls?: ComponentType<ExtensionShellNavigationProps>[];
+  shellControllers?: ComponentType[];
+  shellTabMenuSections?: ComponentType<ExtensionShellTabMenuSectionProps>[];
   globalDialogs?: ComponentType[];
   settingsDialog?: ComponentType;
   getSlashCommands?: () => SlashCommand[];

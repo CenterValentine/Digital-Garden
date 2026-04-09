@@ -11,13 +11,14 @@ import { Folder, Search, Puzzle } from "lucide-react";
 import { useSearchStore } from "@/state/search-store";
 import { useLeftPanelCollapseStore } from "@/state/left-panel-collapse-store";
 import { useLeftPanelViewStore } from "@/state/left-panel-view-store";
-import { getExtensionNavItems, renderExtensionIcon } from "@/lib/extensions";
+import { renderExtensionIcon } from "@/lib/extensions";
+import { useExtensionNavItems } from "@/lib/extensions/client-registry";
 
 export function LeftSidebarCollapsed() {
   const { isSearchOpen, toggleSearch } = useSearchStore();
   const { setMode } = useLeftPanelCollapseStore();
   const { activeView, setActiveView } = useLeftPanelViewStore();
-  const extensionNavItems = getExtensionNavItems();
+  const extensionNavItems = useExtensionNavItems();
 
   const handleSearchClick = () => {
     // Expand panel and open search

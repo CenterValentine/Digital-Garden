@@ -32,6 +32,12 @@ export function getEnabledExtensionRuntimes(): ExtensionRuntime[] {
     .filter((runtime): runtime is ExtensionRuntime => Boolean(runtime));
 }
 
+export function getAllExtensionRuntimes(): ExtensionRuntime[] {
+  return getAllBuiltInExtensions()
+    .map((extension) => extension.runtime)
+    .filter((runtime): runtime is ExtensionRuntime => Boolean(runtime));
+}
+
 export function getEnabledExtensionServerRuntimes(): ExtensionServerRuntime[] {
   return getEnabledBuiltInExtensions()
     .map((extension) => extension.serverRuntime)

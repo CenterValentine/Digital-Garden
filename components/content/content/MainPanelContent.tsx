@@ -22,7 +22,7 @@ import {
   type WorkspacePaneId,
 } from "@/state/content-store";
 import { useLeftPanelViewStore } from "@/state/left-panel-view-store";
-import { getExtensionMainWorkspace } from "@/lib/extensions/client-registry";
+import { useExtensionMainWorkspace } from "@/lib/extensions/client-registry";
 import { useEditorStatsStore } from "@/state/editor-stats-store";
 import { useOutlineStore } from "@/state/outline-store";
 import { useDebugViewStore } from "@/state/debug-view-store";
@@ -803,7 +803,7 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
   }), [handleImportMarkdown, handleExportMarkdown, handleExportChat, handleCopyLink, handleSaveAsTemplate]);
 
   // Calendar workspace — shown in pane 1 when calendar view is active
-  const ExtensionMainWorkspace = getExtensionMainWorkspace(activeView);
+  const ExtensionMainWorkspace = useExtensionMainWorkspace(activeView);
   if (ExtensionMainWorkspace && paneId === "top-left") {
     return (
       <ToolSurfaceProvider contentType={null} handlers={toolHandlers}>

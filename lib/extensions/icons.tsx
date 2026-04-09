@@ -1,4 +1,5 @@
 import {
+  Briefcase,
   CalendarDays,
   Puzzle,
   type LucideIcon,
@@ -6,6 +7,7 @@ import {
 import type { ReactElement } from "react";
 
 const EXTENSION_ICONS: Record<string, LucideIcon> = {
+  Briefcase,
   CalendarDays,
   Puzzle,
 };

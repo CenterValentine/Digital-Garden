@@ -19,7 +19,7 @@ import { PropertiesPanel } from "../blocks/PropertiesPanel";
 import { useOutlineStore } from "@/state/outline-store";
 import { useContentStore } from "@/state/content-store";
 import { useLeftPanelViewStore } from "@/state/left-panel-view-store";
-import { getExtensionRightSidebarPanel } from "@/lib/extensions/client-registry";
+import { useExtensionRightSidebarPanel } from "@/lib/extensions/client-registry";
 import type { OutlineHeading } from "@/lib/domain/content/outline-extractor";
 import type { ChatOutlineEntry } from "@/lib/domain/ai/chat-outline";
 import type { RightSidebarTab } from "@/state/right-sidebar-state-store";
@@ -36,7 +36,7 @@ export function RightSidebarContent({ activeTab }: RightSidebarContentProps) {
   const setActiveHeadingId = useOutlineStore((state) => state.setActiveHeadingId);
   const selectedContentType = useContentStore((s) => s.selectedContentType);
   const activeView = useLeftPanelViewStore((state) => state.activeView);
-  const ExtensionRightSidebarPanel = getExtensionRightSidebarPanel(activeView);
+  const ExtensionRightSidebarPanel = useExtensionRightSidebarPanel(activeView);
 
   // Handle outline heading click — dispatches a CustomEvent that MarkdownEditor listens for
   const handleHeadingClick = (heading: OutlineHeading) => {
