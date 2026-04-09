@@ -6,8 +6,8 @@
 
 "use client";
 
+import { createElement, useEffect, useState, useCallback, useRef, memo } from "react";
 import type { ComponentType, RefObject } from "react";
-import { useEffect, useState, useCallback, useRef, memo } from "react";
 import {
   ChevronDown,
   ChevronLeft,
@@ -28,6 +28,7 @@ import {
   useNavigationHistoryStore,
 } from "@/state/navigation-history-store";
 import { NavigationHistoryDropdown } from "./NavigationHistoryDropdown";
+import { useExtensionShellNavigationControls } from "@/lib/extensions/client-registry";
 
 const HOLD_THRESHOLD_MS = 250;
 
@@ -97,6 +98,7 @@ export function MainPanelNavigation({ paneId }: MainPanelNavigationProps) {
   const paneContentId = useContentStore((state) => getPaneActiveContentId(state, paneId));
   const setSelectedContentId = useContentStore((state) => state.setSelectedContentId);
   const setLayoutMode = useContentStore((state) => state.setLayoutMode);
+  const shellNavigationControls = useExtensionShellNavigationControls();
 
   const paneHistory = useNavigationHistoryStore((state) =>
     state.byPaneId[paneId] ?? EMPTY_PANE_HISTORY
@@ -239,7 +241,12 @@ export function MainPanelNavigation({ paneId }: MainPanelNavigationProps) {
             onForwardClick={goForward}
             backButtonRef={backButtonRef}
           />
-          <div className="h-4 w-px bg-black/10 dark:bg-white/10" />
+          {shellNavigationControls.map((Control) =>
+            createElement(Control, {
+              key: Control.displayName ?? Control.name,
+              paneId,
+            })
+          )}
           <div className="relative">
             <button
               ref={layoutButtonRef}

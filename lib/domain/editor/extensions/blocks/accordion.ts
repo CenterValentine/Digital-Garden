@@ -14,6 +14,7 @@ import { z } from "zod";
 import { createBlockSchema } from "@/lib/domain/blocks/schema";
 import { registerBlock } from "@/lib/domain/blocks/registry";
 import { useBlockStore } from "@/state/block-store";
+import { useRightPanelCollapseStore } from "@/state/right-panel-collapse-store";
 import { openBlockInsertMenu, syncAttrsToPanel } from "@/lib/domain/blocks/node-view-factory";
 
 const { schema: accordionSchema, defaults: accordionDefaults } =
@@ -27,7 +28,7 @@ const { schema: accordionSchema, defaults: accordionDefaults } =
     showContainer: z
       .boolean()
       .default(false)
-      .describe("Show outer container border"),
+      .describe("Show border"),
     showDivider: z
       .boolean()
       .default(true)
@@ -166,6 +167,7 @@ export const Accordion = Node.create({
         const blockId = currentNode.attrs.blockId || "";
         useBlockStore.getState().setSelectedBlock(blockId, "accordion");
         useBlockStore.getState().openProperties();
+        useRightPanelCollapseStore.getState().setCollapsed(false);
         syncAttrsToPanel(blockId, currentNode.attrs);
       });
       chrome.appendChild(menuBtn);

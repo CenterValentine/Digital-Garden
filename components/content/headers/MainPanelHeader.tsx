@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useRef, useCallback } from "react";
+import { createElement, useEffect, useMemo, useState, useRef, useCallback } from "react";
 import {
   ExternalLink,
   File,
@@ -17,6 +17,7 @@ import {
   useContentStore,
   type WorkspacePaneId,
 } from "@/state/content-store";
+import { useExtensionShellTabMenuSections } from "@/lib/extensions/client-registry";
 
 function getTabIcon(contentType: string | null) {
   switch (contentType) {
@@ -58,9 +59,15 @@ export function MainPanelHeader({
   const activateContentTab = useContentStore((state) => state.activateContentTab);
   const closeContentTab = useContentStore((state) => state.closeContentTab);
   const updateContentTab = useContentStore((state) => state.updateContentTab);
+  const shellTabMenuSections = useExtensionShellTabMenuSections();
 
   const [editingTabId, setEditingTabId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState("");
+  const [tabMenu, setTabMenu] = useState<{
+    tabId: string;
+    x: number;
+    y: number;
+  } | null>(null);
   const renameInputRef = useRef<HTMLInputElement>(null);
 
   const startRename = useCallback((tabId: string, currentTitle: string) => {
@@ -106,6 +113,23 @@ export function MainPanelHeader({
         .filter(Boolean),
     [pane?.tabIds, tabsById]
   );
+  const tabMenuTab = tabMenu ? tabsById[tabMenu.tabId] : null;
+
+  useEffect(() => {
+    if (!tabMenu) return;
+
+    const closeMenu = () => setTabMenu(null);
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") closeMenu();
+    };
+
+    window.addEventListener("click", closeMenu);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("click", closeMenu);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [tabMenu]);
 
   useEffect(() => {
     const pendingTabs = tabs.filter((tab) => tab.title === "Loading...");
@@ -140,52 +164,58 @@ export function MainPanelHeader({
   }, [tabs, updateContentTab]);
 
   return (
-    <div
-      className="flex shrink-0 items-center border-b border-white/10"
-      style={{
-        background: glass1.background,
-        backdropFilter: glass1.backdropFilter,
-      }}
-    >
-      <div className="flex min-w-0 flex-1 items-stretch overflow-x-hidden">
-        {tabs.length === 0 ? (
-          <div className="flex items-center px-3 py-2 text-xs font-medium uppercase tracking-[0.18em] text-gray-500">
-            {getPaneLabel(layoutMode, paneId)}
-          </div>
-        ) : tabs.map((tab) => {
-          const Icon = getTabIcon(tab.contentType);
-          const isActive = tab.id === pane?.activeTabId;
-          const isDragging = draggedTabId === tab.id;
+    <>
+      <div
+        className="flex w-full max-w-full shrink-0 items-center overflow-hidden border-b border-white/10"
+        style={{
+          background: glass1.background,
+          backdropFilter: glass1.backdropFilter,
+        }}
+      >
+        <div className="flex min-w-0 max-w-full flex-1 items-stretch overflow-hidden pr-1">
+          {tabs.length === 0 ? (
+            <div className="flex items-center px-3 py-2 text-xs font-medium uppercase tracking-[0.18em] text-gray-500">
+              {getPaneLabel(layoutMode, paneId)}
+            </div>
+          ) : tabs.map((tab) => {
+            const Icon = getTabIcon(tab.contentType);
+            const isActive = tab.id === pane?.activeTabId;
+            const isDragging = draggedTabId === tab.id;
 
-          return (
-            <div
-              key={tab.id}
-              className={`group flex min-w-0 max-w-64 items-center gap-2 border-r border-white/10 px-3 py-2 text-sm transition-colors ${
-                isActive
-                  ? "-mb-px border-b-2 border-gold-primary bg-black/[0.04] text-gold-primary shadow-[0_1px_2px_rgba(15,23,42,0.04)]"
-                  : "text-gray-600 hover:bg-black/[0.035] hover:text-gray-900"
-              } ${isDragging ? "cursor-grabbing opacity-60" : "cursor-grab"}`}
-              data-pane-id={paneId}
-              draggable
-              onDragStart={(event) => {
-                event.dataTransfer.effectAllowed = "move";
-                event.dataTransfer.setData("text/plain", tab.id);
-                onTabDragStart(tab.id, paneId);
-              }}
-              onDragEnd={onTabDragEnd}
-              onDragOver={(event) => {
-                if (!draggedTabId || draggedTabId === tab.id) return;
-                event.preventDefault();
-                event.dataTransfer.dropEffect = "move";
-              }}
-              onDrop={(event) => {
-                if (!draggedTabId) return;
-                if (draggedTabId === tab.id) return;
-                event.preventDefault();
-                event.stopPropagation();
-                onTabDrop(paneId, tab.id);
-              }}
-            >
+            return (
+              <div
+                key={tab.id}
+                className={`group flex min-w-0 max-w-[14rem] shrink items-center gap-2 overflow-hidden border-r border-white/10 px-3 py-2 text-sm transition-colors ${
+                  isActive
+                    ? "-mb-px border-b-2 border-gold-primary bg-black/[0.04] text-gold-primary shadow-[0_1px_2px_rgba(15,23,42,0.04)]"
+                    : "text-gray-600 hover:bg-black/[0.035] hover:text-gray-900"
+                } ${isDragging ? "cursor-grabbing opacity-60" : "cursor-grab"}`}
+                data-pane-id={paneId}
+                draggable
+                onContextMenu={(event) => {
+                  if (shellTabMenuSections.length === 0) return;
+                  event.preventDefault();
+                  setTabMenu({ tabId: tab.id, x: event.clientX, y: event.clientY });
+                }}
+                onDragStart={(event) => {
+                  event.dataTransfer.effectAllowed = "move";
+                  event.dataTransfer.setData("text/plain", tab.id);
+                  onTabDragStart(tab.id, paneId);
+                }}
+                onDragEnd={onTabDragEnd}
+                onDragOver={(event) => {
+                  if (!draggedTabId || draggedTabId === tab.id) return;
+                  event.preventDefault();
+                  event.dataTransfer.dropEffect = "move";
+                }}
+                onDrop={(event) => {
+                  if (!draggedTabId) return;
+                  if (draggedTabId === tab.id) return;
+                  event.preventDefault();
+                  event.stopPropagation();
+                  onTabDrop(paneId, tab.id);
+                }}
+              >
               {editingTabId === tab.id ? (
                 <input
                   ref={renameInputRef}
@@ -203,7 +233,7 @@ export function MainPanelHeader({
               ) : (
                 <button
                   type="button"
-                  className="flex min-w-0 flex-1 items-center gap-2 text-left"
+                  className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden text-left"
                   onClick={() => activateContentTab(tab.id)}
                   onDoubleClick={(e) => { e.preventDefault(); startRename(tab.id, tab.title); }}
                 >
@@ -234,10 +264,26 @@ export function MainPanelHeader({
                   <X className="h-3 w-3" aria-hidden="true" />
                 </button>
               </span>
-            </div>
-          );
-        })}
+              </div>
+            );
+          })}
+        </div>
       </div>
-    </div>
+      {tabMenu && tabMenuTab ? (
+        <div
+          className="fixed z-50 min-w-56 rounded-md border border-white/10 bg-white/95 p-1 text-sm text-gray-900 shadow-lg backdrop-blur-sm dark:bg-gray-900/95 dark:text-gray-100"
+          style={{ left: tabMenu.x, top: tabMenu.y }}
+          onClick={(event) => event.stopPropagation()}
+        >
+          {shellTabMenuSections.map((Section) =>
+            createElement(Section, {
+              key: Section.displayName ?? Section.name,
+              tab: tabMenuTab,
+              closeMenu: () => setTabMenu(null),
+            })
+          )}
+        </div>
+      ) : null}
+    </>
   );
 }

@@ -253,6 +253,22 @@ The following sprints were originally 38-42 in Epoch 9 but are deferred to Epoch
 - [ ] Preserve expected signed-in `view`/`edit` access when entering through `/share`
 - [ ] Prototype small P2P WebRTC rooms only after Hocuspocus stability gates pass
 
+## Epoch 14: Saved Content Workspaces
+
+**Goal**: Persist named tab/pane workspaces with locked claims, temporary borrowing, permanent sharing, and expiration cleanup.
+**Detailed plan**: [epoch-14-saved-content-workspaces.md](epochs/epoch-14-saved-content-workspaces.md)
+
+### Sprint 65: Workspace Persistence + Claims
+- [ ] DB-backed `ContentWorkspace` and `ContentWorkspaceItem` models
+- [ ] Main Workspace fallback for unassigned/catchall tabs
+- [ ] Workspace selector and settings popup in the main-panel navigation chrome
+- [ ] Per-workspace tab/pane layout persistence and restoration
+- [ ] Locked recursive folder/content claims with conflict reminder
+- [ ] Temporary borrowing with auto-release and permanent sharing
+- [ ] Tab context menu actions to move or share tabs across workspaces
+- [ ] Workspace expiration archive/release flow
+- [ ] Build + smoke gate on port `3014`
+
 ---
 
 ## Future Epochs (Unplanned)

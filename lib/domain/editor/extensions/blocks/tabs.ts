@@ -11,7 +11,7 @@
  * Sprint 44: Layout Blocks (rewritten Sprint 44b)
  */
 
-import { Node, mergeAttributes } from "@tiptap/core";
+import { Node, mergeAttributes, type CommandProps, type RawCommands } from "@tiptap/core";
 import { Plugin, PluginKey, TextSelection } from "@tiptap/pm/state";
 import type { Transaction } from "@tiptap/pm/state";
 import type { Node as ProseMirrorNode } from "@tiptap/pm/model";
@@ -19,6 +19,7 @@ import { z } from "zod";
 import { createBlockSchema } from "@/lib/domain/blocks/schema";
 import { registerBlock } from "@/lib/domain/blocks/registry";
 import { useBlockStore } from "@/state/block-store";
+import { useRightPanelCollapseStore } from "@/state/right-panel-collapse-store";
 import { openBlockInsertMenu, syncAttrsToPanel } from "@/lib/domain/blocks/node-view-factory";
 
 const { schema: tabsSchema, defaults: tabsDefaults } =
@@ -28,7 +29,7 @@ const { schema: tabsSchema, defaults: tabsDefaults } =
       .enum(["underline", "pills", "boxed"])
       .default("underline")
       .describe("Tab header visual style"),
-    showContainer: z.boolean().default(false).describe("Show outer container border"),
+    showContainer: z.boolean().default(false).describe("Show border"),
   });
 
 registerBlock({
@@ -193,7 +194,7 @@ export const Tabs = Node.create({
     return {
       insertTabs:
         (tabLabels: string[] = ["Tab 1", "Tab 2"]) =>
-        ({ commands }: { commands: any }) => {
+        ({ commands }: CommandProps) => {
           const panels = tabLabels.map((label) => ({
             type: "tabPanel",
             attrs: { label },
@@ -206,7 +207,7 @@ export const Tabs = Node.create({
             content: panels,
           });
         },
-    } as any;
+    } as Partial<RawCommands>;
   },
 
   /**
@@ -325,6 +326,7 @@ export const Tabs = Node.create({
         const blockId = currentNode.attrs.blockId || "";
         useBlockStore.getState().setSelectedBlock(blockId, "tabs");
         useBlockStore.getState().openProperties();
+        useRightPanelCollapseStore.getState().setCollapsed(false);
         syncAttrsToPanel(blockId, currentNode.attrs);
       });
       chrome.appendChild(menuBtn);

@@ -11,11 +11,14 @@ import { Folder, Search, Puzzle, Users } from "lucide-react";
 import { useSearchStore } from "@/state/search-store";
 import { useLeftPanelCollapseStore } from "@/state/left-panel-collapse-store";
 import { useLeftPanelViewStore } from "@/state/left-panel-view-store";
+import { renderExtensionIcon } from "@/lib/extensions";
+import { useExtensionNavItems } from "@/lib/extensions/client-registry";
 
 export function LeftSidebarCollapsed() {
   const { isSearchOpen, toggleSearch } = useSearchStore();
   const { setMode } = useLeftPanelCollapseStore();
   const { activeView, setActiveView } = useLeftPanelViewStore();
+  const extensionNavItems = useExtensionNavItems();
 
   const handleSearchClick = () => {
     // Expand panel and open search
@@ -83,7 +86,7 @@ export function LeftSidebarCollapsed() {
         <Search className="h-5 w-5" />
       </button>
 
-      {/* Extensions placeholder */}
+      {/* Extensions app */}
       <button
         onClick={handleExtensionsClick}
         className={`rounded p-2 transition-colors ${
@@ -91,7 +94,7 @@ export function LeftSidebarCollapsed() {
             ? "text-gold-primary bg-white/10"
             : "text-gray-400 hover:bg-white/10 hover:text-gold-primary"
         }`}
-        title="Extensions (Coming Soon)"
+        title="Extensions"
         type="button"
       >
         <Puzzle className="h-5 w-5" />
@@ -110,6 +113,27 @@ export function LeftSidebarCollapsed() {
       >
         <Users className="h-5 w-5" />
       </button>
+      {extensionNavItems.map((item) => {
+        return (
+          <button
+            key={item.view}
+            onClick={() => {
+              setMode("full");
+              setActiveView(item.view);
+              if (isSearchOpen) toggleSearch();
+            }}
+            className={`rounded p-2 transition-colors ${
+              activeView === item.view
+                ? "text-gold-primary bg-white/10"
+                : "text-gray-400 hover:bg-white/10 hover:text-gold-primary"
+            }`}
+            title={item.title ?? item.label}
+            type="button"
+          >
+            {renderExtensionIcon(item.iconName, "h-5 w-5")}
+          </button>
+        );
+      })}
     </div>
   );
 }

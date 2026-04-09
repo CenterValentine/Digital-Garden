@@ -18,6 +18,7 @@ import type { Node as ProseMirrorNode } from "@tiptap/pm/model";
 import type { EditorView } from "@tiptap/pm/view";
 import type { Editor } from "@tiptap/core";
 import { useBlockStore } from "@/state/block-store";
+import { useRightPanelCollapseStore } from "@/state/right-panel-collapse-store";
 import { getAllSlashBlocks, getBlockDefinition } from "./registry";
 import { calculateMenuPosition } from "@/lib/core/menu-positioning";
 
@@ -50,13 +51,15 @@ export interface BlockNodeViewOptions {
   renderContent: (
     node: ProseMirrorNode,
     contentDom: HTMLElement,
-    editor: Editor
+    editor: Editor,
+    getPos?: () => number | undefined
   ) => void;
   /** Update the content area when node attrs change. Return false to force re-render. */
   updateContent?: (
     node: ProseMirrorNode,
     contentDom: HTMLElement,
-    editor: Editor
+    editor: Editor,
+    getPos?: () => number | undefined
   ) => boolean;
   /**
    * If provided, the named attr (boolean) controls whether block-container-hidden
@@ -155,23 +158,34 @@ export function openBlockInsertMenu(
 /** Build TipTap JSON for inserting a new block */
 export function buildBlockInsertJson(blockType: string): Record<string, unknown> {
   const id = crypto.randomUUID();
+  const def = getBlockDefinition(blockType);
+  const baseAttrs = {
+    ...(def?.defaultAttrs ?? {}),
+    blockId: id,
+    blockType,
+  };
   switch (blockType) {
     case "cardPanel":
       return {
         type: "cardPanel",
-        attrs: { blockId: id, blockType: "cardPanel", cardBorder: "subtle", showBackground: true },
+        attrs: { ...baseAttrs, cardBorder: "subtle", showBackground: true },
         content: [{ type: "paragraph" }],
       };
     case "accordion":
       return {
         type: "accordion",
-        attrs: { blockId: id, blockType: "accordion", headerText: "", headerLevel: "2", defaultOpen: true, showContainer: false },
+        attrs: { ...baseAttrs, headerText: "", headerLevel: "2", defaultOpen: true, showContainer: false },
         content: [{ type: "paragraph" }],
       };
     case "columns":
       return {
         type: "columns",
-        attrs: { blockId: id, blockType: "columns", columnCount: 2, gapSize: "medium" },
+        attrs: {
+          ...baseAttrs,
+          columnCount: 2,
+          gapSize: "medium",
+          showContainer: false,
+        },
         content: [
           { type: "column", content: [{ type: "paragraph" }] },
           { type: "column", content: [{ type: "paragraph" }] },
@@ -180,7 +194,12 @@ export function buildBlockInsertJson(blockType: string): Record<string, unknown>
     case "tabs":
       return {
         type: "tabs",
-        attrs: { blockId: id, blockType: "tabs", activeTab: 0, tabStyle: "underline" },
+        attrs: {
+          ...baseAttrs,
+          activeTab: 0,
+          tabStyle: "underline",
+          showContainer: false,
+        },
         content: [
           { type: "tabPanel", attrs: { label: "Tab 1" }, content: [{ type: "paragraph" }] },
           { type: "tabPanel", attrs: { label: "Tab 2" }, content: [{ type: "paragraph" }] },
@@ -189,21 +208,49 @@ export function buildBlockInsertJson(blockType: string): Record<string, unknown>
     case "blockColumns":
       return {
         type: "blockColumns",
-        attrs: { blockId: id, blockType: "blockColumns", columnCount: 2 },
+        attrs: {
+          ...baseAttrs,
+          columnCount: 2,
+          showContainer: false,
+        },
         content: [
           { type: "blockColumn", content: [{ type: "paragraph" }] },
           { type: "blockColumn", content: [{ type: "paragraph" }] },
         ],
       };
+    case "listContainer":
+      return {
+        type: "listContainer",
+        attrs: { ...baseAttrs, listType: "bullet" },
+        content: [
+          {
+            type: "bulletList",
+            content: [
+              {
+                type: "listItem",
+                content: [{ type: "paragraph" }],
+              },
+            ],
+          },
+        ],
+      };
     default: {
-      // Atom blocks have no content children — only include content for non-atoms
-      const def = getBlockDefinition(blockType);
-      if (def?.atom) {
-        return { type: blockType, attrs: { blockId: id, blockType } };
+      if (def?.atom || def?.contentModel === null) {
+        return { type: blockType, attrs: baseAttrs };
+      }
+      if (def?.contentModel === "inline*") {
+        return { type: blockType, attrs: baseAttrs };
+      }
+      if (def?.contentModel?.includes("block")) {
+        return {
+          type: blockType,
+          attrs: baseAttrs,
+          content: [{ type: "paragraph" }],
+        };
       }
       return {
         type: blockType,
-        attrs: { blockId: id, blockType },
+        attrs: baseAttrs,
         content: [{ type: "paragraph" }],
       };
     }
@@ -291,6 +338,7 @@ export function createBlockNodeView(options: BlockNodeViewOptions) {
       const blockId = node.attrs.blockId || "";
       useBlockStore.getState().setSelectedBlock(blockId, options.blockType);
       useBlockStore.getState().openProperties();
+      useRightPanelCollapseStore.getState().setCollapsed(false);
       syncAttrsToPanel(blockId, node.attrs);
     });
     chrome.appendChild(menuBtn);
@@ -326,7 +374,8 @@ export function createBlockNodeView(options: BlockNodeViewOptions) {
     dom.appendChild(contentDom);
 
     // Render block-specific content (may insert siblings via parentElement)
-    options.renderContent(node, contentDom, editor);
+    const getNodePos = typeof getPos === "function" ? getPos : undefined;
+    options.renderContent(node, contentDom, editor, getNodePos);
 
     // --- "+" button BELOW block ---
     const insertBelow = document.createElement("button");
@@ -402,12 +451,13 @@ export function createBlockNodeView(options: BlockNodeViewOptions) {
           const handled = options.updateContent(
             updatedNode,
             contentDom,
-            editor
+            editor,
+            getNodePos
           );
           if (!handled) {
             // Re-render from scratch if update returns false
             contentDom.innerHTML = "";
-            options.renderContent(updatedNode, contentDom, editor);
+            options.renderContent(updatedNode, contentDom, editor, getNodePos);
           }
         }
 

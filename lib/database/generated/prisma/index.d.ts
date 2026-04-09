@@ -79,6 +79,16 @@ export type AIProviderKey = $Result.DefaultSelection<Prisma.$AIProviderKeyPayloa
  */
 export type User = $Result.DefaultSelection<Prisma.$UserPayload>
 /**
+ * Model ContentWorkspace
+ *
+ */
+export type ContentWorkspace = $Result.DefaultSelection<Prisma.$ContentWorkspacePayload>
+/**
+ * Model ContentWorkspaceItem
+ *
+ */
+export type ContentWorkspaceItem = $Result.DefaultSelection<Prisma.$ContentWorkspaceItemPayload>
+/**
  * Model Category
  *
  */
@@ -251,6 +261,31 @@ export const FolderViewMode: {
 export type FolderViewMode = (typeof FolderViewMode)[keyof typeof FolderViewMode]
 
 
+export const ContentWorkspaceStatus: {
+  active: 'active',
+  archived: 'archived'
+};
+
+export type ContentWorkspaceStatus = (typeof ContentWorkspaceStatus)[keyof typeof ContentWorkspaceStatus]
+
+
+export const ContentWorkspaceItemAssignmentType: {
+  primary: 'primary',
+  shared: 'shared',
+  borrowed: 'borrowed'
+};
+
+export type ContentWorkspaceItemAssignmentType = (typeof ContentWorkspaceItemAssignmentType)[keyof typeof ContentWorkspaceItemAssignmentType]
+
+
+export const ContentWorkspaceItemScope: {
+  item: 'item',
+  recursive: 'recursive'
+};
+
+export type ContentWorkspaceItemScope = (typeof ContentWorkspaceItemScope)[keyof typeof ContentWorkspaceItemScope]
+
+
 export const UserRole: {
   owner: 'owner',
   admin: 'admin',
@@ -301,6 +336,18 @@ export const ContentRole: typeof $Enums.ContentRole
 export type FolderViewMode = $Enums.FolderViewMode
 
 export const FolderViewMode: typeof $Enums.FolderViewMode
+
+export type ContentWorkspaceStatus = $Enums.ContentWorkspaceStatus
+
+export const ContentWorkspaceStatus: typeof $Enums.ContentWorkspaceStatus
+
+export type ContentWorkspaceItemAssignmentType = $Enums.ContentWorkspaceItemAssignmentType
+
+export const ContentWorkspaceItemAssignmentType: typeof $Enums.ContentWorkspaceItemAssignmentType
+
+export type ContentWorkspaceItemScope = $Enums.ContentWorkspaceItemScope
+
+export const ContentWorkspaceItemScope: typeof $Enums.ContentWorkspaceItemScope
 
 export type UserRole = $Enums.UserRole
 
@@ -564,6 +611,26 @@ export class PrismaClient<
     * ```
     */
   get user(): Prisma.UserDelegate<ExtArgs, ClientOptions>;
+
+  /**
+   * `prisma.contentWorkspace`: Exposes CRUD operations for the **ContentWorkspace** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more ContentWorkspaces
+    * const contentWorkspaces = await prisma.contentWorkspace.findMany()
+    * ```
+    */
+  get contentWorkspace(): Prisma.ContentWorkspaceDelegate<ExtArgs, ClientOptions>;
+
+  /**
+   * `prisma.contentWorkspaceItem`: Exposes CRUD operations for the **ContentWorkspaceItem** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more ContentWorkspaceItems
+    * const contentWorkspaceItems = await prisma.contentWorkspaceItem.findMany()
+    * ```
+    */
+  get contentWorkspaceItem(): Prisma.ContentWorkspaceItemDelegate<ExtArgs, ClientOptions>;
 
   /**
    * `prisma.category`: Exposes CRUD operations for the **Category** model.
@@ -1271,6 +1338,8 @@ export namespace Prisma {
     StorageProviderConfig: 'StorageProviderConfig',
     AIProviderKey: 'AIProviderKey',
     User: 'User',
+    ContentWorkspace: 'ContentWorkspace',
+    ContentWorkspaceItem: 'ContentWorkspaceItem',
     Category: 'Category',
     Tag: 'Tag',
     ViewGrant: 'ViewGrant',
@@ -1312,7 +1381,7 @@ export namespace Prisma {
       omit: GlobalOmitOptions
     }
     meta: {
-      modelProps: "contentNode" | "notePayload" | "filePayload" | "htmlPayload" | "codePayload" | "contentHistory" | "contentPath" | "contentLink" | "contentTag" | "trashBin" | "storageProviderConfig" | "aIProviderKey" | "user" | "category" | "tag" | "viewGrant" | "peopleGroup" | "person" | "peopleFileTreeMount" | "personMention" | "session" | "account" | "auditLog" | "folderPayload" | "externalPayload" | "chatPayload" | "visualizationPayload" | "dataPayload" | "hopePayload" | "workflowPayload" | "reusableCategory" | "savedBlock" | "contentTemplate" | "snippet" | "pageTemplate" | "calendarConnection" | "calendarSource" | "calendarEvent" | "calendarEventAttendee"
+      modelProps: "contentNode" | "notePayload" | "filePayload" | "htmlPayload" | "codePayload" | "contentHistory" | "contentPath" | "contentLink" | "contentTag" | "trashBin" | "storageProviderConfig" | "aIProviderKey" | "user" | "contentWorkspace" | "contentWorkspaceItem" | "category" | "tag" | "viewGrant" | "peopleGroup" | "person" | "peopleFileTreeMount" | "personMention" | "session" | "account" | "auditLog" | "folderPayload" | "externalPayload" | "chatPayload" | "visualizationPayload" | "dataPayload" | "hopePayload" | "workflowPayload" | "reusableCategory" | "savedBlock" | "contentTemplate" | "snippet" | "pageTemplate" | "calendarConnection" | "calendarSource" | "calendarEvent" | "calendarEventAttendee"
       txIsolationLevel: Prisma.TransactionIsolationLevel
     }
     model: {
@@ -2275,6 +2344,154 @@ export namespace Prisma {
           count: {
             args: Prisma.UserCountArgs<ExtArgs>
             result: $Utils.Optional<UserCountAggregateOutputType> | number
+          }
+        }
+      }
+      ContentWorkspace: {
+        payload: Prisma.$ContentWorkspacePayload<ExtArgs>
+        fields: Prisma.ContentWorkspaceFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.ContentWorkspaceFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ContentWorkspacePayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.ContentWorkspaceFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ContentWorkspacePayload>
+          }
+          findFirst: {
+            args: Prisma.ContentWorkspaceFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ContentWorkspacePayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.ContentWorkspaceFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ContentWorkspacePayload>
+          }
+          findMany: {
+            args: Prisma.ContentWorkspaceFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ContentWorkspacePayload>[]
+          }
+          create: {
+            args: Prisma.ContentWorkspaceCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ContentWorkspacePayload>
+          }
+          createMany: {
+            args: Prisma.ContentWorkspaceCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          createManyAndReturn: {
+            args: Prisma.ContentWorkspaceCreateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ContentWorkspacePayload>[]
+          }
+          delete: {
+            args: Prisma.ContentWorkspaceDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ContentWorkspacePayload>
+          }
+          update: {
+            args: Prisma.ContentWorkspaceUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ContentWorkspacePayload>
+          }
+          deleteMany: {
+            args: Prisma.ContentWorkspaceDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.ContentWorkspaceUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateManyAndReturn: {
+            args: Prisma.ContentWorkspaceUpdateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ContentWorkspacePayload>[]
+          }
+          upsert: {
+            args: Prisma.ContentWorkspaceUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ContentWorkspacePayload>
+          }
+          aggregate: {
+            args: Prisma.ContentWorkspaceAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregateContentWorkspace>
+          }
+          groupBy: {
+            args: Prisma.ContentWorkspaceGroupByArgs<ExtArgs>
+            result: $Utils.Optional<ContentWorkspaceGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.ContentWorkspaceCountArgs<ExtArgs>
+            result: $Utils.Optional<ContentWorkspaceCountAggregateOutputType> | number
+          }
+        }
+      }
+      ContentWorkspaceItem: {
+        payload: Prisma.$ContentWorkspaceItemPayload<ExtArgs>
+        fields: Prisma.ContentWorkspaceItemFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.ContentWorkspaceItemFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ContentWorkspaceItemPayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.ContentWorkspaceItemFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ContentWorkspaceItemPayload>
+          }
+          findFirst: {
+            args: Prisma.ContentWorkspaceItemFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ContentWorkspaceItemPayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.ContentWorkspaceItemFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ContentWorkspaceItemPayload>
+          }
+          findMany: {
+            args: Prisma.ContentWorkspaceItemFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ContentWorkspaceItemPayload>[]
+          }
+          create: {
+            args: Prisma.ContentWorkspaceItemCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ContentWorkspaceItemPayload>
+          }
+          createMany: {
+            args: Prisma.ContentWorkspaceItemCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          createManyAndReturn: {
+            args: Prisma.ContentWorkspaceItemCreateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ContentWorkspaceItemPayload>[]
+          }
+          delete: {
+            args: Prisma.ContentWorkspaceItemDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ContentWorkspaceItemPayload>
+          }
+          update: {
+            args: Prisma.ContentWorkspaceItemUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ContentWorkspaceItemPayload>
+          }
+          deleteMany: {
+            args: Prisma.ContentWorkspaceItemDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.ContentWorkspaceItemUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateManyAndReturn: {
+            args: Prisma.ContentWorkspaceItemUpdateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ContentWorkspaceItemPayload>[]
+          }
+          upsert: {
+            args: Prisma.ContentWorkspaceItemUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ContentWorkspaceItemPayload>
+          }
+          aggregate: {
+            args: Prisma.ContentWorkspaceItemAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregateContentWorkspaceItem>
+          }
+          groupBy: {
+            args: Prisma.ContentWorkspaceItemGroupByArgs<ExtArgs>
+            result: $Utils.Optional<ContentWorkspaceItemGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.ContentWorkspaceItemCountArgs<ExtArgs>
+            result: $Utils.Optional<ContentWorkspaceItemCountAggregateOutputType> | number
           }
         }
       }
@@ -4323,6 +4540,8 @@ export namespace Prisma {
     storageProviderConfig?: StorageProviderConfigOmit
     aIProviderKey?: AIProviderKeyOmit
     user?: UserOmit
+    contentWorkspace?: ContentWorkspaceOmit
+    contentWorkspaceItem?: ContentWorkspaceItemOmit
     category?: CategoryOmit
     tag?: TagOmit
     viewGrant?: ViewGrantOmit
@@ -4439,6 +4658,7 @@ export namespace Prisma {
     personMentions: number
     viewGrants: number
     calendarEvents: number
+    workspaceItems: number
   }
 
   export type ContentNodeCountOutputTypeSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
@@ -4452,6 +4672,7 @@ export namespace Prisma {
     personMentions?: boolean | ContentNodeCountOutputTypeCountPersonMentionsArgs
     viewGrants?: boolean | ContentNodeCountOutputTypeCountViewGrantsArgs
     calendarEvents?: boolean | ContentNodeCountOutputTypeCountCalendarEventsArgs
+    workspaceItems?: boolean | ContentNodeCountOutputTypeCountWorkspaceItemsArgs
   }
 
   // Custom InputTypes
@@ -4535,6 +4756,13 @@ export namespace Prisma {
     where?: CalendarEventWhereInput
   }
 
+  /**
+   * ContentNodeCountOutputType without action
+   */
+  export type ContentNodeCountOutputTypeCountWorkspaceItemsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: ContentWorkspaceItemWhereInput
+  }
+
 
   /**
    * Count Type UserCountOutputType
@@ -4566,6 +4794,7 @@ export namespace Prisma {
     calendarConnections: number
     calendarSources: number
     calendarEvents: number
+    contentWorkspaces: number
   }
 
   export type UserCountOutputTypeSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
@@ -4594,6 +4823,7 @@ export namespace Prisma {
     calendarConnections?: boolean | UserCountOutputTypeCountCalendarConnectionsArgs
     calendarSources?: boolean | UserCountOutputTypeCountCalendarSourcesArgs
     calendarEvents?: boolean | UserCountOutputTypeCountCalendarEventsArgs
+    contentWorkspaces?: boolean | UserCountOutputTypeCountContentWorkspacesArgs
   }
 
   // Custom InputTypes
@@ -4780,6 +5010,44 @@ export namespace Prisma {
    */
   export type UserCountOutputTypeCountCalendarEventsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     where?: CalendarEventWhereInput
+  }
+
+  /**
+   * UserCountOutputType without action
+   */
+  export type UserCountOutputTypeCountContentWorkspacesArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: ContentWorkspaceWhereInput
+  }
+
+
+  /**
+   * Count Type ContentWorkspaceCountOutputType
+   */
+
+  export type ContentWorkspaceCountOutputType = {
+    items: number
+  }
+
+  export type ContentWorkspaceCountOutputTypeSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    items?: boolean | ContentWorkspaceCountOutputTypeCountItemsArgs
+  }
+
+  // Custom InputTypes
+  /**
+   * ContentWorkspaceCountOutputType without action
+   */
+  export type ContentWorkspaceCountOutputTypeDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ContentWorkspaceCountOutputType
+     */
+    select?: ContentWorkspaceCountOutputTypeSelect<ExtArgs> | null
+  }
+
+  /**
+   * ContentWorkspaceCountOutputType without action
+   */
+  export type ContentWorkspaceCountOutputTypeCountItemsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: ContentWorkspaceItemWhereInput
   }
 
 
@@ -5446,6 +5714,7 @@ export namespace Prisma {
     trashBinEntry?: boolean | ContentNode$trashBinEntryArgs<ExtArgs>
     viewGrants?: boolean | ContentNode$viewGrantsArgs<ExtArgs>
     calendarEvents?: boolean | ContentNode$calendarEventsArgs<ExtArgs>
+    workspaceItems?: boolean | ContentNode$workspaceItemsArgs<ExtArgs>
     _count?: boolean | ContentNodeCountOutputTypeDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["contentNode"]>
 
@@ -5552,6 +5821,7 @@ export namespace Prisma {
     trashBinEntry?: boolean | ContentNode$trashBinEntryArgs<ExtArgs>
     viewGrants?: boolean | ContentNode$viewGrantsArgs<ExtArgs>
     calendarEvents?: boolean | ContentNode$calendarEventsArgs<ExtArgs>
+    workspaceItems?: boolean | ContentNode$workspaceItemsArgs<ExtArgs>
     _count?: boolean | ContentNodeCountOutputTypeDefaultArgs<ExtArgs>
   }
   export type ContentNodeIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
@@ -5600,6 +5870,7 @@ export namespace Prisma {
       trashBinEntry: Prisma.$TrashBinPayload<ExtArgs> | null
       viewGrants: Prisma.$ViewGrantPayload<ExtArgs>[]
       calendarEvents: Prisma.$CalendarEventPayload<ExtArgs>[]
+      workspaceItems: Prisma.$ContentWorkspaceItemPayload<ExtArgs>[]
     }
     scalars: $Extensions.GetPayloadResult<{
       id: string
@@ -6042,6 +6313,7 @@ export namespace Prisma {
     trashBinEntry<T extends ContentNode$trashBinEntryArgs<ExtArgs> = {}>(args?: Subset<T, ContentNode$trashBinEntryArgs<ExtArgs>>): Prisma__TrashBinClient<$Result.GetResult<Prisma.$TrashBinPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
     viewGrants<T extends ContentNode$viewGrantsArgs<ExtArgs> = {}>(args?: Subset<T, ContentNode$viewGrantsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ViewGrantPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     calendarEvents<T extends ContentNode$calendarEventsArgs<ExtArgs> = {}>(args?: Subset<T, ContentNode$calendarEventsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$CalendarEventPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+    workspaceItems<T extends ContentNode$workspaceItemsArgs<ExtArgs> = {}>(args?: Subset<T, ContentNode$workspaceItemsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ContentWorkspaceItemPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     /**
      * Attaches callbacks for the resolution and/or rejection of the Promise.
      * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -7045,6 +7317,30 @@ export namespace Prisma {
     take?: number
     skip?: number
     distinct?: CalendarEventScalarFieldEnum | CalendarEventScalarFieldEnum[]
+  }
+
+  /**
+   * ContentNode.workspaceItems
+   */
+  export type ContentNode$workspaceItemsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ContentWorkspaceItem
+     */
+    select?: ContentWorkspaceItemSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ContentWorkspaceItem
+     */
+    omit?: ContentWorkspaceItemOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ContentWorkspaceItemInclude<ExtArgs> | null
+    where?: ContentWorkspaceItemWhereInput
+    orderBy?: ContentWorkspaceItemOrderByWithRelationInput | ContentWorkspaceItemOrderByWithRelationInput[]
+    cursor?: ContentWorkspaceItemWhereUniqueInput
+    take?: number
+    skip?: number
+    distinct?: ContentWorkspaceItemScalarFieldEnum | ContentWorkspaceItemScalarFieldEnum[]
   }
 
   /**
@@ -19577,6 +19873,7 @@ export namespace Prisma {
     calendarConnections?: boolean | User$calendarConnectionsArgs<ExtArgs>
     calendarSources?: boolean | User$calendarSourcesArgs<ExtArgs>
     calendarEvents?: boolean | User$calendarEventsArgs<ExtArgs>
+    contentWorkspaces?: boolean | User$contentWorkspacesArgs<ExtArgs>
     _count?: boolean | UserCountOutputTypeDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["user"]>
 
@@ -19643,6 +19940,7 @@ export namespace Prisma {
     calendarConnections?: boolean | User$calendarConnectionsArgs<ExtArgs>
     calendarSources?: boolean | User$calendarSourcesArgs<ExtArgs>
     calendarEvents?: boolean | User$calendarEventsArgs<ExtArgs>
+    contentWorkspaces?: boolean | User$contentWorkspacesArgs<ExtArgs>
     _count?: boolean | UserCountOutputTypeDefaultArgs<ExtArgs>
   }
   export type UserIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {}
@@ -19676,6 +19974,7 @@ export namespace Prisma {
       calendarConnections: Prisma.$CalendarConnectionPayload<ExtArgs>[]
       calendarSources: Prisma.$CalendarSourcePayload<ExtArgs>[]
       calendarEvents: Prisma.$CalendarEventPayload<ExtArgs>[]
+      contentWorkspaces: Prisma.$ContentWorkspacePayload<ExtArgs>[]
     }
     scalars: $Extensions.GetPayloadResult<{
       id: string
@@ -20106,6 +20405,7 @@ export namespace Prisma {
     calendarConnections<T extends User$calendarConnectionsArgs<ExtArgs> = {}>(args?: Subset<T, User$calendarConnectionsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$CalendarConnectionPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     calendarSources<T extends User$calendarSourcesArgs<ExtArgs> = {}>(args?: Subset<T, User$calendarSourcesArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$CalendarSourcePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     calendarEvents<T extends User$calendarEventsArgs<ExtArgs> = {}>(args?: Subset<T, User$calendarEventsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$CalendarEventPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+    contentWorkspaces<T extends User$contentWorkspacesArgs<ExtArgs> = {}>(args?: Subset<T, User$contentWorkspacesArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ContentWorkspacePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     /**
      * Attaches callbacks for the resolution and/or rejection of the Promise.
      * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -21132,6 +21432,30 @@ export namespace Prisma {
   }
 
   /**
+   * User.contentWorkspaces
+   */
+  export type User$contentWorkspacesArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ContentWorkspace
+     */
+    select?: ContentWorkspaceSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ContentWorkspace
+     */
+    omit?: ContentWorkspaceOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ContentWorkspaceInclude<ExtArgs> | null
+    where?: ContentWorkspaceWhereInput
+    orderBy?: ContentWorkspaceOrderByWithRelationInput | ContentWorkspaceOrderByWithRelationInput[]
+    cursor?: ContentWorkspaceWhereUniqueInput
+    take?: number
+    skip?: number
+    distinct?: ContentWorkspaceScalarFieldEnum | ContentWorkspaceScalarFieldEnum[]
+  }
+
+  /**
    * User without action
    */
   export type UserDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
@@ -21147,6 +21471,2321 @@ export namespace Prisma {
      * Choose, which related nodes to fetch as well
      */
     include?: UserInclude<ExtArgs> | null
+  }
+
+
+  /**
+   * Model ContentWorkspace
+   */
+
+  export type AggregateContentWorkspace = {
+    _count: ContentWorkspaceCountAggregateOutputType | null
+    _min: ContentWorkspaceMinAggregateOutputType | null
+    _max: ContentWorkspaceMaxAggregateOutputType | null
+  }
+
+  export type ContentWorkspaceMinAggregateOutputType = {
+    id: string | null
+    ownerId: string | null
+    name: string | null
+    slug: string | null
+    isMain: boolean | null
+    isLocked: boolean | null
+    status: $Enums.ContentWorkspaceStatus | null
+    expiresAt: Date | null
+    archivedAt: Date | null
+    layoutMode: string | null
+    activePaneId: string | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type ContentWorkspaceMaxAggregateOutputType = {
+    id: string | null
+    ownerId: string | null
+    name: string | null
+    slug: string | null
+    isMain: boolean | null
+    isLocked: boolean | null
+    status: $Enums.ContentWorkspaceStatus | null
+    expiresAt: Date | null
+    archivedAt: Date | null
+    layoutMode: string | null
+    activePaneId: string | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type ContentWorkspaceCountAggregateOutputType = {
+    id: number
+    ownerId: number
+    name: number
+    slug: number
+    isMain: number
+    isLocked: number
+    status: number
+    expiresAt: number
+    archivedAt: number
+    layoutMode: number
+    activePaneId: number
+    paneState: number
+    settings: number
+    createdAt: number
+    updatedAt: number
+    _all: number
+  }
+
+
+  export type ContentWorkspaceMinAggregateInputType = {
+    id?: true
+    ownerId?: true
+    name?: true
+    slug?: true
+    isMain?: true
+    isLocked?: true
+    status?: true
+    expiresAt?: true
+    archivedAt?: true
+    layoutMode?: true
+    activePaneId?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type ContentWorkspaceMaxAggregateInputType = {
+    id?: true
+    ownerId?: true
+    name?: true
+    slug?: true
+    isMain?: true
+    isLocked?: true
+    status?: true
+    expiresAt?: true
+    archivedAt?: true
+    layoutMode?: true
+    activePaneId?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type ContentWorkspaceCountAggregateInputType = {
+    id?: true
+    ownerId?: true
+    name?: true
+    slug?: true
+    isMain?: true
+    isLocked?: true
+    status?: true
+    expiresAt?: true
+    archivedAt?: true
+    layoutMode?: true
+    activePaneId?: true
+    paneState?: true
+    settings?: true
+    createdAt?: true
+    updatedAt?: true
+    _all?: true
+  }
+
+  export type ContentWorkspaceAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which ContentWorkspace to aggregate.
+     */
+    where?: ContentWorkspaceWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     *
+     * Determine the order of ContentWorkspaces to fetch.
+     */
+    orderBy?: ContentWorkspaceOrderByWithRelationInput | ContentWorkspaceOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     *
+     * Sets the start position
+     */
+    cursor?: ContentWorkspaceWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     *
+     * Take `±n` ContentWorkspaces from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     *
+     * Skip the first `n` ContentWorkspaces.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     *
+     * Count returned ContentWorkspaces
+    **/
+    _count?: true | ContentWorkspaceCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     *
+     * Select which fields to find the minimum value
+    **/
+    _min?: ContentWorkspaceMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     *
+     * Select which fields to find the maximum value
+    **/
+    _max?: ContentWorkspaceMaxAggregateInputType
+  }
+
+  export type GetContentWorkspaceAggregateType<T extends ContentWorkspaceAggregateArgs> = {
+        [P in keyof T & keyof AggregateContentWorkspace]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateContentWorkspace[P]>
+      : GetScalarType<T[P], AggregateContentWorkspace[P]>
+  }
+
+
+
+
+  export type ContentWorkspaceGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: ContentWorkspaceWhereInput
+    orderBy?: ContentWorkspaceOrderByWithAggregationInput | ContentWorkspaceOrderByWithAggregationInput[]
+    by: ContentWorkspaceScalarFieldEnum[] | ContentWorkspaceScalarFieldEnum
+    having?: ContentWorkspaceScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: ContentWorkspaceCountAggregateInputType | true
+    _min?: ContentWorkspaceMinAggregateInputType
+    _max?: ContentWorkspaceMaxAggregateInputType
+  }
+
+  export type ContentWorkspaceGroupByOutputType = {
+    id: string
+    ownerId: string
+    name: string
+    slug: string
+    isMain: boolean
+    isLocked: boolean
+    status: $Enums.ContentWorkspaceStatus
+    expiresAt: Date | null
+    archivedAt: Date | null
+    layoutMode: string
+    activePaneId: string
+    paneState: JsonValue
+    settings: JsonValue
+    createdAt: Date
+    updatedAt: Date
+    _count: ContentWorkspaceCountAggregateOutputType | null
+    _min: ContentWorkspaceMinAggregateOutputType | null
+    _max: ContentWorkspaceMaxAggregateOutputType | null
+  }
+
+  type GetContentWorkspaceGroupByPayload<T extends ContentWorkspaceGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<ContentWorkspaceGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof ContentWorkspaceGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], ContentWorkspaceGroupByOutputType[P]>
+            : GetScalarType<T[P], ContentWorkspaceGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type ContentWorkspaceSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    ownerId?: boolean
+    name?: boolean
+    slug?: boolean
+    isMain?: boolean
+    isLocked?: boolean
+    status?: boolean
+    expiresAt?: boolean
+    archivedAt?: boolean
+    layoutMode?: boolean
+    activePaneId?: boolean
+    paneState?: boolean
+    settings?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    owner?: boolean | UserDefaultArgs<ExtArgs>
+    items?: boolean | ContentWorkspace$itemsArgs<ExtArgs>
+    _count?: boolean | ContentWorkspaceCountOutputTypeDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["contentWorkspace"]>
+
+  export type ContentWorkspaceSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    ownerId?: boolean
+    name?: boolean
+    slug?: boolean
+    isMain?: boolean
+    isLocked?: boolean
+    status?: boolean
+    expiresAt?: boolean
+    archivedAt?: boolean
+    layoutMode?: boolean
+    activePaneId?: boolean
+    paneState?: boolean
+    settings?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    owner?: boolean | UserDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["contentWorkspace"]>
+
+  export type ContentWorkspaceSelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    ownerId?: boolean
+    name?: boolean
+    slug?: boolean
+    isMain?: boolean
+    isLocked?: boolean
+    status?: boolean
+    expiresAt?: boolean
+    archivedAt?: boolean
+    layoutMode?: boolean
+    activePaneId?: boolean
+    paneState?: boolean
+    settings?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    owner?: boolean | UserDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["contentWorkspace"]>
+
+  export type ContentWorkspaceSelectScalar = {
+    id?: boolean
+    ownerId?: boolean
+    name?: boolean
+    slug?: boolean
+    isMain?: boolean
+    isLocked?: boolean
+    status?: boolean
+    expiresAt?: boolean
+    archivedAt?: boolean
+    layoutMode?: boolean
+    activePaneId?: boolean
+    paneState?: boolean
+    settings?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+  }
+
+  export type ContentWorkspaceOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "ownerId" | "name" | "slug" | "isMain" | "isLocked" | "status" | "expiresAt" | "archivedAt" | "layoutMode" | "activePaneId" | "paneState" | "settings" | "createdAt" | "updatedAt", ExtArgs["result"]["contentWorkspace"]>
+  export type ContentWorkspaceInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    owner?: boolean | UserDefaultArgs<ExtArgs>
+    items?: boolean | ContentWorkspace$itemsArgs<ExtArgs>
+    _count?: boolean | ContentWorkspaceCountOutputTypeDefaultArgs<ExtArgs>
+  }
+  export type ContentWorkspaceIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    owner?: boolean | UserDefaultArgs<ExtArgs>
+  }
+  export type ContentWorkspaceIncludeUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    owner?: boolean | UserDefaultArgs<ExtArgs>
+  }
+
+  export type $ContentWorkspacePayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "ContentWorkspace"
+    objects: {
+      owner: Prisma.$UserPayload<ExtArgs>
+      items: Prisma.$ContentWorkspaceItemPayload<ExtArgs>[]
+    }
+    scalars: $Extensions.GetPayloadResult<{
+      id: string
+      ownerId: string
+      name: string
+      slug: string
+      isMain: boolean
+      isLocked: boolean
+      status: $Enums.ContentWorkspaceStatus
+      expiresAt: Date | null
+      archivedAt: Date | null
+      layoutMode: string
+      activePaneId: string
+      paneState: Prisma.JsonValue
+      settings: Prisma.JsonValue
+      createdAt: Date
+      updatedAt: Date
+    }, ExtArgs["result"]["contentWorkspace"]>
+    composites: {}
+  }
+
+  type ContentWorkspaceGetPayload<S extends boolean | null | undefined | ContentWorkspaceDefaultArgs> = $Result.GetResult<Prisma.$ContentWorkspacePayload, S>
+
+  type ContentWorkspaceCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> =
+    Omit<ContentWorkspaceFindManyArgs, 'select' | 'include' | 'distinct' | 'omit'> & {
+      select?: ContentWorkspaceCountAggregateInputType | true
+    }
+
+  export interface ContentWorkspaceDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['ContentWorkspace'], meta: { name: 'ContentWorkspace' } }
+    /**
+     * Find zero or one ContentWorkspace that matches the filter.
+     * @param {ContentWorkspaceFindUniqueArgs} args - Arguments to find a ContentWorkspace
+     * @example
+     * // Get one ContentWorkspace
+     * const contentWorkspace = await prisma.contentWorkspace.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends ContentWorkspaceFindUniqueArgs>(args: SelectSubset<T, ContentWorkspaceFindUniqueArgs<ExtArgs>>): Prisma__ContentWorkspaceClient<$Result.GetResult<Prisma.$ContentWorkspacePayload<ExtArgs>, T, "findUnique", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find one ContentWorkspace that matches the filter or throw an error with `error.code='P2025'`
+     * if no matches were found.
+     * @param {ContentWorkspaceFindUniqueOrThrowArgs} args - Arguments to find a ContentWorkspace
+     * @example
+     * // Get one ContentWorkspace
+     * const contentWorkspace = await prisma.contentWorkspace.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends ContentWorkspaceFindUniqueOrThrowArgs>(args: SelectSubset<T, ContentWorkspaceFindUniqueOrThrowArgs<ExtArgs>>): Prisma__ContentWorkspaceClient<$Result.GetResult<Prisma.$ContentWorkspacePayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first ContentWorkspace that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ContentWorkspaceFindFirstArgs} args - Arguments to find a ContentWorkspace
+     * @example
+     * // Get one ContentWorkspace
+     * const contentWorkspace = await prisma.contentWorkspace.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends ContentWorkspaceFindFirstArgs>(args?: SelectSubset<T, ContentWorkspaceFindFirstArgs<ExtArgs>>): Prisma__ContentWorkspaceClient<$Result.GetResult<Prisma.$ContentWorkspacePayload<ExtArgs>, T, "findFirst", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first ContentWorkspace that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ContentWorkspaceFindFirstOrThrowArgs} args - Arguments to find a ContentWorkspace
+     * @example
+     * // Get one ContentWorkspace
+     * const contentWorkspace = await prisma.contentWorkspace.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends ContentWorkspaceFindFirstOrThrowArgs>(args?: SelectSubset<T, ContentWorkspaceFindFirstOrThrowArgs<ExtArgs>>): Prisma__ContentWorkspaceClient<$Result.GetResult<Prisma.$ContentWorkspacePayload<ExtArgs>, T, "findFirstOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find zero or more ContentWorkspaces that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ContentWorkspaceFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all ContentWorkspaces
+     * const contentWorkspaces = await prisma.contentWorkspace.findMany()
+     *
+     * // Get first 10 ContentWorkspaces
+     * const contentWorkspaces = await prisma.contentWorkspace.findMany({ take: 10 })
+     *
+     * // Only select the `id`
+     * const contentWorkspaceWithIdOnly = await prisma.contentWorkspace.findMany({ select: { id: true } })
+     *
+     */
+    findMany<T extends ContentWorkspaceFindManyArgs>(args?: SelectSubset<T, ContentWorkspaceFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ContentWorkspacePayload<ExtArgs>, T, "findMany", GlobalOmitOptions>>
+
+    /**
+     * Create a ContentWorkspace.
+     * @param {ContentWorkspaceCreateArgs} args - Arguments to create a ContentWorkspace.
+     * @example
+     * // Create one ContentWorkspace
+     * const ContentWorkspace = await prisma.contentWorkspace.create({
+     *   data: {
+     *     // ... data to create a ContentWorkspace
+     *   }
+     * })
+     *
+     */
+    create<T extends ContentWorkspaceCreateArgs>(args: SelectSubset<T, ContentWorkspaceCreateArgs<ExtArgs>>): Prisma__ContentWorkspaceClient<$Result.GetResult<Prisma.$ContentWorkspacePayload<ExtArgs>, T, "create", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Create many ContentWorkspaces.
+     * @param {ContentWorkspaceCreateManyArgs} args - Arguments to create many ContentWorkspaces.
+     * @example
+     * // Create many ContentWorkspaces
+     * const contentWorkspace = await prisma.contentWorkspace.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *
+     */
+    createMany<T extends ContentWorkspaceCreateManyArgs>(args?: SelectSubset<T, ContentWorkspaceCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create many ContentWorkspaces and returns the data saved in the database.
+     * @param {ContentWorkspaceCreateManyAndReturnArgs} args - Arguments to create many ContentWorkspaces.
+     * @example
+     * // Create many ContentWorkspaces
+     * const contentWorkspace = await prisma.contentWorkspace.createManyAndReturn({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *
+     * // Create many ContentWorkspaces and only return the `id`
+     * const contentWorkspaceWithIdOnly = await prisma.contentWorkspace.createManyAndReturn({
+     *   select: { id: true },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     *
+     */
+    createManyAndReturn<T extends ContentWorkspaceCreateManyAndReturnArgs>(args?: SelectSubset<T, ContentWorkspaceCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ContentWorkspacePayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Delete a ContentWorkspace.
+     * @param {ContentWorkspaceDeleteArgs} args - Arguments to delete one ContentWorkspace.
+     * @example
+     * // Delete one ContentWorkspace
+     * const ContentWorkspace = await prisma.contentWorkspace.delete({
+     *   where: {
+     *     // ... filter to delete one ContentWorkspace
+     *   }
+     * })
+     *
+     */
+    delete<T extends ContentWorkspaceDeleteArgs>(args: SelectSubset<T, ContentWorkspaceDeleteArgs<ExtArgs>>): Prisma__ContentWorkspaceClient<$Result.GetResult<Prisma.$ContentWorkspacePayload<ExtArgs>, T, "delete", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Update one ContentWorkspace.
+     * @param {ContentWorkspaceUpdateArgs} args - Arguments to update one ContentWorkspace.
+     * @example
+     * // Update one ContentWorkspace
+     * const contentWorkspace = await prisma.contentWorkspace.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     *
+     */
+    update<T extends ContentWorkspaceUpdateArgs>(args: SelectSubset<T, ContentWorkspaceUpdateArgs<ExtArgs>>): Prisma__ContentWorkspaceClient<$Result.GetResult<Prisma.$ContentWorkspacePayload<ExtArgs>, T, "update", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Delete zero or more ContentWorkspaces.
+     * @param {ContentWorkspaceDeleteManyArgs} args - Arguments to filter ContentWorkspaces to delete.
+     * @example
+     * // Delete a few ContentWorkspaces
+     * const { count } = await prisma.contentWorkspace.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     *
+     */
+    deleteMany<T extends ContentWorkspaceDeleteManyArgs>(args?: SelectSubset<T, ContentWorkspaceDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more ContentWorkspaces.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ContentWorkspaceUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many ContentWorkspaces
+     * const contentWorkspace = await prisma.contentWorkspace.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     *
+     */
+    updateMany<T extends ContentWorkspaceUpdateManyArgs>(args: SelectSubset<T, ContentWorkspaceUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more ContentWorkspaces and returns the data updated in the database.
+     * @param {ContentWorkspaceUpdateManyAndReturnArgs} args - Arguments to update many ContentWorkspaces.
+     * @example
+     * // Update many ContentWorkspaces
+     * const contentWorkspace = await prisma.contentWorkspace.updateManyAndReturn({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *
+     * // Update zero or more ContentWorkspaces and only return the `id`
+     * const contentWorkspaceWithIdOnly = await prisma.contentWorkspace.updateManyAndReturn({
+     *   select: { id: true },
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     *
+     */
+    updateManyAndReturn<T extends ContentWorkspaceUpdateManyAndReturnArgs>(args: SelectSubset<T, ContentWorkspaceUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ContentWorkspacePayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Create or update one ContentWorkspace.
+     * @param {ContentWorkspaceUpsertArgs} args - Arguments to update or create a ContentWorkspace.
+     * @example
+     * // Update or create a ContentWorkspace
+     * const contentWorkspace = await prisma.contentWorkspace.upsert({
+     *   create: {
+     *     // ... data to create a ContentWorkspace
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the ContentWorkspace we want to update
+     *   }
+     * })
+     */
+    upsert<T extends ContentWorkspaceUpsertArgs>(args: SelectSubset<T, ContentWorkspaceUpsertArgs<ExtArgs>>): Prisma__ContentWorkspaceClient<$Result.GetResult<Prisma.$ContentWorkspacePayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+
+    /**
+     * Count the number of ContentWorkspaces.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ContentWorkspaceCountArgs} args - Arguments to filter ContentWorkspaces to count.
+     * @example
+     * // Count the number of ContentWorkspaces
+     * const count = await prisma.contentWorkspace.count({
+     *   where: {
+     *     // ... the filter for the ContentWorkspaces we want to count
+     *   }
+     * })
+    **/
+    count<T extends ContentWorkspaceCountArgs>(
+      args?: Subset<T, ContentWorkspaceCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], ContentWorkspaceCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a ContentWorkspace.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ContentWorkspaceAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends ContentWorkspaceAggregateArgs>(args: Subset<T, ContentWorkspaceAggregateArgs>): Prisma.PrismaPromise<GetContentWorkspaceAggregateType<T>>
+
+    /**
+     * Group by ContentWorkspace.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ContentWorkspaceGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     *
+    **/
+    groupBy<
+      T extends ContentWorkspaceGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: ContentWorkspaceGroupByArgs['orderBy'] }
+        : { orderBy?: ContentWorkspaceGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, ContentWorkspaceGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetContentWorkspaceGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the ContentWorkspace model
+   */
+  readonly fields: ContentWorkspaceFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for ContentWorkspace.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__ContentWorkspaceClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    owner<T extends UserDefaultArgs<ExtArgs> = {}>(args?: Subset<T, UserDefaultArgs<ExtArgs>>): Prisma__UserClient<$Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+    items<T extends ContentWorkspace$itemsArgs<ExtArgs> = {}>(args?: Subset<T, ContentWorkspace$itemsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ContentWorkspaceItemPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the ContentWorkspace model
+   */
+  interface ContentWorkspaceFieldRefs {
+    readonly id: FieldRef<"ContentWorkspace", 'String'>
+    readonly ownerId: FieldRef<"ContentWorkspace", 'String'>
+    readonly name: FieldRef<"ContentWorkspace", 'String'>
+    readonly slug: FieldRef<"ContentWorkspace", 'String'>
+    readonly isMain: FieldRef<"ContentWorkspace", 'Boolean'>
+    readonly isLocked: FieldRef<"ContentWorkspace", 'Boolean'>
+    readonly status: FieldRef<"ContentWorkspace", 'ContentWorkspaceStatus'>
+    readonly expiresAt: FieldRef<"ContentWorkspace", 'DateTime'>
+    readonly archivedAt: FieldRef<"ContentWorkspace", 'DateTime'>
+    readonly layoutMode: FieldRef<"ContentWorkspace", 'String'>
+    readonly activePaneId: FieldRef<"ContentWorkspace", 'String'>
+    readonly paneState: FieldRef<"ContentWorkspace", 'Json'>
+    readonly settings: FieldRef<"ContentWorkspace", 'Json'>
+    readonly createdAt: FieldRef<"ContentWorkspace", 'DateTime'>
+    readonly updatedAt: FieldRef<"ContentWorkspace", 'DateTime'>
+  }
+
+
+  // Custom InputTypes
+  /**
+   * ContentWorkspace findUnique
+   */
+  export type ContentWorkspaceFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ContentWorkspace
+     */
+    select?: ContentWorkspaceSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ContentWorkspace
+     */
+    omit?: ContentWorkspaceOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ContentWorkspaceInclude<ExtArgs> | null
+    /**
+     * Filter, which ContentWorkspace to fetch.
+     */
+    where: ContentWorkspaceWhereUniqueInput
+  }
+
+  /**
+   * ContentWorkspace findUniqueOrThrow
+   */
+  export type ContentWorkspaceFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ContentWorkspace
+     */
+    select?: ContentWorkspaceSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ContentWorkspace
+     */
+    omit?: ContentWorkspaceOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ContentWorkspaceInclude<ExtArgs> | null
+    /**
+     * Filter, which ContentWorkspace to fetch.
+     */
+    where: ContentWorkspaceWhereUniqueInput
+  }
+
+  /**
+   * ContentWorkspace findFirst
+   */
+  export type ContentWorkspaceFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ContentWorkspace
+     */
+    select?: ContentWorkspaceSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ContentWorkspace
+     */
+    omit?: ContentWorkspaceOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ContentWorkspaceInclude<ExtArgs> | null
+    /**
+     * Filter, which ContentWorkspace to fetch.
+     */
+    where?: ContentWorkspaceWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     *
+     * Determine the order of ContentWorkspaces to fetch.
+     */
+    orderBy?: ContentWorkspaceOrderByWithRelationInput | ContentWorkspaceOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     *
+     * Sets the position for searching for ContentWorkspaces.
+     */
+    cursor?: ContentWorkspaceWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     *
+     * Take `±n` ContentWorkspaces from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     *
+     * Skip the first `n` ContentWorkspaces.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     *
+     * Filter by unique combinations of ContentWorkspaces.
+     */
+    distinct?: ContentWorkspaceScalarFieldEnum | ContentWorkspaceScalarFieldEnum[]
+  }
+
+  /**
+   * ContentWorkspace findFirstOrThrow
+   */
+  export type ContentWorkspaceFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ContentWorkspace
+     */
+    select?: ContentWorkspaceSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ContentWorkspace
+     */
+    omit?: ContentWorkspaceOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ContentWorkspaceInclude<ExtArgs> | null
+    /**
+     * Filter, which ContentWorkspace to fetch.
+     */
+    where?: ContentWorkspaceWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     *
+     * Determine the order of ContentWorkspaces to fetch.
+     */
+    orderBy?: ContentWorkspaceOrderByWithRelationInput | ContentWorkspaceOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     *
+     * Sets the position for searching for ContentWorkspaces.
+     */
+    cursor?: ContentWorkspaceWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     *
+     * Take `±n` ContentWorkspaces from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     *
+     * Skip the first `n` ContentWorkspaces.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     *
+     * Filter by unique combinations of ContentWorkspaces.
+     */
+    distinct?: ContentWorkspaceScalarFieldEnum | ContentWorkspaceScalarFieldEnum[]
+  }
+
+  /**
+   * ContentWorkspace findMany
+   */
+  export type ContentWorkspaceFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ContentWorkspace
+     */
+    select?: ContentWorkspaceSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ContentWorkspace
+     */
+    omit?: ContentWorkspaceOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ContentWorkspaceInclude<ExtArgs> | null
+    /**
+     * Filter, which ContentWorkspaces to fetch.
+     */
+    where?: ContentWorkspaceWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     *
+     * Determine the order of ContentWorkspaces to fetch.
+     */
+    orderBy?: ContentWorkspaceOrderByWithRelationInput | ContentWorkspaceOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     *
+     * Sets the position for listing ContentWorkspaces.
+     */
+    cursor?: ContentWorkspaceWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     *
+     * Take `±n` ContentWorkspaces from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     *
+     * Skip the first `n` ContentWorkspaces.
+     */
+    skip?: number
+    distinct?: ContentWorkspaceScalarFieldEnum | ContentWorkspaceScalarFieldEnum[]
+  }
+
+  /**
+   * ContentWorkspace create
+   */
+  export type ContentWorkspaceCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ContentWorkspace
+     */
+    select?: ContentWorkspaceSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ContentWorkspace
+     */
+    omit?: ContentWorkspaceOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ContentWorkspaceInclude<ExtArgs> | null
+    /**
+     * The data needed to create a ContentWorkspace.
+     */
+    data: XOR<ContentWorkspaceCreateInput, ContentWorkspaceUncheckedCreateInput>
+  }
+
+  /**
+   * ContentWorkspace createMany
+   */
+  export type ContentWorkspaceCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many ContentWorkspaces.
+     */
+    data: ContentWorkspaceCreateManyInput | ContentWorkspaceCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * ContentWorkspace createManyAndReturn
+   */
+  export type ContentWorkspaceCreateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ContentWorkspace
+     */
+    select?: ContentWorkspaceSelectCreateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the ContentWorkspace
+     */
+    omit?: ContentWorkspaceOmit<ExtArgs> | null
+    /**
+     * The data used to create many ContentWorkspaces.
+     */
+    data: ContentWorkspaceCreateManyInput | ContentWorkspaceCreateManyInput[]
+    skipDuplicates?: boolean
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ContentWorkspaceIncludeCreateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * ContentWorkspace update
+   */
+  export type ContentWorkspaceUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ContentWorkspace
+     */
+    select?: ContentWorkspaceSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ContentWorkspace
+     */
+    omit?: ContentWorkspaceOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ContentWorkspaceInclude<ExtArgs> | null
+    /**
+     * The data needed to update a ContentWorkspace.
+     */
+    data: XOR<ContentWorkspaceUpdateInput, ContentWorkspaceUncheckedUpdateInput>
+    /**
+     * Choose, which ContentWorkspace to update.
+     */
+    where: ContentWorkspaceWhereUniqueInput
+  }
+
+  /**
+   * ContentWorkspace updateMany
+   */
+  export type ContentWorkspaceUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update ContentWorkspaces.
+     */
+    data: XOR<ContentWorkspaceUpdateManyMutationInput, ContentWorkspaceUncheckedUpdateManyInput>
+    /**
+     * Filter which ContentWorkspaces to update
+     */
+    where?: ContentWorkspaceWhereInput
+    /**
+     * Limit how many ContentWorkspaces to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * ContentWorkspace updateManyAndReturn
+   */
+  export type ContentWorkspaceUpdateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ContentWorkspace
+     */
+    select?: ContentWorkspaceSelectUpdateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the ContentWorkspace
+     */
+    omit?: ContentWorkspaceOmit<ExtArgs> | null
+    /**
+     * The data used to update ContentWorkspaces.
+     */
+    data: XOR<ContentWorkspaceUpdateManyMutationInput, ContentWorkspaceUncheckedUpdateManyInput>
+    /**
+     * Filter which ContentWorkspaces to update
+     */
+    where?: ContentWorkspaceWhereInput
+    /**
+     * Limit how many ContentWorkspaces to update.
+     */
+    limit?: number
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ContentWorkspaceIncludeUpdateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * ContentWorkspace upsert
+   */
+  export type ContentWorkspaceUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ContentWorkspace
+     */
+    select?: ContentWorkspaceSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ContentWorkspace
+     */
+    omit?: ContentWorkspaceOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ContentWorkspaceInclude<ExtArgs> | null
+    /**
+     * The filter to search for the ContentWorkspace to update in case it exists.
+     */
+    where: ContentWorkspaceWhereUniqueInput
+    /**
+     * In case the ContentWorkspace found by the `where` argument doesn't exist, create a new ContentWorkspace with this data.
+     */
+    create: XOR<ContentWorkspaceCreateInput, ContentWorkspaceUncheckedCreateInput>
+    /**
+     * In case the ContentWorkspace was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<ContentWorkspaceUpdateInput, ContentWorkspaceUncheckedUpdateInput>
+  }
+
+  /**
+   * ContentWorkspace delete
+   */
+  export type ContentWorkspaceDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ContentWorkspace
+     */
+    select?: ContentWorkspaceSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ContentWorkspace
+     */
+    omit?: ContentWorkspaceOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ContentWorkspaceInclude<ExtArgs> | null
+    /**
+     * Filter which ContentWorkspace to delete.
+     */
+    where: ContentWorkspaceWhereUniqueInput
+  }
+
+  /**
+   * ContentWorkspace deleteMany
+   */
+  export type ContentWorkspaceDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which ContentWorkspaces to delete
+     */
+    where?: ContentWorkspaceWhereInput
+    /**
+     * Limit how many ContentWorkspaces to delete.
+     */
+    limit?: number
+  }
+
+  /**
+   * ContentWorkspace.items
+   */
+  export type ContentWorkspace$itemsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ContentWorkspaceItem
+     */
+    select?: ContentWorkspaceItemSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ContentWorkspaceItem
+     */
+    omit?: ContentWorkspaceItemOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ContentWorkspaceItemInclude<ExtArgs> | null
+    where?: ContentWorkspaceItemWhereInput
+    orderBy?: ContentWorkspaceItemOrderByWithRelationInput | ContentWorkspaceItemOrderByWithRelationInput[]
+    cursor?: ContentWorkspaceItemWhereUniqueInput
+    take?: number
+    skip?: number
+    distinct?: ContentWorkspaceItemScalarFieldEnum | ContentWorkspaceItemScalarFieldEnum[]
+  }
+
+  /**
+   * ContentWorkspace without action
+   */
+  export type ContentWorkspaceDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ContentWorkspace
+     */
+    select?: ContentWorkspaceSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ContentWorkspace
+     */
+    omit?: ContentWorkspaceOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ContentWorkspaceInclude<ExtArgs> | null
+  }
+
+
+  /**
+   * Model ContentWorkspaceItem
+   */
+
+  export type AggregateContentWorkspaceItem = {
+    _count: ContentWorkspaceItemCountAggregateOutputType | null
+    _min: ContentWorkspaceItemMinAggregateOutputType | null
+    _max: ContentWorkspaceItemMaxAggregateOutputType | null
+  }
+
+  export type ContentWorkspaceItemMinAggregateOutputType = {
+    id: string | null
+    workspaceId: string | null
+    contentId: string | null
+    assignmentType: $Enums.ContentWorkspaceItemAssignmentType | null
+    scope: $Enums.ContentWorkspaceItemScope | null
+    expiresAt: Date | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type ContentWorkspaceItemMaxAggregateOutputType = {
+    id: string | null
+    workspaceId: string | null
+    contentId: string | null
+    assignmentType: $Enums.ContentWorkspaceItemAssignmentType | null
+    scope: $Enums.ContentWorkspaceItemScope | null
+    expiresAt: Date | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type ContentWorkspaceItemCountAggregateOutputType = {
+    id: number
+    workspaceId: number
+    contentId: number
+    assignmentType: number
+    scope: number
+    expiresAt: number
+    createdAt: number
+    updatedAt: number
+    _all: number
+  }
+
+
+  export type ContentWorkspaceItemMinAggregateInputType = {
+    id?: true
+    workspaceId?: true
+    contentId?: true
+    assignmentType?: true
+    scope?: true
+    expiresAt?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type ContentWorkspaceItemMaxAggregateInputType = {
+    id?: true
+    workspaceId?: true
+    contentId?: true
+    assignmentType?: true
+    scope?: true
+    expiresAt?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type ContentWorkspaceItemCountAggregateInputType = {
+    id?: true
+    workspaceId?: true
+    contentId?: true
+    assignmentType?: true
+    scope?: true
+    expiresAt?: true
+    createdAt?: true
+    updatedAt?: true
+    _all?: true
+  }
+
+  export type ContentWorkspaceItemAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which ContentWorkspaceItem to aggregate.
+     */
+    where?: ContentWorkspaceItemWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     *
+     * Determine the order of ContentWorkspaceItems to fetch.
+     */
+    orderBy?: ContentWorkspaceItemOrderByWithRelationInput | ContentWorkspaceItemOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     *
+     * Sets the start position
+     */
+    cursor?: ContentWorkspaceItemWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     *
+     * Take `±n` ContentWorkspaceItems from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     *
+     * Skip the first `n` ContentWorkspaceItems.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     *
+     * Count returned ContentWorkspaceItems
+    **/
+    _count?: true | ContentWorkspaceItemCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     *
+     * Select which fields to find the minimum value
+    **/
+    _min?: ContentWorkspaceItemMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     *
+     * Select which fields to find the maximum value
+    **/
+    _max?: ContentWorkspaceItemMaxAggregateInputType
+  }
+
+  export type GetContentWorkspaceItemAggregateType<T extends ContentWorkspaceItemAggregateArgs> = {
+        [P in keyof T & keyof AggregateContentWorkspaceItem]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateContentWorkspaceItem[P]>
+      : GetScalarType<T[P], AggregateContentWorkspaceItem[P]>
+  }
+
+
+
+
+  export type ContentWorkspaceItemGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: ContentWorkspaceItemWhereInput
+    orderBy?: ContentWorkspaceItemOrderByWithAggregationInput | ContentWorkspaceItemOrderByWithAggregationInput[]
+    by: ContentWorkspaceItemScalarFieldEnum[] | ContentWorkspaceItemScalarFieldEnum
+    having?: ContentWorkspaceItemScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: ContentWorkspaceItemCountAggregateInputType | true
+    _min?: ContentWorkspaceItemMinAggregateInputType
+    _max?: ContentWorkspaceItemMaxAggregateInputType
+  }
+
+  export type ContentWorkspaceItemGroupByOutputType = {
+    id: string
+    workspaceId: string
+    contentId: string
+    assignmentType: $Enums.ContentWorkspaceItemAssignmentType
+    scope: $Enums.ContentWorkspaceItemScope
+    expiresAt: Date | null
+    createdAt: Date
+    updatedAt: Date
+    _count: ContentWorkspaceItemCountAggregateOutputType | null
+    _min: ContentWorkspaceItemMinAggregateOutputType | null
+    _max: ContentWorkspaceItemMaxAggregateOutputType | null
+  }
+
+  type GetContentWorkspaceItemGroupByPayload<T extends ContentWorkspaceItemGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<ContentWorkspaceItemGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof ContentWorkspaceItemGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], ContentWorkspaceItemGroupByOutputType[P]>
+            : GetScalarType<T[P], ContentWorkspaceItemGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type ContentWorkspaceItemSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    workspaceId?: boolean
+    contentId?: boolean
+    assignmentType?: boolean
+    scope?: boolean
+    expiresAt?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    workspace?: boolean | ContentWorkspaceDefaultArgs<ExtArgs>
+    content?: boolean | ContentNodeDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["contentWorkspaceItem"]>
+
+  export type ContentWorkspaceItemSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    workspaceId?: boolean
+    contentId?: boolean
+    assignmentType?: boolean
+    scope?: boolean
+    expiresAt?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    workspace?: boolean | ContentWorkspaceDefaultArgs<ExtArgs>
+    content?: boolean | ContentNodeDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["contentWorkspaceItem"]>
+
+  export type ContentWorkspaceItemSelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    workspaceId?: boolean
+    contentId?: boolean
+    assignmentType?: boolean
+    scope?: boolean
+    expiresAt?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    workspace?: boolean | ContentWorkspaceDefaultArgs<ExtArgs>
+    content?: boolean | ContentNodeDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["contentWorkspaceItem"]>
+
+  export type ContentWorkspaceItemSelectScalar = {
+    id?: boolean
+    workspaceId?: boolean
+    contentId?: boolean
+    assignmentType?: boolean
+    scope?: boolean
+    expiresAt?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+  }
+
+  export type ContentWorkspaceItemOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "workspaceId" | "contentId" | "assignmentType" | "scope" | "expiresAt" | "createdAt" | "updatedAt", ExtArgs["result"]["contentWorkspaceItem"]>
+  export type ContentWorkspaceItemInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    workspace?: boolean | ContentWorkspaceDefaultArgs<ExtArgs>
+    content?: boolean | ContentNodeDefaultArgs<ExtArgs>
+  }
+  export type ContentWorkspaceItemIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    workspace?: boolean | ContentWorkspaceDefaultArgs<ExtArgs>
+    content?: boolean | ContentNodeDefaultArgs<ExtArgs>
+  }
+  export type ContentWorkspaceItemIncludeUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    workspace?: boolean | ContentWorkspaceDefaultArgs<ExtArgs>
+    content?: boolean | ContentNodeDefaultArgs<ExtArgs>
+  }
+
+  export type $ContentWorkspaceItemPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "ContentWorkspaceItem"
+    objects: {
+      workspace: Prisma.$ContentWorkspacePayload<ExtArgs>
+      content: Prisma.$ContentNodePayload<ExtArgs>
+    }
+    scalars: $Extensions.GetPayloadResult<{
+      id: string
+      workspaceId: string
+      contentId: string
+      assignmentType: $Enums.ContentWorkspaceItemAssignmentType
+      scope: $Enums.ContentWorkspaceItemScope
+      expiresAt: Date | null
+      createdAt: Date
+      updatedAt: Date
+    }, ExtArgs["result"]["contentWorkspaceItem"]>
+    composites: {}
+  }
+
+  type ContentWorkspaceItemGetPayload<S extends boolean | null | undefined | ContentWorkspaceItemDefaultArgs> = $Result.GetResult<Prisma.$ContentWorkspaceItemPayload, S>
+
+  type ContentWorkspaceItemCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> =
+    Omit<ContentWorkspaceItemFindManyArgs, 'select' | 'include' | 'distinct' | 'omit'> & {
+      select?: ContentWorkspaceItemCountAggregateInputType | true
+    }
+
+  export interface ContentWorkspaceItemDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['ContentWorkspaceItem'], meta: { name: 'ContentWorkspaceItem' } }
+    /**
+     * Find zero or one ContentWorkspaceItem that matches the filter.
+     * @param {ContentWorkspaceItemFindUniqueArgs} args - Arguments to find a ContentWorkspaceItem
+     * @example
+     * // Get one ContentWorkspaceItem
+     * const contentWorkspaceItem = await prisma.contentWorkspaceItem.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends ContentWorkspaceItemFindUniqueArgs>(args: SelectSubset<T, ContentWorkspaceItemFindUniqueArgs<ExtArgs>>): Prisma__ContentWorkspaceItemClient<$Result.GetResult<Prisma.$ContentWorkspaceItemPayload<ExtArgs>, T, "findUnique", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find one ContentWorkspaceItem that matches the filter or throw an error with `error.code='P2025'`
+     * if no matches were found.
+     * @param {ContentWorkspaceItemFindUniqueOrThrowArgs} args - Arguments to find a ContentWorkspaceItem
+     * @example
+     * // Get one ContentWorkspaceItem
+     * const contentWorkspaceItem = await prisma.contentWorkspaceItem.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends ContentWorkspaceItemFindUniqueOrThrowArgs>(args: SelectSubset<T, ContentWorkspaceItemFindUniqueOrThrowArgs<ExtArgs>>): Prisma__ContentWorkspaceItemClient<$Result.GetResult<Prisma.$ContentWorkspaceItemPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first ContentWorkspaceItem that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ContentWorkspaceItemFindFirstArgs} args - Arguments to find a ContentWorkspaceItem
+     * @example
+     * // Get one ContentWorkspaceItem
+     * const contentWorkspaceItem = await prisma.contentWorkspaceItem.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends ContentWorkspaceItemFindFirstArgs>(args?: SelectSubset<T, ContentWorkspaceItemFindFirstArgs<ExtArgs>>): Prisma__ContentWorkspaceItemClient<$Result.GetResult<Prisma.$ContentWorkspaceItemPayload<ExtArgs>, T, "findFirst", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first ContentWorkspaceItem that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ContentWorkspaceItemFindFirstOrThrowArgs} args - Arguments to find a ContentWorkspaceItem
+     * @example
+     * // Get one ContentWorkspaceItem
+     * const contentWorkspaceItem = await prisma.contentWorkspaceItem.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends ContentWorkspaceItemFindFirstOrThrowArgs>(args?: SelectSubset<T, ContentWorkspaceItemFindFirstOrThrowArgs<ExtArgs>>): Prisma__ContentWorkspaceItemClient<$Result.GetResult<Prisma.$ContentWorkspaceItemPayload<ExtArgs>, T, "findFirstOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find zero or more ContentWorkspaceItems that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ContentWorkspaceItemFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all ContentWorkspaceItems
+     * const contentWorkspaceItems = await prisma.contentWorkspaceItem.findMany()
+     *
+     * // Get first 10 ContentWorkspaceItems
+     * const contentWorkspaceItems = await prisma.contentWorkspaceItem.findMany({ take: 10 })
+     *
+     * // Only select the `id`
+     * const contentWorkspaceItemWithIdOnly = await prisma.contentWorkspaceItem.findMany({ select: { id: true } })
+     *
+     */
+    findMany<T extends ContentWorkspaceItemFindManyArgs>(args?: SelectSubset<T, ContentWorkspaceItemFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ContentWorkspaceItemPayload<ExtArgs>, T, "findMany", GlobalOmitOptions>>
+
+    /**
+     * Create a ContentWorkspaceItem.
+     * @param {ContentWorkspaceItemCreateArgs} args - Arguments to create a ContentWorkspaceItem.
+     * @example
+     * // Create one ContentWorkspaceItem
+     * const ContentWorkspaceItem = await prisma.contentWorkspaceItem.create({
+     *   data: {
+     *     // ... data to create a ContentWorkspaceItem
+     *   }
+     * })
+     *
+     */
+    create<T extends ContentWorkspaceItemCreateArgs>(args: SelectSubset<T, ContentWorkspaceItemCreateArgs<ExtArgs>>): Prisma__ContentWorkspaceItemClient<$Result.GetResult<Prisma.$ContentWorkspaceItemPayload<ExtArgs>, T, "create", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Create many ContentWorkspaceItems.
+     * @param {ContentWorkspaceItemCreateManyArgs} args - Arguments to create many ContentWorkspaceItems.
+     * @example
+     * // Create many ContentWorkspaceItems
+     * const contentWorkspaceItem = await prisma.contentWorkspaceItem.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *
+     */
+    createMany<T extends ContentWorkspaceItemCreateManyArgs>(args?: SelectSubset<T, ContentWorkspaceItemCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create many ContentWorkspaceItems and returns the data saved in the database.
+     * @param {ContentWorkspaceItemCreateManyAndReturnArgs} args - Arguments to create many ContentWorkspaceItems.
+     * @example
+     * // Create many ContentWorkspaceItems
+     * const contentWorkspaceItem = await prisma.contentWorkspaceItem.createManyAndReturn({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *
+     * // Create many ContentWorkspaceItems and only return the `id`
+     * const contentWorkspaceItemWithIdOnly = await prisma.contentWorkspaceItem.createManyAndReturn({
+     *   select: { id: true },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     *
+     */
+    createManyAndReturn<T extends ContentWorkspaceItemCreateManyAndReturnArgs>(args?: SelectSubset<T, ContentWorkspaceItemCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ContentWorkspaceItemPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Delete a ContentWorkspaceItem.
+     * @param {ContentWorkspaceItemDeleteArgs} args - Arguments to delete one ContentWorkspaceItem.
+     * @example
+     * // Delete one ContentWorkspaceItem
+     * const ContentWorkspaceItem = await prisma.contentWorkspaceItem.delete({
+     *   where: {
+     *     // ... filter to delete one ContentWorkspaceItem
+     *   }
+     * })
+     *
+     */
+    delete<T extends ContentWorkspaceItemDeleteArgs>(args: SelectSubset<T, ContentWorkspaceItemDeleteArgs<ExtArgs>>): Prisma__ContentWorkspaceItemClient<$Result.GetResult<Prisma.$ContentWorkspaceItemPayload<ExtArgs>, T, "delete", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Update one ContentWorkspaceItem.
+     * @param {ContentWorkspaceItemUpdateArgs} args - Arguments to update one ContentWorkspaceItem.
+     * @example
+     * // Update one ContentWorkspaceItem
+     * const contentWorkspaceItem = await prisma.contentWorkspaceItem.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     *
+     */
+    update<T extends ContentWorkspaceItemUpdateArgs>(args: SelectSubset<T, ContentWorkspaceItemUpdateArgs<ExtArgs>>): Prisma__ContentWorkspaceItemClient<$Result.GetResult<Prisma.$ContentWorkspaceItemPayload<ExtArgs>, T, "update", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Delete zero or more ContentWorkspaceItems.
+     * @param {ContentWorkspaceItemDeleteManyArgs} args - Arguments to filter ContentWorkspaceItems to delete.
+     * @example
+     * // Delete a few ContentWorkspaceItems
+     * const { count } = await prisma.contentWorkspaceItem.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     *
+     */
+    deleteMany<T extends ContentWorkspaceItemDeleteManyArgs>(args?: SelectSubset<T, ContentWorkspaceItemDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more ContentWorkspaceItems.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ContentWorkspaceItemUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many ContentWorkspaceItems
+     * const contentWorkspaceItem = await prisma.contentWorkspaceItem.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     *
+     */
+    updateMany<T extends ContentWorkspaceItemUpdateManyArgs>(args: SelectSubset<T, ContentWorkspaceItemUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more ContentWorkspaceItems and returns the data updated in the database.
+     * @param {ContentWorkspaceItemUpdateManyAndReturnArgs} args - Arguments to update many ContentWorkspaceItems.
+     * @example
+     * // Update many ContentWorkspaceItems
+     * const contentWorkspaceItem = await prisma.contentWorkspaceItem.updateManyAndReturn({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *
+     * // Update zero or more ContentWorkspaceItems and only return the `id`
+     * const contentWorkspaceItemWithIdOnly = await prisma.contentWorkspaceItem.updateManyAndReturn({
+     *   select: { id: true },
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     *
+     */
+    updateManyAndReturn<T extends ContentWorkspaceItemUpdateManyAndReturnArgs>(args: SelectSubset<T, ContentWorkspaceItemUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ContentWorkspaceItemPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Create or update one ContentWorkspaceItem.
+     * @param {ContentWorkspaceItemUpsertArgs} args - Arguments to update or create a ContentWorkspaceItem.
+     * @example
+     * // Update or create a ContentWorkspaceItem
+     * const contentWorkspaceItem = await prisma.contentWorkspaceItem.upsert({
+     *   create: {
+     *     // ... data to create a ContentWorkspaceItem
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the ContentWorkspaceItem we want to update
+     *   }
+     * })
+     */
+    upsert<T extends ContentWorkspaceItemUpsertArgs>(args: SelectSubset<T, ContentWorkspaceItemUpsertArgs<ExtArgs>>): Prisma__ContentWorkspaceItemClient<$Result.GetResult<Prisma.$ContentWorkspaceItemPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+
+    /**
+     * Count the number of ContentWorkspaceItems.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ContentWorkspaceItemCountArgs} args - Arguments to filter ContentWorkspaceItems to count.
+     * @example
+     * // Count the number of ContentWorkspaceItems
+     * const count = await prisma.contentWorkspaceItem.count({
+     *   where: {
+     *     // ... the filter for the ContentWorkspaceItems we want to count
+     *   }
+     * })
+    **/
+    count<T extends ContentWorkspaceItemCountArgs>(
+      args?: Subset<T, ContentWorkspaceItemCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], ContentWorkspaceItemCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a ContentWorkspaceItem.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ContentWorkspaceItemAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends ContentWorkspaceItemAggregateArgs>(args: Subset<T, ContentWorkspaceItemAggregateArgs>): Prisma.PrismaPromise<GetContentWorkspaceItemAggregateType<T>>
+
+    /**
+     * Group by ContentWorkspaceItem.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ContentWorkspaceItemGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     *
+    **/
+    groupBy<
+      T extends ContentWorkspaceItemGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: ContentWorkspaceItemGroupByArgs['orderBy'] }
+        : { orderBy?: ContentWorkspaceItemGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, ContentWorkspaceItemGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetContentWorkspaceItemGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the ContentWorkspaceItem model
+   */
+  readonly fields: ContentWorkspaceItemFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for ContentWorkspaceItem.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__ContentWorkspaceItemClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    workspace<T extends ContentWorkspaceDefaultArgs<ExtArgs> = {}>(args?: Subset<T, ContentWorkspaceDefaultArgs<ExtArgs>>): Prisma__ContentWorkspaceClient<$Result.GetResult<Prisma.$ContentWorkspacePayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+    content<T extends ContentNodeDefaultArgs<ExtArgs> = {}>(args?: Subset<T, ContentNodeDefaultArgs<ExtArgs>>): Prisma__ContentNodeClient<$Result.GetResult<Prisma.$ContentNodePayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the ContentWorkspaceItem model
+   */
+  interface ContentWorkspaceItemFieldRefs {
+    readonly id: FieldRef<"ContentWorkspaceItem", 'String'>
+    readonly workspaceId: FieldRef<"ContentWorkspaceItem", 'String'>
+    readonly contentId: FieldRef<"ContentWorkspaceItem", 'String'>
+    readonly assignmentType: FieldRef<"ContentWorkspaceItem", 'ContentWorkspaceItemAssignmentType'>
+    readonly scope: FieldRef<"ContentWorkspaceItem", 'ContentWorkspaceItemScope'>
+    readonly expiresAt: FieldRef<"ContentWorkspaceItem", 'DateTime'>
+    readonly createdAt: FieldRef<"ContentWorkspaceItem", 'DateTime'>
+    readonly updatedAt: FieldRef<"ContentWorkspaceItem", 'DateTime'>
+  }
+
+
+  // Custom InputTypes
+  /**
+   * ContentWorkspaceItem findUnique
+   */
+  export type ContentWorkspaceItemFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ContentWorkspaceItem
+     */
+    select?: ContentWorkspaceItemSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ContentWorkspaceItem
+     */
+    omit?: ContentWorkspaceItemOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ContentWorkspaceItemInclude<ExtArgs> | null
+    /**
+     * Filter, which ContentWorkspaceItem to fetch.
+     */
+    where: ContentWorkspaceItemWhereUniqueInput
+  }
+
+  /**
+   * ContentWorkspaceItem findUniqueOrThrow
+   */
+  export type ContentWorkspaceItemFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ContentWorkspaceItem
+     */
+    select?: ContentWorkspaceItemSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ContentWorkspaceItem
+     */
+    omit?: ContentWorkspaceItemOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ContentWorkspaceItemInclude<ExtArgs> | null
+    /**
+     * Filter, which ContentWorkspaceItem to fetch.
+     */
+    where: ContentWorkspaceItemWhereUniqueInput
+  }
+
+  /**
+   * ContentWorkspaceItem findFirst
+   */
+  export type ContentWorkspaceItemFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ContentWorkspaceItem
+     */
+    select?: ContentWorkspaceItemSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ContentWorkspaceItem
+     */
+    omit?: ContentWorkspaceItemOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ContentWorkspaceItemInclude<ExtArgs> | null
+    /**
+     * Filter, which ContentWorkspaceItem to fetch.
+     */
+    where?: ContentWorkspaceItemWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     *
+     * Determine the order of ContentWorkspaceItems to fetch.
+     */
+    orderBy?: ContentWorkspaceItemOrderByWithRelationInput | ContentWorkspaceItemOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     *
+     * Sets the position for searching for ContentWorkspaceItems.
+     */
+    cursor?: ContentWorkspaceItemWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     *
+     * Take `±n` ContentWorkspaceItems from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     *
+     * Skip the first `n` ContentWorkspaceItems.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     *
+     * Filter by unique combinations of ContentWorkspaceItems.
+     */
+    distinct?: ContentWorkspaceItemScalarFieldEnum | ContentWorkspaceItemScalarFieldEnum[]
+  }
+
+  /**
+   * ContentWorkspaceItem findFirstOrThrow
+   */
+  export type ContentWorkspaceItemFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ContentWorkspaceItem
+     */
+    select?: ContentWorkspaceItemSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ContentWorkspaceItem
+     */
+    omit?: ContentWorkspaceItemOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ContentWorkspaceItemInclude<ExtArgs> | null
+    /**
+     * Filter, which ContentWorkspaceItem to fetch.
+     */
+    where?: ContentWorkspaceItemWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     *
+     * Determine the order of ContentWorkspaceItems to fetch.
+     */
+    orderBy?: ContentWorkspaceItemOrderByWithRelationInput | ContentWorkspaceItemOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     *
+     * Sets the position for searching for ContentWorkspaceItems.
+     */
+    cursor?: ContentWorkspaceItemWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     *
+     * Take `±n` ContentWorkspaceItems from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     *
+     * Skip the first `n` ContentWorkspaceItems.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     *
+     * Filter by unique combinations of ContentWorkspaceItems.
+     */
+    distinct?: ContentWorkspaceItemScalarFieldEnum | ContentWorkspaceItemScalarFieldEnum[]
+  }
+
+  /**
+   * ContentWorkspaceItem findMany
+   */
+  export type ContentWorkspaceItemFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ContentWorkspaceItem
+     */
+    select?: ContentWorkspaceItemSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ContentWorkspaceItem
+     */
+    omit?: ContentWorkspaceItemOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ContentWorkspaceItemInclude<ExtArgs> | null
+    /**
+     * Filter, which ContentWorkspaceItems to fetch.
+     */
+    where?: ContentWorkspaceItemWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     *
+     * Determine the order of ContentWorkspaceItems to fetch.
+     */
+    orderBy?: ContentWorkspaceItemOrderByWithRelationInput | ContentWorkspaceItemOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     *
+     * Sets the position for listing ContentWorkspaceItems.
+     */
+    cursor?: ContentWorkspaceItemWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     *
+     * Take `±n` ContentWorkspaceItems from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     *
+     * Skip the first `n` ContentWorkspaceItems.
+     */
+    skip?: number
+    distinct?: ContentWorkspaceItemScalarFieldEnum | ContentWorkspaceItemScalarFieldEnum[]
+  }
+
+  /**
+   * ContentWorkspaceItem create
+   */
+  export type ContentWorkspaceItemCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ContentWorkspaceItem
+     */
+    select?: ContentWorkspaceItemSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ContentWorkspaceItem
+     */
+    omit?: ContentWorkspaceItemOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ContentWorkspaceItemInclude<ExtArgs> | null
+    /**
+     * The data needed to create a ContentWorkspaceItem.
+     */
+    data: XOR<ContentWorkspaceItemCreateInput, ContentWorkspaceItemUncheckedCreateInput>
+  }
+
+  /**
+   * ContentWorkspaceItem createMany
+   */
+  export type ContentWorkspaceItemCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many ContentWorkspaceItems.
+     */
+    data: ContentWorkspaceItemCreateManyInput | ContentWorkspaceItemCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * ContentWorkspaceItem createManyAndReturn
+   */
+  export type ContentWorkspaceItemCreateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ContentWorkspaceItem
+     */
+    select?: ContentWorkspaceItemSelectCreateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the ContentWorkspaceItem
+     */
+    omit?: ContentWorkspaceItemOmit<ExtArgs> | null
+    /**
+     * The data used to create many ContentWorkspaceItems.
+     */
+    data: ContentWorkspaceItemCreateManyInput | ContentWorkspaceItemCreateManyInput[]
+    skipDuplicates?: boolean
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ContentWorkspaceItemIncludeCreateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * ContentWorkspaceItem update
+   */
+  export type ContentWorkspaceItemUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ContentWorkspaceItem
+     */
+    select?: ContentWorkspaceItemSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ContentWorkspaceItem
+     */
+    omit?: ContentWorkspaceItemOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ContentWorkspaceItemInclude<ExtArgs> | null
+    /**
+     * The data needed to update a ContentWorkspaceItem.
+     */
+    data: XOR<ContentWorkspaceItemUpdateInput, ContentWorkspaceItemUncheckedUpdateInput>
+    /**
+     * Choose, which ContentWorkspaceItem to update.
+     */
+    where: ContentWorkspaceItemWhereUniqueInput
+  }
+
+  /**
+   * ContentWorkspaceItem updateMany
+   */
+  export type ContentWorkspaceItemUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update ContentWorkspaceItems.
+     */
+    data: XOR<ContentWorkspaceItemUpdateManyMutationInput, ContentWorkspaceItemUncheckedUpdateManyInput>
+    /**
+     * Filter which ContentWorkspaceItems to update
+     */
+    where?: ContentWorkspaceItemWhereInput
+    /**
+     * Limit how many ContentWorkspaceItems to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * ContentWorkspaceItem updateManyAndReturn
+   */
+  export type ContentWorkspaceItemUpdateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ContentWorkspaceItem
+     */
+    select?: ContentWorkspaceItemSelectUpdateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the ContentWorkspaceItem
+     */
+    omit?: ContentWorkspaceItemOmit<ExtArgs> | null
+    /**
+     * The data used to update ContentWorkspaceItems.
+     */
+    data: XOR<ContentWorkspaceItemUpdateManyMutationInput, ContentWorkspaceItemUncheckedUpdateManyInput>
+    /**
+     * Filter which ContentWorkspaceItems to update
+     */
+    where?: ContentWorkspaceItemWhereInput
+    /**
+     * Limit how many ContentWorkspaceItems to update.
+     */
+    limit?: number
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ContentWorkspaceItemIncludeUpdateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * ContentWorkspaceItem upsert
+   */
+  export type ContentWorkspaceItemUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ContentWorkspaceItem
+     */
+    select?: ContentWorkspaceItemSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ContentWorkspaceItem
+     */
+    omit?: ContentWorkspaceItemOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ContentWorkspaceItemInclude<ExtArgs> | null
+    /**
+     * The filter to search for the ContentWorkspaceItem to update in case it exists.
+     */
+    where: ContentWorkspaceItemWhereUniqueInput
+    /**
+     * In case the ContentWorkspaceItem found by the `where` argument doesn't exist, create a new ContentWorkspaceItem with this data.
+     */
+    create: XOR<ContentWorkspaceItemCreateInput, ContentWorkspaceItemUncheckedCreateInput>
+    /**
+     * In case the ContentWorkspaceItem was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<ContentWorkspaceItemUpdateInput, ContentWorkspaceItemUncheckedUpdateInput>
+  }
+
+  /**
+   * ContentWorkspaceItem delete
+   */
+  export type ContentWorkspaceItemDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ContentWorkspaceItem
+     */
+    select?: ContentWorkspaceItemSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ContentWorkspaceItem
+     */
+    omit?: ContentWorkspaceItemOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ContentWorkspaceItemInclude<ExtArgs> | null
+    /**
+     * Filter which ContentWorkspaceItem to delete.
+     */
+    where: ContentWorkspaceItemWhereUniqueInput
+  }
+
+  /**
+   * ContentWorkspaceItem deleteMany
+   */
+  export type ContentWorkspaceItemDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which ContentWorkspaceItems to delete
+     */
+    where?: ContentWorkspaceItemWhereInput
+    /**
+     * Limit how many ContentWorkspaceItems to delete.
+     */
+    limit?: number
+  }
+
+  /**
+   * ContentWorkspaceItem without action
+   */
+  export type ContentWorkspaceItemDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ContentWorkspaceItem
+     */
+    select?: ContentWorkspaceItemSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ContentWorkspaceItem
+     */
+    omit?: ContentWorkspaceItemOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ContentWorkspaceItemInclude<ExtArgs> | null
   }
 
 
@@ -51442,6 +54081,41 @@ export namespace Prisma {
   export type UserScalarFieldEnum = (typeof UserScalarFieldEnum)[keyof typeof UserScalarFieldEnum]
 
 
+  export const ContentWorkspaceScalarFieldEnum: {
+    id: 'id',
+    ownerId: 'ownerId',
+    name: 'name',
+    slug: 'slug',
+    isMain: 'isMain',
+    isLocked: 'isLocked',
+    status: 'status',
+    expiresAt: 'expiresAt',
+    archivedAt: 'archivedAt',
+    layoutMode: 'layoutMode',
+    activePaneId: 'activePaneId',
+    paneState: 'paneState',
+    settings: 'settings',
+    createdAt: 'createdAt',
+    updatedAt: 'updatedAt'
+  };
+
+  export type ContentWorkspaceScalarFieldEnum = (typeof ContentWorkspaceScalarFieldEnum)[keyof typeof ContentWorkspaceScalarFieldEnum]
+
+
+  export const ContentWorkspaceItemScalarFieldEnum: {
+    id: 'id',
+    workspaceId: 'workspaceId',
+    contentId: 'contentId',
+    assignmentType: 'assignmentType',
+    scope: 'scope',
+    expiresAt: 'expiresAt',
+    createdAt: 'createdAt',
+    updatedAt: 'updatedAt'
+  };
+
+  export type ContentWorkspaceItemScalarFieldEnum = (typeof ContentWorkspaceItemScalarFieldEnum)[keyof typeof ContentWorkspaceItemScalarFieldEnum]
+
+
   export const CategoryScalarFieldEnum: {
     id: 'id',
     name: 'name',
@@ -52042,6 +54716,48 @@ export namespace Prisma {
 
 
   /**
+   * Reference to a field of type 'ContentWorkspaceStatus'
+   */
+  export type EnumContentWorkspaceStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'ContentWorkspaceStatus'>
+
+
+
+  /**
+   * Reference to a field of type 'ContentWorkspaceStatus[]'
+   */
+  export type ListEnumContentWorkspaceStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'ContentWorkspaceStatus[]'>
+
+
+
+  /**
+   * Reference to a field of type 'ContentWorkspaceItemAssignmentType'
+   */
+  export type EnumContentWorkspaceItemAssignmentTypeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'ContentWorkspaceItemAssignmentType'>
+
+
+
+  /**
+   * Reference to a field of type 'ContentWorkspaceItemAssignmentType[]'
+   */
+  export type ListEnumContentWorkspaceItemAssignmentTypeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'ContentWorkspaceItemAssignmentType[]'>
+
+
+
+  /**
+   * Reference to a field of type 'ContentWorkspaceItemScope'
+   */
+  export type EnumContentWorkspaceItemScopeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'ContentWorkspaceItemScope'>
+
+
+
+  /**
+   * Reference to a field of type 'ContentWorkspaceItemScope[]'
+   */
+  export type ListEnumContentWorkspaceItemScopeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'ContentWorkspaceItemScope[]'>
+
+
+
+  /**
    * Reference to a field of type 'FolderViewMode'
    */
   export type EnumFolderViewModeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'FolderViewMode'>
@@ -52136,6 +54852,7 @@ export namespace Prisma {
     trashBinEntry?: XOR<TrashBinNullableScalarRelationFilter, TrashBinWhereInput> | null
     viewGrants?: ViewGrantListRelationFilter
     calendarEvents?: CalendarEventListRelationFilter
+    workspaceItems?: ContentWorkspaceItemListRelationFilter
   }
 
   export type ContentNodeOrderByWithRelationInput = {
@@ -52185,6 +54902,7 @@ export namespace Prisma {
     trashBinEntry?: TrashBinOrderByWithRelationInput
     viewGrants?: ViewGrantOrderByRelationAggregateInput
     calendarEvents?: CalendarEventOrderByRelationAggregateInput
+    workspaceItems?: ContentWorkspaceItemOrderByRelationAggregateInput
   }
 
   export type ContentNodeWhereUniqueInput = Prisma.AtLeast<{
@@ -52238,6 +54956,7 @@ export namespace Prisma {
     trashBinEntry?: XOR<TrashBinNullableScalarRelationFilter, TrashBinWhereInput> | null
     viewGrants?: ViewGrantListRelationFilter
     calendarEvents?: CalendarEventListRelationFilter
+    workspaceItems?: ContentWorkspaceItemListRelationFilter
   }, "id" | "ownerId_slug">
 
   export type ContentNodeOrderByWithAggregationInput = {
@@ -53156,6 +55875,7 @@ export namespace Prisma {
     calendarConnections?: CalendarConnectionListRelationFilter
     calendarSources?: CalendarSourceListRelationFilter
     calendarEvents?: CalendarEventListRelationFilter
+    contentWorkspaces?: ContentWorkspaceListRelationFilter
   }
 
   export type UserOrderByWithRelationInput = {
@@ -53193,6 +55913,7 @@ export namespace Prisma {
     calendarConnections?: CalendarConnectionOrderByRelationAggregateInput
     calendarSources?: CalendarSourceOrderByRelationAggregateInput
     calendarEvents?: CalendarEventOrderByRelationAggregateInput
+    contentWorkspaces?: ContentWorkspaceOrderByRelationAggregateInput
   }
 
   export type UserWhereUniqueInput = Prisma.AtLeast<{
@@ -53233,6 +55954,7 @@ export namespace Prisma {
     calendarConnections?: CalendarConnectionListRelationFilter
     calendarSources?: CalendarSourceListRelationFilter
     calendarEvents?: CalendarEventListRelationFilter
+    contentWorkspaces?: ContentWorkspaceListRelationFilter
   }, "id" | "username" | "email">
 
   export type UserOrderByWithAggregationInput = {
@@ -53265,6 +55987,189 @@ export namespace Prisma {
     updatedAt?: DateTimeWithAggregatesFilter<"User"> | Date | string
     settings?: JsonNullableWithAggregatesFilter<"User">
     settingsVersion?: IntWithAggregatesFilter<"User"> | number
+  }
+
+  export type ContentWorkspaceWhereInput = {
+    AND?: ContentWorkspaceWhereInput | ContentWorkspaceWhereInput[]
+    OR?: ContentWorkspaceWhereInput[]
+    NOT?: ContentWorkspaceWhereInput | ContentWorkspaceWhereInput[]
+    id?: UuidFilter<"ContentWorkspace"> | string
+    ownerId?: UuidFilter<"ContentWorkspace"> | string
+    name?: StringFilter<"ContentWorkspace"> | string
+    slug?: StringFilter<"ContentWorkspace"> | string
+    isMain?: BoolFilter<"ContentWorkspace"> | boolean
+    isLocked?: BoolFilter<"ContentWorkspace"> | boolean
+    status?: EnumContentWorkspaceStatusFilter<"ContentWorkspace"> | $Enums.ContentWorkspaceStatus
+    expiresAt?: DateTimeNullableFilter<"ContentWorkspace"> | Date | string | null
+    archivedAt?: DateTimeNullableFilter<"ContentWorkspace"> | Date | string | null
+    layoutMode?: StringFilter<"ContentWorkspace"> | string
+    activePaneId?: StringFilter<"ContentWorkspace"> | string
+    paneState?: JsonFilter<"ContentWorkspace">
+    settings?: JsonFilter<"ContentWorkspace">
+    createdAt?: DateTimeFilter<"ContentWorkspace"> | Date | string
+    updatedAt?: DateTimeFilter<"ContentWorkspace"> | Date | string
+    owner?: XOR<UserScalarRelationFilter, UserWhereInput>
+    items?: ContentWorkspaceItemListRelationFilter
+  }
+
+  export type ContentWorkspaceOrderByWithRelationInput = {
+    id?: SortOrder
+    ownerId?: SortOrder
+    name?: SortOrder
+    slug?: SortOrder
+    isMain?: SortOrder
+    isLocked?: SortOrder
+    status?: SortOrder
+    expiresAt?: SortOrderInput | SortOrder
+    archivedAt?: SortOrderInput | SortOrder
+    layoutMode?: SortOrder
+    activePaneId?: SortOrder
+    paneState?: SortOrder
+    settings?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+    owner?: UserOrderByWithRelationInput
+    items?: ContentWorkspaceItemOrderByRelationAggregateInput
+  }
+
+  export type ContentWorkspaceWhereUniqueInput = Prisma.AtLeast<{
+    id?: string
+    ownerId_slug?: ContentWorkspaceOwnerIdSlugCompoundUniqueInput
+    AND?: ContentWorkspaceWhereInput | ContentWorkspaceWhereInput[]
+    OR?: ContentWorkspaceWhereInput[]
+    NOT?: ContentWorkspaceWhereInput | ContentWorkspaceWhereInput[]
+    ownerId?: UuidFilter<"ContentWorkspace"> | string
+    name?: StringFilter<"ContentWorkspace"> | string
+    slug?: StringFilter<"ContentWorkspace"> | string
+    isMain?: BoolFilter<"ContentWorkspace"> | boolean
+    isLocked?: BoolFilter<"ContentWorkspace"> | boolean
+    status?: EnumContentWorkspaceStatusFilter<"ContentWorkspace"> | $Enums.ContentWorkspaceStatus
+    expiresAt?: DateTimeNullableFilter<"ContentWorkspace"> | Date | string | null
+    archivedAt?: DateTimeNullableFilter<"ContentWorkspace"> | Date | string | null
+    layoutMode?: StringFilter<"ContentWorkspace"> | string
+    activePaneId?: StringFilter<"ContentWorkspace"> | string
+    paneState?: JsonFilter<"ContentWorkspace">
+    settings?: JsonFilter<"ContentWorkspace">
+    createdAt?: DateTimeFilter<"ContentWorkspace"> | Date | string
+    updatedAt?: DateTimeFilter<"ContentWorkspace"> | Date | string
+    owner?: XOR<UserScalarRelationFilter, UserWhereInput>
+    items?: ContentWorkspaceItemListRelationFilter
+  }, "id" | "ownerId_slug">
+
+  export type ContentWorkspaceOrderByWithAggregationInput = {
+    id?: SortOrder
+    ownerId?: SortOrder
+    name?: SortOrder
+    slug?: SortOrder
+    isMain?: SortOrder
+    isLocked?: SortOrder
+    status?: SortOrder
+    expiresAt?: SortOrderInput | SortOrder
+    archivedAt?: SortOrderInput | SortOrder
+    layoutMode?: SortOrder
+    activePaneId?: SortOrder
+    paneState?: SortOrder
+    settings?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+    _count?: ContentWorkspaceCountOrderByAggregateInput
+    _max?: ContentWorkspaceMaxOrderByAggregateInput
+    _min?: ContentWorkspaceMinOrderByAggregateInput
+  }
+
+  export type ContentWorkspaceScalarWhereWithAggregatesInput = {
+    AND?: ContentWorkspaceScalarWhereWithAggregatesInput | ContentWorkspaceScalarWhereWithAggregatesInput[]
+    OR?: ContentWorkspaceScalarWhereWithAggregatesInput[]
+    NOT?: ContentWorkspaceScalarWhereWithAggregatesInput | ContentWorkspaceScalarWhereWithAggregatesInput[]
+    id?: UuidWithAggregatesFilter<"ContentWorkspace"> | string
+    ownerId?: UuidWithAggregatesFilter<"ContentWorkspace"> | string
+    name?: StringWithAggregatesFilter<"ContentWorkspace"> | string
+    slug?: StringWithAggregatesFilter<"ContentWorkspace"> | string
+    isMain?: BoolWithAggregatesFilter<"ContentWorkspace"> | boolean
+    isLocked?: BoolWithAggregatesFilter<"ContentWorkspace"> | boolean
+    status?: EnumContentWorkspaceStatusWithAggregatesFilter<"ContentWorkspace"> | $Enums.ContentWorkspaceStatus
+    expiresAt?: DateTimeNullableWithAggregatesFilter<"ContentWorkspace"> | Date | string | null
+    archivedAt?: DateTimeNullableWithAggregatesFilter<"ContentWorkspace"> | Date | string | null
+    layoutMode?: StringWithAggregatesFilter<"ContentWorkspace"> | string
+    activePaneId?: StringWithAggregatesFilter<"ContentWorkspace"> | string
+    paneState?: JsonWithAggregatesFilter<"ContentWorkspace">
+    settings?: JsonWithAggregatesFilter<"ContentWorkspace">
+    createdAt?: DateTimeWithAggregatesFilter<"ContentWorkspace"> | Date | string
+    updatedAt?: DateTimeWithAggregatesFilter<"ContentWorkspace"> | Date | string
+  }
+
+  export type ContentWorkspaceItemWhereInput = {
+    AND?: ContentWorkspaceItemWhereInput | ContentWorkspaceItemWhereInput[]
+    OR?: ContentWorkspaceItemWhereInput[]
+    NOT?: ContentWorkspaceItemWhereInput | ContentWorkspaceItemWhereInput[]
+    id?: UuidFilter<"ContentWorkspaceItem"> | string
+    workspaceId?: UuidFilter<"ContentWorkspaceItem"> | string
+    contentId?: UuidFilter<"ContentWorkspaceItem"> | string
+    assignmentType?: EnumContentWorkspaceItemAssignmentTypeFilter<"ContentWorkspaceItem"> | $Enums.ContentWorkspaceItemAssignmentType
+    scope?: EnumContentWorkspaceItemScopeFilter<"ContentWorkspaceItem"> | $Enums.ContentWorkspaceItemScope
+    expiresAt?: DateTimeNullableFilter<"ContentWorkspaceItem"> | Date | string | null
+    createdAt?: DateTimeFilter<"ContentWorkspaceItem"> | Date | string
+    updatedAt?: DateTimeFilter<"ContentWorkspaceItem"> | Date | string
+    workspace?: XOR<ContentWorkspaceScalarRelationFilter, ContentWorkspaceWhereInput>
+    content?: XOR<ContentNodeScalarRelationFilter, ContentNodeWhereInput>
+  }
+
+  export type ContentWorkspaceItemOrderByWithRelationInput = {
+    id?: SortOrder
+    workspaceId?: SortOrder
+    contentId?: SortOrder
+    assignmentType?: SortOrder
+    scope?: SortOrder
+    expiresAt?: SortOrderInput | SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+    workspace?: ContentWorkspaceOrderByWithRelationInput
+    content?: ContentNodeOrderByWithRelationInput
+  }
+
+  export type ContentWorkspaceItemWhereUniqueInput = Prisma.AtLeast<{
+    id?: string
+    workspaceId_contentId?: ContentWorkspaceItemWorkspaceIdContentIdCompoundUniqueInput
+    AND?: ContentWorkspaceItemWhereInput | ContentWorkspaceItemWhereInput[]
+    OR?: ContentWorkspaceItemWhereInput[]
+    NOT?: ContentWorkspaceItemWhereInput | ContentWorkspaceItemWhereInput[]
+    workspaceId?: UuidFilter<"ContentWorkspaceItem"> | string
+    contentId?: UuidFilter<"ContentWorkspaceItem"> | string
+    assignmentType?: EnumContentWorkspaceItemAssignmentTypeFilter<"ContentWorkspaceItem"> | $Enums.ContentWorkspaceItemAssignmentType
+    scope?: EnumContentWorkspaceItemScopeFilter<"ContentWorkspaceItem"> | $Enums.ContentWorkspaceItemScope
+    expiresAt?: DateTimeNullableFilter<"ContentWorkspaceItem"> | Date | string | null
+    createdAt?: DateTimeFilter<"ContentWorkspaceItem"> | Date | string
+    updatedAt?: DateTimeFilter<"ContentWorkspaceItem"> | Date | string
+    workspace?: XOR<ContentWorkspaceScalarRelationFilter, ContentWorkspaceWhereInput>
+    content?: XOR<ContentNodeScalarRelationFilter, ContentNodeWhereInput>
+  }, "id" | "workspaceId_contentId">
+
+  export type ContentWorkspaceItemOrderByWithAggregationInput = {
+    id?: SortOrder
+    workspaceId?: SortOrder
+    contentId?: SortOrder
+    assignmentType?: SortOrder
+    scope?: SortOrder
+    expiresAt?: SortOrderInput | SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+    _count?: ContentWorkspaceItemCountOrderByAggregateInput
+    _max?: ContentWorkspaceItemMaxOrderByAggregateInput
+    _min?: ContentWorkspaceItemMinOrderByAggregateInput
+  }
+
+  export type ContentWorkspaceItemScalarWhereWithAggregatesInput = {
+    AND?: ContentWorkspaceItemScalarWhereWithAggregatesInput | ContentWorkspaceItemScalarWhereWithAggregatesInput[]
+    OR?: ContentWorkspaceItemScalarWhereWithAggregatesInput[]
+    NOT?: ContentWorkspaceItemScalarWhereWithAggregatesInput | ContentWorkspaceItemScalarWhereWithAggregatesInput[]
+    id?: UuidWithAggregatesFilter<"ContentWorkspaceItem"> | string
+    workspaceId?: UuidWithAggregatesFilter<"ContentWorkspaceItem"> | string
+    contentId?: UuidWithAggregatesFilter<"ContentWorkspaceItem"> | string
+    assignmentType?: EnumContentWorkspaceItemAssignmentTypeWithAggregatesFilter<"ContentWorkspaceItem"> | $Enums.ContentWorkspaceItemAssignmentType
+    scope?: EnumContentWorkspaceItemScopeWithAggregatesFilter<"ContentWorkspaceItem"> | $Enums.ContentWorkspaceItemScope
+    expiresAt?: DateTimeNullableWithAggregatesFilter<"ContentWorkspaceItem"> | Date | string | null
+    createdAt?: DateTimeWithAggregatesFilter<"ContentWorkspaceItem"> | Date | string
+    updatedAt?: DateTimeWithAggregatesFilter<"ContentWorkspaceItem"> | Date | string
   }
 
   export type CategoryWhereInput = {
@@ -55441,6 +58346,7 @@ export namespace Prisma {
     trashBinEntry?: TrashBinCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantCreateNestedManyWithoutContentInput
     calendarEvents?: CalendarEventCreateNestedManyWithoutLinkedContentInput
+    workspaceItems?: ContentWorkspaceItemCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeUncheckedCreateInput = {
@@ -55485,6 +58391,7 @@ export namespace Prisma {
     trashBinEntry?: TrashBinUncheckedCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantUncheckedCreateNestedManyWithoutContentInput
     calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutLinkedContentInput
+    workspaceItems?: ContentWorkspaceItemUncheckedCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeUpdateInput = {
@@ -55529,6 +58436,7 @@ export namespace Prisma {
     trashBinEntry?: TrashBinUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUpdateManyWithoutContentNestedInput
     calendarEvents?: CalendarEventUpdateManyWithoutLinkedContentNestedInput
+    workspaceItems?: ContentWorkspaceItemUpdateManyWithoutContentNestedInput
   }
 
   export type ContentNodeUncheckedUpdateInput = {
@@ -55573,6 +58481,7 @@ export namespace Prisma {
     trashBinEntry?: TrashBinUncheckedUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUncheckedUpdateManyWithoutContentNestedInput
     calendarEvents?: CalendarEventUncheckedUpdateManyWithoutLinkedContentNestedInput
+    workspaceItems?: ContentWorkspaceItemUncheckedUpdateManyWithoutContentNestedInput
   }
 
   export type ContentNodeCreateManyInput = {
@@ -56549,6 +59458,7 @@ export namespace Prisma {
     calendarConnections?: CalendarConnectionCreateNestedManyWithoutUserInput
     calendarSources?: CalendarSourceCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventCreateNestedManyWithoutUserInput
+    contentWorkspaces?: ContentWorkspaceCreateNestedManyWithoutOwnerInput
   }
 
   export type UserUncheckedCreateInput = {
@@ -56586,6 +59496,7 @@ export namespace Prisma {
     calendarConnections?: CalendarConnectionUncheckedCreateNestedManyWithoutUserInput
     calendarSources?: CalendarSourceUncheckedCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutUserInput
+    contentWorkspaces?: ContentWorkspaceUncheckedCreateNestedManyWithoutOwnerInput
   }
 
   export type UserUpdateInput = {
@@ -56623,6 +59534,7 @@ export namespace Prisma {
     calendarConnections?: CalendarConnectionUpdateManyWithoutUserNestedInput
     calendarSources?: CalendarSourceUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUpdateManyWithoutUserNestedInput
+    contentWorkspaces?: ContentWorkspaceUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUncheckedUpdateInput = {
@@ -56660,6 +59572,7 @@ export namespace Prisma {
     calendarConnections?: CalendarConnectionUncheckedUpdateManyWithoutUserNestedInput
     calendarSources?: CalendarSourceUncheckedUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUncheckedUpdateManyWithoutUserNestedInput
+    contentWorkspaces?: ContentWorkspaceUncheckedUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserCreateManyInput = {
@@ -56696,6 +59609,210 @@ export namespace Prisma {
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
     settingsVersion?: IntFieldUpdateOperationsInput | number
+  }
+
+  export type ContentWorkspaceCreateInput = {
+    id?: string
+    name: string
+    slug: string
+    isMain?: boolean
+    isLocked?: boolean
+    status?: $Enums.ContentWorkspaceStatus
+    expiresAt?: Date | string | null
+    archivedAt?: Date | string | null
+    layoutMode?: string
+    activePaneId?: string
+    paneState?: JsonNullValueInput | InputJsonValue
+    settings?: JsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    owner: UserCreateNestedOneWithoutContentWorkspacesInput
+    items?: ContentWorkspaceItemCreateNestedManyWithoutWorkspaceInput
+  }
+
+  export type ContentWorkspaceUncheckedCreateInput = {
+    id?: string
+    ownerId: string
+    name: string
+    slug: string
+    isMain?: boolean
+    isLocked?: boolean
+    status?: $Enums.ContentWorkspaceStatus
+    expiresAt?: Date | string | null
+    archivedAt?: Date | string | null
+    layoutMode?: string
+    activePaneId?: string
+    paneState?: JsonNullValueInput | InputJsonValue
+    settings?: JsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    items?: ContentWorkspaceItemUncheckedCreateNestedManyWithoutWorkspaceInput
+  }
+
+  export type ContentWorkspaceUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    slug?: StringFieldUpdateOperationsInput | string
+    isMain?: BoolFieldUpdateOperationsInput | boolean
+    isLocked?: BoolFieldUpdateOperationsInput | boolean
+    status?: EnumContentWorkspaceStatusFieldUpdateOperationsInput | $Enums.ContentWorkspaceStatus
+    expiresAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    archivedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    layoutMode?: StringFieldUpdateOperationsInput | string
+    activePaneId?: StringFieldUpdateOperationsInput | string
+    paneState?: JsonNullValueInput | InputJsonValue
+    settings?: JsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    owner?: UserUpdateOneRequiredWithoutContentWorkspacesNestedInput
+    items?: ContentWorkspaceItemUpdateManyWithoutWorkspaceNestedInput
+  }
+
+  export type ContentWorkspaceUncheckedUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    ownerId?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    slug?: StringFieldUpdateOperationsInput | string
+    isMain?: BoolFieldUpdateOperationsInput | boolean
+    isLocked?: BoolFieldUpdateOperationsInput | boolean
+    status?: EnumContentWorkspaceStatusFieldUpdateOperationsInput | $Enums.ContentWorkspaceStatus
+    expiresAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    archivedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    layoutMode?: StringFieldUpdateOperationsInput | string
+    activePaneId?: StringFieldUpdateOperationsInput | string
+    paneState?: JsonNullValueInput | InputJsonValue
+    settings?: JsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    items?: ContentWorkspaceItemUncheckedUpdateManyWithoutWorkspaceNestedInput
+  }
+
+  export type ContentWorkspaceCreateManyInput = {
+    id?: string
+    ownerId: string
+    name: string
+    slug: string
+    isMain?: boolean
+    isLocked?: boolean
+    status?: $Enums.ContentWorkspaceStatus
+    expiresAt?: Date | string | null
+    archivedAt?: Date | string | null
+    layoutMode?: string
+    activePaneId?: string
+    paneState?: JsonNullValueInput | InputJsonValue
+    settings?: JsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type ContentWorkspaceUpdateManyMutationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    slug?: StringFieldUpdateOperationsInput | string
+    isMain?: BoolFieldUpdateOperationsInput | boolean
+    isLocked?: BoolFieldUpdateOperationsInput | boolean
+    status?: EnumContentWorkspaceStatusFieldUpdateOperationsInput | $Enums.ContentWorkspaceStatus
+    expiresAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    archivedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    layoutMode?: StringFieldUpdateOperationsInput | string
+    activePaneId?: StringFieldUpdateOperationsInput | string
+    paneState?: JsonNullValueInput | InputJsonValue
+    settings?: JsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type ContentWorkspaceUncheckedUpdateManyInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    ownerId?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    slug?: StringFieldUpdateOperationsInput | string
+    isMain?: BoolFieldUpdateOperationsInput | boolean
+    isLocked?: BoolFieldUpdateOperationsInput | boolean
+    status?: EnumContentWorkspaceStatusFieldUpdateOperationsInput | $Enums.ContentWorkspaceStatus
+    expiresAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    archivedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    layoutMode?: StringFieldUpdateOperationsInput | string
+    activePaneId?: StringFieldUpdateOperationsInput | string
+    paneState?: JsonNullValueInput | InputJsonValue
+    settings?: JsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type ContentWorkspaceItemCreateInput = {
+    id?: string
+    assignmentType?: $Enums.ContentWorkspaceItemAssignmentType
+    scope?: $Enums.ContentWorkspaceItemScope
+    expiresAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    workspace: ContentWorkspaceCreateNestedOneWithoutItemsInput
+    content: ContentNodeCreateNestedOneWithoutWorkspaceItemsInput
+  }
+
+  export type ContentWorkspaceItemUncheckedCreateInput = {
+    id?: string
+    workspaceId: string
+    contentId: string
+    assignmentType?: $Enums.ContentWorkspaceItemAssignmentType
+    scope?: $Enums.ContentWorkspaceItemScope
+    expiresAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type ContentWorkspaceItemUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    assignmentType?: EnumContentWorkspaceItemAssignmentTypeFieldUpdateOperationsInput | $Enums.ContentWorkspaceItemAssignmentType
+    scope?: EnumContentWorkspaceItemScopeFieldUpdateOperationsInput | $Enums.ContentWorkspaceItemScope
+    expiresAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    workspace?: ContentWorkspaceUpdateOneRequiredWithoutItemsNestedInput
+    content?: ContentNodeUpdateOneRequiredWithoutWorkspaceItemsNestedInput
+  }
+
+  export type ContentWorkspaceItemUncheckedUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    workspaceId?: StringFieldUpdateOperationsInput | string
+    contentId?: StringFieldUpdateOperationsInput | string
+    assignmentType?: EnumContentWorkspaceItemAssignmentTypeFieldUpdateOperationsInput | $Enums.ContentWorkspaceItemAssignmentType
+    scope?: EnumContentWorkspaceItemScopeFieldUpdateOperationsInput | $Enums.ContentWorkspaceItemScope
+    expiresAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type ContentWorkspaceItemCreateManyInput = {
+    id?: string
+    workspaceId: string
+    contentId: string
+    assignmentType?: $Enums.ContentWorkspaceItemAssignmentType
+    scope?: $Enums.ContentWorkspaceItemScope
+    expiresAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type ContentWorkspaceItemUpdateManyMutationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    assignmentType?: EnumContentWorkspaceItemAssignmentTypeFieldUpdateOperationsInput | $Enums.ContentWorkspaceItemAssignmentType
+    scope?: EnumContentWorkspaceItemScopeFieldUpdateOperationsInput | $Enums.ContentWorkspaceItemScope
+    expiresAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type ContentWorkspaceItemUncheckedUpdateManyInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    workspaceId?: StringFieldUpdateOperationsInput | string
+    contentId?: StringFieldUpdateOperationsInput | string
+    assignmentType?: EnumContentWorkspaceItemAssignmentTypeFieldUpdateOperationsInput | $Enums.ContentWorkspaceItemAssignmentType
+    scope?: EnumContentWorkspaceItemScopeFieldUpdateOperationsInput | $Enums.ContentWorkspaceItemScope
+    expiresAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
   export type CategoryCreateInput = {
@@ -59218,6 +62335,12 @@ export namespace Prisma {
     none?: CalendarEventWhereInput
   }
 
+  export type ContentWorkspaceItemListRelationFilter = {
+    every?: ContentWorkspaceItemWhereInput
+    some?: ContentWorkspaceItemWhereInput
+    none?: ContentWorkspaceItemWhereInput
+  }
+
   export type SortOrderInput = {
     sort: SortOrder
     nulls?: NullsOrder
@@ -59256,6 +62379,10 @@ export namespace Prisma {
   }
 
   export type CalendarEventOrderByRelationAggregateInput = {
+    _count?: SortOrder
+  }
+
+  export type ContentWorkspaceItemOrderByRelationAggregateInput = {
     _count?: SortOrder
   }
 
@@ -60198,6 +63325,12 @@ export namespace Prisma {
     none?: CalendarSourceWhereInput
   }
 
+  export type ContentWorkspaceListRelationFilter = {
+    every?: ContentWorkspaceWhereInput
+    some?: ContentWorkspaceWhereInput
+    none?: ContentWorkspaceWhereInput
+  }
+
   export type AccountOrderByRelationAggregateInput = {
     _count?: SortOrder
   }
@@ -60262,6 +63395,10 @@ export namespace Prisma {
     _count?: SortOrder
   }
 
+  export type ContentWorkspaceOrderByRelationAggregateInput = {
+    _count?: SortOrder
+  }
+
   export type UserCountOrderByAggregateInput = {
     id?: SortOrder
     username?: SortOrder
@@ -60312,6 +63449,155 @@ export namespace Prisma {
     _count?: NestedIntFilter<$PrismaModel>
     _min?: NestedEnumUserRoleFilter<$PrismaModel>
     _max?: NestedEnumUserRoleFilter<$PrismaModel>
+  }
+
+  export type EnumContentWorkspaceStatusFilter<$PrismaModel = never> = {
+    equals?: $Enums.ContentWorkspaceStatus | EnumContentWorkspaceStatusFieldRefInput<$PrismaModel>
+    in?: $Enums.ContentWorkspaceStatus[] | ListEnumContentWorkspaceStatusFieldRefInput<$PrismaModel>
+    notIn?: $Enums.ContentWorkspaceStatus[] | ListEnumContentWorkspaceStatusFieldRefInput<$PrismaModel>
+    not?: NestedEnumContentWorkspaceStatusFilter<$PrismaModel> | $Enums.ContentWorkspaceStatus
+  }
+
+  export type ContentWorkspaceOwnerIdSlugCompoundUniqueInput = {
+    ownerId: string
+    slug: string
+  }
+
+  export type ContentWorkspaceCountOrderByAggregateInput = {
+    id?: SortOrder
+    ownerId?: SortOrder
+    name?: SortOrder
+    slug?: SortOrder
+    isMain?: SortOrder
+    isLocked?: SortOrder
+    status?: SortOrder
+    expiresAt?: SortOrder
+    archivedAt?: SortOrder
+    layoutMode?: SortOrder
+    activePaneId?: SortOrder
+    paneState?: SortOrder
+    settings?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type ContentWorkspaceMaxOrderByAggregateInput = {
+    id?: SortOrder
+    ownerId?: SortOrder
+    name?: SortOrder
+    slug?: SortOrder
+    isMain?: SortOrder
+    isLocked?: SortOrder
+    status?: SortOrder
+    expiresAt?: SortOrder
+    archivedAt?: SortOrder
+    layoutMode?: SortOrder
+    activePaneId?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type ContentWorkspaceMinOrderByAggregateInput = {
+    id?: SortOrder
+    ownerId?: SortOrder
+    name?: SortOrder
+    slug?: SortOrder
+    isMain?: SortOrder
+    isLocked?: SortOrder
+    status?: SortOrder
+    expiresAt?: SortOrder
+    archivedAt?: SortOrder
+    layoutMode?: SortOrder
+    activePaneId?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type EnumContentWorkspaceStatusWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: $Enums.ContentWorkspaceStatus | EnumContentWorkspaceStatusFieldRefInput<$PrismaModel>
+    in?: $Enums.ContentWorkspaceStatus[] | ListEnumContentWorkspaceStatusFieldRefInput<$PrismaModel>
+    notIn?: $Enums.ContentWorkspaceStatus[] | ListEnumContentWorkspaceStatusFieldRefInput<$PrismaModel>
+    not?: NestedEnumContentWorkspaceStatusWithAggregatesFilter<$PrismaModel> | $Enums.ContentWorkspaceStatus
+    _count?: NestedIntFilter<$PrismaModel>
+    _min?: NestedEnumContentWorkspaceStatusFilter<$PrismaModel>
+    _max?: NestedEnumContentWorkspaceStatusFilter<$PrismaModel>
+  }
+
+  export type EnumContentWorkspaceItemAssignmentTypeFilter<$PrismaModel = never> = {
+    equals?: $Enums.ContentWorkspaceItemAssignmentType | EnumContentWorkspaceItemAssignmentTypeFieldRefInput<$PrismaModel>
+    in?: $Enums.ContentWorkspaceItemAssignmentType[] | ListEnumContentWorkspaceItemAssignmentTypeFieldRefInput<$PrismaModel>
+    notIn?: $Enums.ContentWorkspaceItemAssignmentType[] | ListEnumContentWorkspaceItemAssignmentTypeFieldRefInput<$PrismaModel>
+    not?: NestedEnumContentWorkspaceItemAssignmentTypeFilter<$PrismaModel> | $Enums.ContentWorkspaceItemAssignmentType
+  }
+
+  export type EnumContentWorkspaceItemScopeFilter<$PrismaModel = never> = {
+    equals?: $Enums.ContentWorkspaceItemScope | EnumContentWorkspaceItemScopeFieldRefInput<$PrismaModel>
+    in?: $Enums.ContentWorkspaceItemScope[] | ListEnumContentWorkspaceItemScopeFieldRefInput<$PrismaModel>
+    notIn?: $Enums.ContentWorkspaceItemScope[] | ListEnumContentWorkspaceItemScopeFieldRefInput<$PrismaModel>
+    not?: NestedEnumContentWorkspaceItemScopeFilter<$PrismaModel> | $Enums.ContentWorkspaceItemScope
+  }
+
+  export type ContentWorkspaceScalarRelationFilter = {
+    is?: ContentWorkspaceWhereInput
+    isNot?: ContentWorkspaceWhereInput
+  }
+
+  export type ContentWorkspaceItemWorkspaceIdContentIdCompoundUniqueInput = {
+    workspaceId: string
+    contentId: string
+  }
+
+  export type ContentWorkspaceItemCountOrderByAggregateInput = {
+    id?: SortOrder
+    workspaceId?: SortOrder
+    contentId?: SortOrder
+    assignmentType?: SortOrder
+    scope?: SortOrder
+    expiresAt?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type ContentWorkspaceItemMaxOrderByAggregateInput = {
+    id?: SortOrder
+    workspaceId?: SortOrder
+    contentId?: SortOrder
+    assignmentType?: SortOrder
+    scope?: SortOrder
+    expiresAt?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type ContentWorkspaceItemMinOrderByAggregateInput = {
+    id?: SortOrder
+    workspaceId?: SortOrder
+    contentId?: SortOrder
+    assignmentType?: SortOrder
+    scope?: SortOrder
+    expiresAt?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type EnumContentWorkspaceItemAssignmentTypeWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: $Enums.ContentWorkspaceItemAssignmentType | EnumContentWorkspaceItemAssignmentTypeFieldRefInput<$PrismaModel>
+    in?: $Enums.ContentWorkspaceItemAssignmentType[] | ListEnumContentWorkspaceItemAssignmentTypeFieldRefInput<$PrismaModel>
+    notIn?: $Enums.ContentWorkspaceItemAssignmentType[] | ListEnumContentWorkspaceItemAssignmentTypeFieldRefInput<$PrismaModel>
+    not?: NestedEnumContentWorkspaceItemAssignmentTypeWithAggregatesFilter<$PrismaModel> | $Enums.ContentWorkspaceItemAssignmentType
+    _count?: NestedIntFilter<$PrismaModel>
+    _min?: NestedEnumContentWorkspaceItemAssignmentTypeFilter<$PrismaModel>
+    _max?: NestedEnumContentWorkspaceItemAssignmentTypeFilter<$PrismaModel>
+  }
+
+  export type EnumContentWorkspaceItemScopeWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: $Enums.ContentWorkspaceItemScope | EnumContentWorkspaceItemScopeFieldRefInput<$PrismaModel>
+    in?: $Enums.ContentWorkspaceItemScope[] | ListEnumContentWorkspaceItemScopeFieldRefInput<$PrismaModel>
+    notIn?: $Enums.ContentWorkspaceItemScope[] | ListEnumContentWorkspaceItemScopeFieldRefInput<$PrismaModel>
+    not?: NestedEnumContentWorkspaceItemScopeWithAggregatesFilter<$PrismaModel> | $Enums.ContentWorkspaceItemScope
+    _count?: NestedIntFilter<$PrismaModel>
+    _min?: NestedEnumContentWorkspaceItemScopeFilter<$PrismaModel>
+    _max?: NestedEnumContentWorkspaceItemScopeFilter<$PrismaModel>
   }
 
   export type CategoryCountOrderByAggregateInput = {
@@ -61619,6 +64905,13 @@ export namespace Prisma {
     connect?: CalendarEventWhereUniqueInput | CalendarEventWhereUniqueInput[]
   }
 
+  export type ContentWorkspaceItemCreateNestedManyWithoutContentInput = {
+    create?: XOR<ContentWorkspaceItemCreateWithoutContentInput, ContentWorkspaceItemUncheckedCreateWithoutContentInput> | ContentWorkspaceItemCreateWithoutContentInput[] | ContentWorkspaceItemUncheckedCreateWithoutContentInput[]
+    connectOrCreate?: ContentWorkspaceItemCreateOrConnectWithoutContentInput | ContentWorkspaceItemCreateOrConnectWithoutContentInput[]
+    createMany?: ContentWorkspaceItemCreateManyContentInputEnvelope
+    connect?: ContentWorkspaceItemWhereUniqueInput | ContentWorkspaceItemWhereUniqueInput[]
+  }
+
   export type AuditLogUncheckedCreateNestedManyWithoutTargetContentInput = {
     create?: XOR<AuditLogCreateWithoutTargetContentInput, AuditLogUncheckedCreateWithoutTargetContentInput> | AuditLogCreateWithoutTargetContentInput[] | AuditLogUncheckedCreateWithoutTargetContentInput[]
     connectOrCreate?: AuditLogCreateOrConnectWithoutTargetContentInput | AuditLogCreateOrConnectWithoutTargetContentInput[]
@@ -61765,6 +65058,13 @@ export namespace Prisma {
     connectOrCreate?: CalendarEventCreateOrConnectWithoutLinkedContentInput | CalendarEventCreateOrConnectWithoutLinkedContentInput[]
     createMany?: CalendarEventCreateManyLinkedContentInputEnvelope
     connect?: CalendarEventWhereUniqueInput | CalendarEventWhereUniqueInput[]
+  }
+
+  export type ContentWorkspaceItemUncheckedCreateNestedManyWithoutContentInput = {
+    create?: XOR<ContentWorkspaceItemCreateWithoutContentInput, ContentWorkspaceItemUncheckedCreateWithoutContentInput> | ContentWorkspaceItemCreateWithoutContentInput[] | ContentWorkspaceItemUncheckedCreateWithoutContentInput[]
+    connectOrCreate?: ContentWorkspaceItemCreateOrConnectWithoutContentInput | ContentWorkspaceItemCreateOrConnectWithoutContentInput[]
+    createMany?: ContentWorkspaceItemCreateManyContentInputEnvelope
+    connect?: ContentWorkspaceItemWhereUniqueInput | ContentWorkspaceItemWhereUniqueInput[]
   }
 
   export type StringFieldUpdateOperationsInput = {
@@ -62121,6 +65421,20 @@ export namespace Prisma {
     deleteMany?: CalendarEventScalarWhereInput | CalendarEventScalarWhereInput[]
   }
 
+  export type ContentWorkspaceItemUpdateManyWithoutContentNestedInput = {
+    create?: XOR<ContentWorkspaceItemCreateWithoutContentInput, ContentWorkspaceItemUncheckedCreateWithoutContentInput> | ContentWorkspaceItemCreateWithoutContentInput[] | ContentWorkspaceItemUncheckedCreateWithoutContentInput[]
+    connectOrCreate?: ContentWorkspaceItemCreateOrConnectWithoutContentInput | ContentWorkspaceItemCreateOrConnectWithoutContentInput[]
+    upsert?: ContentWorkspaceItemUpsertWithWhereUniqueWithoutContentInput | ContentWorkspaceItemUpsertWithWhereUniqueWithoutContentInput[]
+    createMany?: ContentWorkspaceItemCreateManyContentInputEnvelope
+    set?: ContentWorkspaceItemWhereUniqueInput | ContentWorkspaceItemWhereUniqueInput[]
+    disconnect?: ContentWorkspaceItemWhereUniqueInput | ContentWorkspaceItemWhereUniqueInput[]
+    delete?: ContentWorkspaceItemWhereUniqueInput | ContentWorkspaceItemWhereUniqueInput[]
+    connect?: ContentWorkspaceItemWhereUniqueInput | ContentWorkspaceItemWhereUniqueInput[]
+    update?: ContentWorkspaceItemUpdateWithWhereUniqueWithoutContentInput | ContentWorkspaceItemUpdateWithWhereUniqueWithoutContentInput[]
+    updateMany?: ContentWorkspaceItemUpdateManyWithWhereWithoutContentInput | ContentWorkspaceItemUpdateManyWithWhereWithoutContentInput[]
+    deleteMany?: ContentWorkspaceItemScalarWhereInput | ContentWorkspaceItemScalarWhereInput[]
+  }
+
   export type AuditLogUncheckedUpdateManyWithoutTargetContentNestedInput = {
     create?: XOR<AuditLogCreateWithoutTargetContentInput, AuditLogUncheckedCreateWithoutTargetContentInput> | AuditLogCreateWithoutTargetContentInput[] | AuditLogUncheckedCreateWithoutTargetContentInput[]
     connectOrCreate?: AuditLogCreateOrConnectWithoutTargetContentInput | AuditLogCreateOrConnectWithoutTargetContentInput[]
@@ -62389,6 +65703,20 @@ export namespace Prisma {
     update?: CalendarEventUpdateWithWhereUniqueWithoutLinkedContentInput | CalendarEventUpdateWithWhereUniqueWithoutLinkedContentInput[]
     updateMany?: CalendarEventUpdateManyWithWhereWithoutLinkedContentInput | CalendarEventUpdateManyWithWhereWithoutLinkedContentInput[]
     deleteMany?: CalendarEventScalarWhereInput | CalendarEventScalarWhereInput[]
+  }
+
+  export type ContentWorkspaceItemUncheckedUpdateManyWithoutContentNestedInput = {
+    create?: XOR<ContentWorkspaceItemCreateWithoutContentInput, ContentWorkspaceItemUncheckedCreateWithoutContentInput> | ContentWorkspaceItemCreateWithoutContentInput[] | ContentWorkspaceItemUncheckedCreateWithoutContentInput[]
+    connectOrCreate?: ContentWorkspaceItemCreateOrConnectWithoutContentInput | ContentWorkspaceItemCreateOrConnectWithoutContentInput[]
+    upsert?: ContentWorkspaceItemUpsertWithWhereUniqueWithoutContentInput | ContentWorkspaceItemUpsertWithWhereUniqueWithoutContentInput[]
+    createMany?: ContentWorkspaceItemCreateManyContentInputEnvelope
+    set?: ContentWorkspaceItemWhereUniqueInput | ContentWorkspaceItemWhereUniqueInput[]
+    disconnect?: ContentWorkspaceItemWhereUniqueInput | ContentWorkspaceItemWhereUniqueInput[]
+    delete?: ContentWorkspaceItemWhereUniqueInput | ContentWorkspaceItemWhereUniqueInput[]
+    connect?: ContentWorkspaceItemWhereUniqueInput | ContentWorkspaceItemWhereUniqueInput[]
+    update?: ContentWorkspaceItemUpdateWithWhereUniqueWithoutContentInput | ContentWorkspaceItemUpdateWithWhereUniqueWithoutContentInput[]
+    updateMany?: ContentWorkspaceItemUpdateManyWithWhereWithoutContentInput | ContentWorkspaceItemUpdateManyWithWhereWithoutContentInput[]
+    deleteMany?: ContentWorkspaceItemScalarWhereInput | ContentWorkspaceItemScalarWhereInput[]
   }
 
   export type ContentNodeCreateNestedOneWithoutNotePayloadInput = {
@@ -62809,6 +66137,13 @@ export namespace Prisma {
     connect?: CalendarEventWhereUniqueInput | CalendarEventWhereUniqueInput[]
   }
 
+  export type ContentWorkspaceCreateNestedManyWithoutOwnerInput = {
+    create?: XOR<ContentWorkspaceCreateWithoutOwnerInput, ContentWorkspaceUncheckedCreateWithoutOwnerInput> | ContentWorkspaceCreateWithoutOwnerInput[] | ContentWorkspaceUncheckedCreateWithoutOwnerInput[]
+    connectOrCreate?: ContentWorkspaceCreateOrConnectWithoutOwnerInput | ContentWorkspaceCreateOrConnectWithoutOwnerInput[]
+    createMany?: ContentWorkspaceCreateManyOwnerInputEnvelope
+    connect?: ContentWorkspaceWhereUniqueInput | ContentWorkspaceWhereUniqueInput[]
+  }
+
   export type AccountUncheckedCreateNestedManyWithoutUserInput = {
     create?: XOR<AccountCreateWithoutUserInput, AccountUncheckedCreateWithoutUserInput> | AccountCreateWithoutUserInput[] | AccountUncheckedCreateWithoutUserInput[]
     connectOrCreate?: AccountCreateOrConnectWithoutUserInput | AccountCreateOrConnectWithoutUserInput[]
@@ -62982,6 +66317,13 @@ export namespace Prisma {
     connectOrCreate?: CalendarEventCreateOrConnectWithoutUserInput | CalendarEventCreateOrConnectWithoutUserInput[]
     createMany?: CalendarEventCreateManyUserInputEnvelope
     connect?: CalendarEventWhereUniqueInput | CalendarEventWhereUniqueInput[]
+  }
+
+  export type ContentWorkspaceUncheckedCreateNestedManyWithoutOwnerInput = {
+    create?: XOR<ContentWorkspaceCreateWithoutOwnerInput, ContentWorkspaceUncheckedCreateWithoutOwnerInput> | ContentWorkspaceCreateWithoutOwnerInput[] | ContentWorkspaceUncheckedCreateWithoutOwnerInput[]
+    connectOrCreate?: ContentWorkspaceCreateOrConnectWithoutOwnerInput | ContentWorkspaceCreateOrConnectWithoutOwnerInput[]
+    createMany?: ContentWorkspaceCreateManyOwnerInputEnvelope
+    connect?: ContentWorkspaceWhereUniqueInput | ContentWorkspaceWhereUniqueInput[]
   }
 
   export type EnumUserRoleFieldUpdateOperationsInput = {
@@ -63338,6 +66680,20 @@ export namespace Prisma {
     deleteMany?: CalendarEventScalarWhereInput | CalendarEventScalarWhereInput[]
   }
 
+  export type ContentWorkspaceUpdateManyWithoutOwnerNestedInput = {
+    create?: XOR<ContentWorkspaceCreateWithoutOwnerInput, ContentWorkspaceUncheckedCreateWithoutOwnerInput> | ContentWorkspaceCreateWithoutOwnerInput[] | ContentWorkspaceUncheckedCreateWithoutOwnerInput[]
+    connectOrCreate?: ContentWorkspaceCreateOrConnectWithoutOwnerInput | ContentWorkspaceCreateOrConnectWithoutOwnerInput[]
+    upsert?: ContentWorkspaceUpsertWithWhereUniqueWithoutOwnerInput | ContentWorkspaceUpsertWithWhereUniqueWithoutOwnerInput[]
+    createMany?: ContentWorkspaceCreateManyOwnerInputEnvelope
+    set?: ContentWorkspaceWhereUniqueInput | ContentWorkspaceWhereUniqueInput[]
+    disconnect?: ContentWorkspaceWhereUniqueInput | ContentWorkspaceWhereUniqueInput[]
+    delete?: ContentWorkspaceWhereUniqueInput | ContentWorkspaceWhereUniqueInput[]
+    connect?: ContentWorkspaceWhereUniqueInput | ContentWorkspaceWhereUniqueInput[]
+    update?: ContentWorkspaceUpdateWithWhereUniqueWithoutOwnerInput | ContentWorkspaceUpdateWithWhereUniqueWithoutOwnerInput[]
+    updateMany?: ContentWorkspaceUpdateManyWithWhereWithoutOwnerInput | ContentWorkspaceUpdateManyWithWhereWithoutOwnerInput[]
+    deleteMany?: ContentWorkspaceScalarWhereInput | ContentWorkspaceScalarWhereInput[]
+  }
+
   export type AccountUncheckedUpdateManyWithoutUserNestedInput = {
     create?: XOR<AccountCreateWithoutUserInput, AccountUncheckedCreateWithoutUserInput> | AccountCreateWithoutUserInput[] | AccountUncheckedCreateWithoutUserInput[]
     connectOrCreate?: AccountCreateOrConnectWithoutUserInput | AccountCreateOrConnectWithoutUserInput[]
@@ -63686,6 +67042,116 @@ export namespace Prisma {
     update?: CalendarEventUpdateWithWhereUniqueWithoutUserInput | CalendarEventUpdateWithWhereUniqueWithoutUserInput[]
     updateMany?: CalendarEventUpdateManyWithWhereWithoutUserInput | CalendarEventUpdateManyWithWhereWithoutUserInput[]
     deleteMany?: CalendarEventScalarWhereInput | CalendarEventScalarWhereInput[]
+  }
+
+  export type ContentWorkspaceUncheckedUpdateManyWithoutOwnerNestedInput = {
+    create?: XOR<ContentWorkspaceCreateWithoutOwnerInput, ContentWorkspaceUncheckedCreateWithoutOwnerInput> | ContentWorkspaceCreateWithoutOwnerInput[] | ContentWorkspaceUncheckedCreateWithoutOwnerInput[]
+    connectOrCreate?: ContentWorkspaceCreateOrConnectWithoutOwnerInput | ContentWorkspaceCreateOrConnectWithoutOwnerInput[]
+    upsert?: ContentWorkspaceUpsertWithWhereUniqueWithoutOwnerInput | ContentWorkspaceUpsertWithWhereUniqueWithoutOwnerInput[]
+    createMany?: ContentWorkspaceCreateManyOwnerInputEnvelope
+    set?: ContentWorkspaceWhereUniqueInput | ContentWorkspaceWhereUniqueInput[]
+    disconnect?: ContentWorkspaceWhereUniqueInput | ContentWorkspaceWhereUniqueInput[]
+    delete?: ContentWorkspaceWhereUniqueInput | ContentWorkspaceWhereUniqueInput[]
+    connect?: ContentWorkspaceWhereUniqueInput | ContentWorkspaceWhereUniqueInput[]
+    update?: ContentWorkspaceUpdateWithWhereUniqueWithoutOwnerInput | ContentWorkspaceUpdateWithWhereUniqueWithoutOwnerInput[]
+    updateMany?: ContentWorkspaceUpdateManyWithWhereWithoutOwnerInput | ContentWorkspaceUpdateManyWithWhereWithoutOwnerInput[]
+    deleteMany?: ContentWorkspaceScalarWhereInput | ContentWorkspaceScalarWhereInput[]
+  }
+
+  export type UserCreateNestedOneWithoutContentWorkspacesInput = {
+    create?: XOR<UserCreateWithoutContentWorkspacesInput, UserUncheckedCreateWithoutContentWorkspacesInput>
+    connectOrCreate?: UserCreateOrConnectWithoutContentWorkspacesInput
+    connect?: UserWhereUniqueInput
+  }
+
+  export type ContentWorkspaceItemCreateNestedManyWithoutWorkspaceInput = {
+    create?: XOR<ContentWorkspaceItemCreateWithoutWorkspaceInput, ContentWorkspaceItemUncheckedCreateWithoutWorkspaceInput> | ContentWorkspaceItemCreateWithoutWorkspaceInput[] | ContentWorkspaceItemUncheckedCreateWithoutWorkspaceInput[]
+    connectOrCreate?: ContentWorkspaceItemCreateOrConnectWithoutWorkspaceInput | ContentWorkspaceItemCreateOrConnectWithoutWorkspaceInput[]
+    createMany?: ContentWorkspaceItemCreateManyWorkspaceInputEnvelope
+    connect?: ContentWorkspaceItemWhereUniqueInput | ContentWorkspaceItemWhereUniqueInput[]
+  }
+
+  export type ContentWorkspaceItemUncheckedCreateNestedManyWithoutWorkspaceInput = {
+    create?: XOR<ContentWorkspaceItemCreateWithoutWorkspaceInput, ContentWorkspaceItemUncheckedCreateWithoutWorkspaceInput> | ContentWorkspaceItemCreateWithoutWorkspaceInput[] | ContentWorkspaceItemUncheckedCreateWithoutWorkspaceInput[]
+    connectOrCreate?: ContentWorkspaceItemCreateOrConnectWithoutWorkspaceInput | ContentWorkspaceItemCreateOrConnectWithoutWorkspaceInput[]
+    createMany?: ContentWorkspaceItemCreateManyWorkspaceInputEnvelope
+    connect?: ContentWorkspaceItemWhereUniqueInput | ContentWorkspaceItemWhereUniqueInput[]
+  }
+
+  export type EnumContentWorkspaceStatusFieldUpdateOperationsInput = {
+    set?: $Enums.ContentWorkspaceStatus
+  }
+
+  export type UserUpdateOneRequiredWithoutContentWorkspacesNestedInput = {
+    create?: XOR<UserCreateWithoutContentWorkspacesInput, UserUncheckedCreateWithoutContentWorkspacesInput>
+    connectOrCreate?: UserCreateOrConnectWithoutContentWorkspacesInput
+    upsert?: UserUpsertWithoutContentWorkspacesInput
+    connect?: UserWhereUniqueInput
+    update?: XOR<XOR<UserUpdateToOneWithWhereWithoutContentWorkspacesInput, UserUpdateWithoutContentWorkspacesInput>, UserUncheckedUpdateWithoutContentWorkspacesInput>
+  }
+
+  export type ContentWorkspaceItemUpdateManyWithoutWorkspaceNestedInput = {
+    create?: XOR<ContentWorkspaceItemCreateWithoutWorkspaceInput, ContentWorkspaceItemUncheckedCreateWithoutWorkspaceInput> | ContentWorkspaceItemCreateWithoutWorkspaceInput[] | ContentWorkspaceItemUncheckedCreateWithoutWorkspaceInput[]
+    connectOrCreate?: ContentWorkspaceItemCreateOrConnectWithoutWorkspaceInput | ContentWorkspaceItemCreateOrConnectWithoutWorkspaceInput[]
+    upsert?: ContentWorkspaceItemUpsertWithWhereUniqueWithoutWorkspaceInput | ContentWorkspaceItemUpsertWithWhereUniqueWithoutWorkspaceInput[]
+    createMany?: ContentWorkspaceItemCreateManyWorkspaceInputEnvelope
+    set?: ContentWorkspaceItemWhereUniqueInput | ContentWorkspaceItemWhereUniqueInput[]
+    disconnect?: ContentWorkspaceItemWhereUniqueInput | ContentWorkspaceItemWhereUniqueInput[]
+    delete?: ContentWorkspaceItemWhereUniqueInput | ContentWorkspaceItemWhereUniqueInput[]
+    connect?: ContentWorkspaceItemWhereUniqueInput | ContentWorkspaceItemWhereUniqueInput[]
+    update?: ContentWorkspaceItemUpdateWithWhereUniqueWithoutWorkspaceInput | ContentWorkspaceItemUpdateWithWhereUniqueWithoutWorkspaceInput[]
+    updateMany?: ContentWorkspaceItemUpdateManyWithWhereWithoutWorkspaceInput | ContentWorkspaceItemUpdateManyWithWhereWithoutWorkspaceInput[]
+    deleteMany?: ContentWorkspaceItemScalarWhereInput | ContentWorkspaceItemScalarWhereInput[]
+  }
+
+  export type ContentWorkspaceItemUncheckedUpdateManyWithoutWorkspaceNestedInput = {
+    create?: XOR<ContentWorkspaceItemCreateWithoutWorkspaceInput, ContentWorkspaceItemUncheckedCreateWithoutWorkspaceInput> | ContentWorkspaceItemCreateWithoutWorkspaceInput[] | ContentWorkspaceItemUncheckedCreateWithoutWorkspaceInput[]
+    connectOrCreate?: ContentWorkspaceItemCreateOrConnectWithoutWorkspaceInput | ContentWorkspaceItemCreateOrConnectWithoutWorkspaceInput[]
+    upsert?: ContentWorkspaceItemUpsertWithWhereUniqueWithoutWorkspaceInput | ContentWorkspaceItemUpsertWithWhereUniqueWithoutWorkspaceInput[]
+    createMany?: ContentWorkspaceItemCreateManyWorkspaceInputEnvelope
+    set?: ContentWorkspaceItemWhereUniqueInput | ContentWorkspaceItemWhereUniqueInput[]
+    disconnect?: ContentWorkspaceItemWhereUniqueInput | ContentWorkspaceItemWhereUniqueInput[]
+    delete?: ContentWorkspaceItemWhereUniqueInput | ContentWorkspaceItemWhereUniqueInput[]
+    connect?: ContentWorkspaceItemWhereUniqueInput | ContentWorkspaceItemWhereUniqueInput[]
+    update?: ContentWorkspaceItemUpdateWithWhereUniqueWithoutWorkspaceInput | ContentWorkspaceItemUpdateWithWhereUniqueWithoutWorkspaceInput[]
+    updateMany?: ContentWorkspaceItemUpdateManyWithWhereWithoutWorkspaceInput | ContentWorkspaceItemUpdateManyWithWhereWithoutWorkspaceInput[]
+    deleteMany?: ContentWorkspaceItemScalarWhereInput | ContentWorkspaceItemScalarWhereInput[]
+  }
+
+  export type ContentWorkspaceCreateNestedOneWithoutItemsInput = {
+    create?: XOR<ContentWorkspaceCreateWithoutItemsInput, ContentWorkspaceUncheckedCreateWithoutItemsInput>
+    connectOrCreate?: ContentWorkspaceCreateOrConnectWithoutItemsInput
+    connect?: ContentWorkspaceWhereUniqueInput
+  }
+
+  export type ContentNodeCreateNestedOneWithoutWorkspaceItemsInput = {
+    create?: XOR<ContentNodeCreateWithoutWorkspaceItemsInput, ContentNodeUncheckedCreateWithoutWorkspaceItemsInput>
+    connectOrCreate?: ContentNodeCreateOrConnectWithoutWorkspaceItemsInput
+    connect?: ContentNodeWhereUniqueInput
+  }
+
+  export type EnumContentWorkspaceItemAssignmentTypeFieldUpdateOperationsInput = {
+    set?: $Enums.ContentWorkspaceItemAssignmentType
+  }
+
+  export type EnumContentWorkspaceItemScopeFieldUpdateOperationsInput = {
+    set?: $Enums.ContentWorkspaceItemScope
+  }
+
+  export type ContentWorkspaceUpdateOneRequiredWithoutItemsNestedInput = {
+    create?: XOR<ContentWorkspaceCreateWithoutItemsInput, ContentWorkspaceUncheckedCreateWithoutItemsInput>
+    connectOrCreate?: ContentWorkspaceCreateOrConnectWithoutItemsInput
+    upsert?: ContentWorkspaceUpsertWithoutItemsInput
+    connect?: ContentWorkspaceWhereUniqueInput
+    update?: XOR<XOR<ContentWorkspaceUpdateToOneWithWhereWithoutItemsInput, ContentWorkspaceUpdateWithoutItemsInput>, ContentWorkspaceUncheckedUpdateWithoutItemsInput>
+  }
+
+  export type ContentNodeUpdateOneRequiredWithoutWorkspaceItemsNestedInput = {
+    create?: XOR<ContentNodeCreateWithoutWorkspaceItemsInput, ContentNodeUncheckedCreateWithoutWorkspaceItemsInput>
+    connectOrCreate?: ContentNodeCreateOrConnectWithoutWorkspaceItemsInput
+    upsert?: ContentNodeUpsertWithoutWorkspaceItemsInput
+    connect?: ContentNodeWhereUniqueInput
+    update?: XOR<XOR<ContentNodeUpdateToOneWithWhereWithoutWorkspaceItemsInput, ContentNodeUpdateWithoutWorkspaceItemsInput>, ContentNodeUncheckedUpdateWithoutWorkspaceItemsInput>
   }
 
   export type UserCreateNestedOneWithoutCategoriesInput = {
@@ -65475,6 +68941,57 @@ export namespace Prisma {
     _max?: NestedEnumUserRoleFilter<$PrismaModel>
   }
 
+  export type NestedEnumContentWorkspaceStatusFilter<$PrismaModel = never> = {
+    equals?: $Enums.ContentWorkspaceStatus | EnumContentWorkspaceStatusFieldRefInput<$PrismaModel>
+    in?: $Enums.ContentWorkspaceStatus[] | ListEnumContentWorkspaceStatusFieldRefInput<$PrismaModel>
+    notIn?: $Enums.ContentWorkspaceStatus[] | ListEnumContentWorkspaceStatusFieldRefInput<$PrismaModel>
+    not?: NestedEnumContentWorkspaceStatusFilter<$PrismaModel> | $Enums.ContentWorkspaceStatus
+  }
+
+  export type NestedEnumContentWorkspaceStatusWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: $Enums.ContentWorkspaceStatus | EnumContentWorkspaceStatusFieldRefInput<$PrismaModel>
+    in?: $Enums.ContentWorkspaceStatus[] | ListEnumContentWorkspaceStatusFieldRefInput<$PrismaModel>
+    notIn?: $Enums.ContentWorkspaceStatus[] | ListEnumContentWorkspaceStatusFieldRefInput<$PrismaModel>
+    not?: NestedEnumContentWorkspaceStatusWithAggregatesFilter<$PrismaModel> | $Enums.ContentWorkspaceStatus
+    _count?: NestedIntFilter<$PrismaModel>
+    _min?: NestedEnumContentWorkspaceStatusFilter<$PrismaModel>
+    _max?: NestedEnumContentWorkspaceStatusFilter<$PrismaModel>
+  }
+
+  export type NestedEnumContentWorkspaceItemAssignmentTypeFilter<$PrismaModel = never> = {
+    equals?: $Enums.ContentWorkspaceItemAssignmentType | EnumContentWorkspaceItemAssignmentTypeFieldRefInput<$PrismaModel>
+    in?: $Enums.ContentWorkspaceItemAssignmentType[] | ListEnumContentWorkspaceItemAssignmentTypeFieldRefInput<$PrismaModel>
+    notIn?: $Enums.ContentWorkspaceItemAssignmentType[] | ListEnumContentWorkspaceItemAssignmentTypeFieldRefInput<$PrismaModel>
+    not?: NestedEnumContentWorkspaceItemAssignmentTypeFilter<$PrismaModel> | $Enums.ContentWorkspaceItemAssignmentType
+  }
+
+  export type NestedEnumContentWorkspaceItemScopeFilter<$PrismaModel = never> = {
+    equals?: $Enums.ContentWorkspaceItemScope | EnumContentWorkspaceItemScopeFieldRefInput<$PrismaModel>
+    in?: $Enums.ContentWorkspaceItemScope[] | ListEnumContentWorkspaceItemScopeFieldRefInput<$PrismaModel>
+    notIn?: $Enums.ContentWorkspaceItemScope[] | ListEnumContentWorkspaceItemScopeFieldRefInput<$PrismaModel>
+    not?: NestedEnumContentWorkspaceItemScopeFilter<$PrismaModel> | $Enums.ContentWorkspaceItemScope
+  }
+
+  export type NestedEnumContentWorkspaceItemAssignmentTypeWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: $Enums.ContentWorkspaceItemAssignmentType | EnumContentWorkspaceItemAssignmentTypeFieldRefInput<$PrismaModel>
+    in?: $Enums.ContentWorkspaceItemAssignmentType[] | ListEnumContentWorkspaceItemAssignmentTypeFieldRefInput<$PrismaModel>
+    notIn?: $Enums.ContentWorkspaceItemAssignmentType[] | ListEnumContentWorkspaceItemAssignmentTypeFieldRefInput<$PrismaModel>
+    not?: NestedEnumContentWorkspaceItemAssignmentTypeWithAggregatesFilter<$PrismaModel> | $Enums.ContentWorkspaceItemAssignmentType
+    _count?: NestedIntFilter<$PrismaModel>
+    _min?: NestedEnumContentWorkspaceItemAssignmentTypeFilter<$PrismaModel>
+    _max?: NestedEnumContentWorkspaceItemAssignmentTypeFilter<$PrismaModel>
+  }
+
+  export type NestedEnumContentWorkspaceItemScopeWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: $Enums.ContentWorkspaceItemScope | EnumContentWorkspaceItemScopeFieldRefInput<$PrismaModel>
+    in?: $Enums.ContentWorkspaceItemScope[] | ListEnumContentWorkspaceItemScopeFieldRefInput<$PrismaModel>
+    notIn?: $Enums.ContentWorkspaceItemScope[] | ListEnumContentWorkspaceItemScopeFieldRefInput<$PrismaModel>
+    not?: NestedEnumContentWorkspaceItemScopeWithAggregatesFilter<$PrismaModel> | $Enums.ContentWorkspaceItemScope
+    _count?: NestedIntFilter<$PrismaModel>
+    _min?: NestedEnumContentWorkspaceItemScopeFilter<$PrismaModel>
+    _max?: NestedEnumContentWorkspaceItemScopeFilter<$PrismaModel>
+  }
+
   export type NestedEnumFolderViewModeFilter<$PrismaModel = never> = {
     equals?: $Enums.FolderViewMode | EnumFolderViewModeFieldRefInput<$PrismaModel>
     in?: $Enums.FolderViewMode[] | ListEnumFolderViewModeFieldRefInput<$PrismaModel>
@@ -65967,6 +69484,7 @@ export namespace Prisma {
     calendarConnections?: CalendarConnectionCreateNestedManyWithoutUserInput
     calendarSources?: CalendarSourceCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventCreateNestedManyWithoutUserInput
+    contentWorkspaces?: ContentWorkspaceCreateNestedManyWithoutOwnerInput
   }
 
   export type UserUncheckedCreateWithoutContentNodesInput = {
@@ -66003,6 +69521,7 @@ export namespace Prisma {
     calendarConnections?: CalendarConnectionUncheckedCreateNestedManyWithoutUserInput
     calendarSources?: CalendarSourceUncheckedCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutUserInput
+    contentWorkspaces?: ContentWorkspaceUncheckedCreateNestedManyWithoutOwnerInput
   }
 
   export type UserCreateOrConnectWithoutContentNodesInput = {
@@ -66051,6 +69570,7 @@ export namespace Prisma {
     trashBinEntry?: TrashBinCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantCreateNestedManyWithoutContentInput
     calendarEvents?: CalendarEventCreateNestedManyWithoutLinkedContentInput
+    workspaceItems?: ContentWorkspaceItemCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeUncheckedCreateWithoutChildrenInput = {
@@ -66094,6 +69614,7 @@ export namespace Prisma {
     trashBinEntry?: TrashBinUncheckedCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantUncheckedCreateNestedManyWithoutContentInput
     calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutLinkedContentInput
+    workspaceItems?: ContentWorkspaceItemUncheckedCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeCreateOrConnectWithoutChildrenInput = {
@@ -66142,6 +69663,7 @@ export namespace Prisma {
     trashBinEntry?: TrashBinCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantCreateNestedManyWithoutContentInput
     calendarEvents?: CalendarEventCreateNestedManyWithoutLinkedContentInput
+    workspaceItems?: ContentWorkspaceItemCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeUncheckedCreateWithoutParentInput = {
@@ -66185,6 +69707,7 @@ export namespace Prisma {
     trashBinEntry?: TrashBinUncheckedCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantUncheckedCreateNestedManyWithoutContentInput
     calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutLinkedContentInput
+    workspaceItems?: ContentWorkspaceItemUncheckedCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeCreateOrConnectWithoutParentInput = {
@@ -66492,6 +70015,36 @@ export namespace Prisma {
 
   export type CalendarEventCreateManyLinkedContentInputEnvelope = {
     data: CalendarEventCreateManyLinkedContentInput | CalendarEventCreateManyLinkedContentInput[]
+    skipDuplicates?: boolean
+  }
+
+  export type ContentWorkspaceItemCreateWithoutContentInput = {
+    id?: string
+    assignmentType?: $Enums.ContentWorkspaceItemAssignmentType
+    scope?: $Enums.ContentWorkspaceItemScope
+    expiresAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    workspace: ContentWorkspaceCreateNestedOneWithoutItemsInput
+  }
+
+  export type ContentWorkspaceItemUncheckedCreateWithoutContentInput = {
+    id?: string
+    workspaceId: string
+    assignmentType?: $Enums.ContentWorkspaceItemAssignmentType
+    scope?: $Enums.ContentWorkspaceItemScope
+    expiresAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type ContentWorkspaceItemCreateOrConnectWithoutContentInput = {
+    where: ContentWorkspaceItemWhereUniqueInput
+    create: XOR<ContentWorkspaceItemCreateWithoutContentInput, ContentWorkspaceItemUncheckedCreateWithoutContentInput>
+  }
+
+  export type ContentWorkspaceItemCreateManyContentInputEnvelope = {
+    data: ContentWorkspaceItemCreateManyContentInput | ContentWorkspaceItemCreateManyContentInput[]
     skipDuplicates?: boolean
   }
 
@@ -67026,6 +70579,7 @@ export namespace Prisma {
     calendarConnections?: CalendarConnectionUpdateManyWithoutUserNestedInput
     calendarSources?: CalendarSourceUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUpdateManyWithoutUserNestedInput
+    contentWorkspaces?: ContentWorkspaceUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUncheckedUpdateWithoutContentNodesInput = {
@@ -67062,6 +70616,7 @@ export namespace Prisma {
     calendarConnections?: CalendarConnectionUncheckedUpdateManyWithoutUserNestedInput
     calendarSources?: CalendarSourceUncheckedUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUncheckedUpdateManyWithoutUserNestedInput
+    contentWorkspaces?: ContentWorkspaceUncheckedUpdateManyWithoutOwnerNestedInput
   }
 
   export type ContentNodeUpsertWithoutChildrenInput = {
@@ -67116,6 +70671,7 @@ export namespace Prisma {
     trashBinEntry?: TrashBinUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUpdateManyWithoutContentNestedInput
     calendarEvents?: CalendarEventUpdateManyWithoutLinkedContentNestedInput
+    workspaceItems?: ContentWorkspaceItemUpdateManyWithoutContentNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutChildrenInput = {
@@ -67159,6 +70715,7 @@ export namespace Prisma {
     trashBinEntry?: TrashBinUncheckedUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUncheckedUpdateManyWithoutContentNestedInput
     calendarEvents?: CalendarEventUncheckedUpdateManyWithoutLinkedContentNestedInput
+    workspaceItems?: ContentWorkspaceItemUncheckedUpdateManyWithoutContentNestedInput
   }
 
   export type ContentNodeUpsertWithWhereUniqueWithoutParentInput = {
@@ -67514,6 +71071,36 @@ export namespace Prisma {
     updatedAt?: DateTimeFilter<"CalendarEvent"> | Date | string
   }
 
+  export type ContentWorkspaceItemUpsertWithWhereUniqueWithoutContentInput = {
+    where: ContentWorkspaceItemWhereUniqueInput
+    update: XOR<ContentWorkspaceItemUpdateWithoutContentInput, ContentWorkspaceItemUncheckedUpdateWithoutContentInput>
+    create: XOR<ContentWorkspaceItemCreateWithoutContentInput, ContentWorkspaceItemUncheckedCreateWithoutContentInput>
+  }
+
+  export type ContentWorkspaceItemUpdateWithWhereUniqueWithoutContentInput = {
+    where: ContentWorkspaceItemWhereUniqueInput
+    data: XOR<ContentWorkspaceItemUpdateWithoutContentInput, ContentWorkspaceItemUncheckedUpdateWithoutContentInput>
+  }
+
+  export type ContentWorkspaceItemUpdateManyWithWhereWithoutContentInput = {
+    where: ContentWorkspaceItemScalarWhereInput
+    data: XOR<ContentWorkspaceItemUpdateManyMutationInput, ContentWorkspaceItemUncheckedUpdateManyWithoutContentInput>
+  }
+
+  export type ContentWorkspaceItemScalarWhereInput = {
+    AND?: ContentWorkspaceItemScalarWhereInput | ContentWorkspaceItemScalarWhereInput[]
+    OR?: ContentWorkspaceItemScalarWhereInput[]
+    NOT?: ContentWorkspaceItemScalarWhereInput | ContentWorkspaceItemScalarWhereInput[]
+    id?: UuidFilter<"ContentWorkspaceItem"> | string
+    workspaceId?: UuidFilter<"ContentWorkspaceItem"> | string
+    contentId?: UuidFilter<"ContentWorkspaceItem"> | string
+    assignmentType?: EnumContentWorkspaceItemAssignmentTypeFilter<"ContentWorkspaceItem"> | $Enums.ContentWorkspaceItemAssignmentType
+    scope?: EnumContentWorkspaceItemScopeFilter<"ContentWorkspaceItem"> | $Enums.ContentWorkspaceItemScope
+    expiresAt?: DateTimeNullableFilter<"ContentWorkspaceItem"> | Date | string | null
+    createdAt?: DateTimeFilter<"ContentWorkspaceItem"> | Date | string
+    updatedAt?: DateTimeFilter<"ContentWorkspaceItem"> | Date | string
+  }
+
   export type ContentNodeCreateWithoutNotePayloadInput = {
     id?: string
     title: string
@@ -67555,6 +71142,7 @@ export namespace Prisma {
     trashBinEntry?: TrashBinCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantCreateNestedManyWithoutContentInput
     calendarEvents?: CalendarEventCreateNestedManyWithoutLinkedContentInput
+    workspaceItems?: ContentWorkspaceItemCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeUncheckedCreateWithoutNotePayloadInput = {
@@ -67598,6 +71186,7 @@ export namespace Prisma {
     trashBinEntry?: TrashBinUncheckedCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantUncheckedCreateNestedManyWithoutContentInput
     calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutLinkedContentInput
+    workspaceItems?: ContentWorkspaceItemUncheckedCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeCreateOrConnectWithoutNotePayloadInput = {
@@ -67657,6 +71246,7 @@ export namespace Prisma {
     trashBinEntry?: TrashBinUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUpdateManyWithoutContentNestedInput
     calendarEvents?: CalendarEventUpdateManyWithoutLinkedContentNestedInput
+    workspaceItems?: ContentWorkspaceItemUpdateManyWithoutContentNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutNotePayloadInput = {
@@ -67700,6 +71290,7 @@ export namespace Prisma {
     trashBinEntry?: TrashBinUncheckedUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUncheckedUpdateManyWithoutContentNestedInput
     calendarEvents?: CalendarEventUncheckedUpdateManyWithoutLinkedContentNestedInput
+    workspaceItems?: ContentWorkspaceItemUncheckedUpdateManyWithoutContentNestedInput
   }
 
   export type ContentNodeCreateWithoutFilePayloadInput = {
@@ -67743,6 +71334,7 @@ export namespace Prisma {
     trashBinEntry?: TrashBinCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantCreateNestedManyWithoutContentInput
     calendarEvents?: CalendarEventCreateNestedManyWithoutLinkedContentInput
+    workspaceItems?: ContentWorkspaceItemCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeUncheckedCreateWithoutFilePayloadInput = {
@@ -67786,6 +71378,7 @@ export namespace Prisma {
     trashBinEntry?: TrashBinUncheckedCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantUncheckedCreateNestedManyWithoutContentInput
     calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutLinkedContentInput
+    workspaceItems?: ContentWorkspaceItemUncheckedCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeCreateOrConnectWithoutFilePayloadInput = {
@@ -67845,6 +71438,7 @@ export namespace Prisma {
     trashBinEntry?: TrashBinUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUpdateManyWithoutContentNestedInput
     calendarEvents?: CalendarEventUpdateManyWithoutLinkedContentNestedInput
+    workspaceItems?: ContentWorkspaceItemUpdateManyWithoutContentNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutFilePayloadInput = {
@@ -67888,6 +71482,7 @@ export namespace Prisma {
     trashBinEntry?: TrashBinUncheckedUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUncheckedUpdateManyWithoutContentNestedInput
     calendarEvents?: CalendarEventUncheckedUpdateManyWithoutLinkedContentNestedInput
+    workspaceItems?: ContentWorkspaceItemUncheckedUpdateManyWithoutContentNestedInput
   }
 
   export type ContentNodeCreateWithoutHtmlPayloadInput = {
@@ -67931,6 +71526,7 @@ export namespace Prisma {
     trashBinEntry?: TrashBinCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantCreateNestedManyWithoutContentInput
     calendarEvents?: CalendarEventCreateNestedManyWithoutLinkedContentInput
+    workspaceItems?: ContentWorkspaceItemCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeUncheckedCreateWithoutHtmlPayloadInput = {
@@ -67974,6 +71570,7 @@ export namespace Prisma {
     trashBinEntry?: TrashBinUncheckedCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantUncheckedCreateNestedManyWithoutContentInput
     calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutLinkedContentInput
+    workspaceItems?: ContentWorkspaceItemUncheckedCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeCreateOrConnectWithoutHtmlPayloadInput = {
@@ -68033,6 +71630,7 @@ export namespace Prisma {
     trashBinEntry?: TrashBinUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUpdateManyWithoutContentNestedInput
     calendarEvents?: CalendarEventUpdateManyWithoutLinkedContentNestedInput
+    workspaceItems?: ContentWorkspaceItemUpdateManyWithoutContentNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutHtmlPayloadInput = {
@@ -68076,6 +71674,7 @@ export namespace Prisma {
     trashBinEntry?: TrashBinUncheckedUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUncheckedUpdateManyWithoutContentNestedInput
     calendarEvents?: CalendarEventUncheckedUpdateManyWithoutLinkedContentNestedInput
+    workspaceItems?: ContentWorkspaceItemUncheckedUpdateManyWithoutContentNestedInput
   }
 
   export type ContentNodeCreateWithoutCodePayloadInput = {
@@ -68119,6 +71718,7 @@ export namespace Prisma {
     trashBinEntry?: TrashBinCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantCreateNestedManyWithoutContentInput
     calendarEvents?: CalendarEventCreateNestedManyWithoutLinkedContentInput
+    workspaceItems?: ContentWorkspaceItemCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeUncheckedCreateWithoutCodePayloadInput = {
@@ -68162,6 +71762,7 @@ export namespace Prisma {
     trashBinEntry?: TrashBinUncheckedCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantUncheckedCreateNestedManyWithoutContentInput
     calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutLinkedContentInput
+    workspaceItems?: ContentWorkspaceItemUncheckedCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeCreateOrConnectWithoutCodePayloadInput = {
@@ -68221,6 +71822,7 @@ export namespace Prisma {
     trashBinEntry?: TrashBinUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUpdateManyWithoutContentNestedInput
     calendarEvents?: CalendarEventUpdateManyWithoutLinkedContentNestedInput
+    workspaceItems?: ContentWorkspaceItemUpdateManyWithoutContentNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutCodePayloadInput = {
@@ -68264,6 +71866,7 @@ export namespace Prisma {
     trashBinEntry?: TrashBinUncheckedUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUncheckedUpdateManyWithoutContentNestedInput
     calendarEvents?: CalendarEventUncheckedUpdateManyWithoutLinkedContentNestedInput
+    workspaceItems?: ContentWorkspaceItemUncheckedUpdateManyWithoutContentNestedInput
   }
 
   export type UserCreateWithoutContentHistoryInput = {
@@ -68300,6 +71903,7 @@ export namespace Prisma {
     calendarConnections?: CalendarConnectionCreateNestedManyWithoutUserInput
     calendarSources?: CalendarSourceCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventCreateNestedManyWithoutUserInput
+    contentWorkspaces?: ContentWorkspaceCreateNestedManyWithoutOwnerInput
   }
 
   export type UserUncheckedCreateWithoutContentHistoryInput = {
@@ -68336,6 +71940,7 @@ export namespace Prisma {
     calendarConnections?: CalendarConnectionUncheckedCreateNestedManyWithoutUserInput
     calendarSources?: CalendarSourceUncheckedCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutUserInput
+    contentWorkspaces?: ContentWorkspaceUncheckedCreateNestedManyWithoutOwnerInput
   }
 
   export type UserCreateOrConnectWithoutContentHistoryInput = {
@@ -68384,6 +71989,7 @@ export namespace Prisma {
     trashBinEntry?: TrashBinCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantCreateNestedManyWithoutContentInput
     calendarEvents?: CalendarEventCreateNestedManyWithoutLinkedContentInput
+    workspaceItems?: ContentWorkspaceItemCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeUncheckedCreateWithoutHistoryInput = {
@@ -68427,6 +72033,7 @@ export namespace Prisma {
     trashBinEntry?: TrashBinUncheckedCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantUncheckedCreateNestedManyWithoutContentInput
     calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutLinkedContentInput
+    workspaceItems?: ContentWorkspaceItemUncheckedCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeCreateOrConnectWithoutHistoryInput = {
@@ -68479,6 +72086,7 @@ export namespace Prisma {
     calendarConnections?: CalendarConnectionUpdateManyWithoutUserNestedInput
     calendarSources?: CalendarSourceUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUpdateManyWithoutUserNestedInput
+    contentWorkspaces?: ContentWorkspaceUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUncheckedUpdateWithoutContentHistoryInput = {
@@ -68515,6 +72123,7 @@ export namespace Prisma {
     calendarConnections?: CalendarConnectionUncheckedUpdateManyWithoutUserNestedInput
     calendarSources?: CalendarSourceUncheckedUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUncheckedUpdateManyWithoutUserNestedInput
+    contentWorkspaces?: ContentWorkspaceUncheckedUpdateManyWithoutOwnerNestedInput
   }
 
   export type ContentNodeUpsertWithoutHistoryInput = {
@@ -68569,6 +72178,7 @@ export namespace Prisma {
     trashBinEntry?: TrashBinUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUpdateManyWithoutContentNestedInput
     calendarEvents?: CalendarEventUpdateManyWithoutLinkedContentNestedInput
+    workspaceItems?: ContentWorkspaceItemUpdateManyWithoutContentNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutHistoryInput = {
@@ -68612,6 +72222,7 @@ export namespace Prisma {
     trashBinEntry?: TrashBinUncheckedUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUncheckedUpdateManyWithoutContentNestedInput
     calendarEvents?: CalendarEventUncheckedUpdateManyWithoutLinkedContentNestedInput
+    workspaceItems?: ContentWorkspaceItemUncheckedUpdateManyWithoutContentNestedInput
   }
 
   export type ContentNodeCreateWithoutContentPathInput = {
@@ -68655,6 +72266,7 @@ export namespace Prisma {
     trashBinEntry?: TrashBinCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantCreateNestedManyWithoutContentInput
     calendarEvents?: CalendarEventCreateNestedManyWithoutLinkedContentInput
+    workspaceItems?: ContentWorkspaceItemCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeUncheckedCreateWithoutContentPathInput = {
@@ -68698,6 +72310,7 @@ export namespace Prisma {
     trashBinEntry?: TrashBinUncheckedCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantUncheckedCreateNestedManyWithoutContentInput
     calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutLinkedContentInput
+    workspaceItems?: ContentWorkspaceItemUncheckedCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeCreateOrConnectWithoutContentPathInput = {
@@ -68757,6 +72370,7 @@ export namespace Prisma {
     trashBinEntry?: TrashBinUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUpdateManyWithoutContentNestedInput
     calendarEvents?: CalendarEventUpdateManyWithoutLinkedContentNestedInput
+    workspaceItems?: ContentWorkspaceItemUpdateManyWithoutContentNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutContentPathInput = {
@@ -68800,6 +72414,7 @@ export namespace Prisma {
     trashBinEntry?: TrashBinUncheckedUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUncheckedUpdateManyWithoutContentNestedInput
     calendarEvents?: CalendarEventUncheckedUpdateManyWithoutLinkedContentNestedInput
+    workspaceItems?: ContentWorkspaceItemUncheckedUpdateManyWithoutContentNestedInput
   }
 
   export type ContentNodeCreateWithoutSourceLinksInput = {
@@ -68843,6 +72458,7 @@ export namespace Prisma {
     trashBinEntry?: TrashBinCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantCreateNestedManyWithoutContentInput
     calendarEvents?: CalendarEventCreateNestedManyWithoutLinkedContentInput
+    workspaceItems?: ContentWorkspaceItemCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeUncheckedCreateWithoutSourceLinksInput = {
@@ -68886,6 +72502,7 @@ export namespace Prisma {
     trashBinEntry?: TrashBinUncheckedCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantUncheckedCreateNestedManyWithoutContentInput
     calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutLinkedContentInput
+    workspaceItems?: ContentWorkspaceItemUncheckedCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeCreateOrConnectWithoutSourceLinksInput = {
@@ -68934,6 +72551,7 @@ export namespace Prisma {
     trashBinEntry?: TrashBinCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantCreateNestedManyWithoutContentInput
     calendarEvents?: CalendarEventCreateNestedManyWithoutLinkedContentInput
+    workspaceItems?: ContentWorkspaceItemCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeUncheckedCreateWithoutTargetLinksInput = {
@@ -68977,6 +72595,7 @@ export namespace Prisma {
     trashBinEntry?: TrashBinUncheckedCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantUncheckedCreateNestedManyWithoutContentInput
     calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutLinkedContentInput
+    workspaceItems?: ContentWorkspaceItemUncheckedCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeCreateOrConnectWithoutTargetLinksInput = {
@@ -69036,6 +72655,7 @@ export namespace Prisma {
     trashBinEntry?: TrashBinUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUpdateManyWithoutContentNestedInput
     calendarEvents?: CalendarEventUpdateManyWithoutLinkedContentNestedInput
+    workspaceItems?: ContentWorkspaceItemUpdateManyWithoutContentNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutSourceLinksInput = {
@@ -69079,6 +72699,7 @@ export namespace Prisma {
     trashBinEntry?: TrashBinUncheckedUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUncheckedUpdateManyWithoutContentNestedInput
     calendarEvents?: CalendarEventUncheckedUpdateManyWithoutLinkedContentNestedInput
+    workspaceItems?: ContentWorkspaceItemUncheckedUpdateManyWithoutContentNestedInput
   }
 
   export type ContentNodeUpsertWithoutTargetLinksInput = {
@@ -69133,6 +72754,7 @@ export namespace Prisma {
     trashBinEntry?: TrashBinUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUpdateManyWithoutContentNestedInput
     calendarEvents?: CalendarEventUpdateManyWithoutLinkedContentNestedInput
+    workspaceItems?: ContentWorkspaceItemUpdateManyWithoutContentNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutTargetLinksInput = {
@@ -69176,6 +72798,7 @@ export namespace Prisma {
     trashBinEntry?: TrashBinUncheckedUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUncheckedUpdateManyWithoutContentNestedInput
     calendarEvents?: CalendarEventUncheckedUpdateManyWithoutLinkedContentNestedInput
+    workspaceItems?: ContentWorkspaceItemUncheckedUpdateManyWithoutContentNestedInput
   }
 
   export type ContentNodeCreateWithoutContentTagsInput = {
@@ -69219,6 +72842,7 @@ export namespace Prisma {
     trashBinEntry?: TrashBinCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantCreateNestedManyWithoutContentInput
     calendarEvents?: CalendarEventCreateNestedManyWithoutLinkedContentInput
+    workspaceItems?: ContentWorkspaceItemCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeUncheckedCreateWithoutContentTagsInput = {
@@ -69262,6 +72886,7 @@ export namespace Prisma {
     trashBinEntry?: TrashBinUncheckedCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantUncheckedCreateNestedManyWithoutContentInput
     calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutLinkedContentInput
+    workspaceItems?: ContentWorkspaceItemUncheckedCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeCreateOrConnectWithoutContentTagsInput = {
@@ -69344,6 +72969,7 @@ export namespace Prisma {
     trashBinEntry?: TrashBinUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUpdateManyWithoutContentNestedInput
     calendarEvents?: CalendarEventUpdateManyWithoutLinkedContentNestedInput
+    workspaceItems?: ContentWorkspaceItemUpdateManyWithoutContentNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutContentTagsInput = {
@@ -69387,6 +73013,7 @@ export namespace Prisma {
     trashBinEntry?: TrashBinUncheckedUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUncheckedUpdateManyWithoutContentNestedInput
     calendarEvents?: CalendarEventUncheckedUpdateManyWithoutLinkedContentNestedInput
+    workspaceItems?: ContentWorkspaceItemUncheckedUpdateManyWithoutContentNestedInput
   }
 
   export type TagUpsertWithoutContentTagsInput = {
@@ -69459,6 +73086,7 @@ export namespace Prisma {
     personMentions?: PersonMentionCreateNestedManyWithoutContentInput
     viewGrants?: ViewGrantCreateNestedManyWithoutContentInput
     calendarEvents?: CalendarEventCreateNestedManyWithoutLinkedContentInput
+    workspaceItems?: ContentWorkspaceItemCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeUncheckedCreateWithoutTrashBinEntryInput = {
@@ -69502,6 +73130,7 @@ export namespace Prisma {
     personMentions?: PersonMentionUncheckedCreateNestedManyWithoutContentInput
     viewGrants?: ViewGrantUncheckedCreateNestedManyWithoutContentInput
     calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutLinkedContentInput
+    workspaceItems?: ContentWorkspaceItemUncheckedCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeCreateOrConnectWithoutTrashBinEntryInput = {
@@ -69543,6 +73172,7 @@ export namespace Prisma {
     calendarConnections?: CalendarConnectionCreateNestedManyWithoutUserInput
     calendarSources?: CalendarSourceCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventCreateNestedManyWithoutUserInput
+    contentWorkspaces?: ContentWorkspaceCreateNestedManyWithoutOwnerInput
   }
 
   export type UserUncheckedCreateWithoutTrashedContentInput = {
@@ -69579,6 +73209,7 @@ export namespace Prisma {
     calendarConnections?: CalendarConnectionUncheckedCreateNestedManyWithoutUserInput
     calendarSources?: CalendarSourceUncheckedCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutUserInput
+    contentWorkspaces?: ContentWorkspaceUncheckedCreateNestedManyWithoutOwnerInput
   }
 
   export type UserCreateOrConnectWithoutTrashedContentInput = {
@@ -69638,6 +73269,7 @@ export namespace Prisma {
     personMentions?: PersonMentionUpdateManyWithoutContentNestedInput
     viewGrants?: ViewGrantUpdateManyWithoutContentNestedInput
     calendarEvents?: CalendarEventUpdateManyWithoutLinkedContentNestedInput
+    workspaceItems?: ContentWorkspaceItemUpdateManyWithoutContentNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutTrashBinEntryInput = {
@@ -69681,6 +73313,7 @@ export namespace Prisma {
     personMentions?: PersonMentionUncheckedUpdateManyWithoutContentNestedInput
     viewGrants?: ViewGrantUncheckedUpdateManyWithoutContentNestedInput
     calendarEvents?: CalendarEventUncheckedUpdateManyWithoutLinkedContentNestedInput
+    workspaceItems?: ContentWorkspaceItemUncheckedUpdateManyWithoutContentNestedInput
   }
 
   export type UserUpsertWithoutTrashedContentInput = {
@@ -69728,6 +73361,7 @@ export namespace Prisma {
     calendarConnections?: CalendarConnectionUpdateManyWithoutUserNestedInput
     calendarSources?: CalendarSourceUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUpdateManyWithoutUserNestedInput
+    contentWorkspaces?: ContentWorkspaceUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUncheckedUpdateWithoutTrashedContentInput = {
@@ -69764,6 +73398,7 @@ export namespace Prisma {
     calendarConnections?: CalendarConnectionUncheckedUpdateManyWithoutUserNestedInput
     calendarSources?: CalendarSourceUncheckedUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUncheckedUpdateManyWithoutUserNestedInput
+    contentWorkspaces?: ContentWorkspaceUncheckedUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserCreateWithoutStorageConfigsInput = {
@@ -69800,6 +73435,7 @@ export namespace Prisma {
     calendarConnections?: CalendarConnectionCreateNestedManyWithoutUserInput
     calendarSources?: CalendarSourceCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventCreateNestedManyWithoutUserInput
+    contentWorkspaces?: ContentWorkspaceCreateNestedManyWithoutOwnerInput
   }
 
   export type UserUncheckedCreateWithoutStorageConfigsInput = {
@@ -69836,6 +73472,7 @@ export namespace Prisma {
     calendarConnections?: CalendarConnectionUncheckedCreateNestedManyWithoutUserInput
     calendarSources?: CalendarSourceUncheckedCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutUserInput
+    contentWorkspaces?: ContentWorkspaceUncheckedCreateNestedManyWithoutOwnerInput
   }
 
   export type UserCreateOrConnectWithoutStorageConfigsInput = {
@@ -69888,6 +73525,7 @@ export namespace Prisma {
     calendarConnections?: CalendarConnectionUpdateManyWithoutUserNestedInput
     calendarSources?: CalendarSourceUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUpdateManyWithoutUserNestedInput
+    contentWorkspaces?: ContentWorkspaceUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUncheckedUpdateWithoutStorageConfigsInput = {
@@ -69924,6 +73562,7 @@ export namespace Prisma {
     calendarConnections?: CalendarConnectionUncheckedUpdateManyWithoutUserNestedInput
     calendarSources?: CalendarSourceUncheckedUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUncheckedUpdateManyWithoutUserNestedInput
+    contentWorkspaces?: ContentWorkspaceUncheckedUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserCreateWithoutAiProviderKeysInput = {
@@ -69960,6 +73599,7 @@ export namespace Prisma {
     calendarConnections?: CalendarConnectionCreateNestedManyWithoutUserInput
     calendarSources?: CalendarSourceCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventCreateNestedManyWithoutUserInput
+    contentWorkspaces?: ContentWorkspaceCreateNestedManyWithoutOwnerInput
   }
 
   export type UserUncheckedCreateWithoutAiProviderKeysInput = {
@@ -69996,6 +73636,7 @@ export namespace Prisma {
     calendarConnections?: CalendarConnectionUncheckedCreateNestedManyWithoutUserInput
     calendarSources?: CalendarSourceUncheckedCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutUserInput
+    contentWorkspaces?: ContentWorkspaceUncheckedCreateNestedManyWithoutOwnerInput
   }
 
   export type UserCreateOrConnectWithoutAiProviderKeysInput = {
@@ -70048,6 +73689,7 @@ export namespace Prisma {
     calendarConnections?: CalendarConnectionUpdateManyWithoutUserNestedInput
     calendarSources?: CalendarSourceUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUpdateManyWithoutUserNestedInput
+    contentWorkspaces?: ContentWorkspaceUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUncheckedUpdateWithoutAiProviderKeysInput = {
@@ -70084,6 +73726,7 @@ export namespace Prisma {
     calendarConnections?: CalendarConnectionUncheckedUpdateManyWithoutUserNestedInput
     calendarSources?: CalendarSourceUncheckedUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUncheckedUpdateManyWithoutUserNestedInput
+    contentWorkspaces?: ContentWorkspaceUncheckedUpdateManyWithoutOwnerNestedInput
   }
 
   export type AccountCreateWithoutUserInput = {
@@ -70317,6 +73960,7 @@ export namespace Prisma {
     trashBinEntry?: TrashBinCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantCreateNestedManyWithoutContentInput
     calendarEvents?: CalendarEventCreateNestedManyWithoutLinkedContentInput
+    workspaceItems?: ContentWorkspaceItemCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeUncheckedCreateWithoutOwnerInput = {
@@ -70360,6 +74004,7 @@ export namespace Prisma {
     trashBinEntry?: TrashBinUncheckedCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantUncheckedCreateNestedManyWithoutContentInput
     calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutLinkedContentInput
+    workspaceItems?: ContentWorkspaceItemUncheckedCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeCreateOrConnectWithoutOwnerInput = {
@@ -71052,6 +74697,52 @@ export namespace Prisma {
     skipDuplicates?: boolean
   }
 
+  export type ContentWorkspaceCreateWithoutOwnerInput = {
+    id?: string
+    name: string
+    slug: string
+    isMain?: boolean
+    isLocked?: boolean
+    status?: $Enums.ContentWorkspaceStatus
+    expiresAt?: Date | string | null
+    archivedAt?: Date | string | null
+    layoutMode?: string
+    activePaneId?: string
+    paneState?: JsonNullValueInput | InputJsonValue
+    settings?: JsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    items?: ContentWorkspaceItemCreateNestedManyWithoutWorkspaceInput
+  }
+
+  export type ContentWorkspaceUncheckedCreateWithoutOwnerInput = {
+    id?: string
+    name: string
+    slug: string
+    isMain?: boolean
+    isLocked?: boolean
+    status?: $Enums.ContentWorkspaceStatus
+    expiresAt?: Date | string | null
+    archivedAt?: Date | string | null
+    layoutMode?: string
+    activePaneId?: string
+    paneState?: JsonNullValueInput | InputJsonValue
+    settings?: JsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    items?: ContentWorkspaceItemUncheckedCreateNestedManyWithoutWorkspaceInput
+  }
+
+  export type ContentWorkspaceCreateOrConnectWithoutOwnerInput = {
+    where: ContentWorkspaceWhereUniqueInput
+    create: XOR<ContentWorkspaceCreateWithoutOwnerInput, ContentWorkspaceUncheckedCreateWithoutOwnerInput>
+  }
+
+  export type ContentWorkspaceCreateManyOwnerInputEnvelope = {
+    data: ContentWorkspaceCreateManyOwnerInput | ContentWorkspaceCreateManyOwnerInput[]
+    skipDuplicates?: boolean
+  }
+
   export type AccountUpsertWithWhereUniqueWithoutUserInput = {
     where: AccountWhereUniqueInput
     update: XOR<AccountUpdateWithoutUserInput, AccountUncheckedUpdateWithoutUserInput>
@@ -71715,6 +75406,533 @@ export namespace Prisma {
     data: XOR<CalendarEventUpdateManyMutationInput, CalendarEventUncheckedUpdateManyWithoutUserInput>
   }
 
+  export type ContentWorkspaceUpsertWithWhereUniqueWithoutOwnerInput = {
+    where: ContentWorkspaceWhereUniqueInput
+    update: XOR<ContentWorkspaceUpdateWithoutOwnerInput, ContentWorkspaceUncheckedUpdateWithoutOwnerInput>
+    create: XOR<ContentWorkspaceCreateWithoutOwnerInput, ContentWorkspaceUncheckedCreateWithoutOwnerInput>
+  }
+
+  export type ContentWorkspaceUpdateWithWhereUniqueWithoutOwnerInput = {
+    where: ContentWorkspaceWhereUniqueInput
+    data: XOR<ContentWorkspaceUpdateWithoutOwnerInput, ContentWorkspaceUncheckedUpdateWithoutOwnerInput>
+  }
+
+  export type ContentWorkspaceUpdateManyWithWhereWithoutOwnerInput = {
+    where: ContentWorkspaceScalarWhereInput
+    data: XOR<ContentWorkspaceUpdateManyMutationInput, ContentWorkspaceUncheckedUpdateManyWithoutOwnerInput>
+  }
+
+  export type ContentWorkspaceScalarWhereInput = {
+    AND?: ContentWorkspaceScalarWhereInput | ContentWorkspaceScalarWhereInput[]
+    OR?: ContentWorkspaceScalarWhereInput[]
+    NOT?: ContentWorkspaceScalarWhereInput | ContentWorkspaceScalarWhereInput[]
+    id?: UuidFilter<"ContentWorkspace"> | string
+    ownerId?: UuidFilter<"ContentWorkspace"> | string
+    name?: StringFilter<"ContentWorkspace"> | string
+    slug?: StringFilter<"ContentWorkspace"> | string
+    isMain?: BoolFilter<"ContentWorkspace"> | boolean
+    isLocked?: BoolFilter<"ContentWorkspace"> | boolean
+    status?: EnumContentWorkspaceStatusFilter<"ContentWorkspace"> | $Enums.ContentWorkspaceStatus
+    expiresAt?: DateTimeNullableFilter<"ContentWorkspace"> | Date | string | null
+    archivedAt?: DateTimeNullableFilter<"ContentWorkspace"> | Date | string | null
+    layoutMode?: StringFilter<"ContentWorkspace"> | string
+    activePaneId?: StringFilter<"ContentWorkspace"> | string
+    paneState?: JsonFilter<"ContentWorkspace">
+    settings?: JsonFilter<"ContentWorkspace">
+    createdAt?: DateTimeFilter<"ContentWorkspace"> | Date | string
+    updatedAt?: DateTimeFilter<"ContentWorkspace"> | Date | string
+  }
+
+  export type UserCreateWithoutContentWorkspacesInput = {
+    id?: string
+    username: string
+    passwordHash?: string | null
+    email: string
+    role?: $Enums.UserRole
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: number
+    accounts?: AccountCreateNestedManyWithoutUserInput
+    aiProviderKeys?: AIProviderKeyCreateNestedManyWithoutUserInput
+    auditTargets?: AuditLogCreateNestedManyWithoutTargetUserInput
+    adminActions?: AuditLogCreateNestedManyWithoutUserInput
+    categories?: CategoryCreateNestedManyWithoutOwnerInput
+    contentHistory?: ContentHistoryCreateNestedManyWithoutUserInput
+    contentNodes?: ContentNodeCreateNestedManyWithoutOwnerInput
+    sessions?: SessionCreateNestedManyWithoutUserInput
+    storageConfigs?: StorageProviderConfigCreateNestedManyWithoutUserInput
+    tags?: TagCreateNestedManyWithoutUserInput
+    trashedContent?: TrashBinCreateNestedManyWithoutDeletedByUserInput
+    viewGrants?: ViewGrantCreateNestedManyWithoutUserInput
+    peopleGroups?: PeopleGroupCreateNestedManyWithoutOwnerInput
+    peopleDefaultGroups?: PeopleGroupCreateNestedManyWithoutDefaultForOwnerInput
+    people?: PersonCreateNestedManyWithoutOwnerInput
+    peopleFileTreeMounts?: PeopleFileTreeMountCreateNestedManyWithoutOwnerInput
+    personMentions?: PersonMentionCreateNestedManyWithoutOwnerInput
+    reusableCategories?: ReusableCategoryCreateNestedManyWithoutUserInput
+    savedBlocks?: SavedBlockCreateNestedManyWithoutUserInput
+    contentTemplates?: ContentTemplateCreateNestedManyWithoutUserInput
+    snippets?: SnippetCreateNestedManyWithoutUserInput
+    pageTemplates?: PageTemplateCreateNestedManyWithoutUserInput
+    calendarConnections?: CalendarConnectionCreateNestedManyWithoutUserInput
+    calendarSources?: CalendarSourceCreateNestedManyWithoutUserInput
+    calendarEvents?: CalendarEventCreateNestedManyWithoutUserInput
+  }
+
+  export type UserUncheckedCreateWithoutContentWorkspacesInput = {
+    id?: string
+    username: string
+    passwordHash?: string | null
+    email: string
+    role?: $Enums.UserRole
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: number
+    accounts?: AccountUncheckedCreateNestedManyWithoutUserInput
+    aiProviderKeys?: AIProviderKeyUncheckedCreateNestedManyWithoutUserInput
+    auditTargets?: AuditLogUncheckedCreateNestedManyWithoutTargetUserInput
+    adminActions?: AuditLogUncheckedCreateNestedManyWithoutUserInput
+    categories?: CategoryUncheckedCreateNestedManyWithoutOwnerInput
+    contentHistory?: ContentHistoryUncheckedCreateNestedManyWithoutUserInput
+    contentNodes?: ContentNodeUncheckedCreateNestedManyWithoutOwnerInput
+    sessions?: SessionUncheckedCreateNestedManyWithoutUserInput
+    storageConfigs?: StorageProviderConfigUncheckedCreateNestedManyWithoutUserInput
+    tags?: TagUncheckedCreateNestedManyWithoutUserInput
+    trashedContent?: TrashBinUncheckedCreateNestedManyWithoutDeletedByUserInput
+    viewGrants?: ViewGrantUncheckedCreateNestedManyWithoutUserInput
+    peopleGroups?: PeopleGroupUncheckedCreateNestedManyWithoutOwnerInput
+    peopleDefaultGroups?: PeopleGroupUncheckedCreateNestedManyWithoutDefaultForOwnerInput
+    people?: PersonUncheckedCreateNestedManyWithoutOwnerInput
+    peopleFileTreeMounts?: PeopleFileTreeMountUncheckedCreateNestedManyWithoutOwnerInput
+    personMentions?: PersonMentionUncheckedCreateNestedManyWithoutOwnerInput
+    reusableCategories?: ReusableCategoryUncheckedCreateNestedManyWithoutUserInput
+    savedBlocks?: SavedBlockUncheckedCreateNestedManyWithoutUserInput
+    contentTemplates?: ContentTemplateUncheckedCreateNestedManyWithoutUserInput
+    snippets?: SnippetUncheckedCreateNestedManyWithoutUserInput
+    pageTemplates?: PageTemplateUncheckedCreateNestedManyWithoutUserInput
+    calendarConnections?: CalendarConnectionUncheckedCreateNestedManyWithoutUserInput
+    calendarSources?: CalendarSourceUncheckedCreateNestedManyWithoutUserInput
+    calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutUserInput
+  }
+
+  export type UserCreateOrConnectWithoutContentWorkspacesInput = {
+    where: UserWhereUniqueInput
+    create: XOR<UserCreateWithoutContentWorkspacesInput, UserUncheckedCreateWithoutContentWorkspacesInput>
+  }
+
+  export type ContentWorkspaceItemCreateWithoutWorkspaceInput = {
+    id?: string
+    assignmentType?: $Enums.ContentWorkspaceItemAssignmentType
+    scope?: $Enums.ContentWorkspaceItemScope
+    expiresAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    content: ContentNodeCreateNestedOneWithoutWorkspaceItemsInput
+  }
+
+  export type ContentWorkspaceItemUncheckedCreateWithoutWorkspaceInput = {
+    id?: string
+    contentId: string
+    assignmentType?: $Enums.ContentWorkspaceItemAssignmentType
+    scope?: $Enums.ContentWorkspaceItemScope
+    expiresAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type ContentWorkspaceItemCreateOrConnectWithoutWorkspaceInput = {
+    where: ContentWorkspaceItemWhereUniqueInput
+    create: XOR<ContentWorkspaceItemCreateWithoutWorkspaceInput, ContentWorkspaceItemUncheckedCreateWithoutWorkspaceInput>
+  }
+
+  export type ContentWorkspaceItemCreateManyWorkspaceInputEnvelope = {
+    data: ContentWorkspaceItemCreateManyWorkspaceInput | ContentWorkspaceItemCreateManyWorkspaceInput[]
+    skipDuplicates?: boolean
+  }
+
+  export type UserUpsertWithoutContentWorkspacesInput = {
+    update: XOR<UserUpdateWithoutContentWorkspacesInput, UserUncheckedUpdateWithoutContentWorkspacesInput>
+    create: XOR<UserCreateWithoutContentWorkspacesInput, UserUncheckedCreateWithoutContentWorkspacesInput>
+    where?: UserWhereInput
+  }
+
+  export type UserUpdateToOneWithWhereWithoutContentWorkspacesInput = {
+    where?: UserWhereInput
+    data: XOR<UserUpdateWithoutContentWorkspacesInput, UserUncheckedUpdateWithoutContentWorkspacesInput>
+  }
+
+  export type UserUpdateWithoutContentWorkspacesInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    username?: StringFieldUpdateOperationsInput | string
+    passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
+    email?: StringFieldUpdateOperationsInput | string
+    role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: IntFieldUpdateOperationsInput | number
+    accounts?: AccountUpdateManyWithoutUserNestedInput
+    aiProviderKeys?: AIProviderKeyUpdateManyWithoutUserNestedInput
+    auditTargets?: AuditLogUpdateManyWithoutTargetUserNestedInput
+    adminActions?: AuditLogUpdateManyWithoutUserNestedInput
+    categories?: CategoryUpdateManyWithoutOwnerNestedInput
+    contentHistory?: ContentHistoryUpdateManyWithoutUserNestedInput
+    contentNodes?: ContentNodeUpdateManyWithoutOwnerNestedInput
+    sessions?: SessionUpdateManyWithoutUserNestedInput
+    storageConfigs?: StorageProviderConfigUpdateManyWithoutUserNestedInput
+    tags?: TagUpdateManyWithoutUserNestedInput
+    trashedContent?: TrashBinUpdateManyWithoutDeletedByUserNestedInput
+    viewGrants?: ViewGrantUpdateManyWithoutUserNestedInput
+    peopleGroups?: PeopleGroupUpdateManyWithoutOwnerNestedInput
+    peopleDefaultGroups?: PeopleGroupUpdateManyWithoutDefaultForOwnerNestedInput
+    people?: PersonUpdateManyWithoutOwnerNestedInput
+    peopleFileTreeMounts?: PeopleFileTreeMountUpdateManyWithoutOwnerNestedInput
+    personMentions?: PersonMentionUpdateManyWithoutOwnerNestedInput
+    reusableCategories?: ReusableCategoryUpdateManyWithoutUserNestedInput
+    savedBlocks?: SavedBlockUpdateManyWithoutUserNestedInput
+    contentTemplates?: ContentTemplateUpdateManyWithoutUserNestedInput
+    snippets?: SnippetUpdateManyWithoutUserNestedInput
+    pageTemplates?: PageTemplateUpdateManyWithoutUserNestedInput
+    calendarConnections?: CalendarConnectionUpdateManyWithoutUserNestedInput
+    calendarSources?: CalendarSourceUpdateManyWithoutUserNestedInput
+    calendarEvents?: CalendarEventUpdateManyWithoutUserNestedInput
+  }
+
+  export type UserUncheckedUpdateWithoutContentWorkspacesInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    username?: StringFieldUpdateOperationsInput | string
+    passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
+    email?: StringFieldUpdateOperationsInput | string
+    role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: IntFieldUpdateOperationsInput | number
+    accounts?: AccountUncheckedUpdateManyWithoutUserNestedInput
+    aiProviderKeys?: AIProviderKeyUncheckedUpdateManyWithoutUserNestedInput
+    auditTargets?: AuditLogUncheckedUpdateManyWithoutTargetUserNestedInput
+    adminActions?: AuditLogUncheckedUpdateManyWithoutUserNestedInput
+    categories?: CategoryUncheckedUpdateManyWithoutOwnerNestedInput
+    contentHistory?: ContentHistoryUncheckedUpdateManyWithoutUserNestedInput
+    contentNodes?: ContentNodeUncheckedUpdateManyWithoutOwnerNestedInput
+    sessions?: SessionUncheckedUpdateManyWithoutUserNestedInput
+    storageConfigs?: StorageProviderConfigUncheckedUpdateManyWithoutUserNestedInput
+    tags?: TagUncheckedUpdateManyWithoutUserNestedInput
+    trashedContent?: TrashBinUncheckedUpdateManyWithoutDeletedByUserNestedInput
+    viewGrants?: ViewGrantUncheckedUpdateManyWithoutUserNestedInput
+    peopleGroups?: PeopleGroupUncheckedUpdateManyWithoutOwnerNestedInput
+    peopleDefaultGroups?: PeopleGroupUncheckedUpdateManyWithoutDefaultForOwnerNestedInput
+    people?: PersonUncheckedUpdateManyWithoutOwnerNestedInput
+    peopleFileTreeMounts?: PeopleFileTreeMountUncheckedUpdateManyWithoutOwnerNestedInput
+    personMentions?: PersonMentionUncheckedUpdateManyWithoutOwnerNestedInput
+    reusableCategories?: ReusableCategoryUncheckedUpdateManyWithoutUserNestedInput
+    savedBlocks?: SavedBlockUncheckedUpdateManyWithoutUserNestedInput
+    contentTemplates?: ContentTemplateUncheckedUpdateManyWithoutUserNestedInput
+    snippets?: SnippetUncheckedUpdateManyWithoutUserNestedInput
+    pageTemplates?: PageTemplateUncheckedUpdateManyWithoutUserNestedInput
+    calendarConnections?: CalendarConnectionUncheckedUpdateManyWithoutUserNestedInput
+    calendarSources?: CalendarSourceUncheckedUpdateManyWithoutUserNestedInput
+    calendarEvents?: CalendarEventUncheckedUpdateManyWithoutUserNestedInput
+  }
+
+  export type ContentWorkspaceItemUpsertWithWhereUniqueWithoutWorkspaceInput = {
+    where: ContentWorkspaceItemWhereUniqueInput
+    update: XOR<ContentWorkspaceItemUpdateWithoutWorkspaceInput, ContentWorkspaceItemUncheckedUpdateWithoutWorkspaceInput>
+    create: XOR<ContentWorkspaceItemCreateWithoutWorkspaceInput, ContentWorkspaceItemUncheckedCreateWithoutWorkspaceInput>
+  }
+
+  export type ContentWorkspaceItemUpdateWithWhereUniqueWithoutWorkspaceInput = {
+    where: ContentWorkspaceItemWhereUniqueInput
+    data: XOR<ContentWorkspaceItemUpdateWithoutWorkspaceInput, ContentWorkspaceItemUncheckedUpdateWithoutWorkspaceInput>
+  }
+
+  export type ContentWorkspaceItemUpdateManyWithWhereWithoutWorkspaceInput = {
+    where: ContentWorkspaceItemScalarWhereInput
+    data: XOR<ContentWorkspaceItemUpdateManyMutationInput, ContentWorkspaceItemUncheckedUpdateManyWithoutWorkspaceInput>
+  }
+
+  export type ContentWorkspaceCreateWithoutItemsInput = {
+    id?: string
+    name: string
+    slug: string
+    isMain?: boolean
+    isLocked?: boolean
+    status?: $Enums.ContentWorkspaceStatus
+    expiresAt?: Date | string | null
+    archivedAt?: Date | string | null
+    layoutMode?: string
+    activePaneId?: string
+    paneState?: JsonNullValueInput | InputJsonValue
+    settings?: JsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    owner: UserCreateNestedOneWithoutContentWorkspacesInput
+  }
+
+  export type ContentWorkspaceUncheckedCreateWithoutItemsInput = {
+    id?: string
+    ownerId: string
+    name: string
+    slug: string
+    isMain?: boolean
+    isLocked?: boolean
+    status?: $Enums.ContentWorkspaceStatus
+    expiresAt?: Date | string | null
+    archivedAt?: Date | string | null
+    layoutMode?: string
+    activePaneId?: string
+    paneState?: JsonNullValueInput | InputJsonValue
+    settings?: JsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type ContentWorkspaceCreateOrConnectWithoutItemsInput = {
+    where: ContentWorkspaceWhereUniqueInput
+    create: XOR<ContentWorkspaceCreateWithoutItemsInput, ContentWorkspaceUncheckedCreateWithoutItemsInput>
+  }
+
+  export type ContentNodeCreateWithoutWorkspaceItemsInput = {
+    id?: string
+    title: string
+    slug: string
+    contentType: $Enums.ContentType
+    role?: $Enums.ContentRole
+    displayOrder?: number
+    isPublished?: boolean
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    deletedAt?: Date | string | null
+    deletedBy?: string | null
+    customIcon?: string | null
+    iconColor?: string | null
+    auditLogs?: AuditLogCreateNestedManyWithoutTargetContentInput
+    codePayload?: CodePayloadCreateNestedOneWithoutContentInput
+    filePayload?: FilePayloadCreateNestedOneWithoutContentInput
+    htmlPayload?: HtmlPayloadCreateNestedOneWithoutContentInput
+    notePayload?: NotePayloadCreateNestedOneWithoutContentInput
+    folderPayload?: FolderPayloadCreateNestedOneWithoutContentInput
+    externalPayload?: ExternalPayloadCreateNestedOneWithoutContentInput
+    chatPayload?: ChatPayloadCreateNestedOneWithoutContentInput
+    visualizationPayload?: VisualizationPayloadCreateNestedOneWithoutContentInput
+    dataPayload?: DataPayloadCreateNestedOneWithoutContentInput
+    hopePayload?: HopePayloadCreateNestedOneWithoutContentInput
+    workflowPayload?: WorkflowPayloadCreateNestedOneWithoutContentInput
+    history?: ContentHistoryCreateNestedManyWithoutContentInput
+    sourceLinks?: ContentLinkCreateNestedManyWithoutSourceInput
+    targetLinks?: ContentLinkCreateNestedManyWithoutTargetInput
+    category?: CategoryCreateNestedOneWithoutContentNodesInput
+    owner: UserCreateNestedOneWithoutContentNodesInput
+    parent?: ContentNodeCreateNestedOneWithoutChildrenInput
+    children?: ContentNodeCreateNestedManyWithoutParentInput
+    peopleGroup?: PeopleGroupCreateNestedOneWithoutContentNodesInput
+    person?: PersonCreateNestedOneWithoutContentNodesInput
+    peopleFileTreeMounts?: PeopleFileTreeMountCreateNestedManyWithoutContentParentInput
+    contentPath?: ContentPathCreateNestedOneWithoutContentInput
+    contentTags?: ContentTagCreateNestedManyWithoutContentInput
+    personMentions?: PersonMentionCreateNestedManyWithoutContentInput
+    trashBinEntry?: TrashBinCreateNestedOneWithoutContentInput
+    viewGrants?: ViewGrantCreateNestedManyWithoutContentInput
+    calendarEvents?: CalendarEventCreateNestedManyWithoutLinkedContentInput
+  }
+
+  export type ContentNodeUncheckedCreateWithoutWorkspaceItemsInput = {
+    id?: string
+    ownerId: string
+    title: string
+    slug: string
+    contentType: $Enums.ContentType
+    role?: $Enums.ContentRole
+    parentId?: string | null
+    displayOrder?: number
+    categoryId?: string | null
+    isPublished?: boolean
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    deletedAt?: Date | string | null
+    deletedBy?: string | null
+    customIcon?: string | null
+    iconColor?: string | null
+    peopleGroupId?: string | null
+    personId?: string | null
+    auditLogs?: AuditLogUncheckedCreateNestedManyWithoutTargetContentInput
+    codePayload?: CodePayloadUncheckedCreateNestedOneWithoutContentInput
+    filePayload?: FilePayloadUncheckedCreateNestedOneWithoutContentInput
+    htmlPayload?: HtmlPayloadUncheckedCreateNestedOneWithoutContentInput
+    notePayload?: NotePayloadUncheckedCreateNestedOneWithoutContentInput
+    folderPayload?: FolderPayloadUncheckedCreateNestedOneWithoutContentInput
+    externalPayload?: ExternalPayloadUncheckedCreateNestedOneWithoutContentInput
+    chatPayload?: ChatPayloadUncheckedCreateNestedOneWithoutContentInput
+    visualizationPayload?: VisualizationPayloadUncheckedCreateNestedOneWithoutContentInput
+    dataPayload?: DataPayloadUncheckedCreateNestedOneWithoutContentInput
+    hopePayload?: HopePayloadUncheckedCreateNestedOneWithoutContentInput
+    workflowPayload?: WorkflowPayloadUncheckedCreateNestedOneWithoutContentInput
+    history?: ContentHistoryUncheckedCreateNestedManyWithoutContentInput
+    sourceLinks?: ContentLinkUncheckedCreateNestedManyWithoutSourceInput
+    targetLinks?: ContentLinkUncheckedCreateNestedManyWithoutTargetInput
+    children?: ContentNodeUncheckedCreateNestedManyWithoutParentInput
+    peopleFileTreeMounts?: PeopleFileTreeMountUncheckedCreateNestedManyWithoutContentParentInput
+    contentPath?: ContentPathUncheckedCreateNestedOneWithoutContentInput
+    contentTags?: ContentTagUncheckedCreateNestedManyWithoutContentInput
+    personMentions?: PersonMentionUncheckedCreateNestedManyWithoutContentInput
+    trashBinEntry?: TrashBinUncheckedCreateNestedOneWithoutContentInput
+    viewGrants?: ViewGrantUncheckedCreateNestedManyWithoutContentInput
+    calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutLinkedContentInput
+  }
+
+  export type ContentNodeCreateOrConnectWithoutWorkspaceItemsInput = {
+    where: ContentNodeWhereUniqueInput
+    create: XOR<ContentNodeCreateWithoutWorkspaceItemsInput, ContentNodeUncheckedCreateWithoutWorkspaceItemsInput>
+  }
+
+  export type ContentWorkspaceUpsertWithoutItemsInput = {
+    update: XOR<ContentWorkspaceUpdateWithoutItemsInput, ContentWorkspaceUncheckedUpdateWithoutItemsInput>
+    create: XOR<ContentWorkspaceCreateWithoutItemsInput, ContentWorkspaceUncheckedCreateWithoutItemsInput>
+    where?: ContentWorkspaceWhereInput
+  }
+
+  export type ContentWorkspaceUpdateToOneWithWhereWithoutItemsInput = {
+    where?: ContentWorkspaceWhereInput
+    data: XOR<ContentWorkspaceUpdateWithoutItemsInput, ContentWorkspaceUncheckedUpdateWithoutItemsInput>
+  }
+
+  export type ContentWorkspaceUpdateWithoutItemsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    slug?: StringFieldUpdateOperationsInput | string
+    isMain?: BoolFieldUpdateOperationsInput | boolean
+    isLocked?: BoolFieldUpdateOperationsInput | boolean
+    status?: EnumContentWorkspaceStatusFieldUpdateOperationsInput | $Enums.ContentWorkspaceStatus
+    expiresAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    archivedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    layoutMode?: StringFieldUpdateOperationsInput | string
+    activePaneId?: StringFieldUpdateOperationsInput | string
+    paneState?: JsonNullValueInput | InputJsonValue
+    settings?: JsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    owner?: UserUpdateOneRequiredWithoutContentWorkspacesNestedInput
+  }
+
+  export type ContentWorkspaceUncheckedUpdateWithoutItemsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    ownerId?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    slug?: StringFieldUpdateOperationsInput | string
+    isMain?: BoolFieldUpdateOperationsInput | boolean
+    isLocked?: BoolFieldUpdateOperationsInput | boolean
+    status?: EnumContentWorkspaceStatusFieldUpdateOperationsInput | $Enums.ContentWorkspaceStatus
+    expiresAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    archivedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    layoutMode?: StringFieldUpdateOperationsInput | string
+    activePaneId?: StringFieldUpdateOperationsInput | string
+    paneState?: JsonNullValueInput | InputJsonValue
+    settings?: JsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type ContentNodeUpsertWithoutWorkspaceItemsInput = {
+    update: XOR<ContentNodeUpdateWithoutWorkspaceItemsInput, ContentNodeUncheckedUpdateWithoutWorkspaceItemsInput>
+    create: XOR<ContentNodeCreateWithoutWorkspaceItemsInput, ContentNodeUncheckedCreateWithoutWorkspaceItemsInput>
+    where?: ContentNodeWhereInput
+  }
+
+  export type ContentNodeUpdateToOneWithWhereWithoutWorkspaceItemsInput = {
+    where?: ContentNodeWhereInput
+    data: XOR<ContentNodeUpdateWithoutWorkspaceItemsInput, ContentNodeUncheckedUpdateWithoutWorkspaceItemsInput>
+  }
+
+  export type ContentNodeUpdateWithoutWorkspaceItemsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    title?: StringFieldUpdateOperationsInput | string
+    slug?: StringFieldUpdateOperationsInput | string
+    contentType?: EnumContentTypeFieldUpdateOperationsInput | $Enums.ContentType
+    role?: EnumContentRoleFieldUpdateOperationsInput | $Enums.ContentRole
+    displayOrder?: IntFieldUpdateOperationsInput | number
+    isPublished?: BoolFieldUpdateOperationsInput | boolean
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    deletedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    deletedBy?: NullableStringFieldUpdateOperationsInput | string | null
+    customIcon?: NullableStringFieldUpdateOperationsInput | string | null
+    iconColor?: NullableStringFieldUpdateOperationsInput | string | null
+    auditLogs?: AuditLogUpdateManyWithoutTargetContentNestedInput
+    codePayload?: CodePayloadUpdateOneWithoutContentNestedInput
+    filePayload?: FilePayloadUpdateOneWithoutContentNestedInput
+    htmlPayload?: HtmlPayloadUpdateOneWithoutContentNestedInput
+    notePayload?: NotePayloadUpdateOneWithoutContentNestedInput
+    folderPayload?: FolderPayloadUpdateOneWithoutContentNestedInput
+    externalPayload?: ExternalPayloadUpdateOneWithoutContentNestedInput
+    chatPayload?: ChatPayloadUpdateOneWithoutContentNestedInput
+    visualizationPayload?: VisualizationPayloadUpdateOneWithoutContentNestedInput
+    dataPayload?: DataPayloadUpdateOneWithoutContentNestedInput
+    hopePayload?: HopePayloadUpdateOneWithoutContentNestedInput
+    workflowPayload?: WorkflowPayloadUpdateOneWithoutContentNestedInput
+    history?: ContentHistoryUpdateManyWithoutContentNestedInput
+    sourceLinks?: ContentLinkUpdateManyWithoutSourceNestedInput
+    targetLinks?: ContentLinkUpdateManyWithoutTargetNestedInput
+    category?: CategoryUpdateOneWithoutContentNodesNestedInput
+    owner?: UserUpdateOneRequiredWithoutContentNodesNestedInput
+    parent?: ContentNodeUpdateOneWithoutChildrenNestedInput
+    children?: ContentNodeUpdateManyWithoutParentNestedInput
+    peopleGroup?: PeopleGroupUpdateOneWithoutContentNodesNestedInput
+    person?: PersonUpdateOneWithoutContentNodesNestedInput
+    peopleFileTreeMounts?: PeopleFileTreeMountUpdateManyWithoutContentParentNestedInput
+    contentPath?: ContentPathUpdateOneWithoutContentNestedInput
+    contentTags?: ContentTagUpdateManyWithoutContentNestedInput
+    personMentions?: PersonMentionUpdateManyWithoutContentNestedInput
+    trashBinEntry?: TrashBinUpdateOneWithoutContentNestedInput
+    viewGrants?: ViewGrantUpdateManyWithoutContentNestedInput
+    calendarEvents?: CalendarEventUpdateManyWithoutLinkedContentNestedInput
+  }
+
+  export type ContentNodeUncheckedUpdateWithoutWorkspaceItemsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    ownerId?: StringFieldUpdateOperationsInput | string
+    title?: StringFieldUpdateOperationsInput | string
+    slug?: StringFieldUpdateOperationsInput | string
+    contentType?: EnumContentTypeFieldUpdateOperationsInput | $Enums.ContentType
+    role?: EnumContentRoleFieldUpdateOperationsInput | $Enums.ContentRole
+    parentId?: NullableStringFieldUpdateOperationsInput | string | null
+    displayOrder?: IntFieldUpdateOperationsInput | number
+    categoryId?: NullableStringFieldUpdateOperationsInput | string | null
+    isPublished?: BoolFieldUpdateOperationsInput | boolean
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    deletedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    deletedBy?: NullableStringFieldUpdateOperationsInput | string | null
+    customIcon?: NullableStringFieldUpdateOperationsInput | string | null
+    iconColor?: NullableStringFieldUpdateOperationsInput | string | null
+    peopleGroupId?: NullableStringFieldUpdateOperationsInput | string | null
+    personId?: NullableStringFieldUpdateOperationsInput | string | null
+    auditLogs?: AuditLogUncheckedUpdateManyWithoutTargetContentNestedInput
+    codePayload?: CodePayloadUncheckedUpdateOneWithoutContentNestedInput
+    filePayload?: FilePayloadUncheckedUpdateOneWithoutContentNestedInput
+    htmlPayload?: HtmlPayloadUncheckedUpdateOneWithoutContentNestedInput
+    notePayload?: NotePayloadUncheckedUpdateOneWithoutContentNestedInput
+    folderPayload?: FolderPayloadUncheckedUpdateOneWithoutContentNestedInput
+    externalPayload?: ExternalPayloadUncheckedUpdateOneWithoutContentNestedInput
+    chatPayload?: ChatPayloadUncheckedUpdateOneWithoutContentNestedInput
+    visualizationPayload?: VisualizationPayloadUncheckedUpdateOneWithoutContentNestedInput
+    dataPayload?: DataPayloadUncheckedUpdateOneWithoutContentNestedInput
+    hopePayload?: HopePayloadUncheckedUpdateOneWithoutContentNestedInput
+    workflowPayload?: WorkflowPayloadUncheckedUpdateOneWithoutContentNestedInput
+    history?: ContentHistoryUncheckedUpdateManyWithoutContentNestedInput
+    sourceLinks?: ContentLinkUncheckedUpdateManyWithoutSourceNestedInput
+    targetLinks?: ContentLinkUncheckedUpdateManyWithoutTargetNestedInput
+    children?: ContentNodeUncheckedUpdateManyWithoutParentNestedInput
+    peopleFileTreeMounts?: PeopleFileTreeMountUncheckedUpdateManyWithoutContentParentNestedInput
+    contentPath?: ContentPathUncheckedUpdateOneWithoutContentNestedInput
+    contentTags?: ContentTagUncheckedUpdateManyWithoutContentNestedInput
+    personMentions?: PersonMentionUncheckedUpdateManyWithoutContentNestedInput
+    trashBinEntry?: TrashBinUncheckedUpdateOneWithoutContentNestedInput
+    viewGrants?: ViewGrantUncheckedUpdateManyWithoutContentNestedInput
+    calendarEvents?: CalendarEventUncheckedUpdateManyWithoutLinkedContentNestedInput
+  }
+
   export type UserCreateWithoutCategoriesInput = {
     id?: string
     username: string
@@ -71749,6 +75967,7 @@ export namespace Prisma {
     calendarConnections?: CalendarConnectionCreateNestedManyWithoutUserInput
     calendarSources?: CalendarSourceCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventCreateNestedManyWithoutUserInput
+    contentWorkspaces?: ContentWorkspaceCreateNestedManyWithoutOwnerInput
   }
 
   export type UserUncheckedCreateWithoutCategoriesInput = {
@@ -71785,6 +76004,7 @@ export namespace Prisma {
     calendarConnections?: CalendarConnectionUncheckedCreateNestedManyWithoutUserInput
     calendarSources?: CalendarSourceUncheckedCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutUserInput
+    contentWorkspaces?: ContentWorkspaceUncheckedCreateNestedManyWithoutOwnerInput
   }
 
   export type UserCreateOrConnectWithoutCategoriesInput = {
@@ -71833,6 +76053,7 @@ export namespace Prisma {
     trashBinEntry?: TrashBinCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantCreateNestedManyWithoutContentInput
     calendarEvents?: CalendarEventCreateNestedManyWithoutLinkedContentInput
+    workspaceItems?: ContentWorkspaceItemCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeUncheckedCreateWithoutCategoryInput = {
@@ -71876,6 +76097,7 @@ export namespace Prisma {
     trashBinEntry?: TrashBinUncheckedCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantUncheckedCreateNestedManyWithoutContentInput
     calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutLinkedContentInput
+    workspaceItems?: ContentWorkspaceItemUncheckedCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeCreateOrConnectWithoutCategoryInput = {
@@ -71933,6 +76155,7 @@ export namespace Prisma {
     calendarConnections?: CalendarConnectionUpdateManyWithoutUserNestedInput
     calendarSources?: CalendarSourceUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUpdateManyWithoutUserNestedInput
+    contentWorkspaces?: ContentWorkspaceUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUncheckedUpdateWithoutCategoriesInput = {
@@ -71969,6 +76192,7 @@ export namespace Prisma {
     calendarConnections?: CalendarConnectionUncheckedUpdateManyWithoutUserNestedInput
     calendarSources?: CalendarSourceUncheckedUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUncheckedUpdateManyWithoutUserNestedInput
+    contentWorkspaces?: ContentWorkspaceUncheckedUpdateManyWithoutOwnerNestedInput
   }
 
   export type ContentNodeUpsertWithWhereUniqueWithoutCategoryInput = {
@@ -72045,6 +76269,7 @@ export namespace Prisma {
     calendarConnections?: CalendarConnectionCreateNestedManyWithoutUserInput
     calendarSources?: CalendarSourceCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventCreateNestedManyWithoutUserInput
+    contentWorkspaces?: ContentWorkspaceCreateNestedManyWithoutOwnerInput
   }
 
   export type UserUncheckedCreateWithoutTagsInput = {
@@ -72081,6 +76306,7 @@ export namespace Prisma {
     calendarConnections?: CalendarConnectionUncheckedCreateNestedManyWithoutUserInput
     calendarSources?: CalendarSourceUncheckedCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutUserInput
+    contentWorkspaces?: ContentWorkspaceUncheckedCreateNestedManyWithoutOwnerInput
   }
 
   export type UserCreateOrConnectWithoutTagsInput = {
@@ -72149,6 +76375,7 @@ export namespace Prisma {
     calendarConnections?: CalendarConnectionUpdateManyWithoutUserNestedInput
     calendarSources?: CalendarSourceUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUpdateManyWithoutUserNestedInput
+    contentWorkspaces?: ContentWorkspaceUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUncheckedUpdateWithoutTagsInput = {
@@ -72185,6 +76412,7 @@ export namespace Prisma {
     calendarConnections?: CalendarConnectionUncheckedUpdateManyWithoutUserNestedInput
     calendarSources?: CalendarSourceUncheckedUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUncheckedUpdateManyWithoutUserNestedInput
+    contentWorkspaces?: ContentWorkspaceUncheckedUpdateManyWithoutOwnerNestedInput
   }
 
   export type ContentNodeCreateWithoutViewGrantsInput = {
@@ -72228,6 +76456,7 @@ export namespace Prisma {
     personMentions?: PersonMentionCreateNestedManyWithoutContentInput
     trashBinEntry?: TrashBinCreateNestedOneWithoutContentInput
     calendarEvents?: CalendarEventCreateNestedManyWithoutLinkedContentInput
+    workspaceItems?: ContentWorkspaceItemCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeUncheckedCreateWithoutViewGrantsInput = {
@@ -72271,6 +76500,7 @@ export namespace Prisma {
     personMentions?: PersonMentionUncheckedCreateNestedManyWithoutContentInput
     trashBinEntry?: TrashBinUncheckedCreateNestedOneWithoutContentInput
     calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutLinkedContentInput
+    workspaceItems?: ContentWorkspaceItemUncheckedCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeCreateOrConnectWithoutViewGrantsInput = {
@@ -72312,6 +76542,7 @@ export namespace Prisma {
     calendarConnections?: CalendarConnectionCreateNestedManyWithoutUserInput
     calendarSources?: CalendarSourceCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventCreateNestedManyWithoutUserInput
+    contentWorkspaces?: ContentWorkspaceCreateNestedManyWithoutOwnerInput
   }
 
   export type UserUncheckedCreateWithoutViewGrantsInput = {
@@ -72348,6 +76579,7 @@ export namespace Prisma {
     calendarConnections?: CalendarConnectionUncheckedCreateNestedManyWithoutUserInput
     calendarSources?: CalendarSourceUncheckedCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutUserInput
+    contentWorkspaces?: ContentWorkspaceUncheckedCreateNestedManyWithoutOwnerInput
   }
 
   export type UserCreateOrConnectWithoutViewGrantsInput = {
@@ -72407,6 +76639,7 @@ export namespace Prisma {
     personMentions?: PersonMentionUpdateManyWithoutContentNestedInput
     trashBinEntry?: TrashBinUpdateOneWithoutContentNestedInput
     calendarEvents?: CalendarEventUpdateManyWithoutLinkedContentNestedInput
+    workspaceItems?: ContentWorkspaceItemUpdateManyWithoutContentNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutViewGrantsInput = {
@@ -72450,6 +76683,7 @@ export namespace Prisma {
     personMentions?: PersonMentionUncheckedUpdateManyWithoutContentNestedInput
     trashBinEntry?: TrashBinUncheckedUpdateOneWithoutContentNestedInput
     calendarEvents?: CalendarEventUncheckedUpdateManyWithoutLinkedContentNestedInput
+    workspaceItems?: ContentWorkspaceItemUncheckedUpdateManyWithoutContentNestedInput
   }
 
   export type UserUpsertWithoutViewGrantsInput = {
@@ -72497,6 +76731,7 @@ export namespace Prisma {
     calendarConnections?: CalendarConnectionUpdateManyWithoutUserNestedInput
     calendarSources?: CalendarSourceUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUpdateManyWithoutUserNestedInput
+    contentWorkspaces?: ContentWorkspaceUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUncheckedUpdateWithoutViewGrantsInput = {
@@ -72533,6 +76768,7 @@ export namespace Prisma {
     calendarConnections?: CalendarConnectionUncheckedUpdateManyWithoutUserNestedInput
     calendarSources?: CalendarSourceUncheckedUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUncheckedUpdateManyWithoutUserNestedInput
+    contentWorkspaces?: ContentWorkspaceUncheckedUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserCreateWithoutPeopleGroupsInput = {
@@ -72569,6 +76805,7 @@ export namespace Prisma {
     calendarConnections?: CalendarConnectionCreateNestedManyWithoutUserInput
     calendarSources?: CalendarSourceCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventCreateNestedManyWithoutUserInput
+    contentWorkspaces?: ContentWorkspaceCreateNestedManyWithoutOwnerInput
   }
 
   export type UserUncheckedCreateWithoutPeopleGroupsInput = {
@@ -72605,6 +76842,7 @@ export namespace Prisma {
     calendarConnections?: CalendarConnectionUncheckedCreateNestedManyWithoutUserInput
     calendarSources?: CalendarSourceUncheckedCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutUserInput
+    contentWorkspaces?: ContentWorkspaceUncheckedCreateNestedManyWithoutOwnerInput
   }
 
   export type UserCreateOrConnectWithoutPeopleGroupsInput = {
@@ -72646,6 +76884,7 @@ export namespace Prisma {
     calendarConnections?: CalendarConnectionCreateNestedManyWithoutUserInput
     calendarSources?: CalendarSourceCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventCreateNestedManyWithoutUserInput
+    contentWorkspaces?: ContentWorkspaceCreateNestedManyWithoutOwnerInput
   }
 
   export type UserUncheckedCreateWithoutPeopleDefaultGroupsInput = {
@@ -72682,6 +76921,7 @@ export namespace Prisma {
     calendarConnections?: CalendarConnectionUncheckedCreateNestedManyWithoutUserInput
     calendarSources?: CalendarSourceUncheckedCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutUserInput
+    contentWorkspaces?: ContentWorkspaceUncheckedCreateNestedManyWithoutOwnerInput
   }
 
   export type UserCreateOrConnectWithoutPeopleDefaultGroupsInput = {
@@ -72871,6 +77111,7 @@ export namespace Prisma {
     trashBinEntry?: TrashBinCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantCreateNestedManyWithoutContentInput
     calendarEvents?: CalendarEventCreateNestedManyWithoutLinkedContentInput
+    workspaceItems?: ContentWorkspaceItemCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeUncheckedCreateWithoutPeopleGroupInput = {
@@ -72914,6 +77155,7 @@ export namespace Prisma {
     trashBinEntry?: TrashBinUncheckedCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantUncheckedCreateNestedManyWithoutContentInput
     calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutLinkedContentInput
+    workspaceItems?: ContentWorkspaceItemUncheckedCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeCreateOrConnectWithoutPeopleGroupInput = {
@@ -73001,6 +77243,7 @@ export namespace Prisma {
     calendarConnections?: CalendarConnectionUpdateManyWithoutUserNestedInput
     calendarSources?: CalendarSourceUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUpdateManyWithoutUserNestedInput
+    contentWorkspaces?: ContentWorkspaceUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUncheckedUpdateWithoutPeopleGroupsInput = {
@@ -73037,6 +77280,7 @@ export namespace Prisma {
     calendarConnections?: CalendarConnectionUncheckedUpdateManyWithoutUserNestedInput
     calendarSources?: CalendarSourceUncheckedUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUncheckedUpdateManyWithoutUserNestedInput
+    contentWorkspaces?: ContentWorkspaceUncheckedUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUpsertWithoutPeopleDefaultGroupsInput = {
@@ -73084,6 +77328,7 @@ export namespace Prisma {
     calendarConnections?: CalendarConnectionUpdateManyWithoutUserNestedInput
     calendarSources?: CalendarSourceUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUpdateManyWithoutUserNestedInput
+    contentWorkspaces?: ContentWorkspaceUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUncheckedUpdateWithoutPeopleDefaultGroupsInput = {
@@ -73120,6 +77365,7 @@ export namespace Prisma {
     calendarConnections?: CalendarConnectionUncheckedUpdateManyWithoutUserNestedInput
     calendarSources?: CalendarSourceUncheckedUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUncheckedUpdateManyWithoutUserNestedInput
+    contentWorkspaces?: ContentWorkspaceUncheckedUpdateManyWithoutOwnerNestedInput
   }
 
   export type PeopleGroupUpsertWithoutChildGroupsInput = {
@@ -73269,6 +77515,7 @@ export namespace Prisma {
     calendarConnections?: CalendarConnectionCreateNestedManyWithoutUserInput
     calendarSources?: CalendarSourceCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventCreateNestedManyWithoutUserInput
+    contentWorkspaces?: ContentWorkspaceCreateNestedManyWithoutOwnerInput
   }
 
   export type UserUncheckedCreateWithoutPeopleInput = {
@@ -73305,6 +77552,7 @@ export namespace Prisma {
     calendarConnections?: CalendarConnectionUncheckedCreateNestedManyWithoutUserInput
     calendarSources?: CalendarSourceUncheckedCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutUserInput
+    contentWorkspaces?: ContentWorkspaceUncheckedCreateNestedManyWithoutOwnerInput
   }
 
   export type UserCreateOrConnectWithoutPeopleInput = {
@@ -73396,6 +77644,7 @@ export namespace Prisma {
     trashBinEntry?: TrashBinCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantCreateNestedManyWithoutContentInput
     calendarEvents?: CalendarEventCreateNestedManyWithoutLinkedContentInput
+    workspaceItems?: ContentWorkspaceItemCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeUncheckedCreateWithoutPersonInput = {
@@ -73439,6 +77688,7 @@ export namespace Prisma {
     trashBinEntry?: TrashBinUncheckedCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantUncheckedCreateNestedManyWithoutContentInput
     calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutLinkedContentInput
+    workspaceItems?: ContentWorkspaceItemUncheckedCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeCreateOrConnectWithoutPersonInput = {
@@ -73554,6 +77804,7 @@ export namespace Prisma {
     calendarConnections?: CalendarConnectionUpdateManyWithoutUserNestedInput
     calendarSources?: CalendarSourceUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUpdateManyWithoutUserNestedInput
+    contentWorkspaces?: ContentWorkspaceUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUncheckedUpdateWithoutPeopleInput = {
@@ -73590,6 +77841,7 @@ export namespace Prisma {
     calendarConnections?: CalendarConnectionUncheckedUpdateManyWithoutUserNestedInput
     calendarSources?: CalendarSourceUncheckedUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUncheckedUpdateManyWithoutUserNestedInput
+    contentWorkspaces?: ContentWorkspaceUncheckedUpdateManyWithoutOwnerNestedInput
   }
 
   export type PeopleGroupUpsertWithoutPeopleInput = {
@@ -73723,6 +77975,7 @@ export namespace Prisma {
     calendarConnections?: CalendarConnectionCreateNestedManyWithoutUserInput
     calendarSources?: CalendarSourceCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventCreateNestedManyWithoutUserInput
+    contentWorkspaces?: ContentWorkspaceCreateNestedManyWithoutOwnerInput
   }
 
   export type UserUncheckedCreateWithoutPeopleFileTreeMountsInput = {
@@ -73759,6 +78012,7 @@ export namespace Prisma {
     calendarConnections?: CalendarConnectionUncheckedCreateNestedManyWithoutUserInput
     calendarSources?: CalendarSourceUncheckedCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutUserInput
+    contentWorkspaces?: ContentWorkspaceUncheckedCreateNestedManyWithoutOwnerInput
   }
 
   export type UserCreateOrConnectWithoutPeopleFileTreeMountsInput = {
@@ -73807,6 +78061,7 @@ export namespace Prisma {
     trashBinEntry?: TrashBinCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantCreateNestedManyWithoutContentInput
     calendarEvents?: CalendarEventCreateNestedManyWithoutLinkedContentInput
+    workspaceItems?: ContentWorkspaceItemCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeUncheckedCreateWithoutPeopleFileTreeMountsInput = {
@@ -73850,6 +78105,7 @@ export namespace Prisma {
     trashBinEntry?: TrashBinUncheckedCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantUncheckedCreateNestedManyWithoutContentInput
     calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutLinkedContentInput
+    workspaceItems?: ContentWorkspaceItemUncheckedCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeCreateOrConnectWithoutPeopleFileTreeMountsInput = {
@@ -73990,6 +78246,7 @@ export namespace Prisma {
     calendarConnections?: CalendarConnectionUpdateManyWithoutUserNestedInput
     calendarSources?: CalendarSourceUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUpdateManyWithoutUserNestedInput
+    contentWorkspaces?: ContentWorkspaceUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUncheckedUpdateWithoutPeopleFileTreeMountsInput = {
@@ -74026,6 +78283,7 @@ export namespace Prisma {
     calendarConnections?: CalendarConnectionUncheckedUpdateManyWithoutUserNestedInput
     calendarSources?: CalendarSourceUncheckedUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUncheckedUpdateManyWithoutUserNestedInput
+    contentWorkspaces?: ContentWorkspaceUncheckedUpdateManyWithoutOwnerNestedInput
   }
 
   export type ContentNodeUpsertWithoutPeopleFileTreeMountsInput = {
@@ -74080,6 +78338,7 @@ export namespace Prisma {
     trashBinEntry?: TrashBinUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUpdateManyWithoutContentNestedInput
     calendarEvents?: CalendarEventUpdateManyWithoutLinkedContentNestedInput
+    workspaceItems?: ContentWorkspaceItemUpdateManyWithoutContentNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutPeopleFileTreeMountsInput = {
@@ -74123,6 +78382,7 @@ export namespace Prisma {
     trashBinEntry?: TrashBinUncheckedUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUncheckedUpdateManyWithoutContentNestedInput
     calendarEvents?: CalendarEventUncheckedUpdateManyWithoutLinkedContentNestedInput
+    workspaceItems?: ContentWorkspaceItemUncheckedUpdateManyWithoutContentNestedInput
   }
 
   export type PeopleGroupUpsertWithoutFileTreeMountsInput = {
@@ -74259,6 +78519,7 @@ export namespace Prisma {
     calendarConnections?: CalendarConnectionCreateNestedManyWithoutUserInput
     calendarSources?: CalendarSourceCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventCreateNestedManyWithoutUserInput
+    contentWorkspaces?: ContentWorkspaceCreateNestedManyWithoutOwnerInput
   }
 
   export type UserUncheckedCreateWithoutPersonMentionsInput = {
@@ -74295,6 +78556,7 @@ export namespace Prisma {
     calendarConnections?: CalendarConnectionUncheckedCreateNestedManyWithoutUserInput
     calendarSources?: CalendarSourceUncheckedCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutUserInput
+    contentWorkspaces?: ContentWorkspaceUncheckedCreateNestedManyWithoutOwnerInput
   }
 
   export type UserCreateOrConnectWithoutPersonMentionsInput = {
@@ -74343,6 +78605,7 @@ export namespace Prisma {
     trashBinEntry?: TrashBinCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantCreateNestedManyWithoutContentInput
     calendarEvents?: CalendarEventCreateNestedManyWithoutLinkedContentInput
+    workspaceItems?: ContentWorkspaceItemCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeUncheckedCreateWithoutPersonMentionsInput = {
@@ -74386,6 +78649,7 @@ export namespace Prisma {
     trashBinEntry?: TrashBinUncheckedCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantUncheckedCreateNestedManyWithoutContentInput
     calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutLinkedContentInput
+    workspaceItems?: ContentWorkspaceItemUncheckedCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeCreateOrConnectWithoutPersonMentionsInput = {
@@ -74483,6 +78747,7 @@ export namespace Prisma {
     calendarConnections?: CalendarConnectionUpdateManyWithoutUserNestedInput
     calendarSources?: CalendarSourceUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUpdateManyWithoutUserNestedInput
+    contentWorkspaces?: ContentWorkspaceUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUncheckedUpdateWithoutPersonMentionsInput = {
@@ -74519,6 +78784,7 @@ export namespace Prisma {
     calendarConnections?: CalendarConnectionUncheckedUpdateManyWithoutUserNestedInput
     calendarSources?: CalendarSourceUncheckedUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUncheckedUpdateManyWithoutUserNestedInput
+    contentWorkspaces?: ContentWorkspaceUncheckedUpdateManyWithoutOwnerNestedInput
   }
 
   export type ContentNodeUpsertWithoutPersonMentionsInput = {
@@ -74573,6 +78839,7 @@ export namespace Prisma {
     trashBinEntry?: TrashBinUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUpdateManyWithoutContentNestedInput
     calendarEvents?: CalendarEventUpdateManyWithoutLinkedContentNestedInput
+    workspaceItems?: ContentWorkspaceItemUpdateManyWithoutContentNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutPersonMentionsInput = {
@@ -74616,6 +78883,7 @@ export namespace Prisma {
     trashBinEntry?: TrashBinUncheckedUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUncheckedUpdateManyWithoutContentNestedInput
     calendarEvents?: CalendarEventUncheckedUpdateManyWithoutLinkedContentNestedInput
+    workspaceItems?: ContentWorkspaceItemUncheckedUpdateManyWithoutContentNestedInput
   }
 
   export type PersonUpsertWithoutMentionsInput = {
@@ -74703,6 +78971,7 @@ export namespace Prisma {
     calendarConnections?: CalendarConnectionCreateNestedManyWithoutUserInput
     calendarSources?: CalendarSourceCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventCreateNestedManyWithoutUserInput
+    contentWorkspaces?: ContentWorkspaceCreateNestedManyWithoutOwnerInput
   }
 
   export type UserUncheckedCreateWithoutSessionsInput = {
@@ -74739,6 +79008,7 @@ export namespace Prisma {
     calendarConnections?: CalendarConnectionUncheckedCreateNestedManyWithoutUserInput
     calendarSources?: CalendarSourceUncheckedCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutUserInput
+    contentWorkspaces?: ContentWorkspaceUncheckedCreateNestedManyWithoutOwnerInput
   }
 
   export type UserCreateOrConnectWithoutSessionsInput = {
@@ -74791,6 +79061,7 @@ export namespace Prisma {
     calendarConnections?: CalendarConnectionUpdateManyWithoutUserNestedInput
     calendarSources?: CalendarSourceUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUpdateManyWithoutUserNestedInput
+    contentWorkspaces?: ContentWorkspaceUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUncheckedUpdateWithoutSessionsInput = {
@@ -74827,6 +79098,7 @@ export namespace Prisma {
     calendarConnections?: CalendarConnectionUncheckedUpdateManyWithoutUserNestedInput
     calendarSources?: CalendarSourceUncheckedUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUncheckedUpdateManyWithoutUserNestedInput
+    contentWorkspaces?: ContentWorkspaceUncheckedUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserCreateWithoutAccountsInput = {
@@ -74863,6 +79135,7 @@ export namespace Prisma {
     calendarConnections?: CalendarConnectionCreateNestedManyWithoutUserInput
     calendarSources?: CalendarSourceCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventCreateNestedManyWithoutUserInput
+    contentWorkspaces?: ContentWorkspaceCreateNestedManyWithoutOwnerInput
   }
 
   export type UserUncheckedCreateWithoutAccountsInput = {
@@ -74899,6 +79172,7 @@ export namespace Prisma {
     calendarConnections?: CalendarConnectionUncheckedCreateNestedManyWithoutUserInput
     calendarSources?: CalendarSourceUncheckedCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutUserInput
+    contentWorkspaces?: ContentWorkspaceUncheckedCreateNestedManyWithoutOwnerInput
   }
 
   export type UserCreateOrConnectWithoutAccountsInput = {
@@ -74951,6 +79225,7 @@ export namespace Prisma {
     calendarConnections?: CalendarConnectionUpdateManyWithoutUserNestedInput
     calendarSources?: CalendarSourceUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUpdateManyWithoutUserNestedInput
+    contentWorkspaces?: ContentWorkspaceUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUncheckedUpdateWithoutAccountsInput = {
@@ -74987,6 +79262,7 @@ export namespace Prisma {
     calendarConnections?: CalendarConnectionUncheckedUpdateManyWithoutUserNestedInput
     calendarSources?: CalendarSourceUncheckedUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUncheckedUpdateManyWithoutUserNestedInput
+    contentWorkspaces?: ContentWorkspaceUncheckedUpdateManyWithoutOwnerNestedInput
   }
 
   export type ContentNodeCreateWithoutAuditLogsInput = {
@@ -75030,6 +79306,7 @@ export namespace Prisma {
     trashBinEntry?: TrashBinCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantCreateNestedManyWithoutContentInput
     calendarEvents?: CalendarEventCreateNestedManyWithoutLinkedContentInput
+    workspaceItems?: ContentWorkspaceItemCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeUncheckedCreateWithoutAuditLogsInput = {
@@ -75073,6 +79350,7 @@ export namespace Prisma {
     trashBinEntry?: TrashBinUncheckedCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantUncheckedCreateNestedManyWithoutContentInput
     calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutLinkedContentInput
+    workspaceItems?: ContentWorkspaceItemUncheckedCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeCreateOrConnectWithoutAuditLogsInput = {
@@ -75114,6 +79392,7 @@ export namespace Prisma {
     calendarConnections?: CalendarConnectionCreateNestedManyWithoutUserInput
     calendarSources?: CalendarSourceCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventCreateNestedManyWithoutUserInput
+    contentWorkspaces?: ContentWorkspaceCreateNestedManyWithoutOwnerInput
   }
 
   export type UserUncheckedCreateWithoutAuditTargetsInput = {
@@ -75150,6 +79429,7 @@ export namespace Prisma {
     calendarConnections?: CalendarConnectionUncheckedCreateNestedManyWithoutUserInput
     calendarSources?: CalendarSourceUncheckedCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutUserInput
+    contentWorkspaces?: ContentWorkspaceUncheckedCreateNestedManyWithoutOwnerInput
   }
 
   export type UserCreateOrConnectWithoutAuditTargetsInput = {
@@ -75191,6 +79471,7 @@ export namespace Prisma {
     calendarConnections?: CalendarConnectionCreateNestedManyWithoutUserInput
     calendarSources?: CalendarSourceCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventCreateNestedManyWithoutUserInput
+    contentWorkspaces?: ContentWorkspaceCreateNestedManyWithoutOwnerInput
   }
 
   export type UserUncheckedCreateWithoutAdminActionsInput = {
@@ -75227,6 +79508,7 @@ export namespace Prisma {
     calendarConnections?: CalendarConnectionUncheckedCreateNestedManyWithoutUserInput
     calendarSources?: CalendarSourceUncheckedCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutUserInput
+    contentWorkspaces?: ContentWorkspaceUncheckedCreateNestedManyWithoutOwnerInput
   }
 
   export type UserCreateOrConnectWithoutAdminActionsInput = {
@@ -75286,6 +79568,7 @@ export namespace Prisma {
     trashBinEntry?: TrashBinUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUpdateManyWithoutContentNestedInput
     calendarEvents?: CalendarEventUpdateManyWithoutLinkedContentNestedInput
+    workspaceItems?: ContentWorkspaceItemUpdateManyWithoutContentNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutAuditLogsInput = {
@@ -75329,6 +79612,7 @@ export namespace Prisma {
     trashBinEntry?: TrashBinUncheckedUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUncheckedUpdateManyWithoutContentNestedInput
     calendarEvents?: CalendarEventUncheckedUpdateManyWithoutLinkedContentNestedInput
+    workspaceItems?: ContentWorkspaceItemUncheckedUpdateManyWithoutContentNestedInput
   }
 
   export type UserUpsertWithoutAuditTargetsInput = {
@@ -75376,6 +79660,7 @@ export namespace Prisma {
     calendarConnections?: CalendarConnectionUpdateManyWithoutUserNestedInput
     calendarSources?: CalendarSourceUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUpdateManyWithoutUserNestedInput
+    contentWorkspaces?: ContentWorkspaceUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUncheckedUpdateWithoutAuditTargetsInput = {
@@ -75412,6 +79697,7 @@ export namespace Prisma {
     calendarConnections?: CalendarConnectionUncheckedUpdateManyWithoutUserNestedInput
     calendarSources?: CalendarSourceUncheckedUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUncheckedUpdateManyWithoutUserNestedInput
+    contentWorkspaces?: ContentWorkspaceUncheckedUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUpsertWithoutAdminActionsInput = {
@@ -75459,6 +79745,7 @@ export namespace Prisma {
     calendarConnections?: CalendarConnectionUpdateManyWithoutUserNestedInput
     calendarSources?: CalendarSourceUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUpdateManyWithoutUserNestedInput
+    contentWorkspaces?: ContentWorkspaceUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUncheckedUpdateWithoutAdminActionsInput = {
@@ -75495,6 +79782,7 @@ export namespace Prisma {
     calendarConnections?: CalendarConnectionUncheckedUpdateManyWithoutUserNestedInput
     calendarSources?: CalendarSourceUncheckedUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUncheckedUpdateManyWithoutUserNestedInput
+    contentWorkspaces?: ContentWorkspaceUncheckedUpdateManyWithoutOwnerNestedInput
   }
 
   export type ContentNodeCreateWithoutFolderPayloadInput = {
@@ -75538,6 +79826,7 @@ export namespace Prisma {
     trashBinEntry?: TrashBinCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantCreateNestedManyWithoutContentInput
     calendarEvents?: CalendarEventCreateNestedManyWithoutLinkedContentInput
+    workspaceItems?: ContentWorkspaceItemCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeUncheckedCreateWithoutFolderPayloadInput = {
@@ -75581,6 +79870,7 @@ export namespace Prisma {
     trashBinEntry?: TrashBinUncheckedCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantUncheckedCreateNestedManyWithoutContentInput
     calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutLinkedContentInput
+    workspaceItems?: ContentWorkspaceItemUncheckedCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeCreateOrConnectWithoutFolderPayloadInput = {
@@ -75640,6 +79930,7 @@ export namespace Prisma {
     trashBinEntry?: TrashBinUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUpdateManyWithoutContentNestedInput
     calendarEvents?: CalendarEventUpdateManyWithoutLinkedContentNestedInput
+    workspaceItems?: ContentWorkspaceItemUpdateManyWithoutContentNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutFolderPayloadInput = {
@@ -75683,6 +79974,7 @@ export namespace Prisma {
     trashBinEntry?: TrashBinUncheckedUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUncheckedUpdateManyWithoutContentNestedInput
     calendarEvents?: CalendarEventUncheckedUpdateManyWithoutLinkedContentNestedInput
+    workspaceItems?: ContentWorkspaceItemUncheckedUpdateManyWithoutContentNestedInput
   }
 
   export type ContentNodeCreateWithoutExternalPayloadInput = {
@@ -75726,6 +80018,7 @@ export namespace Prisma {
     trashBinEntry?: TrashBinCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantCreateNestedManyWithoutContentInput
     calendarEvents?: CalendarEventCreateNestedManyWithoutLinkedContentInput
+    workspaceItems?: ContentWorkspaceItemCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeUncheckedCreateWithoutExternalPayloadInput = {
@@ -75769,6 +80062,7 @@ export namespace Prisma {
     trashBinEntry?: TrashBinUncheckedCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantUncheckedCreateNestedManyWithoutContentInput
     calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutLinkedContentInput
+    workspaceItems?: ContentWorkspaceItemUncheckedCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeCreateOrConnectWithoutExternalPayloadInput = {
@@ -75828,6 +80122,7 @@ export namespace Prisma {
     trashBinEntry?: TrashBinUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUpdateManyWithoutContentNestedInput
     calendarEvents?: CalendarEventUpdateManyWithoutLinkedContentNestedInput
+    workspaceItems?: ContentWorkspaceItemUpdateManyWithoutContentNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutExternalPayloadInput = {
@@ -75871,6 +80166,7 @@ export namespace Prisma {
     trashBinEntry?: TrashBinUncheckedUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUncheckedUpdateManyWithoutContentNestedInput
     calendarEvents?: CalendarEventUncheckedUpdateManyWithoutLinkedContentNestedInput
+    workspaceItems?: ContentWorkspaceItemUncheckedUpdateManyWithoutContentNestedInput
   }
 
   export type ContentNodeCreateWithoutChatPayloadInput = {
@@ -75914,6 +80210,7 @@ export namespace Prisma {
     trashBinEntry?: TrashBinCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantCreateNestedManyWithoutContentInput
     calendarEvents?: CalendarEventCreateNestedManyWithoutLinkedContentInput
+    workspaceItems?: ContentWorkspaceItemCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeUncheckedCreateWithoutChatPayloadInput = {
@@ -75957,6 +80254,7 @@ export namespace Prisma {
     trashBinEntry?: TrashBinUncheckedCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantUncheckedCreateNestedManyWithoutContentInput
     calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutLinkedContentInput
+    workspaceItems?: ContentWorkspaceItemUncheckedCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeCreateOrConnectWithoutChatPayloadInput = {
@@ -76016,6 +80314,7 @@ export namespace Prisma {
     trashBinEntry?: TrashBinUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUpdateManyWithoutContentNestedInput
     calendarEvents?: CalendarEventUpdateManyWithoutLinkedContentNestedInput
+    workspaceItems?: ContentWorkspaceItemUpdateManyWithoutContentNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutChatPayloadInput = {
@@ -76059,6 +80358,7 @@ export namespace Prisma {
     trashBinEntry?: TrashBinUncheckedUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUncheckedUpdateManyWithoutContentNestedInput
     calendarEvents?: CalendarEventUncheckedUpdateManyWithoutLinkedContentNestedInput
+    workspaceItems?: ContentWorkspaceItemUncheckedUpdateManyWithoutContentNestedInput
   }
 
   export type ContentNodeCreateWithoutVisualizationPayloadInput = {
@@ -76102,6 +80402,7 @@ export namespace Prisma {
     trashBinEntry?: TrashBinCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantCreateNestedManyWithoutContentInput
     calendarEvents?: CalendarEventCreateNestedManyWithoutLinkedContentInput
+    workspaceItems?: ContentWorkspaceItemCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeUncheckedCreateWithoutVisualizationPayloadInput = {
@@ -76145,6 +80446,7 @@ export namespace Prisma {
     trashBinEntry?: TrashBinUncheckedCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantUncheckedCreateNestedManyWithoutContentInput
     calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutLinkedContentInput
+    workspaceItems?: ContentWorkspaceItemUncheckedCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeCreateOrConnectWithoutVisualizationPayloadInput = {
@@ -76204,6 +80506,7 @@ export namespace Prisma {
     trashBinEntry?: TrashBinUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUpdateManyWithoutContentNestedInput
     calendarEvents?: CalendarEventUpdateManyWithoutLinkedContentNestedInput
+    workspaceItems?: ContentWorkspaceItemUpdateManyWithoutContentNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutVisualizationPayloadInput = {
@@ -76247,6 +80550,7 @@ export namespace Prisma {
     trashBinEntry?: TrashBinUncheckedUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUncheckedUpdateManyWithoutContentNestedInput
     calendarEvents?: CalendarEventUncheckedUpdateManyWithoutLinkedContentNestedInput
+    workspaceItems?: ContentWorkspaceItemUncheckedUpdateManyWithoutContentNestedInput
   }
 
   export type ContentNodeCreateWithoutDataPayloadInput = {
@@ -76290,6 +80594,7 @@ export namespace Prisma {
     trashBinEntry?: TrashBinCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantCreateNestedManyWithoutContentInput
     calendarEvents?: CalendarEventCreateNestedManyWithoutLinkedContentInput
+    workspaceItems?: ContentWorkspaceItemCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeUncheckedCreateWithoutDataPayloadInput = {
@@ -76333,6 +80638,7 @@ export namespace Prisma {
     trashBinEntry?: TrashBinUncheckedCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantUncheckedCreateNestedManyWithoutContentInput
     calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutLinkedContentInput
+    workspaceItems?: ContentWorkspaceItemUncheckedCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeCreateOrConnectWithoutDataPayloadInput = {
@@ -76392,6 +80698,7 @@ export namespace Prisma {
     trashBinEntry?: TrashBinUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUpdateManyWithoutContentNestedInput
     calendarEvents?: CalendarEventUpdateManyWithoutLinkedContentNestedInput
+    workspaceItems?: ContentWorkspaceItemUpdateManyWithoutContentNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutDataPayloadInput = {
@@ -76435,6 +80742,7 @@ export namespace Prisma {
     trashBinEntry?: TrashBinUncheckedUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUncheckedUpdateManyWithoutContentNestedInput
     calendarEvents?: CalendarEventUncheckedUpdateManyWithoutLinkedContentNestedInput
+    workspaceItems?: ContentWorkspaceItemUncheckedUpdateManyWithoutContentNestedInput
   }
 
   export type ContentNodeCreateWithoutHopePayloadInput = {
@@ -76478,6 +80786,7 @@ export namespace Prisma {
     trashBinEntry?: TrashBinCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantCreateNestedManyWithoutContentInput
     calendarEvents?: CalendarEventCreateNestedManyWithoutLinkedContentInput
+    workspaceItems?: ContentWorkspaceItemCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeUncheckedCreateWithoutHopePayloadInput = {
@@ -76521,6 +80830,7 @@ export namespace Prisma {
     trashBinEntry?: TrashBinUncheckedCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantUncheckedCreateNestedManyWithoutContentInput
     calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutLinkedContentInput
+    workspaceItems?: ContentWorkspaceItemUncheckedCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeCreateOrConnectWithoutHopePayloadInput = {
@@ -76580,6 +80890,7 @@ export namespace Prisma {
     trashBinEntry?: TrashBinUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUpdateManyWithoutContentNestedInput
     calendarEvents?: CalendarEventUpdateManyWithoutLinkedContentNestedInput
+    workspaceItems?: ContentWorkspaceItemUpdateManyWithoutContentNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutHopePayloadInput = {
@@ -76623,6 +80934,7 @@ export namespace Prisma {
     trashBinEntry?: TrashBinUncheckedUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUncheckedUpdateManyWithoutContentNestedInput
     calendarEvents?: CalendarEventUncheckedUpdateManyWithoutLinkedContentNestedInput
+    workspaceItems?: ContentWorkspaceItemUncheckedUpdateManyWithoutContentNestedInput
   }
 
   export type ContentNodeCreateWithoutWorkflowPayloadInput = {
@@ -76666,6 +80978,7 @@ export namespace Prisma {
     trashBinEntry?: TrashBinCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantCreateNestedManyWithoutContentInput
     calendarEvents?: CalendarEventCreateNestedManyWithoutLinkedContentInput
+    workspaceItems?: ContentWorkspaceItemCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeUncheckedCreateWithoutWorkflowPayloadInput = {
@@ -76709,6 +81022,7 @@ export namespace Prisma {
     trashBinEntry?: TrashBinUncheckedCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantUncheckedCreateNestedManyWithoutContentInput
     calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutLinkedContentInput
+    workspaceItems?: ContentWorkspaceItemUncheckedCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeCreateOrConnectWithoutWorkflowPayloadInput = {
@@ -76768,6 +81082,7 @@ export namespace Prisma {
     trashBinEntry?: TrashBinUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUpdateManyWithoutContentNestedInput
     calendarEvents?: CalendarEventUpdateManyWithoutLinkedContentNestedInput
+    workspaceItems?: ContentWorkspaceItemUpdateManyWithoutContentNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutWorkflowPayloadInput = {
@@ -76811,6 +81126,7 @@ export namespace Prisma {
     trashBinEntry?: TrashBinUncheckedUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUncheckedUpdateManyWithoutContentNestedInput
     calendarEvents?: CalendarEventUncheckedUpdateManyWithoutLinkedContentNestedInput
+    workspaceItems?: ContentWorkspaceItemUncheckedUpdateManyWithoutContentNestedInput
   }
 
   export type UserCreateWithoutReusableCategoriesInput = {
@@ -76847,6 +81163,7 @@ export namespace Prisma {
     calendarConnections?: CalendarConnectionCreateNestedManyWithoutUserInput
     calendarSources?: CalendarSourceCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventCreateNestedManyWithoutUserInput
+    contentWorkspaces?: ContentWorkspaceCreateNestedManyWithoutOwnerInput
   }
 
   export type UserUncheckedCreateWithoutReusableCategoriesInput = {
@@ -76883,6 +81200,7 @@ export namespace Prisma {
     calendarConnections?: CalendarConnectionUncheckedCreateNestedManyWithoutUserInput
     calendarSources?: CalendarSourceUncheckedCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutUserInput
+    contentWorkspaces?: ContentWorkspaceUncheckedCreateNestedManyWithoutOwnerInput
   }
 
   export type UserCreateOrConnectWithoutReusableCategoriesInput = {
@@ -77162,6 +81480,7 @@ export namespace Prisma {
     calendarConnections?: CalendarConnectionUpdateManyWithoutUserNestedInput
     calendarSources?: CalendarSourceUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUpdateManyWithoutUserNestedInput
+    contentWorkspaces?: ContentWorkspaceUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUncheckedUpdateWithoutReusableCategoriesInput = {
@@ -77198,6 +81517,7 @@ export namespace Prisma {
     calendarConnections?: CalendarConnectionUncheckedUpdateManyWithoutUserNestedInput
     calendarSources?: CalendarSourceUncheckedUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUncheckedUpdateManyWithoutUserNestedInput
+    contentWorkspaces?: ContentWorkspaceUncheckedUpdateManyWithoutOwnerNestedInput
   }
 
   export type ReusableCategoryUpsertWithoutChildrenInput = {
@@ -77394,6 +81714,7 @@ export namespace Prisma {
     calendarConnections?: CalendarConnectionCreateNestedManyWithoutUserInput
     calendarSources?: CalendarSourceCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventCreateNestedManyWithoutUserInput
+    contentWorkspaces?: ContentWorkspaceCreateNestedManyWithoutOwnerInput
   }
 
   export type UserUncheckedCreateWithoutSavedBlocksInput = {
@@ -77430,6 +81751,7 @@ export namespace Prisma {
     calendarConnections?: CalendarConnectionUncheckedCreateNestedManyWithoutUserInput
     calendarSources?: CalendarSourceUncheckedCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutUserInput
+    contentWorkspaces?: ContentWorkspaceUncheckedCreateNestedManyWithoutOwnerInput
   }
 
   export type UserCreateOrConnectWithoutSavedBlocksInput = {
@@ -77525,6 +81847,7 @@ export namespace Prisma {
     calendarConnections?: CalendarConnectionUpdateManyWithoutUserNestedInput
     calendarSources?: CalendarSourceUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUpdateManyWithoutUserNestedInput
+    contentWorkspaces?: ContentWorkspaceUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUncheckedUpdateWithoutSavedBlocksInput = {
@@ -77561,6 +81884,7 @@ export namespace Prisma {
     calendarConnections?: CalendarConnectionUncheckedUpdateManyWithoutUserNestedInput
     calendarSources?: CalendarSourceUncheckedUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUncheckedUpdateManyWithoutUserNestedInput
+    contentWorkspaces?: ContentWorkspaceUncheckedUpdateManyWithoutOwnerNestedInput
   }
 
   export type ReusableCategoryCreateWithoutContentTemplatesInput = {
@@ -77634,6 +81958,7 @@ export namespace Prisma {
     calendarConnections?: CalendarConnectionCreateNestedManyWithoutUserInput
     calendarSources?: CalendarSourceCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventCreateNestedManyWithoutUserInput
+    contentWorkspaces?: ContentWorkspaceCreateNestedManyWithoutOwnerInput
   }
 
   export type UserUncheckedCreateWithoutContentTemplatesInput = {
@@ -77670,6 +81995,7 @@ export namespace Prisma {
     calendarConnections?: CalendarConnectionUncheckedCreateNestedManyWithoutUserInput
     calendarSources?: CalendarSourceUncheckedCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutUserInput
+    contentWorkspaces?: ContentWorkspaceUncheckedCreateNestedManyWithoutOwnerInput
   }
 
   export type UserCreateOrConnectWithoutContentTemplatesInput = {
@@ -77765,6 +82091,7 @@ export namespace Prisma {
     calendarConnections?: CalendarConnectionUpdateManyWithoutUserNestedInput
     calendarSources?: CalendarSourceUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUpdateManyWithoutUserNestedInput
+    contentWorkspaces?: ContentWorkspaceUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUncheckedUpdateWithoutContentTemplatesInput = {
@@ -77801,6 +82128,7 @@ export namespace Prisma {
     calendarConnections?: CalendarConnectionUncheckedUpdateManyWithoutUserNestedInput
     calendarSources?: CalendarSourceUncheckedUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUncheckedUpdateManyWithoutUserNestedInput
+    contentWorkspaces?: ContentWorkspaceUncheckedUpdateManyWithoutOwnerNestedInput
   }
 
   export type ReusableCategoryCreateWithoutSnippetsInput = {
@@ -77874,6 +82202,7 @@ export namespace Prisma {
     calendarConnections?: CalendarConnectionCreateNestedManyWithoutUserInput
     calendarSources?: CalendarSourceCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventCreateNestedManyWithoutUserInput
+    contentWorkspaces?: ContentWorkspaceCreateNestedManyWithoutOwnerInput
   }
 
   export type UserUncheckedCreateWithoutSnippetsInput = {
@@ -77910,6 +82239,7 @@ export namespace Prisma {
     calendarConnections?: CalendarConnectionUncheckedCreateNestedManyWithoutUserInput
     calendarSources?: CalendarSourceUncheckedCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutUserInput
+    contentWorkspaces?: ContentWorkspaceUncheckedCreateNestedManyWithoutOwnerInput
   }
 
   export type UserCreateOrConnectWithoutSnippetsInput = {
@@ -78005,6 +82335,7 @@ export namespace Prisma {
     calendarConnections?: CalendarConnectionUpdateManyWithoutUserNestedInput
     calendarSources?: CalendarSourceUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUpdateManyWithoutUserNestedInput
+    contentWorkspaces?: ContentWorkspaceUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUncheckedUpdateWithoutSnippetsInput = {
@@ -78041,6 +82372,7 @@ export namespace Prisma {
     calendarConnections?: CalendarConnectionUncheckedUpdateManyWithoutUserNestedInput
     calendarSources?: CalendarSourceUncheckedUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUncheckedUpdateManyWithoutUserNestedInput
+    contentWorkspaces?: ContentWorkspaceUncheckedUpdateManyWithoutOwnerNestedInput
   }
 
   export type ReusableCategoryCreateWithoutPageTemplatesInput = {
@@ -78114,6 +82446,7 @@ export namespace Prisma {
     calendarConnections?: CalendarConnectionCreateNestedManyWithoutUserInput
     calendarSources?: CalendarSourceCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventCreateNestedManyWithoutUserInput
+    contentWorkspaces?: ContentWorkspaceCreateNestedManyWithoutOwnerInput
   }
 
   export type UserUncheckedCreateWithoutPageTemplatesInput = {
@@ -78150,6 +82483,7 @@ export namespace Prisma {
     calendarConnections?: CalendarConnectionUncheckedCreateNestedManyWithoutUserInput
     calendarSources?: CalendarSourceUncheckedCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutUserInput
+    contentWorkspaces?: ContentWorkspaceUncheckedCreateNestedManyWithoutOwnerInput
   }
 
   export type UserCreateOrConnectWithoutPageTemplatesInput = {
@@ -78245,6 +82579,7 @@ export namespace Prisma {
     calendarConnections?: CalendarConnectionUpdateManyWithoutUserNestedInput
     calendarSources?: CalendarSourceUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUpdateManyWithoutUserNestedInput
+    contentWorkspaces?: ContentWorkspaceUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUncheckedUpdateWithoutPageTemplatesInput = {
@@ -78281,6 +82616,7 @@ export namespace Prisma {
     calendarConnections?: CalendarConnectionUncheckedUpdateManyWithoutUserNestedInput
     calendarSources?: CalendarSourceUncheckedUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUncheckedUpdateManyWithoutUserNestedInput
+    contentWorkspaces?: ContentWorkspaceUncheckedUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserCreateWithoutCalendarConnectionsInput = {
@@ -78317,6 +82653,7 @@ export namespace Prisma {
     pageTemplates?: PageTemplateCreateNestedManyWithoutUserInput
     calendarSources?: CalendarSourceCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventCreateNestedManyWithoutUserInput
+    contentWorkspaces?: ContentWorkspaceCreateNestedManyWithoutOwnerInput
   }
 
   export type UserUncheckedCreateWithoutCalendarConnectionsInput = {
@@ -78353,6 +82690,7 @@ export namespace Prisma {
     pageTemplates?: PageTemplateUncheckedCreateNestedManyWithoutUserInput
     calendarSources?: CalendarSourceUncheckedCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutUserInput
+    contentWorkspaces?: ContentWorkspaceUncheckedCreateNestedManyWithoutOwnerInput
   }
 
   export type UserCreateOrConnectWithoutCalendarConnectionsInput = {
@@ -78453,6 +82791,7 @@ export namespace Prisma {
     pageTemplates?: PageTemplateUpdateManyWithoutUserNestedInput
     calendarSources?: CalendarSourceUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUpdateManyWithoutUserNestedInput
+    contentWorkspaces?: ContentWorkspaceUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUncheckedUpdateWithoutCalendarConnectionsInput = {
@@ -78489,6 +82828,7 @@ export namespace Prisma {
     pageTemplates?: PageTemplateUncheckedUpdateManyWithoutUserNestedInput
     calendarSources?: CalendarSourceUncheckedUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUncheckedUpdateManyWithoutUserNestedInput
+    contentWorkspaces?: ContentWorkspaceUncheckedUpdateManyWithoutOwnerNestedInput
   }
 
   export type CalendarSourceUpsertWithWhereUniqueWithoutConnectionInput = {
@@ -78541,6 +82881,7 @@ export namespace Prisma {
     pageTemplates?: PageTemplateCreateNestedManyWithoutUserInput
     calendarConnections?: CalendarConnectionCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventCreateNestedManyWithoutUserInput
+    contentWorkspaces?: ContentWorkspaceCreateNestedManyWithoutOwnerInput
   }
 
   export type UserUncheckedCreateWithoutCalendarSourcesInput = {
@@ -78577,6 +82918,7 @@ export namespace Prisma {
     pageTemplates?: PageTemplateUncheckedCreateNestedManyWithoutUserInput
     calendarConnections?: CalendarConnectionUncheckedCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutUserInput
+    contentWorkspaces?: ContentWorkspaceUncheckedCreateNestedManyWithoutOwnerInput
   }
 
   export type UserCreateOrConnectWithoutCalendarSourcesInput = {
@@ -78722,6 +83064,7 @@ export namespace Prisma {
     pageTemplates?: PageTemplateUpdateManyWithoutUserNestedInput
     calendarConnections?: CalendarConnectionUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUpdateManyWithoutUserNestedInput
+    contentWorkspaces?: ContentWorkspaceUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUncheckedUpdateWithoutCalendarSourcesInput = {
@@ -78758,6 +83101,7 @@ export namespace Prisma {
     pageTemplates?: PageTemplateUncheckedUpdateManyWithoutUserNestedInput
     calendarConnections?: CalendarConnectionUncheckedUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUncheckedUpdateManyWithoutUserNestedInput
+    contentWorkspaces?: ContentWorkspaceUncheckedUpdateManyWithoutOwnerNestedInput
   }
 
   export type CalendarConnectionUpsertWithoutSourcesInput = {
@@ -78851,6 +83195,7 @@ export namespace Prisma {
     pageTemplates?: PageTemplateCreateNestedManyWithoutUserInput
     calendarConnections?: CalendarConnectionCreateNestedManyWithoutUserInput
     calendarSources?: CalendarSourceCreateNestedManyWithoutUserInput
+    contentWorkspaces?: ContentWorkspaceCreateNestedManyWithoutOwnerInput
   }
 
   export type UserUncheckedCreateWithoutCalendarEventsInput = {
@@ -78887,6 +83232,7 @@ export namespace Prisma {
     pageTemplates?: PageTemplateUncheckedCreateNestedManyWithoutUserInput
     calendarConnections?: CalendarConnectionUncheckedCreateNestedManyWithoutUserInput
     calendarSources?: CalendarSourceUncheckedCreateNestedManyWithoutUserInput
+    contentWorkspaces?: ContentWorkspaceUncheckedCreateNestedManyWithoutOwnerInput
   }
 
   export type UserCreateOrConnectWithoutCalendarEventsInput = {
@@ -78978,6 +83324,7 @@ export namespace Prisma {
     personMentions?: PersonMentionCreateNestedManyWithoutContentInput
     trashBinEntry?: TrashBinCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantCreateNestedManyWithoutContentInput
+    workspaceItems?: ContentWorkspaceItemCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeUncheckedCreateWithoutCalendarEventsInput = {
@@ -79021,6 +83368,7 @@ export namespace Prisma {
     personMentions?: PersonMentionUncheckedCreateNestedManyWithoutContentInput
     trashBinEntry?: TrashBinUncheckedCreateNestedOneWithoutContentInput
     viewGrants?: ViewGrantUncheckedCreateNestedManyWithoutContentInput
+    workspaceItems?: ContentWorkspaceItemUncheckedCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeCreateOrConnectWithoutCalendarEventsInput = {
@@ -79099,6 +83447,7 @@ export namespace Prisma {
     pageTemplates?: PageTemplateUpdateManyWithoutUserNestedInput
     calendarConnections?: CalendarConnectionUpdateManyWithoutUserNestedInput
     calendarSources?: CalendarSourceUpdateManyWithoutUserNestedInput
+    contentWorkspaces?: ContentWorkspaceUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUncheckedUpdateWithoutCalendarEventsInput = {
@@ -79135,6 +83484,7 @@ export namespace Prisma {
     pageTemplates?: PageTemplateUncheckedUpdateManyWithoutUserNestedInput
     calendarConnections?: CalendarConnectionUncheckedUpdateManyWithoutUserNestedInput
     calendarSources?: CalendarSourceUncheckedUpdateManyWithoutUserNestedInput
+    contentWorkspaces?: ContentWorkspaceUncheckedUpdateManyWithoutOwnerNestedInput
   }
 
   export type CalendarSourceUpsertWithoutEventsInput = {
@@ -79238,6 +83588,7 @@ export namespace Prisma {
     personMentions?: PersonMentionUpdateManyWithoutContentNestedInput
     trashBinEntry?: TrashBinUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUpdateManyWithoutContentNestedInput
+    workspaceItems?: ContentWorkspaceItemUpdateManyWithoutContentNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutCalendarEventsInput = {
@@ -79281,6 +83632,7 @@ export namespace Prisma {
     personMentions?: PersonMentionUncheckedUpdateManyWithoutContentNestedInput
     trashBinEntry?: TrashBinUncheckedUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUncheckedUpdateManyWithoutContentNestedInput
+    workspaceItems?: ContentWorkspaceItemUncheckedUpdateManyWithoutContentNestedInput
   }
 
   export type CalendarEventAttendeeUpsertWithWhereUniqueWithoutEventInput = {
@@ -79537,6 +83889,16 @@ export namespace Prisma {
     updatedAt?: Date | string
   }
 
+  export type ContentWorkspaceItemCreateManyContentInput = {
+    id?: string
+    workspaceId: string
+    assignmentType?: $Enums.ContentWorkspaceItemAssignmentType
+    scope?: $Enums.ContentWorkspaceItemScope
+    expiresAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
   export type AuditLogUpdateWithoutTargetContentInput = {
     id?: StringFieldUpdateOperationsInput | string
     action?: StringFieldUpdateOperationsInput | string
@@ -79689,6 +84051,7 @@ export namespace Prisma {
     trashBinEntry?: TrashBinUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUpdateManyWithoutContentNestedInput
     calendarEvents?: CalendarEventUpdateManyWithoutLinkedContentNestedInput
+    workspaceItems?: ContentWorkspaceItemUpdateManyWithoutContentNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutParentInput = {
@@ -79732,6 +84095,7 @@ export namespace Prisma {
     trashBinEntry?: TrashBinUncheckedUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUncheckedUpdateManyWithoutContentNestedInput
     calendarEvents?: CalendarEventUncheckedUpdateManyWithoutLinkedContentNestedInput
+    workspaceItems?: ContentWorkspaceItemUncheckedUpdateManyWithoutContentNestedInput
   }
 
   export type ContentNodeUncheckedUpdateManyWithoutParentInput = {
@@ -79923,6 +84287,36 @@ export namespace Prisma {
     meetingUrl?: NullableStringFieldUpdateOperationsInput | string | null
     providerMetadata?: JsonNullValueInput | InputJsonValue
     lastSyncedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type ContentWorkspaceItemUpdateWithoutContentInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    assignmentType?: EnumContentWorkspaceItemAssignmentTypeFieldUpdateOperationsInput | $Enums.ContentWorkspaceItemAssignmentType
+    scope?: EnumContentWorkspaceItemScopeFieldUpdateOperationsInput | $Enums.ContentWorkspaceItemScope
+    expiresAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    workspace?: ContentWorkspaceUpdateOneRequiredWithoutItemsNestedInput
+  }
+
+  export type ContentWorkspaceItemUncheckedUpdateWithoutContentInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    workspaceId?: StringFieldUpdateOperationsInput | string
+    assignmentType?: EnumContentWorkspaceItemAssignmentTypeFieldUpdateOperationsInput | $Enums.ContentWorkspaceItemAssignmentType
+    scope?: EnumContentWorkspaceItemScopeFieldUpdateOperationsInput | $Enums.ContentWorkspaceItemScope
+    expiresAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type ContentWorkspaceItemUncheckedUpdateManyWithoutContentInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    workspaceId?: StringFieldUpdateOperationsInput | string
+    assignmentType?: EnumContentWorkspaceItemAssignmentTypeFieldUpdateOperationsInput | $Enums.ContentWorkspaceItemAssignmentType
+    scope?: EnumContentWorkspaceItemScopeFieldUpdateOperationsInput | $Enums.ContentWorkspaceItemScope
+    expiresAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -80241,6 +84635,23 @@ export namespace Prisma {
     updatedAt?: Date | string
   }
 
+  export type ContentWorkspaceCreateManyOwnerInput = {
+    id?: string
+    name: string
+    slug: string
+    isMain?: boolean
+    isLocked?: boolean
+    status?: $Enums.ContentWorkspaceStatus
+    expiresAt?: Date | string | null
+    archivedAt?: Date | string | null
+    layoutMode?: string
+    activePaneId?: string
+    paneState?: JsonNullValueInput | InputJsonValue
+    settings?: JsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
   export type AccountUpdateWithoutUserInput = {
     id?: StringFieldUpdateOperationsInput | string
     provider?: StringFieldUpdateOperationsInput | string
@@ -80476,6 +84887,7 @@ export namespace Prisma {
     trashBinEntry?: TrashBinUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUpdateManyWithoutContentNestedInput
     calendarEvents?: CalendarEventUpdateManyWithoutLinkedContentNestedInput
+    workspaceItems?: ContentWorkspaceItemUpdateManyWithoutContentNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutOwnerInput = {
@@ -80519,6 +84931,7 @@ export namespace Prisma {
     trashBinEntry?: TrashBinUncheckedUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUncheckedUpdateManyWithoutContentNestedInput
     calendarEvents?: CalendarEventUncheckedUpdateManyWithoutLinkedContentNestedInput
+    workspaceItems?: ContentWorkspaceItemUncheckedUpdateManyWithoutContentNestedInput
   }
 
   export type ContentNodeUncheckedUpdateManyWithoutOwnerInput = {
@@ -81271,6 +85684,99 @@ export namespace Prisma {
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
+  export type ContentWorkspaceUpdateWithoutOwnerInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    slug?: StringFieldUpdateOperationsInput | string
+    isMain?: BoolFieldUpdateOperationsInput | boolean
+    isLocked?: BoolFieldUpdateOperationsInput | boolean
+    status?: EnumContentWorkspaceStatusFieldUpdateOperationsInput | $Enums.ContentWorkspaceStatus
+    expiresAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    archivedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    layoutMode?: StringFieldUpdateOperationsInput | string
+    activePaneId?: StringFieldUpdateOperationsInput | string
+    paneState?: JsonNullValueInput | InputJsonValue
+    settings?: JsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    items?: ContentWorkspaceItemUpdateManyWithoutWorkspaceNestedInput
+  }
+
+  export type ContentWorkspaceUncheckedUpdateWithoutOwnerInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    slug?: StringFieldUpdateOperationsInput | string
+    isMain?: BoolFieldUpdateOperationsInput | boolean
+    isLocked?: BoolFieldUpdateOperationsInput | boolean
+    status?: EnumContentWorkspaceStatusFieldUpdateOperationsInput | $Enums.ContentWorkspaceStatus
+    expiresAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    archivedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    layoutMode?: StringFieldUpdateOperationsInput | string
+    activePaneId?: StringFieldUpdateOperationsInput | string
+    paneState?: JsonNullValueInput | InputJsonValue
+    settings?: JsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    items?: ContentWorkspaceItemUncheckedUpdateManyWithoutWorkspaceNestedInput
+  }
+
+  export type ContentWorkspaceUncheckedUpdateManyWithoutOwnerInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    slug?: StringFieldUpdateOperationsInput | string
+    isMain?: BoolFieldUpdateOperationsInput | boolean
+    isLocked?: BoolFieldUpdateOperationsInput | boolean
+    status?: EnumContentWorkspaceStatusFieldUpdateOperationsInput | $Enums.ContentWorkspaceStatus
+    expiresAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    archivedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    layoutMode?: StringFieldUpdateOperationsInput | string
+    activePaneId?: StringFieldUpdateOperationsInput | string
+    paneState?: JsonNullValueInput | InputJsonValue
+    settings?: JsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type ContentWorkspaceItemCreateManyWorkspaceInput = {
+    id?: string
+    contentId: string
+    assignmentType?: $Enums.ContentWorkspaceItemAssignmentType
+    scope?: $Enums.ContentWorkspaceItemScope
+    expiresAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type ContentWorkspaceItemUpdateWithoutWorkspaceInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    assignmentType?: EnumContentWorkspaceItemAssignmentTypeFieldUpdateOperationsInput | $Enums.ContentWorkspaceItemAssignmentType
+    scope?: EnumContentWorkspaceItemScopeFieldUpdateOperationsInput | $Enums.ContentWorkspaceItemScope
+    expiresAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    content?: ContentNodeUpdateOneRequiredWithoutWorkspaceItemsNestedInput
+  }
+
+  export type ContentWorkspaceItemUncheckedUpdateWithoutWorkspaceInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    contentId?: StringFieldUpdateOperationsInput | string
+    assignmentType?: EnumContentWorkspaceItemAssignmentTypeFieldUpdateOperationsInput | $Enums.ContentWorkspaceItemAssignmentType
+    scope?: EnumContentWorkspaceItemScopeFieldUpdateOperationsInput | $Enums.ContentWorkspaceItemScope
+    expiresAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type ContentWorkspaceItemUncheckedUpdateManyWithoutWorkspaceInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    contentId?: StringFieldUpdateOperationsInput | string
+    assignmentType?: EnumContentWorkspaceItemAssignmentTypeFieldUpdateOperationsInput | $Enums.ContentWorkspaceItemAssignmentType
+    scope?: EnumContentWorkspaceItemScopeFieldUpdateOperationsInput | $Enums.ContentWorkspaceItemScope
+    expiresAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
   export type ContentNodeCreateManyCategoryInput = {
     id?: string
     ownerId: string
@@ -81332,6 +85838,7 @@ export namespace Prisma {
     trashBinEntry?: TrashBinUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUpdateManyWithoutContentNestedInput
     calendarEvents?: CalendarEventUpdateManyWithoutLinkedContentNestedInput
+    workspaceItems?: ContentWorkspaceItemUpdateManyWithoutContentNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutCategoryInput = {
@@ -81375,6 +85882,7 @@ export namespace Prisma {
     trashBinEntry?: TrashBinUncheckedUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUncheckedUpdateManyWithoutContentNestedInput
     calendarEvents?: CalendarEventUncheckedUpdateManyWithoutLinkedContentNestedInput
+    workspaceItems?: ContentWorkspaceItemUncheckedUpdateManyWithoutContentNestedInput
   }
 
   export type ContentNodeUncheckedUpdateManyWithoutCategoryInput = {
@@ -81638,6 +86146,7 @@ export namespace Prisma {
     trashBinEntry?: TrashBinUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUpdateManyWithoutContentNestedInput
     calendarEvents?: CalendarEventUpdateManyWithoutLinkedContentNestedInput
+    workspaceItems?: ContentWorkspaceItemUpdateManyWithoutContentNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutPeopleGroupInput = {
@@ -81681,6 +86190,7 @@ export namespace Prisma {
     trashBinEntry?: TrashBinUncheckedUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUncheckedUpdateManyWithoutContentNestedInput
     calendarEvents?: CalendarEventUncheckedUpdateManyWithoutLinkedContentNestedInput
+    workspaceItems?: ContentWorkspaceItemUncheckedUpdateManyWithoutContentNestedInput
   }
 
   export type ContentNodeUncheckedUpdateManyWithoutPeopleGroupInput = {
@@ -81813,6 +86323,7 @@ export namespace Prisma {
     trashBinEntry?: TrashBinUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUpdateManyWithoutContentNestedInput
     calendarEvents?: CalendarEventUpdateManyWithoutLinkedContentNestedInput
+    workspaceItems?: ContentWorkspaceItemUpdateManyWithoutContentNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutPersonInput = {
@@ -81856,6 +86367,7 @@ export namespace Prisma {
     trashBinEntry?: TrashBinUncheckedUpdateOneWithoutContentNestedInput
     viewGrants?: ViewGrantUncheckedUpdateManyWithoutContentNestedInput
     calendarEvents?: CalendarEventUncheckedUpdateManyWithoutLinkedContentNestedInput
+    workspaceItems?: ContentWorkspaceItemUncheckedUpdateManyWithoutContentNestedInput
   }
 
   export type ContentNodeUncheckedUpdateManyWithoutPersonInput = {

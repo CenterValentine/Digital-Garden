@@ -22,7 +22,7 @@ const { schema: ratingInputSchema, defaults: ratingInputDefaults } =
       .enum(["stars", "hearts", "numbers"])
       .default("stars")
       .describe("Rating style"),
-    showContainer: z.boolean().default(false).describe("Show outer container border"),
+    showContainer: z.boolean().default(false).describe("Show border"),
   });
 
 registerBlock({

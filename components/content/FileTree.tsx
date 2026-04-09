@@ -74,8 +74,43 @@ export function FileTree({
 }: FileTreeProps) {
   const treeRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const { expandedIds, setExpanded, selectedIds, setSelectedIds } = useTreeStateStore();
+  const {
+    expandedIds,
+    setExpanded,
+    selectedIds,
+    setSelectedIds,
+    scrollOffset,
+    setScrollOffset,
+    restoreVersion,
+  } = useTreeStateStore();
   const hasRestoredRef = useRef(false);
+  const isRestoringScrollRef = useRef(false);
+
+  useEffect(() => {
+    const targetOffset = scrollOffset;
+    let frameId = 0;
+    let attempts = 0;
+    isRestoringScrollRef.current = true;
+
+    const restore = () => {
+      treeRef.current?.list.current?.scrollTo(targetOffset);
+      attempts += 1;
+
+      if (attempts < 4) {
+        frameId = requestAnimationFrame(restore);
+        return;
+      }
+
+      isRestoringScrollRef.current = false;
+    };
+
+    frameId = requestAnimationFrame(restore);
+
+    return () => {
+      cancelAnimationFrame(frameId);
+      isRestoringScrollRef.current = false;
+    };
+  }, [restoreVersion]);
 
   // Restore selection ONCE on initial mount from persisted IDs
   useEffect(() => {
@@ -238,6 +273,11 @@ export function FileTree({
     // Note: We need to check the CURRENT state in expandedIds, not the node state
     const isCurrentlyExpanded = expandedIds.has(id);
     setExpanded(id, !isCurrentlyExpanded);
+  };
+
+  const handleScroll = ({ scrollOffset: nextScrollOffset }: { scrollOffset: number }) => {
+    if (isRestoringScrollRef.current) return;
+    setScrollOffset(nextScrollOffset);
   };
 
   // Allow dropping into folders
@@ -451,6 +491,7 @@ export function FileTree({
       tabIndex={0}
     >
       <Tree
+        key={restoreVersion}
         ref={treeRef}
         data={data}
         openByDefault={false}
@@ -467,6 +508,7 @@ export function FileTree({
         childrenAccessor="children"
         onMove={handleMove}
         onSelect={handleSelect}
+        onScroll={handleScroll}
         onToggle={handleToggle}
         onRename={({ id, name }) => {
           // Called when user submits inline edit (Enter or blur)
