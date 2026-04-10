@@ -38,6 +38,7 @@ import { ServerDateInput } from "./extensions/blocks/date-input";
 import { ServerNumberInput } from "./extensions/blocks/number-input";
 import { ServerRatingInput } from "./extensions/blocks/rating-input";
 import { ServerPromptInput } from "./extensions/blocks/prompt-input";
+import { getExtensionServerEditorExtensions } from "@/lib/extensions/server-registry";
 
 // Create lowlight instance with common languages
 const lowlight = createLowlight(common);
@@ -141,6 +142,7 @@ export function getServerExtensions(): Extensions {
     ServerNumberInput,
     ServerRatingInput,
     ServerPromptInput,
+    ...getExtensionServerEditorExtensions(),
 
     // Note: SlashCommands excluded - it uses React components
   ];

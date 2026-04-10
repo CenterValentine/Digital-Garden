@@ -17,52 +17,70 @@ enum ContentType {
   code
 
   // Phase 2 types (new)
-  external       // ExternalPayload - bookmarks with Open Graph preview
-  chat           // ChatPayload - chat conversations (stub)
-  visualization  // VisualizationPayload - charts/graphs (stub)
-  data           // DataPayload - structured data tables (stub)
-  hope           // HopePayload - goals/aspirations (stub)
-  workflow       // WorkflowPayload - automation workflows (stub, inert)
+  external // ExternalPayload - bookmarks with Open Graph preview
+  chat // ChatPayload - chat conversations (stub)
+  visualization // VisualizationPayload - charts/graphs (stub)
+  data // DataPayload - structured data tables (stub)
+  hope // HopePayload - goals/aspirations (stub)
+  workflow // WorkflowPayload - automation workflows (stub, inert)
 }
 
 enum ContentRole {
-  primary     // Shown in file tree by default
-  referenced  // Hidden by default (toggle to show) - embedded/linked content
-  system      // Always hidden - internal system nodes
+  primary // Shown in file tree by default
+  referenced // Hidden by default (toggle to show) - embedded/linked content
+  system // Always hidden - internal system nodes
 }
 
 enum FolderViewMode {
-  list       // Default list view (current behavior)
-  gallery    // Media-focused grid with thumbnails
-  kanban     // Drag-drop cards (project management)
-  dashboard  // Rearrangeable tiles (overview layout)
-  canvas     // Visual graph (mind map style)
+  list // Default list view (current behavior)
+  gallery // Media-focused grid with thumbnails
+  kanban // Drag-drop cards (project management)
+  dashboard // Rearrangeable tiles (overview layout)
+  canvas // Visual graph (mind map style)
+}
+
+enum ContentWorkspaceStatus {
+  active
+  archived
+}
+
+enum ContentWorkspaceItemAssignmentType {
+  primary
+  shared
+  borrowed
+}
+
+enum ContentWorkspaceItemScope {
+  item
+  recursive
 }
 
 model ContentNode {
-  id            String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  ownerId       String           @db.Uuid
-  title         String           @db.VarChar(255)
-  slug          String           @db.VarChar(255)
-  contentType   ContentType      // Required after Phase 1 backfill
-  role          ContentRole      @default(primary) // Phase 2: visibility control
-  parentId      String?          @db.Uuid
-  displayOrder  Int              @default(0)
-  categoryId    String?          @db.Uuid
-  isPublished   Boolean          @default(false)
-  createdAt     DateTime         @default(now()) @db.Timestamptz(6)
-  updatedAt     DateTime         @updatedAt @db.Timestamptz(6)
-  deletedAt     DateTime?        @db.Timestamptz(6)
-  deletedBy     String?          @db.Uuid
-  customIcon    String?          @db.VarChar(100)
-  iconColor     String?          @db.VarChar(20)
-  auditLogs     AuditLog[]       @relation("AuditedContent")
+  id            String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ownerId       String      @db.Uuid
+  title         String      @db.VarChar(255)
+  slug          String      @db.VarChar(255)
+  contentType   ContentType // Required after Phase 1 backfill
+  role          ContentRole @default(primary) // Phase 2: visibility control
+  parentId      String?     @db.Uuid
+  displayOrder  Int         @default(0)
+  categoryId    String?     @db.Uuid
+  isPublished   Boolean     @default(false)
+  createdAt     DateTime    @default(now()) @db.Timestamptz(6)
+  updatedAt     DateTime    @updatedAt @db.Timestamptz(6)
+  deletedAt     DateTime?   @db.Timestamptz(6)
+  deletedBy     String?     @db.Uuid
+  customIcon    String?     @db.VarChar(100)
+  iconColor     String?     @db.VarChar(20)
+  peopleGroupId String?     @db.Uuid
+  personId      String?     @db.Uuid
+  auditLogs     AuditLog[]  @relation("AuditedContent")
 
   // Phase 1 payloads
-  codePayload   CodePayload?
-  filePayload   FilePayload?
-  htmlPayload   HtmlPayload?
-  notePayload   NotePayload?
+  codePayload CodePayload?
+  filePayload FilePayload?
+  htmlPayload HtmlPayload?
+  notePayload NotePayload?
 
   // Phase 2 payloads
   folderPayload        FolderPayload?
@@ -73,23 +91,30 @@ model ContentNode {
   hopePayload          HopePayload?
   workflowPayload      WorkflowPayload?
 
-  history       ContentHistory[]
-  sourceLinks   ContentLink[]    @relation("SourceContent")
-  targetLinks   ContentLink[]    @relation("TargetContent")
-  category      Category?        @relation(fields: [categoryId], references: [id])
-  owner         User             @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  parent        ContentNode?     @relation("Hierarchy", fields: [parentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  children      ContentNode[]    @relation("Hierarchy")
-  contentPath   ContentPath?
-  contentTags   ContentTag[]
-  trashBinEntry TrashBin?
-  viewGrants      ViewGrant[]
-  calendarEvents  CalendarEvent[]
+  history              ContentHistory[]
+  sourceLinks          ContentLink[]         @relation("SourceContent")
+  targetLinks          ContentLink[]         @relation("TargetContent")
+  category             Category?             @relation(fields: [categoryId], references: [id])
+  owner                User                  @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  parent               ContentNode?          @relation("Hierarchy", fields: [parentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  children             ContentNode[]         @relation("Hierarchy")
+  peopleGroup          PeopleGroup?          @relation("PeopleGroupContent", fields: [peopleGroupId], references: [id], onDelete: SetNull)
+  person               Person?               @relation("PersonContent", fields: [personId], references: [id], onDelete: SetNull)
+  peopleFileTreeMounts PeopleFileTreeMount[] @relation("ContentNodePeopleMounts")
+  contentPath          ContentPath?
+  contentTags          ContentTag[]
+  personMentions       PersonMention[]
+  trashBinEntry        TrashBin?
+  viewGrants           ViewGrant[]
+  calendarEvents       CalendarEvent[]
+  workspaceItems  ContentWorkspaceItem[]
 
   @@unique([ownerId, slug])
   @@index([ownerId, deletedAt])
   @@index([parentId, displayOrder])
   @@index([categoryId, displayOrder])
+  @@index([peopleGroupId, displayOrder])
+  @@index([personId, displayOrder])
   @@index([deletedAt])
   @@index([role]) // Phase 2: for filtering by visibility
 }
@@ -275,15 +300,15 @@ model AIProviderKey {
 }
 
 model User {
-  id              String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  username        String                  @unique @db.VarChar(50)
-  passwordHash    String?                 @db.Char(60)
-  email           String                  @unique @db.VarChar(255)
-  role            UserRole                @default(guest)
-  createdAt       DateTime                @default(now()) @db.Timestamptz(6)
-  updatedAt       DateTime                @updatedAt @db.Timestamptz(6)
-  settings        Json?
-  settingsVersion Int                     @default(1)
+  id                   String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  username             String                  @unique @db.VarChar(50)
+  passwordHash         String?                 @db.Char(60)
+  email                String                  @unique @db.VarChar(255)
+  role                 UserRole                @default(guest)
+  createdAt            DateTime                @default(now()) @db.Timestamptz(6)
+  updatedAt            DateTime                @updatedAt @db.Timestamptz(6)
+  settings             Json?
+  settingsVersion      Int                     @default(1)
   accounts             Account[]
   aiProviderKeys       AIProviderKey[]
   auditTargets         AuditLog[]              @relation("AuditTargets")
@@ -296,6 +321,11 @@ model User {
   tags                 Tag[]
   trashedContent       TrashBin[]
   viewGrants           ViewGrant[]
+  peopleGroups         PeopleGroup[]
+  peopleDefaultGroups  PeopleGroup[]           @relation("DefaultPeopleGroup")
+  people               Person[]
+  peopleFileTreeMounts PeopleFileTreeMount[]
+  personMentions       PersonMention[]
   reusableCategories   ReusableCategory[]
   savedBlocks          SavedBlock[]
   contentTemplates     ContentTemplate[]
@@ -304,8 +334,54 @@ model User {
   calendarConnections  CalendarConnection[]
   calendarSources      CalendarSource[]
   calendarEvents       CalendarEvent[]
+  contentWorkspaces    ContentWorkspace[]
 
   @@index([email])
+}
+
+model ContentWorkspace {
+  id           String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ownerId      String                 @db.Uuid
+  name         String                 @db.VarChar(120)
+  slug         String                 @db.VarChar(120)
+  isMain       Boolean                @default(false)
+  isLocked     Boolean                @default(false)
+  status       ContentWorkspaceStatus @default(active)
+  expiresAt    DateTime?              @db.Timestamptz(6)
+  archivedAt   DateTime?              @db.Timestamptz(6)
+  layoutMode   String                 @default("single") @db.VarChar(32)
+  activePaneId String                 @default("top-left") @db.VarChar(32)
+  paneState    Json                   @default("{}")
+  settings     Json                   @default("{}")
+  createdAt    DateTime               @default(now()) @db.Timestamptz(6)
+  updatedAt    DateTime               @updatedAt @db.Timestamptz(6)
+
+  owner User                   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  items ContentWorkspaceItem[]
+
+  @@unique([ownerId, slug])
+  @@index([ownerId, status])
+  @@index([ownerId, isMain])
+  @@index([expiresAt])
+}
+
+model ContentWorkspaceItem {
+  id             String                             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workspaceId    String                             @db.Uuid
+  contentId      String                             @db.Uuid
+  assignmentType ContentWorkspaceItemAssignmentType @default(primary)
+  scope          ContentWorkspaceItemScope          @default(item)
+  expiresAt      DateTime?                          @db.Timestamptz(6)
+  createdAt      DateTime                           @default(now()) @db.Timestamptz(6)
+  updatedAt      DateTime                           @updatedAt @db.Timestamptz(6)
+
+  workspace ContentWorkspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  content   ContentNode      @relation(fields: [contentId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, contentId])
+  @@index([contentId, assignmentType, expiresAt])
+  @@index([workspaceId, assignmentType])
+  @@index([expiresAt])
 }
 
 model Category {
@@ -350,6 +426,105 @@ model ViewGrant {
 
   @@unique([contentId, userId])
   @@index([userId])
+}
+
+// ============================================================
+// Epoch 13: People Foundations
+// ============================================================
+
+model PeopleGroup {
+  id                String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ownerId           String                @db.Uuid
+  parentGroupId     String?               @db.Uuid
+  defaultForOwnerId String?               @unique @db.Uuid
+  name              String                @db.VarChar(120)
+  slug              String                @db.VarChar(140)
+  description       String?
+  displayOrder      Int                   @default(0)
+  isDefault         Boolean               @default(false)
+  metadata          Json                  @default("{}")
+  createdAt         DateTime              @default(now()) @db.Timestamptz(6)
+  updatedAt         DateTime              @updatedAt @db.Timestamptz(6)
+  deletedAt         DateTime?             @db.Timestamptz(6)
+  owner             User                  @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  defaultForOwner   User?                 @relation("DefaultPeopleGroup", fields: [defaultForOwnerId], references: [id], onDelete: Cascade)
+  parentGroup       PeopleGroup?          @relation("PeopleGroupHierarchy", fields: [parentGroupId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  childGroups       PeopleGroup[]         @relation("PeopleGroupHierarchy")
+  people            Person[]
+  contentNodes      ContentNode[]         @relation("PeopleGroupContent")
+  fileTreeMounts    PeopleFileTreeMount[]
+
+  @@unique([ownerId, slug])
+  @@index([ownerId, parentGroupId, displayOrder])
+  @@index([ownerId, isDefault])
+  @@index([parentGroupId])
+  @@index([deletedAt])
+}
+
+model Person {
+  id             String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ownerId        String                @db.Uuid
+  primaryGroupId String                @db.Uuid
+  displayName    String                @db.VarChar(160)
+  slug           String                @db.VarChar(180)
+  givenName      String?               @db.VarChar(120)
+  familyName     String?               @db.VarChar(120)
+  email          String?               @db.VarChar(255)
+  phone          String?               @db.VarChar(50)
+  avatarUrl      String?
+  metadata       Json                  @default("{}")
+  displayOrder   Int                   @default(0)
+  createdAt      DateTime              @default(now()) @db.Timestamptz(6)
+  updatedAt      DateTime              @updatedAt @db.Timestamptz(6)
+  deletedAt      DateTime?             @db.Timestamptz(6)
+  owner          User                  @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  primaryGroup   PeopleGroup           @relation(fields: [primaryGroupId], references: [id], onDelete: Restrict)
+  contentNodes   ContentNode[]         @relation("PersonContent")
+  fileTreeMounts PeopleFileTreeMount[]
+  mentions       PersonMention[]
+
+  @@unique([ownerId, slug])
+  @@index([ownerId, primaryGroupId, displayOrder])
+  @@index([ownerId, displayName])
+  @@index([email])
+  @@index([deletedAt])
+}
+
+model PeopleFileTreeMount {
+  id              String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ownerId         String       @db.Uuid
+  contentParentId String?      @db.Uuid
+  groupId         String?      @db.Uuid
+  personId        String?      @db.Uuid
+  displayOrder    Int          @default(0)
+  createdAt       DateTime     @default(now()) @db.Timestamptz(6)
+  updatedAt       DateTime     @updatedAt @db.Timestamptz(6)
+  owner           User         @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  contentParent   ContentNode? @relation("ContentNodePeopleMounts", fields: [contentParentId], references: [id], onDelete: Cascade)
+  group           PeopleGroup? @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  person          Person?      @relation(fields: [personId], references: [id], onDelete: Cascade)
+
+  @@unique([ownerId, groupId])
+  @@unique([ownerId, personId])
+  @@index([ownerId, contentParentId, displayOrder])
+  @@index([contentParentId])
+}
+
+model PersonMention {
+  id        String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ownerId   String      @db.Uuid
+  contentId String      @db.Uuid
+  personId  String      @db.Uuid
+  positions Json        @default("[]")
+  createdAt DateTime    @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime    @updatedAt @db.Timestamptz(6)
+  owner     User        @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  content   ContentNode @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  person    Person      @relation(fields: [personId], references: [id], onDelete: Cascade)
+
+  @@unique([contentId, personId])
+  @@index([ownerId, personId])
+  @@index([personId])
 }
 
 model Session {
@@ -427,13 +602,13 @@ enum StorageProvider {
 // ============================================================
 
 model FolderPayload {
-  contentId                 String         @id @db.Uuid
-  viewMode                  FolderViewMode @default(list)
-  sortMode                  String?        @db.VarChar(20) // "asc" | "desc" | null (null = manual/tree order)
-  viewPrefs                 Json           @default("{}") // View-specific settings (grid size, tile layout, etc.)
-  includeReferencedContent  Boolean        @default(false) // Show referenced content in this folder view
-  createdAt                 DateTime       @default(now()) @db.Timestamptz(6)
-  updatedAt                 DateTime       @updatedAt @db.Timestamptz(6)
+  contentId                String         @id @db.Uuid
+  viewMode                 FolderViewMode @default(list)
+  sortMode                 String?        @db.VarChar(20) // "asc" | "desc" | null (null = manual/tree order)
+  viewPrefs                Json           @default("{}") // View-specific settings (grid size, tile layout, etc.)
+  includeReferencedContent Boolean        @default(false) // Show referenced content in this folder view
+  createdAt                DateTime       @default(now()) @db.Timestamptz(6)
+  updatedAt                DateTime       @updatedAt @db.Timestamptz(6)
 
   content ContentNode @relation(fields: [contentId], references: [id], onDelete: Cascade)
 
@@ -442,7 +617,7 @@ model FolderPayload {
 
 model ExternalPayload {
   contentId String   @id @db.Uuid
-  url       String   // External URL (HTTPS-only by default)
+  url       String // External URL (HTTPS-only by default)
   subtype   String?  @default("website") @db.VarChar(20) // "website" | "application" (cosmetic)
   preview   Json     @default("{}") // { mode: "none" | "open_graph", cached: {...} }
   createdAt DateTime @default(now()) @db.Timestamptz(6)
@@ -490,14 +665,14 @@ model DataPayload {
 }
 
 model HopePayload {
-  contentId   String   @id @db.Uuid
-  kind        String   @db.VarChar(50) // "goal" | "aspiration" | "milestone" | "dream"
-  status      String   @db.VarChar(20) // "active" | "achieved" | "deferred" | "archived"
-  description String?  // Optional rich description
+  contentId   String    @id @db.Uuid
+  kind        String    @db.VarChar(50) // "goal" | "aspiration" | "milestone" | "dream"
+  status      String    @db.VarChar(20) // "active" | "achieved" | "deferred" | "archived"
+  description String? // Optional rich description
   targetDate  DateTime? @db.Timestamptz(6)
-  metadata    Json     @default("{}") // Progress tracking, tags, etc.
-  createdAt   DateTime @default(now()) @db.Timestamptz(6)
-  updatedAt   DateTime @updatedAt @db.Timestamptz(6)
+  metadata    Json      @default("{}") // Progress tracking, tags, etc.
+  createdAt   DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt   DateTime  @updatedAt @db.Timestamptz(6)
 
   content ContentNode @relation(fields: [contentId], references: [id], onDelete: Cascade)
 
@@ -531,18 +706,18 @@ enum ReusableCategoryScope {
 }
 
 model ReusableCategory {
-  id           String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  name         String                @db.VarChar(100)
-  slug         String                @db.VarChar(100)
-  scope        ReusableCategoryScope
-  userId       String?               @db.Uuid
-  parentId     String?               @db.Uuid
-  displayOrder Int                   @default(0)
-  createdAt    DateTime              @default(now()) @db.Timestamptz(6)
-  updatedAt    DateTime              @updatedAt @db.Timestamptz(6)
-  user         User?                 @relation(fields: [userId], references: [id], onDelete: Cascade)
-  parent       ReusableCategory?     @relation("CategoryHierarchy", fields: [parentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  children     ReusableCategory[]    @relation("CategoryHierarchy")
+  id               String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name             String                @db.VarChar(100)
+  slug             String                @db.VarChar(100)
+  scope            ReusableCategoryScope
+  userId           String?               @db.Uuid
+  parentId         String?               @db.Uuid
+  displayOrder     Int                   @default(0)
+  createdAt        DateTime              @default(now()) @db.Timestamptz(6)
+  updatedAt        DateTime              @updatedAt @db.Timestamptz(6)
+  user             User?                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parent           ReusableCategory?     @relation("CategoryHierarchy", fields: [parentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  children         ReusableCategory[]    @relation("CategoryHierarchy")
   contentTemplates ContentTemplate[]
   snippets         Snippet[]
   pageTemplates    PageTemplate[]
@@ -640,20 +815,20 @@ model PageTemplate {
 // ============================================================
 
 model CalendarConnection {
-  id            String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  userId        String          @db.Uuid
-  provider      String          @db.VarChar(20)
-  displayName   String          @db.VarChar(255)
-  status        String          @default("active") @db.VarChar(30)
-  syncStatus    String          @default("idle") @db.VarChar(20)
-  providerConfig Json           @default("{}")
-  syncCursor    String?
-  lastSyncedAt  DateTime?       @db.Timestamptz(6)
-  lastSyncError String?
-  createdAt     DateTime        @default(now()) @db.Timestamptz(6)
-  updatedAt     DateTime        @updatedAt @db.Timestamptz(6)
-  user          User            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  sources       CalendarSource[]
+  id             String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId         String           @db.Uuid
+  provider       String           @db.VarChar(20)
+  displayName    String           @db.VarChar(255)
+  status         String           @default("active") @db.VarChar(30)
+  syncStatus     String           @default("idle") @db.VarChar(20)
+  providerConfig Json             @default("{}")
+  syncCursor     String?
+  lastSyncedAt   DateTime?        @db.Timestamptz(6)
+  lastSyncError  String?
+  createdAt      DateTime         @default(now()) @db.Timestamptz(6)
+  updatedAt      DateTime         @updatedAt @db.Timestamptz(6)
+  user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sources        CalendarSource[]
 
   @@index([userId, provider])
 }

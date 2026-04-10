@@ -24,6 +24,8 @@ interface IconSelectorProps {
   onSelectIcon: (icon: string) => void;
   currentIcon?: string | null;
   triggerPosition: { x: number; y: number };
+  disablePortal?: boolean;
+  inlineAnchor?: boolean;
 }
 
 // Get all lucide icon names (filter out non-icon exports)
@@ -61,8 +63,12 @@ export function IconSelector({
   onSelectIcon,
   currentIcon,
   triggerPosition,
+  disablePortal = false,
+  inlineAnchor = false,
 }: IconSelectorProps) {
-  const [activeTab, setActiveTab] = useState<"icons" | "emoji">("icons");
+  const [activeTab, setActiveTab] = useState<"icons" | "emoji">(
+    currentIcon?.startsWith("emoji:") ? "emoji" : "icons"
+  );
   const [searchQuery, setSearchQuery] = useState("");
   const [menuPosition, setMenuPosition] = useState<{ x: number; y: number } | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -83,6 +89,10 @@ export function IconSelector({
 
   // Two-phase rendering: measure then position
   useEffect(() => {
+    if (inlineAnchor) {
+      setMenuPosition({ x: 0, y: 0 });
+      return;
+    }
     if (!isOpen || !menuRef.current) return;
 
     const menuRect = menuRef.current.getBoundingClientRect();
@@ -100,9 +110,9 @@ export function IconSelector({
   useEffect(() => {
     if (isOpen) {
       setSearchQuery("");
-      setActiveTab("icons"); // Default to icons tab
+      setActiveTab(currentIcon?.startsWith("emoji:") ? "emoji" : "icons");
     }
-  }, [isOpen]);
+  }, [currentIcon, isOpen]);
 
   // Handle ESC key to close
   useEffect(() => {
@@ -151,9 +161,11 @@ export function IconSelector({
     onClose();
   };
 
-  const menuStyle = !menuPosition
-    ? { visibility: "hidden" as const }
-    : { left: `${menuPosition.x}px`, top: `${menuPosition.y}px` };
+  const menuStyle = inlineAnchor
+    ? undefined
+    : !menuPosition
+      ? { visibility: "hidden" as const }
+      : { left: `${menuPosition.x}px`, top: `${menuPosition.y}px` };
 
   // Common emoji list (expandable)
   const commonEmojis = [
@@ -169,30 +181,31 @@ export function IconSelector({
   const content = (
     <div
       ref={menuRef}
-      className="fixed z-[200] w-80 max-h-[400px] rounded-lg border border-white/10 bg-[#1a1a1a] shadow-2xl flex flex-col"
+      data-icon-selector-root="true"
+      className={`${inlineAnchor ? "absolute left-0 top-full mt-2 z-[80]" : "fixed z-[220]"} flex max-h-[400px] w-80 flex-col rounded-xl border border-black/10 bg-white/95 text-gray-900 shadow-2xl backdrop-blur-sm dark:border-white/10 dark:bg-gray-950/95 dark:text-white`}
       style={menuStyle}
       onClick={(e) => e.stopPropagation()}
     >
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-white/10 px-3 py-2">
-        <h3 className="text-xs font-semibold text-white">Choose Icon</h3>
+      <div className="flex items-center justify-between border-b border-black/10 px-3 py-2 dark:border-white/10">
+        <h3 className="text-xs font-semibold text-gray-900 dark:text-white">Choose Icon</h3>
         <button
           onClick={onClose}
-          className="p-1 rounded hover:bg-white/10 transition-colors"
+          className="rounded p-1 transition-colors hover:bg-black/5 dark:hover:bg-white/10"
           aria-label="Close"
         >
-          <X className="h-3 w-3 text-gray-400" />
+          <X className="h-3 w-3 text-gray-500 dark:text-gray-400" />
         </button>
       </div>
 
       {/* Tabs */}
-      <div className="flex border-b border-white/10">
+      <div className="flex border-b border-black/10 dark:border-white/10">
         <button
           onClick={() => setActiveTab("icons")}
           className={`flex-1 px-3 py-1.5 text-xs font-medium transition-colors ${
             activeTab === "icons"
-              ? "border-b-2 border-primary text-primary"
-              : "text-gray-400 hover:text-white"
+              ? "border-b-2 border-gold-primary text-gold-primary"
+              : "text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white"
           }`}
         >
           Icons ({lucideIconNames.length})
@@ -201,8 +214,8 @@ export function IconSelector({
           onClick={() => setActiveTab("emoji")}
           className={`flex-1 px-3 py-1.5 text-xs font-medium transition-colors ${
             activeTab === "emoji"
-              ? "border-b-2 border-primary text-primary"
-              : "text-gray-400 hover:text-white"
+              ? "border-b-2 border-gold-primary text-gold-primary"
+              : "text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white"
           }`}
         >
           Emoji
@@ -211,15 +224,15 @@ export function IconSelector({
 
       {/* Search (Icons tab only) */}
       {activeTab === "icons" && (
-        <div className="px-3 py-2 border-b border-white/10">
+        <div className="border-b border-black/10 px-3 py-2 dark:border-white/10">
           <div className="relative">
-            <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-gray-400" />
+            <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-gray-400" />
             <input
               type="text"
               placeholder="Search icons..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-7 pr-2 py-1.5 text-xs border border-white/10 rounded bg-black/20 text-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-primary/50 focus:border-primary"
+              className="w-full rounded border border-black/10 bg-white/70 py-1.5 pl-7 pr-2 text-xs text-gray-900 placeholder-gray-500 focus:border-gold-primary focus:outline-none focus:ring-1 focus:ring-gold-primary/30 dark:border-white/10 dark:bg-white/5 dark:text-white"
               autoFocus
             />
           </div>
@@ -242,17 +255,17 @@ export function IconSelector({
                   <button
                     key={iconName}
                     onClick={() => handleIconSelect(iconName)}
-                    className={`p-2 rounded hover:bg-white/10 transition-colors flex items-center justify-center ${
-                      isSelected ? "bg-primary/10 ring-1 ring-primary/30" : ""
+                    className={`flex items-center justify-center rounded p-2 transition-colors hover:bg-black/5 dark:hover:bg-white/10 ${
+                      isSelected ? "bg-gold-primary/10 ring-1 ring-gold-primary/30" : ""
                     }`}
                     title={displayName}
                   >
-                    <IconComponent className="h-4 w-4 text-white" />
+                    <IconComponent className="h-4 w-4 text-gray-900 dark:text-white" />
                   </button>
                 );
               })
             ) : (
-              <div className="col-span-6 text-center py-6 text-xs text-gray-500">
+              <div className="col-span-6 py-6 text-center text-xs text-gray-500">
                 No icons found for "{searchQuery}"
               </div>
             )}
@@ -266,8 +279,8 @@ export function IconSelector({
                 <button
                   key={emoji}
                   onClick={() => handleEmojiSelect(emoji)}
-                  className={`p-1.5 rounded text-lg hover:bg-white/10 transition-colors ${
-                    isSelected ? "bg-primary/10 ring-1 ring-primary/30" : ""
+                  className={`rounded p-1.5 text-lg transition-colors hover:bg-black/5 dark:hover:bg-white/10 ${
+                    isSelected ? "bg-gold-primary/10 ring-1 ring-gold-primary/30" : ""
                   }`}
                   title={emoji}
                 >
@@ -280,13 +293,17 @@ export function IconSelector({
       </div>
 
       {/* Footer */}
-      <div className="border-t border-white/10 px-3 py-1.5 text-[10px] text-gray-500">
+      <div className="border-t border-black/10 px-3 py-1.5 text-[10px] text-gray-500 dark:border-white/10">
         {activeTab === "icons"
           ? `${filteredIcons.length} / ${lucideIconNames.length} icons`
           : `${commonEmojis.length} emojis`}
       </div>
     </div>
   );
+
+  if (disablePortal) {
+    return content;
+  }
 
   return createPortal(content, document.body);
 }

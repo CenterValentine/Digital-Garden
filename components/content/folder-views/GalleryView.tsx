@@ -16,6 +16,7 @@ import type { FolderViewProps } from "./FolderViewContainer";
 import { MediaLightbox } from "./MediaLightbox";
 import { Button } from "@/components/ui/glass/button";
 import { getDisplayExtension } from "@/lib/domain/content/file-extension-utils";
+import { buildContentListUrl } from "./content-query";
 
 interface ContentChild {
   id: string;
@@ -32,6 +33,7 @@ interface ContentChild {
 export function GalleryView({
   folderId,
   folderTitle,
+  contentQuery,
   sortMode,
   viewPrefs = {},
 }: FolderViewProps) {
@@ -41,6 +43,7 @@ export function GalleryView({
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [startSlideshow, setStartSlideshow] = useState(false);
   const [downloadUrls, setDownloadUrls] = useState<Record<string, string>>({});
+  const contentQueryKey = JSON.stringify(contentQuery ?? { parentId: folderId });
 
   // Gallery view preferences
   const gridSize = viewPrefs.gridSize || "medium"; // "small" | "medium" | "large"
@@ -48,7 +51,7 @@ export function GalleryView({
 
   useEffect(() => {
     loadMediaItems();
-  }, [folderId, sortMode]);
+  }, [folderId, contentQueryKey, sortMode]);
 
   // Fetch download URLs in batches for performance
   const fetchDownloadUrls = async (items: ContentChild[]) => {
@@ -82,7 +85,10 @@ export function GalleryView({
     try {
       setLoading(true);
       const response = await fetch(
-        `/api/content/content?parentId=${folderId}&type=file`,
+        buildContentListUrl({
+          ...(contentQuery ?? { parentId: folderId }),
+          type: "file",
+        }),
         { credentials: "include" }
       );
 

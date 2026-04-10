@@ -7,20 +7,23 @@
 
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { createElement, useState, useCallback, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { LeftSidebarHeader } from "./headers/LeftSidebarHeader";
 import { LeftSidebarContent } from "./content/LeftSidebarContent";
 import { LeftSidebarCollapsed } from "./LeftSidebarCollapsed";
 import { LeftSidebarExtensions } from "./content/LeftSidebarExtensions";
+import { PeopleMountPickerDialog } from "./people/PeopleMountPickerDialog";
 import { FileUploadDialog } from "./dialogs/FileUploadDialog";
+import { PEOPLE_VIEW_KEY } from "@/extensions/people/manifest";
 import { useLeftPanelCollapseStore } from "@/state/left-panel-collapse-store";
 import { useLeftPanelViewStore } from "@/state/left-panel-view-store";
-import { CalendarCompanionPanel } from "@/components/calendar/CalendarCompanionPanel";
+import { useExtensionLeftSidebarPanel } from "@/lib/extensions/client-registry";
 
 export function LeftSidebar() {
   const { mode } = useLeftPanelCollapseStore();
   const { activeView } = useLeftPanelViewStore();
+  const ExtensionPanel = useExtensionLeftSidebarPanel(activeView);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [createTrigger, setCreateTrigger] = useState<{
     type: "folder" | "note" | "docx" | "xlsx" | "json" | "code" | "html" | "external" | "chat" | "visualization" | "data" | "hope" | "workflow";
@@ -31,6 +34,7 @@ export function LeftSidebar() {
   const [showFileUpload, setShowFileUpload] = useState(false);
   const [fileUploadParentId, setFileUploadParentId] = useState<string | null>(null);
   const [draggedFiles, setDraggedFiles] = useState<File[] | null>(null);
+  const [peopleMountParentId, setPeopleMountParentId] = useState<string | null | undefined>(undefined);
   const [hasGoogleAuth, setHasGoogleAuth] = useState(false);
 
   // Check if user has Google authentication
@@ -118,6 +122,44 @@ export function LeftSidebar() {
     setCreateTrigger({ type: "chat", timestamp: Date.now() });
   }, []);
 
+  const handleAddPeopleTarget = useCallback((parentId: string | null = null) => {
+    setPeopleMountParentId(parentId);
+  }, []);
+
+  const handleCreatePeopleNote = useCallback(() => {
+    window.dispatchEvent(new CustomEvent("dg:people-create-content", { detail: { type: "note" } }));
+  }, []);
+
+  const handleCreatePeopleFolder = useCallback(() => {
+    window.dispatchEvent(new CustomEvent("dg:people-create-content", { detail: { type: "folder" } }));
+  }, []);
+
+  const handleCreatePeopleContact = useCallback(() => {
+    window.dispatchEvent(new CustomEvent("dg:people-open-create-person"));
+  }, []);
+
+  const handleCreatePeopleUpload = useCallback(() => {
+    window.dispatchEvent(new CustomEvent("dg:people-open-upload"));
+  }, []);
+
+  const handleCreatePeopleDocument = useCallback(() => {
+    window.dispatchEvent(new CustomEvent("dg:people-create-document", {
+      detail: { fileType: "docx" },
+    }));
+  }, []);
+
+  const handleCreatePeopleSpreadsheet = useCallback(() => {
+    window.dispatchEvent(new CustomEvent("dg:people-create-document", {
+      detail: { fileType: "xlsx" },
+    }));
+  }, []);
+
+  const handleCreatePeopleJson = useCallback(() => {
+    window.dispatchEvent(new CustomEvent("dg:people-create-document", {
+      detail: { fileType: "json" },
+    }));
+  }, []);
+
   // const handleCreateData = useCallback(() => {
   //   setCreateTrigger({ type: "data", timestamp: Date.now() });
   // }, []);
@@ -163,20 +205,21 @@ export function LeftSidebar() {
       <div className="flex h-full flex-col">
         {/* Header with create actions */}
         <LeftSidebarHeader
-          onCreateFolder={handleCreateFolder}
-          onCreateNote={handleCreateNote}
-          onCreateFile={handleCreateFile}
-          onCreateDocument={hasGoogleAuth ? handleCreateDocument : undefined}
-          onCreateSpreadsheet={hasGoogleAuth ? handleCreateSpreadsheet : undefined}
-          onCreateCode={handleCreateCode}
-          onCreateHtml={handleCreateHtml}
-          onCreateJson={handleCreateJson}
-          onCreateExternal={handleCreateExternal}
-          onCreateVisualizationMermaid={handleCreateVisualizationMermaid}
-          onCreateVisualizationExcalidraw={handleCreateVisualizationExcalidraw}
-          onCreateVisualizationDiagramsNet={handleCreateVisualizationDiagramsNet}
-          onCreateChat={handleCreateChat}
-          isCreateDisabled={isCreateDisabled}
+          onCreateFolder={activeView === PEOPLE_VIEW_KEY ? handleCreatePeopleFolder : handleCreateFolder}
+          onCreateNote={activeView === PEOPLE_VIEW_KEY ? handleCreatePeopleNote : handleCreateNote}
+          onCreateFile={activeView === PEOPLE_VIEW_KEY ? handleCreatePeopleUpload : handleCreateFile}
+          onCreateDocument={activeView === PEOPLE_VIEW_KEY ? handleCreatePeopleDocument : hasGoogleAuth ? handleCreateDocument : undefined}
+          onCreateSpreadsheet={activeView === PEOPLE_VIEW_KEY ? handleCreatePeopleSpreadsheet : hasGoogleAuth ? handleCreateSpreadsheet : undefined}
+          onCreateCode={activeView === PEOPLE_VIEW_KEY ? undefined : handleCreateCode}
+          onCreateHtml={activeView === PEOPLE_VIEW_KEY ? undefined : handleCreateHtml}
+          onCreateJson={activeView === PEOPLE_VIEW_KEY ? handleCreatePeopleJson : handleCreateJson}
+          onCreateExternal={activeView === PEOPLE_VIEW_KEY ? undefined : handleCreateExternal}
+          onCreateVisualizationMermaid={activeView === PEOPLE_VIEW_KEY ? undefined : handleCreateVisualizationMermaid}
+          onCreateVisualizationExcalidraw={activeView === PEOPLE_VIEW_KEY ? undefined : handleCreateVisualizationExcalidraw}
+          onCreateVisualizationDiagramsNet={activeView === PEOPLE_VIEW_KEY ? undefined : handleCreateVisualizationDiagramsNet}
+          onCreateChat={activeView === PEOPLE_VIEW_KEY ? undefined : handleCreateChat}
+          onAddPeopleTarget={activeView === PEOPLE_VIEW_KEY ? handleCreatePeopleContact : () => handleAddPeopleTarget(null)}
+          isCreateDisabled={activeView === PEOPLE_VIEW_KEY ? false : isCreateDisabled}
         />
 
         {/* Content area - conditionally render based on active view */}
@@ -186,12 +229,13 @@ export function LeftSidebar() {
             createTrigger={createTrigger}
             onSelectionChange={handleSelectionChange}
             onFileDrop={handleFileDrop}
+            onAddPeopleTarget={handleAddPeopleTarget}
           />
         )}
 
         {activeView === "extensions" && <LeftSidebarExtensions />}
 
-        {activeView === "calendar" && <CalendarCompanionPanel />}
+        {ExtensionPanel && createElement(ExtensionPanel)}
 
         {/* Search view is handled by LeftSidebarContent with isSearchOpen state */}
         {activeView === "search" && (
@@ -200,6 +244,7 @@ export function LeftSidebar() {
             createTrigger={createTrigger}
             onSelectionChange={handleSelectionChange}
             onFileDrop={handleFileDrop}
+            onAddPeopleTarget={handleAddPeopleTarget}
           />
         )}
       </div>
@@ -211,6 +256,15 @@ export function LeftSidebar() {
           onSuccess={handleFileUploadSuccess}
           onCancel={handleFileUploadCancel}
           initialFiles={draggedFiles || undefined}
+        />,
+        document.body
+      )}
+
+      {peopleMountParentId !== undefined && typeof document !== "undefined" && createPortal(
+        <PeopleMountPickerDialog
+          parentId={peopleMountParentId}
+          onClose={() => setPeopleMountParentId(undefined)}
+          onMounted={() => setRefreshTrigger((prev) => prev + 1)}
         />,
         document.body
       )}

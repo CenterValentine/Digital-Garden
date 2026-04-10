@@ -29,7 +29,7 @@ interface FileTreeProps {
   }) => Promise<void>;
   onSelect?: (nodes: TreeNode[]) => void;
   onRename?: (id: string, name: string) => Promise<void>;
-  onCreate?: (parentId: string | null, type: "folder" | "note" | "file" | "code" | "html") => Promise<void>;
+  onCreate?: (parentId: string | null, type: "folder" | "note" | "file" | "code" | "html" | "docx" | "xlsx" | "json" | "external" | "chat" | "visualization" | "data" | "hope" | "workflow") => Promise<void>;
   onDelete?: (ids: string | string[]) => Promise<void>; // Support both single ID and batch delete
   onDuplicate?: (ids: string[]) => Promise<void>; // Duplicate content node(s)
   onDownload?: (ids: string[]) => Promise<void>; // Download file(s)
@@ -42,6 +42,7 @@ interface FileTreeProps {
   onCreateVisualizationMermaid?: (parentId: string | null) => Promise<void>;
   onCreateVisualizationExcalidraw?: (parentId: string | null) => Promise<void>;
   onCreateVisualizationDiagramsNet?: (parentId: string | null) => Promise<void>;
+  onAddPeopleTarget?: (parentId: string | null) => Promise<void>;
   height?: number;
   editingNodeId?: string; // If set, automatically triggers edit mode on this node
   expandNodeId?: string | null; // If set, imperatively expands this node
@@ -64,6 +65,7 @@ export function FileTree({
   onCreateVisualizationMermaid,
   onCreateVisualizationExcalidraw,
   onCreateVisualizationDiagramsNet,
+  onAddPeopleTarget,
   height = 600,
   editingNodeId,
   expandNodeId,
@@ -72,8 +74,43 @@ export function FileTree({
 }: FileTreeProps) {
   const treeRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const { expandedIds, setExpanded, selectedIds, setSelectedIds } = useTreeStateStore();
+  const {
+    expandedIds,
+    setExpanded,
+    selectedIds,
+    setSelectedIds,
+    scrollOffset,
+    setScrollOffset,
+    restoreVersion,
+  } = useTreeStateStore();
   const hasRestoredRef = useRef(false);
+  const isRestoringScrollRef = useRef(false);
+
+  useEffect(() => {
+    const targetOffset = scrollOffset;
+    let frameId = 0;
+    let attempts = 0;
+    isRestoringScrollRef.current = true;
+
+    const restore = () => {
+      treeRef.current?.list.current?.scrollTo(targetOffset);
+      attempts += 1;
+
+      if (attempts < 4) {
+        frameId = requestAnimationFrame(restore);
+        return;
+      }
+
+      isRestoringScrollRef.current = false;
+    };
+
+    frameId = requestAnimationFrame(restore);
+
+    return () => {
+      cancelAnimationFrame(frameId);
+      isRestoringScrollRef.current = false;
+    };
+  }, [restoreVersion]);
 
   // Restore selection ONCE on initial mount from persisted IDs
   useEffect(() => {
@@ -191,7 +228,7 @@ export function FileTree({
 
   // Create a wrapper component that has access to callbacks
   const NodeWithCallbacks = (props: any) => {
-    return <FileNode {...props} onRename={onRename} onCreate={onCreate} onDelete={onDelete} onDuplicate={onDuplicate} onDownload={onDownload} onChangeIcon={onChangeIcon} onSetFolderView={onSetFolderView} onToggleReferencedContent={onToggleReferencedContent} onCreateVisualizationMermaid={onCreateVisualizationMermaid} onCreateVisualizationExcalidraw={onCreateVisualizationExcalidraw} onCreateVisualizationDiagramsNet={onCreateVisualizationDiagramsNet} />;
+    return <FileNode {...props} onRename={onRename} onCreate={onCreate} onDelete={onDelete} onDuplicate={onDuplicate} onDownload={onDownload} onChangeIcon={onChangeIcon} onSetFolderView={onSetFolderView} onToggleReferencedContent={onToggleReferencedContent} onCreateVisualizationMermaid={onCreateVisualizationMermaid} onCreateVisualizationExcalidraw={onCreateVisualizationExcalidraw} onCreateVisualizationDiagramsNet={onCreateVisualizationDiagramsNet} onAddPeopleTarget={onAddPeopleTarget} />;
   };
 
   // Get initial open state from persisted IDs
@@ -238,6 +275,11 @@ export function FileTree({
     setExpanded(id, !isCurrentlyExpanded);
   };
 
+  const handleScroll = ({ scrollOffset: nextScrollOffset }: { scrollOffset: number }) => {
+    if (isRestoringScrollRef.current) return;
+    setScrollOffset(nextScrollOffset);
+  };
+
   // Allow dropping into folders
   const canDrop = (args: { dragNodes: NodeApi<TreeNode>[]; parentNode: NodeApi<TreeNode> | null }) => {
     const { dragNodes, parentNode } = args;
@@ -247,6 +289,10 @@ export function FileTree({
 
     // Only allow dropping into folders
     if (parentNode.data.contentType !== "folder") {
+      return false;
+    }
+
+    if (parentNode.data.treeNodeKind && parentNode.data.treeNodeKind !== "content") {
       return false;
     }
 
@@ -445,6 +491,7 @@ export function FileTree({
       tabIndex={0}
     >
       <Tree
+        key={restoreVersion}
         ref={treeRef}
         data={data}
         openByDefault={false}
@@ -461,6 +508,7 @@ export function FileTree({
         childrenAccessor="children"
         onMove={handleMove}
         onSelect={handleSelect}
+        onScroll={handleScroll}
         onToggle={handleToggle}
         onRename={({ id, name }) => {
           // Called when user submits inline edit (Enter or blur)

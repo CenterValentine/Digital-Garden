@@ -14,7 +14,12 @@ import { z } from "zod";
 import { createBlockSchema } from "@/lib/domain/blocks/schema";
 import { registerBlock } from "@/lib/domain/blocks/registry";
 import { useBlockStore } from "@/state/block-store";
-import { openBlockInsertMenu, syncAttrsToPanel } from "@/lib/domain/blocks/node-view-factory";
+import { useRightPanelCollapseStore } from "@/state/right-panel-collapse-store";
+import {
+  openBlockInsertMenu,
+  selectBlockNode,
+  syncAttrsToPanel,
+} from "@/lib/domain/blocks/node-view-factory";
 
 const { schema: accordionSchema, defaults: accordionDefaults } =
   createBlockSchema("accordion", {
@@ -23,14 +28,20 @@ const { schema: accordionSchema, defaults: accordionDefaults } =
       .enum(["1", "2", "3"])
       .default("2")
       .describe("Header size (H1, H2, H3)"),
-    defaultOpen: z.boolean().default(true).describe("Start expanded"),
+    openBehavior: z
+      .enum(["expanded", "collapsed", "lastInteraction"])
+      .default("lastInteraction")
+      .describe(
+        "Controls how the accordion opens by default. Last Interaction keeps the last state you left it in."
+      ),
+    openState: z.boolean().default(true).describe("Persisted open state"),
     showContainer: z
       .boolean()
       .default(false)
-      .describe("Show outer container border"),
+      .describe("Show border"),
     showDivider: z
       .boolean()
-      .default(true)
+      .default(false)
       .describe("Show line between header and content"),
   });
 
@@ -50,6 +61,45 @@ registerBlock({
   hiddenFields: ["headerText"],
 });
 
+function isEmptyParagraphNode(node: { type: { name: string }; content: { size: number }; textContent: string } | null | undefined) {
+  return Boolean(
+    node &&
+      node.type.name === "paragraph" &&
+      node.content.size === 0 &&
+      node.textContent.length === 0
+  );
+}
+
+function focusAccordionTitleById(blockId: string) {
+  if (!blockId) return false;
+
+  const attempt = () => {
+    const title = document.querySelector(
+      `[data-block-id="${CSS.escape(blockId)}"] .block-accordion-title`
+    ) as HTMLElement | null;
+    if (!title) return false;
+
+    title.focus({ preventScroll: true });
+    const selection = window.getSelection();
+    const range = document.createRange();
+    range.selectNodeContents(title);
+    range.collapse(false);
+    selection?.removeAllRanges();
+    selection?.addRange(range);
+    return true;
+  };
+
+  if (attempt()) return true;
+  requestAnimationFrame(() => {
+    if (!attempt()) {
+      setTimeout(() => {
+        attempt();
+      }, 0);
+    }
+  });
+  return true;
+}
+
 /**
  * Accordion parent node.
  * Custom NodeView with inline-editable title and collapsible body.
@@ -59,6 +109,65 @@ export const Accordion = Node.create({
   group: "block",
   content: "block+",
   defining: true,
+
+  addKeyboardShortcuts() {
+    return {
+      Backspace: () => {
+        const { state, view } = this.editor;
+        const { selection } = state;
+        if (!selection.empty) return false;
+
+        const { $from } = selection;
+        if ($from.parent.type.name !== "paragraph" || $from.parentOffset !== 0) {
+          return false;
+        }
+
+        for (let depth = $from.depth; depth > 0; depth--) {
+          const node = $from.node(depth);
+          if (node.type.name !== "accordion") continue;
+
+          const topLevelChildIndex = $from.index(depth);
+          if (topLevelChildIndex !== 0) {
+            return false;
+          }
+
+          const accordionPos = $from.before(depth);
+          const firstChild = node.child(0);
+          const firstChildFrom = accordionPos + 1;
+          const firstChildTo = firstChildFrom + firstChild.nodeSize;
+          const emptyParagraph = state.schema.nodes.paragraph?.create();
+          if (!emptyParagraph) return false;
+          const blockId = String(node.attrs.blockId || "");
+
+          if (node.childCount === 1 && isEmptyParagraphNode(firstChild)) {
+            focusAccordionTitleById(blockId);
+            return true;
+          }
+
+          const tr =
+            node.childCount > 1
+              ? state.tr.delete(firstChildFrom, firstChildTo)
+              : state.tr.replaceWith(firstChildFrom, firstChildTo, emptyParagraph);
+
+          if (node.childCount > 1) {
+            const targetPos = Math.min(accordionPos + 2, tr.doc.content.size);
+            tr.setSelection(TextSelection.near(tr.doc.resolve(targetPos), 1));
+            view.dispatch(tr);
+            view.focus();
+            return true;
+          }
+
+          view.dispatch(tr);
+          if (blockId) {
+            focusAccordionTitleById(blockId);
+          }
+          return true;
+        }
+
+        return false;
+      },
+    };
+  },
 
   addAttributes() {
     return {
@@ -74,10 +183,17 @@ export const Accordion = Node.create({
         parseHTML: (el) => el.getAttribute("data-header-level") || "2",
         renderHTML: (attrs) => ({ "data-header-level": attrs.headerLevel }),
       },
-      defaultOpen: {
+      openBehavior: {
+        default: "lastInteraction",
+        parseHTML: (el) =>
+          el.getAttribute("data-open-behavior") ||
+          (el.getAttribute("data-open") === "false" ? "collapsed" : "lastInteraction"),
+        renderHTML: (attrs) => ({ "data-open-behavior": attrs.openBehavior }),
+      },
+      openState: {
         default: true,
-        parseHTML: (el) => el.getAttribute("data-open") !== "false",
-        renderHTML: (attrs) => ({ "data-open": String(attrs.defaultOpen) }),
+        parseHTML: (el) => el.getAttribute("data-open-state") !== "false",
+        renderHTML: (attrs) => ({ "data-open-state": String(attrs.openState) }),
       },
       showContainer: {
         default: false,
@@ -85,8 +201,8 @@ export const Accordion = Node.create({
         renderHTML: (attrs) => ({ "data-show-container": String(attrs.showContainer) }),
       },
       showDivider: {
-        default: true,
-        parseHTML: (el) => el.getAttribute("data-show-divider") !== "false",
+        default: false,
+        parseHTML: (el) => el.getAttribute("data-show-divider") === "true",
         renderHTML: (attrs) => ({ "data-show-divider": String(attrs.showDivider) }),
       },
     };
@@ -129,6 +245,23 @@ export const Accordion = Node.create({
       if (!currentNode.attrs.showContainer) {
         dom.classList.add("block-container-hidden");
       }
+      const getNodePos = typeof getPos === "function" ? getPos : undefined;
+      const syncBlockSelection = () => {
+        const blockId = currentNode.attrs.blockId || "";
+        useBlockStore.getState().setSelectedBlock(blockId, "accordion");
+        syncAttrsToPanel(blockId, currentNode.attrs);
+      };
+
+      const cursorBefore = document.createElement("button");
+      cursorBefore.classList.add("block-cursor-anchor", "block-cursor-anchor-before");
+      cursorBefore.type = "button";
+      cursorBefore.title = "Place cursor above";
+      cursorBefore.addEventListener("mousedown", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        selectBlockNode(editor, getNodePos);
+      });
+      dom.appendChild(cursorBefore);
 
       // "+" button ABOVE block
       const insertAbove = document.createElement("button");
@@ -166,6 +299,7 @@ export const Accordion = Node.create({
         const blockId = currentNode.attrs.blockId || "";
         useBlockStore.getState().setSelectedBlock(blockId, "accordion");
         useBlockStore.getState().openProperties();
+        useRightPanelCollapseStore.getState().setCollapsed(false);
         syncAttrsToPanel(blockId, currentNode.attrs);
       });
       chrome.appendChild(menuBtn);
@@ -252,6 +386,19 @@ export const Accordion = Node.create({
         e.stopPropagation();
       });
       title.addEventListener("keydown", (e) => {
+        if (e.key === "Backspace") {
+          const selection = window.getSelection();
+          const atStart =
+            selection?.rangeCount &&
+            selection.isCollapsed &&
+            selection.getRangeAt(0).startOffset === 0 &&
+            selection.getRangeAt(0).endOffset === 0;
+          if (atStart) {
+            e.preventDefault();
+            e.stopPropagation();
+            return;
+          }
+        }
         if (e.key === "Enter") {
           e.preventDefault();
           e.stopPropagation();
@@ -315,7 +462,12 @@ export const Accordion = Node.create({
       dom.appendChild(summary);
 
       // Toggle state
-      let isOpen = currentNode.attrs.defaultOpen !== false;
+      const resolveOpenState = (attrs: typeof currentNode.attrs) => {
+        if (attrs.openBehavior === "expanded") return true;
+        if (attrs.openBehavior === "collapsed") return false;
+        return attrs.openState !== false;
+      };
+      let isOpen = resolveOpenState(currentNode.attrs);
       if (isOpen) {
         chevron.classList.add("block-accordion-chevron-open");
       }
@@ -325,6 +477,16 @@ export const Accordion = Node.create({
         chevron.classList.toggle("block-accordion-chevron-open", isOpen);
         contentDOM.classList.toggle("block-accordion-open", isOpen);
         contentDOM.classList.toggle("block-accordion-closed", !isOpen);
+        if (currentNode.attrs.openBehavior === "lastInteraction") {
+          const blockId = currentNode.attrs.blockId || "";
+          if (blockId) {
+            window.dispatchEvent(
+              new CustomEvent("block-attrs-change", {
+                detail: { blockId, key: "openState", value: isOpen },
+              })
+            );
+          }
+        }
       };
 
       // Chevron click toggles
@@ -332,6 +494,7 @@ export const Accordion = Node.create({
       chevron.addEventListener("mousedown", (e) => {
         e.preventDefault();
         e.stopPropagation();
+        syncBlockSelection();
         toggleAccordion();
       });
 
@@ -340,6 +503,7 @@ export const Accordion = Node.create({
         if (e.target === summary) {
           e.preventDefault();
           e.stopPropagation();
+          syncBlockSelection();
           toggleAccordion();
         }
       });
@@ -376,11 +540,33 @@ export const Accordion = Node.create({
       });
       dom.appendChild(insertBelow);
 
-      // Click chrome to select
-      chrome.addEventListener("click", () => {
-        const blockId = currentNode.attrs.blockId || "";
-        useBlockStore.getState().setSelectedBlock(blockId, "accordion");
+      const cursorAfter = document.createElement("button");
+      cursorAfter.classList.add("block-cursor-anchor", "block-cursor-anchor-after");
+      cursorAfter.type = "button";
+      cursorAfter.title = "Place cursor below";
+      cursorAfter.addEventListener("mousedown", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        selectBlockNode(editor, getNodePos);
       });
+      dom.appendChild(cursorAfter);
+
+      dom.addEventListener(
+        "mousedown",
+        (event) => {
+          const target = event.target as HTMLElement;
+          const interactive =
+            target.closest(".block-menu-btn") ||
+            target.closest(".block-delete-btn") ||
+            target.closest(".block-insert-btn");
+          if (interactive) return;
+          selectBlockNode(editor, getNodePos);
+          syncBlockSelection();
+        },
+        true
+      );
+
+      chrome.addEventListener("click", syncBlockSelection);
 
       // Focus the title on first render if it's empty (new accordion)
       if (!currentNode.attrs.headerText) {
@@ -392,6 +578,7 @@ export const Accordion = Node.create({
         contentDOM,
         update(updatedNode) {
           if (updatedNode.type.name !== "accordion") return false;
+          const previousNode = currentNode;
           currentNode = updatedNode;
           dom.setAttribute("data-block-id", updatedNode.attrs.blockId || "");
           dom.classList.toggle("block-container-hidden", !updatedNode.attrs.showContainer);
@@ -399,17 +586,29 @@ export const Accordion = Node.create({
 
           // Sync header level
           title.setAttribute("data-header-level", updatedNode.attrs.headerLevel || "2");
+          if (
+            updatedNode.attrs.openBehavior !== previousNode.attrs.openBehavior ||
+            updatedNode.attrs.openState !== previousNode.attrs.openState
+          ) {
+            isOpen = resolveOpenState(updatedNode.attrs);
+            chevron.classList.toggle("block-accordion-chevron-open", isOpen);
+            contentDOM.classList.toggle("block-accordion-open", isOpen);
+            contentDOM.classList.toggle("block-accordion-closed", !isOpen);
+          }
 
           // Update title only if not being edited
           if (document.activeElement !== title) {
-            title.textContent = updatedNode.attrs.headerText || "";
+            const nextHeaderText =
+              updatedNode.attrs.headerText ||
+              title.textContent ||
+              "";
+            title.textContent = nextHeaderText;
           }
           return true;
         },
         selectNode() {
           dom.classList.add("block-selected", "ProseMirror-selectednode");
-          const blockId = currentNode.attrs.blockId || "";
-          useBlockStore.getState().setSelectedBlock(blockId, "accordion");
+          syncBlockSelection();
         },
         deselectNode() {
           dom.classList.remove("block-selected", "ProseMirror-selectednode");
@@ -468,10 +667,17 @@ export const ServerAccordion = Node.create({
         parseHTML: (el) => el.getAttribute("data-header-level") || "2",
         renderHTML: (attrs) => ({ "data-header-level": attrs.headerLevel }),
       },
-      defaultOpen: {
+      openBehavior: {
+        default: "lastInteraction",
+        parseHTML: (el) =>
+          el.getAttribute("data-open-behavior") ||
+          (el.getAttribute("data-open") === "false" ? "collapsed" : "lastInteraction"),
+        renderHTML: (attrs) => ({ "data-open-behavior": attrs.openBehavior }),
+      },
+      openState: {
         default: true,
-        parseHTML: (el) => el.getAttribute("data-open") !== "false",
-        renderHTML: (attrs) => ({ "data-open": String(attrs.defaultOpen) }),
+        parseHTML: (el) => el.getAttribute("data-open-state") !== "false",
+        renderHTML: (attrs) => ({ "data-open-state": String(attrs.openState) }),
       },
       showContainer: {
         default: false,
@@ -479,8 +685,8 @@ export const ServerAccordion = Node.create({
         renderHTML: (attrs) => ({ "data-show-container": String(attrs.showContainer) }),
       },
       showDivider: {
-        default: true,
-        parseHTML: (el) => el.getAttribute("data-show-divider") !== "false",
+        default: false,
+        parseHTML: (el) => el.getAttribute("data-show-divider") === "true",
         renderHTML: (attrs) => ({ "data-show-divider": String(attrs.showDivider) }),
       },
     };

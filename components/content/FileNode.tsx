@@ -42,6 +42,8 @@ import {
   GitBranch,
   BarChart3,
   MessageCircle,
+  User,
+  Users,
 } from "lucide-react";
 import { useContextMenuStore } from "@/state/context-menu-store";
 import { useContentStore } from "@/state/content-store";
@@ -68,11 +70,13 @@ interface FileNodeProps extends NodeRendererProps<TreeNode> {
   onCreateVisualizationMermaid?: (parentId: string | null) => Promise<void>;
   onCreateVisualizationExcalidraw?: (parentId: string | null) => Promise<void>;
   onCreateVisualizationDiagramsNet?: (parentId: string | null) => Promise<void>;
+  onAddPeopleTarget?: (parentId: string | null) => Promise<void>;
 }
 
-export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete, onDuplicate, onDownload, onChangeIcon, onSetFolderView, onToggleReferencedContent, onCreateVisualizationMermaid, onCreateVisualizationExcalidraw, onCreateVisualizationDiagramsNet }: FileNodeProps) {
+export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete, onDuplicate, onDownload, onChangeIcon, onSetFolderView, onToggleReferencedContent, onCreateVisualizationMermaid, onCreateVisualizationExcalidraw, onCreateVisualizationDiagramsNet, onAddPeopleTarget }: FileNodeProps) {
   const { data } = node;
   const isFolder = data.contentType === "folder";
+  const isPeopleNode = data.treeNodeKind === "peopleGroup" || data.treeNodeKind === "person";
   const isOpen = node.isOpen;
 
   const { openMenu } = useContextMenuStore();
@@ -124,6 +128,18 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
     }
 
     if (isFolder) {
+      if (data.treeNodeKind === "peopleGroup") {
+        return isOpen ? (
+          <FolderOpen className={`${iconSize} text-gold-primary`} />
+        ) : (
+          <Users className={`${iconSize} text-gold-primary`} />
+        );
+      }
+
+      if (data.treeNodeKind === "person") {
+        return <User className={`${iconSize} text-blue-500`} />;
+      }
+
       // Show different icon based on folder view mode
       const viewMode = data.folder?.viewMode;
 
@@ -288,7 +304,7 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
     }
 
     // Files: select on single click (unchanged behaviour)
-    if (!isFolder) {
+    if (!isFolder || isPeopleNode) {
       node.select();
     }
     // Folders: single click does nothing — double-click opens (see handleDoubleClick)
@@ -306,6 +322,9 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
         node.close();
       } else {
         node.open();
+      }
+      if (isPeopleNode) {
+        return;
       }
       node.select();
     }
@@ -336,6 +355,7 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
           title: data.title,
           contentType: data.contentType,
           isFolder,
+          treeNodeKind: data.treeNodeKind,
           parentId: data.parentId, // Add parentId for sibling creation logic
           includeReferencedContent: data.folder?.includeReferencedContent || false, // Phase 2: Folder setting
           externalUrl: data.external?.url, // Phase 2: External link URL
@@ -364,57 +384,61 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
           console.log("[FileNode] onCreateFolder called with parentId:", parentId);
           await onCreate(parentId, "folder");
         } : undefined,
-        onCreateFile: onCreate ? async (parentId: string | null) => {
+        onCreateFile: onCreate && !isPeopleNode ? async (parentId: string | null) => {
           console.log("[FileNode] onCreateFile called with parentId:", parentId);
           await onCreate(parentId, "file");
         } : undefined,
-        onCreateCode: onCreate ? async (parentId: string | null) => {
+        onCreateCode: onCreate && !isPeopleNode ? async (parentId: string | null) => {
           console.log("[FileNode] onCreateCode called with parentId:", parentId);
           await onCreate(parentId, "code");
         } : undefined,
-        onCreateHtml: onCreate ? async (parentId: string | null) => {
+        onCreateHtml: onCreate && !isPeopleNode ? async (parentId: string | null) => {
           console.log("[FileNode] onCreateHtml called with parentId:", parentId);
           await onCreate(parentId, "html");
         } : undefined,
-        onCreateDocument: onCreate ? async (parentId: string | null) => {
+        onCreateDocument: onCreate && !isPeopleNode ? async (parentId: string | null) => {
           console.log("[FileNode] onCreateDocument called with parentId:", parentId);
           await onCreate(parentId, "docx");
         } : undefined,
-        onCreateSpreadsheet: onCreate ? async (parentId: string | null) => {
+        onCreateSpreadsheet: onCreate && !isPeopleNode ? async (parentId: string | null) => {
           console.log("[FileNode] onCreateSpreadsheet called with parentId:", parentId);
           await onCreate(parentId, "xlsx");
         } : undefined,
         // Phase 2: New content types
-        onCreateExternal: onCreate ? async (parentId: string | null) => {
+        onCreateExternal: onCreate && !isPeopleNode ? async (parentId: string | null) => {
           console.log("[FileNode] onCreateExternal called with parentId:", parentId);
           await onCreate(parentId, "external");
         } : undefined,
-        onCreateChat: onCreate ? async (parentId: string | null) => {
+        onCreateChat: onCreate && !isPeopleNode ? async (parentId: string | null) => {
           console.log("[FileNode] onCreateChat called with parentId:", parentId);
           await onCreate(parentId, "chat");
         } : undefined,
+        onAddPeopleTarget: onAddPeopleTarget && !isPeopleNode ? async (parentId: string | null) => {
+          console.log("[FileNode] onAddPeopleTarget called with parentId:", parentId);
+          await onAddPeopleTarget(parentId);
+        } : undefined,
         // Visualization engine-specific callbacks
-        onCreateVisualizationMermaid: onCreateVisualizationMermaid ? async (parentId: string | null) => {
+        onCreateVisualizationMermaid: onCreateVisualizationMermaid && !isPeopleNode ? async (parentId: string | null) => {
           console.log("[FileNode] onCreateVisualizationMermaid called with parentId:", parentId);
           await onCreateVisualizationMermaid(parentId);
         } : undefined,
-        onCreateVisualizationExcalidraw: onCreateVisualizationExcalidraw ? async (parentId: string | null) => {
+        onCreateVisualizationExcalidraw: onCreateVisualizationExcalidraw && !isPeopleNode ? async (parentId: string | null) => {
           console.log("[FileNode] onCreateVisualizationExcalidraw called with parentId:", parentId);
           await onCreateVisualizationExcalidraw(parentId);
         } : undefined,
-        onCreateVisualizationDiagramsNet: onCreateVisualizationDiagramsNet ? async (parentId: string | null) => {
+        onCreateVisualizationDiagramsNet: onCreateVisualizationDiagramsNet && !isPeopleNode ? async (parentId: string | null) => {
           console.log("[FileNode] onCreateVisualizationDiagramsNet called with parentId:", parentId);
           await onCreateVisualizationDiagramsNet(parentId);
         } : undefined,
-        onCreateData: onCreate ? async (parentId: string | null) => {
+        onCreateData: onCreate && !isPeopleNode ? async (parentId: string | null) => {
           console.log("[FileNode] onCreateData called with parentId:", parentId);
           await onCreate(parentId, "data");
         } : undefined,
-        onCreateHope: onCreate ? async (parentId: string | null) => {
+        onCreateHope: onCreate && !isPeopleNode ? async (parentId: string | null) => {
           console.log("[FileNode] onCreateHope called with parentId:", parentId);
           await onCreate(parentId, "hope");
         } : undefined,
-        onCreateWorkflow: onCreate ? async (parentId: string | null) => {
+        onCreateWorkflow: onCreate && !isPeopleNode ? async (parentId: string | null) => {
           console.log("[FileNode] onCreateWorkflow called with parentId:", parentId);
           await onCreate(parentId, "workflow");
         } : undefined,

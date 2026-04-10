@@ -10,6 +10,31 @@
 import { z } from "zod";
 import type { PropertiesField } from "./types";
 
+type ZodCheckDef = {
+  _zod?: {
+    def?: {
+      check?: string;
+      value?: number;
+    };
+  };
+};
+
+type ZodInternalDef = {
+  type?: string;
+  innerType?: z.ZodTypeAny;
+  description?: string;
+  checks?: ZodCheckDef[];
+  entries?: Record<string, string>;
+};
+
+type ZodInspectable = z.ZodTypeAny & {
+  description?: string;
+  options?: string[];
+  _zod?: {
+    def?: ZodInternalDef;
+  };
+};
+
 /**
  * Extract renderable field descriptors from a Zod object schema.
  * Skips internal fields (blockId, blockType).
@@ -25,8 +50,14 @@ export function schemaToFields(
     // Skip internal block fields
     if (key === "blockId" || key === "blockType") continue;
 
-    const def = unwrapZodType(rawDef as z.ZodTypeAny);
-    const field = zodToField(key, def, values[key]);
+    const rawType = rawDef as z.ZodTypeAny;
+    const def = unwrapZodType(rawType);
+    const field = zodToField(
+      key,
+      def,
+      values[key],
+      getZodDescription(rawType) || getZodDescription(def)
+    );
     if (field) {
       fields.push(field);
     }
@@ -46,7 +77,7 @@ function unwrapZodType(def: z.ZodTypeAny): z.ZodTypeAny {
     typeName === "optional" ||
     typeName === "nullable"
   ) {
-    const inner = (def as any)._zod?.def?.innerType;
+    const inner = (def as ZodInspectable)._zod?.def?.innerType;
     if (inner) return unwrapZodType(inner);
   }
   return def;
@@ -54,30 +85,36 @@ function unwrapZodType(def: z.ZodTypeAny): z.ZodTypeAny {
 
 /** Get the Zod v4 type name from a type's internal def */
 function getZodTypeName(def: z.ZodTypeAny): string {
-  return (def as any)._zod?.def?.type || "";
+  return (def as ZodInspectable)._zod?.def?.type || "";
+}
+
+function getZodDescription(def: z.ZodTypeAny): string | undefined {
+  const inspectable = def as ZodInspectable;
+  return inspectable.description || inspectable._zod?.def?.description;
 }
 
 /** Convert a Zod type to a PropertiesField descriptor */
 function zodToField(
   key: string,
   def: z.ZodTypeAny,
-  value: unknown
+  value: unknown,
+  description?: string
 ): PropertiesField | null {
   const label = humanize(key);
-  const description = (def as any).description || undefined;
+  const tooltip = key === "openBehavior" ? description : undefined;
   const typeName = getZodTypeName(def);
 
   // String — detect icon fields by key name
   if (typeName === "string") {
     if (key === "icon" || key.endsWith("Icon") || key === "customIcon") {
-      return { key, label, fieldType: "icon", value: value ?? "", description };
+      return { key, label, fieldType: "icon", value: value ?? "", description, tooltip };
     }
-    return { key, label, fieldType: "text", value: value ?? "", description };
+    return { key, label, fieldType: "text", value: value ?? "", description, tooltip };
   }
 
   // Number
   if (typeName === "number") {
-    const checks = (def as any)._zod?.def?.checks || [];
+    const checks = (def as ZodInspectable)._zod?.def?.checks || [];
     let min: number | undefined;
     let max: number | undefined;
 
@@ -95,6 +132,7 @@ function zodToField(
       min,
       max,
       description,
+      tooltip,
     };
   }
 
@@ -106,15 +144,17 @@ function zodToField(
       fieldType: "boolean",
       value: value ?? false,
       description,
+      tooltip,
     };
   }
 
   // Enum (renders as select)
   if (typeName === "enum") {
-    const entries = (def as any)._zod?.def?.entries;
+    const inspectable = def as ZodInspectable;
+    const entries = inspectable._zod?.def?.entries;
     const optionValues = entries
       ? Object.values(entries) as string[]
-      : (def as any).options || [];
+      : inspectable.options || [];
     const options = optionValues.map((v: string) => ({
       label: humanize(v),
       value: v,
@@ -126,6 +166,7 @@ function zodToField(
       value: value ?? options[0]?.value,
       options,
       description,
+      tooltip,
     };
   }
 
@@ -137,15 +178,18 @@ function zodToField(
       fieldType: "array",
       value: value ?? [],
       description,
+      tooltip,
     };
   }
 
   // Fallback: render as text
-  return { key, label, fieldType: "text", value: value ?? "", description };
+  return { key, label, fieldType: "text", value: value ?? "", description, tooltip };
 }
 
 /** Convert camelCase to "Camel Case" */
 function humanize(key: string): string {
+  if (key === "showContainer" || key === "showBorder") return "Border";
+  if (key === "openBehavior") return "Expand/Collapse Default";
   return key
     .replace(/([A-Z])/g, " $1")
     .replace(/^./, (s) => s.toUpperCase())

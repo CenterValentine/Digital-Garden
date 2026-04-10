@@ -62,6 +62,10 @@ export interface MarkdownEditorProps {
   createTag?: (tagName: string) => Promise<{ id: string; name: string; slug: string; color: string | null; usageCount: number }>;
   /** Callback when a tag is selected from autocomplete */
   onTagSelect?: (tag: { id: string; name: string; slug: string; color: string | null }) => void;
+  /** Fetch people for @ mention autocomplete */
+  fetchPeopleMentions?: (query: string) => Promise<Array<{ id: string; personId: string; label: string; slug: string; email: string | null; phone: string | null; avatarUrl: string | null }>>;
+  /** Callback when a person mention is clicked */
+  onPersonMentionClick?: (personId: string) => void;
   /** Auto-save delay in milliseconds */
   autoSaveDelay?: number;
   /** Read-only mode */
@@ -88,6 +92,8 @@ export function MarkdownEditor({
   fetchTags,
   createTag,
   onTagSelect,
+  fetchPeopleMentions,
+  onPersonMentionClick,
   autoSaveDelay = 2000,
   editable = true,
   compact = false,
@@ -127,6 +133,8 @@ export function MarkdownEditor({
       fetchTags,
       createTag,
       onTagSelect,
+      fetchPeopleMentions,
+      onPersonMentionClick,
     }),
     content,
     editable,

@@ -12,7 +12,6 @@ import {
   File,
   Folder,
   FileText,
-  Upload,
   FileSpreadsheet,
   FileType,
   FileCode,
@@ -21,6 +20,7 @@ import {
   ExternalLink,
   MessageSquare,
   BarChart3,
+  Users,
   Table,
   Target,
   GitBranch,
@@ -50,6 +50,7 @@ export interface NewContentCallbacks {
   onCreateJson?: (parentId: string | null) => void | Promise<void>;
   onCreateExternal?: (parentId: string | null) => void | Promise<void>;
   onCreateChat?: (parentId: string | null) => void | Promise<void>;
+  onAddPeopleTarget?: (parentId: string | null) => void | Promise<void>;
   // NEW: Separate callbacks for each visualization engine
   onCreateVisualizationMermaid?: (parentId: string | null) => void | Promise<void>;
   onCreateVisualizationExcalidraw?: (parentId: string | null) => void | Promise<void>;
@@ -179,6 +180,14 @@ export function getNewContentMenuItems(
     icon: <MessageSquare className="h-4 w-4" />,
     onClick: () => callbacks.onCreateChat?.(normalizedParentId),
     disabled: !callbacks.onCreateChat,
+  });
+
+  items.push({
+    id: "add-people-target",
+    label: "Person / Group",
+    icon: <Users className="h-4 w-4" />,
+    onClick: () => callbacks.onAddPeopleTarget?.(normalizedParentId),
+    disabled: !callbacks.onAddPeopleTarget,
   });
 
   // Visualization submenu with 3 engine choices

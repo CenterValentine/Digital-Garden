@@ -56,8 +56,11 @@ const nextConfig: NextConfig = {
       },
     ];
   },
-  // Empty turbopack config for local dev (uses Turbopack by default)
-  turbopack: {},
+  // Pin local dev to the active worktree. Without this, nested worktrees can
+  // make Turbopack infer the parent repository as the workspace root.
+  turbopack: {
+    root: process.cwd(),
+  },
 };
 
 export default nextConfig;

@@ -8,7 +8,7 @@
 
 "use client";
 
-import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { createElement, useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { ToolSurfaceProvider } from "@/lib/domain/tools";
 import { ContentToolbar } from "../toolbar";
 import { ToolDebugPanel } from "../toolbar/ToolDebugPanel";
@@ -22,7 +22,11 @@ import {
   type WorkspacePaneId,
 } from "@/state/content-store";
 import { useLeftPanelViewStore } from "@/state/left-panel-view-store";
-import { CalendarWorkspace } from "@/components/calendar/CalendarWorkspace";
+import { useTreeStateStore } from "@/state/tree-state-store";
+import {
+  useExtensionContentViewer,
+  useExtensionMainWorkspace,
+} from "@/lib/extensions/client-registry";
 import { useEditorStatsStore } from "@/state/editor-stats-store";
 import { useOutlineStore } from "@/state/outline-store";
 import { useDebugViewStore } from "@/state/debug-view-store";
@@ -109,7 +113,7 @@ interface MainPanelContentProps {
 }
 
 export function MainPanelContent({ paneId }: MainPanelContentProps) {
-  const { activeView } = useLeftPanelViewStore();
+  const { activeView, setActiveView } = useLeftPanelViewStore();
   const { position: notesPanelPosition } = useNotesPanelStore();
   const activePaneId = useContentStore((state) => state.activePaneId);
   const layoutMode = useContentStore((state) => state.layoutMode);
@@ -170,6 +174,18 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
       setContentData(null);
       setContentCustomIcon(null);
       setContentIconColor(null);
+      return;
+    }
+
+    if (selectedContentId.startsWith("person:")) {
+      setIsLoading(false);
+      setError(null);
+      setNoteContent(null);
+      setContentParentId(null);
+      setContentData(null);
+      setContentCustomIcon(null);
+      setContentIconColor(null);
+      setContentType("person-profile");
       return;
     }
 
@@ -570,6 +586,84 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
     []
   );
 
+  const fetchPeopleMentions = useCallback(
+    async (query: string) => {
+      try {
+        const params = new URLSearchParams();
+        params.set("q", query);
+        params.set("limit", "20");
+        const response = await fetch(`/api/people/search?${params.toString()}`, {
+          credentials: "include",
+        });
+
+        const result = await response.json();
+        if (!response.ok || !result.success) {
+          return [];
+        }
+
+        return (result.data?.results || [])
+          .filter((item: any) => item.treeNodeKind === "person")
+          .map((item: any) => ({
+            id: item.id,
+            personId: item.personId,
+            label: item.label,
+            slug: item.slug,
+            email: item.email || null,
+            phone: item.phone || null,
+            avatarUrl: item.avatarUrl || null,
+          }));
+      } catch (error) {
+        console.error("[MainPanelContent] Error fetching people mentions:", error);
+        return [];
+      }
+    },
+    []
+  );
+
+  const handlePersonMentionClick = useCallback(
+    async (personId: string) => {
+      try {
+        const response = await fetch(`/api/people/persons/${personId}`, {
+          credentials: "include",
+        });
+        const result = await response.json();
+
+        if (!response.ok || !result.success || !result.data) {
+          throw new Error(result.error?.message || "Failed to load person");
+        }
+
+        const treePresence = result.data.treePresence;
+        if (treePresence?.isVisibleInFileTree) {
+          const treeState = useTreeStateStore.getState();
+          treeState.expandMany([
+            ...(treePresence.contentAncestorIds || []),
+            ...(treePresence.peopleAncestorIds || []),
+          ]);
+          treeState.setSelectedIds([treePresence.selectedNodeId || `person:${personId}`]);
+          setActiveView("files");
+          window.dispatchEvent(new CustomEvent("dg:tree-refresh"));
+          return;
+        }
+
+        setActiveView("people");
+        window.dispatchEvent(
+          new CustomEvent("dg:people-focus", {
+            detail: {
+              personId,
+              openProfile: true,
+            },
+          })
+        );
+      } catch (error) {
+        console.error("[MainPanelContent] Error handling person mention click:", error);
+        toast.error("Failed to open person", {
+          description: error instanceof Error ? error.message : "Unknown error",
+        });
+      }
+    },
+    [setActiveView]
+  );
+
   // Create a new tag
   const createTag = useCallback(
     async (tagName: string) => {
@@ -803,10 +897,15 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
   }), [handleImportMarkdown, handleExportMarkdown, handleExportChat, handleCopyLink, handleSaveAsTemplate]);
 
   // Calendar workspace — shown in pane 1 when calendar view is active
-  if (activeView === "calendar" && paneId === "top-left") {
+  const ExtensionMainWorkspace = useExtensionMainWorkspace(activeView);
+  const ExtensionContentViewer = useExtensionContentViewer({
+    selectedContentId,
+    contentType,
+  });
+  if (ExtensionMainWorkspace && paneId === "top-left") {
     return (
       <ToolSurfaceProvider contentType={null} handlers={toolHandlers}>
-        <CalendarWorkspace />
+        {createElement(ExtensionMainWorkspace)}
         {process.env.NODE_ENV === "development" && <ToolDebugPanel />}
       </ToolSurfaceProvider>
     );
@@ -827,7 +926,7 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
   if (isLoading) {
     return (
       <div className="flex-1 flex items-center justify-center">
-        <div className="text-sm text-gray-400">Loading note...</div>
+        <div className="text-sm text-gray-400">Loading...</div>
       </div>
     );
   }
@@ -843,6 +942,14 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
           <div className="text-xs text-gray-500">{error}</div>
         </div>
       </div>
+    );
+  } else if (ExtensionContentViewer && selectedContentId) {
+    contentElement = (
+      <ExtensionContentViewer
+        paneId={paneId}
+        selectedContentId={selectedContentId}
+        contentType={contentType}
+      />
     );
   } else if (contentType === "file" && selectedContentId) {
     contentElement = <FileViewer contentId={selectedContentId} title={noteTitle} />;
@@ -976,6 +1083,8 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
             fetchNotesForWikiLink={fetchNotesForWikiLink}
             fetchTags={fetchTags}
             createTag={createTag}
+            fetchPeopleMentions={fetchPeopleMentions}
+            onPersonMentionClick={handlePersonMentionClick}
             autoSaveDelay={2000}
           />
         </div>
@@ -999,11 +1108,11 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
 
   // For non-note content types, append the expandable notes editor
   // This lets any content type (file, folder, external, etc.) have attached notes
-  const isNonNoteContent = contentType && contentType !== "note" && selectedContentId && !error;
+  const isNonNoteContent = contentType && contentType !== "note" && contentType !== "person-profile" && selectedContentId && !error;
 
   // Render navigation once, then content below
   return (
-    <ToolSurfaceProvider contentType={(contentType as ToolContentType) ?? null} handlers={toolHandlers}>
+    <ToolSurfaceProvider contentType={contentType === "person-profile" ? null : (contentType as ToolContentType) ?? null} handlers={toolHandlers}>
       <div
         className="flex h-full min-h-0 flex-col overflow-hidden"
         onPointerDownCapture={() => {
@@ -1017,7 +1126,7 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
           }
         }}
       >
-        {selectedContentId && <ContentToolbar />}
+        {selectedContentId && !selectedContentId.startsWith("person:") && <ContentToolbar />}
         {isNonNoteContent ? (
           <div className="flex flex-1 min-h-0 flex-col overflow-hidden">
             {notesPanelPosition === "above" && (
@@ -1030,6 +1139,8 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
                 fetchNotesForWikiLink={fetchNotesForWikiLink}
                 fetchTags={fetchTags}
                 createTag={createTag}
+                fetchPeopleMentions={fetchPeopleMentions}
+                onPersonMentionClick={handlePersonMentionClick}
                 onSaveAsPageTemplate={handleSaveAsTemplate}
               />
             )}
@@ -1044,6 +1155,8 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
                 fetchNotesForWikiLink={fetchNotesForWikiLink}
                 fetchTags={fetchTags}
                 createTag={createTag}
+                fetchPeopleMentions={fetchPeopleMentions}
+                onPersonMentionClick={handlePersonMentionClick}
                 onSaveAsPageTemplate={handleSaveAsTemplate}
               />
             )}
