@@ -166,7 +166,7 @@ export function MainPanelHeader({
   return (
     <>
       <div
-        className="flex w-full max-w-full shrink-0 items-center overflow-hidden border-b border-white/10 shadow-[inset_0_-1px_0_rgba(255,255,255,0.06),0_2px_6px_rgba(15,23,42,0.04)]"
+        className="flex w-full max-w-full shrink-0 items-center overflow-hidden border-b border-white/10"
         style={{
           background: glass1.background,
           backdropFilter: glass1.backdropFilter,
