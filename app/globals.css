@@ -1307,6 +1307,27 @@ mark {
   background: var(--color-background, #ffffff);
 }
 
+/* ─── Timestamp Block (Sprint 65) ─── */
+
+.ProseMirror .block-timestamp-content {
+  display: flex;
+  align-items: baseline;
+  gap: 0.25rem;
+  padding: 0.25rem 0;
+  font-size: 0.875rem;
+}
+
+.ProseMirror .block-timestamp-prefix {
+  color: rgba(0, 0, 0, 0.45);
+  font-size: 0.8125rem;
+}
+
+.ProseMirror .block-timestamp-date {
+  font-variant-numeric: tabular-nums;
+  color: inherit;
+  font-weight: 450;
+}
+
 /* ─── Accordion (Sprint 44) ─── */
 
 .ProseMirror .block-accordion-summary {

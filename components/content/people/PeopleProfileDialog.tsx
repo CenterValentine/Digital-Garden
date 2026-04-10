@@ -235,21 +235,21 @@ export function PeopleProfileDialog({
   };
 
   return (
-    <div className="fixed inset-0 z-[210] flex items-center justify-center bg-black/45 px-4">
+    <div className="fixed inset-0 z-[210] flex items-center justify-center bg-black/40 px-4 backdrop-blur-[2px]">
       <form
         onSubmit={handleSubmit}
-        className="flex max-h-[430px] w-full max-w-md flex-col overflow-hidden rounded-xl border border-white/10 bg-white shadow-2xl"
+        className="flex max-h-[480px] w-full max-w-md flex-col overflow-hidden rounded-xl border border-white/15 bg-white/95 shadow-2xl backdrop-blur-md dark:bg-gray-900/95"
       >
-        <div className="flex items-start justify-between border-b border-gray-200 px-4 py-3">
+        <div className="flex items-start justify-between border-b border-gray-200/60 px-4 py-3 dark:border-white/10">
           <div>
-            <h2 className="text-sm font-semibold text-gray-900">Edit Contact Profile</h2>
-            <p className="mt-1 text-xs text-gray-500">{description}</p>
+            <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Edit Contact Profile</h2>
+            <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">{description}</p>
           </div>
           <button
             type="button"
             onClick={onClose}
             disabled={isSaving}
-            className="rounded p-1 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 disabled:opacity-50"
+            className="rounded p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700 disabled:opacity-50 dark:hover:bg-white/10 dark:hover:text-gray-200"
             aria-label="Close profile dialog"
           >
             <X className="h-4 w-4" />
@@ -311,20 +311,20 @@ export function PeopleProfileDialog({
           </div>
         </div>
 
-        <div className="flex items-center justify-end border-t border-gray-200 px-4 py-3">
+        <div className="flex items-center justify-end border-t border-gray-200/60 px-4 py-3 dark:border-white/10">
           <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={onClose}
               disabled={isSaving}
-              className="rounded-lg px-3 py-1.5 text-sm text-gray-600 transition-colors hover:bg-gray-100 disabled:opacity-50"
+              className="rounded-lg px-3 py-1.5 text-sm text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 disabled:opacity-50 dark:text-gray-400 dark:hover:bg-white/10"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={!form.displayName.trim() || formDisabled}
-              className="rounded-lg bg-gray-900 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
+              className="rounded-lg bg-gray-900 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-200"
             >
               {isSaving ? "Saving..." : "Save Contact"}
             </button>
@@ -362,7 +362,7 @@ function ProfileTextField({
         placeholder={placeholder}
         type={type}
         disabled={disabled}
-        className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition-colors placeholder:text-gray-500 focus:border-gold-primary/60 disabled:cursor-not-allowed disabled:bg-gray-50"
+        className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition-colors placeholder:text-gray-400 focus:border-gold-primary/60 disabled:cursor-not-allowed disabled:bg-gray-50 dark:border-white/10 dark:bg-white/5 dark:text-gray-100 dark:placeholder:text-gray-600 dark:disabled:bg-white/[0.03]"
       />
     </label>
   );

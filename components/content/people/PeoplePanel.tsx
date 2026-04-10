@@ -1475,7 +1475,7 @@ const PeopleContextMenu = forwardRef<HTMLDivElement, {
   return (
     <div
       ref={ref}
-      className="fixed z-[220] min-w-52 overflow-hidden rounded-md border border-gray-200 bg-white py-1 text-sm shadow-xl"
+      className="fixed z-[220] min-w-[180px] overflow-y-auto rounded-md border border-white/20 bg-white/95 py-1 text-sm shadow-lg backdrop-blur-sm dark:bg-gray-900/95"
       style={
         position
           ? {
@@ -1514,18 +1514,16 @@ const PeopleContextMenu = forwardRef<HTMLDivElement, {
         items={contentMenuItems}
         onLeafAction={onClose}
       />
-      <div className="my-1 border-t border-gray-100" />
+      <div className="my-0.5 border-t border-gray-200/50 dark:border-gray-700/50" />
       {isPerson ? (
-        <>
-          <PeopleContextMenuButton onClick={() => { onEditProfile(); onClose(); }}>
-            Edit Contact
-          </PeopleContextMenuButton>
-        </>
+        <PeopleContextMenuButton onClick={() => { onEditProfile(); onClose(); }}>
+          Edit Contact
+        </PeopleContextMenuButton>
       ) : null}
       <PeopleContextMenuButton onClick={() => { onRename(); onClose(); }}>
         Rename
       </PeopleContextMenuButton>
-      <PeopleContextMenuButton onClick={() => { onDelete(); onClose(); }}>
+      <PeopleContextMenuButton destructive onClick={() => { onDelete(); onClose(); }}>
         Delete
       </PeopleContextMenuButton>
     </div>
@@ -1536,10 +1534,12 @@ PeopleContextMenu.displayName = "PeopleContextMenu";
 function PeopleContextMenuButton({
   children,
   disabled = false,
+  destructive = false,
   onClick,
 }: {
   children: ReactNode;
   disabled?: boolean;
+  destructive?: boolean;
   onClick: () => void;
 }) {
   return (
@@ -1547,7 +1547,11 @@ function PeopleContextMenuButton({
       type="button"
       disabled={disabled}
       onClick={onClick}
-      className="block w-full px-3 py-1.5 text-left text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:text-gray-300"
+      className={`flex w-full items-center px-2.5 py-1 text-left text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
+        destructive
+          ? "text-gray-900 hover:bg-red-500/10 hover:text-red-600 dark:text-gray-100 dark:hover:text-red-400"
+          : "text-gray-900 hover:bg-primary/10 hover:text-primary dark:text-gray-100"
+      }`}
     >
       {children}
     </button>
@@ -1570,9 +1574,9 @@ function AddMenuButton({
       type="button"
       disabled={disabled}
       onClick={onClick}
-      className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:text-gray-300"
+      className="flex w-full items-center gap-2 px-2.5 py-1 text-left text-sm text-gray-900 transition-colors hover:bg-primary/10 hover:text-primary disabled:cursor-not-allowed disabled:opacity-40 dark:text-gray-100"
     >
-      <span className="shrink-0 text-gray-500">{icon}</span>
+      <span className="shrink-0 text-gray-400 dark:text-gray-500">{icon}</span>
       <span>{label}</span>
     </button>
   );
@@ -1592,29 +1596,41 @@ function NestedAddMenuButton({
   onLeafAction: () => void;
 }) {
   const [open, setOpen] = useState(false);
+  const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const scheduleClose = () => {
+    closeTimerRef.current = setTimeout(() => setOpen(false), 120);
+  };
+
+  const cancelClose = () => {
+    if (closeTimerRef.current !== null) {
+      clearTimeout(closeTimerRef.current);
+      closeTimerRef.current = null;
+    }
+  };
 
   return (
     <div
       className="relative"
-      onMouseEnter={() => !disabled && setOpen(true)}
-      onMouseLeave={() => setOpen(false)}
+      onMouseEnter={() => { cancelClose(); if (!disabled) setOpen(true); }}
+      onMouseLeave={scheduleClose}
     >
       <button
         type="button"
         disabled={disabled}
-        onClick={() => {
-          if (!disabled) {
-            setOpen((current) => !current);
-          }
-        }}
-        className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:text-gray-300"
+        onClick={() => { if (!disabled) setOpen((c) => !c); }}
+        className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-gray-700 transition-colors hover:bg-primary/8 hover:text-primary disabled:cursor-not-allowed disabled:text-gray-300 dark:text-gray-300 dark:hover:text-primary"
       >
-        <span className="shrink-0 text-gray-500">{icon}</span>
+        <span className="shrink-0 text-gray-400 dark:text-gray-500">{icon}</span>
         <span className="flex-1">{label}</span>
-        <ChevronRight className="h-4 w-4 text-gray-400" />
+        <ChevronRight className="h-3.5 w-3.5 text-gray-400" />
       </button>
       {open ? (
-        <div className="absolute left-full top-0 z-30 ml-1 min-w-64 overflow-visible rounded-lg border border-gray-200 bg-white py-1 shadow-xl">
+        <div
+          className="absolute left-full top-0 z-30 min-w-52 overflow-visible rounded-md border border-white/20 bg-white/95 py-1 shadow-lg backdrop-blur-sm dark:bg-gray-900/95"
+          onMouseEnter={cancelClose}
+          onMouseLeave={scheduleClose}
+        >
           <RecursiveMenuItems items={items} onLeafAction={onLeafAction} />
         </div>
       ) : null}

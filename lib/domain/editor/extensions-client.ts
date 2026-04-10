@@ -53,6 +53,7 @@ import { DateInput } from "./extensions/blocks/date-input";
 import { NumberInput } from "./extensions/blocks/number-input";
 import { RatingInput } from "./extensions/blocks/rating-input";
 import { PromptInput } from "./extensions/blocks/prompt-input";
+import { Timestamp } from "./extensions/blocks/timestamp";
 import { getExtensionClientEditorExtensions } from "@/lib/extensions/editor-client-registry";
 
 // Create lowlight instance with common languages
@@ -224,6 +225,7 @@ export function getEditorExtensions(options?: EditorExtensionsOptions): Extensio
     NumberInput,
     RatingInput,
     PromptInput,
+    Timestamp,
     ...getExtensionClientEditorExtensions(),
 
     // M6: Tags with autocomplete

@@ -761,8 +761,8 @@ export const Tabs = Node.create({
       // Without this, clicking away leaves the mode attribute set and the global
       // capture listener below intercepts arrow keys anywhere in the document.
       dom.addEventListener("focusout", (e) => {
-        const related = e.relatedTarget as Node | null;
-        if (!related || !dom.contains(related)) {
+        const related = e.relatedTarget as EventTarget | null;
+        if (!related || !dom.contains(related as globalThis.Node)) {
           clearKeyboardTabSurface();
         }
       });
