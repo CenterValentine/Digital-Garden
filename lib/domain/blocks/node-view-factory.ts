@@ -160,6 +160,13 @@ export function moveCursorToAdjacentParagraphAroundBlock(
       ? Math.max(0, boundary - 1)
       : Math.min(boundary + 1, state.doc.content.size);
 
+  // Save the scroll position of the nearest scrollable ancestor before
+  // dispatching. ProseMirror's selectionToDOM places the cursor in the DOM
+  // which can trigger browser scroll-into-view on the selection, jumping
+  // the viewport unexpectedly. We restore it immediately after.
+  const scrollEl = findScrollContainer(view.dom);
+  const savedScrollTop = scrollEl?.scrollTop ?? 0;
+
   view.dispatch(
     state.tr.setSelection(
       TextSelection.near(
@@ -169,7 +176,25 @@ export function moveCursorToAdjacentParagraphAroundBlock(
     )
   );
   focusEditorView(view);
+
+  if (scrollEl) {
+    scrollEl.scrollTop = savedScrollTop;
+  }
+
   return true;
+}
+
+function findScrollContainer(el: Element): HTMLElement | null {
+  let current: Element | null = el.parentElement;
+  while (current && current !== document.documentElement) {
+    const style = window.getComputedStyle(current);
+    const overflowY = style.overflowY;
+    if (overflowY === "auto" || overflowY === "scroll") {
+      return current as HTMLElement;
+    }
+    current = current.parentElement;
+  }
+  return null;
 }
 
 /** Open the block insertion menu at a specific position */

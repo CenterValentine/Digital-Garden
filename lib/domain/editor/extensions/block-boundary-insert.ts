@@ -548,14 +548,8 @@ export const BlockBoundaryInsert = Extension.create({
               const direction = event.key === "ArrowUp" ? "up" : "down";
               const { selection } = this.editor.state;
 
-              if (selection instanceof NodeSelection && selection.node.type.name === "tabs") {
-                return handleSelectedTabsUpDown(
-                  this.editor,
-                  selection.node,
-                  selection.from,
-                  direction
-                );
-              }
+              // Note: NodeSelection + tabs is handled by addKeyboardShortcuts (higher priority)
+              // and never reaches handleKeyDown. Only non-selected-block cases arrive here.
 
               if (selection instanceof NodeSelection && isCustomBlock(selection.node)) {
                 return moveCursorToAdjacentParagraphAroundBlock(
