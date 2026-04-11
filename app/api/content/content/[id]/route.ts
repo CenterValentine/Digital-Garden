@@ -20,6 +20,7 @@ import {
 import { syncContentTags } from "@/lib/domain/content/tag-sync";
 import { syncImageReferences } from "@/lib/domain/content/image-refs";
 import { syncPersonMentions } from "@/lib/domain/content/person-mention-sync";
+import { resolveContentAccess } from "@/lib/domain/collaboration/access";
 import type { JSONContent } from "@tiptap/core";
 import type {
   ContentDetailResponse,
@@ -58,8 +59,13 @@ export async function GET(
       );
     }
 
-    // Check ownership
-    if (content.ownerId !== session.user.id) {
+    try {
+      await resolveContentAccess(prisma, {
+        contentId: id,
+        userId: session.user.id,
+        require: "view",
+      });
+    } catch {
       return NextResponse.json(
         {
           success: false,
@@ -219,8 +225,13 @@ export async function PATCH(
       );
     }
 
-    // Check ownership
-    if (existing.ownerId !== session.user.id) {
+    try {
+      await resolveContentAccess(prisma, {
+        contentId: id,
+        userId: session.user.id,
+        require: "edit",
+      });
+    } catch {
       return NextResponse.json(
         {
           success: false,

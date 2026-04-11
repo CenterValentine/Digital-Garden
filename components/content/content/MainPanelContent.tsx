@@ -51,6 +51,16 @@ import type { OutlineHeading } from "@/lib/domain/content/outline-extractor";
 import { extractOutline } from "@/lib/domain/content/outline-extractor";
 import { SaveAsPageTemplateDialog } from "../dialogs/SaveAsPageTemplateDialog";
 import { useNotesPanelStore } from "@/state/notes-panel-store";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 interface ContentResponse {
   success: boolean;
@@ -147,6 +157,10 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0); // Used to force refetch
+  const [shareDialogOpen, setShareDialogOpen] = useState(false);
+  const [shareEmail, setShareEmail] = useState("");
+  const [shareAccessLevel, setShareAccessLevel] = useState<"view" | "edit">("view");
+  const [isSharing, setIsSharing] = useState(false);
 
   // AbortController for in-flight save requests. When the user navigates to
   // a different document, we abort any pending fetch to prevent Doc A's content
@@ -399,6 +413,22 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
       setOutline(selectedContentId, outline);
     },
     [selectedContentId, setOutline]
+  );
+
+  const handleCollaborationSyncChange = useCallback(
+    (sync: {
+      isSaving: boolean;
+      hasUnsavedChanges: boolean;
+      lastSaved?: Date;
+    }) => {
+      if (!isActivePane) return;
+      setIsSaving(sync.isSaving);
+      setHasUnsavedChanges(sync.hasUnsavedChanges);
+      if (sync.lastSaved) {
+        setLastSaved(sync.lastSaved);
+      }
+    },
+    [isActivePane, setHasUnsavedChanges, setIsSaving, setLastSaved]
   );
 
   // Auto-save handler — hardened against cross-document race conditions.
@@ -886,6 +916,56 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
     }
   }, [titleDraft, noteTitle, selectedContentId, updateContentTab]);
 
+  const handleShareOpen = useCallback(() => {
+    if (!selectedContentId || selectedContentId.startsWith("person:")) {
+      toast.error("Select content before sharing");
+      return;
+    }
+
+    setShareDialogOpen(true);
+  }, [selectedContentId]);
+
+  const submitShareGrant = useCallback(
+    async (method: "POST" | "DELETE") => {
+      if (!selectedContentId) return;
+      const email = shareEmail.trim();
+      if (!email) {
+        toast.error("Enter a collaborator email");
+        return;
+      }
+
+      setIsSharing(true);
+      try {
+        const response = await fetch("/api/collaboration/grants", {
+          method,
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contentId: selectedContentId,
+            email,
+            accessLevel: shareAccessLevel,
+          }),
+        });
+        const result = await response.json();
+
+        if (!response.ok || !result.success) {
+          throw new Error(result.error?.message || "Failed to update sharing");
+        }
+
+        toast.success(
+          method === "POST"
+            ? `${email} can ${shareAccessLevel === "edit" ? "edit" : "view"} this content.`
+            : `${email} no longer has access to this content.`
+        );
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Failed to update sharing");
+      } finally {
+        setIsSharing(false);
+      }
+    },
+    [selectedContentId, shareAccessLevel, shareEmail]
+  );
+
   // Handlers passed as prop to ToolSurfaceProvider (can't use useRegisterToolHandler
   // here because this component renders the provider — useContext sees the parent, not self)
   const toolHandlers = useMemo(() => ({
@@ -894,7 +974,8 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
     "export-chat": handleExportChat,
     "copy-link": handleCopyLink,
     "save-as-template": handleSaveAsTemplate,
-  }), [handleImportMarkdown, handleExportMarkdown, handleExportChat, handleCopyLink, handleSaveAsTemplate]);
+    "share": handleShareOpen,
+  }), [handleImportMarkdown, handleExportMarkdown, handleExportChat, handleCopyLink, handleSaveAsTemplate, handleShareOpen]);
 
   // Calendar workspace — shown in pane 1 when calendar view is active
   const ExtensionMainWorkspace = useExtensionMainWorkspace(activeView);
@@ -1086,6 +1167,8 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
             fetchPeopleMentions={fetchPeopleMentions}
             onPersonMentionClick={handlePersonMentionClick}
             autoSaveDelay={2000}
+            collaborationEnabled={process.env.NEXT_PUBLIC_COLLABORATION_ENABLED === "true"}
+            onCollaborationSyncChange={handleCollaborationSyncChange}
           />
         </div>
       </div>
@@ -1174,6 +1257,67 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
         customIcon={contentCustomIcon}
         iconColor={contentIconColor}
       />
+      <Dialog open={shareDialogOpen} onOpenChange={setShareDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Share Content</DialogTitle>
+            <DialogDescription>
+              Grant or revoke access for an existing Digital Garden user.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium" htmlFor={`share-email-${paneId}`}>
+                Collaborator email
+              </label>
+              <Input
+                id={`share-email-${paneId}`}
+                type="email"
+                value={shareEmail}
+                onChange={(event) => setShareEmail(event.target.value)}
+                placeholder="person@example.com"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium" htmlFor={`share-access-${paneId}`}>
+                Access level
+              </label>
+              <select
+                id={`share-access-${paneId}`}
+                value={shareAccessLevel}
+                onChange={(event) =>
+                  setShareAccessLevel(event.target.value === "edit" ? "edit" : "view")
+                }
+                className="h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+              >
+                <option value="view">View only</option>
+                <option value="edit">Can edit</option>
+              </select>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Public share links are still pending. This dialog manages signed-in
+              user grants for `/content`.
+            </p>
+          </div>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              type="button"
+              variant="outline"
+              disabled={isSharing}
+              onClick={() => submitShareGrant("DELETE")}
+            >
+              Revoke
+            </Button>
+            <Button
+              type="button"
+              disabled={isSharing}
+              onClick={() => submitShareGrant("POST")}
+            >
+              {isSharing ? "Updating..." : "Apply Access"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </ToolSurfaceProvider>
   );
 }

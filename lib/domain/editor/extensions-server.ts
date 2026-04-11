@@ -39,6 +39,7 @@ import { ServerNumberInput } from "./extensions/blocks/number-input";
 import { ServerRatingInput } from "./extensions/blocks/rating-input";
 import { ServerPromptInput } from "./extensions/blocks/prompt-input";
 import { ServerTimestamp } from "./extensions/blocks/timestamp";
+import { ServerPersonMention } from "./extensions/person-mention-server";
 import { getExtensionServerEditorExtensions } from "@/lib/extensions/server-registry";
 
 // Create lowlight instance with common languages
@@ -145,6 +146,7 @@ export function getServerExtensions(): Extensions {
     ServerPromptInput,
     ServerTimestamp,
     ...getExtensionServerEditorExtensions(),
+    ServerPersonMention,
 
     // Note: SlashCommands excluded - it uses React components
   ];

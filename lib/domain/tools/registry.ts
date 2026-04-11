@@ -47,6 +47,15 @@ const TOOL_REGISTRY: ToolDefinition[] = [
     group: "share",
   },
   {
+    id: "share",
+    label: "Share",
+    iconName: "Share2",
+    surfaces: ["toolbar"],
+    contentTypes: "all",
+    order: 210,
+    group: "share",
+  },
+  {
     id: "save-as-template",
     label: "Save as Template",
     iconName: "BookmarkPlus",

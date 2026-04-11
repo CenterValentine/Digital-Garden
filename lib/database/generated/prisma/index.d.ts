@@ -104,6 +104,11 @@ export type Tag = $Result.DefaultSelection<Prisma.$TagPayload>
  */
 export type ViewGrant = $Result.DefaultSelection<Prisma.$ViewGrantPayload>
 /**
+ * Model CollaborationDocument
+ *
+ */
+export type CollaborationDocument = $Result.DefaultSelection<Prisma.$CollaborationDocumentPayload>
+/**
  * Model PeopleGroup
  *
  */
@@ -661,6 +666,16 @@ export class PrismaClient<
     * ```
     */
   get viewGrant(): Prisma.ViewGrantDelegate<ExtArgs, ClientOptions>;
+
+  /**
+   * `prisma.collaborationDocument`: Exposes CRUD operations for the **CollaborationDocument** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more CollaborationDocuments
+    * const collaborationDocuments = await prisma.collaborationDocument.findMany()
+    * ```
+    */
+  get collaborationDocument(): Prisma.CollaborationDocumentDelegate<ExtArgs, ClientOptions>;
 
   /**
    * `prisma.peopleGroup`: Exposes CRUD operations for the **PeopleGroup** model.
@@ -1343,6 +1358,7 @@ export namespace Prisma {
     Category: 'Category',
     Tag: 'Tag',
     ViewGrant: 'ViewGrant',
+    CollaborationDocument: 'CollaborationDocument',
     PeopleGroup: 'PeopleGroup',
     Person: 'Person',
     PeopleFileTreeMount: 'PeopleFileTreeMount',
@@ -1381,7 +1397,7 @@ export namespace Prisma {
       omit: GlobalOmitOptions
     }
     meta: {
-      modelProps: "contentNode" | "notePayload" | "filePayload" | "htmlPayload" | "codePayload" | "contentHistory" | "contentPath" | "contentLink" | "contentTag" | "trashBin" | "storageProviderConfig" | "aIProviderKey" | "user" | "contentWorkspace" | "contentWorkspaceItem" | "category" | "tag" | "viewGrant" | "peopleGroup" | "person" | "peopleFileTreeMount" | "personMention" | "session" | "account" | "auditLog" | "folderPayload" | "externalPayload" | "chatPayload" | "visualizationPayload" | "dataPayload" | "hopePayload" | "workflowPayload" | "reusableCategory" | "savedBlock" | "contentTemplate" | "snippet" | "pageTemplate" | "calendarConnection" | "calendarSource" | "calendarEvent" | "calendarEventAttendee"
+      modelProps: "contentNode" | "notePayload" | "filePayload" | "htmlPayload" | "codePayload" | "contentHistory" | "contentPath" | "contentLink" | "contentTag" | "trashBin" | "storageProviderConfig" | "aIProviderKey" | "user" | "contentWorkspace" | "contentWorkspaceItem" | "category" | "tag" | "viewGrant" | "collaborationDocument" | "peopleGroup" | "person" | "peopleFileTreeMount" | "personMention" | "session" | "account" | "auditLog" | "folderPayload" | "externalPayload" | "chatPayload" | "visualizationPayload" | "dataPayload" | "hopePayload" | "workflowPayload" | "reusableCategory" | "savedBlock" | "contentTemplate" | "snippet" | "pageTemplate" | "calendarConnection" | "calendarSource" | "calendarEvent" | "calendarEventAttendee"
       txIsolationLevel: Prisma.TransactionIsolationLevel
     }
     model: {
@@ -2714,6 +2730,80 @@ export namespace Prisma {
           count: {
             args: Prisma.ViewGrantCountArgs<ExtArgs>
             result: $Utils.Optional<ViewGrantCountAggregateOutputType> | number
+          }
+        }
+      }
+      CollaborationDocument: {
+        payload: Prisma.$CollaborationDocumentPayload<ExtArgs>
+        fields: Prisma.CollaborationDocumentFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.CollaborationDocumentFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CollaborationDocumentPayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.CollaborationDocumentFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CollaborationDocumentPayload>
+          }
+          findFirst: {
+            args: Prisma.CollaborationDocumentFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CollaborationDocumentPayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.CollaborationDocumentFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CollaborationDocumentPayload>
+          }
+          findMany: {
+            args: Prisma.CollaborationDocumentFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CollaborationDocumentPayload>[]
+          }
+          create: {
+            args: Prisma.CollaborationDocumentCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CollaborationDocumentPayload>
+          }
+          createMany: {
+            args: Prisma.CollaborationDocumentCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          createManyAndReturn: {
+            args: Prisma.CollaborationDocumentCreateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CollaborationDocumentPayload>[]
+          }
+          delete: {
+            args: Prisma.CollaborationDocumentDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CollaborationDocumentPayload>
+          }
+          update: {
+            args: Prisma.CollaborationDocumentUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CollaborationDocumentPayload>
+          }
+          deleteMany: {
+            args: Prisma.CollaborationDocumentDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.CollaborationDocumentUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateManyAndReturn: {
+            args: Prisma.CollaborationDocumentUpdateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CollaborationDocumentPayload>[]
+          }
+          upsert: {
+            args: Prisma.CollaborationDocumentUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CollaborationDocumentPayload>
+          }
+          aggregate: {
+            args: Prisma.CollaborationDocumentAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregateCollaborationDocument>
+          }
+          groupBy: {
+            args: Prisma.CollaborationDocumentGroupByArgs<ExtArgs>
+            result: $Utils.Optional<CollaborationDocumentGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.CollaborationDocumentCountArgs<ExtArgs>
+            result: $Utils.Optional<CollaborationDocumentCountAggregateOutputType> | number
           }
         }
       }
@@ -4545,6 +4635,7 @@ export namespace Prisma {
     category?: CategoryOmit
     tag?: TagOmit
     viewGrant?: ViewGrantOmit
+    collaborationDocument?: CollaborationDocumentOmit
     peopleGroup?: PeopleGroupOmit
     person?: PersonOmit
     peopleFileTreeMount?: PeopleFileTreeMountOmit
@@ -4795,6 +4886,7 @@ export namespace Prisma {
     calendarSources: number
     calendarEvents: number
     contentWorkspaces: number
+    collaborationDocuments: number
   }
 
   export type UserCountOutputTypeSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
@@ -4824,6 +4916,7 @@ export namespace Prisma {
     calendarSources?: boolean | UserCountOutputTypeCountCalendarSourcesArgs
     calendarEvents?: boolean | UserCountOutputTypeCountCalendarEventsArgs
     contentWorkspaces?: boolean | UserCountOutputTypeCountContentWorkspacesArgs
+    collaborationDocuments?: boolean | UserCountOutputTypeCountCollaborationDocumentsArgs
   }
 
   // Custom InputTypes
@@ -5017,6 +5110,13 @@ export namespace Prisma {
    */
   export type UserCountOutputTypeCountContentWorkspacesArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     where?: ContentWorkspaceWhereInput
+  }
+
+  /**
+   * UserCountOutputType without action
+   */
+  export type UserCountOutputTypeCountCollaborationDocumentsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: CollaborationDocumentWhereInput
   }
 
 
@@ -5708,6 +5808,7 @@ export namespace Prisma {
     peopleGroup?: boolean | ContentNode$peopleGroupArgs<ExtArgs>
     person?: boolean | ContentNode$personArgs<ExtArgs>
     peopleFileTreeMounts?: boolean | ContentNode$peopleFileTreeMountsArgs<ExtArgs>
+    collaborationDocument?: boolean | ContentNode$collaborationDocumentArgs<ExtArgs>
     contentPath?: boolean | ContentNode$contentPathArgs<ExtArgs>
     contentTags?: boolean | ContentNode$contentTagsArgs<ExtArgs>
     personMentions?: boolean | ContentNode$personMentionsArgs<ExtArgs>
@@ -5815,6 +5916,7 @@ export namespace Prisma {
     peopleGroup?: boolean | ContentNode$peopleGroupArgs<ExtArgs>
     person?: boolean | ContentNode$personArgs<ExtArgs>
     peopleFileTreeMounts?: boolean | ContentNode$peopleFileTreeMountsArgs<ExtArgs>
+    collaborationDocument?: boolean | ContentNode$collaborationDocumentArgs<ExtArgs>
     contentPath?: boolean | ContentNode$contentPathArgs<ExtArgs>
     contentTags?: boolean | ContentNode$contentTagsArgs<ExtArgs>
     personMentions?: boolean | ContentNode$personMentionsArgs<ExtArgs>
@@ -5864,6 +5966,7 @@ export namespace Prisma {
       peopleGroup: Prisma.$PeopleGroupPayload<ExtArgs> | null
       person: Prisma.$PersonPayload<ExtArgs> | null
       peopleFileTreeMounts: Prisma.$PeopleFileTreeMountPayload<ExtArgs>[]
+      collaborationDocument: Prisma.$CollaborationDocumentPayload<ExtArgs> | null
       contentPath: Prisma.$ContentPathPayload<ExtArgs> | null
       contentTags: Prisma.$ContentTagPayload<ExtArgs>[]
       personMentions: Prisma.$PersonMentionPayload<ExtArgs>[]
@@ -6307,6 +6410,7 @@ export namespace Prisma {
     peopleGroup<T extends ContentNode$peopleGroupArgs<ExtArgs> = {}>(args?: Subset<T, ContentNode$peopleGroupArgs<ExtArgs>>): Prisma__PeopleGroupClient<$Result.GetResult<Prisma.$PeopleGroupPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
     person<T extends ContentNode$personArgs<ExtArgs> = {}>(args?: Subset<T, ContentNode$personArgs<ExtArgs>>): Prisma__PersonClient<$Result.GetResult<Prisma.$PersonPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
     peopleFileTreeMounts<T extends ContentNode$peopleFileTreeMountsArgs<ExtArgs> = {}>(args?: Subset<T, ContentNode$peopleFileTreeMountsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$PeopleFileTreeMountPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+    collaborationDocument<T extends ContentNode$collaborationDocumentArgs<ExtArgs> = {}>(args?: Subset<T, ContentNode$collaborationDocumentArgs<ExtArgs>>): Prisma__CollaborationDocumentClient<$Result.GetResult<Prisma.$CollaborationDocumentPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
     contentPath<T extends ContentNode$contentPathArgs<ExtArgs> = {}>(args?: Subset<T, ContentNode$contentPathArgs<ExtArgs>>): Prisma__ContentPathClient<$Result.GetResult<Prisma.$ContentPathPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
     contentTags<T extends ContentNode$contentTagsArgs<ExtArgs> = {}>(args?: Subset<T, ContentNode$contentTagsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ContentTagPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     personMentions<T extends ContentNode$personMentionsArgs<ExtArgs> = {}>(args?: Subset<T, ContentNode$personMentionsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$PersonMentionPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
@@ -7183,6 +7287,25 @@ export namespace Prisma {
     take?: number
     skip?: number
     distinct?: PeopleFileTreeMountScalarFieldEnum | PeopleFileTreeMountScalarFieldEnum[]
+  }
+
+  /**
+   * ContentNode.collaborationDocument
+   */
+  export type ContentNode$collaborationDocumentArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CollaborationDocument
+     */
+    select?: CollaborationDocumentSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CollaborationDocument
+     */
+    omit?: CollaborationDocumentOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CollaborationDocumentInclude<ExtArgs> | null
+    where?: CollaborationDocumentWhereInput
   }
 
   /**
@@ -19874,6 +19997,7 @@ export namespace Prisma {
     calendarSources?: boolean | User$calendarSourcesArgs<ExtArgs>
     calendarEvents?: boolean | User$calendarEventsArgs<ExtArgs>
     contentWorkspaces?: boolean | User$contentWorkspacesArgs<ExtArgs>
+    collaborationDocuments?: boolean | User$collaborationDocumentsArgs<ExtArgs>
     _count?: boolean | UserCountOutputTypeDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["user"]>
 
@@ -19941,6 +20065,7 @@ export namespace Prisma {
     calendarSources?: boolean | User$calendarSourcesArgs<ExtArgs>
     calendarEvents?: boolean | User$calendarEventsArgs<ExtArgs>
     contentWorkspaces?: boolean | User$contentWorkspacesArgs<ExtArgs>
+    collaborationDocuments?: boolean | User$collaborationDocumentsArgs<ExtArgs>
     _count?: boolean | UserCountOutputTypeDefaultArgs<ExtArgs>
   }
   export type UserIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {}
@@ -19975,6 +20100,7 @@ export namespace Prisma {
       calendarSources: Prisma.$CalendarSourcePayload<ExtArgs>[]
       calendarEvents: Prisma.$CalendarEventPayload<ExtArgs>[]
       contentWorkspaces: Prisma.$ContentWorkspacePayload<ExtArgs>[]
+      collaborationDocuments: Prisma.$CollaborationDocumentPayload<ExtArgs>[]
     }
     scalars: $Extensions.GetPayloadResult<{
       id: string
@@ -20406,6 +20532,7 @@ export namespace Prisma {
     calendarSources<T extends User$calendarSourcesArgs<ExtArgs> = {}>(args?: Subset<T, User$calendarSourcesArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$CalendarSourcePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     calendarEvents<T extends User$calendarEventsArgs<ExtArgs> = {}>(args?: Subset<T, User$calendarEventsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$CalendarEventPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     contentWorkspaces<T extends User$contentWorkspacesArgs<ExtArgs> = {}>(args?: Subset<T, User$contentWorkspacesArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ContentWorkspacePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+    collaborationDocuments<T extends User$collaborationDocumentsArgs<ExtArgs> = {}>(args?: Subset<T, User$collaborationDocumentsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$CollaborationDocumentPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     /**
      * Attaches callbacks for the resolution and/or rejection of the Promise.
      * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -21453,6 +21580,30 @@ export namespace Prisma {
     take?: number
     skip?: number
     distinct?: ContentWorkspaceScalarFieldEnum | ContentWorkspaceScalarFieldEnum[]
+  }
+
+  /**
+   * User.collaborationDocuments
+   */
+  export type User$collaborationDocumentsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CollaborationDocument
+     */
+    select?: CollaborationDocumentSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CollaborationDocument
+     */
+    omit?: CollaborationDocumentOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CollaborationDocumentInclude<ExtArgs> | null
+    where?: CollaborationDocumentWhereInput
+    orderBy?: CollaborationDocumentOrderByWithRelationInput | CollaborationDocumentOrderByWithRelationInput[]
+    cursor?: CollaborationDocumentWhereUniqueInput
+    take?: number
+    skip?: number
+    distinct?: CollaborationDocumentScalarFieldEnum | CollaborationDocumentScalarFieldEnum[]
   }
 
   /**
@@ -27140,6 +27291,1154 @@ export namespace Prisma {
      * Choose, which related nodes to fetch as well
      */
     include?: ViewGrantInclude<ExtArgs> | null
+  }
+
+
+  /**
+   * Model CollaborationDocument
+   */
+
+  export type AggregateCollaborationDocument = {
+    _count: CollaborationDocumentCountAggregateOutputType | null
+    _avg: CollaborationDocumentAvgAggregateOutputType | null
+    _sum: CollaborationDocumentSumAggregateOutputType | null
+    _min: CollaborationDocumentMinAggregateOutputType | null
+    _max: CollaborationDocumentMaxAggregateOutputType | null
+  }
+
+  export type CollaborationDocumentAvgAggregateOutputType = {
+    schemaVersion: number | null
+  }
+
+  export type CollaborationDocumentSumAggregateOutputType = {
+    schemaVersion: number | null
+  }
+
+  export type CollaborationDocumentMinAggregateOutputType = {
+    id: string | null
+    contentId: string | null
+    ownerId: string | null
+    documentName: string | null
+    ydocState: Bytes | null
+    schemaVersion: number | null
+    enabledAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type CollaborationDocumentMaxAggregateOutputType = {
+    id: string | null
+    contentId: string | null
+    ownerId: string | null
+    documentName: string | null
+    ydocState: Bytes | null
+    schemaVersion: number | null
+    enabledAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type CollaborationDocumentCountAggregateOutputType = {
+    id: number
+    contentId: number
+    ownerId: number
+    documentName: number
+    ydocState: number
+    snapshotJson: number
+    schemaVersion: number
+    enabledAt: number
+    updatedAt: number
+    _all: number
+  }
+
+
+  export type CollaborationDocumentAvgAggregateInputType = {
+    schemaVersion?: true
+  }
+
+  export type CollaborationDocumentSumAggregateInputType = {
+    schemaVersion?: true
+  }
+
+  export type CollaborationDocumentMinAggregateInputType = {
+    id?: true
+    contentId?: true
+    ownerId?: true
+    documentName?: true
+    ydocState?: true
+    schemaVersion?: true
+    enabledAt?: true
+    updatedAt?: true
+  }
+
+  export type CollaborationDocumentMaxAggregateInputType = {
+    id?: true
+    contentId?: true
+    ownerId?: true
+    documentName?: true
+    ydocState?: true
+    schemaVersion?: true
+    enabledAt?: true
+    updatedAt?: true
+  }
+
+  export type CollaborationDocumentCountAggregateInputType = {
+    id?: true
+    contentId?: true
+    ownerId?: true
+    documentName?: true
+    ydocState?: true
+    snapshotJson?: true
+    schemaVersion?: true
+    enabledAt?: true
+    updatedAt?: true
+    _all?: true
+  }
+
+  export type CollaborationDocumentAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which CollaborationDocument to aggregate.
+     */
+    where?: CollaborationDocumentWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     *
+     * Determine the order of CollaborationDocuments to fetch.
+     */
+    orderBy?: CollaborationDocumentOrderByWithRelationInput | CollaborationDocumentOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     *
+     * Sets the start position
+     */
+    cursor?: CollaborationDocumentWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     *
+     * Take `±n` CollaborationDocuments from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     *
+     * Skip the first `n` CollaborationDocuments.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     *
+     * Count returned CollaborationDocuments
+    **/
+    _count?: true | CollaborationDocumentCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     *
+     * Select which fields to average
+    **/
+    _avg?: CollaborationDocumentAvgAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     *
+     * Select which fields to sum
+    **/
+    _sum?: CollaborationDocumentSumAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     *
+     * Select which fields to find the minimum value
+    **/
+    _min?: CollaborationDocumentMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     *
+     * Select which fields to find the maximum value
+    **/
+    _max?: CollaborationDocumentMaxAggregateInputType
+  }
+
+  export type GetCollaborationDocumentAggregateType<T extends CollaborationDocumentAggregateArgs> = {
+        [P in keyof T & keyof AggregateCollaborationDocument]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateCollaborationDocument[P]>
+      : GetScalarType<T[P], AggregateCollaborationDocument[P]>
+  }
+
+
+
+
+  export type CollaborationDocumentGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: CollaborationDocumentWhereInput
+    orderBy?: CollaborationDocumentOrderByWithAggregationInput | CollaborationDocumentOrderByWithAggregationInput[]
+    by: CollaborationDocumentScalarFieldEnum[] | CollaborationDocumentScalarFieldEnum
+    having?: CollaborationDocumentScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: CollaborationDocumentCountAggregateInputType | true
+    _avg?: CollaborationDocumentAvgAggregateInputType
+    _sum?: CollaborationDocumentSumAggregateInputType
+    _min?: CollaborationDocumentMinAggregateInputType
+    _max?: CollaborationDocumentMaxAggregateInputType
+  }
+
+  export type CollaborationDocumentGroupByOutputType = {
+    id: string
+    contentId: string
+    ownerId: string
+    documentName: string
+    ydocState: Bytes | null
+    snapshotJson: JsonValue | null
+    schemaVersion: number
+    enabledAt: Date
+    updatedAt: Date
+    _count: CollaborationDocumentCountAggregateOutputType | null
+    _avg: CollaborationDocumentAvgAggregateOutputType | null
+    _sum: CollaborationDocumentSumAggregateOutputType | null
+    _min: CollaborationDocumentMinAggregateOutputType | null
+    _max: CollaborationDocumentMaxAggregateOutputType | null
+  }
+
+  type GetCollaborationDocumentGroupByPayload<T extends CollaborationDocumentGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<CollaborationDocumentGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof CollaborationDocumentGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], CollaborationDocumentGroupByOutputType[P]>
+            : GetScalarType<T[P], CollaborationDocumentGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type CollaborationDocumentSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    contentId?: boolean
+    ownerId?: boolean
+    documentName?: boolean
+    ydocState?: boolean
+    snapshotJson?: boolean
+    schemaVersion?: boolean
+    enabledAt?: boolean
+    updatedAt?: boolean
+    content?: boolean | ContentNodeDefaultArgs<ExtArgs>
+    owner?: boolean | UserDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["collaborationDocument"]>
+
+  export type CollaborationDocumentSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    contentId?: boolean
+    ownerId?: boolean
+    documentName?: boolean
+    ydocState?: boolean
+    snapshotJson?: boolean
+    schemaVersion?: boolean
+    enabledAt?: boolean
+    updatedAt?: boolean
+    content?: boolean | ContentNodeDefaultArgs<ExtArgs>
+    owner?: boolean | UserDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["collaborationDocument"]>
+
+  export type CollaborationDocumentSelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    contentId?: boolean
+    ownerId?: boolean
+    documentName?: boolean
+    ydocState?: boolean
+    snapshotJson?: boolean
+    schemaVersion?: boolean
+    enabledAt?: boolean
+    updatedAt?: boolean
+    content?: boolean | ContentNodeDefaultArgs<ExtArgs>
+    owner?: boolean | UserDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["collaborationDocument"]>
+
+  export type CollaborationDocumentSelectScalar = {
+    id?: boolean
+    contentId?: boolean
+    ownerId?: boolean
+    documentName?: boolean
+    ydocState?: boolean
+    snapshotJson?: boolean
+    schemaVersion?: boolean
+    enabledAt?: boolean
+    updatedAt?: boolean
+  }
+
+  export type CollaborationDocumentOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "contentId" | "ownerId" | "documentName" | "ydocState" | "snapshotJson" | "schemaVersion" | "enabledAt" | "updatedAt", ExtArgs["result"]["collaborationDocument"]>
+  export type CollaborationDocumentInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    content?: boolean | ContentNodeDefaultArgs<ExtArgs>
+    owner?: boolean | UserDefaultArgs<ExtArgs>
+  }
+  export type CollaborationDocumentIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    content?: boolean | ContentNodeDefaultArgs<ExtArgs>
+    owner?: boolean | UserDefaultArgs<ExtArgs>
+  }
+  export type CollaborationDocumentIncludeUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    content?: boolean | ContentNodeDefaultArgs<ExtArgs>
+    owner?: boolean | UserDefaultArgs<ExtArgs>
+  }
+
+  export type $CollaborationDocumentPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "CollaborationDocument"
+    objects: {
+      content: Prisma.$ContentNodePayload<ExtArgs>
+      owner: Prisma.$UserPayload<ExtArgs>
+    }
+    scalars: $Extensions.GetPayloadResult<{
+      id: string
+      contentId: string
+      ownerId: string
+      documentName: string
+      ydocState: Prisma.Bytes | null
+      snapshotJson: Prisma.JsonValue | null
+      schemaVersion: number
+      enabledAt: Date
+      updatedAt: Date
+    }, ExtArgs["result"]["collaborationDocument"]>
+    composites: {}
+  }
+
+  type CollaborationDocumentGetPayload<S extends boolean | null | undefined | CollaborationDocumentDefaultArgs> = $Result.GetResult<Prisma.$CollaborationDocumentPayload, S>
+
+  type CollaborationDocumentCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> =
+    Omit<CollaborationDocumentFindManyArgs, 'select' | 'include' | 'distinct' | 'omit'> & {
+      select?: CollaborationDocumentCountAggregateInputType | true
+    }
+
+  export interface CollaborationDocumentDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['CollaborationDocument'], meta: { name: 'CollaborationDocument' } }
+    /**
+     * Find zero or one CollaborationDocument that matches the filter.
+     * @param {CollaborationDocumentFindUniqueArgs} args - Arguments to find a CollaborationDocument
+     * @example
+     * // Get one CollaborationDocument
+     * const collaborationDocument = await prisma.collaborationDocument.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends CollaborationDocumentFindUniqueArgs>(args: SelectSubset<T, CollaborationDocumentFindUniqueArgs<ExtArgs>>): Prisma__CollaborationDocumentClient<$Result.GetResult<Prisma.$CollaborationDocumentPayload<ExtArgs>, T, "findUnique", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find one CollaborationDocument that matches the filter or throw an error with `error.code='P2025'`
+     * if no matches were found.
+     * @param {CollaborationDocumentFindUniqueOrThrowArgs} args - Arguments to find a CollaborationDocument
+     * @example
+     * // Get one CollaborationDocument
+     * const collaborationDocument = await prisma.collaborationDocument.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends CollaborationDocumentFindUniqueOrThrowArgs>(args: SelectSubset<T, CollaborationDocumentFindUniqueOrThrowArgs<ExtArgs>>): Prisma__CollaborationDocumentClient<$Result.GetResult<Prisma.$CollaborationDocumentPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first CollaborationDocument that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {CollaborationDocumentFindFirstArgs} args - Arguments to find a CollaborationDocument
+     * @example
+     * // Get one CollaborationDocument
+     * const collaborationDocument = await prisma.collaborationDocument.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends CollaborationDocumentFindFirstArgs>(args?: SelectSubset<T, CollaborationDocumentFindFirstArgs<ExtArgs>>): Prisma__CollaborationDocumentClient<$Result.GetResult<Prisma.$CollaborationDocumentPayload<ExtArgs>, T, "findFirst", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first CollaborationDocument that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {CollaborationDocumentFindFirstOrThrowArgs} args - Arguments to find a CollaborationDocument
+     * @example
+     * // Get one CollaborationDocument
+     * const collaborationDocument = await prisma.collaborationDocument.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends CollaborationDocumentFindFirstOrThrowArgs>(args?: SelectSubset<T, CollaborationDocumentFindFirstOrThrowArgs<ExtArgs>>): Prisma__CollaborationDocumentClient<$Result.GetResult<Prisma.$CollaborationDocumentPayload<ExtArgs>, T, "findFirstOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find zero or more CollaborationDocuments that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {CollaborationDocumentFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all CollaborationDocuments
+     * const collaborationDocuments = await prisma.collaborationDocument.findMany()
+     *
+     * // Get first 10 CollaborationDocuments
+     * const collaborationDocuments = await prisma.collaborationDocument.findMany({ take: 10 })
+     *
+     * // Only select the `id`
+     * const collaborationDocumentWithIdOnly = await prisma.collaborationDocument.findMany({ select: { id: true } })
+     *
+     */
+    findMany<T extends CollaborationDocumentFindManyArgs>(args?: SelectSubset<T, CollaborationDocumentFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$CollaborationDocumentPayload<ExtArgs>, T, "findMany", GlobalOmitOptions>>
+
+    /**
+     * Create a CollaborationDocument.
+     * @param {CollaborationDocumentCreateArgs} args - Arguments to create a CollaborationDocument.
+     * @example
+     * // Create one CollaborationDocument
+     * const CollaborationDocument = await prisma.collaborationDocument.create({
+     *   data: {
+     *     // ... data to create a CollaborationDocument
+     *   }
+     * })
+     *
+     */
+    create<T extends CollaborationDocumentCreateArgs>(args: SelectSubset<T, CollaborationDocumentCreateArgs<ExtArgs>>): Prisma__CollaborationDocumentClient<$Result.GetResult<Prisma.$CollaborationDocumentPayload<ExtArgs>, T, "create", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Create many CollaborationDocuments.
+     * @param {CollaborationDocumentCreateManyArgs} args - Arguments to create many CollaborationDocuments.
+     * @example
+     * // Create many CollaborationDocuments
+     * const collaborationDocument = await prisma.collaborationDocument.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *
+     */
+    createMany<T extends CollaborationDocumentCreateManyArgs>(args?: SelectSubset<T, CollaborationDocumentCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create many CollaborationDocuments and returns the data saved in the database.
+     * @param {CollaborationDocumentCreateManyAndReturnArgs} args - Arguments to create many CollaborationDocuments.
+     * @example
+     * // Create many CollaborationDocuments
+     * const collaborationDocument = await prisma.collaborationDocument.createManyAndReturn({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *
+     * // Create many CollaborationDocuments and only return the `id`
+     * const collaborationDocumentWithIdOnly = await prisma.collaborationDocument.createManyAndReturn({
+     *   select: { id: true },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     *
+     */
+    createManyAndReturn<T extends CollaborationDocumentCreateManyAndReturnArgs>(args?: SelectSubset<T, CollaborationDocumentCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$CollaborationDocumentPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Delete a CollaborationDocument.
+     * @param {CollaborationDocumentDeleteArgs} args - Arguments to delete one CollaborationDocument.
+     * @example
+     * // Delete one CollaborationDocument
+     * const CollaborationDocument = await prisma.collaborationDocument.delete({
+     *   where: {
+     *     // ... filter to delete one CollaborationDocument
+     *   }
+     * })
+     *
+     */
+    delete<T extends CollaborationDocumentDeleteArgs>(args: SelectSubset<T, CollaborationDocumentDeleteArgs<ExtArgs>>): Prisma__CollaborationDocumentClient<$Result.GetResult<Prisma.$CollaborationDocumentPayload<ExtArgs>, T, "delete", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Update one CollaborationDocument.
+     * @param {CollaborationDocumentUpdateArgs} args - Arguments to update one CollaborationDocument.
+     * @example
+     * // Update one CollaborationDocument
+     * const collaborationDocument = await prisma.collaborationDocument.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     *
+     */
+    update<T extends CollaborationDocumentUpdateArgs>(args: SelectSubset<T, CollaborationDocumentUpdateArgs<ExtArgs>>): Prisma__CollaborationDocumentClient<$Result.GetResult<Prisma.$CollaborationDocumentPayload<ExtArgs>, T, "update", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Delete zero or more CollaborationDocuments.
+     * @param {CollaborationDocumentDeleteManyArgs} args - Arguments to filter CollaborationDocuments to delete.
+     * @example
+     * // Delete a few CollaborationDocuments
+     * const { count } = await prisma.collaborationDocument.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     *
+     */
+    deleteMany<T extends CollaborationDocumentDeleteManyArgs>(args?: SelectSubset<T, CollaborationDocumentDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more CollaborationDocuments.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {CollaborationDocumentUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many CollaborationDocuments
+     * const collaborationDocument = await prisma.collaborationDocument.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     *
+     */
+    updateMany<T extends CollaborationDocumentUpdateManyArgs>(args: SelectSubset<T, CollaborationDocumentUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more CollaborationDocuments and returns the data updated in the database.
+     * @param {CollaborationDocumentUpdateManyAndReturnArgs} args - Arguments to update many CollaborationDocuments.
+     * @example
+     * // Update many CollaborationDocuments
+     * const collaborationDocument = await prisma.collaborationDocument.updateManyAndReturn({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *
+     * // Update zero or more CollaborationDocuments and only return the `id`
+     * const collaborationDocumentWithIdOnly = await prisma.collaborationDocument.updateManyAndReturn({
+     *   select: { id: true },
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     *
+     */
+    updateManyAndReturn<T extends CollaborationDocumentUpdateManyAndReturnArgs>(args: SelectSubset<T, CollaborationDocumentUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$CollaborationDocumentPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Create or update one CollaborationDocument.
+     * @param {CollaborationDocumentUpsertArgs} args - Arguments to update or create a CollaborationDocument.
+     * @example
+     * // Update or create a CollaborationDocument
+     * const collaborationDocument = await prisma.collaborationDocument.upsert({
+     *   create: {
+     *     // ... data to create a CollaborationDocument
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the CollaborationDocument we want to update
+     *   }
+     * })
+     */
+    upsert<T extends CollaborationDocumentUpsertArgs>(args: SelectSubset<T, CollaborationDocumentUpsertArgs<ExtArgs>>): Prisma__CollaborationDocumentClient<$Result.GetResult<Prisma.$CollaborationDocumentPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+
+    /**
+     * Count the number of CollaborationDocuments.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {CollaborationDocumentCountArgs} args - Arguments to filter CollaborationDocuments to count.
+     * @example
+     * // Count the number of CollaborationDocuments
+     * const count = await prisma.collaborationDocument.count({
+     *   where: {
+     *     // ... the filter for the CollaborationDocuments we want to count
+     *   }
+     * })
+    **/
+    count<T extends CollaborationDocumentCountArgs>(
+      args?: Subset<T, CollaborationDocumentCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], CollaborationDocumentCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a CollaborationDocument.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {CollaborationDocumentAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends CollaborationDocumentAggregateArgs>(args: Subset<T, CollaborationDocumentAggregateArgs>): Prisma.PrismaPromise<GetCollaborationDocumentAggregateType<T>>
+
+    /**
+     * Group by CollaborationDocument.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {CollaborationDocumentGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     *
+    **/
+    groupBy<
+      T extends CollaborationDocumentGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: CollaborationDocumentGroupByArgs['orderBy'] }
+        : { orderBy?: CollaborationDocumentGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, CollaborationDocumentGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetCollaborationDocumentGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the CollaborationDocument model
+   */
+  readonly fields: CollaborationDocumentFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for CollaborationDocument.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__CollaborationDocumentClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    content<T extends ContentNodeDefaultArgs<ExtArgs> = {}>(args?: Subset<T, ContentNodeDefaultArgs<ExtArgs>>): Prisma__ContentNodeClient<$Result.GetResult<Prisma.$ContentNodePayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+    owner<T extends UserDefaultArgs<ExtArgs> = {}>(args?: Subset<T, UserDefaultArgs<ExtArgs>>): Prisma__UserClient<$Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the CollaborationDocument model
+   */
+  interface CollaborationDocumentFieldRefs {
+    readonly id: FieldRef<"CollaborationDocument", 'String'>
+    readonly contentId: FieldRef<"CollaborationDocument", 'String'>
+    readonly ownerId: FieldRef<"CollaborationDocument", 'String'>
+    readonly documentName: FieldRef<"CollaborationDocument", 'String'>
+    readonly ydocState: FieldRef<"CollaborationDocument", 'Bytes'>
+    readonly snapshotJson: FieldRef<"CollaborationDocument", 'Json'>
+    readonly schemaVersion: FieldRef<"CollaborationDocument", 'Int'>
+    readonly enabledAt: FieldRef<"CollaborationDocument", 'DateTime'>
+    readonly updatedAt: FieldRef<"CollaborationDocument", 'DateTime'>
+  }
+
+
+  // Custom InputTypes
+  /**
+   * CollaborationDocument findUnique
+   */
+  export type CollaborationDocumentFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CollaborationDocument
+     */
+    select?: CollaborationDocumentSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CollaborationDocument
+     */
+    omit?: CollaborationDocumentOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CollaborationDocumentInclude<ExtArgs> | null
+    /**
+     * Filter, which CollaborationDocument to fetch.
+     */
+    where: CollaborationDocumentWhereUniqueInput
+  }
+
+  /**
+   * CollaborationDocument findUniqueOrThrow
+   */
+  export type CollaborationDocumentFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CollaborationDocument
+     */
+    select?: CollaborationDocumentSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CollaborationDocument
+     */
+    omit?: CollaborationDocumentOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CollaborationDocumentInclude<ExtArgs> | null
+    /**
+     * Filter, which CollaborationDocument to fetch.
+     */
+    where: CollaborationDocumentWhereUniqueInput
+  }
+
+  /**
+   * CollaborationDocument findFirst
+   */
+  export type CollaborationDocumentFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CollaborationDocument
+     */
+    select?: CollaborationDocumentSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CollaborationDocument
+     */
+    omit?: CollaborationDocumentOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CollaborationDocumentInclude<ExtArgs> | null
+    /**
+     * Filter, which CollaborationDocument to fetch.
+     */
+    where?: CollaborationDocumentWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     *
+     * Determine the order of CollaborationDocuments to fetch.
+     */
+    orderBy?: CollaborationDocumentOrderByWithRelationInput | CollaborationDocumentOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     *
+     * Sets the position for searching for CollaborationDocuments.
+     */
+    cursor?: CollaborationDocumentWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     *
+     * Take `±n` CollaborationDocuments from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     *
+     * Skip the first `n` CollaborationDocuments.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     *
+     * Filter by unique combinations of CollaborationDocuments.
+     */
+    distinct?: CollaborationDocumentScalarFieldEnum | CollaborationDocumentScalarFieldEnum[]
+  }
+
+  /**
+   * CollaborationDocument findFirstOrThrow
+   */
+  export type CollaborationDocumentFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CollaborationDocument
+     */
+    select?: CollaborationDocumentSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CollaborationDocument
+     */
+    omit?: CollaborationDocumentOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CollaborationDocumentInclude<ExtArgs> | null
+    /**
+     * Filter, which CollaborationDocument to fetch.
+     */
+    where?: CollaborationDocumentWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     *
+     * Determine the order of CollaborationDocuments to fetch.
+     */
+    orderBy?: CollaborationDocumentOrderByWithRelationInput | CollaborationDocumentOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     *
+     * Sets the position for searching for CollaborationDocuments.
+     */
+    cursor?: CollaborationDocumentWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     *
+     * Take `±n` CollaborationDocuments from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     *
+     * Skip the first `n` CollaborationDocuments.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     *
+     * Filter by unique combinations of CollaborationDocuments.
+     */
+    distinct?: CollaborationDocumentScalarFieldEnum | CollaborationDocumentScalarFieldEnum[]
+  }
+
+  /**
+   * CollaborationDocument findMany
+   */
+  export type CollaborationDocumentFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CollaborationDocument
+     */
+    select?: CollaborationDocumentSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CollaborationDocument
+     */
+    omit?: CollaborationDocumentOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CollaborationDocumentInclude<ExtArgs> | null
+    /**
+     * Filter, which CollaborationDocuments to fetch.
+     */
+    where?: CollaborationDocumentWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     *
+     * Determine the order of CollaborationDocuments to fetch.
+     */
+    orderBy?: CollaborationDocumentOrderByWithRelationInput | CollaborationDocumentOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     *
+     * Sets the position for listing CollaborationDocuments.
+     */
+    cursor?: CollaborationDocumentWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     *
+     * Take `±n` CollaborationDocuments from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     *
+     * Skip the first `n` CollaborationDocuments.
+     */
+    skip?: number
+    distinct?: CollaborationDocumentScalarFieldEnum | CollaborationDocumentScalarFieldEnum[]
+  }
+
+  /**
+   * CollaborationDocument create
+   */
+  export type CollaborationDocumentCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CollaborationDocument
+     */
+    select?: CollaborationDocumentSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CollaborationDocument
+     */
+    omit?: CollaborationDocumentOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CollaborationDocumentInclude<ExtArgs> | null
+    /**
+     * The data needed to create a CollaborationDocument.
+     */
+    data: XOR<CollaborationDocumentCreateInput, CollaborationDocumentUncheckedCreateInput>
+  }
+
+  /**
+   * CollaborationDocument createMany
+   */
+  export type CollaborationDocumentCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many CollaborationDocuments.
+     */
+    data: CollaborationDocumentCreateManyInput | CollaborationDocumentCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * CollaborationDocument createManyAndReturn
+   */
+  export type CollaborationDocumentCreateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CollaborationDocument
+     */
+    select?: CollaborationDocumentSelectCreateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the CollaborationDocument
+     */
+    omit?: CollaborationDocumentOmit<ExtArgs> | null
+    /**
+     * The data used to create many CollaborationDocuments.
+     */
+    data: CollaborationDocumentCreateManyInput | CollaborationDocumentCreateManyInput[]
+    skipDuplicates?: boolean
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CollaborationDocumentIncludeCreateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * CollaborationDocument update
+   */
+  export type CollaborationDocumentUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CollaborationDocument
+     */
+    select?: CollaborationDocumentSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CollaborationDocument
+     */
+    omit?: CollaborationDocumentOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CollaborationDocumentInclude<ExtArgs> | null
+    /**
+     * The data needed to update a CollaborationDocument.
+     */
+    data: XOR<CollaborationDocumentUpdateInput, CollaborationDocumentUncheckedUpdateInput>
+    /**
+     * Choose, which CollaborationDocument to update.
+     */
+    where: CollaborationDocumentWhereUniqueInput
+  }
+
+  /**
+   * CollaborationDocument updateMany
+   */
+  export type CollaborationDocumentUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update CollaborationDocuments.
+     */
+    data: XOR<CollaborationDocumentUpdateManyMutationInput, CollaborationDocumentUncheckedUpdateManyInput>
+    /**
+     * Filter which CollaborationDocuments to update
+     */
+    where?: CollaborationDocumentWhereInput
+    /**
+     * Limit how many CollaborationDocuments to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * CollaborationDocument updateManyAndReturn
+   */
+  export type CollaborationDocumentUpdateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CollaborationDocument
+     */
+    select?: CollaborationDocumentSelectUpdateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the CollaborationDocument
+     */
+    omit?: CollaborationDocumentOmit<ExtArgs> | null
+    /**
+     * The data used to update CollaborationDocuments.
+     */
+    data: XOR<CollaborationDocumentUpdateManyMutationInput, CollaborationDocumentUncheckedUpdateManyInput>
+    /**
+     * Filter which CollaborationDocuments to update
+     */
+    where?: CollaborationDocumentWhereInput
+    /**
+     * Limit how many CollaborationDocuments to update.
+     */
+    limit?: number
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CollaborationDocumentIncludeUpdateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * CollaborationDocument upsert
+   */
+  export type CollaborationDocumentUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CollaborationDocument
+     */
+    select?: CollaborationDocumentSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CollaborationDocument
+     */
+    omit?: CollaborationDocumentOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CollaborationDocumentInclude<ExtArgs> | null
+    /**
+     * The filter to search for the CollaborationDocument to update in case it exists.
+     */
+    where: CollaborationDocumentWhereUniqueInput
+    /**
+     * In case the CollaborationDocument found by the `where` argument doesn't exist, create a new CollaborationDocument with this data.
+     */
+    create: XOR<CollaborationDocumentCreateInput, CollaborationDocumentUncheckedCreateInput>
+    /**
+     * In case the CollaborationDocument was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<CollaborationDocumentUpdateInput, CollaborationDocumentUncheckedUpdateInput>
+  }
+
+  /**
+   * CollaborationDocument delete
+   */
+  export type CollaborationDocumentDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CollaborationDocument
+     */
+    select?: CollaborationDocumentSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CollaborationDocument
+     */
+    omit?: CollaborationDocumentOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CollaborationDocumentInclude<ExtArgs> | null
+    /**
+     * Filter which CollaborationDocument to delete.
+     */
+    where: CollaborationDocumentWhereUniqueInput
+  }
+
+  /**
+   * CollaborationDocument deleteMany
+   */
+  export type CollaborationDocumentDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which CollaborationDocuments to delete
+     */
+    where?: CollaborationDocumentWhereInput
+    /**
+     * Limit how many CollaborationDocuments to delete.
+     */
+    limit?: number
+  }
+
+  /**
+   * CollaborationDocument without action
+   */
+  export type CollaborationDocumentDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CollaborationDocument
+     */
+    select?: CollaborationDocumentSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CollaborationDocument
+     */
+    omit?: CollaborationDocumentOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CollaborationDocumentInclude<ExtArgs> | null
   }
 
 
@@ -54155,6 +55454,21 @@ export namespace Prisma {
   export type ViewGrantScalarFieldEnum = (typeof ViewGrantScalarFieldEnum)[keyof typeof ViewGrantScalarFieldEnum]
 
 
+  export const CollaborationDocumentScalarFieldEnum: {
+    id: 'id',
+    contentId: 'contentId',
+    ownerId: 'ownerId',
+    documentName: 'documentName',
+    ydocState: 'ydocState',
+    snapshotJson: 'snapshotJson',
+    schemaVersion: 'schemaVersion',
+    enabledAt: 'enabledAt',
+    updatedAt: 'updatedAt'
+  };
+
+  export type CollaborationDocumentScalarFieldEnum = (typeof CollaborationDocumentScalarFieldEnum)[keyof typeof CollaborationDocumentScalarFieldEnum]
+
+
   export const PeopleGroupScalarFieldEnum: {
     id: 'id',
     ownerId: 'ownerId',
@@ -54758,6 +56072,20 @@ export namespace Prisma {
 
 
   /**
+   * Reference to a field of type 'Bytes'
+   */
+  export type BytesFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Bytes'>
+
+
+
+  /**
+   * Reference to a field of type 'Bytes[]'
+   */
+  export type ListBytesFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Bytes[]'>
+
+
+
+  /**
    * Reference to a field of type 'FolderViewMode'
    */
   export type EnumFolderViewModeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'FolderViewMode'>
@@ -54846,6 +56174,7 @@ export namespace Prisma {
     peopleGroup?: XOR<PeopleGroupNullableScalarRelationFilter, PeopleGroupWhereInput> | null
     person?: XOR<PersonNullableScalarRelationFilter, PersonWhereInput> | null
     peopleFileTreeMounts?: PeopleFileTreeMountListRelationFilter
+    collaborationDocument?: XOR<CollaborationDocumentNullableScalarRelationFilter, CollaborationDocumentWhereInput> | null
     contentPath?: XOR<ContentPathNullableScalarRelationFilter, ContentPathWhereInput> | null
     contentTags?: ContentTagListRelationFilter
     personMentions?: PersonMentionListRelationFilter
@@ -54896,6 +56225,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupOrderByWithRelationInput
     person?: PersonOrderByWithRelationInput
     peopleFileTreeMounts?: PeopleFileTreeMountOrderByRelationAggregateInput
+    collaborationDocument?: CollaborationDocumentOrderByWithRelationInput
     contentPath?: ContentPathOrderByWithRelationInput
     contentTags?: ContentTagOrderByRelationAggregateInput
     personMentions?: PersonMentionOrderByRelationAggregateInput
@@ -54950,6 +56280,7 @@ export namespace Prisma {
     peopleGroup?: XOR<PeopleGroupNullableScalarRelationFilter, PeopleGroupWhereInput> | null
     person?: XOR<PersonNullableScalarRelationFilter, PersonWhereInput> | null
     peopleFileTreeMounts?: PeopleFileTreeMountListRelationFilter
+    collaborationDocument?: XOR<CollaborationDocumentNullableScalarRelationFilter, CollaborationDocumentWhereInput> | null
     contentPath?: XOR<ContentPathNullableScalarRelationFilter, ContentPathWhereInput> | null
     contentTags?: ContentTagListRelationFilter
     personMentions?: PersonMentionListRelationFilter
@@ -55876,6 +57207,7 @@ export namespace Prisma {
     calendarSources?: CalendarSourceListRelationFilter
     calendarEvents?: CalendarEventListRelationFilter
     contentWorkspaces?: ContentWorkspaceListRelationFilter
+    collaborationDocuments?: CollaborationDocumentListRelationFilter
   }
 
   export type UserOrderByWithRelationInput = {
@@ -55914,6 +57246,7 @@ export namespace Prisma {
     calendarSources?: CalendarSourceOrderByRelationAggregateInput
     calendarEvents?: CalendarEventOrderByRelationAggregateInput
     contentWorkspaces?: ContentWorkspaceOrderByRelationAggregateInput
+    collaborationDocuments?: CollaborationDocumentOrderByRelationAggregateInput
   }
 
   export type UserWhereUniqueInput = Prisma.AtLeast<{
@@ -55955,6 +57288,7 @@ export namespace Prisma {
     calendarSources?: CalendarSourceListRelationFilter
     calendarEvents?: CalendarEventListRelationFilter
     contentWorkspaces?: ContentWorkspaceListRelationFilter
+    collaborationDocuments?: CollaborationDocumentListRelationFilter
   }, "id" | "username" | "email">
 
   export type UserOrderByWithAggregationInput = {
@@ -56378,6 +57712,86 @@ export namespace Prisma {
     accessLevel?: StringWithAggregatesFilter<"ViewGrant"> | string
     grantedAt?: DateTimeWithAggregatesFilter<"ViewGrant"> | Date | string
     expiresAt?: DateTimeNullableWithAggregatesFilter<"ViewGrant"> | Date | string | null
+  }
+
+  export type CollaborationDocumentWhereInput = {
+    AND?: CollaborationDocumentWhereInput | CollaborationDocumentWhereInput[]
+    OR?: CollaborationDocumentWhereInput[]
+    NOT?: CollaborationDocumentWhereInput | CollaborationDocumentWhereInput[]
+    id?: UuidFilter<"CollaborationDocument"> | string
+    contentId?: UuidFilter<"CollaborationDocument"> | string
+    ownerId?: UuidFilter<"CollaborationDocument"> | string
+    documentName?: StringFilter<"CollaborationDocument"> | string
+    ydocState?: BytesNullableFilter<"CollaborationDocument"> | Bytes | null
+    snapshotJson?: JsonNullableFilter<"CollaborationDocument">
+    schemaVersion?: IntFilter<"CollaborationDocument"> | number
+    enabledAt?: DateTimeFilter<"CollaborationDocument"> | Date | string
+    updatedAt?: DateTimeFilter<"CollaborationDocument"> | Date | string
+    content?: XOR<ContentNodeScalarRelationFilter, ContentNodeWhereInput>
+    owner?: XOR<UserScalarRelationFilter, UserWhereInput>
+  }
+
+  export type CollaborationDocumentOrderByWithRelationInput = {
+    id?: SortOrder
+    contentId?: SortOrder
+    ownerId?: SortOrder
+    documentName?: SortOrder
+    ydocState?: SortOrderInput | SortOrder
+    snapshotJson?: SortOrderInput | SortOrder
+    schemaVersion?: SortOrder
+    enabledAt?: SortOrder
+    updatedAt?: SortOrder
+    content?: ContentNodeOrderByWithRelationInput
+    owner?: UserOrderByWithRelationInput
+  }
+
+  export type CollaborationDocumentWhereUniqueInput = Prisma.AtLeast<{
+    id?: string
+    contentId?: string
+    documentName?: string
+    AND?: CollaborationDocumentWhereInput | CollaborationDocumentWhereInput[]
+    OR?: CollaborationDocumentWhereInput[]
+    NOT?: CollaborationDocumentWhereInput | CollaborationDocumentWhereInput[]
+    ownerId?: UuidFilter<"CollaborationDocument"> | string
+    ydocState?: BytesNullableFilter<"CollaborationDocument"> | Bytes | null
+    snapshotJson?: JsonNullableFilter<"CollaborationDocument">
+    schemaVersion?: IntFilter<"CollaborationDocument"> | number
+    enabledAt?: DateTimeFilter<"CollaborationDocument"> | Date | string
+    updatedAt?: DateTimeFilter<"CollaborationDocument"> | Date | string
+    content?: XOR<ContentNodeScalarRelationFilter, ContentNodeWhereInput>
+    owner?: XOR<UserScalarRelationFilter, UserWhereInput>
+  }, "id" | "contentId" | "documentName">
+
+  export type CollaborationDocumentOrderByWithAggregationInput = {
+    id?: SortOrder
+    contentId?: SortOrder
+    ownerId?: SortOrder
+    documentName?: SortOrder
+    ydocState?: SortOrderInput | SortOrder
+    snapshotJson?: SortOrderInput | SortOrder
+    schemaVersion?: SortOrder
+    enabledAt?: SortOrder
+    updatedAt?: SortOrder
+    _count?: CollaborationDocumentCountOrderByAggregateInput
+    _avg?: CollaborationDocumentAvgOrderByAggregateInput
+    _max?: CollaborationDocumentMaxOrderByAggregateInput
+    _min?: CollaborationDocumentMinOrderByAggregateInput
+    _sum?: CollaborationDocumentSumOrderByAggregateInput
+  }
+
+  export type CollaborationDocumentScalarWhereWithAggregatesInput = {
+    AND?: CollaborationDocumentScalarWhereWithAggregatesInput | CollaborationDocumentScalarWhereWithAggregatesInput[]
+    OR?: CollaborationDocumentScalarWhereWithAggregatesInput[]
+    NOT?: CollaborationDocumentScalarWhereWithAggregatesInput | CollaborationDocumentScalarWhereWithAggregatesInput[]
+    id?: UuidWithAggregatesFilter<"CollaborationDocument"> | string
+    contentId?: UuidWithAggregatesFilter<"CollaborationDocument"> | string
+    ownerId?: UuidWithAggregatesFilter<"CollaborationDocument"> | string
+    documentName?: StringWithAggregatesFilter<"CollaborationDocument"> | string
+    ydocState?: BytesNullableWithAggregatesFilter<"CollaborationDocument"> | Bytes | null
+    snapshotJson?: JsonNullableWithAggregatesFilter<"CollaborationDocument">
+    schemaVersion?: IntWithAggregatesFilter<"CollaborationDocument"> | number
+    enabledAt?: DateTimeWithAggregatesFilter<"CollaborationDocument"> | Date | string
+    updatedAt?: DateTimeWithAggregatesFilter<"CollaborationDocument"> | Date | string
   }
 
   export type PeopleGroupWhereInput = {
@@ -58340,6 +59754,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupCreateNestedOneWithoutContentNodesInput
     person?: PersonCreateNestedOneWithoutContentNodesInput
     peopleFileTreeMounts?: PeopleFileTreeMountCreateNestedManyWithoutContentParentInput
+    collaborationDocument?: CollaborationDocumentCreateNestedOneWithoutContentInput
     contentPath?: ContentPathCreateNestedOneWithoutContentInput
     contentTags?: ContentTagCreateNestedManyWithoutContentInput
     personMentions?: PersonMentionCreateNestedManyWithoutContentInput
@@ -58385,6 +59800,7 @@ export namespace Prisma {
     targetLinks?: ContentLinkUncheckedCreateNestedManyWithoutTargetInput
     children?: ContentNodeUncheckedCreateNestedManyWithoutParentInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedCreateNestedManyWithoutContentParentInput
+    collaborationDocument?: CollaborationDocumentUncheckedCreateNestedOneWithoutContentInput
     contentPath?: ContentPathUncheckedCreateNestedOneWithoutContentInput
     contentTags?: ContentTagUncheckedCreateNestedManyWithoutContentInput
     personMentions?: PersonMentionUncheckedCreateNestedManyWithoutContentInput
@@ -58430,6 +59846,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupUpdateOneWithoutContentNodesNestedInput
     person?: PersonUpdateOneWithoutContentNodesNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUpdateManyWithoutContentParentNestedInput
+    collaborationDocument?: CollaborationDocumentUpdateOneWithoutContentNestedInput
     contentPath?: ContentPathUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUpdateManyWithoutContentNestedInput
     personMentions?: PersonMentionUpdateManyWithoutContentNestedInput
@@ -58475,6 +59892,7 @@ export namespace Prisma {
     targetLinks?: ContentLinkUncheckedUpdateManyWithoutTargetNestedInput
     children?: ContentNodeUncheckedUpdateManyWithoutParentNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedUpdateManyWithoutContentParentNestedInput
+    collaborationDocument?: CollaborationDocumentUncheckedUpdateOneWithoutContentNestedInput
     contentPath?: ContentPathUncheckedUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUncheckedUpdateManyWithoutContentNestedInput
     personMentions?: PersonMentionUncheckedUpdateManyWithoutContentNestedInput
@@ -59459,6 +60877,7 @@ export namespace Prisma {
     calendarSources?: CalendarSourceCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventCreateNestedManyWithoutUserInput
     contentWorkspaces?: ContentWorkspaceCreateNestedManyWithoutOwnerInput
+    collaborationDocuments?: CollaborationDocumentCreateNestedManyWithoutOwnerInput
   }
 
   export type UserUncheckedCreateInput = {
@@ -59497,6 +60916,7 @@ export namespace Prisma {
     calendarSources?: CalendarSourceUncheckedCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutUserInput
     contentWorkspaces?: ContentWorkspaceUncheckedCreateNestedManyWithoutOwnerInput
+    collaborationDocuments?: CollaborationDocumentUncheckedCreateNestedManyWithoutOwnerInput
   }
 
   export type UserUpdateInput = {
@@ -59535,6 +60955,7 @@ export namespace Prisma {
     calendarSources?: CalendarSourceUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUpdateManyWithoutUserNestedInput
     contentWorkspaces?: ContentWorkspaceUpdateManyWithoutOwnerNestedInput
+    collaborationDocuments?: CollaborationDocumentUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUncheckedUpdateInput = {
@@ -59573,6 +60994,7 @@ export namespace Prisma {
     calendarSources?: CalendarSourceUncheckedUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUncheckedUpdateManyWithoutUserNestedInput
     contentWorkspaces?: ContentWorkspaceUncheckedUpdateManyWithoutOwnerNestedInput
+    collaborationDocuments?: CollaborationDocumentUncheckedUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserCreateManyInput = {
@@ -60027,6 +61449,88 @@ export namespace Prisma {
     accessLevel?: StringFieldUpdateOperationsInput | string
     grantedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     expiresAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  }
+
+  export type CollaborationDocumentCreateInput = {
+    id?: string
+    documentName: string
+    ydocState?: Bytes | null
+    snapshotJson?: NullableJsonNullValueInput | InputJsonValue
+    schemaVersion?: number
+    enabledAt?: Date | string
+    updatedAt?: Date | string
+    content: ContentNodeCreateNestedOneWithoutCollaborationDocumentInput
+    owner: UserCreateNestedOneWithoutCollaborationDocumentsInput
+  }
+
+  export type CollaborationDocumentUncheckedCreateInput = {
+    id?: string
+    contentId: string
+    ownerId: string
+    documentName: string
+    ydocState?: Bytes | null
+    snapshotJson?: NullableJsonNullValueInput | InputJsonValue
+    schemaVersion?: number
+    enabledAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type CollaborationDocumentUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    documentName?: StringFieldUpdateOperationsInput | string
+    ydocState?: NullableBytesFieldUpdateOperationsInput | Bytes | null
+    snapshotJson?: NullableJsonNullValueInput | InputJsonValue
+    schemaVersion?: IntFieldUpdateOperationsInput | number
+    enabledAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    content?: ContentNodeUpdateOneRequiredWithoutCollaborationDocumentNestedInput
+    owner?: UserUpdateOneRequiredWithoutCollaborationDocumentsNestedInput
+  }
+
+  export type CollaborationDocumentUncheckedUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    contentId?: StringFieldUpdateOperationsInput | string
+    ownerId?: StringFieldUpdateOperationsInput | string
+    documentName?: StringFieldUpdateOperationsInput | string
+    ydocState?: NullableBytesFieldUpdateOperationsInput | Bytes | null
+    snapshotJson?: NullableJsonNullValueInput | InputJsonValue
+    schemaVersion?: IntFieldUpdateOperationsInput | number
+    enabledAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type CollaborationDocumentCreateManyInput = {
+    id?: string
+    contentId: string
+    ownerId: string
+    documentName: string
+    ydocState?: Bytes | null
+    snapshotJson?: NullableJsonNullValueInput | InputJsonValue
+    schemaVersion?: number
+    enabledAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type CollaborationDocumentUpdateManyMutationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    documentName?: StringFieldUpdateOperationsInput | string
+    ydocState?: NullableBytesFieldUpdateOperationsInput | Bytes | null
+    snapshotJson?: NullableJsonNullValueInput | InputJsonValue
+    schemaVersion?: IntFieldUpdateOperationsInput | number
+    enabledAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type CollaborationDocumentUncheckedUpdateManyInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    contentId?: StringFieldUpdateOperationsInput | string
+    ownerId?: StringFieldUpdateOperationsInput | string
+    documentName?: StringFieldUpdateOperationsInput | string
+    ydocState?: NullableBytesFieldUpdateOperationsInput | Bytes | null
+    snapshotJson?: NullableJsonNullValueInput | InputJsonValue
+    schemaVersion?: IntFieldUpdateOperationsInput | number
+    enabledAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
   export type PeopleGroupCreateInput = {
@@ -62301,6 +63805,11 @@ export namespace Prisma {
     none?: PeopleFileTreeMountWhereInput
   }
 
+  export type CollaborationDocumentNullableScalarRelationFilter = {
+    is?: CollaborationDocumentWhereInput | null
+    isNot?: CollaborationDocumentWhereInput | null
+  }
+
   export type ContentPathNullableScalarRelationFilter = {
     is?: ContentPathWhereInput | null
     isNot?: ContentPathWhereInput | null
@@ -63331,6 +64840,12 @@ export namespace Prisma {
     none?: ContentWorkspaceWhereInput
   }
 
+  export type CollaborationDocumentListRelationFilter = {
+    every?: CollaborationDocumentWhereInput
+    some?: CollaborationDocumentWhereInput
+    none?: CollaborationDocumentWhereInput
+  }
+
   export type AccountOrderByRelationAggregateInput = {
     _count?: SortOrder
   }
@@ -63396,6 +64911,10 @@ export namespace Prisma {
   }
 
   export type ContentWorkspaceOrderByRelationAggregateInput = {
+    _count?: SortOrder
+  }
+
+  export type CollaborationDocumentOrderByRelationAggregateInput = {
     _count?: SortOrder
   }
 
@@ -63706,6 +65225,65 @@ export namespace Prisma {
     accessLevel?: SortOrder
     grantedAt?: SortOrder
     expiresAt?: SortOrder
+  }
+
+  export type BytesNullableFilter<$PrismaModel = never> = {
+    equals?: Bytes | BytesFieldRefInput<$PrismaModel> | null
+    in?: Bytes[] | ListBytesFieldRefInput<$PrismaModel> | null
+    notIn?: Bytes[] | ListBytesFieldRefInput<$PrismaModel> | null
+    not?: NestedBytesNullableFilter<$PrismaModel> | Bytes | null
+  }
+
+  export type CollaborationDocumentCountOrderByAggregateInput = {
+    id?: SortOrder
+    contentId?: SortOrder
+    ownerId?: SortOrder
+    documentName?: SortOrder
+    ydocState?: SortOrder
+    snapshotJson?: SortOrder
+    schemaVersion?: SortOrder
+    enabledAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type CollaborationDocumentAvgOrderByAggregateInput = {
+    schemaVersion?: SortOrder
+  }
+
+  export type CollaborationDocumentMaxOrderByAggregateInput = {
+    id?: SortOrder
+    contentId?: SortOrder
+    ownerId?: SortOrder
+    documentName?: SortOrder
+    ydocState?: SortOrder
+    schemaVersion?: SortOrder
+    enabledAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type CollaborationDocumentMinOrderByAggregateInput = {
+    id?: SortOrder
+    contentId?: SortOrder
+    ownerId?: SortOrder
+    documentName?: SortOrder
+    ydocState?: SortOrder
+    schemaVersion?: SortOrder
+    enabledAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type CollaborationDocumentSumOrderByAggregateInput = {
+    schemaVersion?: SortOrder
+  }
+
+  export type BytesNullableWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: Bytes | BytesFieldRefInput<$PrismaModel> | null
+    in?: Bytes[] | ListBytesFieldRefInput<$PrismaModel> | null
+    notIn?: Bytes[] | ListBytesFieldRefInput<$PrismaModel> | null
+    not?: NestedBytesNullableWithAggregatesFilter<$PrismaModel> | Bytes | null
+    _count?: NestedIntNullableFilter<$PrismaModel>
+    _min?: NestedBytesNullableFilter<$PrismaModel>
+    _max?: NestedBytesNullableFilter<$PrismaModel>
   }
 
   export type UserNullableScalarRelationFilter = {
@@ -64865,6 +66443,12 @@ export namespace Prisma {
     connect?: PeopleFileTreeMountWhereUniqueInput | PeopleFileTreeMountWhereUniqueInput[]
   }
 
+  export type CollaborationDocumentCreateNestedOneWithoutContentInput = {
+    create?: XOR<CollaborationDocumentCreateWithoutContentInput, CollaborationDocumentUncheckedCreateWithoutContentInput>
+    connectOrCreate?: CollaborationDocumentCreateOrConnectWithoutContentInput
+    connect?: CollaborationDocumentWhereUniqueInput
+  }
+
   export type ContentPathCreateNestedOneWithoutContentInput = {
     create?: XOR<ContentPathCreateWithoutContentInput, ContentPathUncheckedCreateWithoutContentInput>
     connectOrCreate?: ContentPathCreateOrConnectWithoutContentInput
@@ -65018,6 +66602,12 @@ export namespace Prisma {
     connectOrCreate?: PeopleFileTreeMountCreateOrConnectWithoutContentParentInput | PeopleFileTreeMountCreateOrConnectWithoutContentParentInput[]
     createMany?: PeopleFileTreeMountCreateManyContentParentInputEnvelope
     connect?: PeopleFileTreeMountWhereUniqueInput | PeopleFileTreeMountWhereUniqueInput[]
+  }
+
+  export type CollaborationDocumentUncheckedCreateNestedOneWithoutContentInput = {
+    create?: XOR<CollaborationDocumentCreateWithoutContentInput, CollaborationDocumentUncheckedCreateWithoutContentInput>
+    connectOrCreate?: CollaborationDocumentCreateOrConnectWithoutContentInput
+    connect?: CollaborationDocumentWhereUniqueInput
   }
 
   export type ContentPathUncheckedCreateNestedOneWithoutContentInput = {
@@ -65345,6 +66935,16 @@ export namespace Prisma {
     deleteMany?: PeopleFileTreeMountScalarWhereInput | PeopleFileTreeMountScalarWhereInput[]
   }
 
+  export type CollaborationDocumentUpdateOneWithoutContentNestedInput = {
+    create?: XOR<CollaborationDocumentCreateWithoutContentInput, CollaborationDocumentUncheckedCreateWithoutContentInput>
+    connectOrCreate?: CollaborationDocumentCreateOrConnectWithoutContentInput
+    upsert?: CollaborationDocumentUpsertWithoutContentInput
+    disconnect?: CollaborationDocumentWhereInput | boolean
+    delete?: CollaborationDocumentWhereInput | boolean
+    connect?: CollaborationDocumentWhereUniqueInput
+    update?: XOR<XOR<CollaborationDocumentUpdateToOneWithWhereWithoutContentInput, CollaborationDocumentUpdateWithoutContentInput>, CollaborationDocumentUncheckedUpdateWithoutContentInput>
+  }
+
   export type ContentPathUpdateOneWithoutContentNestedInput = {
     create?: XOR<ContentPathCreateWithoutContentInput, ContentPathUncheckedCreateWithoutContentInput>
     connectOrCreate?: ContentPathCreateOrConnectWithoutContentInput
@@ -65627,6 +67227,16 @@ export namespace Prisma {
     update?: PeopleFileTreeMountUpdateWithWhereUniqueWithoutContentParentInput | PeopleFileTreeMountUpdateWithWhereUniqueWithoutContentParentInput[]
     updateMany?: PeopleFileTreeMountUpdateManyWithWhereWithoutContentParentInput | PeopleFileTreeMountUpdateManyWithWhereWithoutContentParentInput[]
     deleteMany?: PeopleFileTreeMountScalarWhereInput | PeopleFileTreeMountScalarWhereInput[]
+  }
+
+  export type CollaborationDocumentUncheckedUpdateOneWithoutContentNestedInput = {
+    create?: XOR<CollaborationDocumentCreateWithoutContentInput, CollaborationDocumentUncheckedCreateWithoutContentInput>
+    connectOrCreate?: CollaborationDocumentCreateOrConnectWithoutContentInput
+    upsert?: CollaborationDocumentUpsertWithoutContentInput
+    disconnect?: CollaborationDocumentWhereInput | boolean
+    delete?: CollaborationDocumentWhereInput | boolean
+    connect?: CollaborationDocumentWhereUniqueInput
+    update?: XOR<XOR<CollaborationDocumentUpdateToOneWithWhereWithoutContentInput, CollaborationDocumentUpdateWithoutContentInput>, CollaborationDocumentUncheckedUpdateWithoutContentInput>
   }
 
   export type ContentPathUncheckedUpdateOneWithoutContentNestedInput = {
@@ -66144,6 +67754,13 @@ export namespace Prisma {
     connect?: ContentWorkspaceWhereUniqueInput | ContentWorkspaceWhereUniqueInput[]
   }
 
+  export type CollaborationDocumentCreateNestedManyWithoutOwnerInput = {
+    create?: XOR<CollaborationDocumentCreateWithoutOwnerInput, CollaborationDocumentUncheckedCreateWithoutOwnerInput> | CollaborationDocumentCreateWithoutOwnerInput[] | CollaborationDocumentUncheckedCreateWithoutOwnerInput[]
+    connectOrCreate?: CollaborationDocumentCreateOrConnectWithoutOwnerInput | CollaborationDocumentCreateOrConnectWithoutOwnerInput[]
+    createMany?: CollaborationDocumentCreateManyOwnerInputEnvelope
+    connect?: CollaborationDocumentWhereUniqueInput | CollaborationDocumentWhereUniqueInput[]
+  }
+
   export type AccountUncheckedCreateNestedManyWithoutUserInput = {
     create?: XOR<AccountCreateWithoutUserInput, AccountUncheckedCreateWithoutUserInput> | AccountCreateWithoutUserInput[] | AccountUncheckedCreateWithoutUserInput[]
     connectOrCreate?: AccountCreateOrConnectWithoutUserInput | AccountCreateOrConnectWithoutUserInput[]
@@ -66324,6 +67941,13 @@ export namespace Prisma {
     connectOrCreate?: ContentWorkspaceCreateOrConnectWithoutOwnerInput | ContentWorkspaceCreateOrConnectWithoutOwnerInput[]
     createMany?: ContentWorkspaceCreateManyOwnerInputEnvelope
     connect?: ContentWorkspaceWhereUniqueInput | ContentWorkspaceWhereUniqueInput[]
+  }
+
+  export type CollaborationDocumentUncheckedCreateNestedManyWithoutOwnerInput = {
+    create?: XOR<CollaborationDocumentCreateWithoutOwnerInput, CollaborationDocumentUncheckedCreateWithoutOwnerInput> | CollaborationDocumentCreateWithoutOwnerInput[] | CollaborationDocumentUncheckedCreateWithoutOwnerInput[]
+    connectOrCreate?: CollaborationDocumentCreateOrConnectWithoutOwnerInput | CollaborationDocumentCreateOrConnectWithoutOwnerInput[]
+    createMany?: CollaborationDocumentCreateManyOwnerInputEnvelope
+    connect?: CollaborationDocumentWhereUniqueInput | CollaborationDocumentWhereUniqueInput[]
   }
 
   export type EnumUserRoleFieldUpdateOperationsInput = {
@@ -66694,6 +68318,20 @@ export namespace Prisma {
     deleteMany?: ContentWorkspaceScalarWhereInput | ContentWorkspaceScalarWhereInput[]
   }
 
+  export type CollaborationDocumentUpdateManyWithoutOwnerNestedInput = {
+    create?: XOR<CollaborationDocumentCreateWithoutOwnerInput, CollaborationDocumentUncheckedCreateWithoutOwnerInput> | CollaborationDocumentCreateWithoutOwnerInput[] | CollaborationDocumentUncheckedCreateWithoutOwnerInput[]
+    connectOrCreate?: CollaborationDocumentCreateOrConnectWithoutOwnerInput | CollaborationDocumentCreateOrConnectWithoutOwnerInput[]
+    upsert?: CollaborationDocumentUpsertWithWhereUniqueWithoutOwnerInput | CollaborationDocumentUpsertWithWhereUniqueWithoutOwnerInput[]
+    createMany?: CollaborationDocumentCreateManyOwnerInputEnvelope
+    set?: CollaborationDocumentWhereUniqueInput | CollaborationDocumentWhereUniqueInput[]
+    disconnect?: CollaborationDocumentWhereUniqueInput | CollaborationDocumentWhereUniqueInput[]
+    delete?: CollaborationDocumentWhereUniqueInput | CollaborationDocumentWhereUniqueInput[]
+    connect?: CollaborationDocumentWhereUniqueInput | CollaborationDocumentWhereUniqueInput[]
+    update?: CollaborationDocumentUpdateWithWhereUniqueWithoutOwnerInput | CollaborationDocumentUpdateWithWhereUniqueWithoutOwnerInput[]
+    updateMany?: CollaborationDocumentUpdateManyWithWhereWithoutOwnerInput | CollaborationDocumentUpdateManyWithWhereWithoutOwnerInput[]
+    deleteMany?: CollaborationDocumentScalarWhereInput | CollaborationDocumentScalarWhereInput[]
+  }
+
   export type AccountUncheckedUpdateManyWithoutUserNestedInput = {
     create?: XOR<AccountCreateWithoutUserInput, AccountUncheckedCreateWithoutUserInput> | AccountCreateWithoutUserInput[] | AccountUncheckedCreateWithoutUserInput[]
     connectOrCreate?: AccountCreateOrConnectWithoutUserInput | AccountCreateOrConnectWithoutUserInput[]
@@ -67058,6 +68696,20 @@ export namespace Prisma {
     deleteMany?: ContentWorkspaceScalarWhereInput | ContentWorkspaceScalarWhereInput[]
   }
 
+  export type CollaborationDocumentUncheckedUpdateManyWithoutOwnerNestedInput = {
+    create?: XOR<CollaborationDocumentCreateWithoutOwnerInput, CollaborationDocumentUncheckedCreateWithoutOwnerInput> | CollaborationDocumentCreateWithoutOwnerInput[] | CollaborationDocumentUncheckedCreateWithoutOwnerInput[]
+    connectOrCreate?: CollaborationDocumentCreateOrConnectWithoutOwnerInput | CollaborationDocumentCreateOrConnectWithoutOwnerInput[]
+    upsert?: CollaborationDocumentUpsertWithWhereUniqueWithoutOwnerInput | CollaborationDocumentUpsertWithWhereUniqueWithoutOwnerInput[]
+    createMany?: CollaborationDocumentCreateManyOwnerInputEnvelope
+    set?: CollaborationDocumentWhereUniqueInput | CollaborationDocumentWhereUniqueInput[]
+    disconnect?: CollaborationDocumentWhereUniqueInput | CollaborationDocumentWhereUniqueInput[]
+    delete?: CollaborationDocumentWhereUniqueInput | CollaborationDocumentWhereUniqueInput[]
+    connect?: CollaborationDocumentWhereUniqueInput | CollaborationDocumentWhereUniqueInput[]
+    update?: CollaborationDocumentUpdateWithWhereUniqueWithoutOwnerInput | CollaborationDocumentUpdateWithWhereUniqueWithoutOwnerInput[]
+    updateMany?: CollaborationDocumentUpdateManyWithWhereWithoutOwnerInput | CollaborationDocumentUpdateManyWithWhereWithoutOwnerInput[]
+    deleteMany?: CollaborationDocumentScalarWhereInput | CollaborationDocumentScalarWhereInput[]
+  }
+
   export type UserCreateNestedOneWithoutContentWorkspacesInput = {
     create?: XOR<UserCreateWithoutContentWorkspacesInput, UserUncheckedCreateWithoutContentWorkspacesInput>
     connectOrCreate?: UserCreateOrConnectWithoutContentWorkspacesInput
@@ -67292,6 +68944,38 @@ export namespace Prisma {
     upsert?: UserUpsertWithoutViewGrantsInput
     connect?: UserWhereUniqueInput
     update?: XOR<XOR<UserUpdateToOneWithWhereWithoutViewGrantsInput, UserUpdateWithoutViewGrantsInput>, UserUncheckedUpdateWithoutViewGrantsInput>
+  }
+
+  export type ContentNodeCreateNestedOneWithoutCollaborationDocumentInput = {
+    create?: XOR<ContentNodeCreateWithoutCollaborationDocumentInput, ContentNodeUncheckedCreateWithoutCollaborationDocumentInput>
+    connectOrCreate?: ContentNodeCreateOrConnectWithoutCollaborationDocumentInput
+    connect?: ContentNodeWhereUniqueInput
+  }
+
+  export type UserCreateNestedOneWithoutCollaborationDocumentsInput = {
+    create?: XOR<UserCreateWithoutCollaborationDocumentsInput, UserUncheckedCreateWithoutCollaborationDocumentsInput>
+    connectOrCreate?: UserCreateOrConnectWithoutCollaborationDocumentsInput
+    connect?: UserWhereUniqueInput
+  }
+
+  export type NullableBytesFieldUpdateOperationsInput = {
+    set?: Bytes | null
+  }
+
+  export type ContentNodeUpdateOneRequiredWithoutCollaborationDocumentNestedInput = {
+    create?: XOR<ContentNodeCreateWithoutCollaborationDocumentInput, ContentNodeUncheckedCreateWithoutCollaborationDocumentInput>
+    connectOrCreate?: ContentNodeCreateOrConnectWithoutCollaborationDocumentInput
+    upsert?: ContentNodeUpsertWithoutCollaborationDocumentInput
+    connect?: ContentNodeWhereUniqueInput
+    update?: XOR<XOR<ContentNodeUpdateToOneWithWhereWithoutCollaborationDocumentInput, ContentNodeUpdateWithoutCollaborationDocumentInput>, ContentNodeUncheckedUpdateWithoutCollaborationDocumentInput>
+  }
+
+  export type UserUpdateOneRequiredWithoutCollaborationDocumentsNestedInput = {
+    create?: XOR<UserCreateWithoutCollaborationDocumentsInput, UserUncheckedCreateWithoutCollaborationDocumentsInput>
+    connectOrCreate?: UserCreateOrConnectWithoutCollaborationDocumentsInput
+    upsert?: UserUpsertWithoutCollaborationDocumentsInput
+    connect?: UserWhereUniqueInput
+    update?: XOR<XOR<UserUpdateToOneWithWhereWithoutCollaborationDocumentsInput, UserUpdateWithoutCollaborationDocumentsInput>, UserUncheckedUpdateWithoutCollaborationDocumentsInput>
   }
 
   export type UserCreateNestedOneWithoutPeopleGroupsInput = {
@@ -68992,6 +70676,23 @@ export namespace Prisma {
     _max?: NestedEnumContentWorkspaceItemScopeFilter<$PrismaModel>
   }
 
+  export type NestedBytesNullableFilter<$PrismaModel = never> = {
+    equals?: Bytes | BytesFieldRefInput<$PrismaModel> | null
+    in?: Bytes[] | ListBytesFieldRefInput<$PrismaModel> | null
+    notIn?: Bytes[] | ListBytesFieldRefInput<$PrismaModel> | null
+    not?: NestedBytesNullableFilter<$PrismaModel> | Bytes | null
+  }
+
+  export type NestedBytesNullableWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: Bytes | BytesFieldRefInput<$PrismaModel> | null
+    in?: Bytes[] | ListBytesFieldRefInput<$PrismaModel> | null
+    notIn?: Bytes[] | ListBytesFieldRefInput<$PrismaModel> | null
+    not?: NestedBytesNullableWithAggregatesFilter<$PrismaModel> | Bytes | null
+    _count?: NestedIntNullableFilter<$PrismaModel>
+    _min?: NestedBytesNullableFilter<$PrismaModel>
+    _max?: NestedBytesNullableFilter<$PrismaModel>
+  }
+
   export type NestedEnumFolderViewModeFilter<$PrismaModel = never> = {
     equals?: $Enums.FolderViewMode | EnumFolderViewModeFieldRefInput<$PrismaModel>
     in?: $Enums.FolderViewMode[] | ListEnumFolderViewModeFieldRefInput<$PrismaModel>
@@ -69485,6 +71186,7 @@ export namespace Prisma {
     calendarSources?: CalendarSourceCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventCreateNestedManyWithoutUserInput
     contentWorkspaces?: ContentWorkspaceCreateNestedManyWithoutOwnerInput
+    collaborationDocuments?: CollaborationDocumentCreateNestedManyWithoutOwnerInput
   }
 
   export type UserUncheckedCreateWithoutContentNodesInput = {
@@ -69522,6 +71224,7 @@ export namespace Prisma {
     calendarSources?: CalendarSourceUncheckedCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutUserInput
     contentWorkspaces?: ContentWorkspaceUncheckedCreateNestedManyWithoutOwnerInput
+    collaborationDocuments?: CollaborationDocumentUncheckedCreateNestedManyWithoutOwnerInput
   }
 
   export type UserCreateOrConnectWithoutContentNodesInput = {
@@ -69564,6 +71267,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupCreateNestedOneWithoutContentNodesInput
     person?: PersonCreateNestedOneWithoutContentNodesInput
     peopleFileTreeMounts?: PeopleFileTreeMountCreateNestedManyWithoutContentParentInput
+    collaborationDocument?: CollaborationDocumentCreateNestedOneWithoutContentInput
     contentPath?: ContentPathCreateNestedOneWithoutContentInput
     contentTags?: ContentTagCreateNestedManyWithoutContentInput
     personMentions?: PersonMentionCreateNestedManyWithoutContentInput
@@ -69608,6 +71312,7 @@ export namespace Prisma {
     sourceLinks?: ContentLinkUncheckedCreateNestedManyWithoutSourceInput
     targetLinks?: ContentLinkUncheckedCreateNestedManyWithoutTargetInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedCreateNestedManyWithoutContentParentInput
+    collaborationDocument?: CollaborationDocumentUncheckedCreateNestedOneWithoutContentInput
     contentPath?: ContentPathUncheckedCreateNestedOneWithoutContentInput
     contentTags?: ContentTagUncheckedCreateNestedManyWithoutContentInput
     personMentions?: PersonMentionUncheckedCreateNestedManyWithoutContentInput
@@ -69657,6 +71362,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupCreateNestedOneWithoutContentNodesInput
     person?: PersonCreateNestedOneWithoutContentNodesInput
     peopleFileTreeMounts?: PeopleFileTreeMountCreateNestedManyWithoutContentParentInput
+    collaborationDocument?: CollaborationDocumentCreateNestedOneWithoutContentInput
     contentPath?: ContentPathCreateNestedOneWithoutContentInput
     contentTags?: ContentTagCreateNestedManyWithoutContentInput
     personMentions?: PersonMentionCreateNestedManyWithoutContentInput
@@ -69701,6 +71407,7 @@ export namespace Prisma {
     targetLinks?: ContentLinkUncheckedCreateNestedManyWithoutTargetInput
     children?: ContentNodeUncheckedCreateNestedManyWithoutParentInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedCreateNestedManyWithoutContentParentInput
+    collaborationDocument?: CollaborationDocumentUncheckedCreateNestedOneWithoutContentInput
     contentPath?: ContentPathUncheckedCreateNestedOneWithoutContentInput
     contentTags?: ContentTagUncheckedCreateNestedManyWithoutContentInput
     personMentions?: PersonMentionUncheckedCreateNestedManyWithoutContentInput
@@ -69836,6 +71543,33 @@ export namespace Prisma {
   export type PeopleFileTreeMountCreateManyContentParentInputEnvelope = {
     data: PeopleFileTreeMountCreateManyContentParentInput | PeopleFileTreeMountCreateManyContentParentInput[]
     skipDuplicates?: boolean
+  }
+
+  export type CollaborationDocumentCreateWithoutContentInput = {
+    id?: string
+    documentName: string
+    ydocState?: Bytes | null
+    snapshotJson?: NullableJsonNullValueInput | InputJsonValue
+    schemaVersion?: number
+    enabledAt?: Date | string
+    updatedAt?: Date | string
+    owner: UserCreateNestedOneWithoutCollaborationDocumentsInput
+  }
+
+  export type CollaborationDocumentUncheckedCreateWithoutContentInput = {
+    id?: string
+    ownerId: string
+    documentName: string
+    ydocState?: Bytes | null
+    snapshotJson?: NullableJsonNullValueInput | InputJsonValue
+    schemaVersion?: number
+    enabledAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type CollaborationDocumentCreateOrConnectWithoutContentInput = {
+    where: CollaborationDocumentWhereUniqueInput
+    create: XOR<CollaborationDocumentCreateWithoutContentInput, CollaborationDocumentUncheckedCreateWithoutContentInput>
   }
 
   export type ContentPathCreateWithoutContentInput = {
@@ -70580,6 +72314,7 @@ export namespace Prisma {
     calendarSources?: CalendarSourceUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUpdateManyWithoutUserNestedInput
     contentWorkspaces?: ContentWorkspaceUpdateManyWithoutOwnerNestedInput
+    collaborationDocuments?: CollaborationDocumentUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUncheckedUpdateWithoutContentNodesInput = {
@@ -70617,6 +72352,7 @@ export namespace Prisma {
     calendarSources?: CalendarSourceUncheckedUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUncheckedUpdateManyWithoutUserNestedInput
     contentWorkspaces?: ContentWorkspaceUncheckedUpdateManyWithoutOwnerNestedInput
+    collaborationDocuments?: CollaborationDocumentUncheckedUpdateManyWithoutOwnerNestedInput
   }
 
   export type ContentNodeUpsertWithoutChildrenInput = {
@@ -70665,6 +72401,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupUpdateOneWithoutContentNodesNestedInput
     person?: PersonUpdateOneWithoutContentNodesNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUpdateManyWithoutContentParentNestedInput
+    collaborationDocument?: CollaborationDocumentUpdateOneWithoutContentNestedInput
     contentPath?: ContentPathUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUpdateManyWithoutContentNestedInput
     personMentions?: PersonMentionUpdateManyWithoutContentNestedInput
@@ -70709,6 +72446,7 @@ export namespace Prisma {
     sourceLinks?: ContentLinkUncheckedUpdateManyWithoutSourceNestedInput
     targetLinks?: ContentLinkUncheckedUpdateManyWithoutTargetNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedUpdateManyWithoutContentParentNestedInput
+    collaborationDocument?: CollaborationDocumentUncheckedUpdateOneWithoutContentNestedInput
     contentPath?: ContentPathUncheckedUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUncheckedUpdateManyWithoutContentNestedInput
     personMentions?: PersonMentionUncheckedUpdateManyWithoutContentNestedInput
@@ -70886,6 +72624,39 @@ export namespace Prisma {
     displayOrder?: IntFilter<"PeopleFileTreeMount"> | number
     createdAt?: DateTimeFilter<"PeopleFileTreeMount"> | Date | string
     updatedAt?: DateTimeFilter<"PeopleFileTreeMount"> | Date | string
+  }
+
+  export type CollaborationDocumentUpsertWithoutContentInput = {
+    update: XOR<CollaborationDocumentUpdateWithoutContentInput, CollaborationDocumentUncheckedUpdateWithoutContentInput>
+    create: XOR<CollaborationDocumentCreateWithoutContentInput, CollaborationDocumentUncheckedCreateWithoutContentInput>
+    where?: CollaborationDocumentWhereInput
+  }
+
+  export type CollaborationDocumentUpdateToOneWithWhereWithoutContentInput = {
+    where?: CollaborationDocumentWhereInput
+    data: XOR<CollaborationDocumentUpdateWithoutContentInput, CollaborationDocumentUncheckedUpdateWithoutContentInput>
+  }
+
+  export type CollaborationDocumentUpdateWithoutContentInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    documentName?: StringFieldUpdateOperationsInput | string
+    ydocState?: NullableBytesFieldUpdateOperationsInput | Bytes | null
+    snapshotJson?: NullableJsonNullValueInput | InputJsonValue
+    schemaVersion?: IntFieldUpdateOperationsInput | number
+    enabledAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    owner?: UserUpdateOneRequiredWithoutCollaborationDocumentsNestedInput
+  }
+
+  export type CollaborationDocumentUncheckedUpdateWithoutContentInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    ownerId?: StringFieldUpdateOperationsInput | string
+    documentName?: StringFieldUpdateOperationsInput | string
+    ydocState?: NullableBytesFieldUpdateOperationsInput | Bytes | null
+    snapshotJson?: NullableJsonNullValueInput | InputJsonValue
+    schemaVersion?: IntFieldUpdateOperationsInput | number
+    enabledAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
   export type ContentPathUpsertWithoutContentInput = {
@@ -71136,6 +72907,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupCreateNestedOneWithoutContentNodesInput
     person?: PersonCreateNestedOneWithoutContentNodesInput
     peopleFileTreeMounts?: PeopleFileTreeMountCreateNestedManyWithoutContentParentInput
+    collaborationDocument?: CollaborationDocumentCreateNestedOneWithoutContentInput
     contentPath?: ContentPathCreateNestedOneWithoutContentInput
     contentTags?: ContentTagCreateNestedManyWithoutContentInput
     personMentions?: PersonMentionCreateNestedManyWithoutContentInput
@@ -71180,6 +72952,7 @@ export namespace Prisma {
     targetLinks?: ContentLinkUncheckedCreateNestedManyWithoutTargetInput
     children?: ContentNodeUncheckedCreateNestedManyWithoutParentInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedCreateNestedManyWithoutContentParentInput
+    collaborationDocument?: CollaborationDocumentUncheckedCreateNestedOneWithoutContentInput
     contentPath?: ContentPathUncheckedCreateNestedOneWithoutContentInput
     contentTags?: ContentTagUncheckedCreateNestedManyWithoutContentInput
     personMentions?: PersonMentionUncheckedCreateNestedManyWithoutContentInput
@@ -71240,6 +73013,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupUpdateOneWithoutContentNodesNestedInput
     person?: PersonUpdateOneWithoutContentNodesNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUpdateManyWithoutContentParentNestedInput
+    collaborationDocument?: CollaborationDocumentUpdateOneWithoutContentNestedInput
     contentPath?: ContentPathUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUpdateManyWithoutContentNestedInput
     personMentions?: PersonMentionUpdateManyWithoutContentNestedInput
@@ -71284,6 +73058,7 @@ export namespace Prisma {
     targetLinks?: ContentLinkUncheckedUpdateManyWithoutTargetNestedInput
     children?: ContentNodeUncheckedUpdateManyWithoutParentNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedUpdateManyWithoutContentParentNestedInput
+    collaborationDocument?: CollaborationDocumentUncheckedUpdateOneWithoutContentNestedInput
     contentPath?: ContentPathUncheckedUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUncheckedUpdateManyWithoutContentNestedInput
     personMentions?: PersonMentionUncheckedUpdateManyWithoutContentNestedInput
@@ -71328,6 +73103,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupCreateNestedOneWithoutContentNodesInput
     person?: PersonCreateNestedOneWithoutContentNodesInput
     peopleFileTreeMounts?: PeopleFileTreeMountCreateNestedManyWithoutContentParentInput
+    collaborationDocument?: CollaborationDocumentCreateNestedOneWithoutContentInput
     contentPath?: ContentPathCreateNestedOneWithoutContentInput
     contentTags?: ContentTagCreateNestedManyWithoutContentInput
     personMentions?: PersonMentionCreateNestedManyWithoutContentInput
@@ -71372,6 +73148,7 @@ export namespace Prisma {
     targetLinks?: ContentLinkUncheckedCreateNestedManyWithoutTargetInput
     children?: ContentNodeUncheckedCreateNestedManyWithoutParentInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedCreateNestedManyWithoutContentParentInput
+    collaborationDocument?: CollaborationDocumentUncheckedCreateNestedOneWithoutContentInput
     contentPath?: ContentPathUncheckedCreateNestedOneWithoutContentInput
     contentTags?: ContentTagUncheckedCreateNestedManyWithoutContentInput
     personMentions?: PersonMentionUncheckedCreateNestedManyWithoutContentInput
@@ -71432,6 +73209,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupUpdateOneWithoutContentNodesNestedInput
     person?: PersonUpdateOneWithoutContentNodesNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUpdateManyWithoutContentParentNestedInput
+    collaborationDocument?: CollaborationDocumentUpdateOneWithoutContentNestedInput
     contentPath?: ContentPathUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUpdateManyWithoutContentNestedInput
     personMentions?: PersonMentionUpdateManyWithoutContentNestedInput
@@ -71476,6 +73254,7 @@ export namespace Prisma {
     targetLinks?: ContentLinkUncheckedUpdateManyWithoutTargetNestedInput
     children?: ContentNodeUncheckedUpdateManyWithoutParentNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedUpdateManyWithoutContentParentNestedInput
+    collaborationDocument?: CollaborationDocumentUncheckedUpdateOneWithoutContentNestedInput
     contentPath?: ContentPathUncheckedUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUncheckedUpdateManyWithoutContentNestedInput
     personMentions?: PersonMentionUncheckedUpdateManyWithoutContentNestedInput
@@ -71520,6 +73299,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupCreateNestedOneWithoutContentNodesInput
     person?: PersonCreateNestedOneWithoutContentNodesInput
     peopleFileTreeMounts?: PeopleFileTreeMountCreateNestedManyWithoutContentParentInput
+    collaborationDocument?: CollaborationDocumentCreateNestedOneWithoutContentInput
     contentPath?: ContentPathCreateNestedOneWithoutContentInput
     contentTags?: ContentTagCreateNestedManyWithoutContentInput
     personMentions?: PersonMentionCreateNestedManyWithoutContentInput
@@ -71564,6 +73344,7 @@ export namespace Prisma {
     targetLinks?: ContentLinkUncheckedCreateNestedManyWithoutTargetInput
     children?: ContentNodeUncheckedCreateNestedManyWithoutParentInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedCreateNestedManyWithoutContentParentInput
+    collaborationDocument?: CollaborationDocumentUncheckedCreateNestedOneWithoutContentInput
     contentPath?: ContentPathUncheckedCreateNestedOneWithoutContentInput
     contentTags?: ContentTagUncheckedCreateNestedManyWithoutContentInput
     personMentions?: PersonMentionUncheckedCreateNestedManyWithoutContentInput
@@ -71624,6 +73405,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupUpdateOneWithoutContentNodesNestedInput
     person?: PersonUpdateOneWithoutContentNodesNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUpdateManyWithoutContentParentNestedInput
+    collaborationDocument?: CollaborationDocumentUpdateOneWithoutContentNestedInput
     contentPath?: ContentPathUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUpdateManyWithoutContentNestedInput
     personMentions?: PersonMentionUpdateManyWithoutContentNestedInput
@@ -71668,6 +73450,7 @@ export namespace Prisma {
     targetLinks?: ContentLinkUncheckedUpdateManyWithoutTargetNestedInput
     children?: ContentNodeUncheckedUpdateManyWithoutParentNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedUpdateManyWithoutContentParentNestedInput
+    collaborationDocument?: CollaborationDocumentUncheckedUpdateOneWithoutContentNestedInput
     contentPath?: ContentPathUncheckedUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUncheckedUpdateManyWithoutContentNestedInput
     personMentions?: PersonMentionUncheckedUpdateManyWithoutContentNestedInput
@@ -71712,6 +73495,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupCreateNestedOneWithoutContentNodesInput
     person?: PersonCreateNestedOneWithoutContentNodesInput
     peopleFileTreeMounts?: PeopleFileTreeMountCreateNestedManyWithoutContentParentInput
+    collaborationDocument?: CollaborationDocumentCreateNestedOneWithoutContentInput
     contentPath?: ContentPathCreateNestedOneWithoutContentInput
     contentTags?: ContentTagCreateNestedManyWithoutContentInput
     personMentions?: PersonMentionCreateNestedManyWithoutContentInput
@@ -71756,6 +73540,7 @@ export namespace Prisma {
     targetLinks?: ContentLinkUncheckedCreateNestedManyWithoutTargetInput
     children?: ContentNodeUncheckedCreateNestedManyWithoutParentInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedCreateNestedManyWithoutContentParentInput
+    collaborationDocument?: CollaborationDocumentUncheckedCreateNestedOneWithoutContentInput
     contentPath?: ContentPathUncheckedCreateNestedOneWithoutContentInput
     contentTags?: ContentTagUncheckedCreateNestedManyWithoutContentInput
     personMentions?: PersonMentionUncheckedCreateNestedManyWithoutContentInput
@@ -71816,6 +73601,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupUpdateOneWithoutContentNodesNestedInput
     person?: PersonUpdateOneWithoutContentNodesNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUpdateManyWithoutContentParentNestedInput
+    collaborationDocument?: CollaborationDocumentUpdateOneWithoutContentNestedInput
     contentPath?: ContentPathUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUpdateManyWithoutContentNestedInput
     personMentions?: PersonMentionUpdateManyWithoutContentNestedInput
@@ -71860,6 +73646,7 @@ export namespace Prisma {
     targetLinks?: ContentLinkUncheckedUpdateManyWithoutTargetNestedInput
     children?: ContentNodeUncheckedUpdateManyWithoutParentNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedUpdateManyWithoutContentParentNestedInput
+    collaborationDocument?: CollaborationDocumentUncheckedUpdateOneWithoutContentNestedInput
     contentPath?: ContentPathUncheckedUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUncheckedUpdateManyWithoutContentNestedInput
     personMentions?: PersonMentionUncheckedUpdateManyWithoutContentNestedInput
@@ -71904,6 +73691,7 @@ export namespace Prisma {
     calendarSources?: CalendarSourceCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventCreateNestedManyWithoutUserInput
     contentWorkspaces?: ContentWorkspaceCreateNestedManyWithoutOwnerInput
+    collaborationDocuments?: CollaborationDocumentCreateNestedManyWithoutOwnerInput
   }
 
   export type UserUncheckedCreateWithoutContentHistoryInput = {
@@ -71941,6 +73729,7 @@ export namespace Prisma {
     calendarSources?: CalendarSourceUncheckedCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutUserInput
     contentWorkspaces?: ContentWorkspaceUncheckedCreateNestedManyWithoutOwnerInput
+    collaborationDocuments?: CollaborationDocumentUncheckedCreateNestedManyWithoutOwnerInput
   }
 
   export type UserCreateOrConnectWithoutContentHistoryInput = {
@@ -71983,6 +73772,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupCreateNestedOneWithoutContentNodesInput
     person?: PersonCreateNestedOneWithoutContentNodesInput
     peopleFileTreeMounts?: PeopleFileTreeMountCreateNestedManyWithoutContentParentInput
+    collaborationDocument?: CollaborationDocumentCreateNestedOneWithoutContentInput
     contentPath?: ContentPathCreateNestedOneWithoutContentInput
     contentTags?: ContentTagCreateNestedManyWithoutContentInput
     personMentions?: PersonMentionCreateNestedManyWithoutContentInput
@@ -72027,6 +73817,7 @@ export namespace Prisma {
     targetLinks?: ContentLinkUncheckedCreateNestedManyWithoutTargetInput
     children?: ContentNodeUncheckedCreateNestedManyWithoutParentInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedCreateNestedManyWithoutContentParentInput
+    collaborationDocument?: CollaborationDocumentUncheckedCreateNestedOneWithoutContentInput
     contentPath?: ContentPathUncheckedCreateNestedOneWithoutContentInput
     contentTags?: ContentTagUncheckedCreateNestedManyWithoutContentInput
     personMentions?: PersonMentionUncheckedCreateNestedManyWithoutContentInput
@@ -72087,6 +73878,7 @@ export namespace Prisma {
     calendarSources?: CalendarSourceUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUpdateManyWithoutUserNestedInput
     contentWorkspaces?: ContentWorkspaceUpdateManyWithoutOwnerNestedInput
+    collaborationDocuments?: CollaborationDocumentUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUncheckedUpdateWithoutContentHistoryInput = {
@@ -72124,6 +73916,7 @@ export namespace Prisma {
     calendarSources?: CalendarSourceUncheckedUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUncheckedUpdateManyWithoutUserNestedInput
     contentWorkspaces?: ContentWorkspaceUncheckedUpdateManyWithoutOwnerNestedInput
+    collaborationDocuments?: CollaborationDocumentUncheckedUpdateManyWithoutOwnerNestedInput
   }
 
   export type ContentNodeUpsertWithoutHistoryInput = {
@@ -72172,6 +73965,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupUpdateOneWithoutContentNodesNestedInput
     person?: PersonUpdateOneWithoutContentNodesNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUpdateManyWithoutContentParentNestedInput
+    collaborationDocument?: CollaborationDocumentUpdateOneWithoutContentNestedInput
     contentPath?: ContentPathUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUpdateManyWithoutContentNestedInput
     personMentions?: PersonMentionUpdateManyWithoutContentNestedInput
@@ -72216,6 +74010,7 @@ export namespace Prisma {
     targetLinks?: ContentLinkUncheckedUpdateManyWithoutTargetNestedInput
     children?: ContentNodeUncheckedUpdateManyWithoutParentNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedUpdateManyWithoutContentParentNestedInput
+    collaborationDocument?: CollaborationDocumentUncheckedUpdateOneWithoutContentNestedInput
     contentPath?: ContentPathUncheckedUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUncheckedUpdateManyWithoutContentNestedInput
     personMentions?: PersonMentionUncheckedUpdateManyWithoutContentNestedInput
@@ -72261,6 +74056,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupCreateNestedOneWithoutContentNodesInput
     person?: PersonCreateNestedOneWithoutContentNodesInput
     peopleFileTreeMounts?: PeopleFileTreeMountCreateNestedManyWithoutContentParentInput
+    collaborationDocument?: CollaborationDocumentCreateNestedOneWithoutContentInput
     contentTags?: ContentTagCreateNestedManyWithoutContentInput
     personMentions?: PersonMentionCreateNestedManyWithoutContentInput
     trashBinEntry?: TrashBinCreateNestedOneWithoutContentInput
@@ -72305,6 +74101,7 @@ export namespace Prisma {
     targetLinks?: ContentLinkUncheckedCreateNestedManyWithoutTargetInput
     children?: ContentNodeUncheckedCreateNestedManyWithoutParentInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedCreateNestedManyWithoutContentParentInput
+    collaborationDocument?: CollaborationDocumentUncheckedCreateNestedOneWithoutContentInput
     contentTags?: ContentTagUncheckedCreateNestedManyWithoutContentInput
     personMentions?: PersonMentionUncheckedCreateNestedManyWithoutContentInput
     trashBinEntry?: TrashBinUncheckedCreateNestedOneWithoutContentInput
@@ -72365,6 +74162,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupUpdateOneWithoutContentNodesNestedInput
     person?: PersonUpdateOneWithoutContentNodesNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUpdateManyWithoutContentParentNestedInput
+    collaborationDocument?: CollaborationDocumentUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUpdateManyWithoutContentNestedInput
     personMentions?: PersonMentionUpdateManyWithoutContentNestedInput
     trashBinEntry?: TrashBinUpdateOneWithoutContentNestedInput
@@ -72409,6 +74207,7 @@ export namespace Prisma {
     targetLinks?: ContentLinkUncheckedUpdateManyWithoutTargetNestedInput
     children?: ContentNodeUncheckedUpdateManyWithoutParentNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedUpdateManyWithoutContentParentNestedInput
+    collaborationDocument?: CollaborationDocumentUncheckedUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUncheckedUpdateManyWithoutContentNestedInput
     personMentions?: PersonMentionUncheckedUpdateManyWithoutContentNestedInput
     trashBinEntry?: TrashBinUncheckedUpdateOneWithoutContentNestedInput
@@ -72452,6 +74251,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupCreateNestedOneWithoutContentNodesInput
     person?: PersonCreateNestedOneWithoutContentNodesInput
     peopleFileTreeMounts?: PeopleFileTreeMountCreateNestedManyWithoutContentParentInput
+    collaborationDocument?: CollaborationDocumentCreateNestedOneWithoutContentInput
     contentPath?: ContentPathCreateNestedOneWithoutContentInput
     contentTags?: ContentTagCreateNestedManyWithoutContentInput
     personMentions?: PersonMentionCreateNestedManyWithoutContentInput
@@ -72496,6 +74296,7 @@ export namespace Prisma {
     targetLinks?: ContentLinkUncheckedCreateNestedManyWithoutTargetInput
     children?: ContentNodeUncheckedCreateNestedManyWithoutParentInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedCreateNestedManyWithoutContentParentInput
+    collaborationDocument?: CollaborationDocumentUncheckedCreateNestedOneWithoutContentInput
     contentPath?: ContentPathUncheckedCreateNestedOneWithoutContentInput
     contentTags?: ContentTagUncheckedCreateNestedManyWithoutContentInput
     personMentions?: PersonMentionUncheckedCreateNestedManyWithoutContentInput
@@ -72545,6 +74346,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupCreateNestedOneWithoutContentNodesInput
     person?: PersonCreateNestedOneWithoutContentNodesInput
     peopleFileTreeMounts?: PeopleFileTreeMountCreateNestedManyWithoutContentParentInput
+    collaborationDocument?: CollaborationDocumentCreateNestedOneWithoutContentInput
     contentPath?: ContentPathCreateNestedOneWithoutContentInput
     contentTags?: ContentTagCreateNestedManyWithoutContentInput
     personMentions?: PersonMentionCreateNestedManyWithoutContentInput
@@ -72589,6 +74391,7 @@ export namespace Prisma {
     sourceLinks?: ContentLinkUncheckedCreateNestedManyWithoutSourceInput
     children?: ContentNodeUncheckedCreateNestedManyWithoutParentInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedCreateNestedManyWithoutContentParentInput
+    collaborationDocument?: CollaborationDocumentUncheckedCreateNestedOneWithoutContentInput
     contentPath?: ContentPathUncheckedCreateNestedOneWithoutContentInput
     contentTags?: ContentTagUncheckedCreateNestedManyWithoutContentInput
     personMentions?: PersonMentionUncheckedCreateNestedManyWithoutContentInput
@@ -72649,6 +74452,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupUpdateOneWithoutContentNodesNestedInput
     person?: PersonUpdateOneWithoutContentNodesNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUpdateManyWithoutContentParentNestedInput
+    collaborationDocument?: CollaborationDocumentUpdateOneWithoutContentNestedInput
     contentPath?: ContentPathUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUpdateManyWithoutContentNestedInput
     personMentions?: PersonMentionUpdateManyWithoutContentNestedInput
@@ -72693,6 +74497,7 @@ export namespace Prisma {
     targetLinks?: ContentLinkUncheckedUpdateManyWithoutTargetNestedInput
     children?: ContentNodeUncheckedUpdateManyWithoutParentNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedUpdateManyWithoutContentParentNestedInput
+    collaborationDocument?: CollaborationDocumentUncheckedUpdateOneWithoutContentNestedInput
     contentPath?: ContentPathUncheckedUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUncheckedUpdateManyWithoutContentNestedInput
     personMentions?: PersonMentionUncheckedUpdateManyWithoutContentNestedInput
@@ -72748,6 +74553,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupUpdateOneWithoutContentNodesNestedInput
     person?: PersonUpdateOneWithoutContentNodesNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUpdateManyWithoutContentParentNestedInput
+    collaborationDocument?: CollaborationDocumentUpdateOneWithoutContentNestedInput
     contentPath?: ContentPathUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUpdateManyWithoutContentNestedInput
     personMentions?: PersonMentionUpdateManyWithoutContentNestedInput
@@ -72792,6 +74598,7 @@ export namespace Prisma {
     sourceLinks?: ContentLinkUncheckedUpdateManyWithoutSourceNestedInput
     children?: ContentNodeUncheckedUpdateManyWithoutParentNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedUpdateManyWithoutContentParentNestedInput
+    collaborationDocument?: CollaborationDocumentUncheckedUpdateOneWithoutContentNestedInput
     contentPath?: ContentPathUncheckedUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUncheckedUpdateManyWithoutContentNestedInput
     personMentions?: PersonMentionUncheckedUpdateManyWithoutContentNestedInput
@@ -72837,6 +74644,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupCreateNestedOneWithoutContentNodesInput
     person?: PersonCreateNestedOneWithoutContentNodesInput
     peopleFileTreeMounts?: PeopleFileTreeMountCreateNestedManyWithoutContentParentInput
+    collaborationDocument?: CollaborationDocumentCreateNestedOneWithoutContentInput
     contentPath?: ContentPathCreateNestedOneWithoutContentInput
     personMentions?: PersonMentionCreateNestedManyWithoutContentInput
     trashBinEntry?: TrashBinCreateNestedOneWithoutContentInput
@@ -72881,6 +74689,7 @@ export namespace Prisma {
     targetLinks?: ContentLinkUncheckedCreateNestedManyWithoutTargetInput
     children?: ContentNodeUncheckedCreateNestedManyWithoutParentInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedCreateNestedManyWithoutContentParentInput
+    collaborationDocument?: CollaborationDocumentUncheckedCreateNestedOneWithoutContentInput
     contentPath?: ContentPathUncheckedCreateNestedOneWithoutContentInput
     personMentions?: PersonMentionUncheckedCreateNestedManyWithoutContentInput
     trashBinEntry?: TrashBinUncheckedCreateNestedOneWithoutContentInput
@@ -72964,6 +74773,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupUpdateOneWithoutContentNodesNestedInput
     person?: PersonUpdateOneWithoutContentNodesNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUpdateManyWithoutContentParentNestedInput
+    collaborationDocument?: CollaborationDocumentUpdateOneWithoutContentNestedInput
     contentPath?: ContentPathUpdateOneWithoutContentNestedInput
     personMentions?: PersonMentionUpdateManyWithoutContentNestedInput
     trashBinEntry?: TrashBinUpdateOneWithoutContentNestedInput
@@ -73008,6 +74818,7 @@ export namespace Prisma {
     targetLinks?: ContentLinkUncheckedUpdateManyWithoutTargetNestedInput
     children?: ContentNodeUncheckedUpdateManyWithoutParentNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedUpdateManyWithoutContentParentNestedInput
+    collaborationDocument?: CollaborationDocumentUncheckedUpdateOneWithoutContentNestedInput
     contentPath?: ContentPathUncheckedUpdateOneWithoutContentNestedInput
     personMentions?: PersonMentionUncheckedUpdateManyWithoutContentNestedInput
     trashBinEntry?: TrashBinUncheckedUpdateOneWithoutContentNestedInput
@@ -73081,6 +74892,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupCreateNestedOneWithoutContentNodesInput
     person?: PersonCreateNestedOneWithoutContentNodesInput
     peopleFileTreeMounts?: PeopleFileTreeMountCreateNestedManyWithoutContentParentInput
+    collaborationDocument?: CollaborationDocumentCreateNestedOneWithoutContentInput
     contentPath?: ContentPathCreateNestedOneWithoutContentInput
     contentTags?: ContentTagCreateNestedManyWithoutContentInput
     personMentions?: PersonMentionCreateNestedManyWithoutContentInput
@@ -73125,6 +74937,7 @@ export namespace Prisma {
     targetLinks?: ContentLinkUncheckedCreateNestedManyWithoutTargetInput
     children?: ContentNodeUncheckedCreateNestedManyWithoutParentInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedCreateNestedManyWithoutContentParentInput
+    collaborationDocument?: CollaborationDocumentUncheckedCreateNestedOneWithoutContentInput
     contentPath?: ContentPathUncheckedCreateNestedOneWithoutContentInput
     contentTags?: ContentTagUncheckedCreateNestedManyWithoutContentInput
     personMentions?: PersonMentionUncheckedCreateNestedManyWithoutContentInput
@@ -73173,6 +74986,7 @@ export namespace Prisma {
     calendarSources?: CalendarSourceCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventCreateNestedManyWithoutUserInput
     contentWorkspaces?: ContentWorkspaceCreateNestedManyWithoutOwnerInput
+    collaborationDocuments?: CollaborationDocumentCreateNestedManyWithoutOwnerInput
   }
 
   export type UserUncheckedCreateWithoutTrashedContentInput = {
@@ -73210,6 +75024,7 @@ export namespace Prisma {
     calendarSources?: CalendarSourceUncheckedCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutUserInput
     contentWorkspaces?: ContentWorkspaceUncheckedCreateNestedManyWithoutOwnerInput
+    collaborationDocuments?: CollaborationDocumentUncheckedCreateNestedManyWithoutOwnerInput
   }
 
   export type UserCreateOrConnectWithoutTrashedContentInput = {
@@ -73264,6 +75079,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupUpdateOneWithoutContentNodesNestedInput
     person?: PersonUpdateOneWithoutContentNodesNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUpdateManyWithoutContentParentNestedInput
+    collaborationDocument?: CollaborationDocumentUpdateOneWithoutContentNestedInput
     contentPath?: ContentPathUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUpdateManyWithoutContentNestedInput
     personMentions?: PersonMentionUpdateManyWithoutContentNestedInput
@@ -73308,6 +75124,7 @@ export namespace Prisma {
     targetLinks?: ContentLinkUncheckedUpdateManyWithoutTargetNestedInput
     children?: ContentNodeUncheckedUpdateManyWithoutParentNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedUpdateManyWithoutContentParentNestedInput
+    collaborationDocument?: CollaborationDocumentUncheckedUpdateOneWithoutContentNestedInput
     contentPath?: ContentPathUncheckedUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUncheckedUpdateManyWithoutContentNestedInput
     personMentions?: PersonMentionUncheckedUpdateManyWithoutContentNestedInput
@@ -73362,6 +75179,7 @@ export namespace Prisma {
     calendarSources?: CalendarSourceUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUpdateManyWithoutUserNestedInput
     contentWorkspaces?: ContentWorkspaceUpdateManyWithoutOwnerNestedInput
+    collaborationDocuments?: CollaborationDocumentUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUncheckedUpdateWithoutTrashedContentInput = {
@@ -73399,6 +75217,7 @@ export namespace Prisma {
     calendarSources?: CalendarSourceUncheckedUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUncheckedUpdateManyWithoutUserNestedInput
     contentWorkspaces?: ContentWorkspaceUncheckedUpdateManyWithoutOwnerNestedInput
+    collaborationDocuments?: CollaborationDocumentUncheckedUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserCreateWithoutStorageConfigsInput = {
@@ -73436,6 +75255,7 @@ export namespace Prisma {
     calendarSources?: CalendarSourceCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventCreateNestedManyWithoutUserInput
     contentWorkspaces?: ContentWorkspaceCreateNestedManyWithoutOwnerInput
+    collaborationDocuments?: CollaborationDocumentCreateNestedManyWithoutOwnerInput
   }
 
   export type UserUncheckedCreateWithoutStorageConfigsInput = {
@@ -73473,6 +75293,7 @@ export namespace Prisma {
     calendarSources?: CalendarSourceUncheckedCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutUserInput
     contentWorkspaces?: ContentWorkspaceUncheckedCreateNestedManyWithoutOwnerInput
+    collaborationDocuments?: CollaborationDocumentUncheckedCreateNestedManyWithoutOwnerInput
   }
 
   export type UserCreateOrConnectWithoutStorageConfigsInput = {
@@ -73526,6 +75347,7 @@ export namespace Prisma {
     calendarSources?: CalendarSourceUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUpdateManyWithoutUserNestedInput
     contentWorkspaces?: ContentWorkspaceUpdateManyWithoutOwnerNestedInput
+    collaborationDocuments?: CollaborationDocumentUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUncheckedUpdateWithoutStorageConfigsInput = {
@@ -73563,6 +75385,7 @@ export namespace Prisma {
     calendarSources?: CalendarSourceUncheckedUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUncheckedUpdateManyWithoutUserNestedInput
     contentWorkspaces?: ContentWorkspaceUncheckedUpdateManyWithoutOwnerNestedInput
+    collaborationDocuments?: CollaborationDocumentUncheckedUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserCreateWithoutAiProviderKeysInput = {
@@ -73600,6 +75423,7 @@ export namespace Prisma {
     calendarSources?: CalendarSourceCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventCreateNestedManyWithoutUserInput
     contentWorkspaces?: ContentWorkspaceCreateNestedManyWithoutOwnerInput
+    collaborationDocuments?: CollaborationDocumentCreateNestedManyWithoutOwnerInput
   }
 
   export type UserUncheckedCreateWithoutAiProviderKeysInput = {
@@ -73637,6 +75461,7 @@ export namespace Prisma {
     calendarSources?: CalendarSourceUncheckedCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutUserInput
     contentWorkspaces?: ContentWorkspaceUncheckedCreateNestedManyWithoutOwnerInput
+    collaborationDocuments?: CollaborationDocumentUncheckedCreateNestedManyWithoutOwnerInput
   }
 
   export type UserCreateOrConnectWithoutAiProviderKeysInput = {
@@ -73690,6 +75515,7 @@ export namespace Prisma {
     calendarSources?: CalendarSourceUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUpdateManyWithoutUserNestedInput
     contentWorkspaces?: ContentWorkspaceUpdateManyWithoutOwnerNestedInput
+    collaborationDocuments?: CollaborationDocumentUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUncheckedUpdateWithoutAiProviderKeysInput = {
@@ -73727,6 +75553,7 @@ export namespace Prisma {
     calendarSources?: CalendarSourceUncheckedUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUncheckedUpdateManyWithoutUserNestedInput
     contentWorkspaces?: ContentWorkspaceUncheckedUpdateManyWithoutOwnerNestedInput
+    collaborationDocuments?: CollaborationDocumentUncheckedUpdateManyWithoutOwnerNestedInput
   }
 
   export type AccountCreateWithoutUserInput = {
@@ -73954,6 +75781,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupCreateNestedOneWithoutContentNodesInput
     person?: PersonCreateNestedOneWithoutContentNodesInput
     peopleFileTreeMounts?: PeopleFileTreeMountCreateNestedManyWithoutContentParentInput
+    collaborationDocument?: CollaborationDocumentCreateNestedOneWithoutContentInput
     contentPath?: ContentPathCreateNestedOneWithoutContentInput
     contentTags?: ContentTagCreateNestedManyWithoutContentInput
     personMentions?: PersonMentionCreateNestedManyWithoutContentInput
@@ -73998,6 +75826,7 @@ export namespace Prisma {
     targetLinks?: ContentLinkUncheckedCreateNestedManyWithoutTargetInput
     children?: ContentNodeUncheckedCreateNestedManyWithoutParentInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedCreateNestedManyWithoutContentParentInput
+    collaborationDocument?: CollaborationDocumentUncheckedCreateNestedOneWithoutContentInput
     contentPath?: ContentPathUncheckedCreateNestedOneWithoutContentInput
     contentTags?: ContentTagUncheckedCreateNestedManyWithoutContentInput
     personMentions?: PersonMentionUncheckedCreateNestedManyWithoutContentInput
@@ -74743,6 +76572,38 @@ export namespace Prisma {
     skipDuplicates?: boolean
   }
 
+  export type CollaborationDocumentCreateWithoutOwnerInput = {
+    id?: string
+    documentName: string
+    ydocState?: Bytes | null
+    snapshotJson?: NullableJsonNullValueInput | InputJsonValue
+    schemaVersion?: number
+    enabledAt?: Date | string
+    updatedAt?: Date | string
+    content: ContentNodeCreateNestedOneWithoutCollaborationDocumentInput
+  }
+
+  export type CollaborationDocumentUncheckedCreateWithoutOwnerInput = {
+    id?: string
+    contentId: string
+    documentName: string
+    ydocState?: Bytes | null
+    snapshotJson?: NullableJsonNullValueInput | InputJsonValue
+    schemaVersion?: number
+    enabledAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type CollaborationDocumentCreateOrConnectWithoutOwnerInput = {
+    where: CollaborationDocumentWhereUniqueInput
+    create: XOR<CollaborationDocumentCreateWithoutOwnerInput, CollaborationDocumentUncheckedCreateWithoutOwnerInput>
+  }
+
+  export type CollaborationDocumentCreateManyOwnerInputEnvelope = {
+    data: CollaborationDocumentCreateManyOwnerInput | CollaborationDocumentCreateManyOwnerInput[]
+    skipDuplicates?: boolean
+  }
+
   export type AccountUpsertWithWhereUniqueWithoutUserInput = {
     where: AccountWhereUniqueInput
     update: XOR<AccountUpdateWithoutUserInput, AccountUncheckedUpdateWithoutUserInput>
@@ -75443,6 +77304,37 @@ export namespace Prisma {
     updatedAt?: DateTimeFilter<"ContentWorkspace"> | Date | string
   }
 
+  export type CollaborationDocumentUpsertWithWhereUniqueWithoutOwnerInput = {
+    where: CollaborationDocumentWhereUniqueInput
+    update: XOR<CollaborationDocumentUpdateWithoutOwnerInput, CollaborationDocumentUncheckedUpdateWithoutOwnerInput>
+    create: XOR<CollaborationDocumentCreateWithoutOwnerInput, CollaborationDocumentUncheckedCreateWithoutOwnerInput>
+  }
+
+  export type CollaborationDocumentUpdateWithWhereUniqueWithoutOwnerInput = {
+    where: CollaborationDocumentWhereUniqueInput
+    data: XOR<CollaborationDocumentUpdateWithoutOwnerInput, CollaborationDocumentUncheckedUpdateWithoutOwnerInput>
+  }
+
+  export type CollaborationDocumentUpdateManyWithWhereWithoutOwnerInput = {
+    where: CollaborationDocumentScalarWhereInput
+    data: XOR<CollaborationDocumentUpdateManyMutationInput, CollaborationDocumentUncheckedUpdateManyWithoutOwnerInput>
+  }
+
+  export type CollaborationDocumentScalarWhereInput = {
+    AND?: CollaborationDocumentScalarWhereInput | CollaborationDocumentScalarWhereInput[]
+    OR?: CollaborationDocumentScalarWhereInput[]
+    NOT?: CollaborationDocumentScalarWhereInput | CollaborationDocumentScalarWhereInput[]
+    id?: UuidFilter<"CollaborationDocument"> | string
+    contentId?: UuidFilter<"CollaborationDocument"> | string
+    ownerId?: UuidFilter<"CollaborationDocument"> | string
+    documentName?: StringFilter<"CollaborationDocument"> | string
+    ydocState?: BytesNullableFilter<"CollaborationDocument"> | Bytes | null
+    snapshotJson?: JsonNullableFilter<"CollaborationDocument">
+    schemaVersion?: IntFilter<"CollaborationDocument"> | number
+    enabledAt?: DateTimeFilter<"CollaborationDocument"> | Date | string
+    updatedAt?: DateTimeFilter<"CollaborationDocument"> | Date | string
+  }
+
   export type UserCreateWithoutContentWorkspacesInput = {
     id?: string
     username: string
@@ -75478,6 +77370,7 @@ export namespace Prisma {
     calendarConnections?: CalendarConnectionCreateNestedManyWithoutUserInput
     calendarSources?: CalendarSourceCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventCreateNestedManyWithoutUserInput
+    collaborationDocuments?: CollaborationDocumentCreateNestedManyWithoutOwnerInput
   }
 
   export type UserUncheckedCreateWithoutContentWorkspacesInput = {
@@ -75515,6 +77408,7 @@ export namespace Prisma {
     calendarConnections?: CalendarConnectionUncheckedCreateNestedManyWithoutUserInput
     calendarSources?: CalendarSourceUncheckedCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutUserInput
+    collaborationDocuments?: CollaborationDocumentUncheckedCreateNestedManyWithoutOwnerInput
   }
 
   export type UserCreateOrConnectWithoutContentWorkspacesInput = {
@@ -75598,6 +77492,7 @@ export namespace Prisma {
     calendarConnections?: CalendarConnectionUpdateManyWithoutUserNestedInput
     calendarSources?: CalendarSourceUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUpdateManyWithoutUserNestedInput
+    collaborationDocuments?: CollaborationDocumentUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUncheckedUpdateWithoutContentWorkspacesInput = {
@@ -75635,6 +77530,7 @@ export namespace Prisma {
     calendarConnections?: CalendarConnectionUncheckedUpdateManyWithoutUserNestedInput
     calendarSources?: CalendarSourceUncheckedUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUncheckedUpdateManyWithoutUserNestedInput
+    collaborationDocuments?: CollaborationDocumentUncheckedUpdateManyWithoutOwnerNestedInput
   }
 
   export type ContentWorkspaceItemUpsertWithWhereUniqueWithoutWorkspaceInput = {
@@ -75730,6 +77626,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupCreateNestedOneWithoutContentNodesInput
     person?: PersonCreateNestedOneWithoutContentNodesInput
     peopleFileTreeMounts?: PeopleFileTreeMountCreateNestedManyWithoutContentParentInput
+    collaborationDocument?: CollaborationDocumentCreateNestedOneWithoutContentInput
     contentPath?: ContentPathCreateNestedOneWithoutContentInput
     contentTags?: ContentTagCreateNestedManyWithoutContentInput
     personMentions?: PersonMentionCreateNestedManyWithoutContentInput
@@ -75774,6 +77671,7 @@ export namespace Prisma {
     targetLinks?: ContentLinkUncheckedCreateNestedManyWithoutTargetInput
     children?: ContentNodeUncheckedCreateNestedManyWithoutParentInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedCreateNestedManyWithoutContentParentInput
+    collaborationDocument?: CollaborationDocumentUncheckedCreateNestedOneWithoutContentInput
     contentPath?: ContentPathUncheckedCreateNestedOneWithoutContentInput
     contentTags?: ContentTagUncheckedCreateNestedManyWithoutContentInput
     personMentions?: PersonMentionUncheckedCreateNestedManyWithoutContentInput
@@ -75881,6 +77779,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupUpdateOneWithoutContentNodesNestedInput
     person?: PersonUpdateOneWithoutContentNodesNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUpdateManyWithoutContentParentNestedInput
+    collaborationDocument?: CollaborationDocumentUpdateOneWithoutContentNestedInput
     contentPath?: ContentPathUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUpdateManyWithoutContentNestedInput
     personMentions?: PersonMentionUpdateManyWithoutContentNestedInput
@@ -75925,6 +77824,7 @@ export namespace Prisma {
     targetLinks?: ContentLinkUncheckedUpdateManyWithoutTargetNestedInput
     children?: ContentNodeUncheckedUpdateManyWithoutParentNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedUpdateManyWithoutContentParentNestedInput
+    collaborationDocument?: CollaborationDocumentUncheckedUpdateOneWithoutContentNestedInput
     contentPath?: ContentPathUncheckedUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUncheckedUpdateManyWithoutContentNestedInput
     personMentions?: PersonMentionUncheckedUpdateManyWithoutContentNestedInput
@@ -75968,6 +77868,7 @@ export namespace Prisma {
     calendarSources?: CalendarSourceCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventCreateNestedManyWithoutUserInput
     contentWorkspaces?: ContentWorkspaceCreateNestedManyWithoutOwnerInput
+    collaborationDocuments?: CollaborationDocumentCreateNestedManyWithoutOwnerInput
   }
 
   export type UserUncheckedCreateWithoutCategoriesInput = {
@@ -76005,6 +77906,7 @@ export namespace Prisma {
     calendarSources?: CalendarSourceUncheckedCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutUserInput
     contentWorkspaces?: ContentWorkspaceUncheckedCreateNestedManyWithoutOwnerInput
+    collaborationDocuments?: CollaborationDocumentUncheckedCreateNestedManyWithoutOwnerInput
   }
 
   export type UserCreateOrConnectWithoutCategoriesInput = {
@@ -76047,6 +77949,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupCreateNestedOneWithoutContentNodesInput
     person?: PersonCreateNestedOneWithoutContentNodesInput
     peopleFileTreeMounts?: PeopleFileTreeMountCreateNestedManyWithoutContentParentInput
+    collaborationDocument?: CollaborationDocumentCreateNestedOneWithoutContentInput
     contentPath?: ContentPathCreateNestedOneWithoutContentInput
     contentTags?: ContentTagCreateNestedManyWithoutContentInput
     personMentions?: PersonMentionCreateNestedManyWithoutContentInput
@@ -76091,6 +77994,7 @@ export namespace Prisma {
     targetLinks?: ContentLinkUncheckedCreateNestedManyWithoutTargetInput
     children?: ContentNodeUncheckedCreateNestedManyWithoutParentInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedCreateNestedManyWithoutContentParentInput
+    collaborationDocument?: CollaborationDocumentUncheckedCreateNestedOneWithoutContentInput
     contentPath?: ContentPathUncheckedCreateNestedOneWithoutContentInput
     contentTags?: ContentTagUncheckedCreateNestedManyWithoutContentInput
     personMentions?: PersonMentionUncheckedCreateNestedManyWithoutContentInput
@@ -76156,6 +78060,7 @@ export namespace Prisma {
     calendarSources?: CalendarSourceUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUpdateManyWithoutUserNestedInput
     contentWorkspaces?: ContentWorkspaceUpdateManyWithoutOwnerNestedInput
+    collaborationDocuments?: CollaborationDocumentUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUncheckedUpdateWithoutCategoriesInput = {
@@ -76193,6 +78098,7 @@ export namespace Prisma {
     calendarSources?: CalendarSourceUncheckedUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUncheckedUpdateManyWithoutUserNestedInput
     contentWorkspaces?: ContentWorkspaceUncheckedUpdateManyWithoutOwnerNestedInput
+    collaborationDocuments?: CollaborationDocumentUncheckedUpdateManyWithoutOwnerNestedInput
   }
 
   export type ContentNodeUpsertWithWhereUniqueWithoutCategoryInput = {
@@ -76270,6 +78176,7 @@ export namespace Prisma {
     calendarSources?: CalendarSourceCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventCreateNestedManyWithoutUserInput
     contentWorkspaces?: ContentWorkspaceCreateNestedManyWithoutOwnerInput
+    collaborationDocuments?: CollaborationDocumentCreateNestedManyWithoutOwnerInput
   }
 
   export type UserUncheckedCreateWithoutTagsInput = {
@@ -76307,6 +78214,7 @@ export namespace Prisma {
     calendarSources?: CalendarSourceUncheckedCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutUserInput
     contentWorkspaces?: ContentWorkspaceUncheckedCreateNestedManyWithoutOwnerInput
+    collaborationDocuments?: CollaborationDocumentUncheckedCreateNestedManyWithoutOwnerInput
   }
 
   export type UserCreateOrConnectWithoutTagsInput = {
@@ -76376,6 +78284,7 @@ export namespace Prisma {
     calendarSources?: CalendarSourceUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUpdateManyWithoutUserNestedInput
     contentWorkspaces?: ContentWorkspaceUpdateManyWithoutOwnerNestedInput
+    collaborationDocuments?: CollaborationDocumentUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUncheckedUpdateWithoutTagsInput = {
@@ -76413,6 +78322,7 @@ export namespace Prisma {
     calendarSources?: CalendarSourceUncheckedUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUncheckedUpdateManyWithoutUserNestedInput
     contentWorkspaces?: ContentWorkspaceUncheckedUpdateManyWithoutOwnerNestedInput
+    collaborationDocuments?: CollaborationDocumentUncheckedUpdateManyWithoutOwnerNestedInput
   }
 
   export type ContentNodeCreateWithoutViewGrantsInput = {
@@ -76451,6 +78361,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupCreateNestedOneWithoutContentNodesInput
     person?: PersonCreateNestedOneWithoutContentNodesInput
     peopleFileTreeMounts?: PeopleFileTreeMountCreateNestedManyWithoutContentParentInput
+    collaborationDocument?: CollaborationDocumentCreateNestedOneWithoutContentInput
     contentPath?: ContentPathCreateNestedOneWithoutContentInput
     contentTags?: ContentTagCreateNestedManyWithoutContentInput
     personMentions?: PersonMentionCreateNestedManyWithoutContentInput
@@ -76495,6 +78406,7 @@ export namespace Prisma {
     targetLinks?: ContentLinkUncheckedCreateNestedManyWithoutTargetInput
     children?: ContentNodeUncheckedCreateNestedManyWithoutParentInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedCreateNestedManyWithoutContentParentInput
+    collaborationDocument?: CollaborationDocumentUncheckedCreateNestedOneWithoutContentInput
     contentPath?: ContentPathUncheckedCreateNestedOneWithoutContentInput
     contentTags?: ContentTagUncheckedCreateNestedManyWithoutContentInput
     personMentions?: PersonMentionUncheckedCreateNestedManyWithoutContentInput
@@ -76543,6 +78455,7 @@ export namespace Prisma {
     calendarSources?: CalendarSourceCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventCreateNestedManyWithoutUserInput
     contentWorkspaces?: ContentWorkspaceCreateNestedManyWithoutOwnerInput
+    collaborationDocuments?: CollaborationDocumentCreateNestedManyWithoutOwnerInput
   }
 
   export type UserUncheckedCreateWithoutViewGrantsInput = {
@@ -76580,6 +78493,7 @@ export namespace Prisma {
     calendarSources?: CalendarSourceUncheckedCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutUserInput
     contentWorkspaces?: ContentWorkspaceUncheckedCreateNestedManyWithoutOwnerInput
+    collaborationDocuments?: CollaborationDocumentUncheckedCreateNestedManyWithoutOwnerInput
   }
 
   export type UserCreateOrConnectWithoutViewGrantsInput = {
@@ -76634,6 +78548,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupUpdateOneWithoutContentNodesNestedInput
     person?: PersonUpdateOneWithoutContentNodesNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUpdateManyWithoutContentParentNestedInput
+    collaborationDocument?: CollaborationDocumentUpdateOneWithoutContentNestedInput
     contentPath?: ContentPathUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUpdateManyWithoutContentNestedInput
     personMentions?: PersonMentionUpdateManyWithoutContentNestedInput
@@ -76678,6 +78593,7 @@ export namespace Prisma {
     targetLinks?: ContentLinkUncheckedUpdateManyWithoutTargetNestedInput
     children?: ContentNodeUncheckedUpdateManyWithoutParentNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedUpdateManyWithoutContentParentNestedInput
+    collaborationDocument?: CollaborationDocumentUncheckedUpdateOneWithoutContentNestedInput
     contentPath?: ContentPathUncheckedUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUncheckedUpdateManyWithoutContentNestedInput
     personMentions?: PersonMentionUncheckedUpdateManyWithoutContentNestedInput
@@ -76732,6 +78648,7 @@ export namespace Prisma {
     calendarSources?: CalendarSourceUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUpdateManyWithoutUserNestedInput
     contentWorkspaces?: ContentWorkspaceUpdateManyWithoutOwnerNestedInput
+    collaborationDocuments?: CollaborationDocumentUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUncheckedUpdateWithoutViewGrantsInput = {
@@ -76755,6 +78672,371 @@ export namespace Prisma {
     storageConfigs?: StorageProviderConfigUncheckedUpdateManyWithoutUserNestedInput
     tags?: TagUncheckedUpdateManyWithoutUserNestedInput
     trashedContent?: TrashBinUncheckedUpdateManyWithoutDeletedByUserNestedInput
+    peopleGroups?: PeopleGroupUncheckedUpdateManyWithoutOwnerNestedInput
+    peopleDefaultGroups?: PeopleGroupUncheckedUpdateManyWithoutDefaultForOwnerNestedInput
+    people?: PersonUncheckedUpdateManyWithoutOwnerNestedInput
+    peopleFileTreeMounts?: PeopleFileTreeMountUncheckedUpdateManyWithoutOwnerNestedInput
+    personMentions?: PersonMentionUncheckedUpdateManyWithoutOwnerNestedInput
+    reusableCategories?: ReusableCategoryUncheckedUpdateManyWithoutUserNestedInput
+    savedBlocks?: SavedBlockUncheckedUpdateManyWithoutUserNestedInput
+    contentTemplates?: ContentTemplateUncheckedUpdateManyWithoutUserNestedInput
+    snippets?: SnippetUncheckedUpdateManyWithoutUserNestedInput
+    pageTemplates?: PageTemplateUncheckedUpdateManyWithoutUserNestedInput
+    calendarConnections?: CalendarConnectionUncheckedUpdateManyWithoutUserNestedInput
+    calendarSources?: CalendarSourceUncheckedUpdateManyWithoutUserNestedInput
+    calendarEvents?: CalendarEventUncheckedUpdateManyWithoutUserNestedInput
+    contentWorkspaces?: ContentWorkspaceUncheckedUpdateManyWithoutOwnerNestedInput
+    collaborationDocuments?: CollaborationDocumentUncheckedUpdateManyWithoutOwnerNestedInput
+  }
+
+  export type ContentNodeCreateWithoutCollaborationDocumentInput = {
+    id?: string
+    title: string
+    slug: string
+    contentType: $Enums.ContentType
+    role?: $Enums.ContentRole
+    displayOrder?: number
+    isPublished?: boolean
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    deletedAt?: Date | string | null
+    deletedBy?: string | null
+    customIcon?: string | null
+    iconColor?: string | null
+    auditLogs?: AuditLogCreateNestedManyWithoutTargetContentInput
+    codePayload?: CodePayloadCreateNestedOneWithoutContentInput
+    filePayload?: FilePayloadCreateNestedOneWithoutContentInput
+    htmlPayload?: HtmlPayloadCreateNestedOneWithoutContentInput
+    notePayload?: NotePayloadCreateNestedOneWithoutContentInput
+    folderPayload?: FolderPayloadCreateNestedOneWithoutContentInput
+    externalPayload?: ExternalPayloadCreateNestedOneWithoutContentInput
+    chatPayload?: ChatPayloadCreateNestedOneWithoutContentInput
+    visualizationPayload?: VisualizationPayloadCreateNestedOneWithoutContentInput
+    dataPayload?: DataPayloadCreateNestedOneWithoutContentInput
+    hopePayload?: HopePayloadCreateNestedOneWithoutContentInput
+    workflowPayload?: WorkflowPayloadCreateNestedOneWithoutContentInput
+    history?: ContentHistoryCreateNestedManyWithoutContentInput
+    sourceLinks?: ContentLinkCreateNestedManyWithoutSourceInput
+    targetLinks?: ContentLinkCreateNestedManyWithoutTargetInput
+    category?: CategoryCreateNestedOneWithoutContentNodesInput
+    owner: UserCreateNestedOneWithoutContentNodesInput
+    parent?: ContentNodeCreateNestedOneWithoutChildrenInput
+    children?: ContentNodeCreateNestedManyWithoutParentInput
+    peopleGroup?: PeopleGroupCreateNestedOneWithoutContentNodesInput
+    person?: PersonCreateNestedOneWithoutContentNodesInput
+    peopleFileTreeMounts?: PeopleFileTreeMountCreateNestedManyWithoutContentParentInput
+    contentPath?: ContentPathCreateNestedOneWithoutContentInput
+    contentTags?: ContentTagCreateNestedManyWithoutContentInput
+    personMentions?: PersonMentionCreateNestedManyWithoutContentInput
+    trashBinEntry?: TrashBinCreateNestedOneWithoutContentInput
+    viewGrants?: ViewGrantCreateNestedManyWithoutContentInput
+    calendarEvents?: CalendarEventCreateNestedManyWithoutLinkedContentInput
+    workspaceItems?: ContentWorkspaceItemCreateNestedManyWithoutContentInput
+  }
+
+  export type ContentNodeUncheckedCreateWithoutCollaborationDocumentInput = {
+    id?: string
+    ownerId: string
+    title: string
+    slug: string
+    contentType: $Enums.ContentType
+    role?: $Enums.ContentRole
+    parentId?: string | null
+    displayOrder?: number
+    categoryId?: string | null
+    isPublished?: boolean
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    deletedAt?: Date | string | null
+    deletedBy?: string | null
+    customIcon?: string | null
+    iconColor?: string | null
+    peopleGroupId?: string | null
+    personId?: string | null
+    auditLogs?: AuditLogUncheckedCreateNestedManyWithoutTargetContentInput
+    codePayload?: CodePayloadUncheckedCreateNestedOneWithoutContentInput
+    filePayload?: FilePayloadUncheckedCreateNestedOneWithoutContentInput
+    htmlPayload?: HtmlPayloadUncheckedCreateNestedOneWithoutContentInput
+    notePayload?: NotePayloadUncheckedCreateNestedOneWithoutContentInput
+    folderPayload?: FolderPayloadUncheckedCreateNestedOneWithoutContentInput
+    externalPayload?: ExternalPayloadUncheckedCreateNestedOneWithoutContentInput
+    chatPayload?: ChatPayloadUncheckedCreateNestedOneWithoutContentInput
+    visualizationPayload?: VisualizationPayloadUncheckedCreateNestedOneWithoutContentInput
+    dataPayload?: DataPayloadUncheckedCreateNestedOneWithoutContentInput
+    hopePayload?: HopePayloadUncheckedCreateNestedOneWithoutContentInput
+    workflowPayload?: WorkflowPayloadUncheckedCreateNestedOneWithoutContentInput
+    history?: ContentHistoryUncheckedCreateNestedManyWithoutContentInput
+    sourceLinks?: ContentLinkUncheckedCreateNestedManyWithoutSourceInput
+    targetLinks?: ContentLinkUncheckedCreateNestedManyWithoutTargetInput
+    children?: ContentNodeUncheckedCreateNestedManyWithoutParentInput
+    peopleFileTreeMounts?: PeopleFileTreeMountUncheckedCreateNestedManyWithoutContentParentInput
+    contentPath?: ContentPathUncheckedCreateNestedOneWithoutContentInput
+    contentTags?: ContentTagUncheckedCreateNestedManyWithoutContentInput
+    personMentions?: PersonMentionUncheckedCreateNestedManyWithoutContentInput
+    trashBinEntry?: TrashBinUncheckedCreateNestedOneWithoutContentInput
+    viewGrants?: ViewGrantUncheckedCreateNestedManyWithoutContentInput
+    calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutLinkedContentInput
+    workspaceItems?: ContentWorkspaceItemUncheckedCreateNestedManyWithoutContentInput
+  }
+
+  export type ContentNodeCreateOrConnectWithoutCollaborationDocumentInput = {
+    where: ContentNodeWhereUniqueInput
+    create: XOR<ContentNodeCreateWithoutCollaborationDocumentInput, ContentNodeUncheckedCreateWithoutCollaborationDocumentInput>
+  }
+
+  export type UserCreateWithoutCollaborationDocumentsInput = {
+    id?: string
+    username: string
+    passwordHash?: string | null
+    email: string
+    role?: $Enums.UserRole
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: number
+    accounts?: AccountCreateNestedManyWithoutUserInput
+    aiProviderKeys?: AIProviderKeyCreateNestedManyWithoutUserInput
+    auditTargets?: AuditLogCreateNestedManyWithoutTargetUserInput
+    adminActions?: AuditLogCreateNestedManyWithoutUserInput
+    categories?: CategoryCreateNestedManyWithoutOwnerInput
+    contentHistory?: ContentHistoryCreateNestedManyWithoutUserInput
+    contentNodes?: ContentNodeCreateNestedManyWithoutOwnerInput
+    sessions?: SessionCreateNestedManyWithoutUserInput
+    storageConfigs?: StorageProviderConfigCreateNestedManyWithoutUserInput
+    tags?: TagCreateNestedManyWithoutUserInput
+    trashedContent?: TrashBinCreateNestedManyWithoutDeletedByUserInput
+    viewGrants?: ViewGrantCreateNestedManyWithoutUserInput
+    peopleGroups?: PeopleGroupCreateNestedManyWithoutOwnerInput
+    peopleDefaultGroups?: PeopleGroupCreateNestedManyWithoutDefaultForOwnerInput
+    people?: PersonCreateNestedManyWithoutOwnerInput
+    peopleFileTreeMounts?: PeopleFileTreeMountCreateNestedManyWithoutOwnerInput
+    personMentions?: PersonMentionCreateNestedManyWithoutOwnerInput
+    reusableCategories?: ReusableCategoryCreateNestedManyWithoutUserInput
+    savedBlocks?: SavedBlockCreateNestedManyWithoutUserInput
+    contentTemplates?: ContentTemplateCreateNestedManyWithoutUserInput
+    snippets?: SnippetCreateNestedManyWithoutUserInput
+    pageTemplates?: PageTemplateCreateNestedManyWithoutUserInput
+    calendarConnections?: CalendarConnectionCreateNestedManyWithoutUserInput
+    calendarSources?: CalendarSourceCreateNestedManyWithoutUserInput
+    calendarEvents?: CalendarEventCreateNestedManyWithoutUserInput
+    contentWorkspaces?: ContentWorkspaceCreateNestedManyWithoutOwnerInput
+  }
+
+  export type UserUncheckedCreateWithoutCollaborationDocumentsInput = {
+    id?: string
+    username: string
+    passwordHash?: string | null
+    email: string
+    role?: $Enums.UserRole
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: number
+    accounts?: AccountUncheckedCreateNestedManyWithoutUserInput
+    aiProviderKeys?: AIProviderKeyUncheckedCreateNestedManyWithoutUserInput
+    auditTargets?: AuditLogUncheckedCreateNestedManyWithoutTargetUserInput
+    adminActions?: AuditLogUncheckedCreateNestedManyWithoutUserInput
+    categories?: CategoryUncheckedCreateNestedManyWithoutOwnerInput
+    contentHistory?: ContentHistoryUncheckedCreateNestedManyWithoutUserInput
+    contentNodes?: ContentNodeUncheckedCreateNestedManyWithoutOwnerInput
+    sessions?: SessionUncheckedCreateNestedManyWithoutUserInput
+    storageConfigs?: StorageProviderConfigUncheckedCreateNestedManyWithoutUserInput
+    tags?: TagUncheckedCreateNestedManyWithoutUserInput
+    trashedContent?: TrashBinUncheckedCreateNestedManyWithoutDeletedByUserInput
+    viewGrants?: ViewGrantUncheckedCreateNestedManyWithoutUserInput
+    peopleGroups?: PeopleGroupUncheckedCreateNestedManyWithoutOwnerInput
+    peopleDefaultGroups?: PeopleGroupUncheckedCreateNestedManyWithoutDefaultForOwnerInput
+    people?: PersonUncheckedCreateNestedManyWithoutOwnerInput
+    peopleFileTreeMounts?: PeopleFileTreeMountUncheckedCreateNestedManyWithoutOwnerInput
+    personMentions?: PersonMentionUncheckedCreateNestedManyWithoutOwnerInput
+    reusableCategories?: ReusableCategoryUncheckedCreateNestedManyWithoutUserInput
+    savedBlocks?: SavedBlockUncheckedCreateNestedManyWithoutUserInput
+    contentTemplates?: ContentTemplateUncheckedCreateNestedManyWithoutUserInput
+    snippets?: SnippetUncheckedCreateNestedManyWithoutUserInput
+    pageTemplates?: PageTemplateUncheckedCreateNestedManyWithoutUserInput
+    calendarConnections?: CalendarConnectionUncheckedCreateNestedManyWithoutUserInput
+    calendarSources?: CalendarSourceUncheckedCreateNestedManyWithoutUserInput
+    calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutUserInput
+    contentWorkspaces?: ContentWorkspaceUncheckedCreateNestedManyWithoutOwnerInput
+  }
+
+  export type UserCreateOrConnectWithoutCollaborationDocumentsInput = {
+    where: UserWhereUniqueInput
+    create: XOR<UserCreateWithoutCollaborationDocumentsInput, UserUncheckedCreateWithoutCollaborationDocumentsInput>
+  }
+
+  export type ContentNodeUpsertWithoutCollaborationDocumentInput = {
+    update: XOR<ContentNodeUpdateWithoutCollaborationDocumentInput, ContentNodeUncheckedUpdateWithoutCollaborationDocumentInput>
+    create: XOR<ContentNodeCreateWithoutCollaborationDocumentInput, ContentNodeUncheckedCreateWithoutCollaborationDocumentInput>
+    where?: ContentNodeWhereInput
+  }
+
+  export type ContentNodeUpdateToOneWithWhereWithoutCollaborationDocumentInput = {
+    where?: ContentNodeWhereInput
+    data: XOR<ContentNodeUpdateWithoutCollaborationDocumentInput, ContentNodeUncheckedUpdateWithoutCollaborationDocumentInput>
+  }
+
+  export type ContentNodeUpdateWithoutCollaborationDocumentInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    title?: StringFieldUpdateOperationsInput | string
+    slug?: StringFieldUpdateOperationsInput | string
+    contentType?: EnumContentTypeFieldUpdateOperationsInput | $Enums.ContentType
+    role?: EnumContentRoleFieldUpdateOperationsInput | $Enums.ContentRole
+    displayOrder?: IntFieldUpdateOperationsInput | number
+    isPublished?: BoolFieldUpdateOperationsInput | boolean
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    deletedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    deletedBy?: NullableStringFieldUpdateOperationsInput | string | null
+    customIcon?: NullableStringFieldUpdateOperationsInput | string | null
+    iconColor?: NullableStringFieldUpdateOperationsInput | string | null
+    auditLogs?: AuditLogUpdateManyWithoutTargetContentNestedInput
+    codePayload?: CodePayloadUpdateOneWithoutContentNestedInput
+    filePayload?: FilePayloadUpdateOneWithoutContentNestedInput
+    htmlPayload?: HtmlPayloadUpdateOneWithoutContentNestedInput
+    notePayload?: NotePayloadUpdateOneWithoutContentNestedInput
+    folderPayload?: FolderPayloadUpdateOneWithoutContentNestedInput
+    externalPayload?: ExternalPayloadUpdateOneWithoutContentNestedInput
+    chatPayload?: ChatPayloadUpdateOneWithoutContentNestedInput
+    visualizationPayload?: VisualizationPayloadUpdateOneWithoutContentNestedInput
+    dataPayload?: DataPayloadUpdateOneWithoutContentNestedInput
+    hopePayload?: HopePayloadUpdateOneWithoutContentNestedInput
+    workflowPayload?: WorkflowPayloadUpdateOneWithoutContentNestedInput
+    history?: ContentHistoryUpdateManyWithoutContentNestedInput
+    sourceLinks?: ContentLinkUpdateManyWithoutSourceNestedInput
+    targetLinks?: ContentLinkUpdateManyWithoutTargetNestedInput
+    category?: CategoryUpdateOneWithoutContentNodesNestedInput
+    owner?: UserUpdateOneRequiredWithoutContentNodesNestedInput
+    parent?: ContentNodeUpdateOneWithoutChildrenNestedInput
+    children?: ContentNodeUpdateManyWithoutParentNestedInput
+    peopleGroup?: PeopleGroupUpdateOneWithoutContentNodesNestedInput
+    person?: PersonUpdateOneWithoutContentNodesNestedInput
+    peopleFileTreeMounts?: PeopleFileTreeMountUpdateManyWithoutContentParentNestedInput
+    contentPath?: ContentPathUpdateOneWithoutContentNestedInput
+    contentTags?: ContentTagUpdateManyWithoutContentNestedInput
+    personMentions?: PersonMentionUpdateManyWithoutContentNestedInput
+    trashBinEntry?: TrashBinUpdateOneWithoutContentNestedInput
+    viewGrants?: ViewGrantUpdateManyWithoutContentNestedInput
+    calendarEvents?: CalendarEventUpdateManyWithoutLinkedContentNestedInput
+    workspaceItems?: ContentWorkspaceItemUpdateManyWithoutContentNestedInput
+  }
+
+  export type ContentNodeUncheckedUpdateWithoutCollaborationDocumentInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    ownerId?: StringFieldUpdateOperationsInput | string
+    title?: StringFieldUpdateOperationsInput | string
+    slug?: StringFieldUpdateOperationsInput | string
+    contentType?: EnumContentTypeFieldUpdateOperationsInput | $Enums.ContentType
+    role?: EnumContentRoleFieldUpdateOperationsInput | $Enums.ContentRole
+    parentId?: NullableStringFieldUpdateOperationsInput | string | null
+    displayOrder?: IntFieldUpdateOperationsInput | number
+    categoryId?: NullableStringFieldUpdateOperationsInput | string | null
+    isPublished?: BoolFieldUpdateOperationsInput | boolean
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    deletedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    deletedBy?: NullableStringFieldUpdateOperationsInput | string | null
+    customIcon?: NullableStringFieldUpdateOperationsInput | string | null
+    iconColor?: NullableStringFieldUpdateOperationsInput | string | null
+    peopleGroupId?: NullableStringFieldUpdateOperationsInput | string | null
+    personId?: NullableStringFieldUpdateOperationsInput | string | null
+    auditLogs?: AuditLogUncheckedUpdateManyWithoutTargetContentNestedInput
+    codePayload?: CodePayloadUncheckedUpdateOneWithoutContentNestedInput
+    filePayload?: FilePayloadUncheckedUpdateOneWithoutContentNestedInput
+    htmlPayload?: HtmlPayloadUncheckedUpdateOneWithoutContentNestedInput
+    notePayload?: NotePayloadUncheckedUpdateOneWithoutContentNestedInput
+    folderPayload?: FolderPayloadUncheckedUpdateOneWithoutContentNestedInput
+    externalPayload?: ExternalPayloadUncheckedUpdateOneWithoutContentNestedInput
+    chatPayload?: ChatPayloadUncheckedUpdateOneWithoutContentNestedInput
+    visualizationPayload?: VisualizationPayloadUncheckedUpdateOneWithoutContentNestedInput
+    dataPayload?: DataPayloadUncheckedUpdateOneWithoutContentNestedInput
+    hopePayload?: HopePayloadUncheckedUpdateOneWithoutContentNestedInput
+    workflowPayload?: WorkflowPayloadUncheckedUpdateOneWithoutContentNestedInput
+    history?: ContentHistoryUncheckedUpdateManyWithoutContentNestedInput
+    sourceLinks?: ContentLinkUncheckedUpdateManyWithoutSourceNestedInput
+    targetLinks?: ContentLinkUncheckedUpdateManyWithoutTargetNestedInput
+    children?: ContentNodeUncheckedUpdateManyWithoutParentNestedInput
+    peopleFileTreeMounts?: PeopleFileTreeMountUncheckedUpdateManyWithoutContentParentNestedInput
+    contentPath?: ContentPathUncheckedUpdateOneWithoutContentNestedInput
+    contentTags?: ContentTagUncheckedUpdateManyWithoutContentNestedInput
+    personMentions?: PersonMentionUncheckedUpdateManyWithoutContentNestedInput
+    trashBinEntry?: TrashBinUncheckedUpdateOneWithoutContentNestedInput
+    viewGrants?: ViewGrantUncheckedUpdateManyWithoutContentNestedInput
+    calendarEvents?: CalendarEventUncheckedUpdateManyWithoutLinkedContentNestedInput
+    workspaceItems?: ContentWorkspaceItemUncheckedUpdateManyWithoutContentNestedInput
+  }
+
+  export type UserUpsertWithoutCollaborationDocumentsInput = {
+    update: XOR<UserUpdateWithoutCollaborationDocumentsInput, UserUncheckedUpdateWithoutCollaborationDocumentsInput>
+    create: XOR<UserCreateWithoutCollaborationDocumentsInput, UserUncheckedCreateWithoutCollaborationDocumentsInput>
+    where?: UserWhereInput
+  }
+
+  export type UserUpdateToOneWithWhereWithoutCollaborationDocumentsInput = {
+    where?: UserWhereInput
+    data: XOR<UserUpdateWithoutCollaborationDocumentsInput, UserUncheckedUpdateWithoutCollaborationDocumentsInput>
+  }
+
+  export type UserUpdateWithoutCollaborationDocumentsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    username?: StringFieldUpdateOperationsInput | string
+    passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
+    email?: StringFieldUpdateOperationsInput | string
+    role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: IntFieldUpdateOperationsInput | number
+    accounts?: AccountUpdateManyWithoutUserNestedInput
+    aiProviderKeys?: AIProviderKeyUpdateManyWithoutUserNestedInput
+    auditTargets?: AuditLogUpdateManyWithoutTargetUserNestedInput
+    adminActions?: AuditLogUpdateManyWithoutUserNestedInput
+    categories?: CategoryUpdateManyWithoutOwnerNestedInput
+    contentHistory?: ContentHistoryUpdateManyWithoutUserNestedInput
+    contentNodes?: ContentNodeUpdateManyWithoutOwnerNestedInput
+    sessions?: SessionUpdateManyWithoutUserNestedInput
+    storageConfigs?: StorageProviderConfigUpdateManyWithoutUserNestedInput
+    tags?: TagUpdateManyWithoutUserNestedInput
+    trashedContent?: TrashBinUpdateManyWithoutDeletedByUserNestedInput
+    viewGrants?: ViewGrantUpdateManyWithoutUserNestedInput
+    peopleGroups?: PeopleGroupUpdateManyWithoutOwnerNestedInput
+    peopleDefaultGroups?: PeopleGroupUpdateManyWithoutDefaultForOwnerNestedInput
+    people?: PersonUpdateManyWithoutOwnerNestedInput
+    peopleFileTreeMounts?: PeopleFileTreeMountUpdateManyWithoutOwnerNestedInput
+    personMentions?: PersonMentionUpdateManyWithoutOwnerNestedInput
+    reusableCategories?: ReusableCategoryUpdateManyWithoutUserNestedInput
+    savedBlocks?: SavedBlockUpdateManyWithoutUserNestedInput
+    contentTemplates?: ContentTemplateUpdateManyWithoutUserNestedInput
+    snippets?: SnippetUpdateManyWithoutUserNestedInput
+    pageTemplates?: PageTemplateUpdateManyWithoutUserNestedInput
+    calendarConnections?: CalendarConnectionUpdateManyWithoutUserNestedInput
+    calendarSources?: CalendarSourceUpdateManyWithoutUserNestedInput
+    calendarEvents?: CalendarEventUpdateManyWithoutUserNestedInput
+    contentWorkspaces?: ContentWorkspaceUpdateManyWithoutOwnerNestedInput
+  }
+
+  export type UserUncheckedUpdateWithoutCollaborationDocumentsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    username?: StringFieldUpdateOperationsInput | string
+    passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
+    email?: StringFieldUpdateOperationsInput | string
+    role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: IntFieldUpdateOperationsInput | number
+    accounts?: AccountUncheckedUpdateManyWithoutUserNestedInput
+    aiProviderKeys?: AIProviderKeyUncheckedUpdateManyWithoutUserNestedInput
+    auditTargets?: AuditLogUncheckedUpdateManyWithoutTargetUserNestedInput
+    adminActions?: AuditLogUncheckedUpdateManyWithoutUserNestedInput
+    categories?: CategoryUncheckedUpdateManyWithoutOwnerNestedInput
+    contentHistory?: ContentHistoryUncheckedUpdateManyWithoutUserNestedInput
+    contentNodes?: ContentNodeUncheckedUpdateManyWithoutOwnerNestedInput
+    sessions?: SessionUncheckedUpdateManyWithoutUserNestedInput
+    storageConfigs?: StorageProviderConfigUncheckedUpdateManyWithoutUserNestedInput
+    tags?: TagUncheckedUpdateManyWithoutUserNestedInput
+    trashedContent?: TrashBinUncheckedUpdateManyWithoutDeletedByUserNestedInput
+    viewGrants?: ViewGrantUncheckedUpdateManyWithoutUserNestedInput
     peopleGroups?: PeopleGroupUncheckedUpdateManyWithoutOwnerNestedInput
     peopleDefaultGroups?: PeopleGroupUncheckedUpdateManyWithoutDefaultForOwnerNestedInput
     people?: PersonUncheckedUpdateManyWithoutOwnerNestedInput
@@ -76806,6 +79088,7 @@ export namespace Prisma {
     calendarSources?: CalendarSourceCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventCreateNestedManyWithoutUserInput
     contentWorkspaces?: ContentWorkspaceCreateNestedManyWithoutOwnerInput
+    collaborationDocuments?: CollaborationDocumentCreateNestedManyWithoutOwnerInput
   }
 
   export type UserUncheckedCreateWithoutPeopleGroupsInput = {
@@ -76843,6 +79126,7 @@ export namespace Prisma {
     calendarSources?: CalendarSourceUncheckedCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutUserInput
     contentWorkspaces?: ContentWorkspaceUncheckedCreateNestedManyWithoutOwnerInput
+    collaborationDocuments?: CollaborationDocumentUncheckedCreateNestedManyWithoutOwnerInput
   }
 
   export type UserCreateOrConnectWithoutPeopleGroupsInput = {
@@ -76885,6 +79169,7 @@ export namespace Prisma {
     calendarSources?: CalendarSourceCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventCreateNestedManyWithoutUserInput
     contentWorkspaces?: ContentWorkspaceCreateNestedManyWithoutOwnerInput
+    collaborationDocuments?: CollaborationDocumentCreateNestedManyWithoutOwnerInput
   }
 
   export type UserUncheckedCreateWithoutPeopleDefaultGroupsInput = {
@@ -76922,6 +79207,7 @@ export namespace Prisma {
     calendarSources?: CalendarSourceUncheckedCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutUserInput
     contentWorkspaces?: ContentWorkspaceUncheckedCreateNestedManyWithoutOwnerInput
+    collaborationDocuments?: CollaborationDocumentUncheckedCreateNestedManyWithoutOwnerInput
   }
 
   export type UserCreateOrConnectWithoutPeopleDefaultGroupsInput = {
@@ -77105,6 +79391,7 @@ export namespace Prisma {
     children?: ContentNodeCreateNestedManyWithoutParentInput
     person?: PersonCreateNestedOneWithoutContentNodesInput
     peopleFileTreeMounts?: PeopleFileTreeMountCreateNestedManyWithoutContentParentInput
+    collaborationDocument?: CollaborationDocumentCreateNestedOneWithoutContentInput
     contentPath?: ContentPathCreateNestedOneWithoutContentInput
     contentTags?: ContentTagCreateNestedManyWithoutContentInput
     personMentions?: PersonMentionCreateNestedManyWithoutContentInput
@@ -77149,6 +79436,7 @@ export namespace Prisma {
     targetLinks?: ContentLinkUncheckedCreateNestedManyWithoutTargetInput
     children?: ContentNodeUncheckedCreateNestedManyWithoutParentInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedCreateNestedManyWithoutContentParentInput
+    collaborationDocument?: CollaborationDocumentUncheckedCreateNestedOneWithoutContentInput
     contentPath?: ContentPathUncheckedCreateNestedOneWithoutContentInput
     contentTags?: ContentTagUncheckedCreateNestedManyWithoutContentInput
     personMentions?: PersonMentionUncheckedCreateNestedManyWithoutContentInput
@@ -77244,6 +79532,7 @@ export namespace Prisma {
     calendarSources?: CalendarSourceUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUpdateManyWithoutUserNestedInput
     contentWorkspaces?: ContentWorkspaceUpdateManyWithoutOwnerNestedInput
+    collaborationDocuments?: CollaborationDocumentUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUncheckedUpdateWithoutPeopleGroupsInput = {
@@ -77281,6 +79570,7 @@ export namespace Prisma {
     calendarSources?: CalendarSourceUncheckedUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUncheckedUpdateManyWithoutUserNestedInput
     contentWorkspaces?: ContentWorkspaceUncheckedUpdateManyWithoutOwnerNestedInput
+    collaborationDocuments?: CollaborationDocumentUncheckedUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUpsertWithoutPeopleDefaultGroupsInput = {
@@ -77329,6 +79619,7 @@ export namespace Prisma {
     calendarSources?: CalendarSourceUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUpdateManyWithoutUserNestedInput
     contentWorkspaces?: ContentWorkspaceUpdateManyWithoutOwnerNestedInput
+    collaborationDocuments?: CollaborationDocumentUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUncheckedUpdateWithoutPeopleDefaultGroupsInput = {
@@ -77366,6 +79657,7 @@ export namespace Prisma {
     calendarSources?: CalendarSourceUncheckedUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUncheckedUpdateManyWithoutUserNestedInput
     contentWorkspaces?: ContentWorkspaceUncheckedUpdateManyWithoutOwnerNestedInput
+    collaborationDocuments?: CollaborationDocumentUncheckedUpdateManyWithoutOwnerNestedInput
   }
 
   export type PeopleGroupUpsertWithoutChildGroupsInput = {
@@ -77516,6 +79808,7 @@ export namespace Prisma {
     calendarSources?: CalendarSourceCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventCreateNestedManyWithoutUserInput
     contentWorkspaces?: ContentWorkspaceCreateNestedManyWithoutOwnerInput
+    collaborationDocuments?: CollaborationDocumentCreateNestedManyWithoutOwnerInput
   }
 
   export type UserUncheckedCreateWithoutPeopleInput = {
@@ -77553,6 +79846,7 @@ export namespace Prisma {
     calendarSources?: CalendarSourceUncheckedCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutUserInput
     contentWorkspaces?: ContentWorkspaceUncheckedCreateNestedManyWithoutOwnerInput
+    collaborationDocuments?: CollaborationDocumentUncheckedCreateNestedManyWithoutOwnerInput
   }
 
   export type UserCreateOrConnectWithoutPeopleInput = {
@@ -77638,6 +79932,7 @@ export namespace Prisma {
     children?: ContentNodeCreateNestedManyWithoutParentInput
     peopleGroup?: PeopleGroupCreateNestedOneWithoutContentNodesInput
     peopleFileTreeMounts?: PeopleFileTreeMountCreateNestedManyWithoutContentParentInput
+    collaborationDocument?: CollaborationDocumentCreateNestedOneWithoutContentInput
     contentPath?: ContentPathCreateNestedOneWithoutContentInput
     contentTags?: ContentTagCreateNestedManyWithoutContentInput
     personMentions?: PersonMentionCreateNestedManyWithoutContentInput
@@ -77682,6 +79977,7 @@ export namespace Prisma {
     targetLinks?: ContentLinkUncheckedCreateNestedManyWithoutTargetInput
     children?: ContentNodeUncheckedCreateNestedManyWithoutParentInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedCreateNestedManyWithoutContentParentInput
+    collaborationDocument?: CollaborationDocumentUncheckedCreateNestedOneWithoutContentInput
     contentPath?: ContentPathUncheckedCreateNestedOneWithoutContentInput
     contentTags?: ContentTagUncheckedCreateNestedManyWithoutContentInput
     personMentions?: PersonMentionUncheckedCreateNestedManyWithoutContentInput
@@ -77805,6 +80101,7 @@ export namespace Prisma {
     calendarSources?: CalendarSourceUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUpdateManyWithoutUserNestedInput
     contentWorkspaces?: ContentWorkspaceUpdateManyWithoutOwnerNestedInput
+    collaborationDocuments?: CollaborationDocumentUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUncheckedUpdateWithoutPeopleInput = {
@@ -77842,6 +80139,7 @@ export namespace Prisma {
     calendarSources?: CalendarSourceUncheckedUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUncheckedUpdateManyWithoutUserNestedInput
     contentWorkspaces?: ContentWorkspaceUncheckedUpdateManyWithoutOwnerNestedInput
+    collaborationDocuments?: CollaborationDocumentUncheckedUpdateManyWithoutOwnerNestedInput
   }
 
   export type PeopleGroupUpsertWithoutPeopleInput = {
@@ -77976,6 +80274,7 @@ export namespace Prisma {
     calendarSources?: CalendarSourceCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventCreateNestedManyWithoutUserInput
     contentWorkspaces?: ContentWorkspaceCreateNestedManyWithoutOwnerInput
+    collaborationDocuments?: CollaborationDocumentCreateNestedManyWithoutOwnerInput
   }
 
   export type UserUncheckedCreateWithoutPeopleFileTreeMountsInput = {
@@ -78013,6 +80312,7 @@ export namespace Prisma {
     calendarSources?: CalendarSourceUncheckedCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutUserInput
     contentWorkspaces?: ContentWorkspaceUncheckedCreateNestedManyWithoutOwnerInput
+    collaborationDocuments?: CollaborationDocumentUncheckedCreateNestedManyWithoutOwnerInput
   }
 
   export type UserCreateOrConnectWithoutPeopleFileTreeMountsInput = {
@@ -78055,6 +80355,7 @@ export namespace Prisma {
     children?: ContentNodeCreateNestedManyWithoutParentInput
     peopleGroup?: PeopleGroupCreateNestedOneWithoutContentNodesInput
     person?: PersonCreateNestedOneWithoutContentNodesInput
+    collaborationDocument?: CollaborationDocumentCreateNestedOneWithoutContentInput
     contentPath?: ContentPathCreateNestedOneWithoutContentInput
     contentTags?: ContentTagCreateNestedManyWithoutContentInput
     personMentions?: PersonMentionCreateNestedManyWithoutContentInput
@@ -78099,6 +80400,7 @@ export namespace Prisma {
     sourceLinks?: ContentLinkUncheckedCreateNestedManyWithoutSourceInput
     targetLinks?: ContentLinkUncheckedCreateNestedManyWithoutTargetInput
     children?: ContentNodeUncheckedCreateNestedManyWithoutParentInput
+    collaborationDocument?: CollaborationDocumentUncheckedCreateNestedOneWithoutContentInput
     contentPath?: ContentPathUncheckedCreateNestedOneWithoutContentInput
     contentTags?: ContentTagUncheckedCreateNestedManyWithoutContentInput
     personMentions?: PersonMentionUncheckedCreateNestedManyWithoutContentInput
@@ -78247,6 +80549,7 @@ export namespace Prisma {
     calendarSources?: CalendarSourceUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUpdateManyWithoutUserNestedInput
     contentWorkspaces?: ContentWorkspaceUpdateManyWithoutOwnerNestedInput
+    collaborationDocuments?: CollaborationDocumentUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUncheckedUpdateWithoutPeopleFileTreeMountsInput = {
@@ -78284,6 +80587,7 @@ export namespace Prisma {
     calendarSources?: CalendarSourceUncheckedUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUncheckedUpdateManyWithoutUserNestedInput
     contentWorkspaces?: ContentWorkspaceUncheckedUpdateManyWithoutOwnerNestedInput
+    collaborationDocuments?: CollaborationDocumentUncheckedUpdateManyWithoutOwnerNestedInput
   }
 
   export type ContentNodeUpsertWithoutPeopleFileTreeMountsInput = {
@@ -78332,6 +80636,7 @@ export namespace Prisma {
     children?: ContentNodeUpdateManyWithoutParentNestedInput
     peopleGroup?: PeopleGroupUpdateOneWithoutContentNodesNestedInput
     person?: PersonUpdateOneWithoutContentNodesNestedInput
+    collaborationDocument?: CollaborationDocumentUpdateOneWithoutContentNestedInput
     contentPath?: ContentPathUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUpdateManyWithoutContentNestedInput
     personMentions?: PersonMentionUpdateManyWithoutContentNestedInput
@@ -78376,6 +80681,7 @@ export namespace Prisma {
     sourceLinks?: ContentLinkUncheckedUpdateManyWithoutSourceNestedInput
     targetLinks?: ContentLinkUncheckedUpdateManyWithoutTargetNestedInput
     children?: ContentNodeUncheckedUpdateManyWithoutParentNestedInput
+    collaborationDocument?: CollaborationDocumentUncheckedUpdateOneWithoutContentNestedInput
     contentPath?: ContentPathUncheckedUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUncheckedUpdateManyWithoutContentNestedInput
     personMentions?: PersonMentionUncheckedUpdateManyWithoutContentNestedInput
@@ -78520,6 +80826,7 @@ export namespace Prisma {
     calendarSources?: CalendarSourceCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventCreateNestedManyWithoutUserInput
     contentWorkspaces?: ContentWorkspaceCreateNestedManyWithoutOwnerInput
+    collaborationDocuments?: CollaborationDocumentCreateNestedManyWithoutOwnerInput
   }
 
   export type UserUncheckedCreateWithoutPersonMentionsInput = {
@@ -78557,6 +80864,7 @@ export namespace Prisma {
     calendarSources?: CalendarSourceUncheckedCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutUserInput
     contentWorkspaces?: ContentWorkspaceUncheckedCreateNestedManyWithoutOwnerInput
+    collaborationDocuments?: CollaborationDocumentUncheckedCreateNestedManyWithoutOwnerInput
   }
 
   export type UserCreateOrConnectWithoutPersonMentionsInput = {
@@ -78600,6 +80908,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupCreateNestedOneWithoutContentNodesInput
     person?: PersonCreateNestedOneWithoutContentNodesInput
     peopleFileTreeMounts?: PeopleFileTreeMountCreateNestedManyWithoutContentParentInput
+    collaborationDocument?: CollaborationDocumentCreateNestedOneWithoutContentInput
     contentPath?: ContentPathCreateNestedOneWithoutContentInput
     contentTags?: ContentTagCreateNestedManyWithoutContentInput
     trashBinEntry?: TrashBinCreateNestedOneWithoutContentInput
@@ -78644,6 +80953,7 @@ export namespace Prisma {
     targetLinks?: ContentLinkUncheckedCreateNestedManyWithoutTargetInput
     children?: ContentNodeUncheckedCreateNestedManyWithoutParentInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedCreateNestedManyWithoutContentParentInput
+    collaborationDocument?: CollaborationDocumentUncheckedCreateNestedOneWithoutContentInput
     contentPath?: ContentPathUncheckedCreateNestedOneWithoutContentInput
     contentTags?: ContentTagUncheckedCreateNestedManyWithoutContentInput
     trashBinEntry?: TrashBinUncheckedCreateNestedOneWithoutContentInput
@@ -78748,6 +81058,7 @@ export namespace Prisma {
     calendarSources?: CalendarSourceUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUpdateManyWithoutUserNestedInput
     contentWorkspaces?: ContentWorkspaceUpdateManyWithoutOwnerNestedInput
+    collaborationDocuments?: CollaborationDocumentUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUncheckedUpdateWithoutPersonMentionsInput = {
@@ -78785,6 +81096,7 @@ export namespace Prisma {
     calendarSources?: CalendarSourceUncheckedUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUncheckedUpdateManyWithoutUserNestedInput
     contentWorkspaces?: ContentWorkspaceUncheckedUpdateManyWithoutOwnerNestedInput
+    collaborationDocuments?: CollaborationDocumentUncheckedUpdateManyWithoutOwnerNestedInput
   }
 
   export type ContentNodeUpsertWithoutPersonMentionsInput = {
@@ -78834,6 +81146,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupUpdateOneWithoutContentNodesNestedInput
     person?: PersonUpdateOneWithoutContentNodesNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUpdateManyWithoutContentParentNestedInput
+    collaborationDocument?: CollaborationDocumentUpdateOneWithoutContentNestedInput
     contentPath?: ContentPathUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUpdateManyWithoutContentNestedInput
     trashBinEntry?: TrashBinUpdateOneWithoutContentNestedInput
@@ -78878,6 +81191,7 @@ export namespace Prisma {
     targetLinks?: ContentLinkUncheckedUpdateManyWithoutTargetNestedInput
     children?: ContentNodeUncheckedUpdateManyWithoutParentNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedUpdateManyWithoutContentParentNestedInput
+    collaborationDocument?: CollaborationDocumentUncheckedUpdateOneWithoutContentNestedInput
     contentPath?: ContentPathUncheckedUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUncheckedUpdateManyWithoutContentNestedInput
     trashBinEntry?: TrashBinUncheckedUpdateOneWithoutContentNestedInput
@@ -78972,6 +81286,7 @@ export namespace Prisma {
     calendarSources?: CalendarSourceCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventCreateNestedManyWithoutUserInput
     contentWorkspaces?: ContentWorkspaceCreateNestedManyWithoutOwnerInput
+    collaborationDocuments?: CollaborationDocumentCreateNestedManyWithoutOwnerInput
   }
 
   export type UserUncheckedCreateWithoutSessionsInput = {
@@ -79009,6 +81324,7 @@ export namespace Prisma {
     calendarSources?: CalendarSourceUncheckedCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutUserInput
     contentWorkspaces?: ContentWorkspaceUncheckedCreateNestedManyWithoutOwnerInput
+    collaborationDocuments?: CollaborationDocumentUncheckedCreateNestedManyWithoutOwnerInput
   }
 
   export type UserCreateOrConnectWithoutSessionsInput = {
@@ -79062,6 +81378,7 @@ export namespace Prisma {
     calendarSources?: CalendarSourceUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUpdateManyWithoutUserNestedInput
     contentWorkspaces?: ContentWorkspaceUpdateManyWithoutOwnerNestedInput
+    collaborationDocuments?: CollaborationDocumentUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUncheckedUpdateWithoutSessionsInput = {
@@ -79099,6 +81416,7 @@ export namespace Prisma {
     calendarSources?: CalendarSourceUncheckedUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUncheckedUpdateManyWithoutUserNestedInput
     contentWorkspaces?: ContentWorkspaceUncheckedUpdateManyWithoutOwnerNestedInput
+    collaborationDocuments?: CollaborationDocumentUncheckedUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserCreateWithoutAccountsInput = {
@@ -79136,6 +81454,7 @@ export namespace Prisma {
     calendarSources?: CalendarSourceCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventCreateNestedManyWithoutUserInput
     contentWorkspaces?: ContentWorkspaceCreateNestedManyWithoutOwnerInput
+    collaborationDocuments?: CollaborationDocumentCreateNestedManyWithoutOwnerInput
   }
 
   export type UserUncheckedCreateWithoutAccountsInput = {
@@ -79173,6 +81492,7 @@ export namespace Prisma {
     calendarSources?: CalendarSourceUncheckedCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutUserInput
     contentWorkspaces?: ContentWorkspaceUncheckedCreateNestedManyWithoutOwnerInput
+    collaborationDocuments?: CollaborationDocumentUncheckedCreateNestedManyWithoutOwnerInput
   }
 
   export type UserCreateOrConnectWithoutAccountsInput = {
@@ -79226,6 +81546,7 @@ export namespace Prisma {
     calendarSources?: CalendarSourceUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUpdateManyWithoutUserNestedInput
     contentWorkspaces?: ContentWorkspaceUpdateManyWithoutOwnerNestedInput
+    collaborationDocuments?: CollaborationDocumentUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUncheckedUpdateWithoutAccountsInput = {
@@ -79263,6 +81584,7 @@ export namespace Prisma {
     calendarSources?: CalendarSourceUncheckedUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUncheckedUpdateManyWithoutUserNestedInput
     contentWorkspaces?: ContentWorkspaceUncheckedUpdateManyWithoutOwnerNestedInput
+    collaborationDocuments?: CollaborationDocumentUncheckedUpdateManyWithoutOwnerNestedInput
   }
 
   export type ContentNodeCreateWithoutAuditLogsInput = {
@@ -79300,6 +81622,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupCreateNestedOneWithoutContentNodesInput
     person?: PersonCreateNestedOneWithoutContentNodesInput
     peopleFileTreeMounts?: PeopleFileTreeMountCreateNestedManyWithoutContentParentInput
+    collaborationDocument?: CollaborationDocumentCreateNestedOneWithoutContentInput
     contentPath?: ContentPathCreateNestedOneWithoutContentInput
     contentTags?: ContentTagCreateNestedManyWithoutContentInput
     personMentions?: PersonMentionCreateNestedManyWithoutContentInput
@@ -79344,6 +81667,7 @@ export namespace Prisma {
     targetLinks?: ContentLinkUncheckedCreateNestedManyWithoutTargetInput
     children?: ContentNodeUncheckedCreateNestedManyWithoutParentInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedCreateNestedManyWithoutContentParentInput
+    collaborationDocument?: CollaborationDocumentUncheckedCreateNestedOneWithoutContentInput
     contentPath?: ContentPathUncheckedCreateNestedOneWithoutContentInput
     contentTags?: ContentTagUncheckedCreateNestedManyWithoutContentInput
     personMentions?: PersonMentionUncheckedCreateNestedManyWithoutContentInput
@@ -79393,6 +81717,7 @@ export namespace Prisma {
     calendarSources?: CalendarSourceCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventCreateNestedManyWithoutUserInput
     contentWorkspaces?: ContentWorkspaceCreateNestedManyWithoutOwnerInput
+    collaborationDocuments?: CollaborationDocumentCreateNestedManyWithoutOwnerInput
   }
 
   export type UserUncheckedCreateWithoutAuditTargetsInput = {
@@ -79430,6 +81755,7 @@ export namespace Prisma {
     calendarSources?: CalendarSourceUncheckedCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutUserInput
     contentWorkspaces?: ContentWorkspaceUncheckedCreateNestedManyWithoutOwnerInput
+    collaborationDocuments?: CollaborationDocumentUncheckedCreateNestedManyWithoutOwnerInput
   }
 
   export type UserCreateOrConnectWithoutAuditTargetsInput = {
@@ -79472,6 +81798,7 @@ export namespace Prisma {
     calendarSources?: CalendarSourceCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventCreateNestedManyWithoutUserInput
     contentWorkspaces?: ContentWorkspaceCreateNestedManyWithoutOwnerInput
+    collaborationDocuments?: CollaborationDocumentCreateNestedManyWithoutOwnerInput
   }
 
   export type UserUncheckedCreateWithoutAdminActionsInput = {
@@ -79509,6 +81836,7 @@ export namespace Prisma {
     calendarSources?: CalendarSourceUncheckedCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutUserInput
     contentWorkspaces?: ContentWorkspaceUncheckedCreateNestedManyWithoutOwnerInput
+    collaborationDocuments?: CollaborationDocumentUncheckedCreateNestedManyWithoutOwnerInput
   }
 
   export type UserCreateOrConnectWithoutAdminActionsInput = {
@@ -79562,6 +81890,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupUpdateOneWithoutContentNodesNestedInput
     person?: PersonUpdateOneWithoutContentNodesNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUpdateManyWithoutContentParentNestedInput
+    collaborationDocument?: CollaborationDocumentUpdateOneWithoutContentNestedInput
     contentPath?: ContentPathUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUpdateManyWithoutContentNestedInput
     personMentions?: PersonMentionUpdateManyWithoutContentNestedInput
@@ -79606,6 +81935,7 @@ export namespace Prisma {
     targetLinks?: ContentLinkUncheckedUpdateManyWithoutTargetNestedInput
     children?: ContentNodeUncheckedUpdateManyWithoutParentNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedUpdateManyWithoutContentParentNestedInput
+    collaborationDocument?: CollaborationDocumentUncheckedUpdateOneWithoutContentNestedInput
     contentPath?: ContentPathUncheckedUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUncheckedUpdateManyWithoutContentNestedInput
     personMentions?: PersonMentionUncheckedUpdateManyWithoutContentNestedInput
@@ -79661,6 +81991,7 @@ export namespace Prisma {
     calendarSources?: CalendarSourceUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUpdateManyWithoutUserNestedInput
     contentWorkspaces?: ContentWorkspaceUpdateManyWithoutOwnerNestedInput
+    collaborationDocuments?: CollaborationDocumentUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUncheckedUpdateWithoutAuditTargetsInput = {
@@ -79698,6 +82029,7 @@ export namespace Prisma {
     calendarSources?: CalendarSourceUncheckedUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUncheckedUpdateManyWithoutUserNestedInput
     contentWorkspaces?: ContentWorkspaceUncheckedUpdateManyWithoutOwnerNestedInput
+    collaborationDocuments?: CollaborationDocumentUncheckedUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUpsertWithoutAdminActionsInput = {
@@ -79746,6 +82078,7 @@ export namespace Prisma {
     calendarSources?: CalendarSourceUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUpdateManyWithoutUserNestedInput
     contentWorkspaces?: ContentWorkspaceUpdateManyWithoutOwnerNestedInput
+    collaborationDocuments?: CollaborationDocumentUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUncheckedUpdateWithoutAdminActionsInput = {
@@ -79783,6 +82116,7 @@ export namespace Prisma {
     calendarSources?: CalendarSourceUncheckedUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUncheckedUpdateManyWithoutUserNestedInput
     contentWorkspaces?: ContentWorkspaceUncheckedUpdateManyWithoutOwnerNestedInput
+    collaborationDocuments?: CollaborationDocumentUncheckedUpdateManyWithoutOwnerNestedInput
   }
 
   export type ContentNodeCreateWithoutFolderPayloadInput = {
@@ -79820,6 +82154,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupCreateNestedOneWithoutContentNodesInput
     person?: PersonCreateNestedOneWithoutContentNodesInput
     peopleFileTreeMounts?: PeopleFileTreeMountCreateNestedManyWithoutContentParentInput
+    collaborationDocument?: CollaborationDocumentCreateNestedOneWithoutContentInput
     contentPath?: ContentPathCreateNestedOneWithoutContentInput
     contentTags?: ContentTagCreateNestedManyWithoutContentInput
     personMentions?: PersonMentionCreateNestedManyWithoutContentInput
@@ -79864,6 +82199,7 @@ export namespace Prisma {
     targetLinks?: ContentLinkUncheckedCreateNestedManyWithoutTargetInput
     children?: ContentNodeUncheckedCreateNestedManyWithoutParentInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedCreateNestedManyWithoutContentParentInput
+    collaborationDocument?: CollaborationDocumentUncheckedCreateNestedOneWithoutContentInput
     contentPath?: ContentPathUncheckedCreateNestedOneWithoutContentInput
     contentTags?: ContentTagUncheckedCreateNestedManyWithoutContentInput
     personMentions?: PersonMentionUncheckedCreateNestedManyWithoutContentInput
@@ -79924,6 +82260,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupUpdateOneWithoutContentNodesNestedInput
     person?: PersonUpdateOneWithoutContentNodesNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUpdateManyWithoutContentParentNestedInput
+    collaborationDocument?: CollaborationDocumentUpdateOneWithoutContentNestedInput
     contentPath?: ContentPathUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUpdateManyWithoutContentNestedInput
     personMentions?: PersonMentionUpdateManyWithoutContentNestedInput
@@ -79968,6 +82305,7 @@ export namespace Prisma {
     targetLinks?: ContentLinkUncheckedUpdateManyWithoutTargetNestedInput
     children?: ContentNodeUncheckedUpdateManyWithoutParentNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedUpdateManyWithoutContentParentNestedInput
+    collaborationDocument?: CollaborationDocumentUncheckedUpdateOneWithoutContentNestedInput
     contentPath?: ContentPathUncheckedUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUncheckedUpdateManyWithoutContentNestedInput
     personMentions?: PersonMentionUncheckedUpdateManyWithoutContentNestedInput
@@ -80012,6 +82350,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupCreateNestedOneWithoutContentNodesInput
     person?: PersonCreateNestedOneWithoutContentNodesInput
     peopleFileTreeMounts?: PeopleFileTreeMountCreateNestedManyWithoutContentParentInput
+    collaborationDocument?: CollaborationDocumentCreateNestedOneWithoutContentInput
     contentPath?: ContentPathCreateNestedOneWithoutContentInput
     contentTags?: ContentTagCreateNestedManyWithoutContentInput
     personMentions?: PersonMentionCreateNestedManyWithoutContentInput
@@ -80056,6 +82395,7 @@ export namespace Prisma {
     targetLinks?: ContentLinkUncheckedCreateNestedManyWithoutTargetInput
     children?: ContentNodeUncheckedCreateNestedManyWithoutParentInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedCreateNestedManyWithoutContentParentInput
+    collaborationDocument?: CollaborationDocumentUncheckedCreateNestedOneWithoutContentInput
     contentPath?: ContentPathUncheckedCreateNestedOneWithoutContentInput
     contentTags?: ContentTagUncheckedCreateNestedManyWithoutContentInput
     personMentions?: PersonMentionUncheckedCreateNestedManyWithoutContentInput
@@ -80116,6 +82456,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupUpdateOneWithoutContentNodesNestedInput
     person?: PersonUpdateOneWithoutContentNodesNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUpdateManyWithoutContentParentNestedInput
+    collaborationDocument?: CollaborationDocumentUpdateOneWithoutContentNestedInput
     contentPath?: ContentPathUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUpdateManyWithoutContentNestedInput
     personMentions?: PersonMentionUpdateManyWithoutContentNestedInput
@@ -80160,6 +82501,7 @@ export namespace Prisma {
     targetLinks?: ContentLinkUncheckedUpdateManyWithoutTargetNestedInput
     children?: ContentNodeUncheckedUpdateManyWithoutParentNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedUpdateManyWithoutContentParentNestedInput
+    collaborationDocument?: CollaborationDocumentUncheckedUpdateOneWithoutContentNestedInput
     contentPath?: ContentPathUncheckedUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUncheckedUpdateManyWithoutContentNestedInput
     personMentions?: PersonMentionUncheckedUpdateManyWithoutContentNestedInput
@@ -80204,6 +82546,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupCreateNestedOneWithoutContentNodesInput
     person?: PersonCreateNestedOneWithoutContentNodesInput
     peopleFileTreeMounts?: PeopleFileTreeMountCreateNestedManyWithoutContentParentInput
+    collaborationDocument?: CollaborationDocumentCreateNestedOneWithoutContentInput
     contentPath?: ContentPathCreateNestedOneWithoutContentInput
     contentTags?: ContentTagCreateNestedManyWithoutContentInput
     personMentions?: PersonMentionCreateNestedManyWithoutContentInput
@@ -80248,6 +82591,7 @@ export namespace Prisma {
     targetLinks?: ContentLinkUncheckedCreateNestedManyWithoutTargetInput
     children?: ContentNodeUncheckedCreateNestedManyWithoutParentInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedCreateNestedManyWithoutContentParentInput
+    collaborationDocument?: CollaborationDocumentUncheckedCreateNestedOneWithoutContentInput
     contentPath?: ContentPathUncheckedCreateNestedOneWithoutContentInput
     contentTags?: ContentTagUncheckedCreateNestedManyWithoutContentInput
     personMentions?: PersonMentionUncheckedCreateNestedManyWithoutContentInput
@@ -80308,6 +82652,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupUpdateOneWithoutContentNodesNestedInput
     person?: PersonUpdateOneWithoutContentNodesNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUpdateManyWithoutContentParentNestedInput
+    collaborationDocument?: CollaborationDocumentUpdateOneWithoutContentNestedInput
     contentPath?: ContentPathUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUpdateManyWithoutContentNestedInput
     personMentions?: PersonMentionUpdateManyWithoutContentNestedInput
@@ -80352,6 +82697,7 @@ export namespace Prisma {
     targetLinks?: ContentLinkUncheckedUpdateManyWithoutTargetNestedInput
     children?: ContentNodeUncheckedUpdateManyWithoutParentNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedUpdateManyWithoutContentParentNestedInput
+    collaborationDocument?: CollaborationDocumentUncheckedUpdateOneWithoutContentNestedInput
     contentPath?: ContentPathUncheckedUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUncheckedUpdateManyWithoutContentNestedInput
     personMentions?: PersonMentionUncheckedUpdateManyWithoutContentNestedInput
@@ -80396,6 +82742,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupCreateNestedOneWithoutContentNodesInput
     person?: PersonCreateNestedOneWithoutContentNodesInput
     peopleFileTreeMounts?: PeopleFileTreeMountCreateNestedManyWithoutContentParentInput
+    collaborationDocument?: CollaborationDocumentCreateNestedOneWithoutContentInput
     contentPath?: ContentPathCreateNestedOneWithoutContentInput
     contentTags?: ContentTagCreateNestedManyWithoutContentInput
     personMentions?: PersonMentionCreateNestedManyWithoutContentInput
@@ -80440,6 +82787,7 @@ export namespace Prisma {
     targetLinks?: ContentLinkUncheckedCreateNestedManyWithoutTargetInput
     children?: ContentNodeUncheckedCreateNestedManyWithoutParentInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedCreateNestedManyWithoutContentParentInput
+    collaborationDocument?: CollaborationDocumentUncheckedCreateNestedOneWithoutContentInput
     contentPath?: ContentPathUncheckedCreateNestedOneWithoutContentInput
     contentTags?: ContentTagUncheckedCreateNestedManyWithoutContentInput
     personMentions?: PersonMentionUncheckedCreateNestedManyWithoutContentInput
@@ -80500,6 +82848,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupUpdateOneWithoutContentNodesNestedInput
     person?: PersonUpdateOneWithoutContentNodesNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUpdateManyWithoutContentParentNestedInput
+    collaborationDocument?: CollaborationDocumentUpdateOneWithoutContentNestedInput
     contentPath?: ContentPathUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUpdateManyWithoutContentNestedInput
     personMentions?: PersonMentionUpdateManyWithoutContentNestedInput
@@ -80544,6 +82893,7 @@ export namespace Prisma {
     targetLinks?: ContentLinkUncheckedUpdateManyWithoutTargetNestedInput
     children?: ContentNodeUncheckedUpdateManyWithoutParentNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedUpdateManyWithoutContentParentNestedInput
+    collaborationDocument?: CollaborationDocumentUncheckedUpdateOneWithoutContentNestedInput
     contentPath?: ContentPathUncheckedUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUncheckedUpdateManyWithoutContentNestedInput
     personMentions?: PersonMentionUncheckedUpdateManyWithoutContentNestedInput
@@ -80588,6 +82938,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupCreateNestedOneWithoutContentNodesInput
     person?: PersonCreateNestedOneWithoutContentNodesInput
     peopleFileTreeMounts?: PeopleFileTreeMountCreateNestedManyWithoutContentParentInput
+    collaborationDocument?: CollaborationDocumentCreateNestedOneWithoutContentInput
     contentPath?: ContentPathCreateNestedOneWithoutContentInput
     contentTags?: ContentTagCreateNestedManyWithoutContentInput
     personMentions?: PersonMentionCreateNestedManyWithoutContentInput
@@ -80632,6 +82983,7 @@ export namespace Prisma {
     targetLinks?: ContentLinkUncheckedCreateNestedManyWithoutTargetInput
     children?: ContentNodeUncheckedCreateNestedManyWithoutParentInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedCreateNestedManyWithoutContentParentInput
+    collaborationDocument?: CollaborationDocumentUncheckedCreateNestedOneWithoutContentInput
     contentPath?: ContentPathUncheckedCreateNestedOneWithoutContentInput
     contentTags?: ContentTagUncheckedCreateNestedManyWithoutContentInput
     personMentions?: PersonMentionUncheckedCreateNestedManyWithoutContentInput
@@ -80692,6 +83044,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupUpdateOneWithoutContentNodesNestedInput
     person?: PersonUpdateOneWithoutContentNodesNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUpdateManyWithoutContentParentNestedInput
+    collaborationDocument?: CollaborationDocumentUpdateOneWithoutContentNestedInput
     contentPath?: ContentPathUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUpdateManyWithoutContentNestedInput
     personMentions?: PersonMentionUpdateManyWithoutContentNestedInput
@@ -80736,6 +83089,7 @@ export namespace Prisma {
     targetLinks?: ContentLinkUncheckedUpdateManyWithoutTargetNestedInput
     children?: ContentNodeUncheckedUpdateManyWithoutParentNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedUpdateManyWithoutContentParentNestedInput
+    collaborationDocument?: CollaborationDocumentUncheckedUpdateOneWithoutContentNestedInput
     contentPath?: ContentPathUncheckedUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUncheckedUpdateManyWithoutContentNestedInput
     personMentions?: PersonMentionUncheckedUpdateManyWithoutContentNestedInput
@@ -80780,6 +83134,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupCreateNestedOneWithoutContentNodesInput
     person?: PersonCreateNestedOneWithoutContentNodesInput
     peopleFileTreeMounts?: PeopleFileTreeMountCreateNestedManyWithoutContentParentInput
+    collaborationDocument?: CollaborationDocumentCreateNestedOneWithoutContentInput
     contentPath?: ContentPathCreateNestedOneWithoutContentInput
     contentTags?: ContentTagCreateNestedManyWithoutContentInput
     personMentions?: PersonMentionCreateNestedManyWithoutContentInput
@@ -80824,6 +83179,7 @@ export namespace Prisma {
     targetLinks?: ContentLinkUncheckedCreateNestedManyWithoutTargetInput
     children?: ContentNodeUncheckedCreateNestedManyWithoutParentInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedCreateNestedManyWithoutContentParentInput
+    collaborationDocument?: CollaborationDocumentUncheckedCreateNestedOneWithoutContentInput
     contentPath?: ContentPathUncheckedCreateNestedOneWithoutContentInput
     contentTags?: ContentTagUncheckedCreateNestedManyWithoutContentInput
     personMentions?: PersonMentionUncheckedCreateNestedManyWithoutContentInput
@@ -80884,6 +83240,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupUpdateOneWithoutContentNodesNestedInput
     person?: PersonUpdateOneWithoutContentNodesNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUpdateManyWithoutContentParentNestedInput
+    collaborationDocument?: CollaborationDocumentUpdateOneWithoutContentNestedInput
     contentPath?: ContentPathUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUpdateManyWithoutContentNestedInput
     personMentions?: PersonMentionUpdateManyWithoutContentNestedInput
@@ -80928,6 +83285,7 @@ export namespace Prisma {
     targetLinks?: ContentLinkUncheckedUpdateManyWithoutTargetNestedInput
     children?: ContentNodeUncheckedUpdateManyWithoutParentNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedUpdateManyWithoutContentParentNestedInput
+    collaborationDocument?: CollaborationDocumentUncheckedUpdateOneWithoutContentNestedInput
     contentPath?: ContentPathUncheckedUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUncheckedUpdateManyWithoutContentNestedInput
     personMentions?: PersonMentionUncheckedUpdateManyWithoutContentNestedInput
@@ -80972,6 +83330,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupCreateNestedOneWithoutContentNodesInput
     person?: PersonCreateNestedOneWithoutContentNodesInput
     peopleFileTreeMounts?: PeopleFileTreeMountCreateNestedManyWithoutContentParentInput
+    collaborationDocument?: CollaborationDocumentCreateNestedOneWithoutContentInput
     contentPath?: ContentPathCreateNestedOneWithoutContentInput
     contentTags?: ContentTagCreateNestedManyWithoutContentInput
     personMentions?: PersonMentionCreateNestedManyWithoutContentInput
@@ -81016,6 +83375,7 @@ export namespace Prisma {
     targetLinks?: ContentLinkUncheckedCreateNestedManyWithoutTargetInput
     children?: ContentNodeUncheckedCreateNestedManyWithoutParentInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedCreateNestedManyWithoutContentParentInput
+    collaborationDocument?: CollaborationDocumentUncheckedCreateNestedOneWithoutContentInput
     contentPath?: ContentPathUncheckedCreateNestedOneWithoutContentInput
     contentTags?: ContentTagUncheckedCreateNestedManyWithoutContentInput
     personMentions?: PersonMentionUncheckedCreateNestedManyWithoutContentInput
@@ -81076,6 +83436,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupUpdateOneWithoutContentNodesNestedInput
     person?: PersonUpdateOneWithoutContentNodesNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUpdateManyWithoutContentParentNestedInput
+    collaborationDocument?: CollaborationDocumentUpdateOneWithoutContentNestedInput
     contentPath?: ContentPathUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUpdateManyWithoutContentNestedInput
     personMentions?: PersonMentionUpdateManyWithoutContentNestedInput
@@ -81120,6 +83481,7 @@ export namespace Prisma {
     targetLinks?: ContentLinkUncheckedUpdateManyWithoutTargetNestedInput
     children?: ContentNodeUncheckedUpdateManyWithoutParentNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedUpdateManyWithoutContentParentNestedInput
+    collaborationDocument?: CollaborationDocumentUncheckedUpdateOneWithoutContentNestedInput
     contentPath?: ContentPathUncheckedUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUncheckedUpdateManyWithoutContentNestedInput
     personMentions?: PersonMentionUncheckedUpdateManyWithoutContentNestedInput
@@ -81164,6 +83526,7 @@ export namespace Prisma {
     calendarSources?: CalendarSourceCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventCreateNestedManyWithoutUserInput
     contentWorkspaces?: ContentWorkspaceCreateNestedManyWithoutOwnerInput
+    collaborationDocuments?: CollaborationDocumentCreateNestedManyWithoutOwnerInput
   }
 
   export type UserUncheckedCreateWithoutReusableCategoriesInput = {
@@ -81201,6 +83564,7 @@ export namespace Prisma {
     calendarSources?: CalendarSourceUncheckedCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutUserInput
     contentWorkspaces?: ContentWorkspaceUncheckedCreateNestedManyWithoutOwnerInput
+    collaborationDocuments?: CollaborationDocumentUncheckedCreateNestedManyWithoutOwnerInput
   }
 
   export type UserCreateOrConnectWithoutReusableCategoriesInput = {
@@ -81481,6 +83845,7 @@ export namespace Prisma {
     calendarSources?: CalendarSourceUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUpdateManyWithoutUserNestedInput
     contentWorkspaces?: ContentWorkspaceUpdateManyWithoutOwnerNestedInput
+    collaborationDocuments?: CollaborationDocumentUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUncheckedUpdateWithoutReusableCategoriesInput = {
@@ -81518,6 +83883,7 @@ export namespace Prisma {
     calendarSources?: CalendarSourceUncheckedUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUncheckedUpdateManyWithoutUserNestedInput
     contentWorkspaces?: ContentWorkspaceUncheckedUpdateManyWithoutOwnerNestedInput
+    collaborationDocuments?: CollaborationDocumentUncheckedUpdateManyWithoutOwnerNestedInput
   }
 
   export type ReusableCategoryUpsertWithoutChildrenInput = {
@@ -81715,6 +84081,7 @@ export namespace Prisma {
     calendarSources?: CalendarSourceCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventCreateNestedManyWithoutUserInput
     contentWorkspaces?: ContentWorkspaceCreateNestedManyWithoutOwnerInput
+    collaborationDocuments?: CollaborationDocumentCreateNestedManyWithoutOwnerInput
   }
 
   export type UserUncheckedCreateWithoutSavedBlocksInput = {
@@ -81752,6 +84119,7 @@ export namespace Prisma {
     calendarSources?: CalendarSourceUncheckedCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutUserInput
     contentWorkspaces?: ContentWorkspaceUncheckedCreateNestedManyWithoutOwnerInput
+    collaborationDocuments?: CollaborationDocumentUncheckedCreateNestedManyWithoutOwnerInput
   }
 
   export type UserCreateOrConnectWithoutSavedBlocksInput = {
@@ -81848,6 +84216,7 @@ export namespace Prisma {
     calendarSources?: CalendarSourceUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUpdateManyWithoutUserNestedInput
     contentWorkspaces?: ContentWorkspaceUpdateManyWithoutOwnerNestedInput
+    collaborationDocuments?: CollaborationDocumentUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUncheckedUpdateWithoutSavedBlocksInput = {
@@ -81885,6 +84254,7 @@ export namespace Prisma {
     calendarSources?: CalendarSourceUncheckedUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUncheckedUpdateManyWithoutUserNestedInput
     contentWorkspaces?: ContentWorkspaceUncheckedUpdateManyWithoutOwnerNestedInput
+    collaborationDocuments?: CollaborationDocumentUncheckedUpdateManyWithoutOwnerNestedInput
   }
 
   export type ReusableCategoryCreateWithoutContentTemplatesInput = {
@@ -81959,6 +84329,7 @@ export namespace Prisma {
     calendarSources?: CalendarSourceCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventCreateNestedManyWithoutUserInput
     contentWorkspaces?: ContentWorkspaceCreateNestedManyWithoutOwnerInput
+    collaborationDocuments?: CollaborationDocumentCreateNestedManyWithoutOwnerInput
   }
 
   export type UserUncheckedCreateWithoutContentTemplatesInput = {
@@ -81996,6 +84367,7 @@ export namespace Prisma {
     calendarSources?: CalendarSourceUncheckedCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutUserInput
     contentWorkspaces?: ContentWorkspaceUncheckedCreateNestedManyWithoutOwnerInput
+    collaborationDocuments?: CollaborationDocumentUncheckedCreateNestedManyWithoutOwnerInput
   }
 
   export type UserCreateOrConnectWithoutContentTemplatesInput = {
@@ -82092,6 +84464,7 @@ export namespace Prisma {
     calendarSources?: CalendarSourceUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUpdateManyWithoutUserNestedInput
     contentWorkspaces?: ContentWorkspaceUpdateManyWithoutOwnerNestedInput
+    collaborationDocuments?: CollaborationDocumentUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUncheckedUpdateWithoutContentTemplatesInput = {
@@ -82129,6 +84502,7 @@ export namespace Prisma {
     calendarSources?: CalendarSourceUncheckedUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUncheckedUpdateManyWithoutUserNestedInput
     contentWorkspaces?: ContentWorkspaceUncheckedUpdateManyWithoutOwnerNestedInput
+    collaborationDocuments?: CollaborationDocumentUncheckedUpdateManyWithoutOwnerNestedInput
   }
 
   export type ReusableCategoryCreateWithoutSnippetsInput = {
@@ -82203,6 +84577,7 @@ export namespace Prisma {
     calendarSources?: CalendarSourceCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventCreateNestedManyWithoutUserInput
     contentWorkspaces?: ContentWorkspaceCreateNestedManyWithoutOwnerInput
+    collaborationDocuments?: CollaborationDocumentCreateNestedManyWithoutOwnerInput
   }
 
   export type UserUncheckedCreateWithoutSnippetsInput = {
@@ -82240,6 +84615,7 @@ export namespace Prisma {
     calendarSources?: CalendarSourceUncheckedCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutUserInput
     contentWorkspaces?: ContentWorkspaceUncheckedCreateNestedManyWithoutOwnerInput
+    collaborationDocuments?: CollaborationDocumentUncheckedCreateNestedManyWithoutOwnerInput
   }
 
   export type UserCreateOrConnectWithoutSnippetsInput = {
@@ -82336,6 +84712,7 @@ export namespace Prisma {
     calendarSources?: CalendarSourceUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUpdateManyWithoutUserNestedInput
     contentWorkspaces?: ContentWorkspaceUpdateManyWithoutOwnerNestedInput
+    collaborationDocuments?: CollaborationDocumentUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUncheckedUpdateWithoutSnippetsInput = {
@@ -82373,6 +84750,7 @@ export namespace Prisma {
     calendarSources?: CalendarSourceUncheckedUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUncheckedUpdateManyWithoutUserNestedInput
     contentWorkspaces?: ContentWorkspaceUncheckedUpdateManyWithoutOwnerNestedInput
+    collaborationDocuments?: CollaborationDocumentUncheckedUpdateManyWithoutOwnerNestedInput
   }
 
   export type ReusableCategoryCreateWithoutPageTemplatesInput = {
@@ -82447,6 +84825,7 @@ export namespace Prisma {
     calendarSources?: CalendarSourceCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventCreateNestedManyWithoutUserInput
     contentWorkspaces?: ContentWorkspaceCreateNestedManyWithoutOwnerInput
+    collaborationDocuments?: CollaborationDocumentCreateNestedManyWithoutOwnerInput
   }
 
   export type UserUncheckedCreateWithoutPageTemplatesInput = {
@@ -82484,6 +84863,7 @@ export namespace Prisma {
     calendarSources?: CalendarSourceUncheckedCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutUserInput
     contentWorkspaces?: ContentWorkspaceUncheckedCreateNestedManyWithoutOwnerInput
+    collaborationDocuments?: CollaborationDocumentUncheckedCreateNestedManyWithoutOwnerInput
   }
 
   export type UserCreateOrConnectWithoutPageTemplatesInput = {
@@ -82580,6 +84960,7 @@ export namespace Prisma {
     calendarSources?: CalendarSourceUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUpdateManyWithoutUserNestedInput
     contentWorkspaces?: ContentWorkspaceUpdateManyWithoutOwnerNestedInput
+    collaborationDocuments?: CollaborationDocumentUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUncheckedUpdateWithoutPageTemplatesInput = {
@@ -82617,6 +84998,7 @@ export namespace Prisma {
     calendarSources?: CalendarSourceUncheckedUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUncheckedUpdateManyWithoutUserNestedInput
     contentWorkspaces?: ContentWorkspaceUncheckedUpdateManyWithoutOwnerNestedInput
+    collaborationDocuments?: CollaborationDocumentUncheckedUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserCreateWithoutCalendarConnectionsInput = {
@@ -82654,6 +85036,7 @@ export namespace Prisma {
     calendarSources?: CalendarSourceCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventCreateNestedManyWithoutUserInput
     contentWorkspaces?: ContentWorkspaceCreateNestedManyWithoutOwnerInput
+    collaborationDocuments?: CollaborationDocumentCreateNestedManyWithoutOwnerInput
   }
 
   export type UserUncheckedCreateWithoutCalendarConnectionsInput = {
@@ -82691,6 +85074,7 @@ export namespace Prisma {
     calendarSources?: CalendarSourceUncheckedCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutUserInput
     contentWorkspaces?: ContentWorkspaceUncheckedCreateNestedManyWithoutOwnerInput
+    collaborationDocuments?: CollaborationDocumentUncheckedCreateNestedManyWithoutOwnerInput
   }
 
   export type UserCreateOrConnectWithoutCalendarConnectionsInput = {
@@ -82792,6 +85176,7 @@ export namespace Prisma {
     calendarSources?: CalendarSourceUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUpdateManyWithoutUserNestedInput
     contentWorkspaces?: ContentWorkspaceUpdateManyWithoutOwnerNestedInput
+    collaborationDocuments?: CollaborationDocumentUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUncheckedUpdateWithoutCalendarConnectionsInput = {
@@ -82829,6 +85214,7 @@ export namespace Prisma {
     calendarSources?: CalendarSourceUncheckedUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUncheckedUpdateManyWithoutUserNestedInput
     contentWorkspaces?: ContentWorkspaceUncheckedUpdateManyWithoutOwnerNestedInput
+    collaborationDocuments?: CollaborationDocumentUncheckedUpdateManyWithoutOwnerNestedInput
   }
 
   export type CalendarSourceUpsertWithWhereUniqueWithoutConnectionInput = {
@@ -82882,6 +85268,7 @@ export namespace Prisma {
     calendarConnections?: CalendarConnectionCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventCreateNestedManyWithoutUserInput
     contentWorkspaces?: ContentWorkspaceCreateNestedManyWithoutOwnerInput
+    collaborationDocuments?: CollaborationDocumentCreateNestedManyWithoutOwnerInput
   }
 
   export type UserUncheckedCreateWithoutCalendarSourcesInput = {
@@ -82919,6 +85306,7 @@ export namespace Prisma {
     calendarConnections?: CalendarConnectionUncheckedCreateNestedManyWithoutUserInput
     calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutUserInput
     contentWorkspaces?: ContentWorkspaceUncheckedCreateNestedManyWithoutOwnerInput
+    collaborationDocuments?: CollaborationDocumentUncheckedCreateNestedManyWithoutOwnerInput
   }
 
   export type UserCreateOrConnectWithoutCalendarSourcesInput = {
@@ -83065,6 +85453,7 @@ export namespace Prisma {
     calendarConnections?: CalendarConnectionUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUpdateManyWithoutUserNestedInput
     contentWorkspaces?: ContentWorkspaceUpdateManyWithoutOwnerNestedInput
+    collaborationDocuments?: CollaborationDocumentUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUncheckedUpdateWithoutCalendarSourcesInput = {
@@ -83102,6 +85491,7 @@ export namespace Prisma {
     calendarConnections?: CalendarConnectionUncheckedUpdateManyWithoutUserNestedInput
     calendarEvents?: CalendarEventUncheckedUpdateManyWithoutUserNestedInput
     contentWorkspaces?: ContentWorkspaceUncheckedUpdateManyWithoutOwnerNestedInput
+    collaborationDocuments?: CollaborationDocumentUncheckedUpdateManyWithoutOwnerNestedInput
   }
 
   export type CalendarConnectionUpsertWithoutSourcesInput = {
@@ -83196,6 +85586,7 @@ export namespace Prisma {
     calendarConnections?: CalendarConnectionCreateNestedManyWithoutUserInput
     calendarSources?: CalendarSourceCreateNestedManyWithoutUserInput
     contentWorkspaces?: ContentWorkspaceCreateNestedManyWithoutOwnerInput
+    collaborationDocuments?: CollaborationDocumentCreateNestedManyWithoutOwnerInput
   }
 
   export type UserUncheckedCreateWithoutCalendarEventsInput = {
@@ -83233,6 +85624,7 @@ export namespace Prisma {
     calendarConnections?: CalendarConnectionUncheckedCreateNestedManyWithoutUserInput
     calendarSources?: CalendarSourceUncheckedCreateNestedManyWithoutUserInput
     contentWorkspaces?: ContentWorkspaceUncheckedCreateNestedManyWithoutOwnerInput
+    collaborationDocuments?: CollaborationDocumentUncheckedCreateNestedManyWithoutOwnerInput
   }
 
   export type UserCreateOrConnectWithoutCalendarEventsInput = {
@@ -83319,6 +85711,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupCreateNestedOneWithoutContentNodesInput
     person?: PersonCreateNestedOneWithoutContentNodesInput
     peopleFileTreeMounts?: PeopleFileTreeMountCreateNestedManyWithoutContentParentInput
+    collaborationDocument?: CollaborationDocumentCreateNestedOneWithoutContentInput
     contentPath?: ContentPathCreateNestedOneWithoutContentInput
     contentTags?: ContentTagCreateNestedManyWithoutContentInput
     personMentions?: PersonMentionCreateNestedManyWithoutContentInput
@@ -83363,6 +85756,7 @@ export namespace Prisma {
     targetLinks?: ContentLinkUncheckedCreateNestedManyWithoutTargetInput
     children?: ContentNodeUncheckedCreateNestedManyWithoutParentInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedCreateNestedManyWithoutContentParentInput
+    collaborationDocument?: CollaborationDocumentUncheckedCreateNestedOneWithoutContentInput
     contentPath?: ContentPathUncheckedCreateNestedOneWithoutContentInput
     contentTags?: ContentTagUncheckedCreateNestedManyWithoutContentInput
     personMentions?: PersonMentionUncheckedCreateNestedManyWithoutContentInput
@@ -83448,6 +85842,7 @@ export namespace Prisma {
     calendarConnections?: CalendarConnectionUpdateManyWithoutUserNestedInput
     calendarSources?: CalendarSourceUpdateManyWithoutUserNestedInput
     contentWorkspaces?: ContentWorkspaceUpdateManyWithoutOwnerNestedInput
+    collaborationDocuments?: CollaborationDocumentUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUncheckedUpdateWithoutCalendarEventsInput = {
@@ -83485,6 +85880,7 @@ export namespace Prisma {
     calendarConnections?: CalendarConnectionUncheckedUpdateManyWithoutUserNestedInput
     calendarSources?: CalendarSourceUncheckedUpdateManyWithoutUserNestedInput
     contentWorkspaces?: ContentWorkspaceUncheckedUpdateManyWithoutOwnerNestedInput
+    collaborationDocuments?: CollaborationDocumentUncheckedUpdateManyWithoutOwnerNestedInput
   }
 
   export type CalendarSourceUpsertWithoutEventsInput = {
@@ -83583,6 +85979,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupUpdateOneWithoutContentNodesNestedInput
     person?: PersonUpdateOneWithoutContentNodesNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUpdateManyWithoutContentParentNestedInput
+    collaborationDocument?: CollaborationDocumentUpdateOneWithoutContentNestedInput
     contentPath?: ContentPathUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUpdateManyWithoutContentNestedInput
     personMentions?: PersonMentionUpdateManyWithoutContentNestedInput
@@ -83627,6 +86024,7 @@ export namespace Prisma {
     targetLinks?: ContentLinkUncheckedUpdateManyWithoutTargetNestedInput
     children?: ContentNodeUncheckedUpdateManyWithoutParentNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedUpdateManyWithoutContentParentNestedInput
+    collaborationDocument?: CollaborationDocumentUncheckedUpdateOneWithoutContentNestedInput
     contentPath?: ContentPathUncheckedUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUncheckedUpdateManyWithoutContentNestedInput
     personMentions?: PersonMentionUncheckedUpdateManyWithoutContentNestedInput
@@ -84045,6 +86443,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupUpdateOneWithoutContentNodesNestedInput
     person?: PersonUpdateOneWithoutContentNodesNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUpdateManyWithoutContentParentNestedInput
+    collaborationDocument?: CollaborationDocumentUpdateOneWithoutContentNestedInput
     contentPath?: ContentPathUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUpdateManyWithoutContentNestedInput
     personMentions?: PersonMentionUpdateManyWithoutContentNestedInput
@@ -84089,6 +86488,7 @@ export namespace Prisma {
     targetLinks?: ContentLinkUncheckedUpdateManyWithoutTargetNestedInput
     children?: ContentNodeUncheckedUpdateManyWithoutParentNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedUpdateManyWithoutContentParentNestedInput
+    collaborationDocument?: CollaborationDocumentUncheckedUpdateOneWithoutContentNestedInput
     contentPath?: ContentPathUncheckedUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUncheckedUpdateManyWithoutContentNestedInput
     personMentions?: PersonMentionUncheckedUpdateManyWithoutContentNestedInput
@@ -84652,6 +87052,17 @@ export namespace Prisma {
     updatedAt?: Date | string
   }
 
+  export type CollaborationDocumentCreateManyOwnerInput = {
+    id?: string
+    contentId: string
+    documentName: string
+    ydocState?: Bytes | null
+    snapshotJson?: NullableJsonNullValueInput | InputJsonValue
+    schemaVersion?: number
+    enabledAt?: Date | string
+    updatedAt?: Date | string
+  }
+
   export type AccountUpdateWithoutUserInput = {
     id?: StringFieldUpdateOperationsInput | string
     provider?: StringFieldUpdateOperationsInput | string
@@ -84881,6 +87292,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupUpdateOneWithoutContentNodesNestedInput
     person?: PersonUpdateOneWithoutContentNodesNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUpdateManyWithoutContentParentNestedInput
+    collaborationDocument?: CollaborationDocumentUpdateOneWithoutContentNestedInput
     contentPath?: ContentPathUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUpdateManyWithoutContentNestedInput
     personMentions?: PersonMentionUpdateManyWithoutContentNestedInput
@@ -84925,6 +87337,7 @@ export namespace Prisma {
     targetLinks?: ContentLinkUncheckedUpdateManyWithoutTargetNestedInput
     children?: ContentNodeUncheckedUpdateManyWithoutParentNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedUpdateManyWithoutContentParentNestedInput
+    collaborationDocument?: CollaborationDocumentUncheckedUpdateOneWithoutContentNestedInput
     contentPath?: ContentPathUncheckedUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUncheckedUpdateManyWithoutContentNestedInput
     personMentions?: PersonMentionUncheckedUpdateManyWithoutContentNestedInput
@@ -85737,6 +88150,39 @@ export namespace Prisma {
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
+  export type CollaborationDocumentUpdateWithoutOwnerInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    documentName?: StringFieldUpdateOperationsInput | string
+    ydocState?: NullableBytesFieldUpdateOperationsInput | Bytes | null
+    snapshotJson?: NullableJsonNullValueInput | InputJsonValue
+    schemaVersion?: IntFieldUpdateOperationsInput | number
+    enabledAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    content?: ContentNodeUpdateOneRequiredWithoutCollaborationDocumentNestedInput
+  }
+
+  export type CollaborationDocumentUncheckedUpdateWithoutOwnerInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    contentId?: StringFieldUpdateOperationsInput | string
+    documentName?: StringFieldUpdateOperationsInput | string
+    ydocState?: NullableBytesFieldUpdateOperationsInput | Bytes | null
+    snapshotJson?: NullableJsonNullValueInput | InputJsonValue
+    schemaVersion?: IntFieldUpdateOperationsInput | number
+    enabledAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type CollaborationDocumentUncheckedUpdateManyWithoutOwnerInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    contentId?: StringFieldUpdateOperationsInput | string
+    documentName?: StringFieldUpdateOperationsInput | string
+    ydocState?: NullableBytesFieldUpdateOperationsInput | Bytes | null
+    snapshotJson?: NullableJsonNullValueInput | InputJsonValue
+    schemaVersion?: IntFieldUpdateOperationsInput | number
+    enabledAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
   export type ContentWorkspaceItemCreateManyWorkspaceInput = {
     id?: string
     contentId: string
@@ -85832,6 +88278,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupUpdateOneWithoutContentNodesNestedInput
     person?: PersonUpdateOneWithoutContentNodesNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUpdateManyWithoutContentParentNestedInput
+    collaborationDocument?: CollaborationDocumentUpdateOneWithoutContentNestedInput
     contentPath?: ContentPathUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUpdateManyWithoutContentNestedInput
     personMentions?: PersonMentionUpdateManyWithoutContentNestedInput
@@ -85876,6 +88323,7 @@ export namespace Prisma {
     targetLinks?: ContentLinkUncheckedUpdateManyWithoutTargetNestedInput
     children?: ContentNodeUncheckedUpdateManyWithoutParentNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedUpdateManyWithoutContentParentNestedInput
+    collaborationDocument?: CollaborationDocumentUncheckedUpdateOneWithoutContentNestedInput
     contentPath?: ContentPathUncheckedUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUncheckedUpdateManyWithoutContentNestedInput
     personMentions?: PersonMentionUncheckedUpdateManyWithoutContentNestedInput
@@ -86140,6 +88588,7 @@ export namespace Prisma {
     children?: ContentNodeUpdateManyWithoutParentNestedInput
     person?: PersonUpdateOneWithoutContentNodesNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUpdateManyWithoutContentParentNestedInput
+    collaborationDocument?: CollaborationDocumentUpdateOneWithoutContentNestedInput
     contentPath?: ContentPathUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUpdateManyWithoutContentNestedInput
     personMentions?: PersonMentionUpdateManyWithoutContentNestedInput
@@ -86184,6 +88633,7 @@ export namespace Prisma {
     targetLinks?: ContentLinkUncheckedUpdateManyWithoutTargetNestedInput
     children?: ContentNodeUncheckedUpdateManyWithoutParentNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedUpdateManyWithoutContentParentNestedInput
+    collaborationDocument?: CollaborationDocumentUncheckedUpdateOneWithoutContentNestedInput
     contentPath?: ContentPathUncheckedUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUncheckedUpdateManyWithoutContentNestedInput
     personMentions?: PersonMentionUncheckedUpdateManyWithoutContentNestedInput
@@ -86317,6 +88767,7 @@ export namespace Prisma {
     children?: ContentNodeUpdateManyWithoutParentNestedInput
     peopleGroup?: PeopleGroupUpdateOneWithoutContentNodesNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUpdateManyWithoutContentParentNestedInput
+    collaborationDocument?: CollaborationDocumentUpdateOneWithoutContentNestedInput
     contentPath?: ContentPathUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUpdateManyWithoutContentNestedInput
     personMentions?: PersonMentionUpdateManyWithoutContentNestedInput
@@ -86361,6 +88812,7 @@ export namespace Prisma {
     targetLinks?: ContentLinkUncheckedUpdateManyWithoutTargetNestedInput
     children?: ContentNodeUncheckedUpdateManyWithoutParentNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedUpdateManyWithoutContentParentNestedInput
+    collaborationDocument?: CollaborationDocumentUncheckedUpdateOneWithoutContentNestedInput
     contentPath?: ContentPathUncheckedUpdateOneWithoutContentNestedInput
     contentTags?: ContentTagUncheckedUpdateManyWithoutContentNestedInput
     personMentions?: PersonMentionUncheckedUpdateManyWithoutContentNestedInput

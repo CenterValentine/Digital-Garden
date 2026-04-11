@@ -12,7 +12,7 @@
 "use client";
 
 import { useEditor, EditorContent } from "@tiptap/react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import { getEditorExtensions } from "@/lib/domain/editor/extensions-client";
 import type { JSONContent } from "@tiptap/core";
 import { LinkDialog } from "./LinkDialog";
@@ -25,6 +25,66 @@ import { isImageUrl } from "@/lib/domain/editor/utils/image-url";
 import { useEditorInstanceStore } from "@/state/editor-instance-store";
 import { useSettingsStore } from "@/state/settings-store";
 import { toast } from "sonner";
+import { HocuspocusProvider } from "@hocuspocus/provider";
+import * as Y from "yjs";
+
+interface CollaborationUser {
+  id?: string;
+  name: string;
+  email?: string | null;
+  color: string;
+}
+
+interface RemoteCollaborator extends CollaborationUser {
+  clientId: number;
+}
+
+interface CollaborationCursorLabel extends RemoteCollaborator {
+  left: number;
+  top: number;
+}
+
+function hasMeaningfulContent(content: JSONContent | null | undefined): boolean {
+  if (!content) return false;
+
+  if (typeof content.text === "string" && content.text.trim().length > 0) {
+    return true;
+  }
+
+  if (Array.isArray(content.content)) {
+    return content.content.some(hasMeaningfulContent);
+  }
+
+  return false;
+}
+
+function remoteCollaboratorsFromProvider(
+  provider: HocuspocusProvider | null,
+  document: Y.Doc | null
+): RemoteCollaborator[] {
+  const states = provider?.awareness?.getStates();
+  if (!states || !document) return [];
+
+  return Array.from(states.entries())
+    .filter(([clientId]) => clientId !== document.clientID)
+    .map(([clientId, state]) => {
+      const user = state.user as Partial<CollaborationUser> | undefined;
+      return {
+        clientId,
+        id: user?.id,
+        name: user?.name?.trim() || `Collaborator ${clientId}`,
+        email: user?.email ?? null,
+        color: user?.color || "#c4a15a",
+      };
+    });
+}
+
+function collaboratorsKey(collaborators: RemoteCollaborator[]): string {
+  return collaborators
+    .map((collaborator) => collaborator.clientId)
+    .sort((a, b) => a - b)
+    .join(",");
+}
 
 export interface EditorStats {
   /** Word count */
@@ -70,6 +130,14 @@ export interface MarkdownEditorProps {
   autoSaveDelay?: number;
   /** Read-only mode */
   editable?: boolean;
+  /** Opt-in Hocuspocus/Yjs collaboration mode. Disabled by default. */
+  collaborationEnabled?: boolean;
+  /** Callback when collaborative sync state changes */
+  onCollaborationSyncChange?: (sync: {
+    isSaving: boolean;
+    hasUnsavedChanges: boolean;
+    lastSaved?: Date;
+  }) => void;
   /** Compact mode for secondary/embedded editors (less padding, smaller prose) */
   compact?: boolean;
   /** Placeholder text when editor is empty */
@@ -96,14 +164,27 @@ export function MarkdownEditor({
   onPersonMentionClick,
   autoSaveDelay = 2000,
   editable = true,
+  collaborationEnabled = false,
+  onCollaborationSyncChange,
   compact = false,
   placeholder,
   className = "",
 }: MarkdownEditorProps) {
-  const [isSaving, setIsSaving] = useState(false);
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [, setIsSaving] = useState(false);
+  const [, setHasUnsavedChanges] = useState(false);
   const [isLinkDialogOpen, setIsLinkDialogOpen] = useState(false);
+  const [collaborationState, setCollaborationState] = useState<{
+    document: Y.Doc;
+    provider: HocuspocusProvider;
+    readOnly: boolean;
+    user: CollaborationUser;
+  } | null>(null);
+  const [collaborationError, setCollaborationError] = useState<string | null>(null);
+  const [remoteCollaborators, setRemoteCollaborators] = useState<RemoteCollaborator[]>([]);
+  const [cursorLabels, setCursorLabels] = useState<CollaborationCursorLabel[]>([]);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const editorScrollRef = useRef<HTMLDivElement>(null);
+  const duplicateWarningToastKeyRef = useRef<string | null>(null);
   // Track the last content we saved so we can distinguish save-echoes
   // (parent updating state after our save) from genuine external updates
   // (navigation, refetch). Prevents cursor-jump-on-autosave bug.
@@ -123,10 +204,214 @@ export function MarkdownEditor({
   // (useEditor doesn't re-apply editorProps on re-renders), so they'd capture a
   // stale version where editor=null. Same pattern as onSaveRef/contentIdRef.
   const insertImageFromFileRef = useRef<(file: File) => void>(() => {});
+  const shouldUseCollaboration = collaborationEnabled && Boolean(contentId);
+  const effectiveEditable =
+    editable &&
+    (!shouldUseCollaboration || Boolean(collaborationState)) &&
+    (!collaborationState || !collaborationState.readOnly);
+
+  useEffect(() => {
+    if (!shouldUseCollaboration || !contentId) {
+      setCollaborationState(null);
+      setCollaborationError(null);
+      setRemoteCollaborators([]);
+      setCursorLabels([]);
+      return;
+    }
+
+    let cancelled = false;
+    let provider: HocuspocusProvider | null = null;
+    let document: Y.Doc | null = null;
+    let didSync = false;
+    let failed = false;
+    let syncTimeout: ReturnType<typeof setTimeout> | null = null;
+    let presenceInterval: ReturnType<typeof setInterval> | null = null;
+
+    const syncRemoteCollaborators = () => {
+      if (cancelled || !provider || !document) return;
+      setRemoteCollaborators(remoteCollaboratorsFromProvider(provider, document));
+    };
+
+    const failCollaboration = (message: string) => {
+      if (cancelled || failed) return;
+      failed = true;
+      if (syncTimeout) {
+        clearTimeout(syncTimeout);
+        syncTimeout = null;
+      }
+      provider?.destroy();
+      document?.destroy();
+      setCollaborationError(message);
+      setCollaborationState(null);
+      setRemoteCollaborators([]);
+      setCursorLabels([]);
+      onCollaborationSyncChange?.({
+        isSaving: false,
+        hasUnsavedChanges: false,
+      });
+    };
+
+    async function connect() {
+      try {
+        const response = await fetch("/api/collaboration/token", {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ contentId }),
+        });
+
+        const result = await response.json();
+        if (!response.ok || !result.success) {
+          throw new Error(result.error?.message || "Failed to initialize collaboration");
+        }
+
+        document = new Y.Doc();
+        syncTimeout = setTimeout(() => {
+          if (!didSync) {
+            failCollaboration(
+              "Collaborative editing server did not finish syncing. This document is locked read-only to prevent accidental overwrite."
+            );
+          }
+        }, 8000);
+        provider = new HocuspocusProvider({
+          url: result.data.websocketUrl,
+          name: result.data.documentName,
+          token: result.data.token,
+          document,
+          onStatus: ({ status }) => {
+            if (status === "connecting") {
+              onCollaborationSyncChange?.({
+                isSaving: true,
+                hasUnsavedChanges: true,
+              });
+            } else if (status === "disconnected" && !didSync) {
+              failCollaboration(
+                "Collaborative editing server is unavailable. This document is locked read-only to prevent accidental overwrite."
+              );
+            }
+          },
+          onSynced: ({ state }) => {
+            if (state) {
+              didSync = true;
+              syncRemoteCollaborators();
+              if (syncTimeout) {
+                clearTimeout(syncTimeout);
+                syncTimeout = null;
+              }
+              const syncedFragment = document?.getXmlFragment("default");
+              if (hasMeaningfulContent(content) && syncedFragment?.length === 0) {
+                failCollaboration(
+                  "Collaborative document synced empty while this note already has content. This document is locked read-only to prevent accidental overwrite."
+                );
+                return;
+              }
+              if (!cancelled && document && provider) {
+                setCollaborationError(null);
+                setCollaborationState({
+                  document,
+                  provider,
+                  readOnly: Boolean(result.data.readOnly),
+                  user: result.data.user ?? {
+                    name: "Collaborator",
+                    color: "#c4a15a",
+                  },
+                });
+              }
+              onCollaborationSyncChange?.({
+                isSaving: false,
+                hasUnsavedChanges: false,
+                lastSaved: new Date(),
+              });
+            }
+          },
+          onUnsyncedChanges: ({ number }) => {
+            onCollaborationSyncChange?.({
+              isSaving: number > 0,
+              hasUnsavedChanges: number > 0,
+              ...(number === 0 ? { lastSaved: new Date() } : {}),
+            });
+          },
+          onAwarenessChange: () => {
+            syncRemoteCollaborators();
+          },
+          onAwarenessUpdate: () => {
+            syncRemoteCollaborators();
+          },
+          onStateless: ({ payload }) => {
+            try {
+              const message = JSON.parse(payload) as { type?: string; message?: string };
+              if (message.type === "collaboration-access-revoked") {
+                failCollaboration(message.message || "Collaboration access was revoked.");
+              }
+            } catch {
+              // Ignore unrelated stateless provider messages.
+            }
+          },
+          onClose: ({ event }) => {
+            if (!cancelled && didSync) {
+              failCollaboration(
+                event.reason ||
+                  "Collaborative editing connection closed. This document is locked read-only to prevent accidental overwrite."
+              );
+            }
+          },
+          onAuthenticationFailed: ({ reason }) => {
+            failCollaboration(reason || "Collaboration authentication failed");
+          },
+        });
+        presenceInterval = setInterval(syncRemoteCollaborators, 1000);
+
+        if (cancelled) {
+          provider.destroy();
+          document.destroy();
+          return;
+        }
+
+        setCollaborationError(null);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Failed to initialize collaboration";
+        if (!cancelled) {
+          setCollaborationError(message);
+          setCollaborationState(null);
+          setRemoteCollaborators([]);
+          setCursorLabels([]);
+        }
+      }
+    }
+
+    connect();
+
+    return () => {
+      cancelled = true;
+      provider?.destroy();
+      document?.destroy();
+      if (syncTimeout) {
+        clearTimeout(syncTimeout);
+        syncTimeout = null;
+      }
+      if (presenceInterval) {
+        clearInterval(presenceInterval);
+        presenceInterval = null;
+      }
+      setRemoteCollaborators([]);
+      setCursorLabels([]);
+      setCollaborationState(null);
+    };
+  }, [contentId, onCollaborationSyncChange, shouldUseCollaboration]);
 
   // Initialize editor
   const editor = useEditor({
     extensions: getEditorExtensions({
+      collaboration: collaborationState
+        ? {
+            document: collaborationState.document,
+            provider: collaborationState.provider,
+            user: {
+              name: collaborationState.user.name,
+              color: collaborationState.user.color,
+            },
+          }
+        : undefined,
       onWikiLinkClick,
       fetchNotesForWikiLink,
       onTagClick,
@@ -136,8 +421,8 @@ export function MarkdownEditor({
       fetchPeopleMentions,
       onPersonMentionClick,
     }),
-    content,
-    editable,
+    content: collaborationState ? undefined : content,
+    editable: effectiveEditable,
     immediatelyRender: false, // Prevent SSR hydration mismatch
     editorProps: {
       attributes: {
@@ -242,6 +527,10 @@ export function MarkdownEditor({
         clearTimeout(saveTimeoutRef.current);
       }
 
+      if (shouldUseCollaboration) {
+        return;
+      }
+
       // Schedule auto-save.
       // IMPORTANT: Snapshot the save callback AND contentId at the moment the
       // edit happens. This prevents the race condition where the user navigates
@@ -274,7 +563,102 @@ export function MarkdownEditor({
         }, autoSaveDelay);
       }
     },
-  });
+  }, [collaborationState, effectiveEditable]);
+
+  const refreshCursorLabels = useCallback(() => {
+    const container = editorScrollRef.current;
+    if (!container || remoteCollaborators.length === 0) {
+      setCursorLabels([]);
+      return;
+    }
+
+    const containerRect = container.getBoundingClientRect();
+    const nextLabels = remoteCollaborators.flatMap((collaborator) => {
+      const caret = container.querySelector<HTMLElement>(
+        `[data-collaboration-client-id="${collaborator.clientId}"]`
+      );
+      if (!caret) return [];
+
+      const caretRect = caret.getBoundingClientRect();
+      return [
+        {
+          ...collaborator,
+          left: caretRect.left - containerRect.left + container.scrollLeft,
+          top: caretRect.top - containerRect.top + container.scrollTop,
+        },
+      ];
+    });
+
+    setCursorLabels(nextLabels);
+  }, [remoteCollaborators]);
+
+  useEffect(() => {
+    if (!collaborationState || !editor) {
+      setCursorLabels([]);
+      return;
+    }
+
+    const container = editorScrollRef.current;
+    if (!container) return;
+
+    let frame: number | null = null;
+    const scheduleRefresh = () => {
+      if (frame !== null) {
+        window.cancelAnimationFrame(frame);
+      }
+      frame = window.requestAnimationFrame(() => {
+        frame = null;
+        refreshCursorLabels();
+      });
+    };
+
+    scheduleRefresh();
+    const prosemirror = container.querySelector(".ProseMirror");
+    const observer = new MutationObserver(scheduleRefresh);
+    if (prosemirror) {
+      observer.observe(prosemirror, {
+        attributes: true,
+        childList: true,
+        subtree: true,
+      });
+    }
+
+    container.addEventListener("scroll", scheduleRefresh, { passive: true });
+    window.addEventListener("resize", scheduleRefresh);
+    const interval = window.setInterval(scheduleRefresh, 500);
+
+    return () => {
+      if (frame !== null) {
+        window.cancelAnimationFrame(frame);
+      }
+      observer.disconnect();
+      container.removeEventListener("scroll", scheduleRefresh);
+      window.removeEventListener("resize", scheduleRefresh);
+      window.clearInterval(interval);
+    };
+  }, [collaborationState, editor, refreshCursorLabels]);
+
+  useEffect(() => {
+    if (!collaborationState) {
+      duplicateWarningToastKeyRef.current = null;
+      return;
+    }
+
+    if (remoteCollaborators.length === 0) {
+      duplicateWarningToastKeyRef.current = null;
+      return;
+    }
+
+    const key = collaboratorsKey(remoteCollaborators);
+    if (duplicateWarningToastKeyRef.current === key) return;
+
+    duplicateWarningToastKeyRef.current = key;
+    const names = remoteCollaborators.map((collaborator) => collaborator.name).join(", ");
+    toast.warning("This document is open in another browser or session.", {
+      description: `${names} ${remoteCollaborators.length === 1 ? "is" : "are"} also connected to this document.`,
+      duration: 8000,
+    });
+  }, [collaborationState, remoteCollaborators]);
 
   // Sync editor content when the prop changes from an EXTERNAL source
   // (navigation to a different note, refetch after rename).
@@ -283,6 +667,7 @@ export function MarkdownEditor({
   // any content the user typed during the save round-trip.
   useEffect(() => {
     if (!editor || !content) return;
+    if (collaborationState) return;
 
     // If this content matches what we just saved, it's a save-echo — skip it
     if (content === lastSavedContentRef.current) {
@@ -292,7 +677,7 @@ export function MarkdownEditor({
 
     // Genuine external update — apply it
     editor.commands.setContent(content);
-  }, [content, editor]);
+  }, [collaborationState, content, editor]);
 
   // Initial stats update when editor is created
   useEffect(() => {
@@ -488,6 +873,23 @@ export function MarkdownEditor({
 
   return (
     <div className={`flex flex-col h-full ${className} ${showAiHighlight ? "" : "ai-highlight-hidden"}`}>
+      {collaborationEnabled && collaborationError ? (
+        <div className="border-b border-red-500/20 bg-red-500/10 px-4 py-2 text-sm text-red-700">
+          Collaboration unavailable: {collaborationError}
+        </div>
+      ) : null}
+      {shouldUseCollaboration && !collaborationState && !collaborationError ? (
+        <div className="border-b border-amber-500/20 bg-amber-500/10 px-4 py-2 text-sm text-amber-700">
+          Connecting collaborative editor...
+        </div>
+      ) : null}
+      {collaborationState && remoteCollaborators.length > 0 ? (
+        <div className="border-b border-amber-500/20 bg-amber-500/10 px-4 py-2 text-sm text-amber-800">
+          This document is open in {remoteCollaborators.length} other{" "}
+          {remoteCollaborators.length === 1 ? "session" : "sessions"}:{" "}
+          {remoteCollaborators.map((collaborator) => collaborator.name).join(", ")}.
+        </div>
+      ) : null}
       {/* Sprint 37: Hidden file input for image upload */}
       <input
         ref={fileInputRef}
@@ -502,7 +904,8 @@ export function MarkdownEditor({
           may not fire 'drop' on the contenteditable). React handlers on the wrapper
           catch drops reliably regardless of where they land in the editor area. */}
       <div
-        className="flex-1 overflow-y-auto"
+        ref={editorScrollRef}
+        className="relative flex-1 overflow-y-auto"
         onDragOver={(e) => {
           if (
             e.dataTransfer.types.includes("Files") ||
@@ -578,6 +981,23 @@ export function MarkdownEditor({
         }}
       >
         <EditorContent editor={editor} />
+        {cursorLabels.length > 0 ? (
+          <div className="pointer-events-none absolute inset-0 z-30">
+            {cursorLabels.map((label) => (
+              <div
+                key={label.clientId}
+                className="dg-collaboration-caret-floating-label"
+                style={{
+                  "--collaborator-color": label.color,
+                  left: label.left + 8,
+                  top: Math.max(label.top - 28, 4),
+                } as CSSProperties}
+              >
+                {label.name}
+              </div>
+            ))}
+          </div>
+        ) : null}
       </div>
 
       {/* Bubble Menu - floating toolbar on text selection */}

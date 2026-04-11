@@ -101,6 +101,7 @@ model ContentNode {
   peopleGroup          PeopleGroup?          @relation("PeopleGroupContent", fields: [peopleGroupId], references: [id], onDelete: SetNull)
   person               Person?               @relation("PersonContent", fields: [personId], references: [id], onDelete: SetNull)
   peopleFileTreeMounts PeopleFileTreeMount[] @relation("ContentNodePeopleMounts")
+  collaborationDocument CollaborationDocument?
   contentPath          ContentPath?
   contentTags          ContentTag[]
   personMentions       PersonMention[]
@@ -335,6 +336,7 @@ model User {
   calendarSources      CalendarSource[]
   calendarEvents       CalendarEvent[]
   contentWorkspaces    ContentWorkspace[]
+  collaborationDocuments CollaborationDocument[]
 
   @@index([email])
 }
@@ -426,6 +428,22 @@ model ViewGrant {
 
   @@unique([contentId, userId])
   @@index([userId])
+}
+
+model CollaborationDocument {
+  id            String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  contentId     String      @unique @db.Uuid
+  ownerId       String      @db.Uuid
+  documentName  String      @unique @db.VarChar(160)
+  ydocState     Bytes?
+  snapshotJson  Json?
+  schemaVersion Int         @default(1)
+  enabledAt     DateTime    @default(now()) @db.Timestamptz(6)
+  updatedAt     DateTime    @updatedAt @db.Timestamptz(6)
+  content       ContentNode @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  owner         User        @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@index([ownerId, updatedAt])
 }
 
 // ============================================================

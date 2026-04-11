@@ -2557,3 +2557,40 @@ mark {
   font-size: 0.72rem;
   padding: 0.5rem;
 }
+
+.ProseMirror .dg-collaboration-caret {
+  --collaborator-color: #c4a15a;
+  border-left: 2px solid var(--collaborator-color);
+  display: inline-block;
+  height: 1.25em;
+  margin-left: -1px;
+  margin-right: -1px;
+  pointer-events: none;
+  position: relative;
+  vertical-align: text-top;
+  width: 0;
+  z-index: 20;
+}
+
+.dg-collaboration-caret-floating-label {
+  background: var(--collaborator-color);
+  border-radius: 999px;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.18);
+  color: white;
+  display: inline-flex;
+  font-size: 0.68rem;
+  font-weight: 750;
+  line-height: 1;
+  max-width: 12rem;
+  opacity: 0.96;
+  overflow: hidden;
+  padding: 0.22rem 0.45rem;
+  position: absolute;
+  text-overflow: ellipsis;
+  transform: translate(0, 0);
+  white-space: nowrap;
+}
+
+.ProseMirror .dg-collaboration-selection {
+  border-radius: 0.12rem;
+}

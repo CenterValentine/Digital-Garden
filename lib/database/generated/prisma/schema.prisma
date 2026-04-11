@@ -91,23 +91,24 @@ model ContentNode {
   hopePayload          HopePayload?
   workflowPayload      WorkflowPayload?
 
-  history              ContentHistory[]
-  sourceLinks          ContentLink[]          @relation("SourceContent")
-  targetLinks          ContentLink[]          @relation("TargetContent")
-  category             Category?              @relation(fields: [categoryId], references: [id])
-  owner                User                   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  parent               ContentNode?           @relation("Hierarchy", fields: [parentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  children             ContentNode[]          @relation("Hierarchy")
-  peopleGroup          PeopleGroup?           @relation("PeopleGroupContent", fields: [peopleGroupId], references: [id], onDelete: SetNull)
-  person               Person?                @relation("PersonContent", fields: [personId], references: [id], onDelete: SetNull)
-  peopleFileTreeMounts PeopleFileTreeMount[]  @relation("ContentNodePeopleMounts")
-  contentPath          ContentPath?
-  contentTags          ContentTag[]
-  personMentions       PersonMention[]
-  trashBinEntry        TrashBin?
-  viewGrants           ViewGrant[]
-  calendarEvents       CalendarEvent[]
-  workspaceItems       ContentWorkspaceItem[]
+  history               ContentHistory[]
+  sourceLinks           ContentLink[]          @relation("SourceContent")
+  targetLinks           ContentLink[]          @relation("TargetContent")
+  category              Category?              @relation(fields: [categoryId], references: [id])
+  owner                 User                   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  parent                ContentNode?           @relation("Hierarchy", fields: [parentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  children              ContentNode[]          @relation("Hierarchy")
+  peopleGroup           PeopleGroup?           @relation("PeopleGroupContent", fields: [peopleGroupId], references: [id], onDelete: SetNull)
+  person                Person?                @relation("PersonContent", fields: [personId], references: [id], onDelete: SetNull)
+  peopleFileTreeMounts  PeopleFileTreeMount[]  @relation("ContentNodePeopleMounts")
+  collaborationDocument CollaborationDocument?
+  contentPath           ContentPath?
+  contentTags           ContentTag[]
+  personMentions        PersonMention[]
+  trashBinEntry         TrashBin?
+  viewGrants            ViewGrant[]
+  calendarEvents        CalendarEvent[]
+  workspaceItems        ContentWorkspaceItem[]
 
   @@unique([ownerId, slug])
   @@index([ownerId, deletedAt])
@@ -300,41 +301,42 @@ model AIProviderKey {
 }
 
 model User {
-  id                   String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  username             String                  @unique @db.VarChar(50)
-  passwordHash         String?                 @db.Char(60)
-  email                String                  @unique @db.VarChar(255)
-  role                 UserRole                @default(guest)
-  createdAt            DateTime                @default(now()) @db.Timestamptz(6)
-  updatedAt            DateTime                @updatedAt @db.Timestamptz(6)
-  settings             Json?
-  settingsVersion      Int                     @default(1)
-  accounts             Account[]
-  aiProviderKeys       AIProviderKey[]
-  auditTargets         AuditLog[]              @relation("AuditTargets")
-  adminActions         AuditLog[]              @relation("AdminActions")
-  categories           Category[]
-  contentHistory       ContentHistory[]
-  contentNodes         ContentNode[]
-  sessions             Session[]
-  storageConfigs       StorageProviderConfig[]
-  tags                 Tag[]
-  trashedContent       TrashBin[]
-  viewGrants           ViewGrant[]
-  peopleGroups         PeopleGroup[]
-  peopleDefaultGroups  PeopleGroup[]           @relation("DefaultPeopleGroup")
-  people               Person[]
-  peopleFileTreeMounts PeopleFileTreeMount[]
-  personMentions       PersonMention[]
-  reusableCategories   ReusableCategory[]
-  savedBlocks          SavedBlock[]
-  contentTemplates     ContentTemplate[]
-  snippets             Snippet[]
-  pageTemplates        PageTemplate[]
-  calendarConnections  CalendarConnection[]
-  calendarSources      CalendarSource[]
-  calendarEvents       CalendarEvent[]
-  contentWorkspaces    ContentWorkspace[]
+  id                     String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  username               String                  @unique @db.VarChar(50)
+  passwordHash           String?                 @db.Char(60)
+  email                  String                  @unique @db.VarChar(255)
+  role                   UserRole                @default(guest)
+  createdAt              DateTime                @default(now()) @db.Timestamptz(6)
+  updatedAt              DateTime                @updatedAt @db.Timestamptz(6)
+  settings               Json?
+  settingsVersion        Int                     @default(1)
+  accounts               Account[]
+  aiProviderKeys         AIProviderKey[]
+  auditTargets           AuditLog[]              @relation("AuditTargets")
+  adminActions           AuditLog[]              @relation("AdminActions")
+  categories             Category[]
+  contentHistory         ContentHistory[]
+  contentNodes           ContentNode[]
+  sessions               Session[]
+  storageConfigs         StorageProviderConfig[]
+  tags                   Tag[]
+  trashedContent         TrashBin[]
+  viewGrants             ViewGrant[]
+  peopleGroups           PeopleGroup[]
+  peopleDefaultGroups    PeopleGroup[]           @relation("DefaultPeopleGroup")
+  people                 Person[]
+  peopleFileTreeMounts   PeopleFileTreeMount[]
+  personMentions         PersonMention[]
+  reusableCategories     ReusableCategory[]
+  savedBlocks            SavedBlock[]
+  contentTemplates       ContentTemplate[]
+  snippets               Snippet[]
+  pageTemplates          PageTemplate[]
+  calendarConnections    CalendarConnection[]
+  calendarSources        CalendarSource[]
+  calendarEvents         CalendarEvent[]
+  contentWorkspaces      ContentWorkspace[]
+  collaborationDocuments CollaborationDocument[]
 
   @@index([email])
 }
@@ -426,6 +428,22 @@ model ViewGrant {
 
   @@unique([contentId, userId])
   @@index([userId])
+}
+
+model CollaborationDocument {
+  id            String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  contentId     String      @unique @db.Uuid
+  ownerId       String      @db.Uuid
+  documentName  String      @unique @db.VarChar(160)
+  ydocState     Bytes?
+  snapshotJson  Json?
+  schemaVersion Int         @default(1)
+  enabledAt     DateTime    @default(now()) @db.Timestamptz(6)
+  updatedAt     DateTime    @updatedAt @db.Timestamptz(6)
+  content       ContentNode @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  owner         User        @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@index([ownerId, updatedAt])
 }
 
 // ============================================================
