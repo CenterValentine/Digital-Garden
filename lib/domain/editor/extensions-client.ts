@@ -69,7 +69,8 @@ const lowlight = createLowlight(common);
 export interface EditorExtensionsOptions {
   collaboration?: {
     document: Doc;
-    provider: HocuspocusProvider;
+    provider?: HocuspocusProvider | null;
+    field?: string;
     user: {
       name: string;
       color: string;
@@ -138,27 +139,31 @@ export function getEditorExtensions(options?: EditorExtensionsOptions): Extensio
       ? [
           Collaboration.configure({
             document: collaboration.document,
-            field: "default",
+            field: collaboration.field ?? "default",
           }),
-          CollaborationCaret.configure({
-            provider: collaboration.provider,
-            user: collaboration.user,
-            render: (user, clientId?: number) => {
-              const cursor = document.createElement("span");
-              cursor.classList.add("dg-collaboration-caret");
-              cursor.style.setProperty("--collaborator-color", user.color);
-              if (clientId !== undefined) {
-                cursor.dataset.collaborationClientId = String(clientId);
-              }
-              cursor.title = user.name;
-              return cursor;
-            },
-            selectionRender: (user) => ({
-              nodeName: "span",
-              class: "dg-collaboration-selection",
-              style: `background-color: ${user.color}24`,
-            }),
-          }),
+          ...(collaboration.provider
+            ? [
+                CollaborationCaret.configure({
+                  provider: collaboration.provider,
+                  user: collaboration.user,
+                  render: (user, clientId?: number) => {
+                    const cursor = document.createElement("span");
+                    cursor.classList.add("dg-collaboration-caret");
+                    cursor.style.setProperty("--collaborator-color", user.color);
+                    if (clientId !== undefined) {
+                      cursor.dataset.collaborationClientId = String(clientId);
+                    }
+                    cursor.title = user.name;
+                    return cursor;
+                  },
+                  selectionRender: (user) => ({
+                    nodeName: "span",
+                    class: "dg-collaboration-selection",
+                    style: `background-color: ${user.color}24`,
+                  }),
+                }),
+              ]
+            : []),
         ]
       : []),
 

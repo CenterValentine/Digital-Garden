@@ -12,7 +12,7 @@
 "use client";
 
 import { useEditor, EditorContent } from "@tiptap/react";
-import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { getEditorExtensions } from "@/lib/domain/editor/extensions-client";
 import type { JSONContent } from "@tiptap/core";
 import { LinkDialog } from "./LinkDialog";
@@ -25,15 +25,12 @@ import { isImageUrl } from "@/lib/domain/editor/utils/image-url";
 import { useEditorInstanceStore } from "@/state/editor-instance-store";
 import { useSettingsStore } from "@/state/settings-store";
 import { toast } from "sonner";
-import { HocuspocusProvider } from "@hocuspocus/provider";
+import type { HocuspocusProvider } from "@hocuspocus/provider";
 import * as Y from "yjs";
-
-interface CollaborationUser {
-  id?: string;
-  name: string;
-  email?: string | null;
-  color: string;
-}
+import type {
+  CollaborationRuntimeHandle,
+  CollaborationUser,
+} from "@/lib/domain/collaboration/runtime";
 
 interface RemoteCollaborator extends CollaborationUser {
   clientId: number;
@@ -44,18 +41,12 @@ interface CollaborationCursorLabel extends RemoteCollaborator {
   top: number;
 }
 
-function hasMeaningfulContent(content: JSONContent | null | undefined): boolean {
-  if (!content) return false;
-
-  if (typeof content.text === "string" && content.text.trim().length > 0) {
-    return true;
-  }
-
-  if (Array.isArray(content.content)) {
-    return content.content.some(hasMeaningfulContent);
-  }
-
-  return false;
+interface EditorImageAttrs {
+  src: string;
+  alt?: string;
+  contentId?: string | null;
+  source?: string;
+  uploading?: boolean;
 }
 
 function remoteCollaboratorsFromProvider(
@@ -132,6 +123,8 @@ export interface MarkdownEditorProps {
   editable?: boolean;
   /** Opt-in Hocuspocus/Yjs collaboration mode. Disabled by default. */
   collaborationEnabled?: boolean;
+  /** Shared workspace-aware collaboration runtime. The editor never owns runtime infrastructure. */
+  collaborationRuntime?: CollaborationRuntimeHandle | null;
   /** Callback when collaborative sync state changes */
   onCollaborationSyncChange?: (sync: {
     isSaving: boolean;
@@ -165,21 +158,14 @@ export function MarkdownEditor({
   autoSaveDelay = 2000,
   editable = true,
   collaborationEnabled = false,
+  collaborationRuntime = null,
   onCollaborationSyncChange,
   compact = false,
-  placeholder,
   className = "",
 }: MarkdownEditorProps) {
   const [, setIsSaving] = useState(false);
   const [, setHasUnsavedChanges] = useState(false);
   const [isLinkDialogOpen, setIsLinkDialogOpen] = useState(false);
-  const [collaborationState, setCollaborationState] = useState<{
-    document: Y.Doc;
-    provider: HocuspocusProvider;
-    readOnly: boolean;
-    user: CollaborationUser;
-  } | null>(null);
-  const [collaborationError, setCollaborationError] = useState<string | null>(null);
   const [remoteCollaborators, setRemoteCollaborators] = useState<RemoteCollaborator[]>([]);
   const [cursorLabels, setCursorLabels] = useState<CollaborationCursorLabel[]>([]);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -204,200 +190,105 @@ export function MarkdownEditor({
   // (useEditor doesn't re-apply editorProps on re-renders), so they'd capture a
   // stale version where editor=null. Same pattern as onSaveRef/contentIdRef.
   const insertImageFromFileRef = useRef<(file: File) => void>(() => {});
-  const shouldUseCollaboration = collaborationEnabled && Boolean(contentId);
+  const shouldUseCollaboration =
+    collaborationEnabled && Boolean(contentId) && Boolean(collaborationRuntime);
+  const runtimeYdoc = collaborationRuntime?.ydoc ?? null;
+  const runtimeProvider = collaborationRuntime?.provider ?? null;
+  const runtimeUser = collaborationRuntime?.user ?? null;
+  const runtimePersistenceState = collaborationRuntime?.state.persistenceState ?? null;
+  const runtimeReadOnly = collaborationRuntime?.state.readOnly ?? false;
+  const runtimeEditPolicy = collaborationRuntime?.state.editPolicy ?? null;
+  const runtimeConnectionState = collaborationRuntime?.state.connectionState ?? null;
+  const runtimeLocalDirty = collaborationRuntime?.state.localDirty ?? false;
+  const runtimeUnsyncedUpdateCount = collaborationRuntime?.state.unsyncedUpdateCount ?? 0;
+  const collaborationState = useMemo(
+    () =>
+      shouldUseCollaboration &&
+      runtimeYdoc &&
+      runtimePersistenceState === "localReady"
+        ? {
+            document: runtimeYdoc,
+            provider: runtimeProvider,
+            readOnly: runtimeEditPolicy ? !runtimeEditPolicy.editable : runtimeReadOnly,
+            user: runtimeUser ?? {
+              name: "Collaborator",
+              color: "#c4a15a",
+            },
+          }
+        : null,
+    [
+      shouldUseCollaboration,
+      runtimeProvider,
+      runtimeEditPolicy,
+      runtimePersistenceState,
+      runtimeReadOnly,
+      runtimeUser,
+      runtimeYdoc,
+    ]
+  );
+  const collaborationWarning = collaborationRuntime?.state.warning ?? null;
+  const collaborationNotice = runtimeEditPolicy?.warning ?? collaborationWarning;
+  const isCollaborationEditBlocked =
+    shouldUseCollaboration && runtimeEditPolicy ? !runtimeEditPolicy.editable : false;
+  const isCollaborationBooting =
+    shouldUseCollaboration && runtimeEditPolicy?.reason === "booting-local-state";
+  const isCollaborationConnecting =
+    runtimeConnectionState === "promoting" ||
+    runtimeConnectionState === "connecting";
   const effectiveEditable =
     editable &&
-    (!shouldUseCollaboration || Boolean(collaborationState)) &&
-    (!collaborationState || !collaborationState.readOnly);
+    (!shouldUseCollaboration || Boolean(runtimeEditPolicy?.editable));
 
   useEffect(() => {
-    if (!shouldUseCollaboration || !contentId) {
-      setCollaborationState(null);
-      setCollaborationError(null);
+    if (!collaborationState) {
       setRemoteCollaborators([]);
       setCursorLabels([]);
       return;
     }
 
-    let cancelled = false;
-    let provider: HocuspocusProvider | null = null;
-    let document: Y.Doc | null = null;
-    let didSync = false;
-    let failed = false;
-    let syncTimeout: ReturnType<typeof setTimeout> | null = null;
-    let presenceInterval: ReturnType<typeof setInterval> | null = null;
-
     const syncRemoteCollaborators = () => {
-      if (cancelled || !provider || !document) return;
-      setRemoteCollaborators(remoteCollaboratorsFromProvider(provider, document));
+      setRemoteCollaborators(
+        remoteCollaboratorsFromProvider(
+          collaborationState.provider,
+          collaborationState.document
+        )
+      );
     };
 
-    const failCollaboration = (message: string) => {
-      if (cancelled || failed) return;
-      failed = true;
-      if (syncTimeout) {
-        clearTimeout(syncTimeout);
-        syncTimeout = null;
-      }
-      provider?.destroy();
-      document?.destroy();
-      setCollaborationError(message);
-      setCollaborationState(null);
-      setRemoteCollaborators([]);
-      setCursorLabels([]);
-      onCollaborationSyncChange?.({
-        isSaving: false,
-        hasUnsavedChanges: false,
-      });
-    };
-
-    async function connect() {
-      try {
-        const response = await fetch("/api/collaboration/token", {
-          method: "POST",
-          credentials: "include",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ contentId }),
-        });
-
-        const result = await response.json();
-        if (!response.ok || !result.success) {
-          throw new Error(result.error?.message || "Failed to initialize collaboration");
-        }
-
-        document = new Y.Doc();
-        syncTimeout = setTimeout(() => {
-          if (!didSync) {
-            failCollaboration(
-              "Collaborative editing server did not finish syncing. This document is locked read-only to prevent accidental overwrite."
-            );
-          }
-        }, 8000);
-        provider = new HocuspocusProvider({
-          url: result.data.websocketUrl,
-          name: result.data.documentName,
-          token: result.data.token,
-          document,
-          onStatus: ({ status }) => {
-            if (status === "connecting") {
-              onCollaborationSyncChange?.({
-                isSaving: true,
-                hasUnsavedChanges: true,
-              });
-            } else if (status === "disconnected" && !didSync) {
-              failCollaboration(
-                "Collaborative editing server is unavailable. This document is locked read-only to prevent accidental overwrite."
-              );
-            }
-          },
-          onSynced: ({ state }) => {
-            if (state) {
-              didSync = true;
-              syncRemoteCollaborators();
-              if (syncTimeout) {
-                clearTimeout(syncTimeout);
-                syncTimeout = null;
-              }
-              const syncedFragment = document?.getXmlFragment("default");
-              if (hasMeaningfulContent(content) && syncedFragment?.length === 0) {
-                failCollaboration(
-                  "Collaborative document synced empty while this note already has content. This document is locked read-only to prevent accidental overwrite."
-                );
-                return;
-              }
-              if (!cancelled && document && provider) {
-                setCollaborationError(null);
-                setCollaborationState({
-                  document,
-                  provider,
-                  readOnly: Boolean(result.data.readOnly),
-                  user: result.data.user ?? {
-                    name: "Collaborator",
-                    color: "#c4a15a",
-                  },
-                });
-              }
-              onCollaborationSyncChange?.({
-                isSaving: false,
-                hasUnsavedChanges: false,
-                lastSaved: new Date(),
-              });
-            }
-          },
-          onUnsyncedChanges: ({ number }) => {
-            onCollaborationSyncChange?.({
-              isSaving: number > 0,
-              hasUnsavedChanges: number > 0,
-              ...(number === 0 ? { lastSaved: new Date() } : {}),
-            });
-          },
-          onAwarenessChange: () => {
-            syncRemoteCollaborators();
-          },
-          onAwarenessUpdate: () => {
-            syncRemoteCollaborators();
-          },
-          onStateless: ({ payload }) => {
-            try {
-              const message = JSON.parse(payload) as { type?: string; message?: string };
-              if (message.type === "collaboration-access-revoked") {
-                failCollaboration(message.message || "Collaboration access was revoked.");
-              }
-            } catch {
-              // Ignore unrelated stateless provider messages.
-            }
-          },
-          onClose: ({ event }) => {
-            if (!cancelled && didSync) {
-              failCollaboration(
-                event.reason ||
-                  "Collaborative editing connection closed. This document is locked read-only to prevent accidental overwrite."
-              );
-            }
-          },
-          onAuthenticationFailed: ({ reason }) => {
-            failCollaboration(reason || "Collaboration authentication failed");
-          },
-        });
-        presenceInterval = setInterval(syncRemoteCollaborators, 1000);
-
-        if (cancelled) {
-          provider.destroy();
-          document.destroy();
-          return;
-        }
-
-        setCollaborationError(null);
-      } catch (error) {
-        const message = error instanceof Error ? error.message : "Failed to initialize collaboration";
-        if (!cancelled) {
-          setCollaborationError(message);
-          setCollaborationState(null);
-          setRemoteCollaborators([]);
-          setCursorLabels([]);
-        }
-      }
-    }
-
-    connect();
-
+    syncRemoteCollaborators();
+    const presenceInterval = setInterval(syncRemoteCollaborators, 1000);
     return () => {
-      cancelled = true;
-      provider?.destroy();
-      document?.destroy();
-      if (syncTimeout) {
-        clearTimeout(syncTimeout);
-        syncTimeout = null;
-      }
-      if (presenceInterval) {
-        clearInterval(presenceInterval);
-        presenceInterval = null;
-      }
+      clearInterval(presenceInterval);
       setRemoteCollaborators([]);
       setCursorLabels([]);
-      setCollaborationState(null);
     };
-  }, [contentId, onCollaborationSyncChange, shouldUseCollaboration]);
+  }, [collaborationState]);
+
+  useEffect(() => {
+    if (!collaborationRuntime || !onCollaborationSyncChange) return;
+    const isSaving =
+      runtimeConnectionState === "promoting" ||
+      runtimeConnectionState === "connecting" ||
+      runtimeUnsyncedUpdateCount > 0;
+    const hasUnsavedChanges =
+      runtimeLocalDirty ||
+      runtimeUnsyncedUpdateCount > 0 ||
+      runtimeConnectionState === "disconnectedButDirty";
+
+    onCollaborationSyncChange({
+      isSaving,
+      hasUnsavedChanges,
+      ...(!hasUnsavedChanges && runtimeConnectionState === "synced"
+        ? { lastSaved: new Date() }
+        : {}),
+    });
+  }, [
+    collaborationRuntime,
+    runtimeConnectionState,
+    runtimeLocalDirty,
+    runtimeUnsyncedUpdateCount,
+    onCollaborationSyncChange,
+  ]);
 
   // Initialize editor
   const editor = useEditor({
@@ -406,6 +297,7 @@ export function MarkdownEditor({
         ? {
             document: collaborationState.document,
             provider: collaborationState.provider,
+            field: "default",
             user: {
               name: collaborationState.user.name,
               color: collaborationState.user.color,
@@ -527,7 +419,7 @@ export function MarkdownEditor({
         clearTimeout(saveTimeoutRef.current);
       }
 
-      if (shouldUseCollaboration) {
+      if (collaborationState?.provider) {
         return;
       }
 
@@ -564,6 +456,10 @@ export function MarkdownEditor({
       }
     },
   }, [collaborationState, effectiveEditable]);
+
+  useEffect(() => {
+    editor?.setEditable(effectiveEditable);
+  }, [editor, effectiveEditable]);
 
   const refreshCursorLabels = useCallback(() => {
     const container = editorScrollRef.current;
@@ -778,7 +674,7 @@ export function MarkdownEditor({
           alt: alt || "AI generated image",
           contentId: imgContentId || null,
           source: source || "ai-generated",
-        } as any)
+        } as EditorImageAttrs)
         .run();
     };
 
@@ -805,7 +701,7 @@ export function MarkdownEditor({
           alt: file.name,
           uploading: true,
           source: "user-uploaded",
-        } as any)
+        } as EditorImageAttrs)
         .run();
 
       // Upload in the background
@@ -873,12 +769,24 @@ export function MarkdownEditor({
 
   return (
     <div className={`flex flex-col h-full ${className} ${showAiHighlight ? "" : "ai-highlight-hidden"}`}>
-      {collaborationEnabled && collaborationError ? (
-        <div className="border-b border-red-500/20 bg-red-500/10 px-4 py-2 text-sm text-red-700">
-          Collaboration unavailable: {collaborationError}
+      {collaborationEnabled && collaborationNotice && !isCollaborationBooting ? (
+        <div
+          className={
+            isCollaborationEditBlocked
+              ? "border-b border-red-500/20 bg-red-500/10 px-4 py-2 text-sm text-red-700"
+              : "border-b border-amber-500/20 bg-amber-500/10 px-4 py-2 text-sm text-amber-800"
+          }
+        >
+          {isCollaborationEditBlocked ? "Editing blocked" : "Collaboration notice"}:{" "}
+          {collaborationNotice}
         </div>
       ) : null}
-      {shouldUseCollaboration && !collaborationState && !collaborationError ? (
+      {isCollaborationBooting ? (
+        <div className="border-b border-amber-500/20 bg-amber-500/10 px-4 py-2 text-sm text-amber-700">
+          Loading local collaborative state...
+        </div>
+      ) : null}
+      {isCollaborationConnecting ? (
         <div className="border-b border-amber-500/20 bg-amber-500/10 px-4 py-2 text-sm text-amber-700">
           Connecting collaborative editor...
         </div>
@@ -960,7 +868,7 @@ export function MarkdownEditor({
                 editor
                   .chain()
                   .focus()
-                  .setImage(imageAttrs as any)
+                  .setImage(imageAttrs as EditorImageAttrs)
                   .run();
               }
             } catch (err) {

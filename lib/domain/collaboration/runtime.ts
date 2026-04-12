@@ -1,0 +1,1106 @@
+"use client";
+
+import { HocuspocusProvider } from "@hocuspocus/provider";
+import { TiptapTransformer } from "@hocuspocus/transformer";
+import type { JSONContent } from "@tiptap/core";
+import { IndexeddbPersistence } from "y-indexeddb";
+import * as Y from "yjs";
+import { useEffect, useMemo, useRef, useState } from "react";
+
+import { getCollaborationServerExtensions } from "@/lib/domain/collaboration/extensions";
+
+export type LocalSurfaceTopology = "singleSurface" | "multiSurface";
+export type BrowserSessionTopology = "singleSession" | "multiSession";
+export type RemoteCollaborationTopology = "solo" | "remotePresent";
+export type PersistenceState = "booting" | "localReady";
+export type SyncCapability = "localOnly" | "syncCapable";
+export type ConnectionState =
+  | "localOnly"
+  | "promoting"
+  | "connecting"
+  | "connected"
+  | "synced"
+  | "disconnectedButDirty"
+  | "coolingDown";
+export type PresenceState = "none" | "selfOnly" | "multiUserPresent";
+export type NetworkState = "online" | "offline";
+export type AuthState = "unknown" | "authorized" | "unauthorized";
+export type PromotionReason =
+  | "browser-multi-session"
+  | "remote-presence"
+  | "explicit-live-workflow"
+  | "reconnect-after-offline";
+export type CollaborationEditPolicyReason =
+  | "local-ready"
+  | "offline-local-durable"
+  | "booting-local-state"
+  | "view-only-permission"
+  | "auth-revoked"
+  | "known-stale"
+  | "unsupported";
+
+export type CollaborativeFieldKind = "tiptapXml" | "text" | "map" | "array" | "viewOnly";
+
+export interface CollaborativeFieldSpec {
+  field: "default" | "note" | "primary" | "meta" | "comments";
+  kind: CollaborativeFieldKind;
+  editable: boolean;
+  required: boolean;
+}
+
+export interface ContentCollaborationCapability {
+  contentType: string;
+  syncCapability: SyncCapability;
+  defaultEditableField: string | null;
+  fields: CollaborativeFieldSpec[];
+  promotionAllowed: boolean;
+  localPersistence: boolean;
+  hocuspocusPersistence: boolean;
+}
+
+export interface CollaborationEditPolicy {
+  editable: boolean;
+  reason: CollaborationEditPolicyReason;
+  warning: string | null;
+}
+
+export interface RuntimeConsumerDescriptor {
+  consumerId: string;
+  contentId: string;
+  surfaceKind:
+    | "workspace-pane"
+    | "workspace-tab"
+    | "folder-preview"
+    | "person-workspace"
+    | "right-sidebar"
+    | "share-view"
+    | "other";
+  workspaceId?: string | null;
+  paneId?: string | null;
+  tabId?: string | null;
+  viewInstanceId: string;
+  requiresEditableField?: string | null;
+  requiresLiveTransport?: boolean;
+  mountedAt: number;
+}
+
+export interface CollaborationRuntimeState {
+  contentId: string;
+  documentName: string;
+  userId: string;
+  browserContextId: string;
+  sessionId: string;
+  persistenceState: PersistenceState;
+  syncCapability: SyncCapability;
+  connectionState: ConnectionState;
+  localSurfaceTopology: LocalSurfaceTopology;
+  browserSessionTopology: BrowserSessionTopology;
+  remoteCollaborationTopology: RemoteCollaborationTopology;
+  presenceState: PresenceState;
+  networkState: NetworkState;
+  authState: AuthState;
+  consumerCount: number;
+  liveConsumerCount: number;
+  lastKnownServerRevision: number | null;
+  localDirty: boolean;
+  unsyncedUpdateCount: number;
+  reconnectIntent: boolean;
+  readOnly: boolean;
+  warning: string | null;
+  editPolicy: CollaborationEditPolicy;
+}
+
+export interface CollaborationUser {
+  id?: string;
+  name: string;
+  email?: string | null;
+  color: string;
+}
+
+export interface CollaborationRuntimeHandle {
+  runtimeId: string;
+  contentId: string;
+  ydoc: Y.Doc;
+  provider: HocuspocusProvider | null;
+  state: CollaborationRuntimeState;
+  capability: ContentCollaborationCapability;
+  user: CollaborationUser | null;
+  promote: (reason: PromotionReason) => Promise<void>;
+  updateConsumer: (patch: Partial<RuntimeConsumerDescriptor>) => void;
+  release: () => void;
+}
+
+interface CollaborationTokenResponse {
+  success: boolean;
+  data?: {
+    token: string;
+    documentName: string;
+    readOnly: boolean;
+    user?: CollaborationUser;
+    revision?: number;
+    websocketUrl: string;
+  };
+  error?: { message?: string };
+}
+
+interface CollaborationStateResponse {
+  success: boolean;
+  data?: {
+    documentName: string;
+    readOnly: boolean;
+    update: string | null;
+  };
+  error?: { message?: string };
+}
+
+interface DocumentRuntimeEntry {
+  runtimeId: string;
+  contentId: string;
+  capability: ContentCollaborationCapability;
+  ydoc: Y.Doc;
+  indexedDbProvider: IndexeddbPersistence;
+  hocuspocusProvider: HocuspocusProvider | null;
+  state: CollaborationRuntimeState;
+  consumers: Map<string, RuntimeConsumerDescriptor>;
+  user: CollaborationUser | null;
+  listeners: Set<() => void>;
+  cooldownTimer: ReturnType<typeof setTimeout> | null;
+  idleEvictionTimer: ReturnType<typeof setTimeout> | null;
+  sessionAnnounceTimer: ReturnType<typeof setInterval> | null;
+  sessionSweepTimer: ReturnType<typeof setInterval> | null;
+  presenceHeartbeatTimer: ReturnType<typeof setInterval> | null;
+  presenceEventSource: EventSource | null;
+  broadcastChannel: BroadcastChannel | null;
+  knownBrowserSessions: Map<string, number>;
+  pendingInitialContent: JSONContent | null;
+  hasSeededInitialContent: boolean;
+  isBootstrappingInitialContent: boolean;
+  promotionPromise: Promise<void> | null;
+  ydocUpdateHandler:
+    | ((
+        update: Uint8Array,
+        origin: unknown,
+        doc: Y.Doc,
+        transaction: Y.Transaction
+      ) => void)
+    | null;
+  networkOnlineHandler: () => void;
+  networkOfflineHandler: () => void;
+}
+
+interface UseCollaborationRuntimeOptions {
+  contentId: string | null;
+  capability: ContentCollaborationCapability | null;
+  descriptor: Omit<RuntimeConsumerDescriptor, "consumerId" | "contentId" | "mountedAt">;
+  initialContent?: JSONContent | null;
+}
+
+const NOTE_CAPABILITY: ContentCollaborationCapability = {
+  contentType: "note",
+  syncCapability: "syncCapable",
+  defaultEditableField: "default",
+  fields: [{ field: "default", kind: "tiptapXml", editable: true, required: true }],
+  promotionAllowed: true,
+  localPersistence: true,
+  hocuspocusPersistence: true,
+};
+
+const COLLABORATION_CHANNEL_NAME = "dg-collaboration-runtime";
+const SESSION_STALE_AFTER_MS = 6000;
+const SESSION_ANNOUNCE_INTERVAL_MS = 2000;
+const COOLDOWN_MS = 120_000;
+const IDLE_EVICTION_MS = 300_000;
+
+function hasMeaningfulContent(content: JSONContent | null | undefined): boolean {
+  if (!content) return false;
+  if (typeof content.text === "string" && content.text.trim().length > 0) return true;
+  return Array.isArray(content.content) && content.content.some(hasMeaningfulContent);
+}
+
+function createId(prefix: string) {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return `${prefix}:${crypto.randomUUID()}`;
+  }
+  return `${prefix}:${Math.random().toString(36).slice(2)}:${Date.now()}`;
+}
+
+function getSessionStorageId(key: string, prefix: string) {
+  if (typeof window === "undefined") return createId(prefix);
+  const existing = window.sessionStorage.getItem(key);
+  if (existing) return existing;
+  const next = createId(prefix);
+  window.sessionStorage.setItem(key, next);
+  return next;
+}
+
+function createConsumerId(
+  descriptor: Omit<RuntimeConsumerDescriptor, "consumerId" | "contentId" | "mountedAt">
+) {
+  return [
+    descriptor.surfaceKind,
+    descriptor.workspaceId ?? "workspace",
+    descriptor.paneId ?? "pane",
+    descriptor.tabId ?? "tab",
+    descriptor.viewInstanceId,
+  ].join(":");
+}
+
+function getEditableFieldNames(capability: ContentCollaborationCapability) {
+  return capability.fields.filter((field) => field.editable).map((field) => field.field);
+}
+
+function deriveEditPolicy(
+  state: CollaborationRuntimeState,
+  capability: ContentCollaborationCapability
+): CollaborationEditPolicy {
+  if (capability.syncCapability !== "syncCapable" || !capability.localPersistence) {
+    return {
+      editable: false,
+      reason: "unsupported",
+      warning: "This content type does not support local collaborative editing.",
+    };
+  }
+
+  if (state.authState === "unauthorized") {
+    return {
+      editable: false,
+      reason: "auth-revoked",
+      warning: state.warning || "Editing is blocked because access was revoked.",
+    };
+  }
+
+  if (state.readOnly) {
+    return {
+      editable: false,
+      reason: "view-only-permission",
+      warning: state.warning || "You have view-only access to this document.",
+    };
+  }
+
+  if (state.persistenceState !== "localReady") {
+    return {
+      editable: false,
+      reason: "booting-local-state",
+      warning: "Loading local collaborative state before editing is enabled.",
+    };
+  }
+
+  if (state.networkState === "offline" || state.connectionState === "disconnectedButDirty") {
+    return {
+      editable: true,
+      reason: "offline-local-durable",
+      warning:
+        state.warning ||
+        "Offline editing is active. Changes are saved locally and will sync when collaboration reconnects.",
+    };
+  }
+
+  return {
+    editable: true,
+    reason: "local-ready",
+    warning: state.warning,
+  };
+}
+
+function base64ToUint8Array(value: string) {
+  const binary = atob(value);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+  return bytes;
+}
+
+export function getContentCollaborationCapability(
+  contentType: string | null | undefined
+): ContentCollaborationCapability | null {
+  if (contentType === "note") return NOTE_CAPABILITY;
+  return null;
+}
+
+class CollaborationRuntimeManager {
+  private entries = new Map<string, DocumentRuntimeEntry>();
+  private browserContextId = getSessionStorageId("dg-collab-browser-context-id", "browser");
+  private sessionId = getSessionStorageId("dg-collab-session-id", "session");
+
+  acquire(
+    contentId: string,
+    capability: ContentCollaborationCapability,
+    descriptor: Omit<RuntimeConsumerDescriptor, "consumerId" | "contentId" | "mountedAt">,
+    initialContent?: JSONContent | null
+  ): CollaborationRuntimeHandle {
+    const entry = this.getOrCreateEntry(contentId, capability);
+    const consumerId = createConsumerId(descriptor);
+
+    if (entry.idleEvictionTimer) {
+      clearTimeout(entry.idleEvictionTimer);
+      entry.idleEvictionTimer = null;
+    }
+
+    entry.consumers.set(consumerId, {
+      ...descriptor,
+      consumerId,
+      contentId,
+      mountedAt: Date.now(),
+    });
+
+    if (initialContent) {
+      this.seedInitialContent(entry, initialContent);
+    }
+
+    this.recalculateLocalSurfaceTopology(entry);
+    this.maybePromoteFromCurrentTopology(entry);
+    this.emit(entry);
+
+    return this.createHandle(entry, consumerId);
+  }
+
+  subscribe(contentId: string, listener: () => void) {
+    const entry = this.entries.get(contentId);
+    if (!entry) return () => {};
+    entry.listeners.add(listener);
+    return () => {
+      entry.listeners.delete(listener);
+    };
+  }
+
+  getHandle(contentId: string, consumerId: string): CollaborationRuntimeHandle | null {
+    const entry = this.entries.get(contentId);
+    if (!entry || !entry.consumers.has(consumerId)) return null;
+    return this.createHandle(entry, consumerId);
+  }
+
+  seed(contentId: string, content: JSONContent | null | undefined) {
+    const entry = this.entries.get(contentId);
+    if (!entry || !content) return;
+    this.seedInitialContent(entry, content);
+  }
+
+  private getOrCreateEntry(
+    contentId: string,
+    capability: ContentCollaborationCapability
+  ): DocumentRuntimeEntry {
+    const existing = this.entries.get(contentId);
+    if (existing) return existing;
+
+    const ydoc = new Y.Doc();
+    const indexedDbProvider = new IndexeddbPersistence(`dg:content:${contentId}`, ydoc);
+    const entry: DocumentRuntimeEntry = {
+      runtimeId: createId(`runtime:${contentId}`),
+      contentId,
+      capability,
+      ydoc,
+      indexedDbProvider,
+      hocuspocusProvider: null,
+      user: null,
+      listeners: new Set(),
+      consumers: new Map(),
+      cooldownTimer: null,
+      idleEvictionTimer: null,
+      sessionAnnounceTimer: null,
+      sessionSweepTimer: null,
+      presenceHeartbeatTimer: null,
+      presenceEventSource: null,
+      broadcastChannel: null,
+      knownBrowserSessions: new Map(),
+      pendingInitialContent: null,
+      hasSeededInitialContent: false,
+      isBootstrappingInitialContent: false,
+      promotionPromise: null,
+      ydocUpdateHandler: null,
+      networkOnlineHandler: () => this.handleNetworkOnline(contentId),
+      networkOfflineHandler: () => this.handleNetworkOffline(contentId),
+      state: {
+        contentId,
+        documentName: `content:${contentId}`,
+        userId: "unknown",
+        browserContextId: this.browserContextId,
+        sessionId: this.sessionId,
+        persistenceState: "booting",
+        syncCapability: capability.syncCapability,
+        connectionState: "localOnly",
+        localSurfaceTopology: "singleSurface",
+        browserSessionTopology: "singleSession",
+        remoteCollaborationTopology: "solo",
+        presenceState: "none",
+        networkState:
+          typeof navigator === "undefined" || navigator.onLine ? "online" : "offline",
+        authState: "unknown",
+        consumerCount: 0,
+        liveConsumerCount: 0,
+        lastKnownServerRevision: null,
+        localDirty: false,
+        unsyncedUpdateCount: 0,
+        reconnectIntent: false,
+        readOnly: false,
+        warning: null,
+        editPolicy: {
+          editable: false,
+          reason: "booting-local-state",
+          warning: "Loading local collaborative state before editing is enabled.",
+        },
+      },
+    };
+
+    entry.ydocUpdateHandler = (_update, _origin, _doc, transaction) => {
+      if (!transaction.local || entry.isBootstrappingInitialContent) return;
+      if (entry.state.persistenceState !== "localReady") return;
+
+      if (
+        entry.state.networkState === "offline" ||
+        entry.state.connectionState === "disconnectedButDirty"
+      ) {
+        entry.state.localDirty = true;
+        entry.state.unsyncedUpdateCount = Math.max(entry.state.unsyncedUpdateCount, 1);
+        entry.state.reconnectIntent = true;
+        entry.state.connectionState = "disconnectedButDirty";
+        entry.state.warning =
+          "Offline editing is active. Changes are saved locally and will sync when collaboration reconnects.";
+        this.emit(entry);
+      }
+    };
+    entry.ydoc.on("update", entry.ydocUpdateHandler);
+
+    indexedDbProvider.whenSynced.then(() => {
+      entry.state.persistenceState = "localReady";
+      void this.bootstrapInitialContent(entry);
+      this.emit(entry);
+    });
+
+    this.startBrowserSessionDetection(entry);
+    this.startRemotePresenceDetection(entry);
+    window.addEventListener("online", entry.networkOnlineHandler);
+    window.addEventListener("offline", entry.networkOfflineHandler);
+    this.entries.set(contentId, entry);
+    return entry;
+  }
+
+  private seedInitialContent(entry: DocumentRuntimeEntry, content: JSONContent | null | undefined) {
+    if (!content || entry.hasSeededInitialContent || !hasMeaningfulContent(content)) return;
+    entry.pendingInitialContent = content;
+    if (entry.state.persistenceState !== "localReady") return;
+    void this.bootstrapInitialContent(entry);
+  }
+
+  private async bootstrapInitialContent(entry: DocumentRuntimeEntry) {
+    if (
+      entry.hasSeededInitialContent ||
+      entry.isBootstrappingInitialContent ||
+      entry.state.persistenceState !== "localReady"
+    ) {
+      return;
+    }
+
+    const fragment = entry.ydoc.getXmlFragment("default");
+    if (fragment.length > 0) {
+      entry.hasSeededInitialContent = true;
+      return;
+    }
+
+    if (!entry.pendingInitialContent || !hasMeaningfulContent(entry.pendingInitialContent)) {
+      return;
+    }
+
+    entry.isBootstrappingInitialContent = true;
+    try {
+      const canonicalState = await this.fetchCanonicalYDocState(entry.contentId);
+      if (canonicalState?.update) {
+        Y.applyUpdate(entry.ydoc, canonicalState.update);
+        entry.state.documentName = canonicalState.documentName;
+        entry.state.readOnly = canonicalState.readOnly;
+        entry.hasSeededInitialContent = true;
+        entry.state.warning = null;
+        return;
+      }
+    } catch (error) {
+      entry.state.warning =
+        error instanceof Error
+          ? `Using local-only fallback because canonical collaboration state could not be loaded: ${error.message}`
+          : "Using local-only fallback because canonical collaboration state could not be loaded.";
+    } finally {
+      entry.isBootstrappingInitialContent = false;
+      this.emit(entry);
+    }
+
+    const seededDoc = TiptapTransformer.toYdoc(
+      entry.pendingInitialContent,
+      "default",
+      getCollaborationServerExtensions()
+    );
+    Y.applyUpdate(entry.ydoc, Y.encodeStateAsUpdate(seededDoc));
+    seededDoc.destroy();
+    entry.hasSeededInitialContent = true;
+    this.emit(entry);
+  }
+
+  private async fetchCanonicalYDocState(contentId: string) {
+    const response = await fetch("/api/collaboration/state", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ contentId }),
+    });
+    const result = (await response.json()) as CollaborationStateResponse;
+    if (!response.ok || !result.success || !result.data) {
+      throw new Error(result.error?.message || "Failed to load collaboration state");
+    }
+    return {
+      documentName: result.data.documentName,
+      readOnly: result.data.readOnly,
+      update: result.data.update ? base64ToUint8Array(result.data.update) : null,
+    };
+  }
+
+  private startBrowserSessionDetection(entry: DocumentRuntimeEntry) {
+    const storageKey = `dg-collab-session:${entry.contentId}:${this.sessionId}`;
+    const announce = () => {
+      if (entry.consumers.size === 0) {
+        try {
+          localStorage.removeItem(storageKey);
+        } catch {
+          // Ignore storage privacy failures.
+        }
+        return;
+      }
+      const payload = {
+        type: "session-announcement",
+        contentId: entry.contentId,
+        sessionId: this.sessionId,
+        browserContextId: this.browserContextId,
+        surfaceCount: entry.consumers.size,
+        timestamp: Date.now(),
+      };
+      entry.broadcastChannel?.postMessage(payload);
+      try {
+        localStorage.setItem(storageKey, JSON.stringify(payload));
+      } catch {
+        // Ignore storage quota/privacy failures; BroadcastChannel still covers modern browsers.
+      }
+    };
+
+    if ("BroadcastChannel" in window) {
+      entry.broadcastChannel = new BroadcastChannel(COLLABORATION_CHANNEL_NAME);
+      entry.broadcastChannel.onmessage = (event) => {
+        this.handleSessionAnnouncement(entry, event.data);
+      };
+    }
+
+    const handleStorage = (event: StorageEvent) => {
+      if (!event.key?.startsWith(`dg-collab-session:${entry.contentId}:`) || !event.newValue) {
+        return;
+      }
+      try {
+        this.handleSessionAnnouncement(entry, JSON.parse(event.newValue));
+      } catch {
+        // Ignore malformed localStorage session payloads.
+      }
+    };
+
+    window.addEventListener("storage", handleStorage);
+    entry.sessionAnnounceTimer = setInterval(announce, SESSION_ANNOUNCE_INTERVAL_MS);
+    entry.sessionSweepTimer = setInterval(() => this.sweepBrowserSessions(entry), 1000);
+    announce();
+
+    const originalDispose = entry.indexedDbProvider.destroy?.bind(entry.indexedDbProvider);
+    const disposeSessionDetection = () => {
+      window.removeEventListener("storage", handleStorage);
+      if (entry.sessionAnnounceTimer) clearInterval(entry.sessionAnnounceTimer);
+      if (entry.sessionSweepTimer) clearInterval(entry.sessionSweepTimer);
+      entry.broadcastChannel?.close();
+      try {
+        localStorage.removeItem(storageKey);
+      } catch {
+        // Ignore storage privacy failures.
+      }
+      originalDispose?.();
+    };
+    entry.indexedDbProvider.destroy = disposeSessionDetection as typeof entry.indexedDbProvider.destroy;
+  }
+
+  private startRemotePresenceDetection(entry: DocumentRuntimeEntry) {
+    const sendHeartbeat = () => {
+      if (entry.consumers.size === 0) return;
+      const consumers = Array.from(entry.consumers.values());
+      void fetch("/api/collaboration/presence/heartbeat", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contentId: entry.contentId,
+          sessionId: this.sessionId,
+          browserContextId: this.browserContextId,
+          surfaceCount: entry.consumers.size,
+          activePaneIds: consumers.flatMap((consumer) =>
+            consumer.paneId ? [consumer.paneId] : []
+          ),
+          activeTabIds: consumers.flatMap((consumer) =>
+            consumer.tabId ? [consumer.tabId] : []
+          ),
+          transportState: entry.state.connectionState,
+          lastKnownServerRevision: entry.state.lastKnownServerRevision,
+        }),
+      }).catch(() => {
+        // Presence is advisory. Transport promotion can still happen via BroadcastChannel.
+      });
+    };
+
+    entry.presenceHeartbeatTimer = setInterval(sendHeartbeat, 5000);
+    sendHeartbeat();
+
+    const streamUrl = `/api/collaboration/presence/stream?contentId=${encodeURIComponent(
+      entry.contentId
+    )}&sessionId=${encodeURIComponent(this.sessionId)}`;
+    entry.presenceEventSource = new EventSource(streamUrl, { withCredentials: true });
+    entry.presenceEventSource.addEventListener("presence", (event) => {
+      this.handleRemotePresence(entry, event as MessageEvent<string>);
+    });
+    entry.presenceEventSource.onerror = () => {
+      // EventSource reconnects automatically. Keep state unchanged to avoid false warnings.
+    };
+  }
+
+  private handleRemotePresence(entry: DocumentRuntimeEntry, event: MessageEvent<string>) {
+    try {
+      const payload = JSON.parse(event.data) as {
+        sessions?: Array<{ sessionId?: string; userId?: string; surfaceCount?: number }>;
+      };
+      const remoteSessions =
+        payload.sessions?.filter(
+          (session) =>
+            session.sessionId &&
+            session.sessionId !== this.sessionId &&
+            (session.surfaceCount ?? 0) > 0
+        ) ?? [];
+
+      const nextTopology = remoteSessions.length > 0 ? "remotePresent" : "solo";
+      if (entry.state.remoteCollaborationTopology !== nextTopology) {
+        entry.state.remoteCollaborationTopology = nextTopology;
+        entry.state.presenceState = remoteSessions.length > 0 ? "multiUserPresent" : "selfOnly";
+        this.emit(entry);
+      }
+
+      if (nextTopology === "remotePresent") {
+        void this.promote(entry, "remote-presence");
+      } else {
+        this.maybeStartCooldown(entry);
+      }
+    } catch {
+      // Ignore malformed presence events.
+    }
+  }
+
+  private handleSessionAnnouncement(entry: DocumentRuntimeEntry, payload: unknown) {
+    if (!payload || typeof payload !== "object") return;
+    const message = payload as {
+      type?: string;
+      contentId?: string;
+      sessionId?: string;
+      surfaceCount?: number;
+      timestamp?: number;
+    };
+    if (
+      message.type !== "session-announcement" ||
+      message.contentId !== entry.contentId ||
+      !message.sessionId ||
+      message.sessionId === this.sessionId ||
+      message.surfaceCount === 0
+    ) {
+      return;
+    }
+
+    entry.knownBrowserSessions.set(message.sessionId, message.timestamp ?? Date.now());
+    if (entry.state.browserSessionTopology !== "multiSession") {
+      entry.state.browserSessionTopology = "multiSession";
+      this.emit(entry);
+    }
+    this.maybePromoteFromCurrentTopology(entry);
+  }
+
+  private sweepBrowserSessions(entry: DocumentRuntimeEntry) {
+    const now = Date.now();
+    for (const [sessionId, lastSeen] of entry.knownBrowserSessions) {
+      if (now - lastSeen > SESSION_STALE_AFTER_MS) {
+        entry.knownBrowserSessions.delete(sessionId);
+      }
+    }
+
+    const nextTopology =
+      entry.knownBrowserSessions.size > 0 ? "multiSession" : "singleSession";
+    if (entry.state.browserSessionTopology !== nextTopology) {
+      entry.state.browserSessionTopology = nextTopology;
+      this.emit(entry);
+      if (nextTopology === "singleSession") {
+        this.maybeStartCooldown(entry);
+      }
+    }
+  }
+
+  private recalculateLocalSurfaceTopology(entry: DocumentRuntimeEntry) {
+    entry.state.consumerCount = entry.consumers.size;
+    entry.state.liveConsumerCount = Array.from(entry.consumers.values()).filter(
+      (consumer) => consumer.requiresLiveTransport
+    ).length;
+    entry.state.localSurfaceTopology =
+      entry.consumers.size > 1 ? "multiSurface" : "singleSurface";
+  }
+
+  private maybePromoteFromCurrentTopology(entry: DocumentRuntimeEntry) {
+    if (
+      entry.state.browserSessionTopology === "multiSession" ||
+      entry.state.remoteCollaborationTopology === "remotePresent" ||
+      entry.state.reconnectIntent ||
+      entry.state.liveConsumerCount > 0
+    ) {
+      void this.promote(entry, "browser-multi-session");
+    }
+  }
+
+  private async promote(entry: DocumentRuntimeEntry, reason: PromotionReason) {
+    if (entry.hocuspocusProvider) {
+      if (
+        entry.state.networkState === "online" &&
+        (entry.state.connectionState === "disconnectedButDirty" ||
+          entry.state.connectionState === "localOnly")
+      ) {
+        entry.state.connectionState = "connecting";
+        entry.hocuspocusProvider.connect();
+        this.emit(entry);
+      }
+      return entry.promotionPromise ?? Promise.resolve();
+    }
+
+    if (entry.promotionPromise) {
+      return entry.promotionPromise ?? Promise.resolve();
+    }
+    if (entry.state.authState === "unauthorized") return;
+    if (entry.state.syncCapability !== "syncCapable" || !entry.capability.promotionAllowed) return;
+
+    entry.promotionPromise = this.promoteInternal(entry, reason).finally(() => {
+      entry.promotionPromise = null;
+    });
+    return entry.promotionPromise;
+  }
+
+  private async promoteInternal(entry: DocumentRuntimeEntry, reason: PromotionReason) {
+    void reason;
+    entry.state.connectionState = "promoting";
+    entry.state.warning = null;
+    this.emit(entry);
+
+    const response = await fetch("/api/collaboration/token", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contentId: entry.contentId,
+        requestedFields: getEditableFieldNames(entry.capability),
+      }),
+    });
+    const result = (await response.json()) as CollaborationTokenResponse;
+    if (!response.ok || !result.success || !result.data) {
+      const message = result.error?.message || "Failed to initialize collaboration";
+      entry.state.connectionState = "localOnly";
+      entry.state.warning = message;
+      this.emit(entry);
+      throw new Error(message);
+    }
+
+    entry.user = result.data.user ?? {
+      name: "Collaborator",
+      color: "#c4a15a",
+    };
+    entry.state.authState = "authorized";
+    entry.state.readOnly = Boolean(result.data.readOnly);
+    entry.state.documentName = result.data.documentName;
+    entry.state.lastKnownServerRevision = result.data.revision ?? null;
+    entry.state.connectionState = "connecting";
+    this.emit(entry);
+
+    entry.hocuspocusProvider = new HocuspocusProvider({
+      url: result.data.websocketUrl,
+      name: result.data.documentName,
+      token: result.data.token,
+      document: entry.ydoc,
+      onStatus: ({ status }) => {
+        if (status === "connecting") {
+          entry.state.connectionState = "connecting";
+        } else if (status === "connected") {
+          entry.state.connectionState = "connected";
+        } else if (status === "disconnected") {
+          this.handleProviderDisconnected(entry);
+        }
+        this.emit(entry);
+      },
+      onSynced: ({ state }) => {
+        if (!state) return;
+        entry.state.connectionState = "synced";
+        entry.state.warning = null;
+        entry.state.reconnectIntent = false;
+        entry.state.localDirty = false;
+        entry.state.unsyncedUpdateCount = 0;
+        this.emit(entry);
+      },
+      onUnsyncedChanges: ({ number }) => {
+        entry.state.unsyncedUpdateCount = number;
+        entry.state.localDirty = number > 0;
+        this.emit(entry);
+      },
+      onAwarenessChange: () => this.updateProviderPresence(entry),
+      onAwarenessUpdate: () => this.updateProviderPresence(entry),
+      onStateless: ({ payload }) => this.handleServerEvent(entry, payload),
+      onAuthenticationFailed: ({ reason }) => this.markUnauthorized(entry, reason),
+      onClose: () => this.handleProviderDisconnected(entry),
+    });
+    this.emit(entry);
+  }
+
+  private updateProviderPresence(entry: DocumentRuntimeEntry) {
+    const states = entry.hocuspocusProvider?.awareness?.getStates();
+    const hasRemote = Boolean(
+      states && Array.from(states.keys()).some((clientId) => clientId !== entry.ydoc.clientID)
+    );
+    entry.state.presenceState = hasRemote ? "multiUserPresent" : "selfOnly";
+    entry.state.remoteCollaborationTopology = hasRemote ? "remotePresent" : "solo";
+    this.emit(entry);
+    if (!hasRemote) {
+      this.maybeStartCooldown(entry);
+    }
+  }
+
+  private handleServerEvent(entry: DocumentRuntimeEntry, payload: string) {
+    try {
+      const message = JSON.parse(payload) as { type?: string; message?: string };
+      if (message.type === "collaboration-access-revoked") {
+        this.markUnauthorized(entry, message.message || "Collaboration access was revoked.");
+      }
+    } catch {
+      // Ignore unrelated stateless provider messages.
+    }
+  }
+
+  private markUnauthorized(entry: DocumentRuntimeEntry, reason?: string) {
+    this.destroyProviderOnly(entry);
+    entry.state.authState = "unauthorized";
+    entry.state.readOnly = true;
+    entry.state.connectionState = "localOnly";
+    entry.state.warning = reason || "Collaboration access was revoked.";
+    this.emit(entry);
+  }
+
+  private handleProviderDisconnected(entry: DocumentRuntimeEntry) {
+    if (entry.state.localDirty || entry.state.unsyncedUpdateCount > 0) {
+      entry.state.connectionState = "disconnectedButDirty";
+      entry.state.reconnectIntent = true;
+      entry.state.warning =
+        "Live collaboration is unavailable. Local edits are durable and will sync when the collaboration server reconnects.";
+    } else if (entry.hocuspocusProvider) {
+      entry.state.connectionState = "localOnly";
+    }
+    this.emit(entry);
+  }
+
+  private handleNetworkOnline(contentId: string) {
+    const entry = this.entries.get(contentId);
+    if (!entry) return;
+    entry.state.networkState = "online";
+    this.emit(entry);
+    if (
+      entry.state.reconnectIntent ||
+      entry.state.browserSessionTopology === "multiSession" ||
+      entry.state.remoteCollaborationTopology === "remotePresent"
+    ) {
+      void this.promote(entry, "reconnect-after-offline");
+    }
+  }
+
+  private handleNetworkOffline(contentId: string) {
+    const entry = this.entries.get(contentId);
+    if (!entry) return;
+    entry.state.networkState = "offline";
+    if (entry.hocuspocusProvider) {
+      entry.state.connectionState = "disconnectedButDirty";
+      entry.state.reconnectIntent = true;
+      entry.state.warning =
+        "Offline editing is active. Changes are saved locally and will sync when collaboration reconnects.";
+    }
+    this.emit(entry);
+  }
+
+  private maybeStartCooldown(entry: DocumentRuntimeEntry) {
+    if (!entry.hocuspocusProvider || entry.state.connectionState !== "synced") return;
+    if (
+      entry.state.remoteCollaborationTopology !== "solo" ||
+      entry.state.browserSessionTopology !== "singleSession"
+    ) {
+      return;
+    }
+
+    if (entry.cooldownTimer) clearTimeout(entry.cooldownTimer);
+    entry.state.connectionState = "coolingDown";
+    this.emit(entry);
+
+    entry.cooldownTimer = setTimeout(() => {
+      entry.cooldownTimer = null;
+      if (this.canDemoteProvider(entry)) {
+        this.destroyProviderOnly(entry);
+        entry.state.connectionState = "localOnly";
+      } else {
+        entry.state.connectionState = entry.hocuspocusProvider ? "synced" : "localOnly";
+      }
+      this.emit(entry);
+    }, COOLDOWN_MS);
+  }
+
+  private canDemoteProvider(entry: DocumentRuntimeEntry) {
+    return (
+      entry.state.remoteCollaborationTopology === "solo" &&
+      entry.state.browserSessionTopology === "singleSession" &&
+      entry.state.consumerCount === 0 &&
+      entry.state.liveConsumerCount === 0 &&
+      entry.state.unsyncedUpdateCount === 0 &&
+      !entry.state.localDirty &&
+      !entry.state.reconnectIntent &&
+      entry.state.networkState === "online"
+    );
+  }
+
+  private release(contentId: string, consumerId: string) {
+    const entry = this.entries.get(contentId);
+    if (!entry) return;
+
+    entry.consumers.delete(consumerId);
+    this.recalculateLocalSurfaceTopology(entry);
+
+    if (entry.consumers.size === 0) {
+      this.maybeStartCooldown(entry);
+      if (entry.idleEvictionTimer) clearTimeout(entry.idleEvictionTimer);
+      entry.idleEvictionTimer = setTimeout(() => this.evictIfIdle(contentId), IDLE_EVICTION_MS);
+    }
+
+    this.emit(entry);
+  }
+
+  private evictIfIdle(contentId: string) {
+    const entry = this.entries.get(contentId);
+    if (!entry || entry.consumers.size > 0) return;
+    if (entry.state.localDirty || entry.state.unsyncedUpdateCount > 0) return;
+
+    this.destroyProviderOnly(entry);
+    entry.indexedDbProvider.destroy?.();
+    if (entry.presenceHeartbeatTimer) clearInterval(entry.presenceHeartbeatTimer);
+    entry.presenceEventSource?.close();
+    if (entry.ydocUpdateHandler) {
+      entry.ydoc.off("update", entry.ydocUpdateHandler);
+    }
+    entry.ydoc.destroy();
+    window.removeEventListener("online", entry.networkOnlineHandler);
+    window.removeEventListener("offline", entry.networkOfflineHandler);
+    if (entry.cooldownTimer) clearTimeout(entry.cooldownTimer);
+    this.entries.delete(contentId);
+  }
+
+  private destroyProviderOnly(entry: DocumentRuntimeEntry) {
+    entry.hocuspocusProvider?.destroy();
+    entry.hocuspocusProvider = null;
+  }
+
+  private refreshEditPolicy(entry: DocumentRuntimeEntry) {
+    entry.state.editPolicy = deriveEditPolicy(entry.state, entry.capability);
+  }
+
+  private createHandle(
+    entry: DocumentRuntimeEntry,
+    consumerId: string
+  ): CollaborationRuntimeHandle {
+    this.refreshEditPolicy(entry);
+    return {
+      runtimeId: entry.runtimeId,
+      contentId: entry.contentId,
+      ydoc: entry.ydoc,
+      provider: entry.hocuspocusProvider,
+      state: { ...entry.state },
+      capability: entry.capability,
+      user: entry.user,
+      promote: (reason) => this.promote(entry, reason),
+      updateConsumer: (patch) => {
+        const current = entry.consumers.get(consumerId);
+        if (!current) return;
+        entry.consumers.set(consumerId, { ...current, ...patch });
+        this.recalculateLocalSurfaceTopology(entry);
+        this.maybePromoteFromCurrentTopology(entry);
+        this.emit(entry);
+      },
+      release: () => this.release(entry.contentId, consumerId),
+    };
+  }
+
+  private emit(entry: DocumentRuntimeEntry) {
+    this.refreshEditPolicy(entry);
+    for (const listener of entry.listeners) {
+      listener();
+    }
+  }
+}
+
+export const collaborationRuntimeManager = new CollaborationRuntimeManager();
+
+export function useCollaborationRuntime({
+  contentId,
+  capability,
+  descriptor,
+  initialContent,
+}: UseCollaborationRuntimeOptions) {
+  const consumerIdRef = useRef<string | null>(null);
+  const [handle, setHandle] = useState<CollaborationRuntimeHandle | null>(null);
+  const descriptorKey = useMemo(
+    () =>
+      [
+        descriptor.surfaceKind,
+        descriptor.workspaceId ?? "",
+        descriptor.paneId ?? "",
+        descriptor.tabId ?? "",
+        descriptor.viewInstanceId,
+        descriptor.requiresEditableField ?? "",
+        descriptor.requiresLiveTransport ? "live" : "local",
+      ].join("|"),
+    [descriptor]
+  );
+
+  useEffect(() => {
+    if (!contentId || !capability || capability.syncCapability !== "syncCapable") {
+      setHandle(null);
+      return;
+    }
+
+    const acquired = collaborationRuntimeManager.acquire(
+      contentId,
+      capability,
+      descriptor,
+      initialContent
+    );
+    consumerIdRef.current = createConsumerId(descriptor);
+    setHandle(acquired);
+
+    const unsubscribe = collaborationRuntimeManager.subscribe(contentId, () => {
+      const consumerId = consumerIdRef.current;
+      if (!consumerId) return;
+      setHandle(collaborationRuntimeManager.getHandle(contentId, consumerId));
+    });
+
+    return () => {
+      unsubscribe();
+      acquired.release();
+      consumerIdRef.current = null;
+      setHandle(null);
+    };
+    // descriptorKey intentionally captures the descriptor fields used for consumer identity.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [contentId, capability?.contentType, descriptorKey]);
+
+  useEffect(() => {
+    if (!contentId || !initialContent) return;
+    collaborationRuntimeManager.seed(contentId, initialContent);
+  }, [contentId, initialContent]);
+
+  return handle;
+}

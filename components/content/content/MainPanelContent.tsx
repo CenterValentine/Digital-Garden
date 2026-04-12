@@ -61,6 +61,10 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  getContentCollaborationCapability,
+  useCollaborationRuntime,
+} from "@/lib/domain/collaboration/runtime";
 
 interface ContentResponse {
   success: boolean;
@@ -130,9 +134,8 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
   const selectedContentId = useContentStore((state) =>
     getPaneActiveContentId(state, paneId)
   );
-  const activeTabId = useContentStore((state) =>
-    getPaneActiveTab(state, paneId)?.id ?? null
-  );
+  const activeTab = useContentStore((state) => getPaneActiveTab(state, paneId));
+  const activeTabId = activeTab?.id ?? null;
   const setSelectedContentId = useContentStore((state) => state.setSelectedContentId);
   const setSelectedContentType = useContentStore((state) => state.setSelectedContentType);
   const updateContentTab = useContentStore((state) => state.updateContentTab);
@@ -161,6 +164,32 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
   const [shareEmail, setShareEmail] = useState("");
   const [shareAccessLevel, setShareAccessLevel] = useState<"view" | "edit">("view");
   const [isSharing, setIsSharing] = useState(false);
+  const collaborationEnabled = process.env.NEXT_PUBLIC_COLLABORATION_ENABLED === "true";
+  const collaborationCapability = useMemo(
+    () => (collaborationEnabled ? getContentCollaborationCapability(contentType) : null),
+    [collaborationEnabled, contentType]
+  );
+  const collaborationDescriptor = useMemo(
+    () => ({
+      surfaceKind: "workspace-pane" as const,
+      workspaceId: "content-workspace",
+      paneId,
+      tabId: activeTabId,
+      viewInstanceId: `${paneId}:${activeTabId ?? selectedContentId ?? "empty"}`,
+      requiresEditableField: contentType === "note" ? "default" : null,
+      requiresLiveTransport: false,
+    }),
+    [activeTabId, contentType, paneId, selectedContentId]
+  );
+  const collaborationRuntime = useCollaborationRuntime({
+    contentId:
+      collaborationEnabled && contentType === "note" && noteContent && selectedContentId
+        ? selectedContentId
+        : null,
+    capability: collaborationCapability,
+    descriptor: collaborationDescriptor,
+    initialContent: noteContent,
+  });
 
   // AbortController for in-flight save requests. When the user navigates to
   // a different document, we abort any pending fetch to prevent Doc A's content
@@ -1167,7 +1196,8 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
             fetchPeopleMentions={fetchPeopleMentions}
             onPersonMentionClick={handlePersonMentionClick}
             autoSaveDelay={2000}
-            collaborationEnabled={process.env.NEXT_PUBLIC_COLLABORATION_ENABLED === "true"}
+            collaborationEnabled={collaborationEnabled}
+            collaborationRuntime={collaborationRuntime}
             onCollaborationSyncChange={handleCollaborationSyncChange}
           />
         </div>
