@@ -922,11 +922,29 @@ class CollaborationRuntimeManager {
     try {
       const message = JSON.parse(payload) as { type?: string; message?: string };
       if (message.type === "collaboration-access-revoked") {
-        this.markUnauthorized(entry, message.message || "Collaboration access was revoked.");
+        this.handlePotentialAccessRevocation(
+          entry,
+          message.message || "Collaboration access may have changed."
+        );
       }
     } catch {
       // Ignore unrelated stateless provider messages.
     }
+  }
+
+  private handlePotentialAccessRevocation(entry: DocumentRuntimeEntry, reason: string) {
+    const browserOffline = typeof navigator !== "undefined" && !navigator.onLine;
+    if (entry.state.networkState === "offline" || browserOffline) {
+      entry.state.networkState = "offline";
+      this.markTransportUnavailable(entry);
+      return;
+    }
+
+    if (entry.authVerificationPromise) return;
+
+    entry.authVerificationPromise = this.verifyAuthenticationFailure(entry, reason).finally(() => {
+      entry.authVerificationPromise = null;
+    });
   }
 
   private markUnauthorized(entry: DocumentRuntimeEntry, reason?: string) {

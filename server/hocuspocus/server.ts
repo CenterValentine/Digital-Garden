@@ -42,6 +42,21 @@ function getCollaborationContext(context: unknown): CollaborationConnectionConte
   return context as CollaborationConnectionContext;
 }
 
+function getErrorMessage(error: unknown) {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function isConfirmedAccessRevocation(error: unknown) {
+  const message = getErrorMessage(error);
+  return (
+    message.includes("Content not found") ||
+    message.includes("View access required") ||
+    message.includes("Collaboration access revoked") ||
+    message.includes("Collaboration token access is stale") ||
+    message.includes("Collaboration token is not valid")
+  );
+}
+
 async function revalidateConnectionAccess(
   data: Pick<connectedPayload, "connection" | "context">
 ) {
@@ -112,20 +127,35 @@ const server = new Server({
     try {
       await revalidateConnectionAccess(data);
     } catch (error) {
-      closeRevokedConnection(data);
-      throw error;
+      if (isConfirmedAccessRevocation(error)) {
+        closeRevokedConnection(data);
+        throw error;
+      }
+
+      console.warn(
+        `[hocuspocus] transient access revalidation failure for ${data.documentName}:`,
+        getErrorMessage(error)
+      );
     }
   },
 
   async connected(data: connectedPayload) {
     const interval = setInterval(() => {
       revalidateConnectionAccess(data).catch((error) => {
+        if (isConfirmedAccessRevocation(error)) {
+          console.warn(
+            `[hocuspocus] closing revoked collaboration connection for ${data.documentName}:`,
+            getErrorMessage(error)
+          );
+          closeRevokedConnection(data);
+          clearInterval(interval);
+          return;
+        }
+
         console.warn(
-          `[hocuspocus] closing stale collaboration connection for ${data.documentName}:`,
-          error instanceof Error ? error.message : error
+          `[hocuspocus] transient access revalidation failure for ${data.documentName}:`,
+          getErrorMessage(error)
         );
-        closeRevokedConnection(data);
-        clearInterval(interval);
       });
     }, accessRevalidationIntervalMs);
 
