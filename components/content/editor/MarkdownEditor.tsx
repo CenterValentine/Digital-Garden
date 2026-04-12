@@ -231,6 +231,7 @@ export function MarkdownEditor({
   const runtimeProvider = collaborationRuntime?.provider ?? null;
   const runtimeUser = collaborationRuntime?.user ?? null;
   const runtimePersistenceState = collaborationRuntime?.state.persistenceState ?? null;
+  const runtimeBootstrapState = collaborationRuntime?.state.bootstrapState ?? null;
   const runtimeReadOnly = collaborationRuntime?.state.readOnly ?? false;
   const runtimeEditPolicy = collaborationRuntime?.state.editPolicy ?? null;
   const runtimeConnectionState = collaborationRuntime?.state.connectionState ?? null;
@@ -241,7 +242,8 @@ export function MarkdownEditor({
     () =>
       shouldUseCollaboration &&
       runtimeYdoc &&
-      runtimePersistenceState === "localReady"
+      runtimePersistenceState === "localReady" &&
+      runtimeBootstrapState === "ready"
         ? {
             document: runtimeYdoc,
             provider: runtimeProvider,
@@ -256,6 +258,7 @@ export function MarkdownEditor({
       shouldUseCollaboration,
       runtimeProvider,
       runtimeEditPolicy,
+      runtimeBootstrapState,
       runtimePersistenceState,
       runtimeReadOnly,
       runtimeUser,

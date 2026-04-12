@@ -21,20 +21,21 @@ function hasMeaningfulContent(content: JSONContent | null | undefined): boolean 
   return false;
 }
 
+function ydocStateHasDefaultContent(state: Uint8Array): boolean {
+  const ydoc = new Y.Doc();
+  try {
+    Y.applyUpdate(ydoc, state);
+    return ydoc.getXmlFragment("default").length > 0;
+  } finally {
+    ydoc.destroy();
+  }
+}
+
 export async function loadCollaborationYDocState(
   prisma: PrismaClient,
   documentName: string
 ): Promise<Uint8Array | null> {
   const contentId = parseCollaborationDocumentName(documentName);
-  const record = await prisma.collaborationDocument.findUnique({
-    where: { documentName },
-    select: { ydocState: true },
-  });
-
-  if (record?.ydocState) {
-    return new Uint8Array(record.ydocState);
-  }
-
   const content = await prisma.contentNode.findFirst({
     where: {
       id: contentId,
@@ -48,6 +49,19 @@ export async function loadCollaborationYDocState(
 
   if (!content?.notePayload) {
     return null;
+  }
+
+  const record = await prisma.collaborationDocument.findUnique({
+    where: { documentName },
+    select: { ydocState: true },
+  });
+
+  if (record?.ydocState) {
+    const state = new Uint8Array(record.ydocState);
+    const noteContent = content.notePayload.tiptapJson as JSONContent;
+    if (ydocStateHasDefaultContent(state) || !hasMeaningfulContent(noteContent)) {
+      return state;
+    }
   }
 
   const ydoc = TiptapTransformer.toYdoc(

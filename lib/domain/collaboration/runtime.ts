@@ -13,6 +13,7 @@ export type LocalSurfaceTopology = "singleSurface" | "multiSurface";
 export type BrowserSessionTopology = "singleSession" | "multiSession";
 export type RemoteCollaborationTopology = "solo" | "remotePresent";
 export type PersistenceState = "booting" | "localReady";
+export type BootstrapState = "pending" | "ready" | "failed";
 export type SyncCapability = "localOnly" | "syncCapable";
 export type ConnectionState =
   | "localOnly"
@@ -34,6 +35,7 @@ export type CollaborationEditPolicyReason =
   | "local-ready"
   | "offline-local-durable"
   | "booting-local-state"
+  | "bootstrap-failed"
   | "view-only-permission"
   | "auth-revoked"
   | "known-stale"
@@ -91,6 +93,7 @@ export interface CollaborationRuntimeState {
   browserContextId: string;
   sessionId: string;
   persistenceState: PersistenceState;
+  bootstrapState: BootstrapState;
   syncCapability: SyncCapability;
   connectionState: ConnectionState;
   localSurfaceTopology: LocalSurfaceTopology;
@@ -275,6 +278,16 @@ function deriveEditPolicy(
     };
   }
 
+  if (state.bootstrapState === "failed") {
+    return {
+      editable: false,
+      reason: "bootstrap-failed",
+      warning:
+        state.warning ||
+        "Collaborative editing could not initialize. Showing saved content read-only to prevent overwrite.",
+    };
+  }
+
   if (state.readOnly) {
     return {
       editable: false,
@@ -283,7 +296,7 @@ function deriveEditPolicy(
     };
   }
 
-  if (state.persistenceState !== "localReady") {
+  if (state.persistenceState !== "localReady" || state.bootstrapState === "pending") {
     return {
       editable: false,
       reason: "booting-local-state",
@@ -323,6 +336,16 @@ function base64ToUint8Array(value: string) {
     bytes[index] = binary.charCodeAt(index);
   }
   return bytes;
+}
+
+function ydocUpdateHasDefaultContent(update: Uint8Array) {
+  const doc = new Y.Doc();
+  try {
+    Y.applyUpdate(doc, update);
+    return doc.getXmlFragment("default").length > 0;
+  } finally {
+    doc.destroy();
+  }
 }
 
 async function readJsonResponse<T>(response: Response): Promise<T | null> {
@@ -440,6 +463,7 @@ class CollaborationRuntimeManager {
         browserContextId: this.browserContextId,
         sessionId: this.sessionId,
         persistenceState: "booting",
+        bootstrapState: "pending",
         syncCapability: capability.syncCapability,
         connectionState: "localOnly",
         localSurfaceTopology: "singleSurface",
@@ -499,8 +523,14 @@ class CollaborationRuntimeManager {
   }
 
   private seedInitialContent(entry: DocumentRuntimeEntry, content: JSONContent | null | undefined) {
-    if (!content || entry.hasSeededInitialContent || !hasMeaningfulContent(content)) return;
+    if (!content || entry.hasSeededInitialContent) return;
     entry.pendingInitialContent = content;
+    if (!hasMeaningfulContent(content)) {
+      entry.hasSeededInitialContent = true;
+      entry.state.bootstrapState = "ready";
+      this.emit(entry);
+      return;
+    }
     if (entry.state.persistenceState !== "localReady") return;
     void this.bootstrapInitialContent(entry);
   }
@@ -517,10 +547,14 @@ class CollaborationRuntimeManager {
     const fragment = entry.ydoc.getXmlFragment("default");
     if (fragment.length > 0) {
       entry.hasSeededInitialContent = true;
+      entry.state.bootstrapState = "ready";
       return;
     }
 
     if (!entry.pendingInitialContent || !hasMeaningfulContent(entry.pendingInitialContent)) {
+      entry.hasSeededInitialContent = true;
+      entry.state.bootstrapState = "ready";
+      this.emit(entry);
       return;
     }
 
@@ -528,10 +562,19 @@ class CollaborationRuntimeManager {
     try {
       const canonicalState = await this.fetchCanonicalYDocState(entry.contentId);
       if (canonicalState?.update) {
+        if (
+          hasMeaningfulContent(entry.pendingInitialContent) &&
+          !ydocUpdateHasDefaultContent(canonicalState.update)
+        ) {
+          throw new Error(
+            "Canonical collaboration state was empty while saved note content exists"
+          );
+        }
         Y.applyUpdate(entry.ydoc, canonicalState.update);
         entry.state.documentName = canonicalState.documentName;
         entry.state.readOnly = canonicalState.readOnly;
         entry.hasSeededInitialContent = true;
+        entry.state.bootstrapState = "ready";
         entry.state.warning = null;
         return;
       }
@@ -547,14 +590,28 @@ class CollaborationRuntimeManager {
       this.emit(entry);
     }
 
-    const seededDoc = TiptapTransformer.toYdoc(
-      entry.pendingInitialContent,
-      "default",
-      getCollaborationServerExtensions()
-    );
-    Y.applyUpdate(entry.ydoc, Y.encodeStateAsUpdate(seededDoc));
-    seededDoc.destroy();
-    entry.hasSeededInitialContent = true;
+    try {
+      const seededDoc = TiptapTransformer.toYdoc(
+        entry.pendingInitialContent,
+        "default",
+        getCollaborationServerExtensions()
+      );
+      Y.applyUpdate(entry.ydoc, Y.encodeStateAsUpdate(seededDoc));
+      seededDoc.destroy();
+      entry.hasSeededInitialContent = true;
+      entry.state.bootstrapState = "ready";
+      entry.state.warning = null;
+    } catch (error) {
+      entry.state.bootstrapState = "failed";
+      entry.state.warning =
+        "Collaborative editing could not initialize. Showing saved content read-only to prevent overwrite.";
+      if (process.env.NODE_ENV === "development") {
+        console.error(
+          "[collaboration] failed to bootstrap collaborative document",
+          error instanceof Error ? error.message : error
+        );
+      }
+    }
     this.emit(entry);
   }
 
