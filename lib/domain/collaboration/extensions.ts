@@ -31,6 +31,7 @@ import { ServerRatingInput } from "@/lib/domain/editor/extensions/blocks/rating-
 import { ServerPromptInput } from "@/lib/domain/editor/extensions/blocks/prompt-input";
 import { ServerTimestamp } from "@/lib/domain/editor/extensions/blocks/timestamp";
 import { ServerPersonMention } from "@/lib/domain/editor/extensions/person-mention-server";
+import { ServerCalendarViewBlock } from "@/extensions/calendar/editor/calendar-view-block";
 
 export function getCollaborationServerExtensions(): Extensions {
   return [
@@ -84,5 +85,6 @@ export function getCollaborationServerExtensions(): Extensions {
     ServerPromptInput,
     ServerTimestamp,
     ServerPersonMention,
+    ServerCalendarViewBlock,
   ];
 }

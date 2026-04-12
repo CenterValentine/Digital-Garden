@@ -536,10 +536,12 @@ class CollaborationRuntimeManager {
         return;
       }
     } catch (error) {
-      entry.state.warning =
-        error instanceof Error
-          ? `Using local-only fallback because canonical collaboration state could not be loaded: ${error.message}`
-          : "Using local-only fallback because canonical collaboration state could not be loaded.";
+      if (process.env.NODE_ENV === "development") {
+        console.warn(
+          "[collaboration] using local-only bootstrap fallback",
+          error instanceof Error ? error.message : error
+        );
+      }
     } finally {
       entry.isBootstrappingInitialContent = false;
       this.emit(entry);
