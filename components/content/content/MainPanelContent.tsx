@@ -1197,6 +1197,7 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
         <div className="flex-1 overflow-hidden">
           <MarkdownEditor
             contentId={selectedContentId ?? undefined}
+            title={noteTitle}
             parentId={contentParentId}
             content={noteContent}
             onSave={handleSave}
