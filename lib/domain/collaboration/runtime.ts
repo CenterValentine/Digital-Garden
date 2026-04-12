@@ -302,6 +302,14 @@ function deriveEditPolicy(
   };
 }
 
+function sameEditPolicy(left: CollaborationEditPolicy, right: CollaborationEditPolicy) {
+  return (
+    left.editable === right.editable &&
+    left.reason === right.reason &&
+    left.warning === right.warning
+  );
+}
+
 function base64ToUint8Array(value: string) {
   const binary = atob(value);
   const bytes = new Uint8Array(binary.length);
@@ -1005,7 +1013,10 @@ class CollaborationRuntimeManager {
   }
 
   private refreshEditPolicy(entry: DocumentRuntimeEntry) {
-    entry.state.editPolicy = deriveEditPolicy(entry.state, entry.capability);
+    const nextPolicy = deriveEditPolicy(entry.state, entry.capability);
+    if (!sameEditPolicy(entry.state.editPolicy, nextPolicy)) {
+      entry.state.editPolicy = nextPolicy;
+    }
   }
 
   private createHandle(

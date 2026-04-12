@@ -77,6 +77,13 @@ function collaboratorsKey(collaborators: RemoteCollaborator[]): string {
     .join(",");
 }
 
+function cursorLabelsKey(labels: CollaborationCursorLabel[]): string {
+  return labels
+    .map((label) => `${label.clientId}:${Math.round(label.left)}:${Math.round(label.top)}`)
+    .sort()
+    .join("|");
+}
+
 export interface EditorStats {
   /** Word count */
   words: number;
@@ -171,6 +178,7 @@ export function MarkdownEditor({
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const editorScrollRef = useRef<HTMLDivElement>(null);
   const duplicateWarningToastKeyRef = useRef<string | null>(null);
+  const appliedEditableRef = useRef<boolean | null>(null);
   // Track the last content we saved so we can distinguish save-echoes
   // (parent updating state after our save) from genuine external updates
   // (navigation, refetch). Prevents cursor-jump-on-autosave bug.
@@ -241,17 +249,20 @@ export function MarkdownEditor({
 
   useEffect(() => {
     if (!collaborationState) {
-      setRemoteCollaborators([]);
-      setCursorLabels([]);
+      setRemoteCollaborators((current) => (current.length === 0 ? current : []));
+      setCursorLabels((current) => (current.length === 0 ? current : []));
       return;
     }
 
     const syncRemoteCollaborators = () => {
-      setRemoteCollaborators(
-        remoteCollaboratorsFromProvider(
-          collaborationState.provider,
-          collaborationState.document
-        )
+      const nextCollaborators = remoteCollaboratorsFromProvider(
+        collaborationState.provider,
+        collaborationState.document
+      );
+      setRemoteCollaborators((current) =>
+        collaboratorsKey(current) === collaboratorsKey(nextCollaborators)
+          ? current
+          : nextCollaborators
       );
     };
 
@@ -259,8 +270,8 @@ export function MarkdownEditor({
     const presenceInterval = setInterval(syncRemoteCollaborators, 1000);
     return () => {
       clearInterval(presenceInterval);
-      setRemoteCollaborators([]);
-      setCursorLabels([]);
+      setRemoteCollaborators((current) => (current.length === 0 ? current : []));
+      setCursorLabels((current) => (current.length === 0 ? current : []));
     };
   }, [collaborationState]);
 
@@ -458,13 +469,23 @@ export function MarkdownEditor({
   }, [collaborationState, effectiveEditable]);
 
   useEffect(() => {
-    editor?.setEditable(effectiveEditable);
+    if (!editor) return;
+    if (
+      appliedEditableRef.current === effectiveEditable &&
+      editor.isEditable === effectiveEditable
+    ) {
+      return;
+    }
+    appliedEditableRef.current = effectiveEditable;
+    if (editor.isEditable !== effectiveEditable) {
+      editor.setEditable(effectiveEditable);
+    }
   }, [editor, effectiveEditable]);
 
   const refreshCursorLabels = useCallback(() => {
     const container = editorScrollRef.current;
     if (!container || remoteCollaborators.length === 0) {
-      setCursorLabels([]);
+      setCursorLabels((current) => (current.length === 0 ? current : []));
       return;
     }
 
@@ -485,7 +506,9 @@ export function MarkdownEditor({
       ];
     });
 
-    setCursorLabels(nextLabels);
+    setCursorLabels((current) =>
+      cursorLabelsKey(current) === cursorLabelsKey(nextLabels) ? current : nextLabels
+    );
   }, [remoteCollaborators]);
 
   useEffect(() => {
