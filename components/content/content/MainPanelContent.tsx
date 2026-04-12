@@ -467,6 +467,10 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
   const handleSave = useCallback(
     async (content: JSONContent) => {
       if (!selectedContentId) return;
+      if (typeof navigator !== "undefined" && !navigator.onLine) {
+        setHasUnsavedChanges(true);
+        return;
+      }
 
       // GUARD: Only discard saves when this pane has navigated to a different
       // document. Another pane becoming focused should not cancel the save.
@@ -527,6 +531,15 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
         // AbortError is expected when we cancel a save due to navigation
         if (err instanceof DOMException && err.name === "AbortError") {
           console.log(`[MainPanelContent] Save aborted for ${selectedContentId} (navigation)`);
+          return;
+        }
+        const message = err instanceof Error ? err.message : String(err);
+        if (
+          (typeof navigator !== "undefined" && !navigator.onLine) ||
+          message.includes("Can't reach database server") ||
+          message.includes("Failed to fetch")
+        ) {
+          setHasUnsavedChanges(true);
           return;
         }
         console.error("Failed to save note:", err);

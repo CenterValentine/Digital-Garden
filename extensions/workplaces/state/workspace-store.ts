@@ -133,6 +133,15 @@ function restoreTreeSnapshotForWorkspace(workspaceId: string | null) {
   useTreeStateStore.getState().restoreSnapshot(snapshots[workspaceId]);
 }
 
+function isOfflineLikePersistenceError(value: unknown) {
+  const message = value instanceof Error ? value.message : String(value);
+  return (
+    (typeof navigator !== "undefined" && !navigator.onLine) ||
+    message.includes("Can't reach database server") ||
+    message.includes("Failed to fetch")
+  );
+}
+
 async function parseResponse<T>(response: Response, fallback: string): Promise<T> {
   const result = (await response.json()) as ApiResponse<T>;
   if (!response.ok || !result.success || result.data === undefined) {
@@ -630,21 +639,27 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     const activeWorkspaceId = get().activeWorkspaceId;
     if (!activeWorkspaceId) return;
     if (!hasWorkspace(get().workspaces, activeWorkspaceId)) return;
+    saveTreeSnapshotForWorkspace(activeWorkspaceId);
+
+    if (typeof navigator !== "undefined" && !navigator.onLine) {
+      return;
+    }
 
     const snapshot = useContentStore.getState().getWorkspaceStateSnapshot();
-    const response = await fetch(`/api/content/workspaces/${activeWorkspaceId}/state`, {
-      method: "PATCH",
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(snapshot satisfies WorkspaceStatePayload),
-    });
     let workspace: ContentWorkspaceResponse;
     try {
+      const response = await fetch(`/api/content/workspaces/${activeWorkspaceId}/state`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(snapshot satisfies WorkspaceStatePayload),
+      });
       workspace = await parseResponse<ContentWorkspaceResponse>(
         response,
         "Failed to save workspace state"
       );
     } catch (error) {
+      if (isOfflineLikePersistenceError(error)) return;
       if (!isWorkspaceNotFoundError(error)) throw error;
 
       const workspaces = await fetchWorkspaces();

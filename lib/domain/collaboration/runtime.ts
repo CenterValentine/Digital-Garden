@@ -577,14 +577,6 @@ class CollaborationRuntimeManager {
   private startBrowserSessionDetection(entry: DocumentRuntimeEntry) {
     const storageKey = `dg-collab-session:${entry.contentId}:${this.sessionId}`;
     const announce = () => {
-      if (entry.consumers.size === 0) {
-        try {
-          localStorage.removeItem(storageKey);
-        } catch {
-          // Ignore storage privacy failures.
-        }
-        return;
-      }
       const payload = {
         type: "session-announcement",
         contentId: entry.contentId,
@@ -593,6 +585,16 @@ class CollaborationRuntimeManager {
         surfaceCount: entry.consumers.size,
         timestamp: Date.now(),
       };
+
+      if (entry.consumers.size === 0) {
+        entry.broadcastChannel?.postMessage(payload);
+        try {
+          localStorage.removeItem(storageKey);
+        } catch {
+          // Ignore storage privacy failures.
+        }
+        return;
+      }
       entry.broadcastChannel?.postMessage(payload);
       try {
         localStorage.setItem(storageKey, JSON.stringify(payload));
@@ -641,10 +643,28 @@ class CollaborationRuntimeManager {
   }
 
   private startRemotePresenceDetection(entry: DocumentRuntimeEntry) {
-    const sendHeartbeat = () => {
-      if (entry.consumers.size === 0) return;
-      const consumers = Array.from(entry.consumers.values());
-      void fetch("/api/collaboration/presence/heartbeat", {
+    entry.presenceHeartbeatTimer = setInterval(() => {
+      void this.sendPresenceHeartbeat(entry);
+    }, 5000);
+    void this.sendPresenceHeartbeat(entry);
+
+    const streamUrl = `/api/collaboration/presence/stream?contentId=${encodeURIComponent(
+      entry.contentId
+    )}&sessionId=${encodeURIComponent(this.sessionId)}`;
+    entry.presenceEventSource = new EventSource(streamUrl, { withCredentials: true });
+    entry.presenceEventSource.addEventListener("presence", (event) => {
+      this.handleRemotePresence(entry, event as MessageEvent<string>);
+    });
+    entry.presenceEventSource.onerror = () => {
+      // EventSource reconnects automatically. Keep state unchanged to avoid false warnings.
+    };
+  }
+
+  private async sendPresenceHeartbeat(entry: DocumentRuntimeEntry, includeZero = false) {
+    if (entry.consumers.size === 0 && !includeZero) return;
+    const consumers = Array.from(entry.consumers.values());
+    try {
+      await fetch("/api/collaboration/presence/heartbeat", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -662,24 +682,10 @@ class CollaborationRuntimeManager {
           transportState: entry.state.connectionState,
           lastKnownServerRevision: entry.state.lastKnownServerRevision,
         }),
-      }).catch(() => {
-        // Presence is advisory. Transport promotion can still happen via BroadcastChannel.
       });
-    };
-
-    entry.presenceHeartbeatTimer = setInterval(sendHeartbeat, 5000);
-    sendHeartbeat();
-
-    const streamUrl = `/api/collaboration/presence/stream?contentId=${encodeURIComponent(
-      entry.contentId
-    )}&sessionId=${encodeURIComponent(this.sessionId)}`;
-    entry.presenceEventSource = new EventSource(streamUrl, { withCredentials: true });
-    entry.presenceEventSource.addEventListener("presence", (event) => {
-      this.handleRemotePresence(entry, event as MessageEvent<string>);
-    });
-    entry.presenceEventSource.onerror = () => {
-      // EventSource reconnects automatically. Keep state unchanged to avoid false warnings.
-    };
+    } catch {
+      // Presence is advisory. Transport promotion can still happen via BroadcastChannel.
+    }
   }
 
   private handleRemotePresence(entry: DocumentRuntimeEntry, event: MessageEvent<string>) {
@@ -725,9 +731,14 @@ class CollaborationRuntimeManager {
       message.type !== "session-announcement" ||
       message.contentId !== entry.contentId ||
       !message.sessionId ||
-      message.sessionId === this.sessionId ||
-      message.surfaceCount === 0
+      message.sessionId === this.sessionId
     ) {
+      return;
+    }
+
+    if (message.surfaceCount === 0) {
+      entry.knownBrowserSessions.delete(message.sessionId);
+      this.sweepBrowserSessions(entry);
       return;
     }
 
@@ -765,6 +776,10 @@ class CollaborationRuntimeManager {
     ).length;
     entry.state.localSurfaceTopology =
       entry.consumers.size > 1 ? "multiSurface" : "singleSurface";
+    entry.hocuspocusProvider?.awareness?.setLocalStateField(
+      "activeSurfaceCount",
+      entry.consumers.size
+    );
   }
 
   private maybePromoteFromCurrentTopology(entry: DocumentRuntimeEntry) {
@@ -871,6 +886,10 @@ class CollaborationRuntimeManager {
       onAuthenticationFailed: ({ reason }) => this.handleAuthenticationFailed(entry, reason),
       onClose: () => this.handleProviderDisconnected(entry),
     });
+    entry.hocuspocusProvider.awareness?.setLocalStateField(
+      "activeSurfaceCount",
+      entry.consumers.size
+    );
     this.emit(entry);
   }
 
@@ -1131,6 +1150,7 @@ class CollaborationRuntimeManager {
     this.recalculateLocalSurfaceTopology(entry);
 
     if (entry.consumers.size === 0) {
+      void this.sendPresenceHeartbeat(entry, true);
       this.maybeStartCooldown(entry);
       if (entry.idleEvictionTimer) clearTimeout(entry.idleEvictionTimer);
       entry.idleEvictionTimer = setTimeout(() => this.evictIfIdle(contentId), IDLE_EVICTION_MS);

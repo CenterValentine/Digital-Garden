@@ -58,6 +58,7 @@ function remoteCollaboratorsFromProvider(
 
   return Array.from(states.entries())
     .filter(([clientId]) => clientId !== document.clientID)
+    .filter(([, state]) => state.activeSurfaceCount !== 0)
     .map(([clientId, state]) => {
       const user = state.user as Partial<CollaborationUser> | undefined;
       return {
@@ -207,6 +208,7 @@ export function MarkdownEditor({
   const runtimeReadOnly = collaborationRuntime?.state.readOnly ?? false;
   const runtimeEditPolicy = collaborationRuntime?.state.editPolicy ?? null;
   const runtimeConnectionState = collaborationRuntime?.state.connectionState ?? null;
+  const runtimeNetworkState = collaborationRuntime?.state.networkState ?? null;
   const runtimeLocalDirty = collaborationRuntime?.state.localDirty ?? false;
   const runtimeUnsyncedUpdateCount = collaborationRuntime?.state.unsyncedUpdateCount ?? 0;
   const collaborationState = useMemo(
@@ -246,6 +248,11 @@ export function MarkdownEditor({
   const effectiveEditable =
     editable &&
     (!shouldUseCollaboration || Boolean(runtimeEditPolicy?.editable));
+  const shouldSkipRestAutosaveForCollaboration =
+    shouldUseCollaboration &&
+    (runtimeNetworkState === "offline" ||
+      runtimeConnectionState === "disconnectedButDirty" ||
+      runtimeEditPolicy?.reason === "offline-local-durable");
 
   useEffect(() => {
     if (!collaborationState) {
@@ -430,7 +437,7 @@ export function MarkdownEditor({
         clearTimeout(saveTimeoutRef.current);
       }
 
-      if (collaborationState?.provider) {
+      if (collaborationState?.provider || shouldSkipRestAutosaveForCollaboration) {
         return;
       }
 
@@ -466,7 +473,7 @@ export function MarkdownEditor({
         }, autoSaveDelay);
       }
     },
-  }, [collaborationState, effectiveEditable]);
+  }, [collaborationState, effectiveEditable, shouldSkipRestAutosaveForCollaboration]);
 
   useEffect(() => {
     if (!editor) return;
