@@ -153,6 +153,11 @@ interface CollaborationStateResponse {
   error?: { message?: string };
 }
 
+type CollaborationAccessVerification =
+  | { status: "authorized"; data: NonNullable<CollaborationTokenResponse["data"]> }
+  | { status: "unauthorized"; reason: string }
+  | { status: "transient"; reason: string };
+
 interface DocumentRuntimeEntry {
   runtimeId: string;
   contentId: string;
@@ -176,6 +181,7 @@ interface DocumentRuntimeEntry {
   hasSeededInitialContent: boolean;
   isBootstrappingInitialContent: boolean;
   promotionPromise: Promise<void> | null;
+  authVerificationPromise: Promise<void> | null;
   ydocUpdateHandler:
     | ((
         update: Uint8Array,
@@ -319,6 +325,14 @@ function base64ToUint8Array(value: string) {
   return bytes;
 }
 
+async function readJsonResponse<T>(response: Response): Promise<T | null> {
+  try {
+    return (await response.json()) as T;
+  } catch {
+    return null;
+  }
+}
+
 export function getContentCollaborationCapability(
   contentType: string | null | undefined
 ): ContentCollaborationCapability | null {
@@ -415,6 +429,7 @@ class CollaborationRuntimeManager {
       hasSeededInitialContent: false,
       isBootstrappingInitialContent: false,
       promotionPromise: null,
+      authVerificationPromise: null,
       ydocUpdateHandler: null,
       networkOnlineHandler: () => this.handleNetworkOnline(contentId),
       networkOfflineHandler: () => this.handleNetworkOffline(contentId),
@@ -795,32 +810,29 @@ class CollaborationRuntimeManager {
     entry.state.warning = null;
     this.emit(entry);
 
-    const response = await fetch("/api/collaboration/token", {
-      method: "POST",
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contentId: entry.contentId,
-        requestedFields: getEditableFieldNames(entry.capability),
-      }),
-    });
-    const result = (await response.json()) as CollaborationTokenResponse;
-    if (!response.ok || !result.success || !result.data) {
-      const message = result.error?.message || "Failed to initialize collaboration";
-      entry.state.connectionState = "localOnly";
-      entry.state.warning = message;
-      this.emit(entry);
-      throw new Error(message);
+    let tokenResponse: { response: Response; result: CollaborationTokenResponse | null };
+    try {
+      tokenResponse = await this.fetchCollaborationToken(entry);
+    } catch (error) {
+      this.markTransportUnavailable(
+        entry,
+        error instanceof Error ? error.message : "Live collaboration is temporarily unavailable."
+      );
+      return;
     }
 
-    entry.user = result.data.user ?? {
-      name: "Collaborator",
-      color: "#c4a15a",
-    };
-    entry.state.authState = "authorized";
-    entry.state.readOnly = Boolean(result.data.readOnly);
-    entry.state.documentName = result.data.documentName;
-    entry.state.lastKnownServerRevision = result.data.revision ?? null;
+    const { response, result } = tokenResponse;
+    if (!response.ok || !result?.success || !result.data) {
+      const message = result?.error?.message || "Failed to initialize collaboration";
+      if (response.status === 401 || response.status === 403) {
+        this.markUnauthorized(entry, message);
+      } else {
+        this.markTransportUnavailable(entry, message);
+      }
+      return;
+    }
+
+    this.applyAuthorizedToken(entry, result.data);
     entry.state.connectionState = "connecting";
     this.emit(entry);
 
@@ -856,10 +868,41 @@ class CollaborationRuntimeManager {
       onAwarenessChange: () => this.updateProviderPresence(entry),
       onAwarenessUpdate: () => this.updateProviderPresence(entry),
       onStateless: ({ payload }) => this.handleServerEvent(entry, payload),
-      onAuthenticationFailed: ({ reason }) => this.markUnauthorized(entry, reason),
+      onAuthenticationFailed: ({ reason }) => this.handleAuthenticationFailed(entry, reason),
       onClose: () => this.handleProviderDisconnected(entry),
     });
     this.emit(entry);
+  }
+
+  private async fetchCollaborationToken(entry: DocumentRuntimeEntry) {
+    const response = await fetch("/api/collaboration/token", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contentId: entry.contentId,
+        requestedFields: getEditableFieldNames(entry.capability),
+      }),
+    });
+
+    return {
+      response,
+      result: await readJsonResponse<CollaborationTokenResponse>(response),
+    };
+  }
+
+  private applyAuthorizedToken(
+    entry: DocumentRuntimeEntry,
+    data: NonNullable<CollaborationTokenResponse["data"]>
+  ) {
+    entry.user = data.user ?? {
+      name: "Collaborator",
+      color: "#c4a15a",
+    };
+    entry.state.authState = "authorized";
+    entry.state.readOnly = Boolean(data.readOnly);
+    entry.state.documentName = data.documentName;
+    entry.state.lastKnownServerRevision = data.revision ?? null;
   }
 
   private updateProviderPresence(entry: DocumentRuntimeEntry) {
@@ -891,8 +934,98 @@ class CollaborationRuntimeManager {
     entry.state.authState = "unauthorized";
     entry.state.readOnly = true;
     entry.state.connectionState = "localOnly";
+    entry.state.reconnectIntent = false;
     entry.state.warning = reason || "Collaboration access was revoked.";
     this.emit(entry);
+  }
+
+  private markTransportUnavailable(entry: DocumentRuntimeEntry, reason?: string) {
+    this.destroyProviderOnly(entry);
+    entry.state.connectionState = "disconnectedButDirty";
+    entry.state.reconnectIntent = true;
+    entry.state.warning =
+      entry.state.networkState === "offline" ||
+      (typeof navigator !== "undefined" && !navigator.onLine)
+        ? "Offline editing is active. Changes are saved locally and will sync when collaboration reconnects."
+        : reason ||
+          "Live collaboration is temporarily unavailable. Local edits are durable and will sync when collaboration reconnects.";
+    this.emit(entry);
+  }
+
+  private handleAuthenticationFailed(entry: DocumentRuntimeEntry, reason?: string) {
+    const browserOffline = typeof navigator !== "undefined" && !navigator.onLine;
+    if (entry.state.networkState === "offline" || browserOffline) {
+      entry.state.networkState = "offline";
+      this.markTransportUnavailable(entry, reason);
+      return;
+    }
+
+    if (entry.authVerificationPromise) return;
+
+    entry.authVerificationPromise = this.verifyAuthenticationFailure(entry, reason).finally(() => {
+      entry.authVerificationPromise = null;
+    });
+  }
+
+  private async verifyAuthenticationFailure(entry: DocumentRuntimeEntry, reason?: string) {
+    const verification = await this.verifyCollaborationAccess(entry, reason);
+
+    if (verification.status === "unauthorized") {
+      this.markUnauthorized(entry, verification.reason);
+      return;
+    }
+
+    if (verification.status === "authorized") {
+      this.applyAuthorizedToken(entry, verification.data);
+      if (verification.data.readOnly) {
+        entry.state.warning = "You have view-only access to this document.";
+        this.emit(entry);
+        return;
+      }
+      this.markTransportUnavailable(
+        entry,
+        "Live collaboration authentication could not be completed. Local edits remain durable and will sync after reconnect."
+      );
+      return;
+    }
+
+    this.markTransportUnavailable(entry, verification.reason);
+  }
+
+  private async verifyCollaborationAccess(
+    entry: DocumentRuntimeEntry,
+    reason?: string
+  ): Promise<CollaborationAccessVerification> {
+    try {
+      const { response, result } = await this.fetchCollaborationToken(entry);
+      const serverMessage = result?.error?.message;
+
+      if (response.status === 401 || response.status === 403) {
+        return {
+          status: "unauthorized",
+          reason: serverMessage || reason || "Collaboration access was revoked.",
+        };
+      }
+
+      if (response.ok && result?.success && result.data) {
+        return { status: "authorized", data: result.data };
+      }
+
+      return {
+        status: "transient",
+        reason:
+          serverMessage ||
+          "Live collaboration authentication could not be verified. Local edits remain durable and will sync after reconnect.",
+      };
+    } catch (error) {
+      return {
+        status: "transient",
+        reason:
+          error instanceof Error
+            ? error.message
+            : "Live collaboration is temporarily unavailable.",
+      };
+    }
   }
 
   private handleProviderDisconnected(entry: DocumentRuntimeEntry) {
