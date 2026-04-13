@@ -162,7 +162,7 @@ export function SharedContentViewer({ content }: SharedContentViewerProps) {
               <h1 className="text-4xl font-semibold tracking-tight">{content.title}</h1>
               <p className="mt-2 text-sm text-muted-foreground">
                 Public share links are view-only. Signed-in collaborators with edit access
-                can continue in the workspace editor.
+                can continue in the content editor.
               </p>
             </div>
             {content.canEdit ? (
@@ -170,7 +170,7 @@ export function SharedContentViewer({ content }: SharedContentViewerProps) {
                 href={editHref}
                 className="inline-flex h-10 shrink-0 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground shadow-sm hover:bg-primary/90"
               >
-                Open in editable workspace
+                Open in editor
               </Link>
             ) : null}
           </div>
