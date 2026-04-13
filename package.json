@@ -13,7 +13,8 @@
     "lint": "eslint",
     "build:tokens": "style-dictionary build --config style-dictionary.config.js",
     "collab:schema:check": "tsx scripts/validate-collaboration-schema.ts",
-    "db:seed": "tsx prisma/seed.ts"
+    "db:seed": "tsx prisma/seed.ts",
+    "collab:env:check": "tsx scripts/check-hocuspocus-env.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

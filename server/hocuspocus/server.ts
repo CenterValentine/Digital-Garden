@@ -4,6 +4,7 @@ import type {
   beforeHandleMessagePayload,
   connectedPayload,
   onAuthenticatePayload,
+  onRequestPayload,
 } from "@hocuspocus/server";
 
 import { prisma } from "../../lib/database/client";
@@ -18,6 +19,19 @@ const port = Number(process.env.PORT || process.env.HOCUSPOCUS_PORT || 1234);
 const accessRevalidationIntervalMs = Number(
   process.env.HOCUSPOCUS_ACCESS_REVALIDATION_MS || 2000
 );
+const startedAt = Date.now();
+
+function validateProductionConfiguration() {
+  if (process.env.NODE_ENV !== "production") return;
+
+  if (!process.env.COLLABORATION_TOKEN_SECRET) {
+    throw new Error("COLLABORATION_TOKEN_SECRET is required in production");
+  }
+
+  if (!process.env.DATABASE_URL) {
+    throw new Error("DATABASE_URL is required in production");
+  }
+}
 
 interface CollaborationConnectionContext {
   contentId: string;
@@ -44,6 +58,50 @@ function getCollaborationContext(context: unknown): CollaborationConnectionConte
 
 function getErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : String(error);
+}
+
+function sendJsonAndStop(
+  response: onRequestPayload["response"],
+  status: number,
+  payload: Record<string, unknown>
+): never {
+  response.writeHead(status, {
+    "Content-Type": "application/json",
+    "Cache-Control": "no-store",
+  });
+  response.end(JSON.stringify(payload));
+  throw null;
+}
+
+async function handleHealthRequest(data: onRequestPayload) {
+  const url = new URL(data.request.url ?? "/", `http://${data.request.headers.host ?? "localhost"}`);
+
+  if (url.pathname === "/healthz") {
+    sendJsonAndStop(data.response, 200, {
+      ok: true,
+      service: "digital-garden-hocuspocus",
+      uptimeMs: Date.now() - startedAt,
+    });
+  }
+
+  if (url.pathname === "/readyz") {
+    try {
+      await prisma.$queryRaw`SELECT 1`;
+      sendJsonAndStop(data.response, 200, {
+        ok: true,
+        service: "digital-garden-hocuspocus",
+        database: "ready",
+        uptimeMs: Date.now() - startedAt,
+      });
+    } catch (error) {
+      sendJsonAndStop(data.response, 503, {
+        ok: false,
+        service: "digital-garden-hocuspocus",
+        database: "unavailable",
+        error: getErrorMessage(error),
+      });
+    }
+  }
 }
 
 function isConfirmedAccessRevocation(error: unknown) {
@@ -89,11 +147,15 @@ function closeRevokedConnection(data: Pick<connectedPayload, "connection">) {
   });
 }
 
+validateProductionConfiguration();
+
 const server = new Server({
   name: "digital-garden-hocuspocus",
   port,
   debounce: Number(process.env.HOCUSPOCUS_STORE_DEBOUNCE_MS || 2000),
   maxDebounce: Number(process.env.HOCUSPOCUS_STORE_MAX_DEBOUNCE_MS || 10000),
+
+  onRequest: handleHealthRequest,
 
   async onAuthenticate(data: onAuthenticatePayload) {
     const tokenPayload = verifyCollaborationToken(data.token);
