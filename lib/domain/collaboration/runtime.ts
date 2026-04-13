@@ -224,7 +224,10 @@ interface DocumentRuntimeEntry {
   networkOnlineHandler: () => void;
   networkOfflineHandler: () => void;
   visibilityChangeHandler: () => void;
+  pageHideHandler: () => void;
   lastActivityAt: number;
+  reconnectTimer: ReturnType<typeof setTimeout> | null;
+  reconnectAttempts: number;
 }
 
 interface UseCollaborationRuntimeOptions {
@@ -249,10 +252,24 @@ const SESSION_STALE_AFTER_MS = 6000;
 const SESSION_ANNOUNCE_INTERVAL_MS = 2000;
 const PRESENCE_HEARTBEAT_INTERVAL_MS = 10_000;
 const PRESENCE_HEARTBEAT_IDLE_INTERVAL_MS = 30_000;
-const PRESENCE_HEARTBEAT_HIDDEN_INTERVAL_MS = 60_000;
+const PRESENCE_HEARTBEAT_HIDDEN_INTERVAL_MS = 30_000;
 const PRESENCE_IDLE_AFTER_MS = 60_000;
+const PROVIDER_RECONNECT_BASE_MS = 1000;
+const PROVIDER_RECONNECT_MAX_MS = 30_000;
 const COOLDOWN_MS = 120_000;
 const IDLE_EVICTION_MS = 300_000;
+const LOCAL_CACHE_MANIFEST_KEY = "dg-collab-local-cache-manifest";
+const LOCAL_CACHE_PRUNE_AFTER_MS = 30 * 24 * 60 * 60 * 1000;
+
+interface LocalCacheManifestEntry {
+  contentId: string;
+  indexedDbName: string;
+  lastAccessedAt: number;
+  dirty: boolean;
+  unsyncedUpdateCount: number;
+}
+
+type LocalCacheManifest = Record<string, LocalCacheManifestEntry>;
 
 function createId(prefix: string) {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
@@ -268,6 +285,61 @@ function getSessionStorageId(key: string, prefix: string) {
   const next = createId(prefix);
   window.sessionStorage.setItem(key, next);
   return next;
+}
+
+function readLocalCacheManifest(): LocalCacheManifest {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = window.localStorage.getItem(LOCAL_CACHE_MANIFEST_KEY);
+    return raw ? (JSON.parse(raw) as LocalCacheManifest) : {};
+  } catch {
+    return {};
+  }
+}
+
+function writeLocalCacheManifest(manifest: LocalCacheManifest) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(LOCAL_CACHE_MANIFEST_KEY, JSON.stringify(manifest));
+  } catch {
+    // Local cache accounting is advisory; IndexedDB durability is the source of truth.
+  }
+}
+
+function updateLocalCacheManifest(entry: DocumentRuntimeEntry) {
+  const manifest = readLocalCacheManifest();
+  manifest[entry.contentId] = {
+    contentId: entry.contentId,
+    indexedDbName: `dg:content:${entry.contentId}`,
+    lastAccessedAt: Date.now(),
+    dirty: entry.state.localDirty,
+    unsyncedUpdateCount: entry.state.unsyncedUpdateCount,
+  };
+  writeLocalCacheManifest(manifest);
+}
+
+function pruneCleanLocalCacheManifestEntries() {
+  if (typeof window === "undefined" || !("indexedDB" in window)) return;
+  const manifest = readLocalCacheManifest();
+  const now = Date.now();
+  let changed = false;
+
+  for (const [contentId, entry] of Object.entries(manifest)) {
+    if (entry.dirty || entry.unsyncedUpdateCount > 0) continue;
+    if (now - entry.lastAccessedAt < LOCAL_CACHE_PRUNE_AFTER_MS) continue;
+
+    try {
+      window.indexedDB.deleteDatabase(entry.indexedDbName);
+    } catch {
+      // Ignore browser storage errors; the manifest cleanup is best effort.
+    }
+    delete manifest[contentId];
+    changed = true;
+  }
+
+  if (changed) {
+    writeLocalCacheManifest(manifest);
+  }
 }
 
 export function getCollaborationBrowserSessionId() {
@@ -460,6 +532,7 @@ class CollaborationRuntimeManager {
     const existing = this.entries.get(contentId);
     if (existing) return existing;
 
+    pruneCleanLocalCacheManifestEntries();
     const ydoc = new Y.Doc();
     const indexedDbProvider = new IndexeddbPersistence(`dg:content:${contentId}`, ydoc);
     const entry: DocumentRuntimeEntry = {
@@ -490,7 +563,10 @@ class CollaborationRuntimeManager {
       networkOnlineHandler: () => this.handleNetworkOnline(contentId),
       networkOfflineHandler: () => this.handleNetworkOffline(contentId),
       visibilityChangeHandler: () => this.handleVisibilityChange(contentId),
+      pageHideHandler: () => this.handlePageHide(contentId),
       lastActivityAt: Date.now(),
+      reconnectTimer: null,
+      reconnectAttempts: 0,
       state: {
         contentId,
         documentName: `content:${contentId}`,
@@ -555,7 +631,9 @@ class CollaborationRuntimeManager {
     window.addEventListener("online", entry.networkOnlineHandler);
     window.addEventListener("offline", entry.networkOfflineHandler);
     document.addEventListener("visibilitychange", entry.visibilityChangeHandler);
+    window.addEventListener("pagehide", entry.pageHideHandler);
     this.entries.set(contentId, entry);
+    updateLocalCacheManifest(entry);
     return entry;
   }
 
@@ -740,17 +818,21 @@ class CollaborationRuntimeManager {
     };
   }
 
-  private announceBrowserSession(entry: DocumentRuntimeEntry) {
+  private announceBrowserSession(entry: DocumentRuntimeEntry, forceZero = false) {
     const storageKey = `dg-collab-session:${entry.contentId}:${this.sessionId}`;
+    const selfPresence = this.getSelfPresencePayload(entry);
     const payload = {
       type: "session-announcement",
-      ...this.getSelfPresencePayload(entry),
+      ...selfPresence,
+      surfaceCount: forceZero ? 0 : selfPresence.surfaceCount,
+      activePaneIds: forceZero ? [] : selfPresence.activePaneIds,
+      activeTabIds: forceZero ? [] : selfPresence.activeTabIds,
       timestamp: Date.now(),
     };
 
     entry.broadcastChannel?.postMessage(payload);
     try {
-      if (entry.consumers.size === 0) {
+      if (forceZero || entry.consumers.size === 0) {
         localStorage.setItem(storageKey, JSON.stringify(payload));
         window.setTimeout(() => {
           try {
@@ -879,6 +961,34 @@ class CollaborationRuntimeManager {
     } finally {
       entry.presenceHeartbeatInFlight = false;
     }
+  }
+
+  private sendPresenceCloseBeacon(entry: DocumentRuntimeEntry) {
+    const session = {
+      ...this.getSelfPresencePayload(entry),
+      surfaceCount: 0,
+      activePaneIds: [],
+      activeTabIds: [],
+      transportState: entry.state.connectionState,
+    };
+    const payload = JSON.stringify({ sessions: [session] });
+
+    if (typeof navigator !== "undefined" && "sendBeacon" in navigator) {
+      const blob = new Blob([payload], { type: "application/json" });
+      if (navigator.sendBeacon("/api/collaboration/presence/heartbeat", blob)) {
+        return;
+      }
+    }
+
+    void fetch("/api/collaboration/presence/heartbeat", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: payload,
+      keepalive: true,
+    }).catch(() => {
+      // Presence close is advisory; stale records are pruned server-side.
+    });
   }
 
   private handleRemotePresence(entry: DocumentRuntimeEntry, event: MessageEvent<string>) {
@@ -1053,6 +1163,13 @@ class CollaborationRuntimeManager {
   }
 
   private async promote(entry: DocumentRuntimeEntry, reason: PromotionReason) {
+    if (entry.reconnectTimer && reason !== "explicit-live-workflow") {
+      return entry.promotionPromise ?? Promise.resolve();
+    }
+    if (entry.reconnectTimer && reason === "explicit-live-workflow") {
+      this.clearProviderReconnect(entry);
+    }
+
     if (entry.hocuspocusProvider) {
       if (
         entry.state.networkState === "online" &&
@@ -1132,6 +1249,7 @@ class CollaborationRuntimeManager {
       },
       onSynced: ({ state }) => {
         if (!state) return;
+        this.clearProviderReconnect(entry);
         entry.state.connectionState = "synced";
         entry.state.warning = null;
         entry.state.reconnectIntent = false;
@@ -1231,12 +1349,16 @@ class CollaborationRuntimeManager {
   }
 
   private markUnauthorized(entry: DocumentRuntimeEntry, reason?: string) {
+    this.clearProviderReconnect(entry);
     this.destroyProviderOnly(entry);
     entry.state.authState = "unauthorized";
     entry.state.readOnly = true;
     entry.state.connectionState = "localOnly";
     entry.state.reconnectIntent = false;
-    entry.state.warning = reason || "Collaboration access was revoked.";
+    entry.state.warning =
+      entry.state.localDirty || entry.state.unsyncedUpdateCount > 0
+        ? "Access changed before local edits could sync. Your local collaborative cache is preserved, but remote sync is blocked."
+        : reason || "Collaboration access was revoked.";
     this.emit(entry);
   }
 
@@ -1251,6 +1373,7 @@ class CollaborationRuntimeManager {
         : reason ||
           "Live collaboration is temporarily unavailable. Local edits are durable and will sync when collaboration reconnects.";
     this.emit(entry);
+    this.scheduleProviderReconnect(entry, "reconnect-after-offline");
   }
 
   private handleAuthenticationFailed(entry: DocumentRuntimeEntry, reason?: string) {
@@ -1329,6 +1452,44 @@ class CollaborationRuntimeManager {
     }
   }
 
+  private clearProviderReconnect(entry: DocumentRuntimeEntry) {
+    if (entry.reconnectTimer) {
+      clearTimeout(entry.reconnectTimer);
+      entry.reconnectTimer = null;
+    }
+    entry.reconnectAttempts = 0;
+  }
+
+  private shouldReconnectProvider(entry: DocumentRuntimeEntry) {
+    return (
+      entry.consumers.size > 0 &&
+      entry.state.networkState === "online" &&
+      entry.state.authState !== "unauthorized" &&
+      (entry.state.reconnectIntent ||
+        entry.state.browserSessionTopology === "multiSession" ||
+        entry.state.remoteCollaborationTopology === "remotePresent" ||
+        entry.state.liveConsumerCount > 0)
+    );
+  }
+
+  private scheduleProviderReconnect(entry: DocumentRuntimeEntry, reason: PromotionReason) {
+    if (entry.reconnectTimer || entry.hocuspocusProvider || entry.promotionPromise) return;
+    if (!this.shouldReconnectProvider(entry)) return;
+
+    const exponentialDelay = Math.min(
+      PROVIDER_RECONNECT_MAX_MS,
+      PROVIDER_RECONNECT_BASE_MS * 2 ** entry.reconnectAttempts
+    );
+    const jitter = Math.floor(Math.random() * Math.min(1000, exponentialDelay));
+    entry.reconnectAttempts += 1;
+    entry.reconnectTimer = setTimeout(() => {
+      entry.reconnectTimer = null;
+      if (this.shouldReconnectProvider(entry)) {
+        void this.promote(entry, reason);
+      }
+    }, exponentialDelay + jitter);
+  }
+
   private handleProviderDisconnected(entry: DocumentRuntimeEntry) {
     if (entry.state.localDirty || entry.state.unsyncedUpdateCount > 0) {
       entry.state.connectionState = "disconnectedButDirty";
@@ -1339,6 +1500,7 @@ class CollaborationRuntimeManager {
       entry.state.connectionState = "localOnly";
     }
     this.emit(entry);
+    this.scheduleProviderReconnect(entry, "reconnect-after-offline");
   }
 
   private handleNetworkOnline(contentId: string) {
@@ -1362,6 +1524,7 @@ class CollaborationRuntimeManager {
     const entry = this.entries.get(contentId);
     if (!entry) return;
     entry.state.networkState = "offline";
+    this.clearProviderReconnect(entry);
     this.closePresenceStream(entry);
     this.schedulePresenceHeartbeat(entry);
     if (entry.hocuspocusProvider) {
@@ -1378,6 +1541,13 @@ class CollaborationRuntimeManager {
     if (!entry) return;
     this.schedulePresenceHeartbeat(entry);
     this.syncPresenceTransport(entry);
+  }
+
+  private handlePageHide(contentId: string) {
+    const entry = this.entries.get(contentId);
+    if (!entry || entry.consumers.size === 0) return;
+    this.announceBrowserSession(entry, true);
+    this.sendPresenceCloseBeacon(entry);
   }
 
   private maybeStartCooldown(entry: DocumentRuntimeEntry) {
@@ -1453,7 +1623,9 @@ class CollaborationRuntimeManager {
     window.removeEventListener("online", entry.networkOnlineHandler);
     window.removeEventListener("offline", entry.networkOfflineHandler);
     document.removeEventListener("visibilitychange", entry.visibilityChangeHandler);
+    window.removeEventListener("pagehide", entry.pageHideHandler);
     if (entry.cooldownTimer) clearTimeout(entry.cooldownTimer);
+    this.clearProviderReconnect(entry);
     this.entries.delete(contentId);
   }
 
@@ -1500,6 +1672,7 @@ class CollaborationRuntimeManager {
 
   private emit(entry: DocumentRuntimeEntry) {
     this.refreshEditPolicy(entry);
+    updateLocalCacheManifest(entry);
     for (const listener of entry.listeners) {
       listener();
     }
