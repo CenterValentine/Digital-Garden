@@ -4,32 +4,12 @@ import * as Y from "yjs";
 
 import type { PrismaClient } from "@/lib/database/generated/prisma";
 import { extractSearchTextFromTipTap } from "@/lib/domain/content/search-text";
+import {
+  hasMeaningfulTipTapContent,
+  ydocUpdateHasMeaningfulDefaultContent,
+} from "./content-safety";
 import { getCollaborationServerExtensions } from "./extensions";
 import { getCollaborationDocumentName } from "./tokens";
-
-function hasMeaningfulContent(content: JSONContent | null | undefined): boolean {
-  if (!content) return false;
-
-  if (typeof content.text === "string" && content.text.trim().length > 0) {
-    return true;
-  }
-
-  if (Array.isArray(content.content)) {
-    return content.content.some(hasMeaningfulContent);
-  }
-
-  return false;
-}
-
-function ydocStateHasDefaultContent(state: Uint8Array): boolean {
-  const ydoc = new Y.Doc();
-  try {
-    Y.applyUpdate(ydoc, state);
-    return ydoc.getXmlFragment("default").length > 0;
-  } finally {
-    ydoc.destroy();
-  }
-}
 
 export async function loadCollaborationYDocState(
   prisma: PrismaClient,
@@ -59,7 +39,10 @@ export async function loadCollaborationYDocState(
   if (record?.ydocState) {
     const state = new Uint8Array(record.ydocState);
     const noteContent = content.notePayload.tiptapJson as JSONContent;
-    if (ydocStateHasDefaultContent(state) || !hasMeaningfulContent(noteContent)) {
+    if (
+      ydocUpdateHasMeaningfulDefaultContent(state) ||
+      !hasMeaningfulTipTapContent(noteContent)
+    ) {
       return state;
     }
   }
@@ -100,7 +83,7 @@ export async function storeCollaborationYDocState(
   const ydoc = new Y.Doc();
   Y.applyUpdate(ydoc, state);
   const snapshot = TiptapTransformer.fromYdoc(ydoc, "default") as JSONContent;
-  const snapshotHasMeaningfulContent = hasMeaningfulContent(snapshot);
+  const snapshotHasMeaningfulContent = hasMeaningfulTipTapContent(snapshot);
   const searchText = extractSearchTextFromTipTap(snapshot);
   const wordCount = searchText.split(/\s+/).filter(Boolean).length;
 
@@ -122,9 +105,8 @@ export async function storeCollaborationYDocState(
 
     const existingContent = content.notePayload?.tiptapJson as JSONContent | undefined;
     if (
-      hasMeaningfulContent(existingContent) &&
-      !snapshotHasMeaningfulContent &&
-      ydoc.getXmlFragment("default").length === 0
+      hasMeaningfulTipTapContent(existingContent) &&
+      !snapshotHasMeaningfulContent
     ) {
       throw new Error(
         "Refusing to store an empty collaborative document over existing note content"

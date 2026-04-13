@@ -11,6 +11,7 @@
     "start": "next start",
     "lint": "eslint",
     "build:tokens": "style-dictionary build --config style-dictionary.config.js",
+    "collab:schema:check": "tsx scripts/validate-collaboration-schema.ts",
     "db:seed": "tsx prisma/seed.ts"
   },
   "prisma": {

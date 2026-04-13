@@ -132,6 +132,7 @@ export function getEditorExtensions(options?: EditorExtensionsOptions): Extensio
       },
       // Enable horizontal rule with ---
       horizontalRule: {},
+      link: false,
       undoRedo: collaboration ? false : {},
     }),
 

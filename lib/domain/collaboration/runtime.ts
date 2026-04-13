@@ -7,6 +7,11 @@ import { IndexeddbPersistence } from "y-indexeddb";
 import * as Y from "yjs";
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import {
+  hasMeaningfulTipTapContent,
+  ydocHasMeaningfulDefaultContent,
+  ydocUpdateHasMeaningfulDefaultContent,
+} from "@/lib/domain/collaboration/content-safety";
 import { getCollaborationServerExtensions } from "@/lib/domain/collaboration/extensions";
 
 export type LocalSurfaceTopology = "singleSurface" | "multiSurface";
@@ -220,12 +225,6 @@ const SESSION_ANNOUNCE_INTERVAL_MS = 2000;
 const COOLDOWN_MS = 120_000;
 const IDLE_EVICTION_MS = 300_000;
 
-function hasMeaningfulContent(content: JSONContent | null | undefined): boolean {
-  if (!content) return false;
-  if (typeof content.text === "string" && content.text.trim().length > 0) return true;
-  return Array.isArray(content.content) && content.content.some(hasMeaningfulContent);
-}
-
 function createId(prefix: string) {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
     return `${prefix}:${crypto.randomUUID()}`;
@@ -336,16 +335,6 @@ function base64ToUint8Array(value: string) {
     bytes[index] = binary.charCodeAt(index);
   }
   return bytes;
-}
-
-function ydocUpdateHasDefaultContent(update: Uint8Array) {
-  const doc = new Y.Doc();
-  try {
-    Y.applyUpdate(doc, update);
-    return doc.getXmlFragment("default").length > 0;
-  } finally {
-    doc.destroy();
-  }
 }
 
 async function readJsonResponse<T>(response: Response): Promise<T | null> {
@@ -525,7 +514,7 @@ class CollaborationRuntimeManager {
   private seedInitialContent(entry: DocumentRuntimeEntry, content: JSONContent | null | undefined) {
     if (!content || entry.hasSeededInitialContent) return;
     entry.pendingInitialContent = content;
-    if (!hasMeaningfulContent(content)) {
+    if (!hasMeaningfulTipTapContent(content)) {
       entry.hasSeededInitialContent = true;
       entry.state.bootstrapState = "ready";
       this.emit(entry);
@@ -544,14 +533,21 @@ class CollaborationRuntimeManager {
       return;
     }
 
-    const fragment = entry.ydoc.getXmlFragment("default");
-    if (fragment.length > 0) {
+    const pendingContentIsMeaningful = hasMeaningfulTipTapContent(
+      entry.pendingInitialContent
+    );
+    const localYdocIsMeaningful = ydocHasMeaningfulDefaultContent(entry.ydoc);
+
+    if (
+      localYdocIsMeaningful ||
+      (entry.ydoc.getXmlFragment("default").length > 0 && !pendingContentIsMeaningful)
+    ) {
       entry.hasSeededInitialContent = true;
       entry.state.bootstrapState = "ready";
       return;
     }
 
-    if (!entry.pendingInitialContent || !hasMeaningfulContent(entry.pendingInitialContent)) {
+    if (!entry.pendingInitialContent || !pendingContentIsMeaningful) {
       entry.hasSeededInitialContent = true;
       entry.state.bootstrapState = "ready";
       this.emit(entry);
@@ -563,8 +559,8 @@ class CollaborationRuntimeManager {
       const canonicalState = await this.fetchCanonicalYDocState(entry.contentId);
       if (canonicalState?.update) {
         if (
-          hasMeaningfulContent(entry.pendingInitialContent) &&
-          !ydocUpdateHasDefaultContent(canonicalState.update)
+          pendingContentIsMeaningful &&
+          !ydocUpdateHasMeaningfulDefaultContent(canonicalState.update)
         ) {
           throw new Error(
             "Canonical collaboration state was empty while saved note content exists"
