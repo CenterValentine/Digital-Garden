@@ -107,7 +107,7 @@ function TabPresenceDiscs({
   if (sessions.length === 0) return null;
   if (!anchorRect || typeof document === "undefined") return null;
 
-  const top = Math.max(4, anchorRect.top - 18);
+  const top = Math.max(4, anchorRect.top - 10);
   const left = Math.min(
     window.innerWidth - 36,
     Math.max(4, anchorRect.right - 68)
