@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 
 import { prisma } from "@/lib/database/client";
-import { resolveContentAccess } from "@/lib/domain/collaboration/access";
+import { assertCachedPresenceAccess } from "@/lib/domain/collaboration/presence-access-cache";
 import {
   listCollaborationPresence,
   subscribeCollaborationPresence,
@@ -20,10 +20,9 @@ export async function GET(request: NextRequest) {
     return new Response("contentId is required", { status: 400 });
   }
 
-  await resolveContentAccess(prisma, {
+  await assertCachedPresenceAccess(prisma, {
     contentId,
     userId: session.user.id,
-    require: "view",
   });
 
   const encoder = new TextEncoder();

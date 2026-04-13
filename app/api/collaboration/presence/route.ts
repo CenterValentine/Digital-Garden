@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { prisma } from "@/lib/database/client";
-import { resolveContentAccess } from "@/lib/domain/collaboration/access";
+import { filterCachedPresenceContentIds } from "@/lib/domain/collaboration/presence-access-cache";
 import { listCollaborationPresence } from "@/lib/domain/collaboration/presence-server";
 import { getSession } from "@/lib/infrastructure/auth/session";
 
@@ -29,21 +29,6 @@ function isUuid(value: string) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{12}$/i.test(value);
 }
 
-async function getPublicContentIds(contentIds: string[]) {
-  if (contentIds.length === 0) return [];
-
-  const publicContent = await prisma.contentNode.findMany({
-    where: {
-      id: { in: contentIds },
-      deletedAt: null,
-      isPublished: true,
-    },
-    select: { id: true },
-  });
-
-  return publicContent.map((content) => content.id);
-}
-
 export async function GET(request: NextRequest) {
   try {
     const session = await getSession();
@@ -59,23 +44,10 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    const accessResults = session
-      ? await Promise.allSettled(
-          contentIds.map((contentId) =>
-            resolveContentAccess(prisma, {
-              contentId,
-              userId: session.user.id,
-              require: "view",
-            })
-          )
-        )
-      : [];
-    const accessibleContentIds = session
-      ? contentIds.filter(
-          (_contentId, index) =>
-            accessResults[index].status === "fulfilled"
-        )
-      : await getPublicContentIds(contentIds);
+    const accessibleContentIds = await filterCachedPresenceContentIds(prisma, {
+      contentIds,
+      userId: session?.user.id ?? null,
+    });
 
     const records = accessibleContentIds.flatMap((contentId) =>
       listCollaborationPresence(contentId).filter(

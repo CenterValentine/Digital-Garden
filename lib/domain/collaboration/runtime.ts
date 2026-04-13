@@ -166,6 +166,28 @@ type CollaborationAccessVerification =
   | { status: "unauthorized"; reason: string }
   | { status: "transient"; reason: string };
 
+interface BrowserSessionPresence {
+  sessionId: string;
+  browserContextId: string;
+  surfaceCount: number;
+  activePaneIds: string[];
+  activeTabIds: string[];
+  transportState: ConnectionState;
+  lastKnownServerRevision: number | null;
+  lastSeenAt: number;
+}
+
+interface PresenceHeartbeatPayload {
+  contentId: string;
+  sessionId: string;
+  browserContextId: string;
+  surfaceCount: number;
+  activePaneIds: string[];
+  activeTabIds: string[];
+  transportState: ConnectionState;
+  lastKnownServerRevision: number | null;
+}
+
 interface DocumentRuntimeEntry {
   runtimeId: string;
   contentId: string;
@@ -181,11 +203,11 @@ interface DocumentRuntimeEntry {
   idleEvictionTimer: ReturnType<typeof setTimeout> | null;
   sessionAnnounceTimer: ReturnType<typeof setInterval> | null;
   sessionSweepTimer: ReturnType<typeof setInterval> | null;
-  presenceHeartbeatTimer: ReturnType<typeof setInterval> | null;
+  presenceHeartbeatTimer: ReturnType<typeof setTimeout> | null;
   presenceHeartbeatInFlight: boolean;
   presenceEventSource: EventSource | null;
   broadcastChannel: BroadcastChannel | null;
-  knownBrowserSessions: Map<string, number>;
+  knownBrowserSessions: Map<string, BrowserSessionPresence>;
   pendingInitialContent: JSONContent | null;
   hasSeededInitialContent: boolean;
   isBootstrappingInitialContent: boolean;
@@ -201,6 +223,8 @@ interface DocumentRuntimeEntry {
     | null;
   networkOnlineHandler: () => void;
   networkOfflineHandler: () => void;
+  visibilityChangeHandler: () => void;
+  lastActivityAt: number;
 }
 
 interface UseCollaborationRuntimeOptions {
@@ -224,6 +248,9 @@ const COLLABORATION_CHANNEL_NAME = "dg-collaboration-runtime";
 const SESSION_STALE_AFTER_MS = 6000;
 const SESSION_ANNOUNCE_INTERVAL_MS = 2000;
 const PRESENCE_HEARTBEAT_INTERVAL_MS = 10_000;
+const PRESENCE_HEARTBEAT_IDLE_INTERVAL_MS = 30_000;
+const PRESENCE_HEARTBEAT_HIDDEN_INTERVAL_MS = 60_000;
+const PRESENCE_IDLE_AFTER_MS = 60_000;
 const COOLDOWN_MS = 120_000;
 const IDLE_EVICTION_MS = 300_000;
 
@@ -383,12 +410,16 @@ class CollaborationRuntimeManager {
       contentId,
       mountedAt: Date.now(),
     });
+    entry.lastActivityAt = Date.now();
 
     if (initialContent) {
       this.seedInitialContent(entry, initialContent);
     }
 
     this.recalculateLocalSurfaceTopology(entry);
+    this.announceBrowserSession(entry);
+    this.syncPresenceTransport(entry);
+    this.schedulePresenceHeartbeat(entry, 0);
     this.maybePromoteFromCurrentTopology(entry);
     this.emit(entry);
 
@@ -458,6 +489,8 @@ class CollaborationRuntimeManager {
       ydocUpdateHandler: null,
       networkOnlineHandler: () => this.handleNetworkOnline(contentId),
       networkOfflineHandler: () => this.handleNetworkOffline(contentId),
+      visibilityChangeHandler: () => this.handleVisibilityChange(contentId),
+      lastActivityAt: Date.now(),
       state: {
         contentId,
         documentName: `content:${contentId}`,
@@ -495,6 +528,7 @@ class CollaborationRuntimeManager {
       if (!transaction.local || entry.isBootstrappingInitialContent) return;
       if (entry.state.persistenceState !== "localReady") return;
 
+      entry.lastActivityAt = Date.now();
       if (
         entry.state.networkState === "offline" ||
         entry.state.connectionState === "disconnectedButDirty"
@@ -520,6 +554,7 @@ class CollaborationRuntimeManager {
     this.startRemotePresenceDetection(entry);
     window.addEventListener("online", entry.networkOnlineHandler);
     window.addEventListener("offline", entry.networkOfflineHandler);
+    document.addEventListener("visibilitychange", entry.visibilityChangeHandler);
     this.entries.set(contentId, entry);
     return entry;
   }
@@ -644,37 +679,11 @@ class CollaborationRuntimeManager {
 
   private startBrowserSessionDetection(entry: DocumentRuntimeEntry) {
     const storageKey = `dg-collab-session:${entry.contentId}:${this.sessionId}`;
-    const announce = () => {
-      const payload = {
-        type: "session-announcement",
-        contentId: entry.contentId,
-        sessionId: this.sessionId,
-        browserContextId: this.browserContextId,
-        surfaceCount: entry.consumers.size,
-        timestamp: Date.now(),
-      };
-
-      if (entry.consumers.size === 0) {
-        entry.broadcastChannel?.postMessage(payload);
-        try {
-          localStorage.removeItem(storageKey);
-        } catch {
-          // Ignore storage privacy failures.
-        }
-        return;
-      }
-      entry.broadcastChannel?.postMessage(payload);
-      try {
-        localStorage.setItem(storageKey, JSON.stringify(payload));
-      } catch {
-        // Ignore storage quota/privacy failures; BroadcastChannel still covers modern browsers.
-      }
-    };
 
     if ("BroadcastChannel" in window) {
       entry.broadcastChannel = new BroadcastChannel(COLLABORATION_CHANNEL_NAME);
       entry.broadcastChannel.onmessage = (event) => {
-        this.handleSessionAnnouncement(entry, event.data);
+        this.handleBroadcastMessage(entry, event.data);
       };
     }
 
@@ -683,16 +692,19 @@ class CollaborationRuntimeManager {
         return;
       }
       try {
-        this.handleSessionAnnouncement(entry, JSON.parse(event.newValue));
+        this.handleBroadcastMessage(entry, JSON.parse(event.newValue));
       } catch {
         // Ignore malformed localStorage session payloads.
       }
     };
 
     window.addEventListener("storage", handleStorage);
-    entry.sessionAnnounceTimer = setInterval(announce, SESSION_ANNOUNCE_INTERVAL_MS);
+    entry.sessionAnnounceTimer = setInterval(
+      () => this.announceBrowserSession(entry),
+      SESSION_ANNOUNCE_INTERVAL_MS
+    );
     entry.sessionSweepTimer = setInterval(() => this.sweepBrowserSessions(entry), 1000);
-    announce();
+    this.announceBrowserSession(entry);
 
     const originalDispose = entry.indexedDbProvider.destroy?.bind(entry.indexedDbProvider);
     const disposeSessionDetection = () => {
@@ -710,12 +722,58 @@ class CollaborationRuntimeManager {
     entry.indexedDbProvider.destroy = disposeSessionDetection as typeof entry.indexedDbProvider.destroy;
   }
 
-  private startRemotePresenceDetection(entry: DocumentRuntimeEntry) {
-    entry.presenceHeartbeatTimer = setInterval(() => {
-      void this.sendPresenceHeartbeat(entry);
-    }, PRESENCE_HEARTBEAT_INTERVAL_MS);
-    void this.sendPresenceHeartbeat(entry);
+  private getSelfPresencePayload(entry: DocumentRuntimeEntry): PresenceHeartbeatPayload {
+    const consumers = Array.from(entry.consumers.values());
+    return {
+      contentId: entry.contentId,
+      sessionId: this.sessionId,
+      browserContextId: this.browserContextId,
+      surfaceCount: entry.consumers.size,
+      activePaneIds: consumers.flatMap((consumer) =>
+        consumer.paneId ? [consumer.paneId] : []
+      ),
+      activeTabIds: consumers.flatMap((consumer) =>
+        consumer.tabId ? [consumer.tabId] : []
+      ),
+      transportState: entry.state.connectionState,
+      lastKnownServerRevision: entry.state.lastKnownServerRevision,
+    };
+  }
 
+  private announceBrowserSession(entry: DocumentRuntimeEntry) {
+    const storageKey = `dg-collab-session:${entry.contentId}:${this.sessionId}`;
+    const payload = {
+      type: "session-announcement",
+      ...this.getSelfPresencePayload(entry),
+      timestamp: Date.now(),
+    };
+
+    entry.broadcastChannel?.postMessage(payload);
+    try {
+      if (entry.consumers.size === 0) {
+        localStorage.setItem(storageKey, JSON.stringify(payload));
+        window.setTimeout(() => {
+          try {
+            localStorage.removeItem(storageKey);
+          } catch {
+            // Ignore storage privacy failures.
+          }
+        }, 0);
+      } else {
+        localStorage.setItem(storageKey, JSON.stringify(payload));
+      }
+    } catch {
+      // Ignore storage quota/privacy failures; BroadcastChannel still covers modern browsers.
+    }
+  }
+
+  private startRemotePresenceDetection(entry: DocumentRuntimeEntry) {
+    this.schedulePresenceHeartbeat(entry, 0);
+    this.syncPresenceTransport(entry);
+  }
+
+  private openPresenceStream(entry: DocumentRuntimeEntry) {
+    if (entry.presenceEventSource || entry.consumers.size === 0) return;
     const streamUrl = `/api/collaboration/presence/stream?contentId=${encodeURIComponent(
       entry.contentId
     )}&sessionId=${encodeURIComponent(this.sessionId)}`;
@@ -728,31 +786,93 @@ class CollaborationRuntimeManager {
     };
   }
 
-  private async sendPresenceHeartbeat(entry: DocumentRuntimeEntry, includeZero = false) {
-    if (entry.consumers.size === 0 && !includeZero) return;
-    if (entry.presenceHeartbeatInFlight) return;
+  private closePresenceStream(entry: DocumentRuntimeEntry) {
+    entry.presenceEventSource?.close();
+    entry.presenceEventSource = null;
+  }
 
-    const consumers = Array.from(entry.consumers.values());
+  private syncPresenceTransport(entry: DocumentRuntimeEntry) {
+    if (!entry.broadcastChannel || this.isPresenceLeader(entry)) {
+      this.openPresenceStream(entry);
+    } else {
+      this.closePresenceStream(entry);
+    }
+  }
+
+  private getPresenceHeartbeatDelay(entry: DocumentRuntimeEntry) {
+    if (entry.state.networkState === "offline") return PRESENCE_HEARTBEAT_HIDDEN_INTERVAL_MS;
+    if (typeof document !== "undefined" && document.visibilityState === "hidden") {
+      return PRESENCE_HEARTBEAT_HIDDEN_INTERVAL_MS;
+    }
+    if (Date.now() - entry.lastActivityAt > PRESENCE_IDLE_AFTER_MS) {
+      return PRESENCE_HEARTBEAT_IDLE_INTERVAL_MS;
+    }
+    return PRESENCE_HEARTBEAT_INTERVAL_MS;
+  }
+
+  private schedulePresenceHeartbeat(entry: DocumentRuntimeEntry, delay?: number) {
+    if (entry.presenceHeartbeatTimer) {
+      clearTimeout(entry.presenceHeartbeatTimer);
+      entry.presenceHeartbeatTimer = null;
+    }
+
+    entry.presenceHeartbeatTimer = setTimeout(() => {
+      void this.sendPresenceHeartbeat(entry).finally(() => {
+        if (this.entries.get(entry.contentId) === entry) {
+          this.schedulePresenceHeartbeat(entry);
+        }
+      });
+    }, delay ?? this.getPresenceHeartbeatDelay(entry));
+  }
+
+  private isPresenceLeader(entry: DocumentRuntimeEntry) {
+    if (entry.consumers.size === 0) return false;
+    const activeSessionIds = [
+      this.sessionId,
+      ...Array.from(entry.knownBrowserSessions.values())
+        .filter((session) => session.surfaceCount > 0)
+        .map((session) => session.sessionId),
+    ].sort();
+    return activeSessionIds[0] === this.sessionId;
+  }
+
+  private buildPresenceHeartbeatSessions(
+    entry: DocumentRuntimeEntry,
+    includeZero = false
+  ): PresenceHeartbeatPayload[] {
+    const self = this.getSelfPresencePayload(entry);
+    if (includeZero) return [self];
+    if (entry.consumers.size === 0 || !this.isPresenceLeader(entry)) return [];
+
+    return [
+      self,
+      ...Array.from(entry.knownBrowserSessions.values())
+        .map((session) => ({
+          contentId: entry.contentId,
+          sessionId: session.sessionId,
+          browserContextId: session.browserContextId,
+          surfaceCount: session.surfaceCount,
+          activePaneIds: session.activePaneIds,
+          activeTabIds: session.activeTabIds,
+          transportState: session.transportState,
+          lastKnownServerRevision: session.lastKnownServerRevision,
+        })),
+    ];
+  }
+
+  private async sendPresenceHeartbeat(entry: DocumentRuntimeEntry, includeZero = false) {
+    if (entry.state.networkState === "offline" && !includeZero) return;
+    if (entry.presenceHeartbeatInFlight) return;
+    const sessions = this.buildPresenceHeartbeatSessions(entry, includeZero);
+    if (sessions.length === 0) return;
+
     entry.presenceHeartbeatInFlight = true;
     try {
       await fetch("/api/collaboration/presence/heartbeat", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contentId: entry.contentId,
-          sessionId: this.sessionId,
-          browserContextId: this.browserContextId,
-          surfaceCount: entry.consumers.size,
-          activePaneIds: consumers.flatMap((consumer) =>
-            consumer.paneId ? [consumer.paneId] : []
-          ),
-          activeTabIds: consumers.flatMap((consumer) =>
-            consumer.tabId ? [consumer.tabId] : []
-          ),
-          transportState: entry.state.connectionState,
-          lastKnownServerRevision: entry.state.lastKnownServerRevision,
-        }),
+        body: JSON.stringify({ sessions }),
       });
     } catch {
       // Presence is advisory. Transport promotion can still happen via BroadcastChannel.
@@ -766,28 +886,55 @@ class CollaborationRuntimeManager {
       const payload = JSON.parse(event.data) as {
         sessions?: Array<{ sessionId?: string; userId?: string; surfaceCount?: number }>;
       };
-      const remoteSessions =
-        payload.sessions?.filter(
-          (session) =>
-            session.sessionId &&
-            session.sessionId !== this.sessionId &&
-            (session.surfaceCount ?? 0) > 0
-        ) ?? [];
-
-      const nextTopology = remoteSessions.length > 0 ? "remotePresent" : "solo";
-      if (entry.state.remoteCollaborationTopology !== nextTopology) {
-        entry.state.remoteCollaborationTopology = nextTopology;
-        entry.state.presenceState = remoteSessions.length > 0 ? "multiUserPresent" : "selfOnly";
-        this.emit(entry);
-      }
-
-      if (nextTopology === "remotePresent") {
-        void this.promote(entry, "remote-presence");
-      } else {
-        this.maybeStartCooldown(entry);
-      }
+      this.applyRemotePresenceSessions(entry, payload.sessions ?? []);
+      entry.broadcastChannel?.postMessage({
+        type: "remote-presence-snapshot",
+        contentId: entry.contentId,
+        sessions: payload.sessions ?? [],
+        timestamp: Date.now(),
+      });
     } catch {
       // Ignore malformed presence events.
+    }
+  }
+
+  private handleBroadcastMessage(entry: DocumentRuntimeEntry, payload: unknown) {
+    if (!payload || typeof payload !== "object") return;
+    const message = payload as { type?: string; contentId?: string };
+    if (message.type === "remote-presence-snapshot" && message.contentId === entry.contentId) {
+      this.applyRemotePresenceSessions(
+        entry,
+        (payload as { sessions?: Array<{ sessionId?: string; surfaceCount?: number }> }).sessions ??
+          []
+      );
+      return;
+    }
+
+    this.handleSessionAnnouncement(entry, payload);
+  }
+
+  private applyRemotePresenceSessions(
+    entry: DocumentRuntimeEntry,
+    sessions: Array<{ sessionId?: string; surfaceCount?: number }>
+  ) {
+    const remoteSessions = sessions.filter(
+      (session) =>
+        session.sessionId &&
+        session.sessionId !== this.sessionId &&
+        (session.surfaceCount ?? 0) > 0
+    );
+
+    const nextTopology = remoteSessions.length > 0 ? "remotePresent" : "solo";
+    if (entry.state.remoteCollaborationTopology !== nextTopology) {
+      entry.state.remoteCollaborationTopology = nextTopology;
+      entry.state.presenceState = remoteSessions.length > 0 ? "multiUserPresent" : "selfOnly";
+      this.emit(entry);
+    }
+
+    if (nextTopology === "remotePresent") {
+      void this.promote(entry, "remote-presence");
+    } else {
+      this.maybeStartCooldown(entry);
     }
   }
 
@@ -797,7 +944,12 @@ class CollaborationRuntimeManager {
       type?: string;
       contentId?: string;
       sessionId?: string;
+      browserContextId?: string;
       surfaceCount?: number;
+      activePaneIds?: string[];
+      activeTabIds?: string[];
+      transportState?: ConnectionState;
+      lastKnownServerRevision?: number | null;
       timestamp?: number;
     };
     if (
@@ -810,29 +962,62 @@ class CollaborationRuntimeManager {
     }
 
     if (message.surfaceCount === 0) {
-      entry.knownBrowserSessions.delete(message.sessionId);
+      entry.knownBrowserSessions.set(message.sessionId, {
+        sessionId: message.sessionId,
+        browserContextId: message.browserContextId ?? message.sessionId,
+        surfaceCount: 0,
+        activePaneIds: [],
+        activeTabIds: [],
+        transportState: message.transportState ?? "localOnly",
+        lastKnownServerRevision:
+          typeof message.lastKnownServerRevision === "number"
+            ? message.lastKnownServerRevision
+            : null,
+        lastSeenAt: message.timestamp ?? Date.now(),
+      });
       this.sweepBrowserSessions(entry);
+      this.syncPresenceTransport(entry);
+      if (this.isPresenceLeader(entry)) {
+        void this.sendPresenceHeartbeat(entry);
+      }
       return;
     }
 
-    entry.knownBrowserSessions.set(message.sessionId, message.timestamp ?? Date.now());
+    entry.knownBrowserSessions.set(message.sessionId, {
+      sessionId: message.sessionId,
+      browserContextId: message.browserContextId ?? message.sessionId,
+      surfaceCount: Math.max(0, Number(message.surfaceCount ?? 0)),
+      activePaneIds: Array.isArray(message.activePaneIds) ? message.activePaneIds : [],
+      activeTabIds: Array.isArray(message.activeTabIds) ? message.activeTabIds : [],
+      transportState: message.transportState ?? "localOnly",
+      lastKnownServerRevision:
+        typeof message.lastKnownServerRevision === "number"
+          ? message.lastKnownServerRevision
+          : null,
+      lastSeenAt: message.timestamp ?? Date.now(),
+    });
     if (entry.state.browserSessionTopology !== "multiSession") {
       entry.state.browserSessionTopology = "multiSession";
       this.emit(entry);
     }
+    this.syncPresenceTransport(entry);
     this.maybePromoteFromCurrentTopology(entry);
   }
 
   private sweepBrowserSessions(entry: DocumentRuntimeEntry) {
     const now = Date.now();
-    for (const [sessionId, lastSeen] of entry.knownBrowserSessions) {
-      if (now - lastSeen > SESSION_STALE_AFTER_MS) {
+    for (const [sessionId, session] of entry.knownBrowserSessions) {
+      if (now - session.lastSeenAt > SESSION_STALE_AFTER_MS) {
         entry.knownBrowserSessions.delete(sessionId);
       }
     }
 
     const nextTopology =
-      entry.knownBrowserSessions.size > 0 ? "multiSession" : "singleSession";
+      Array.from(entry.knownBrowserSessions.values()).some(
+        (session) => session.surfaceCount > 0
+      )
+        ? "multiSession"
+        : "singleSession";
     if (entry.state.browserSessionTopology !== nextTopology) {
       entry.state.browserSessionTopology = nextTopology;
       this.emit(entry);
@@ -840,6 +1025,7 @@ class CollaborationRuntimeManager {
         this.maybeStartCooldown(entry);
       }
     }
+    this.syncPresenceTransport(entry);
   }
 
   private recalculateLocalSurfaceTopology(entry: DocumentRuntimeEntry) {
@@ -923,6 +1109,11 @@ class CollaborationRuntimeManager {
     this.applyAuthorizedToken(entry, result.data);
     entry.state.connectionState = "connecting";
     this.emit(entry);
+
+    if (entry.hocuspocusProvider) {
+      entry.hocuspocusProvider.connect();
+      return;
+    }
 
     entry.hocuspocusProvider = new HocuspocusProvider({
       url: result.data.websocketUrl,
@@ -1154,6 +1345,9 @@ class CollaborationRuntimeManager {
     const entry = this.entries.get(contentId);
     if (!entry) return;
     entry.state.networkState = "online";
+    entry.lastActivityAt = Date.now();
+    this.schedulePresenceHeartbeat(entry, 0);
+    this.syncPresenceTransport(entry);
     this.emit(entry);
     if (
       entry.state.reconnectIntent ||
@@ -1168,6 +1362,8 @@ class CollaborationRuntimeManager {
     const entry = this.entries.get(contentId);
     if (!entry) return;
     entry.state.networkState = "offline";
+    this.closePresenceStream(entry);
+    this.schedulePresenceHeartbeat(entry);
     if (entry.hocuspocusProvider) {
       entry.state.connectionState = "disconnectedButDirty";
       entry.state.reconnectIntent = true;
@@ -1175,6 +1371,13 @@ class CollaborationRuntimeManager {
         "Offline editing is active. Changes are saved locally and will sync when collaboration reconnects.";
     }
     this.emit(entry);
+  }
+
+  private handleVisibilityChange(contentId: string) {
+    const entry = this.entries.get(contentId);
+    if (!entry) return;
+    this.schedulePresenceHeartbeat(entry);
+    this.syncPresenceTransport(entry);
   }
 
   private maybeStartCooldown(entry: DocumentRuntimeEntry) {
@@ -1221,6 +1424,8 @@ class CollaborationRuntimeManager {
 
     entry.consumers.delete(consumerId);
     this.recalculateLocalSurfaceTopology(entry);
+    this.announceBrowserSession(entry);
+    this.syncPresenceTransport(entry);
 
     if (entry.consumers.size === 0) {
       void this.sendPresenceHeartbeat(entry, true);
@@ -1239,14 +1444,15 @@ class CollaborationRuntimeManager {
 
     this.destroyProviderOnly(entry);
     entry.indexedDbProvider.destroy?.();
-    if (entry.presenceHeartbeatTimer) clearInterval(entry.presenceHeartbeatTimer);
-    entry.presenceEventSource?.close();
+    if (entry.presenceHeartbeatTimer) clearTimeout(entry.presenceHeartbeatTimer);
+    this.closePresenceStream(entry);
     if (entry.ydocUpdateHandler) {
       entry.ydoc.off("update", entry.ydocUpdateHandler);
     }
     entry.ydoc.destroy();
     window.removeEventListener("online", entry.networkOnlineHandler);
     window.removeEventListener("offline", entry.networkOfflineHandler);
+    document.removeEventListener("visibilitychange", entry.visibilityChangeHandler);
     if (entry.cooldownTimer) clearTimeout(entry.cooldownTimer);
     this.entries.delete(contentId);
   }
@@ -1281,7 +1487,10 @@ class CollaborationRuntimeManager {
         const current = entry.consumers.get(consumerId);
         if (!current) return;
         entry.consumers.set(consumerId, { ...current, ...patch });
+        entry.lastActivityAt = Date.now();
         this.recalculateLocalSurfaceTopology(entry);
+        this.announceBrowserSession(entry);
+        this.syncPresenceTransport(entry);
         this.maybePromoteFromCurrentTopology(entry);
         this.emit(entry);
       },

@@ -1,15 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { prisma } from "@/lib/database/client";
-import { resolveContentAccess } from "@/lib/domain/collaboration/access";
+import {
+  assertCachedPresenceAccess,
+  assertCachedPublicPresenceAccess,
+} from "@/lib/domain/collaboration/presence-access-cache";
 import { upsertCollaborationPresence } from "@/lib/domain/collaboration/presence-server";
 import { getSession } from "@/lib/infrastructure/auth/session";
 
 export const runtime = "nodejs";
 
-const PRESENCE_ACCESS_CACHE_TTL_MS = 30_000;
-
-const presenceAccessCache = new Map<string, number>();
+const MAX_HEARTBEAT_SESSIONS = 32;
 
 type PresenceTransportState =
   | "localOnly"
@@ -30,50 +31,42 @@ const TRANSPORT_STATES = new Set<PresenceTransportState>([
   "coolingDown",
 ]);
 
+interface PresenceHeartbeatInput {
+  contentId?: string;
+  sessionId?: string;
+  browserContextId?: string;
+  displayName?: string;
+  avatarUrl?: string | null;
+  surfaceCount?: number;
+  activePaneIds?: string[];
+  activeTabIds?: string[];
+  transportState?: string;
+  lastKnownServerRevision?: number | null;
+}
+
 function parseTransportState(value: unknown): PresenceTransportState {
   return typeof value === "string" && TRANSPORT_STATES.has(value as PresenceTransportState)
     ? (value as PresenceTransportState)
     : "localOnly";
 }
 
-async function assertPresenceAccess(contentId: string, userId: string) {
-  const key = `${contentId}:${userId}`;
-  const cachedUntil = presenceAccessCache.get(key);
-  const now = Date.now();
-
-  if (cachedUntil && cachedUntil > now) {
-    return;
-  }
-
-  await resolveContentAccess(prisma, {
-    contentId,
-    userId,
-    require: "view",
-  });
-  presenceAccessCache.set(key, now + PRESENCE_ACCESS_CACHE_TTL_MS);
-
-  if (presenceAccessCache.size > 5000) {
-    for (const [cacheKey, expiresAt] of presenceAccessCache) {
-      if (expiresAt <= now) {
-        presenceAccessCache.delete(cacheKey);
-      }
-    }
-  }
+function parseHeartbeatInputs(body: PresenceHeartbeatInput & { sessions?: PresenceHeartbeatInput[] }) {
+  const sessions = Array.isArray(body.sessions) ? body.sessions : [body];
+  return sessions.slice(0, MAX_HEARTBEAT_SESSIONS).map((session) => ({
+    ...session,
+    contentId: session.contentId?.trim(),
+    sessionId: session.sessionId?.trim(),
+    browserContextId: session.browserContextId?.trim(),
+  }));
 }
 
-async function assertPublicPresenceAccess(contentId: string) {
-  const content = await prisma.contentNode.findFirst({
-    where: {
-      id: contentId,
-      deletedAt: null,
-      isPublished: true,
-    },
-    select: { id: true },
-  });
-
-  if (!content) {
-    throw new Error("View access required");
-  }
+function sanitizeStringList(value: unknown) {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter((item): item is string => typeof item === "string")
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .slice(0, 16);
 }
 
 function sanitizeDisplayName(value: unknown) {
@@ -85,61 +78,65 @@ function sanitizeDisplayName(value: unknown) {
 export async function POST(request: NextRequest) {
   try {
     const session = await getSession();
-    const body = (await request.json()) as {
-      contentId?: string;
-      sessionId?: string;
-      browserContextId?: string;
-      displayName?: string;
-      avatarUrl?: string | null;
-      surfaceCount?: number;
-      activePaneIds?: string[];
-      activeTabIds?: string[];
-      transportState?: string;
-      lastKnownServerRevision?: number | null;
+    const body = (await request.json()) as PresenceHeartbeatInput & {
+      sessions?: PresenceHeartbeatInput[];
     };
+    const heartbeatSessions = parseHeartbeatInputs(body);
 
-    const contentId = body.contentId?.trim();
-    const sessionId = body.sessionId?.trim();
-    const browserContextId = body.browserContextId?.trim();
-
-    if (!contentId || !sessionId || !browserContextId) {
+    if (
+      heartbeatSessions.length === 0 ||
+      heartbeatSessions.some(
+        (heartbeat) => !heartbeat.contentId || !heartbeat.sessionId || !heartbeat.browserContextId
+      )
+    ) {
       return NextResponse.json(
         {
           success: false,
           error: {
             code: "VALIDATION_ERROR",
-            message: "contentId, sessionId, and browserContextId are required",
+            message: "Each heartbeat requires contentId, sessionId, and browserContextId",
           },
         },
         { status: 400 }
       );
     }
 
-    if (session) {
-      await assertPresenceAccess(contentId, session.user.id);
-    } else {
-      await assertPublicPresenceAccess(contentId);
+    const contentIds = Array.from(
+      new Set(heartbeatSessions.map((heartbeat) => heartbeat.contentId as string))
+    );
+
+    for (const contentId of contentIds) {
+      if (session) {
+        await assertCachedPresenceAccess(prisma, {
+          contentId,
+          userId: session.user.id,
+        });
+      } else {
+        await assertCachedPublicPresenceAccess(prisma, contentId);
+      }
     }
 
-    upsertCollaborationPresence({
-      contentId,
-      userId: session?.user.id ?? `visitor:${browserContextId}`,
-      displayName: session?.user.username ?? sanitizeDisplayName(body.displayName),
-      avatarUrl: sanitizeDisplayName(body.avatarUrl),
-      isAnonymous: !session,
-      sessionId,
-      browserContextId,
-      surfaceCount: Math.max(0, Number(body.surfaceCount ?? 0)),
-      activePaneIds: Array.isArray(body.activePaneIds) ? body.activePaneIds : [],
-      activeTabIds: Array.isArray(body.activeTabIds) ? body.activeTabIds : [],
-      transportState: parseTransportState(body.transportState),
-      lastKnownServerRevision:
-        typeof body.lastKnownServerRevision === "number"
-          ? body.lastKnownServerRevision
-          : null,
-    });
+    for (const heartbeat of heartbeatSessions) {
+      upsertCollaborationPresence({
+        contentId: heartbeat.contentId as string,
+        userId: session?.user.id ?? `visitor:${heartbeat.browserContextId}`,
+        displayName: session?.user.username ?? sanitizeDisplayName(heartbeat.displayName),
+        avatarUrl: sanitizeDisplayName(heartbeat.avatarUrl),
+        isAnonymous: !session,
+        sessionId: heartbeat.sessionId as string,
+        browserContextId: heartbeat.browserContextId as string,
+        surfaceCount: Math.max(0, Number(heartbeat.surfaceCount ?? 0)),
+        activePaneIds: sanitizeStringList(heartbeat.activePaneIds),
+        activeTabIds: sanitizeStringList(heartbeat.activeTabIds),
+        transportState: parseTransportState(heartbeat.transportState),
+        lastKnownServerRevision:
+          typeof heartbeat.lastKnownServerRevision === "number"
+            ? heartbeat.lastKnownServerRevision
+            : null,
+      });
+    }
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, data: { accepted: heartbeatSessions.length } });
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Failed to update collaboration presence";
