@@ -48,7 +48,7 @@ const TOOL_REGISTRY: ToolDefinition[] = [
   },
   {
     id: "share",
-    label: "Share",
+    label: "Share settings",
     iconName: "Share2",
     surfaces: ["toolbar"],
     contentTypes: "all",
