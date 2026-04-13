@@ -8,6 +8,108 @@ export const runtime = "nodejs";
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const ACCESS_LEVELS = new Set(["view", "edit"]);
 
+export async function GET(request: NextRequest) {
+  try {
+    const session = await requireAuth();
+    const contentId = request.nextUrl.searchParams.get("contentId")?.trim();
+
+    if (!contentId || !UUID_RE.test(contentId)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: {
+            code: "VALIDATION_ERROR",
+            message: "A valid contentId is required",
+          },
+        },
+        { status: 400 }
+      );
+    }
+
+    const content = await prisma.contentNode.findFirst({
+      where: {
+        id: contentId,
+        deletedAt: null,
+      },
+      select: {
+        id: true,
+        ownerId: true,
+        title: true,
+        isPublished: true,
+      },
+    });
+
+    if (!content) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: {
+            code: "NOT_FOUND",
+            message: "Content not found",
+          },
+        },
+        { status: 404 }
+      );
+    }
+
+    if (content.ownerId !== session.user.id) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: {
+            code: "FORBIDDEN",
+            message: "Only the content owner can manage collaboration access",
+          },
+        },
+        { status: 403 }
+      );
+    }
+
+    const grants = await prisma.viewGrant.findMany({
+      where: {
+        contentId,
+        OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+      },
+      orderBy: [{ grantedAt: "desc" }, { id: "desc" }],
+      select: {
+        id: true,
+        contentId: true,
+        userId: true,
+        accessLevel: true,
+        grantedAt: true,
+        expiresAt: true,
+        user: {
+          select: {
+            id: true,
+            email: true,
+            username: true,
+          },
+        },
+      },
+    });
+
+    return NextResponse.json({
+      success: true,
+      data: {
+        content,
+        grants,
+      },
+    });
+  } catch (error) {
+    console.error("GET /api/collaboration/grants error:", error);
+    return NextResponse.json(
+      {
+        success: false,
+        error: {
+          code: "SERVER_ERROR",
+          message: "Failed to load collaboration access",
+        },
+      },
+      { status: 500 }
+    );
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const session = await requireAuth();
@@ -156,6 +258,13 @@ export async function POST(request: NextRequest) {
         accessLevel: true,
         grantedAt: true,
         expiresAt: true,
+        user: {
+          select: {
+            id: true,
+            email: true,
+            username: true,
+          },
+        },
       },
     });
 
@@ -191,10 +300,14 @@ export async function DELETE(request: NextRequest) {
     const body = (await request.json()) as {
       contentId?: string;
       email?: string;
+      userId?: string;
+      grantId?: string;
     };
 
     const contentId = body.contentId?.trim();
     const email = body.email?.trim().toLowerCase();
+    const userId = body.userId?.trim();
+    const grantId = body.grantId?.trim();
 
     if (!contentId || !UUID_RE.test(contentId)) {
       return NextResponse.json(
@@ -209,13 +322,13 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    if (!email) {
+    if (!email && !userId && !grantId) {
       return NextResponse.json(
         {
           success: false,
           error: {
             code: "VALIDATION_ERROR",
-            message: "A target user email is required",
+            message: "A target user email, userId, or grantId is required",
           },
         },
         { status: 400 }
@@ -258,30 +371,36 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    const targetUser = await prisma.user.findUnique({
-      where: { email },
-      select: {
-        id: true,
-      },
-    });
-
-    if (!targetUser) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: {
-            code: "NOT_FOUND",
-            message: "No user exists for that email",
-          },
+    let targetUserId = userId;
+    if (!targetUserId && email) {
+      const targetUser = await prisma.user.findUnique({
+        where: { email },
+        select: {
+          id: true,
         },
-        { status: 404 }
-      );
+      });
+
+      if (!targetUser) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: {
+              code: "NOT_FOUND",
+              message: "No user exists for that email",
+            },
+          },
+          { status: 404 }
+        );
+      }
+
+      targetUserId = targetUser.id;
     }
 
     await prisma.viewGrant.deleteMany({
       where: {
         contentId,
-        userId: targetUser.id,
+        ...(grantId ? { id: grantId } : {}),
+        ...(targetUserId ? { userId: targetUserId } : {}),
       },
     });
 

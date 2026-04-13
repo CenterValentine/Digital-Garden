@@ -310,6 +310,18 @@ export async function PATCH(
       updateData.categoryId = categoryId;
     }
     if (isPublished !== undefined) {
+      if (existing.ownerId !== session.user.id) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: {
+              code: "FORBIDDEN",
+              message: "Only the content owner can change public sharing",
+            },
+          },
+          { status: 403 }
+        );
+      }
       updateData.isPublished = isPublished;
     }
     if (customIcon !== undefined) {

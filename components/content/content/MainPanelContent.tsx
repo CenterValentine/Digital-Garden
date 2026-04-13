@@ -123,6 +123,35 @@ interface ContentResponse {
   };
 }
 
+interface ShareGrant {
+  id: string;
+  contentId: string;
+  userId: string;
+  accessLevel: "view" | "edit" | string;
+  grantedAt: string;
+  expiresAt: string | null;
+  user: {
+    id: string;
+    email: string | null;
+    username: string | null;
+  };
+}
+
+interface ShareGrantsResponse {
+  success: boolean;
+  data?: {
+    content: {
+      id: string;
+      title: string;
+      isPublished: boolean;
+    };
+    grants: ShareGrant[];
+  };
+  error?: {
+    message?: string;
+  };
+}
+
 interface MainPanelContentProps {
   paneId: WorkspacePaneId;
 }
@@ -165,6 +194,8 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
   const [shareEmail, setShareEmail] = useState("");
   const [shareAccessLevel, setShareAccessLevel] = useState<"view" | "edit">("view");
+  const [shareGrants, setShareGrants] = useState<ShareGrant[]>([]);
+  const [isShareGrantsLoading, setIsShareGrantsLoading] = useState(false);
   const [isSharing, setIsSharing] = useState(false);
   const collaborationEnabled = process.env.NEXT_PUBLIC_COLLABORATION_ENABLED === "true";
   const collaborationCapability = useMemo(
@@ -962,6 +993,39 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
     }
   }, [titleDraft, noteTitle, selectedContentId, updateContentTab]);
 
+  const fetchShareGrants = useCallback(async () => {
+    if (!selectedContentId || selectedContentId.startsWith("person:")) {
+      setShareGrants([]);
+      return;
+    }
+
+    setIsShareGrantsLoading(true);
+    try {
+      const response = await fetch(
+        `/api/collaboration/grants?contentId=${encodeURIComponent(selectedContentId)}`,
+        {
+          method: "GET",
+          credentials: "include",
+        }
+      );
+      const result = (await response.json()) as ShareGrantsResponse;
+
+      if (!response.ok || !result.success || !result.data) {
+        throw new Error(result.error?.message || "Failed to load sharing access");
+      }
+
+      setShareGrants(result.data.grants);
+      setContentIsPublished(Boolean(result.data.content.isPublished));
+    } catch (error) {
+      setShareGrants([]);
+      toast.error(
+        error instanceof Error ? error.message : "Failed to load sharing access"
+      );
+    } finally {
+      setIsShareGrantsLoading(false);
+    }
+  }, [selectedContentId]);
+
   const handleShareOpen = useCallback(() => {
     if (!selectedContentId || selectedContentId.startsWith("person:")) {
       toast.error("Select content before sharing");
@@ -970,6 +1034,11 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
 
     setShareDialogOpen(true);
   }, [selectedContentId]);
+
+  useEffect(() => {
+    if (!shareDialogOpen) return;
+    void fetchShareGrants();
+  }, [fetchShareGrants, shareDialogOpen]);
 
   const getPublicShareUrl = useCallback(() => {
     if (typeof window === "undefined" || !selectedContentId) return "";
@@ -1054,13 +1123,48 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
             ? `${email} can ${shareAccessLevel === "edit" ? "edit" : "view"} this content.`
             : `${email} no longer has access to this content.`
         );
+        setShareEmail("");
+        await fetchShareGrants();
       } catch (error) {
         toast.error(error instanceof Error ? error.message : "Failed to update sharing");
       } finally {
         setIsSharing(false);
       }
     },
-    [selectedContentId, shareAccessLevel, shareEmail]
+    [fetchShareGrants, selectedContentId, shareAccessLevel, shareEmail]
+  );
+
+  const revokeShareGrant = useCallback(
+    async (grant: ShareGrant) => {
+      if (!selectedContentId) return;
+
+      setIsSharing(true);
+      try {
+        const response = await fetch("/api/collaboration/grants", {
+          method: "DELETE",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contentId: selectedContentId,
+            grantId: grant.id,
+            userId: grant.userId,
+          }),
+        });
+        const result = await response.json();
+
+        if (!response.ok || !result.success) {
+          throw new Error(result.error?.message || "Failed to revoke sharing");
+        }
+
+        setShareGrants((current) => current.filter((item) => item.id !== grant.id));
+        toast.success(`${grant.user.email ?? grant.user.username ?? "User"} no longer has access.`);
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Failed to revoke sharing");
+      } finally {
+        setIsSharing(false);
+      }
+    },
+    [selectedContentId]
   );
 
   // Handlers passed as prop to ToolSurfaceProvider (can't use useRegisterToolHandler
@@ -1418,6 +1522,71 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
                 <option value="view">View only</option>
                 <option value="edit">Can edit</option>
               </select>
+            </div>
+            <div className="rounded-lg border border-border">
+              <div className="flex items-center justify-between border-b border-border px-3 py-2">
+                <div>
+                  <p className="text-sm font-medium">Signed-in collaborators</p>
+                  <p className="text-xs text-muted-foreground">
+                    View grants can open `/share`; edit grants can use `/content`.
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  disabled={isShareGrantsLoading}
+                  onClick={fetchShareGrants}
+                >
+                  Refresh
+                </Button>
+              </div>
+              <div className="max-h-48 overflow-y-auto">
+                {isShareGrantsLoading ? (
+                  <p className="px-3 py-4 text-sm text-muted-foreground">
+                    Loading collaborators...
+                  </p>
+                ) : shareGrants.length === 0 ? (
+                  <p className="px-3 py-4 text-sm text-muted-foreground">
+                    No signed-in collaborators have been added.
+                  </p>
+                ) : (
+                  <div className="divide-y divide-border">
+                    {shareGrants.map((grant) => {
+                      const displayName =
+                        grant.user.username || grant.user.email || "Unknown user";
+                      const grantedAt = new Date(grant.grantedAt).toLocaleDateString();
+
+                      return (
+                        <div
+                          key={grant.id}
+                          className="flex items-center justify-between gap-3 px-3 py-2"
+                        >
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-medium">{displayName}</p>
+                            <p className="truncate text-xs text-muted-foreground">
+                              {grant.user.email}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {grant.accessLevel === "edit" ? "Can edit" : "View only"} · Added{" "}
+                              {grantedAt}
+                            </p>
+                          </div>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            disabled={isSharing}
+                            onClick={() => revokeShareGrant(grant)}
+                          >
+                            Revoke
+                          </Button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             </div>
             <p className="text-xs text-muted-foreground">
               Signed-in users with edit access should use `/content` for live
