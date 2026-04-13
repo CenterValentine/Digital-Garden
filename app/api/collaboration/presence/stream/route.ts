@@ -10,6 +10,8 @@ import { requireAuth } from "@/lib/infrastructure/auth/middleware";
 
 export const runtime = "nodejs";
 
+const PRESENCE_STREAM_REFRESH_MS = 15_000;
+
 export async function GET(request: NextRequest) {
   const session = await requireAuth();
   const contentId = request.nextUrl.searchParams.get("contentId")?.trim();
@@ -41,7 +43,7 @@ export async function GET(request: NextRequest) {
       };
 
       const unsubscribe = subscribeCollaborationPresence(contentId, send);
-      const interval = setInterval(send, 5000);
+      const interval = setInterval(send, PRESENCE_STREAM_REFRESH_MS);
       const close = () => {
         clearInterval(interval);
         unsubscribe();

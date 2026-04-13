@@ -32,16 +32,6 @@ export async function resolveContentAccess(
       id: true,
       ownerId: true,
       contentType: true,
-      viewGrants: {
-        where: {
-          userId: input.userId,
-          OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
-        },
-        select: {
-          accessLevel: true,
-        },
-        take: 1,
-      },
     },
   });
 
@@ -53,7 +43,22 @@ export async function resolveContentAccess(
   if (content.ownerId === input.userId) {
     accessLevel = "owner";
   } else {
-    const grantLevel = content.viewGrants[0]?.accessLevel?.toLowerCase();
+    const grant = await prisma.viewGrant.findUnique({
+      where: {
+        contentId_userId: {
+          contentId: input.contentId,
+          userId: input.userId,
+        },
+      },
+      select: {
+        accessLevel: true,
+        expiresAt: true,
+      },
+    });
+    const grantLevel =
+      grant && (!grant.expiresAt || grant.expiresAt > new Date())
+        ? grant.accessLevel.toLowerCase()
+        : null;
     if (grantLevel && EDIT_LEVELS.has(grantLevel)) {
       accessLevel = "edit";
     } else if (grantLevel && VIEW_LEVELS.has(grantLevel)) {

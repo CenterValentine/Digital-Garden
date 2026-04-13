@@ -23,7 +23,7 @@ interface PresenceStore {
   listeners: Map<string, Set<() => void>>;
 }
 
-const STALE_AFTER_MS = 15_000;
+const STALE_AFTER_MS = 45_000;
 
 declare global {
   var __dgCollaborationPresenceStore: PresenceStore | undefined;

@@ -182,6 +182,7 @@ interface DocumentRuntimeEntry {
   sessionAnnounceTimer: ReturnType<typeof setInterval> | null;
   sessionSweepTimer: ReturnType<typeof setInterval> | null;
   presenceHeartbeatTimer: ReturnType<typeof setInterval> | null;
+  presenceHeartbeatInFlight: boolean;
   presenceEventSource: EventSource | null;
   broadcastChannel: BroadcastChannel | null;
   knownBrowserSessions: Map<string, number>;
@@ -222,6 +223,7 @@ const NOTE_CAPABILITY: ContentCollaborationCapability = {
 const COLLABORATION_CHANNEL_NAME = "dg-collaboration-runtime";
 const SESSION_STALE_AFTER_MS = 6000;
 const SESSION_ANNOUNCE_INTERVAL_MS = 2000;
+const PRESENCE_HEARTBEAT_INTERVAL_MS = 15_000;
 const COOLDOWN_MS = 120_000;
 const IDLE_EVICTION_MS = 300_000;
 
@@ -434,6 +436,7 @@ class CollaborationRuntimeManager {
       sessionAnnounceTimer: null,
       sessionSweepTimer: null,
       presenceHeartbeatTimer: null,
+      presenceHeartbeatInFlight: false,
       presenceEventSource: null,
       broadcastChannel: null,
       knownBrowserSessions: new Map(),
@@ -700,7 +703,7 @@ class CollaborationRuntimeManager {
   private startRemotePresenceDetection(entry: DocumentRuntimeEntry) {
     entry.presenceHeartbeatTimer = setInterval(() => {
       void this.sendPresenceHeartbeat(entry);
-    }, 5000);
+    }, PRESENCE_HEARTBEAT_INTERVAL_MS);
     void this.sendPresenceHeartbeat(entry);
 
     const streamUrl = `/api/collaboration/presence/stream?contentId=${encodeURIComponent(
@@ -717,7 +720,10 @@ class CollaborationRuntimeManager {
 
   private async sendPresenceHeartbeat(entry: DocumentRuntimeEntry, includeZero = false) {
     if (entry.consumers.size === 0 && !includeZero) return;
+    if (entry.presenceHeartbeatInFlight) return;
+
     const consumers = Array.from(entry.consumers.values());
+    entry.presenceHeartbeatInFlight = true;
     try {
       await fetch("/api/collaboration/presence/heartbeat", {
         method: "POST",
@@ -740,6 +746,8 @@ class CollaborationRuntimeManager {
       });
     } catch {
       // Presence is advisory. Transport promotion can still happen via BroadcastChannel.
+    } finally {
+      entry.presenceHeartbeatInFlight = false;
     }
   }
 

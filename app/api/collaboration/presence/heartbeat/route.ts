@@ -7,6 +7,10 @@ import { requireAuth } from "@/lib/infrastructure/auth/middleware";
 
 export const runtime = "nodejs";
 
+const PRESENCE_ACCESS_CACHE_TTL_MS = 30_000;
+
+const presenceAccessCache = new Map<string, number>();
+
 type PresenceTransportState =
   | "localOnly"
   | "promoting"
@@ -30,6 +34,31 @@ function parseTransportState(value: unknown): PresenceTransportState {
   return typeof value === "string" && TRANSPORT_STATES.has(value as PresenceTransportState)
     ? (value as PresenceTransportState)
     : "localOnly";
+}
+
+async function assertPresenceAccess(contentId: string, userId: string) {
+  const key = `${contentId}:${userId}`;
+  const cachedUntil = presenceAccessCache.get(key);
+  const now = Date.now();
+
+  if (cachedUntil && cachedUntil > now) {
+    return;
+  }
+
+  await resolveContentAccess(prisma, {
+    contentId,
+    userId,
+    require: "view",
+  });
+  presenceAccessCache.set(key, now + PRESENCE_ACCESS_CACHE_TTL_MS);
+
+  if (presenceAccessCache.size > 5000) {
+    for (const [cacheKey, expiresAt] of presenceAccessCache) {
+      if (expiresAt <= now) {
+        presenceAccessCache.delete(cacheKey);
+      }
+    }
+  }
 }
 
 export async function POST(request: NextRequest) {
@@ -63,11 +92,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    await resolveContentAccess(prisma, {
-      contentId,
-      userId: session.user.id,
-      require: "view",
-    });
+    await assertPresenceAccess(contentId, session.user.id);
 
     upsertCollaborationPresence({
       contentId,
