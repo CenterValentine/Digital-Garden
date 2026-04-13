@@ -1,6 +1,7 @@
 "use client";
 
 import { createElement, useEffect, useMemo, useState, useRef, useCallback } from "react";
+import { createPortal } from "react-dom";
 import {
   ExternalLink,
   File,
@@ -96,11 +97,27 @@ function formatSessionStart(firstSeenAt: number) {
   })}`;
 }
 
-function TabPresenceDiscs({ sessions }: { sessions: TabPresenceSession[] }) {
+function TabPresenceDiscs({
+  sessions,
+  anchorRect,
+}: {
+  sessions: TabPresenceSession[];
+  anchorRect: DOMRect | null;
+}) {
   if (sessions.length === 0) return null;
+  if (!anchorRect || typeof document === "undefined") return null;
 
-  return (
-    <div className="group/presence absolute -top-2 right-7 z-20 flex max-w-[8rem] items-center overflow-visible pr-1">
+  const top = Math.max(4, anchorRect.top - 18);
+  const left = Math.min(
+    window.innerWidth - 36,
+    Math.max(4, anchorRect.right - 68)
+  );
+
+  return createPortal(
+    <div
+      className="group/presence fixed z-[90] flex max-w-[8rem] items-center overflow-visible pr-1"
+      style={{ left, top }}
+    >
       {sessions.slice(0, 5).map((session, index) => {
         const displayName =
           session.displayName?.trim() || getVisitorName(session.sessionId || session.userId);
@@ -154,7 +171,8 @@ function TabPresenceDiscs({ sessions }: { sessions: TabPresenceSession[] }) {
           +{sessions.length - 5}
         </div>
       ) : null}
-    </div>
+    </div>,
+    document.body
   );
 }
 
@@ -192,7 +210,9 @@ export function MainPanelHeader({
   const [presenceByContentId, setPresenceByContentId] = useState<
     Record<string, TabPresenceSession[]>
   >({});
+  const [tabRects, setTabRects] = useState<Record<string, DOMRect | null>>({});
   const renameInputRef = useRef<HTMLInputElement>(null);
+  const tabElementsRef = useRef<Map<string, HTMLDivElement>>(new Map());
 
   const startRename = useCallback((tabId: string, currentTitle: string) => {
     setEditingTabId(tabId);
@@ -242,6 +262,35 @@ export function MainPanelHeader({
     [tabs]
   );
   const tabMenuTab = tabMenu ? tabsById[tabMenu.tabId] : null;
+
+  const updateTabRects = useCallback(() => {
+    const nextRects: Record<string, DOMRect | null> = {};
+    for (const tab of tabs) {
+      nextRects[tab.id] = tabElementsRef.current.get(tab.id)?.getBoundingClientRect() ?? null;
+    }
+    setTabRects(nextRects);
+  }, [tabs]);
+
+  useEffect(() => {
+    updateTabRects();
+
+    const handleWindowChange = () => updateTabRects();
+    window.addEventListener("resize", handleWindowChange);
+    window.addEventListener("scroll", handleWindowChange, true);
+
+    const resizeObserver =
+      typeof ResizeObserver === "undefined" ? null : new ResizeObserver(handleWindowChange);
+    for (const tab of tabs) {
+      const element = tabElementsRef.current.get(tab.id);
+      if (element) resizeObserver?.observe(element);
+    }
+
+    return () => {
+      window.removeEventListener("resize", handleWindowChange);
+      window.removeEventListener("scroll", handleWindowChange, true);
+      resizeObserver?.disconnect();
+    };
+  }, [tabs, updateTabRects]);
 
   useEffect(() => {
     if (tabContentIds.length === 0) {
@@ -351,6 +400,13 @@ export function MainPanelHeader({
             return (
               <div
                 key={tab.id}
+                ref={(node) => {
+                  if (node) {
+                    tabElementsRef.current.set(tab.id, node);
+                  } else {
+                    tabElementsRef.current.delete(tab.id);
+                  }
+                }}
                 className={`group relative flex min-w-0 max-w-[14rem] shrink items-center gap-2 overflow-visible border-r border-white/10 px-3 py-2 text-sm transition-colors ${
                   isActive
                     ? "-mb-px border-b-2 border-gold-primary bg-black/[0.04] text-gold-primary shadow-[0_1px_2px_rgba(15,23,42,0.04)]"
@@ -382,7 +438,10 @@ export function MainPanelHeader({
                   onTabDrop(paneId, tab.id);
                 }}
               >
-                <TabPresenceDiscs sessions={presenceByContentId[tab.contentId] ?? []} />
+                <TabPresenceDiscs
+                  sessions={presenceByContentId[tab.contentId] ?? []}
+                  anchorRect={tabRects[tab.id] ?? null}
+                />
                 {editingTabId === tab.id ? (
                   <input
                     ref={renameInputRef}
