@@ -33,6 +33,17 @@ interface TabPresenceSession {
   lastSeenAt: number;
 }
 
+interface PresenceDisplayGroup {
+  key: string;
+  displayName: string;
+  avatarUrl: string | null;
+  isAnonymous: boolean;
+  surfaceCount: number;
+  sessionCount: number;
+  firstSeenAt: number;
+  colorSeed: string;
+}
+
 interface PresenceSnapshotResponse {
   success: boolean;
   data?: {
@@ -97,6 +108,41 @@ function formatSessionStart(firstSeenAt: number) {
   })}`;
 }
 
+function groupPresenceSessions(sessions: TabPresenceSession[]): PresenceDisplayGroup[] {
+  const groups = new Map<string, PresenceDisplayGroup>();
+
+  for (const session of sessions) {
+    const displayName =
+      session.displayName?.trim() || getVisitorName(session.sessionId || session.userId);
+    const key = session.isAnonymous
+      ? session.userId || session.sessionId
+      : session.userId || displayName;
+    const existing = groups.get(key);
+
+    if (existing) {
+      existing.surfaceCount += session.surfaceCount;
+      existing.sessionCount += 1;
+      existing.firstSeenAt = Math.min(existing.firstSeenAt, session.firstSeenAt || Date.now());
+      if (!existing.avatarUrl && session.avatarUrl) {
+        existing.avatarUrl = session.avatarUrl;
+      }
+    } else {
+      groups.set(key, {
+        key,
+        displayName,
+        avatarUrl: session.avatarUrl,
+        isAnonymous: session.isAnonymous,
+        surfaceCount: session.surfaceCount,
+        sessionCount: 1,
+        firstSeenAt: session.firstSeenAt || Date.now(),
+        colorSeed: session.userId || session.sessionId,
+      });
+    }
+  }
+
+  return Array.from(groups.values()).sort((left, right) => left.firstSeenAt - right.firstSeenAt);
+}
+
 function TabPresenceDiscs({
   sessions,
   anchorRect,
@@ -107,6 +153,9 @@ function TabPresenceDiscs({
   if (sessions.length === 0) return null;
   if (!anchorRect || typeof document === "undefined") return null;
 
+  const groups = groupPresenceSessions(sessions);
+  const visibleGroups = groups.slice(0, 4);
+  const hiddenGroups = groups.slice(4);
   const top = Math.max(4, anchorRect.top - 10);
   const left = Math.min(
     window.innerWidth - 36,
@@ -118,11 +167,9 @@ function TabPresenceDiscs({
       className="group/presence fixed z-[90] flex max-w-[8rem] items-center overflow-visible pr-1"
       style={{ left, top }}
     >
-      {sessions.slice(0, 5).map((session, index) => {
-        const displayName =
-          session.displayName?.trim() || getVisitorName(session.sessionId || session.userId);
-        const initials = getInitials(displayName);
-        const colorIndex = hashString(session.userId || session.sessionId) % 5;
+      {visibleGroups.map((group, index) => {
+        const initials = getInitials(group.displayName);
+        const colorIndex = hashString(group.colorSeed) % 5;
         const colors = [
           "bg-blue-500",
           "bg-emerald-500",
@@ -133,32 +180,33 @@ function TabPresenceDiscs({
 
         return (
           <div
-            key={session.sessionId}
+            key={group.key}
             className="group/card relative -ml-2 first:ml-0 transition-all duration-150 group-hover/presence:ml-1"
-            style={{ zIndex: sessions.length - index }}
+            style={{ zIndex: groups.length - index }}
           >
             <div
               className={`flex h-6 w-6 items-center justify-center overflow-hidden rounded-full border-2 border-background text-[10px] font-semibold uppercase text-white shadow-sm ${
                 colors[colorIndex]
               }`}
-              aria-label={displayName}
+              aria-label={group.displayName}
             >
-              {session.avatarUrl ? (
+              {group.avatarUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={session.avatarUrl} alt="" className="h-full w-full object-cover" />
+                <img src={group.avatarUrl} alt="" className="h-full w-full object-cover" />
               ) : (
                 initials
               )}
             </div>
             <div className="pointer-events-none absolute left-1/2 top-7 z-50 w-44 -translate-x-1/2 rounded-md border border-border bg-popover px-2 py-1.5 text-xs text-popover-foreground opacity-0 shadow-md transition-opacity delay-300 group-hover/card:opacity-100">
-              <p className="truncate font-medium">{displayName}</p>
-              {session.isAnonymous ? (
+              <p className="truncate font-medium">{group.displayName}</p>
+              {group.isAnonymous ? (
                 <p className="text-muted-foreground">Public viewer</p>
               ) : (
                 <>
-                  <p className="text-muted-foreground">{formatSessionStart(session.firstSeenAt)}</p>
+                  <p className="text-muted-foreground">{formatSessionStart(group.firstSeenAt)}</p>
                   <p className="text-muted-foreground">
-                    {session.surfaceCount} active {session.surfaceCount === 1 ? "view" : "views"}
+                    {group.sessionCount} {group.sessionCount === 1 ? "session" : "sessions"} ·{" "}
+                    {group.surfaceCount} active {group.surfaceCount === 1 ? "view" : "views"}
                   </p>
                 </>
               )}
@@ -166,9 +214,20 @@ function TabPresenceDiscs({
           </div>
         );
       })}
-      {sessions.length > 5 ? (
-        <div className="-ml-2 flex h-6 w-6 items-center justify-center rounded-full border-2 border-background bg-muted text-[10px] font-semibold text-muted-foreground transition-all duration-150 group-hover/presence:ml-1">
-          +{sessions.length - 5}
+      {hiddenGroups.length > 0 ? (
+        <div className="group/card relative -ml-2 transition-all duration-150 group-hover/presence:ml-1">
+          <div className="flex h-6 w-6 items-center justify-center rounded-full border-2 border-background bg-muted text-[10px] font-semibold text-muted-foreground">
+            +{hiddenGroups.length}
+          </div>
+          <div className="pointer-events-none absolute left-1/2 top-7 z-50 w-52 -translate-x-1/2 rounded-md border border-border bg-popover px-2 py-1.5 text-xs text-popover-foreground opacity-0 shadow-md transition-opacity delay-300 group-hover/card:opacity-100">
+            <p className="mb-1 font-medium">Other viewers</p>
+            {hiddenGroups.slice(0, 8).map((group) => (
+              <p key={group.key} className="truncate text-muted-foreground">
+                {group.displayName}
+                {group.sessionCount > 1 ? ` · ${group.sessionCount} sessions` : ""}
+              </p>
+            ))}
+          </div>
         </div>
       ) : null}
     </div>,

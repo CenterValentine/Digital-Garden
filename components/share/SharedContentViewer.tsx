@@ -23,6 +23,17 @@ interface SharePresenceSession {
   lastSeenAt: number;
 }
 
+interface SharePresenceGroup {
+  key: string;
+  displayName: string;
+  avatarUrl: string | null;
+  isAnonymous: boolean;
+  surfaceCount: number;
+  sessionCount: number;
+  firstSeenAt: number;
+  colorSeed: string;
+}
+
 interface PresenceSnapshotResponse {
   success: boolean;
   data?: {
@@ -137,9 +148,47 @@ function getInitials(name: string) {
   return (words[0]?.slice(0, 2) || "?").toUpperCase();
 }
 
+function groupPresenceSessions(sessions: SharePresenceSession[]): SharePresenceGroup[] {
+  const groups = new Map<string, SharePresenceGroup>();
+
+  for (const session of sessions) {
+    const displayName =
+      session.displayName?.trim() || getVisitorName(session.sessionId || session.userId);
+    const key = session.isAnonymous
+      ? session.userId || session.sessionId
+      : session.userId || displayName;
+    const existing = groups.get(key);
+
+    if (existing) {
+      existing.surfaceCount += session.surfaceCount;
+      existing.sessionCount += 1;
+      existing.firstSeenAt = Math.min(existing.firstSeenAt, session.firstSeenAt || Date.now());
+      if (!existing.avatarUrl && session.avatarUrl) {
+        existing.avatarUrl = session.avatarUrl;
+      }
+    } else {
+      groups.set(key, {
+        key,
+        displayName,
+        avatarUrl: session.avatarUrl,
+        isAnonymous: session.isAnonymous,
+        surfaceCount: session.surfaceCount,
+        sessionCount: 1,
+        firstSeenAt: session.firstSeenAt || Date.now(),
+        colorSeed: session.userId || session.sessionId,
+      });
+    }
+  }
+
+  return Array.from(groups.values()).sort((left, right) => left.firstSeenAt - right.firstSeenAt);
+}
+
 function SharePresenceDiscs({ sessions }: { sessions: SharePresenceSession[] }) {
   if (sessions.length === 0) return null;
 
+  const groups = groupPresenceSessions(sessions);
+  const visibleGroups = groups.slice(0, 5);
+  const hiddenGroups = groups.slice(5);
   const colors = [
     "bg-blue-500",
     "bg-emerald-500",
@@ -151,44 +200,57 @@ function SharePresenceDiscs({ sessions }: { sessions: SharePresenceSession[] }) 
   return (
     <div
       className="group/presence flex items-center overflow-visible pr-1"
-      aria-label={`${sessions.length} other viewer${sessions.length === 1 ? "" : "s"}`}
+      aria-label={`${groups.length} other viewer${groups.length === 1 ? "" : "s"}`}
     >
-      {sessions.slice(0, 6).map((session, index) => {
-        const displayName =
-          session.displayName?.trim() || getVisitorName(session.sessionId || session.userId);
-        const colorIndex = hashString(session.userId || session.sessionId) % colors.length;
+      {visibleGroups.map((group, index) => {
+        const colorIndex = hashString(group.colorSeed) % colors.length;
 
         return (
           <div
-            key={session.sessionId}
+            key={group.key}
             className="group/card relative -ml-2 first:ml-0 transition-all duration-150 group-hover/presence:ml-1"
-            style={{ zIndex: sessions.length - index }}
+            style={{ zIndex: groups.length - index }}
           >
             <div
               className={`flex h-8 w-8 items-center justify-center overflow-hidden rounded-full border-2 border-background text-xs font-semibold uppercase text-white shadow-sm ${
                 colors[colorIndex]
               }`}
-              aria-label={displayName}
+              aria-label={group.displayName}
             >
-              {session.avatarUrl && !session.isAnonymous ? (
+              {group.avatarUrl && !group.isAnonymous ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={session.avatarUrl} alt="" className="h-full w-full object-cover" />
+                <img src={group.avatarUrl} alt="" className="h-full w-full object-cover" />
               ) : (
-                getInitials(displayName)
+                getInitials(group.displayName)
               )}
             </div>
             <div className="pointer-events-none absolute right-0 top-10 z-50 w-44 rounded-md border border-border bg-popover px-2 py-1.5 text-xs text-popover-foreground opacity-0 shadow-md transition-opacity delay-300 group-hover/card:opacity-100">
-              <p className="truncate font-medium">{displayName}</p>
+              <p className="truncate font-medium">{group.displayName}</p>
               <p className="text-muted-foreground">
-                {session.isAnonymous ? "Public viewer" : "Signed-in viewer"}
+                {group.isAnonymous ? "Public viewer" : "Signed-in viewer"}
+              </p>
+              <p className="text-muted-foreground">
+                {group.sessionCount} {group.sessionCount === 1 ? "session" : "sessions"} ·{" "}
+                {group.surfaceCount} active {group.surfaceCount === 1 ? "view" : "views"}
               </p>
             </div>
           </div>
         );
       })}
-      {sessions.length > 6 ? (
-        <div className="-ml-2 flex h-8 w-8 items-center justify-center rounded-full border-2 border-background bg-muted text-xs font-semibold text-muted-foreground transition-all duration-150 group-hover/presence:ml-1">
-          +{sessions.length - 6}
+      {hiddenGroups.length > 0 ? (
+        <div className="group/card relative -ml-2 transition-all duration-150 group-hover/presence:ml-1">
+          <div className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-background bg-muted text-xs font-semibold text-muted-foreground">
+            +{hiddenGroups.length}
+          </div>
+          <div className="pointer-events-none absolute right-0 top-10 z-50 w-52 rounded-md border border-border bg-popover px-2 py-1.5 text-xs text-popover-foreground opacity-0 shadow-md transition-opacity delay-300 group-hover/card:opacity-100">
+            <p className="mb-1 font-medium">Other viewers</p>
+            {hiddenGroups.slice(0, 8).map((group) => (
+              <p key={group.key} className="truncate text-muted-foreground">
+                {group.displayName}
+                {group.sessionCount > 1 ? ` · ${group.sessionCount} sessions` : ""}
+              </p>
+            ))}
+          </div>
         </div>
       ) : null}
     </div>
