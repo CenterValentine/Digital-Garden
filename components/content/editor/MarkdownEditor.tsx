@@ -78,29 +78,6 @@ function collaboratorsKey(collaborators: RemoteCollaborator[]): string {
     .join(",");
 }
 
-function collaboratorWarningKey(contentId: string | undefined, collaborators: RemoteCollaborator[]) {
-  const collaboratorIds = collaborators
-    .map((collaborator) => collaborator.id || collaborator.email || collaborator.name)
-    .sort()
-    .join(",");
-  return `dg-collaboration-warning:${contentId ?? "unknown"}:${collaboratorIds}`;
-}
-
-function shouldShowCollaboratorWarning(key: string) {
-  if (typeof window === "undefined") return true;
-  const lastShown = Number(window.localStorage.getItem(key) ?? 0);
-  return !Number.isFinite(lastShown) || Date.now() - lastShown > 60 * 60 * 1000;
-}
-
-function markCollaboratorWarningShown(key: string) {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(key, String(Date.now()));
-  } catch {
-    // Ignore storage privacy failures; in-memory ref still prevents immediate repeats.
-  }
-}
-
 function cursorLabelsKey(labels: CollaborationCursorLabel[]): string {
   return labels
     .map((label) => `${label.clientId}:${Math.round(label.left)}:${Math.round(label.top)}`)
@@ -174,7 +151,6 @@ export interface MarkdownEditorProps {
 
 export function MarkdownEditor({
   contentId,
-  title,
   parentId,
   content,
   onChange,
@@ -204,7 +180,6 @@ export function MarkdownEditor({
   const [cursorLabels, setCursorLabels] = useState<CollaborationCursorLabel[]>([]);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const editorScrollRef = useRef<HTMLDivElement>(null);
-  const duplicateWarningToastKeyRef = useRef<string | null>(null);
   const appliedEditableRef = useRef<boolean | null>(null);
   // Track the last content we saved so we can distinguish save-echoes
   // (parent updating state after our save) from genuine external updates
@@ -267,7 +242,6 @@ export function MarkdownEditor({
   );
   const collaborationWarning = collaborationRuntime?.state.warning ?? null;
   const collaborationNotice = runtimeEditPolicy?.warning ?? collaborationWarning;
-  const collaborationDocumentLabel = title?.trim() || "This document";
   const isCollaborationEditBlocked =
     shouldUseCollaboration && runtimeEditPolicy ? !runtimeEditPolicy.editable : false;
   const isCollaborationBooting =
@@ -595,33 +569,6 @@ export function MarkdownEditor({
     };
   }, [collaborationState, editor, refreshCursorLabels]);
 
-  useEffect(() => {
-    if (!collaborationState) {
-      duplicateWarningToastKeyRef.current = null;
-      return;
-    }
-
-    if (remoteCollaborators.length === 0) {
-      duplicateWarningToastKeyRef.current = null;
-      return;
-    }
-
-    const key = collaboratorWarningKey(contentId, remoteCollaborators);
-    if (duplicateWarningToastKeyRef.current === key) return;
-    if (!shouldShowCollaboratorWarning(key)) {
-      duplicateWarningToastKeyRef.current = key;
-      return;
-    }
-
-    duplicateWarningToastKeyRef.current = key;
-    markCollaboratorWarningShown(key);
-    const names = remoteCollaborators.map((collaborator) => collaborator.name).join(", ");
-    toast.warning(`${collaborationDocumentLabel} is open in another browser or session.`, {
-      description: `${names} ${remoteCollaborators.length === 1 ? "is" : "are"} also connected.`,
-      duration: 8000,
-    });
-  }, [collaborationDocumentLabel, collaborationState, contentId, remoteCollaborators]);
-
   // Sync editor content when the prop changes from an EXTERNAL source
   // (navigation to a different note, refetch after rename).
   // Skip when the change is a save-echo: the parent updating state after
@@ -855,13 +802,6 @@ export function MarkdownEditor({
       {isCollaborationConnecting ? (
         <div className="border-b border-amber-500/20 bg-amber-500/10 px-4 py-2 text-sm text-amber-700">
           Connecting collaborative editor...
-        </div>
-      ) : null}
-      {collaborationState && remoteCollaborators.length > 0 ? (
-        <div className="border-b border-amber-500/20 bg-amber-500/10 px-4 py-2 text-sm text-amber-800">
-          {collaborationDocumentLabel} is open in {remoteCollaborators.length} other{" "}
-          {remoteCollaborators.length === 1 ? "session" : "sessions"}:{" "}
-          {remoteCollaborators.map((collaborator) => collaborator.name).join(", ")}.
         </div>
       ) : null}
       {/* Sprint 37: Hidden file input for image upload */}

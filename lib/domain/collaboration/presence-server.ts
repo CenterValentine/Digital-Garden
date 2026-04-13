@@ -1,6 +1,9 @@
 export interface CollaborationPresenceRecord {
   contentId: string;
   userId: string;
+  displayName: string | null;
+  avatarUrl: string | null;
+  isAnonymous: boolean;
   sessionId: string;
   browserContextId: string;
   surfaceCount: number;
@@ -15,6 +18,7 @@ export interface CollaborationPresenceRecord {
     | "disconnectedButDirty"
     | "coolingDown";
   lastKnownServerRevision: number | null;
+  firstSeenAt: number;
   lastSeenAt: number;
 }
 
@@ -54,11 +58,13 @@ function prune(contentId: string) {
 }
 
 export function upsertCollaborationPresence(
-  record: Omit<CollaborationPresenceRecord, "lastSeenAt">
+  record: Omit<CollaborationPresenceRecord, "firstSeenAt" | "lastSeenAt">
 ) {
   const store = getStore();
+  const existing = store.records.get(getKey(record.contentId, record.sessionId));
   store.records.set(getKey(record.contentId, record.sessionId), {
     ...record,
+    firstSeenAt: existing?.firstSeenAt ?? Date.now(),
     lastSeenAt: Date.now(),
   });
   prune(record.contentId);

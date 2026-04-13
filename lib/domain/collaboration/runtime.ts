@@ -243,6 +243,10 @@ function getSessionStorageId(key: string, prefix: string) {
   return next;
 }
 
+export function getCollaborationBrowserSessionId() {
+  return getSessionStorageId("dg-collab-session-id", "session");
+}
+
 function createConsumerId(
   descriptor: Omit<RuntimeConsumerDescriptor, "consumerId" | "contentId" | "mountedAt">
 ) {

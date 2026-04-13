@@ -2,8 +2,14 @@
 
 import type { JSONContent } from "@tiptap/core";
 import Link from "next/link";
+import { useEffect } from "react";
 
 import { MarkdownEditor } from "@/components/content/editor/MarkdownEditor";
+
+const SHARE_PRESENCE_INTERVAL_MS = 15_000;
+const VISITOR_ADJECTIVES = ["Silver", "Quiet", "Golden", "Bright", "Gentle", "Blue"];
+const VISITOR_TRAITS = ["Windy", "Curious", "Clever", "Sunny", "Brisk", "Calm"];
+const VISITOR_ANIMALS = ["Raccoon", "Fox", "Heron", "Otter", "Finch", "Badger"];
 
 type SharedContentType =
   | "folder"
@@ -62,8 +68,85 @@ function formatJson(value: unknown) {
   return JSON.stringify(value ?? {}, null, 2);
 }
 
+function createId(prefix: string) {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return `${prefix}:${crypto.randomUUID()}`;
+  }
+  return `${prefix}:${Math.random().toString(36).slice(2)}:${Date.now()}`;
+}
+
+function getSessionStorageId(key: string, prefix: string) {
+  const existing = window.sessionStorage.getItem(key);
+  if (existing) return existing;
+  const next = createId(prefix);
+  window.sessionStorage.setItem(key, next);
+  return next;
+}
+
+function getSessionStorageValue(key: string, createValue: () => string) {
+  const existing = window.sessionStorage.getItem(key);
+  if (existing) return existing;
+  const next = createValue();
+  window.sessionStorage.setItem(key, next);
+  return next;
+}
+
+function hashString(value: string) {
+  let hash = 0;
+  for (let index = 0; index < value.length; index += 1) {
+    hash = (hash << 5) - hash + value.charCodeAt(index);
+    hash |= 0;
+  }
+  return Math.abs(hash);
+}
+
+function getVisitorName(seed: string) {
+  const hash = hashString(seed);
+  return [
+    VISITOR_ADJECTIVES[hash % VISITOR_ADJECTIVES.length],
+    VISITOR_TRAITS[Math.floor(hash / 7) % VISITOR_TRAITS.length],
+    VISITOR_ANIMALS[Math.floor(hash / 17) % VISITOR_ANIMALS.length],
+  ].join(" ");
+}
+
 export function SharedContentViewer({ content }: SharedContentViewerProps) {
   const editHref = `/content?content=${encodeURIComponent(content.id)}`;
+
+  useEffect(() => {
+    const sessionId = getSessionStorageId("dg-share-session-id", "share-session");
+    const browserContextId = getSessionStorageId("dg-share-browser-context-id", "share-browser");
+    const displayName = getSessionStorageValue(
+      "dg-share-visitor-name",
+      () => getVisitorName(browserContextId)
+    );
+
+    const heartbeat = async () => {
+      try {
+        await fetch("/api/collaboration/presence/heartbeat", {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contentId: content.id,
+            sessionId,
+            browserContextId,
+            displayName,
+            surfaceCount: 1,
+            activePaneIds: [],
+            activeTabIds: [],
+            transportState: "localOnly",
+            lastKnownServerRevision: null,
+          }),
+        });
+      } catch {
+        // Public viewer presence is advisory.
+      }
+    };
+
+    void heartbeat();
+    const interval = window.setInterval(heartbeat, SHARE_PRESENCE_INTERVAL_MS);
+    return () => window.clearInterval(interval);
+  }, [content.id]);
 
   return (
     <main className="min-h-screen bg-background text-foreground">

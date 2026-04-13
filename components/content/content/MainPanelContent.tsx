@@ -193,6 +193,7 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
   const [refreshTrigger, setRefreshTrigger] = useState(0); // Used to force refetch
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
   const [shareEmail, setShareEmail] = useState("");
+  const [shareEmails, setShareEmails] = useState<string[]>([]);
   const [shareAccessLevel, setShareAccessLevel] = useState<"view" | "edit">("view");
   const [shareGrants, setShareGrants] = useState<ShareGrant[]>([]);
   const [isShareGrantsLoading, setIsShareGrantsLoading] = useState(false);
@@ -1053,6 +1054,45 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
     toast.success("Public share link copied");
   }, [getPublicShareUrl]);
 
+  const addShareEmailEntries = useCallback((rawValue: string) => {
+    const entries = rawValue
+      .split(/[\s,;]+/)
+      .map((entry) => entry.trim().toLowerCase())
+      .filter(Boolean);
+
+    if (entries.length === 0) return;
+    const validEntries: string[] = [];
+    for (const entry of entries) {
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(entry)) {
+        toast.error(`${entry} is not a valid email address`);
+      } else {
+        validEntries.push(entry);
+      }
+    }
+
+    if (validEntries.length === 0) {
+      setShareEmail("");
+      return;
+    }
+
+    setShareEmails((current) => {
+      const existing = new Set(current);
+      const next = [...current];
+      for (const entry of validEntries) {
+        if (!existing.has(entry)) {
+          existing.add(entry);
+          next.push(entry);
+        }
+      }
+      return next;
+    });
+    setShareEmail("");
+  }, []);
+
+  const removeShareEmailEntry = useCallback((email: string) => {
+    setShareEmails((current) => current.filter((entry) => entry !== email));
+  }, []);
+
   const updatePublicShare = useCallback(
     async (nextPublished: boolean) => {
       if (!selectedContentId) return;
@@ -1092,38 +1132,58 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
   );
 
   const submitShareGrant = useCallback(
-    async (method: "POST" | "DELETE") => {
+    async () => {
       if (!selectedContentId) return;
       const email = shareEmail.trim();
-      if (!email) {
-        toast.error("Enter a collaborator email");
+      const emails = email ? [...shareEmails, email] : shareEmails;
+      const normalizedEmails = Array.from(
+        new Set(emails.map((entry) => entry.trim().toLowerCase()).filter(Boolean))
+      );
+
+      if (normalizedEmails.length === 0) {
+        toast.error("Enter at least one collaborator email");
+        return;
+      }
+      const invalidEmail = normalizedEmails.find(
+        (entry) => !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(entry)
+      );
+      if (invalidEmail) {
+        toast.error(`${invalidEmail} is not a valid email address`);
         return;
       }
 
       setIsSharing(true);
       try {
-        const response = await fetch("/api/collaboration/grants", {
-          method,
-          credentials: "include",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            contentId: selectedContentId,
-            email,
-            accessLevel: shareAccessLevel,
-          }),
-        });
-        const result = await response.json();
+        const results = await Promise.all(
+          normalizedEmails.map(async (targetEmail) => {
+            const response = await fetch("/api/collaboration/grants", {
+              method: "POST",
+              credentials: "include",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                contentId: selectedContentId,
+                email: targetEmail,
+                accessLevel: shareAccessLevel,
+              }),
+            });
+            const result = await response.json();
 
-        if (!response.ok || !result.success) {
-          throw new Error(result.error?.message || "Failed to update sharing");
-        }
+            if (!response.ok || !result.success) {
+              throw new Error(
+                `${targetEmail}: ${result.error?.message || "Failed to update sharing"}`
+              );
+            }
+            return targetEmail;
+          })
+        );
 
         toast.success(
-          method === "POST"
-            ? `${email} can ${shareAccessLevel === "edit" ? "edit" : "view"} this content.`
-            : `${email} no longer has access to this content.`
+          `${results.length} collaborator${results.length === 1 ? "" : "s"} can ${
+            shareAccessLevel === "edit" ? "edit" : "view"
+          } this content.`
         );
         setShareEmail("");
+        setShareEmails([]);
         await fetchShareGrants();
       } catch (error) {
         toast.error(error instanceof Error ? error.message : "Failed to update sharing");
@@ -1131,7 +1191,7 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
         setIsSharing(false);
       }
     },
-    [fetchShareGrants, selectedContentId, shareAccessLevel, shareEmail]
+    [fetchShareGrants, selectedContentId, shareAccessLevel, shareEmail, shareEmails]
   );
 
   const revokeShareGrant = useCallback(
@@ -1497,15 +1557,54 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium" htmlFor={`share-email-${paneId}`}>
-                Collaborator email
+                Collaborator emails
               </label>
-              <Input
-                id={`share-email-${paneId}`}
-                type="email"
-                value={shareEmail}
-                onChange={(event) => setShareEmail(event.target.value)}
-                placeholder="person@example.com"
-              />
+              <div className="flex min-h-10 flex-wrap items-center gap-2 rounded-md border border-input bg-background px-2 py-1 shadow-sm focus-within:ring-1 focus-within:ring-ring">
+                {shareEmails.map((email) => (
+                  <span
+                    key={email}
+                    className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-1 text-xs text-muted-foreground"
+                  >
+                    {email}
+                    <button
+                      type="button"
+                      className="rounded-full px-1 text-muted-foreground hover:bg-background hover:text-foreground"
+                      onClick={() => removeShareEmailEntry(email)}
+                      aria-label={`Remove ${email}`}
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+                <input
+                  id={`share-email-${paneId}`}
+                  type="text"
+                  value={shareEmail}
+                  onChange={(event) => {
+                    const value = event.target.value;
+                    if (value.includes(",") || value.includes(";")) {
+                      addShareEmailEntries(value);
+                    } else {
+                      setShareEmail(value);
+                    }
+                  }}
+                  onBlur={() => addShareEmailEntries(shareEmail)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Tab" || event.key === "Enter" || event.key === ",") {
+                      event.preventDefault();
+                      addShareEmailEntries(shareEmail);
+                    }
+                    if (event.key === "Backspace" && !shareEmail && shareEmails.length > 0) {
+                      setShareEmails((current) => current.slice(0, -1));
+                    }
+                  }}
+                  placeholder={shareEmails.length === 0 ? "person@example.com" : "Add another"}
+                  className="min-w-[14rem] flex-1 bg-transparent px-1 py-1 text-sm outline-none placeholder:text-muted-foreground"
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Press comma, tab, enter, or click away to add each address.
+              </p>
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium" htmlFor={`share-access-${paneId}`}>
@@ -1596,16 +1695,8 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
           <DialogFooter className="gap-2 sm:gap-0">
             <Button
               type="button"
-              variant="outline"
               disabled={isSharing}
-              onClick={() => submitShareGrant("DELETE")}
-            >
-              Revoke
-            </Button>
-            <Button
-              type="button"
-              disabled={isSharing}
-              onClick={() => submitShareGrant("POST")}
+              onClick={submitShareGrant}
             >
               {isSharing ? "Updating..." : "Apply Access"}
             </Button>

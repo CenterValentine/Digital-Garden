@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/database/client";
 import { resolveContentAccess } from "@/lib/domain/collaboration/access";
 import { upsertCollaborationPresence } from "@/lib/domain/collaboration/presence-server";
-import { requireAuth } from "@/lib/infrastructure/auth/middleware";
+import { getSession } from "@/lib/infrastructure/auth/session";
 
 export const runtime = "nodejs";
 
@@ -61,13 +61,36 @@ async function assertPresenceAccess(contentId: string, userId: string) {
   }
 }
 
+async function assertPublicPresenceAccess(contentId: string) {
+  const content = await prisma.contentNode.findFirst({
+    where: {
+      id: contentId,
+      deletedAt: null,
+      isPublished: true,
+    },
+    select: { id: true },
+  });
+
+  if (!content) {
+    throw new Error("View access required");
+  }
+}
+
+function sanitizeDisplayName(value: unknown) {
+  return typeof value === "string" && value.trim()
+    ? value.trim().slice(0, 80)
+    : null;
+}
+
 export async function POST(request: NextRequest) {
   try {
-    const session = await requireAuth();
+    const session = await getSession();
     const body = (await request.json()) as {
       contentId?: string;
       sessionId?: string;
       browserContextId?: string;
+      displayName?: string;
+      avatarUrl?: string | null;
       surfaceCount?: number;
       activePaneIds?: string[];
       activeTabIds?: string[];
@@ -92,11 +115,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    await assertPresenceAccess(contentId, session.user.id);
+    if (session) {
+      await assertPresenceAccess(contentId, session.user.id);
+    } else {
+      await assertPublicPresenceAccess(contentId);
+    }
 
     upsertCollaborationPresence({
       contentId,
-      userId: session.user.id,
+      userId: session?.user.id ?? `visitor:${browserContextId}`,
+      displayName: session?.user.username ?? sanitizeDisplayName(body.displayName),
+      avatarUrl: sanitizeDisplayName(body.avatarUrl),
+      isAnonymous: !session,
       sessionId,
       browserContextId,
       surfaceCount: Math.max(0, Number(body.surfaceCount ?? 0)),
