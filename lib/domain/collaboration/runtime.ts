@@ -410,6 +410,12 @@ class CollaborationRuntimeManager {
     return this.createHandle(entry, consumerId);
   }
 
+  markAllUnauthorized(reason: string) {
+    for (const entry of this.entries.values()) {
+      this.markUnauthorized(entry, reason);
+    }
+  }
+
   seed(contentId: string, content: JSONContent | null | undefined) {
     const entry = this.entries.get(contentId);
     if (!entry || !content) return;

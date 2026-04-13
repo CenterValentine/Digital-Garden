@@ -7,14 +7,22 @@ export async function GET(
 ): Promise<NextResponse<ApiResponse<SessionData | null>>> {
   try {
     const session = await getSession()
+    const requiresSession = request.nextUrl.searchParams.get('required') === 'true'
 
     if (!session) {
       return NextResponse.json(
         {
-          success: true,
-          data: null,
+          success: !requiresSession,
+          ...(requiresSession
+            ? {
+                error: {
+                  code: 'UNAUTHORIZED',
+                  message: 'Authentication required',
+                },
+              }
+            : { data: null }),
         } as ApiResponse<null>,
-        { status: 200 }
+        { status: requiresSession ? 401 : 200 }
       )
     }
 
@@ -39,4 +47,3 @@ export async function GET(
     )
   }
 }
-

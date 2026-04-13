@@ -15,6 +15,7 @@ import { CollapsibleRightPanel } from "./CollapsibleRightPanel";
 import { StatusBar } from "./StatusBar";
 import NotesNavBar from "@/components/client/nav/NotesNavBar";
 import { ExtensionGlobalDialogs } from "@/lib/extensions/ExtensionGlobalDialogs";
+import { AuthSessionSync } from "./AuthSessionSync";
 
 interface ConditionalNotesLayoutProps {
   children: React.ReactNode;
@@ -33,12 +34,18 @@ export function ConditionalNotesLayout({
 
   // Fullscreen mode: just render children directly
   if (isFullscreen) {
-    return <>{children}</>;
+    return (
+      <>
+        <AuthSessionSync />
+        {children}
+      </>
+    );
   }
 
   // Normal mode: render full panel structure
   return (
     <>
+      <AuthSessionSync />
       {/* Notes-specific navbar */}
       <NotesNavBar />
 

@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import NavBarLogo from "../logo/NavBarLogo";
 import { Button } from "@/components/client/ui/button/Button";
 import type { SessionData } from "@/lib/infrastructure/auth/types";
+import { publishSignedOut } from "@/lib/infrastructure/auth/client-session-events";
 
 export default function NavBar() {
   const router = useRouter();
@@ -31,6 +32,7 @@ export default function NavBar() {
     try {
       await fetch("/api/auth/sign-out", { method: "POST" });
       setSession(null);
+      publishSignedOut("manual");
       router.push("/");
       router.refresh();
     } catch (error) {
