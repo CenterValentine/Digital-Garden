@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev --port 3015",
     "dev:collab": "tsx server/hocuspocus/bootstrap.ts",
+    "start:collab": "tsx server/hocuspocus/bootstrap.ts",
     "typecheck": "tsc --noEmit",
     "build": "prisma generate && pnpm build:tokens && tsc --noEmit && next build --webpack",
     "vercel-build": "prisma generate && pnpm build:tokens && next build --webpack",

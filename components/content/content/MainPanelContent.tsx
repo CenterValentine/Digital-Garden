@@ -74,6 +74,7 @@ interface ContentResponse {
     slug: string;
     parentId: string | null;
     contentType: string;
+    isPublished: boolean;
     customIcon?: string | null;
     iconColor?: string | null;
     note?: {
@@ -156,6 +157,7 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
   const [contentIconColor, setContentIconColor] = useState<string | null>(null);
   const [contentType, setContentType] = useState<string | null>(null);
   const [contentParentId, setContentParentId] = useState<string | null>(null);
+  const [contentIsPublished, setContentIsPublished] = useState(false);
   const [contentData, setContentData] = useState<any>(null); // Phase 2: Store payload data
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -214,6 +216,7 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
       setNoteTitle("");
       setContentType(null);
       setContentParentId(null);
+      setContentIsPublished(false);
       setContentData(null);
       setContentCustomIcon(null);
       setContentIconColor(null);
@@ -278,6 +281,7 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
 
         setNoteTitle(result.data.title);
         setContentParentId(result.data.parentId);
+        setContentIsPublished(Boolean(result.data.isPublished));
         setContentType(result.data.contentType);
         setContentCustomIcon(result.data.customIcon ?? null);
         setContentIconColor(result.data.iconColor ?? null);
@@ -967,6 +971,57 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
     setShareDialogOpen(true);
   }, [selectedContentId]);
 
+  const getPublicShareUrl = useCallback(() => {
+    if (typeof window === "undefined" || !selectedContentId) return "";
+    return `${window.location.origin}/share/${selectedContentId}`;
+  }, [selectedContentId]);
+
+  const copyPublicShareLink = useCallback(async () => {
+    const url = getPublicShareUrl();
+    if (!url) return;
+
+    await navigator.clipboard.writeText(url);
+    toast.success("Public share link copied");
+  }, [getPublicShareUrl]);
+
+  const updatePublicShare = useCallback(
+    async (nextPublished: boolean) => {
+      if (!selectedContentId) return;
+
+      setIsSharing(true);
+      const previous = contentIsPublished;
+      setContentIsPublished(nextPublished);
+
+      try {
+        const response = await fetch(`/api/content/content/${selectedContentId}`, {
+          method: "PATCH",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ isPublished: nextPublished }),
+        });
+        const result = await response.json().catch(() => null);
+
+        if (!response.ok || !result?.success) {
+          throw new Error(result?.error?.message || "Failed to update public sharing");
+        }
+
+        toast.success(
+          nextPublished
+            ? "Public view-only share link enabled"
+            : "Public share link disabled"
+        );
+      } catch (error) {
+        setContentIsPublished(previous);
+        toast.error(
+          error instanceof Error ? error.message : "Failed to update public sharing"
+        );
+      } finally {
+        setIsSharing(false);
+      }
+    },
+    [contentIsPublished, selectedContentId]
+  );
+
   const submitShareGrant = useCallback(
     async (method: "POST" | "DELETE") => {
       if (!selectedContentId) return;
@@ -1306,10 +1361,36 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
           <DialogHeader>
             <DialogTitle>Share Content</DialogTitle>
             <DialogDescription>
-              Grant or revoke access for an existing Digital Garden user.
+              Manage public view-only sharing and signed-in collaborator access.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
+            <div className="rounded-lg border border-border p-3">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-sm font-medium">Public share link</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Anyone with this link can view this content at `/share`.
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant={contentIsPublished ? "outline" : "default"}
+                  disabled={isSharing}
+                  onClick={() => updatePublicShare(!contentIsPublished)}
+                >
+                  {contentIsPublished ? "Disable" : "Enable"}
+                </Button>
+              </div>
+              {contentIsPublished ? (
+                <div className="mt-3 flex gap-2">
+                  <Input readOnly value={getPublicShareUrl()} />
+                  <Button type="button" variant="outline" onClick={copyPublicShareLink}>
+                    Copy
+                  </Button>
+                </div>
+              ) : null}
+            </div>
             <div className="space-y-2">
               <label className="text-sm font-medium" htmlFor={`share-email-${paneId}`}>
                 Collaborator email
@@ -1339,8 +1420,8 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
               </select>
             </div>
             <p className="text-xs text-muted-foreground">
-              Public share links are still pending. This dialog manages signed-in
-              user grants for `/content`.
+              Signed-in users with edit access should use `/content` for live
+              collaboration. Public `/share` access is view-only.
             </p>
           </div>
           <DialogFooter className="gap-2 sm:gap-0">

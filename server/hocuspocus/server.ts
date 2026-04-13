@@ -14,7 +14,7 @@ import {
 } from "../../lib/domain/collaboration/documents";
 import { verifyCollaborationToken } from "../../lib/domain/collaboration/tokens";
 
-const port = Number(process.env.HOCUSPOCUS_PORT || 1234);
+const port = Number(process.env.PORT || process.env.HOCUSPOCUS_PORT || 1234);
 const accessRevalidationIntervalMs = Number(
   process.env.HOCUSPOCUS_ACCESS_REVALIDATION_MS || 2000
 );
