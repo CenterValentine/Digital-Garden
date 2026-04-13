@@ -40,7 +40,7 @@ interface PresenceSnapshotResponse {
   };
 }
 
-const PRESENCE_POLL_INTERVAL_MS = 15_000;
+const PRESENCE_POLL_INTERVAL_MS = 10_000;
 const VISITOR_ADJECTIVES = ["Silver", "Quiet", "Golden", "Bright", "Gentle", "Blue"];
 const VISITOR_TRAITS = ["Windy", "Curious", "Clever", "Sunny", "Brisk", "Calm"];
 const VISITOR_ANIMALS = ["Raccoon", "Fox", "Heron", "Otter", "Finch", "Badger"];

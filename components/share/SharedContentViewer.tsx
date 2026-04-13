@@ -6,7 +6,7 @@ import { useEffect } from "react";
 
 import { MarkdownEditor } from "@/components/content/editor/MarkdownEditor";
 
-const SHARE_PRESENCE_INTERVAL_MS = 15_000;
+const SHARE_PRESENCE_INTERVAL_MS = 10_000;
 const VISITOR_ADJECTIVES = ["Silver", "Quiet", "Golden", "Bright", "Gentle", "Blue"];
 const VISITOR_TRAITS = ["Windy", "Curious", "Clever", "Sunny", "Brisk", "Calm"];
 const VISITOR_ANIMALS = ["Raccoon", "Fox", "Heron", "Otter", "Finch", "Badger"];
