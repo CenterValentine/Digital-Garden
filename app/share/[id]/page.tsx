@@ -9,14 +9,13 @@ import { getSession } from "@/lib/infrastructure/auth/session";
 
 type SharePageParams = Promise<{ id: string }>;
 
-async function getSignedInAccess(contentId: string) {
-  const session = await getSession();
-  if (!session) return null;
+async function getSignedInAccess(contentId: string, userId: string | null) {
+  if (!userId) return null;
 
   try {
     return await resolveContentAccess(prisma, {
       contentId,
-      userId: session.user.id,
+      userId,
       require: "view",
     });
   } catch {
@@ -26,6 +25,7 @@ async function getSignedInAccess(contentId: string) {
 
 export default async function SharePage({ params }: { params: SharePageParams }) {
   const { id } = await params;
+  const session = await getSession();
   const [content, signedInAccess] = await Promise.all([
     prisma.contentNode.findFirst({
       where: {
@@ -34,7 +34,7 @@ export default async function SharePage({ params }: { params: SharePageParams })
       },
       include: CONTENT_WITH_PAYLOADS,
     }),
-    getSignedInAccess(id),
+    getSignedInAccess(id, session?.user.id ?? null),
   ]);
 
   if (!content) {
@@ -64,6 +64,7 @@ export default async function SharePage({ params }: { params: SharePageParams })
         isPublished: content.isPublished,
         accessLevel,
         canEdit: Boolean(signedInAccess?.canEdit),
+        isSignedIn: Boolean(session),
         note: content.notePayload
           ? {
               tiptapJson: content.notePayload.tiptapJson as JSONContent,
