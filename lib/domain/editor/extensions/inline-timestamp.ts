@@ -101,37 +101,48 @@ function createTimestampPopover(opts: {
   const modeRow = document.createElement("div");
   modeRow.style.cssText = "display: flex; gap: 6px;";
 
-  const MODES: { key: TimestampMode; label: string; title: string }[] = [
-    { key: "frozen",        label: "🔒 Frozen",    title: "Date is set at insertion and never changes" },
-    { key: "document-date", label: "📄 Doc date",  title: "Resolves to the document's creation date — useful in templates" },
-    { key: "live",          label: "🔄 Live",      title: "Always shows today's date" },
+  // Inline SVG icons — matches the project's server-component icon pattern
+  const LOCK_SVG = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>`;
+  const DOC_SVG  = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>`;
+  const LIVE_SVG = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`;
+
+  const MODES: { key: TimestampMode; label: string; icon: string; title: string }[] = [
+    { key: "frozen",        label: "Frozen",   icon: LOCK_SVG, title: "Date is set at insertion and never changes" },
+    { key: "document-date", label: "Doc date", icon: DOC_SVG,  title: "Resolves to the document's creation date — useful in templates" },
+    { key: "live",          label: "Live",     icon: LIVE_SVG, title: "Always shows today's date" },
   ];
 
-  MODES.forEach(({ key, label, title }) => {
+  MODES.forEach(({ key, label, icon, title }) => {
     const btn = document.createElement("button");
     btn.type = "button";
-    btn.textContent = label;
     btn.title = title;
+    btn.innerHTML = `${icon}<span style="margin-left:4px">${label}</span>`;
+    const isActive = currentMode === key;
     btn.style.cssText = `
       flex: 1;
-      padding: 4px 6px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 5px 8px;
       border-radius: 6px;
-      border: 1px solid ${currentMode === key ? "var(--gold-primary, #c9a86c)" : "rgba(0,0,0,0.1)"};
-      background: ${currentMode === key ? "rgba(201,168,108,0.12)" : "transparent"};
-      color: ${currentMode === key ? "var(--gold-primary, #c9a86c)" : "inherit"};
+      border: 1px solid ${isActive ? "var(--gold-primary, #c9a86c)" : "rgba(0,0,0,0.08)"};
+      background: ${isActive ? "rgba(201,168,108,0.12)" : "rgba(0,0,0,0.02)"};
+      color: ${isActive ? "var(--gold-primary, #c9a86c)" : "var(--muted-foreground, #888)"};
       font-size: 12px;
+      font-weight: ${isActive ? "600" : "400"};
       cursor: pointer;
       transition: all 0.1s;
       white-space: nowrap;
+      gap: 4px;
     `;
     btn.addEventListener("click", () => {
       onModeChange(key);
-      // Update active state visually
       modeRow.querySelectorAll("button").forEach((b, i) => {
         const active = MODES[i].key === key;
-        (b as HTMLButtonElement).style.border = `1px solid ${active ? "var(--gold-primary, #c9a86c)" : "rgba(0,0,0,0.1)"}`;
-        (b as HTMLButtonElement).style.background = active ? "rgba(201,168,108,0.12)" : "transparent";
-        (b as HTMLButtonElement).style.color = active ? "var(--gold-primary, #c9a86c)" : "inherit";
+        (b as HTMLButtonElement).style.border = `1px solid ${active ? "var(--gold-primary, #c9a86c)" : "rgba(0,0,0,0.08)"}`;
+        (b as HTMLButtonElement).style.background = active ? "rgba(201,168,108,0.12)" : "rgba(0,0,0,0.02)";
+        (b as HTMLButtonElement).style.color = active ? "var(--gold-primary, #c9a86c)" : "var(--muted-foreground, #888)";
+        (b as HTMLButtonElement).style.fontWeight = active ? "600" : "400";
       });
     });
     modeRow.appendChild(btn);
@@ -151,33 +162,78 @@ function createTimestampPopover(opts: {
     const btn = document.createElement("button");
     btn.type = "button";
     btn.textContent = formatTimestampDate(sampleDate, preset);
+    const isActive = currentFormat === preset;
     btn.style.cssText = `
-      padding: 5px 8px;
+      padding: 6px 10px;
       border-radius: 6px;
-      border: 1px solid ${currentFormat === preset ? "var(--gold-primary, #c9a86c)" : "rgba(0,0,0,0.1)"};
-      background: ${currentFormat === preset ? "rgba(201,168,108,0.12)" : "transparent"};
-      color: ${currentFormat === preset ? "var(--gold-primary, #c9a86c)" : "inherit"};
+      border: 1px solid ${isActive ? "var(--gold-primary, #c9a86c)" : "rgba(0,0,0,0.08)"};
+      background: ${isActive ? "rgba(201,168,108,0.12)" : "rgba(0,0,0,0.02)"};
+      color: ${isActive ? "var(--gold-primary, #c9a86c)" : "var(--foreground, #1a1a1a)"};
       font-size: 12px;
+      font-weight: ${isActive ? "600" : "400"};
       cursor: pointer;
       transition: all 0.1s;
       text-align: left;
+      letter-spacing: -0.01em;
     `;
+    btn.addEventListener("mouseenter", () => {
+      if (preset !== currentFormat) btn.style.background = "rgba(0,0,0,0.05)";
+    });
+    btn.addEventListener("mouseleave", () => {
+      if (preset !== currentFormat) btn.style.background = "rgba(0,0,0,0.02)";
+    });
     btn.addEventListener("click", () => {
       onFormatChange(preset);
       formatGrid.querySelectorAll("button").forEach((b, i) => {
         const active = FORMAT_PRESETS[i] === preset;
-        (b as HTMLButtonElement).style.border = `1px solid ${active ? "var(--gold-primary, #c9a86c)" : "rgba(0,0,0,0.1)"}`;
-        (b as HTMLButtonElement).style.background = active ? "rgba(201,168,108,0.12)" : "transparent";
-        (b as HTMLButtonElement).style.color = active ? "var(--gold-primary, #c9a86c)" : "inherit";
+        (b as HTMLButtonElement).style.border = `1px solid ${active ? "var(--gold-primary, #c9a86c)" : "rgba(0,0,0,0.08)"}`;
+        (b as HTMLButtonElement).style.background = active ? "rgba(201,168,108,0.12)" : "rgba(0,0,0,0.02)";
+        (b as HTMLButtonElement).style.color = active ? "var(--gold-primary, #c9a86c)" : "var(--foreground, #1a1a1a)";
+        (b as HTMLButtonElement).style.fontWeight = active ? "600" : "400";
       });
     });
     formatGrid.appendChild(btn);
+  });
+
+  // ── Divider + Copy date utility ──
+  const divider = document.createElement("div");
+  divider.style.cssText = "height: 1px; background: rgba(0,0,0,0.06); margin: 2px 0;";
+
+  const COPY_SVG = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`;
+  const copyBtn = document.createElement("button");
+  copyBtn.type = "button";
+  copyBtn.innerHTML = `${COPY_SVG}<span style="margin-left:6px">Copy date text</span>`;
+  copyBtn.style.cssText = `
+    display: inline-flex;
+    align-items: center;
+    width: 100%;
+    padding: 5px 8px;
+    border-radius: 6px;
+    border: none;
+    background: transparent;
+    color: var(--muted-foreground, #888);
+    font-size: 12px;
+    cursor: pointer;
+    transition: background 0.1s;
+    text-align: left;
+  `;
+  copyBtn.addEventListener("mouseenter", () => { copyBtn.style.background = "rgba(0,0,0,0.04)"; });
+  copyBtn.addEventListener("mouseleave", () => { copyBtn.style.background = "transparent"; });
+  copyBtn.addEventListener("click", () => {
+    const text = formatTimestampDate(sampleDate, currentFormat);
+    navigator.clipboard.writeText(text).catch(() => {});
+    copyBtn.innerHTML = `${COPY_SVG}<span style="margin-left:6px">Copied!</span>`;
+    setTimeout(() => {
+      copyBtn.innerHTML = `${COPY_SVG}<span style="margin-left:6px">Copy date text</span>`;
+    }, 1500);
   });
 
   portal.appendChild(modeLabel);
   portal.appendChild(modeRow);
   portal.appendChild(formatLabel);
   portal.appendChild(formatGrid);
+  portal.appendChild(divider);
+  portal.appendChild(copyBtn);
   document.body.appendChild(portal);
 
   // ── Position: below anchor, flip up if needed ──

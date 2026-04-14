@@ -271,7 +271,7 @@ export function MainPanelNavigation({ paneId }: MainPanelNavigationProps) {
             {isLayoutMenuOpen && (
               <div
                 ref={layoutMenuRef}
-                className="absolute left-0 top-full z-40 mt-2 min-w-48 rounded-md border border-white/10 bg-white/95 p-1 shadow-lg backdrop-blur-sm dark:bg-gray-900/95"
+                className="absolute left-0 top-full z-50 mt-2 min-w-48 rounded-md border border-white/10 bg-white/95 p-1 shadow-lg backdrop-blur-sm dark:bg-gray-900/95"
               >
                 {LAYOUT_OPTIONS.map((option) => {
                   const Icon = option.icon;

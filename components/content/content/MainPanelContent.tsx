@@ -1490,7 +1490,7 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
                 onSaveAsPageTemplate={handleSaveAsTemplate}
               />
             )}
-            <div className="flex-1 min-h-0 overflow-hidden">{contentElement}</div>
+            <div className="flex-1 min-h-0 overflow-auto">{contentElement}</div>
             {notesPanelPosition !== "above" && (
               <ExpandableEditor
                 contentId={selectedContentId}

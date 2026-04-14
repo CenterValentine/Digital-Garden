@@ -16,6 +16,7 @@ import { PluginKey } from "@tiptap/pm/state";
 import tippy, { Instance as TippyInstance } from "tippy.js";
 import { SlashCommandsList, type SlashCommandsListRef } from "./slash-commands-menu";
 import { getExtensionSlashCommands } from "@/lib/extensions/editor-client-registry";
+import { useTimestampFormatStore } from "@/state/timestamp-format-store";
 
 // Plugin key for slash commands
 export const slashCommandsPluginKey = new PluginKey("slashCommands");
@@ -493,7 +494,6 @@ export function getSlashCommands(editor: Editor): SlashCommand[] {
       description: "Insert today's date inline — click to set format & mode",
       icon: "🕐",
       command: ({ editor, range }) => {
-        const { useTimestampFormatStore } = require("@/state/timestamp-format-store");
         const { defaultFormat, defaultMode } = useTimestampFormatStore.getState();
         const d = new Date();
         const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
