@@ -2602,10 +2602,15 @@ mark {
 
 /* ─── Allotment sash overrides ─────────────────────────────────────────── */
 
-/* Vertical sash visibility: the ::before indicator is transparent at rest, blue
-   on hover — no additional override needed. Tab headers use z-40 to sit above
-   the sash (z-35), so tab close buttons remain clickable even when the sash
-   occupies the same horizontal region. */
+/* Vertical sash: restrict the hover indicator to below the tab header area.
+   The sash hit-area (JS-managed inline width) spans full height, but the
+   visual ::before indicator is clipped to start at 48px (h-12 tab header).
+   This prevents the sash glow from obscuring tab close buttons at the top.
+   Tab headers already use z-40 > sash z-35, so clicks reach the X button. */
+:root .sash-module_sash__K-9lB.sash-module_vertical__pB-rs:before {
+  top: 48px;
+  height: calc(100% - 48px);
+}
 
 /* ─── Panel collapse/expand transition ──────────────────────────────────── */
 
