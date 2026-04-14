@@ -466,6 +466,40 @@ export function getSlashCommands(editor: Editor): SlashCommand[] {
       },
       aliases: ["prompt", "ai", "instruction", "template"],
     },
+    // Epoch 11 Sprint 45: Template + Snippet insertion
+    {
+      title: "Template",
+      description: "Insert a saved content template",
+      icon: "📄",
+      command: ({ editor, range }) => {
+        editor.chain().focus().deleteRange(range).run();
+        window.dispatchEvent(new CustomEvent("open-template-picker"));
+      },
+      aliases: ["tpl", "templates"],
+    },
+    {
+      title: "Snippet",
+      description: "Insert a reusable text snippet",
+      icon: "✂",
+      command: ({ editor, range }) => {
+        editor.chain().focus().deleteRange(range).run();
+        window.dispatchEvent(new CustomEvent("open-snippet-picker"));
+      },
+      aliases: ["snip", "snippets", "reusable"],
+    },
+    // Sprint 65: Timestamp block
+    {
+      title: "Timestamp",
+      description: "Insert today's date as a frozen timestamp",
+      icon: "🕐",
+      command: ({ editor, range }) => {
+        editor.chain().focus().deleteRange(range).insertContent({
+          type: "timestamp",
+          attrs: { isoDate: new Date().toISOString().slice(0, 10) },
+        }).run();
+      },
+      aliases: ["date", "today", "now", "stamp", "datestamp"],
+    },
     ...getExtensionSlashCommands(),
     // Report Issue - Always at the bottom
     {

@@ -440,7 +440,7 @@ export function MainPanelHeader({
   return (
     <>
       <div
-        className="flex w-full max-w-full shrink-0 items-center overflow-visible border-b border-white/10"
+        className="relative z-40 flex w-full max-w-full shrink-0 items-center overflow-visible border-b border-white/10"
         style={{
           background: glass1.background,
           backdropFilter: glass1.backdropFilter,

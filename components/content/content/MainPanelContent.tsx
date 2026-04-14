@@ -1238,7 +1238,7 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
     "share": handleShareOpen,
   }), [handleImportMarkdown, handleExportMarkdown, handleExportChat, handleCopyLink, handleSaveAsTemplate, handleShareOpen]);
 
-  // Calendar workspace — shown in pane 1 when calendar view is active
+  // Extension workspace — shown in pane 1 when an extension view is active
   const ExtensionMainWorkspace = useExtensionMainWorkspace(activeView);
   const ExtensionContentViewer = useExtensionContentViewer({
     selectedContentId,
@@ -1386,7 +1386,7 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
     const editorElement = (
       <div className="flex flex-col h-full">
         {/* Note title header with debug toggle */}
-        <div className="flex-none px-6 pt-6 pb-3 flex items-start justify-between border-b border-black/5 shadow-[inset_0_-1px_0_rgba(15,23,42,0.08),0_3px_10px_rgba(15,23,42,0.035)]">
+        <div className="flex-none px-6 pt-6 pb-4 flex items-start justify-between shadow-[0_2px_4px_rgba(15,23,42,0.09),0_8px_28px_rgba(15,23,42,0.06),0_24px_64px_rgba(15,23,42,0.03)]">
           {isTitleEditing ? (
             <input
               ref={titleInputRef}

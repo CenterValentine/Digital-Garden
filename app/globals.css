@@ -2,6 +2,11 @@
 @import "../dist/variables.css";
 @import "tippy.js/dist/tippy.css";
 
+/* Exclude git worktrees from Tailwind v4 automatic source scanning.
+   Without this, @tailwindcss/postcss traverses .worktrees/** and times out
+   reading files from nested worktree checkouts (e.g. public/site.webmanifest). */
+@source not "../.worktrees/**/*";
+
 @custom-variant dark (&:is(.dark *));
 
 /* Hide default navbar on notes routes (uses its own NotesNavBar) */
@@ -883,15 +888,15 @@ mark {
   padding: 0.25rem 0.375rem 0.25rem 0.375rem;
   border: 1px solid rgba(0, 0, 0, 0.12);
   border-radius: 6px;
-  background: transparent;
+  background: rgba(0, 0, 0, 0.03);
 
   transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
 }
 
 .ProseMirror .block-node:hover {
-  border-color: rgba(0, 0, 0, 0.18);
-  background: transparent;
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.025);
+  border-color: rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.04);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
 
 }
 
@@ -2593,4 +2598,35 @@ mark {
 
 .ProseMirror .dg-collaboration-selection {
   border-radius: 0.12rem;
+}
+
+/* ─── Allotment sash overrides ─────────────────────────────────────────── */
+
+/* Vertical sash: restrict the hover indicator to below the tab header area.
+   The sash hit-area (JS-managed inline width) spans full height, but the
+   visual ::before indicator is clipped to start at 48px (h-12 tab header).
+   This prevents the sash glow from obscuring tab close buttons at the top.
+   Tab headers already use z-40 > sash z-35, so clicks reach the X button. */
+:root .sash-module_sash__K-9lB.sash-module_vertical__pB-rs:before {
+  top: 48px;
+  height: calc(100% - 48px);
+}
+
+/* ─── Panel collapse/expand transition ──────────────────────────────────── */
+
+/* Only animate allotment pane positions during programmatic toggle events,
+   not during drag (which would add 200ms lag per mousemove). ResizablePanels
+   adds data-panel-transitioning for ~250ms on toggle, then removes it. */
+[data-panel-transitioning] .allotment-module_splitViewView__MGZ6O {
+  transition: left 0.22s ease-out, width 0.22s ease-out;
+}
+
+/* ─── Scrollbar utility ─────────────────────────────────────────────────── */
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
