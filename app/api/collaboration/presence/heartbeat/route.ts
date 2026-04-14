@@ -116,25 +116,27 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    for (const heartbeat of heartbeatSessions) {
-      upsertCollaborationPresence({
-        contentId: heartbeat.contentId as string,
-        userId: session?.user.id ?? `visitor:${heartbeat.browserContextId}`,
-        displayName: session?.user.username ?? sanitizeDisplayName(heartbeat.displayName),
-        avatarUrl: sanitizeDisplayName(heartbeat.avatarUrl),
-        isAnonymous: !session,
-        sessionId: heartbeat.sessionId as string,
-        browserContextId: heartbeat.browserContextId as string,
-        surfaceCount: Math.max(0, Number(heartbeat.surfaceCount ?? 0)),
-        activePaneIds: sanitizeStringList(heartbeat.activePaneIds),
-        activeTabIds: sanitizeStringList(heartbeat.activeTabIds),
-        transportState: parseTransportState(heartbeat.transportState),
-        lastKnownServerRevision:
-          typeof heartbeat.lastKnownServerRevision === "number"
-            ? heartbeat.lastKnownServerRevision
-            : null,
-      });
-    }
+    await Promise.all(
+      heartbeatSessions.map((heartbeat) =>
+        upsertCollaborationPresence(prisma, {
+          contentId: heartbeat.contentId as string,
+          userId: session?.user.id ?? `visitor:${heartbeat.browserContextId}`,
+          displayName: session?.user.username ?? sanitizeDisplayName(heartbeat.displayName),
+          avatarUrl: sanitizeDisplayName(heartbeat.avatarUrl),
+          isAnonymous: !session,
+          sessionId: heartbeat.sessionId as string,
+          browserContextId: heartbeat.browserContextId as string,
+          surfaceCount: Math.max(0, Number(heartbeat.surfaceCount ?? 0)),
+          activePaneIds: sanitizeStringList(heartbeat.activePaneIds),
+          activeTabIds: sanitizeStringList(heartbeat.activeTabIds),
+          transportState: parseTransportState(heartbeat.transportState),
+          lastKnownServerRevision:
+            typeof heartbeat.lastKnownServerRevision === "number"
+              ? heartbeat.lastKnownServerRevision
+              : null,
+        })
+      )
+    );
 
     return NextResponse.json({ success: true, data: { accepted: heartbeatSessions.length } });
   } catch (error) {

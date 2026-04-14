@@ -49,11 +49,13 @@ export async function GET(request: NextRequest) {
       userId: session?.user.id ?? null,
     });
 
-    const records = accessibleContentIds.flatMap((contentId) =>
-      listCollaborationPresence(contentId).filter(
-        (record) => !excludeSessionId || record.sessionId !== excludeSessionId
+    const records = (
+      await Promise.all(
+        accessibleContentIds.map((contentId) => listCollaborationPresence(prisma, contentId))
       )
-    );
+    )
+      .flat()
+      .filter((record) => !excludeSessionId || record.sessionId !== excludeSessionId);
     const userIds = Array.from(new Set(records.map((record) => record.userId))).filter(isUuid);
     const users = await prisma.user.findMany({
       where: { id: { in: userIds } },

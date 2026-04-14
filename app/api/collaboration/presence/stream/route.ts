@@ -28,29 +28,43 @@ export async function GET(request: NextRequest) {
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
     start(controller) {
-      const send = () => {
-        const sessions = listCollaborationPresence(contentId);
-        controller.enqueue(
-          encoder.encode(
-            `event: presence\ndata: ${JSON.stringify({
-              type: "presence",
-              contentId,
-              sessions,
-            })}\n\n`
-          )
-        );
+      let isClosed = false;
+      let isSending = false;
+      const send = async () => {
+        if (isClosed || isSending) return;
+        isSending = true;
+        try {
+          const sessions = await listCollaborationPresence(prisma, contentId);
+          if (isClosed) return;
+          controller.enqueue(
+            encoder.encode(
+              `event: presence\ndata: ${JSON.stringify({
+                type: "presence",
+                contentId,
+                sessions,
+              })}\n\n`
+            )
+          );
+        } finally {
+          isSending = false;
+        }
       };
 
-      const unsubscribe = subscribeCollaborationPresence(contentId, send);
-      const interval = setInterval(send, PRESENCE_STREAM_REFRESH_MS);
+      const unsubscribe = subscribeCollaborationPresence(contentId, () => {
+        void send();
+      });
+      const interval = setInterval(() => {
+        void send();
+      }, PRESENCE_STREAM_REFRESH_MS);
       const close = () => {
+        isClosed = true;
         clearInterval(interval);
         unsubscribe();
         controller.close();
       };
 
       request.signal.addEventListener("abort", close, { once: true });
-      send();
+      void send();
     },
   });
 

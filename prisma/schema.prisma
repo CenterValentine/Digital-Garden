@@ -102,6 +102,7 @@ model ContentNode {
   person               Person?               @relation("PersonContent", fields: [personId], references: [id], onDelete: SetNull)
   peopleFileTreeMounts PeopleFileTreeMount[] @relation("ContentNodePeopleMounts")
   collaborationDocument CollaborationDocument?
+  collaborationPresenceRecords CollaborationPresence[]
   contentPath          ContentPath?
   contentTags          ContentTag[]
   personMentions       PersonMention[]
@@ -444,6 +445,29 @@ model CollaborationDocument {
   owner         User        @relation(fields: [ownerId], references: [id], onDelete: Cascade)
 
   @@index([ownerId, updatedAt])
+}
+
+model CollaborationPresence {
+  id                      String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  contentId               String      @db.Uuid
+  userId                  String      @db.VarChar(160)
+  displayName             String?     @db.VarChar(120)
+  avatarUrl               String?
+  isAnonymous             Boolean     @default(false)
+  sessionId               String      @db.VarChar(160)
+  browserContextId        String      @db.VarChar(160)
+  surfaceCount            Int         @default(0)
+  activePaneIds           String[]
+  activeTabIds            String[]
+  transportState          String      @default("localOnly") @db.VarChar(40)
+  lastKnownServerRevision Int?
+  firstSeenAt             DateTime    @default(now()) @db.Timestamptz(6)
+  lastSeenAt              DateTime    @updatedAt @db.Timestamptz(6)
+  content                 ContentNode @relation(fields: [contentId], references: [id], onDelete: Cascade)
+
+  @@unique([contentId, sessionId])
+  @@index([contentId, lastSeenAt])
+  @@index([sessionId])
 }
 
 // ============================================================

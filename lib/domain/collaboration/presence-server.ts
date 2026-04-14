@@ -1,3 +1,5 @@
+import type { PrismaClient } from "@/lib/database/generated/prisma";
+
 export interface CollaborationPresenceRecord {
   contentId: string;
   userId: string;
@@ -23,7 +25,6 @@ export interface CollaborationPresenceRecord {
 }
 
 interface PresenceStore {
-  records: Map<string, CollaborationPresenceRecord>;
   listeners: Map<string, Set<() => void>>;
 }
 
@@ -36,47 +37,101 @@ declare global {
 function getStore() {
   if (!globalThis.__dgCollaborationPresenceStore) {
     globalThis.__dgCollaborationPresenceStore = {
-      records: new Map(),
       listeners: new Map(),
     };
   }
   return globalThis.__dgCollaborationPresenceStore;
 }
 
-function getKey(contentId: string, sessionId: string) {
-  return `${contentId}:${sessionId}`;
+async function prune(prisma: PrismaClient, contentId: string) {
+  await prisma.collaborationPresence.deleteMany({
+    where: {
+      contentId,
+      lastSeenAt: {
+        lt: new Date(Date.now() - STALE_AFTER_MS),
+      },
+    },
+  });
 }
 
-function prune(contentId: string) {
-  const store = getStore();
-  const now = Date.now();
-  for (const [key, record] of store.records) {
-    if (record.contentId === contentId && now - record.lastSeenAt > STALE_AFTER_MS) {
-      store.records.delete(key);
-    }
-  }
-}
-
-export function upsertCollaborationPresence(
+export async function upsertCollaborationPresence(
+  prisma: PrismaClient,
   record: Omit<CollaborationPresenceRecord, "firstSeenAt" | "lastSeenAt">
 ) {
-  const store = getStore();
-  const existing = store.records.get(getKey(record.contentId, record.sessionId));
-  store.records.set(getKey(record.contentId, record.sessionId), {
-    ...record,
-    firstSeenAt: existing?.firstSeenAt ?? Date.now(),
-    lastSeenAt: Date.now(),
+  const now = new Date();
+  await prisma.collaborationPresence.upsert({
+    where: {
+      contentId_sessionId: {
+        contentId: record.contentId,
+        sessionId: record.sessionId,
+      },
+    },
+    create: {
+      contentId: record.contentId,
+      userId: record.userId,
+      displayName: record.displayName,
+      avatarUrl: record.avatarUrl,
+      isAnonymous: record.isAnonymous,
+      sessionId: record.sessionId,
+      browserContextId: record.browserContextId,
+      surfaceCount: record.surfaceCount,
+      activePaneIds: record.activePaneIds,
+      activeTabIds: record.activeTabIds,
+      transportState: record.transportState,
+      lastKnownServerRevision: record.lastKnownServerRevision,
+      firstSeenAt: now,
+      lastSeenAt: now,
+    },
+    update: {
+      userId: record.userId,
+      displayName: record.displayName,
+      avatarUrl: record.avatarUrl,
+      isAnonymous: record.isAnonymous,
+      browserContextId: record.browserContextId,
+      surfaceCount: record.surfaceCount,
+      activePaneIds: record.activePaneIds,
+      activeTabIds: record.activeTabIds,
+      transportState: record.transportState,
+      lastKnownServerRevision: record.lastKnownServerRevision,
+      lastSeenAt: now,
+    },
   });
-  prune(record.contentId);
+  await prune(prisma, record.contentId);
   notifyCollaborationPresence(record.contentId);
 }
 
-export function listCollaborationPresence(contentId: string) {
-  const store = getStore();
-  prune(contentId);
-  return Array.from(store.records.values()).filter(
-    (record) => record.contentId === contentId && record.surfaceCount > 0
-  );
+export async function listCollaborationPresence(prisma: PrismaClient, contentId: string) {
+  const records = await prisma.collaborationPresence.findMany({
+    where: {
+      contentId,
+      surfaceCount: {
+        gt: 0,
+      },
+      lastSeenAt: {
+        gte: new Date(Date.now() - STALE_AFTER_MS),
+      },
+    },
+    orderBy: {
+      firstSeenAt: "asc",
+    },
+  });
+
+  return records.map((record) => ({
+    contentId: record.contentId,
+    userId: record.userId,
+    displayName: record.displayName,
+    avatarUrl: record.avatarUrl,
+    isAnonymous: record.isAnonymous,
+    sessionId: record.sessionId,
+    browserContextId: record.browserContextId,
+    surfaceCount: record.surfaceCount,
+    activePaneIds: record.activePaneIds,
+    activeTabIds: record.activeTabIds,
+    transportState: record.transportState as CollaborationPresenceRecord["transportState"],
+    lastKnownServerRevision: record.lastKnownServerRevision,
+    firstSeenAt: record.firstSeenAt.getTime(),
+    lastSeenAt: record.lastSeenAt.getTime(),
+  }));
 }
 
 export function subscribeCollaborationPresence(contentId: string, listener: () => void) {
