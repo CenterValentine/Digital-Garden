@@ -39,6 +39,7 @@ import { ServerNumberInput } from "./extensions/blocks/number-input";
 import { ServerRatingInput } from "./extensions/blocks/rating-input";
 import { ServerPromptInput } from "./extensions/blocks/prompt-input";
 import { ServerTimestamp } from "./extensions/blocks/timestamp";
+import { ServerInlineTimestamp } from "./extensions/inline-timestamp";
 import { ServerPersonMention } from "./extensions/person-mention-server";
 import { ServerTag } from "./extensions/tag-server";
 import { ServerWikiLink } from "./extensions/wiki-link-server";
@@ -148,6 +149,7 @@ export function getServerExtensions(): Extensions {
     ServerRatingInput,
     ServerPromptInput,
     ServerTimestamp,
+    ServerInlineTimestamp,
     ...getExtensionServerEditorExtensions(),
     ServerTag,
     ServerWikiLink,

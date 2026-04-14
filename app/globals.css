@@ -2600,7 +2600,27 @@ mark {
   border-radius: 0.12rem;
 }
 
-/* ─── Allotment sash overrides ─────────────────────────────────────────── */
+/* ─── Inline Timestamp ──────────────────────────────────────────────────── */
+
+/* The .inline-timestamp span flows inside paragraphs. Style overrides live
+   here rather than in JS so they respond to dark mode and theme tokens. */
+.inline-timestamp {
+  display: inline;
+  cursor: pointer;
+  border-radius: 4px;
+  padding: 1px 4px;
+  background: rgba(201, 168, 108, 0.1);
+  color: var(--gold-primary);
+  font-size: inherit;
+  line-height: inherit;
+  transition: background 0.1s;
+  user-select: none;
+}
+.inline-timestamp:hover {
+  background: rgba(201, 168, 108, 0.2);
+}
+
+/* ─── Allotment sash overrides ──────────────────────────────────────────── */
 
 /* Vertical sash: restrict the hover indicator to below the tab header area.
    The sash hit-area (JS-managed inline width) spans full height, but the
