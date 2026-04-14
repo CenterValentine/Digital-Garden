@@ -309,46 +309,6 @@ export function MainPanelHeader({
     setEditingTabId(null);
   }, []);
 
-  const [editingTabId, setEditingTabId] = useState<string | null>(null);
-  const [editingTitle, setEditingTitle] = useState("");
-  const renameInputRef = useRef<HTMLInputElement>(null);
-
-  const startRename = useCallback((tabId: string, currentTitle: string) => {
-    setEditingTabId(tabId);
-    setEditingTitle(currentTitle);
-    // Focus input on next tick after render
-    setTimeout(() => renameInputRef.current?.select(), 0);
-  }, []);
-
-  const commitRename = useCallback(async (tab: { id: string; contentId: string; title: string }) => {
-    const newTitle = editingTitle.trim();
-    setEditingTabId(null);
-    if (!newTitle || newTitle === tab.title) return;
-
-    // Optimistic update
-    updateContentTab(tab.contentId, { title: newTitle });
-
-    try {
-      const response = await fetch(`/api/content/content/${tab.contentId}`, {
-        method: "PATCH",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: newTitle }),
-      });
-      if (!response.ok) throw new Error("Failed to rename");
-      // Notify tree to refresh title
-      window.dispatchEvent(new CustomEvent("dg:tree-refresh"));
-    } catch {
-      // Revert on failure
-      updateContentTab(tab.contentId, { title: tab.title });
-      toast.error("Failed to rename");
-    }
-  }, [editingTitle, updateContentTab]);
-
-  const cancelRename = useCallback(() => {
-    setEditingTabId(null);
-  }, []);
-
   const tabs = useMemo(
     () =>
       (pane?.tabIds ?? [])
