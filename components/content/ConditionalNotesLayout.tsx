@@ -8,6 +8,7 @@
 
 "use client";
 
+import { Suspense } from "react";
 import { usePathname } from "next/navigation";
 import { ResizablePanels } from "./ResizablePanels";
 import { LeftSidebar } from "./LeftSidebar";
@@ -36,7 +37,9 @@ export function ConditionalNotesLayout({
   if (isFullscreen) {
     return (
       <>
-        <AuthSessionSync />
+        <Suspense fallback={null}>
+          <AuthSessionSync />
+        </Suspense>
         {children}
       </>
     );
@@ -45,7 +48,9 @@ export function ConditionalNotesLayout({
   // Normal mode: render full panel structure
   return (
     <>
-      <AuthSessionSync />
+      <Suspense fallback={null}>
+        <AuthSessionSync />
+      </Suspense>
       {/* Notes-specific navbar */}
       <NotesNavBar />
 
