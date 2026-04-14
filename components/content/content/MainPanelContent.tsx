@@ -51,6 +51,20 @@ import type { OutlineHeading } from "@/lib/domain/content/outline-extractor";
 import { extractOutline } from "@/lib/domain/content/outline-extractor";
 import { SaveAsPageTemplateDialog } from "../dialogs/SaveAsPageTemplateDialog";
 import { useNotesPanelStore } from "@/state/notes-panel-store";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  getContentCollaborationCapability,
+  useCollaborationRuntime,
+} from "@/lib/domain/collaboration/runtime";
 
 interface ContentResponse {
   success: boolean;
@@ -60,6 +74,7 @@ interface ContentResponse {
     slug: string;
     parentId: string | null;
     contentType: string;
+    isPublished: boolean;
     customIcon?: string | null;
     iconColor?: string | null;
     note?: {
@@ -108,6 +123,35 @@ interface ContentResponse {
   };
 }
 
+interface ShareGrant {
+  id: string;
+  contentId: string;
+  userId: string;
+  accessLevel: "view" | "edit" | string;
+  grantedAt: string;
+  expiresAt: string | null;
+  user: {
+    id: string;
+    email: string | null;
+    username: string | null;
+  };
+}
+
+interface ShareGrantsResponse {
+  success: boolean;
+  data?: {
+    content: {
+      id: string;
+      title: string;
+      isPublished: boolean;
+    };
+    grants: ShareGrant[];
+  };
+  error?: {
+    message?: string;
+  };
+}
+
 interface MainPanelContentProps {
   paneId: WorkspacePaneId;
 }
@@ -120,9 +164,8 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
   const selectedContentId = useContentStore((state) =>
     getPaneActiveContentId(state, paneId)
   );
-  const activeTabId = useContentStore((state) =>
-    getPaneActiveTab(state, paneId)?.id ?? null
-  );
+  const activeTab = useContentStore((state) => getPaneActiveTab(state, paneId));
+  const activeTabId = activeTab?.id ?? null;
   const setSelectedContentId = useContentStore((state) => state.setSelectedContentId);
   const setSelectedContentType = useContentStore((state) => state.setSelectedContentType);
   const updateContentTab = useContentStore((state) => state.updateContentTab);
@@ -143,10 +186,44 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
   const [contentIconColor, setContentIconColor] = useState<string | null>(null);
   const [contentType, setContentType] = useState<string | null>(null);
   const [contentParentId, setContentParentId] = useState<string | null>(null);
+  const [contentIsPublished, setContentIsPublished] = useState(false);
   const [contentData, setContentData] = useState<any>(null); // Phase 2: Store payload data
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0); // Used to force refetch
+  const [shareDialogOpen, setShareDialogOpen] = useState(false);
+  const [shareEmail, setShareEmail] = useState("");
+  const [shareEmails, setShareEmails] = useState<string[]>([]);
+  const [shareAccessLevel, setShareAccessLevel] = useState<"view" | "edit">("view");
+  const [shareGrants, setShareGrants] = useState<ShareGrant[]>([]);
+  const [isShareGrantsLoading, setIsShareGrantsLoading] = useState(false);
+  const [isSharing, setIsSharing] = useState(false);
+  const collaborationEnabled = process.env.NEXT_PUBLIC_COLLABORATION_ENABLED === "true";
+  const collaborationCapability = useMemo(
+    () => (collaborationEnabled ? getContentCollaborationCapability(contentType) : null),
+    [collaborationEnabled, contentType]
+  );
+  const collaborationDescriptor = useMemo(
+    () => ({
+      surfaceKind: "workspace-pane" as const,
+      workspaceId: "content-workspace",
+      paneId,
+      tabId: activeTabId,
+      viewInstanceId: `${paneId}:${activeTabId ?? selectedContentId ?? "empty"}`,
+      requiresEditableField: contentType === "note" ? "default" : null,
+      requiresLiveTransport: false,
+    }),
+    [activeTabId, contentType, paneId, selectedContentId]
+  );
+  const collaborationRuntime = useCollaborationRuntime({
+    contentId:
+      collaborationEnabled && contentType === "note" && noteContent && selectedContentId
+        ? selectedContentId
+        : null,
+    capability: collaborationCapability,
+    descriptor: collaborationDescriptor,
+    initialContent: noteContent,
+  });
 
   // AbortController for in-flight save requests. When the user navigates to
   // a different document, we abort any pending fetch to prevent Doc A's content
@@ -171,6 +248,7 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
       setNoteTitle("");
       setContentType(null);
       setContentParentId(null);
+      setContentIsPublished(false);
       setContentData(null);
       setContentCustomIcon(null);
       setContentIconColor(null);
@@ -235,6 +313,7 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
 
         setNoteTitle(result.data.title);
         setContentParentId(result.data.parentId);
+        setContentIsPublished(Boolean(result.data.isPublished));
         setContentType(result.data.contentType);
         setContentCustomIcon(result.data.customIcon ?? null);
         setContentIconColor(result.data.iconColor ?? null);
@@ -401,6 +480,22 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
     [selectedContentId, setOutline]
   );
 
+  const handleCollaborationSyncChange = useCallback(
+    (sync: {
+      isSaving: boolean;
+      hasUnsavedChanges: boolean;
+      lastSaved?: Date;
+    }) => {
+      if (!isActivePane) return;
+      setIsSaving(sync.isSaving);
+      setHasUnsavedChanges(sync.hasUnsavedChanges);
+      if (sync.lastSaved) {
+        setLastSaved(sync.lastSaved);
+      }
+    },
+    [isActivePane, setHasUnsavedChanges, setIsSaving, setLastSaved]
+  );
+
   // Auto-save handler — hardened against cross-document race conditions.
   // The contentId is captured in the closure at creation time. Before making
   // the API call, we verify it still matches the currently-viewed document.
@@ -408,6 +503,10 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
   const handleSave = useCallback(
     async (content: JSONContent) => {
       if (!selectedContentId) return;
+      if (typeof navigator !== "undefined" && !navigator.onLine) {
+        setHasUnsavedChanges(true);
+        return;
+      }
 
       // GUARD: Only discard saves when this pane has navigated to a different
       // document. Another pane becoming focused should not cancel the save.
@@ -468,6 +567,15 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
         // AbortError is expected when we cancel a save due to navigation
         if (err instanceof DOMException && err.name === "AbortError") {
           console.log(`[MainPanelContent] Save aborted for ${selectedContentId} (navigation)`);
+          return;
+        }
+        const message = err instanceof Error ? err.message : String(err);
+        if (
+          (typeof navigator !== "undefined" && !navigator.onLine) ||
+          message.includes("Can't reach database server") ||
+          message.includes("Failed to fetch")
+        ) {
+          setHasUnsavedChanges(true);
           return;
         }
         console.error("Failed to save note:", err);
@@ -886,6 +994,239 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
     }
   }, [titleDraft, noteTitle, selectedContentId, updateContentTab]);
 
+  const fetchShareGrants = useCallback(async () => {
+    if (!selectedContentId || selectedContentId.startsWith("person:")) {
+      setShareGrants([]);
+      return;
+    }
+
+    setIsShareGrantsLoading(true);
+    try {
+      const response = await fetch(
+        `/api/collaboration/grants?contentId=${encodeURIComponent(selectedContentId)}`,
+        {
+          method: "GET",
+          credentials: "include",
+        }
+      );
+      const result = (await response.json()) as ShareGrantsResponse;
+
+      if (!response.ok || !result.success || !result.data) {
+        throw new Error(result.error?.message || "Failed to load sharing access");
+      }
+
+      setShareGrants(result.data.grants);
+      setContentIsPublished(Boolean(result.data.content.isPublished));
+    } catch (error) {
+      setShareGrants([]);
+      toast.error(
+        error instanceof Error ? error.message : "Failed to load sharing access"
+      );
+    } finally {
+      setIsShareGrantsLoading(false);
+    }
+  }, [selectedContentId]);
+
+  const handleShareOpen = useCallback(() => {
+    if (!selectedContentId || selectedContentId.startsWith("person:")) {
+      toast.error("Select content before sharing");
+      return;
+    }
+
+    setShareDialogOpen(true);
+  }, [selectedContentId]);
+
+  useEffect(() => {
+    if (!shareDialogOpen) return;
+    void fetchShareGrants();
+  }, [fetchShareGrants, shareDialogOpen]);
+
+  const getPublicShareUrl = useCallback(() => {
+    if (typeof window === "undefined" || !selectedContentId) return "";
+    return `${window.location.origin}/share/${selectedContentId}`;
+  }, [selectedContentId]);
+
+  const copyPublicShareLink = useCallback(async () => {
+    const url = getPublicShareUrl();
+    if (!url) return;
+
+    await navigator.clipboard.writeText(url);
+    toast.success("Public share link copied");
+  }, [getPublicShareUrl]);
+
+  const addShareEmailEntries = useCallback((rawValue: string) => {
+    const entries = rawValue
+      .split(/[\s,;]+/)
+      .map((entry) => entry.trim().toLowerCase())
+      .filter(Boolean);
+
+    if (entries.length === 0) return;
+    const validEntries: string[] = [];
+    for (const entry of entries) {
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(entry)) {
+        toast.error(`${entry} is not a valid email address`);
+      } else {
+        validEntries.push(entry);
+      }
+    }
+
+    if (validEntries.length === 0) {
+      setShareEmail("");
+      return;
+    }
+
+    setShareEmails((current) => {
+      const existing = new Set(current);
+      const next = [...current];
+      for (const entry of validEntries) {
+        if (!existing.has(entry)) {
+          existing.add(entry);
+          next.push(entry);
+        }
+      }
+      return next;
+    });
+    setShareEmail("");
+  }, []);
+
+  const removeShareEmailEntry = useCallback((email: string) => {
+    setShareEmails((current) => current.filter((entry) => entry !== email));
+  }, []);
+
+  const updatePublicShare = useCallback(
+    async (nextPublished: boolean) => {
+      if (!selectedContentId) return;
+
+      setIsSharing(true);
+      const previous = contentIsPublished;
+      setContentIsPublished(nextPublished);
+
+      try {
+        const response = await fetch(`/api/content/content/${selectedContentId}`, {
+          method: "PATCH",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ isPublished: nextPublished }),
+        });
+        const result = await response.json().catch(() => null);
+
+        if (!response.ok || !result?.success) {
+          throw new Error(result?.error?.message || "Failed to update public sharing");
+        }
+
+        toast.success(
+          nextPublished
+            ? "Public view-only share link enabled"
+            : "Public share link disabled"
+        );
+      } catch (error) {
+        setContentIsPublished(previous);
+        toast.error(
+          error instanceof Error ? error.message : "Failed to update public sharing"
+        );
+      } finally {
+        setIsSharing(false);
+      }
+    },
+    [contentIsPublished, selectedContentId]
+  );
+
+  const submitShareGrant = useCallback(
+    async () => {
+      if (!selectedContentId) return;
+      const email = shareEmail.trim();
+      const emails = email ? [...shareEmails, email] : shareEmails;
+      const normalizedEmails = Array.from(
+        new Set(emails.map((entry) => entry.trim().toLowerCase()).filter(Boolean))
+      );
+
+      if (normalizedEmails.length === 0) {
+        toast.error("Enter at least one collaborator email");
+        return;
+      }
+      const invalidEmail = normalizedEmails.find(
+        (entry) => !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(entry)
+      );
+      if (invalidEmail) {
+        toast.error(`${invalidEmail} is not a valid email address`);
+        return;
+      }
+
+      setIsSharing(true);
+      try {
+        const results = await Promise.all(
+          normalizedEmails.map(async (targetEmail) => {
+            const response = await fetch("/api/collaboration/grants", {
+              method: "POST",
+              credentials: "include",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                contentId: selectedContentId,
+                email: targetEmail,
+                accessLevel: shareAccessLevel,
+              }),
+            });
+            const result = await response.json();
+
+            if (!response.ok || !result.success) {
+              throw new Error(
+                `${targetEmail}: ${result.error?.message || "Failed to update sharing"}`
+              );
+            }
+            return targetEmail;
+          })
+        );
+
+        toast.success(
+          `${results.length} collaborator${results.length === 1 ? "" : "s"} can ${
+            shareAccessLevel === "edit" ? "edit" : "view"
+          } this content.`
+        );
+        setShareEmail("");
+        setShareEmails([]);
+        await fetchShareGrants();
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Failed to update sharing");
+      } finally {
+        setIsSharing(false);
+      }
+    },
+    [fetchShareGrants, selectedContentId, shareAccessLevel, shareEmail, shareEmails]
+  );
+
+  const revokeShareGrant = useCallback(
+    async (grant: ShareGrant) => {
+      if (!selectedContentId) return;
+
+      setIsSharing(true);
+      try {
+        const response = await fetch("/api/collaboration/grants", {
+          method: "DELETE",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contentId: selectedContentId,
+            grantId: grant.id,
+            userId: grant.userId,
+          }),
+        });
+        const result = await response.json();
+
+        if (!response.ok || !result.success) {
+          throw new Error(result.error?.message || "Failed to revoke sharing");
+        }
+
+        setShareGrants((current) => current.filter((item) => item.id !== grant.id));
+        toast.success(`${grant.user.email ?? grant.user.username ?? "User"} no longer has access.`);
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Failed to revoke sharing");
+      } finally {
+        setIsSharing(false);
+      }
+    },
+    [selectedContentId]
+  );
+
   // Handlers passed as prop to ToolSurfaceProvider (can't use useRegisterToolHandler
   // here because this component renders the provider — useContext sees the parent, not self)
   const toolHandlers = useMemo(() => ({
@@ -894,7 +1235,8 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
     "export-chat": handleExportChat,
     "copy-link": handleCopyLink,
     "save-as-template": handleSaveAsTemplate,
-  }), [handleImportMarkdown, handleExportMarkdown, handleExportChat, handleCopyLink, handleSaveAsTemplate]);
+    "share": handleShareOpen,
+  }), [handleImportMarkdown, handleExportMarkdown, handleExportChat, handleCopyLink, handleSaveAsTemplate, handleShareOpen]);
 
   // Calendar workspace — shown in pane 1 when calendar view is active
   const ExtensionMainWorkspace = useExtensionMainWorkspace(activeView);
@@ -1044,7 +1386,7 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
     const editorElement = (
       <div className="flex flex-col h-full">
         {/* Note title header with debug toggle */}
-        <div className="flex-none px-6 pt-6 pb-2 flex items-start justify-between">
+        <div className="flex-none px-6 pt-6 pb-3 flex items-start justify-between border-b border-black/5 shadow-[inset_0_-1px_0_rgba(15,23,42,0.08),0_3px_10px_rgba(15,23,42,0.035)]">
           {isTitleEditing ? (
             <input
               ref={titleInputRef}
@@ -1074,6 +1416,7 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
         <div className="flex-1 overflow-hidden">
           <MarkdownEditor
             contentId={selectedContentId ?? undefined}
+            title={noteTitle}
             parentId={contentParentId}
             content={noteContent}
             onSave={handleSave}
@@ -1086,6 +1429,9 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
             fetchPeopleMentions={fetchPeopleMentions}
             onPersonMentionClick={handlePersonMentionClick}
             autoSaveDelay={2000}
+            collaborationEnabled={collaborationEnabled}
+            collaborationRuntime={collaborationRuntime}
+            onCollaborationSyncChange={handleCollaborationSyncChange}
           />
         </div>
       </div>
@@ -1174,6 +1520,189 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
         customIcon={contentCustomIcon}
         iconColor={contentIconColor}
       />
+      <Dialog open={shareDialogOpen} onOpenChange={setShareDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Share Content</DialogTitle>
+            <DialogDescription>
+              Manage public view-only sharing and signed-in collaborator access.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="rounded-lg border border-border p-3">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-sm font-medium">Public share link</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Anyone with this link can view this content at `/share`.
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant={contentIsPublished ? "outline" : "default"}
+                  disabled={isSharing}
+                  onClick={() => updatePublicShare(!contentIsPublished)}
+                >
+                  {contentIsPublished ? "Disable" : "Enable"}
+                </Button>
+              </div>
+              {contentIsPublished ? (
+                <div className="mt-3 flex gap-2">
+                  <Input readOnly value={getPublicShareUrl()} />
+                  <Button type="button" variant="outline" onClick={copyPublicShareLink}>
+                    Copy
+                  </Button>
+                </div>
+              ) : null}
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium" htmlFor={`share-email-${paneId}`}>
+                Collaborator emails
+              </label>
+              <div className="flex min-h-10 flex-wrap items-center gap-2 rounded-md border border-input bg-background px-2 py-1 shadow-sm focus-within:ring-1 focus-within:ring-ring">
+                {shareEmails.map((email) => (
+                  <span
+                    key={email}
+                    className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-1 text-xs text-muted-foreground"
+                  >
+                    {email}
+                    <button
+                      type="button"
+                      className="rounded-full px-1 text-muted-foreground hover:bg-background hover:text-foreground"
+                      onClick={() => removeShareEmailEntry(email)}
+                      aria-label={`Remove ${email}`}
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+                <input
+                  id={`share-email-${paneId}`}
+                  type="text"
+                  value={shareEmail}
+                  onChange={(event) => {
+                    const value = event.target.value;
+                    if (value.includes(",") || value.includes(";")) {
+                      addShareEmailEntries(value);
+                    } else {
+                      setShareEmail(value);
+                    }
+                  }}
+                  onBlur={() => addShareEmailEntries(shareEmail)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Tab" || event.key === "Enter" || event.key === ",") {
+                      event.preventDefault();
+                      addShareEmailEntries(shareEmail);
+                    }
+                    if (event.key === "Backspace" && !shareEmail && shareEmails.length > 0) {
+                      setShareEmails((current) => current.slice(0, -1));
+                    }
+                  }}
+                  placeholder={shareEmails.length === 0 ? "person@example.com" : "Add another"}
+                  className="min-w-[14rem] flex-1 bg-transparent px-1 py-1 text-sm outline-none placeholder:text-muted-foreground"
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Press comma, tab, enter, or click away to add each address.
+              </p>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium" htmlFor={`share-access-${paneId}`}>
+                Access level
+              </label>
+              <select
+                id={`share-access-${paneId}`}
+                value={shareAccessLevel}
+                onChange={(event) =>
+                  setShareAccessLevel(event.target.value === "edit" ? "edit" : "view")
+                }
+                className="h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+              >
+                <option value="view">View only</option>
+                <option value="edit">Can edit</option>
+              </select>
+            </div>
+            <div className="rounded-lg border border-border">
+              <div className="flex items-center justify-between border-b border-border px-3 py-2">
+                <div>
+                  <p className="text-sm font-medium">Signed-in collaborators</p>
+                  <p className="text-xs text-muted-foreground">
+                    View grants can open `/share`; edit grants can use `/content`.
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  disabled={isShareGrantsLoading}
+                  onClick={fetchShareGrants}
+                >
+                  Refresh
+                </Button>
+              </div>
+              <div className="max-h-48 overflow-y-auto">
+                {isShareGrantsLoading ? (
+                  <p className="px-3 py-4 text-sm text-muted-foreground">
+                    Loading collaborators...
+                  </p>
+                ) : shareGrants.length === 0 ? (
+                  <p className="px-3 py-4 text-sm text-muted-foreground">
+                    No signed-in collaborators have been added.
+                  </p>
+                ) : (
+                  <div className="divide-y divide-border">
+                    {shareGrants.map((grant) => {
+                      const displayName =
+                        grant.user.username || grant.user.email || "Unknown user";
+                      const grantedAt = new Date(grant.grantedAt).toLocaleDateString();
+
+                      return (
+                        <div
+                          key={grant.id}
+                          className="flex items-center justify-between gap-3 px-3 py-2"
+                        >
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-medium">{displayName}</p>
+                            <p className="truncate text-xs text-muted-foreground">
+                              {grant.user.email}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {grant.accessLevel === "edit" ? "Can edit" : "View only"} · Added{" "}
+                              {grantedAt}
+                            </p>
+                          </div>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            disabled={isSharing}
+                            onClick={() => revokeShareGrant(grant)}
+                          >
+                            Revoke
+                          </Button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Signed-in users with edit access should use `/content` for live
+              collaboration. Public `/share` access is view-only.
+            </p>
+          </div>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              type="button"
+              disabled={isSharing}
+              onClick={submitShareGrant}
+            >
+              {isSharing ? "Updating..." : "Apply Access"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </ToolSurfaceProvider>
   );
 }

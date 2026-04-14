@@ -19,6 +19,10 @@ import TableRow from "@tiptap/extension-table-row";
 import TableHeader from "@tiptap/extension-table-header";
 import TableCell from "@tiptap/extension-table-cell";
 import CharacterCount from "@tiptap/extension-character-count";
+import Collaboration from "@tiptap/extension-collaboration";
+import CollaborationCaret from "@tiptap/extension-collaboration-caret";
+import type { HocuspocusProvider } from "@hocuspocus/provider";
+import type { Doc } from "yjs";
 import { common, createLowlight } from "lowlight";
 import { SlashCommands } from "./commands/slash-commands";
 import { TaskListInputRule } from "./extensions/task-list";
@@ -53,6 +57,7 @@ import { DateInput } from "./extensions/blocks/date-input";
 import { NumberInput } from "./extensions/blocks/number-input";
 import { RatingInput } from "./extensions/blocks/rating-input";
 import { PromptInput } from "./extensions/blocks/prompt-input";
+import { Timestamp } from "./extensions/blocks/timestamp";
 import { getExtensionClientEditorExtensions } from "@/lib/extensions/editor-client-registry";
 
 // Create lowlight instance with common languages
@@ -62,6 +67,15 @@ const lowlight = createLowlight(common);
  * Options for configuring editor extensions
  */
 export interface EditorExtensionsOptions {
+  collaboration?: {
+    document: Doc;
+    provider?: HocuspocusProvider | null;
+    field?: string;
+    user: {
+      name: string;
+      color: string;
+    };
+  };
   /** Callback when a wiki-link is clicked */
   onWikiLinkClick?: (targetTitle: string) => void;
   /** Fetch notes for wiki-link autocomplete */
@@ -87,6 +101,8 @@ export interface EditorExtensionsOptions {
  * @returns TipTap extensions array
  */
 export function getEditorExtensions(options?: EditorExtensionsOptions): Extensions {
+  const collaboration = options?.collaboration;
+
   return [
     StarterKit.configure({
       // Heading levels with markdown shortcuts (# ## ###)
@@ -116,7 +132,41 @@ export function getEditorExtensions(options?: EditorExtensionsOptions): Extensio
       },
       // Enable horizontal rule with ---
       horizontalRule: {},
+      link: false,
+      undoRedo: collaboration ? false : {},
     }),
+
+    ...(collaboration
+      ? [
+          Collaboration.configure({
+            document: collaboration.document,
+            field: collaboration.field ?? "default",
+          }),
+          ...(collaboration.provider
+            ? [
+                CollaborationCaret.configure({
+                  provider: collaboration.provider,
+                  user: collaboration.user,
+                  render: (user, clientId?: number) => {
+                    const cursor = document.createElement("span");
+                    cursor.classList.add("dg-collaboration-caret");
+                    cursor.style.setProperty("--collaborator-color", user.color);
+                    if (clientId !== undefined) {
+                      cursor.dataset.collaborationClientId = String(clientId);
+                    }
+                    cursor.title = user.name;
+                    return cursor;
+                  },
+                  selectionRender: (user) => ({
+                    nodeName: "span",
+                    class: "dg-collaboration-selection",
+                    style: `background-color: ${user.color}24`,
+                  }),
+                }),
+              ]
+            : []),
+        ]
+      : []),
 
     // Syntax-highlighted code blocks
     CodeBlockLowlight.configure({
@@ -224,6 +274,7 @@ export function getEditorExtensions(options?: EditorExtensionsOptions): Extensio
     NumberInput,
     RatingInput,
     PromptInput,
+    Timestamp,
     ...getExtensionClientEditorExtensions(),
 
     // M6: Tags with autocomplete

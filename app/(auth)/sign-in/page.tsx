@@ -1,9 +1,19 @@
 'use client'
 
-import { useState, FormEvent } from 'react'
+import { useState, type FormEvent, type MouseEvent } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import type { SignInInput, ApiResponse, SessionData, AuthError } from '@/lib/infrastructure/auth/types'
+import type { SignInInput, ApiResponse, SessionData } from '@/lib/infrastructure/auth/types'
+
+function safeRedirectPath(value: string | null): string {
+  if (!value || !value.startsWith('/') || value.startsWith('//')) return '/content'
+  return value
+}
+
+function getRedirectPathFromLocation(): string {
+  if (typeof window === 'undefined') return '/content'
+  return safeRedirectPath(new URLSearchParams(window.location.search).get('redirect'))
+}
 
 export default function SignInPage() {
   const router = useRouter()
@@ -36,17 +46,23 @@ export default function SignInPage() {
         return
       }
 
-      // Redirect to content page
-      router.push('/content')
+      router.push(getRedirectPathFromLocation())
       router.refresh()
-    } catch (err) {
+    } catch {
       setError('An unexpected error occurred')
       setIsLoading(false)
     }
   }
 
   const handleGoogleSignIn = () => {
-    window.location.href = '/api/auth/google'
+    const redirectTo = getRedirectPathFromLocation()
+    window.location.href = `/api/auth/google?redirect=${encodeURIComponent(redirectTo)}`
+  }
+
+  const handleCreateAccount = (event: MouseEvent<HTMLAnchorElement>) => {
+    event.preventDefault()
+    const redirectTo = getRedirectPathFromLocation()
+    router.push(`/sign-up?redirect=${encodeURIComponent(redirectTo)}`)
   }
 
   return (
@@ -60,6 +76,7 @@ export default function SignInPage() {
             Or{' '}
             <Link
               href="/sign-up"
+              onClick={handleCreateAccount}
               className="font-medium text-indigo-600 hover:text-indigo-500"
             >
               create a new account
@@ -162,4 +179,3 @@ export default function SignInPage() {
     </div>
   )
 }
-

@@ -116,22 +116,22 @@ export function PeopleCreateDialog({
   };
 
   return (
-    <div className="fixed inset-0 z-[210] flex items-center justify-center bg-black/45 px-4">
-      <form onSubmit={submit} className="flex max-h-[430px] w-full max-w-md flex-col overflow-hidden rounded-xl border border-white/10 bg-white shadow-2xl">
-        <div className="flex items-start justify-between border-b border-gray-200 px-4 py-3">
+    <div className="fixed inset-0 z-[210] flex items-center justify-center bg-black/40 px-4 backdrop-blur-[2px]">
+      <form onSubmit={submit} className="flex max-h-[480px] w-full max-w-md flex-col overflow-hidden rounded-xl border border-white/15 bg-white/95 shadow-2xl backdrop-blur-md dark:bg-gray-900/95">
+        <div className="flex items-start justify-between border-b border-gray-200/60 px-4 py-3 dark:border-white/10">
           <div>
-            <h2 className="text-sm font-semibold text-gray-900">
+            <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
               {isPerson ? "Create Person Profile" : "Create Group"}
             </h2>
-            <p className="mt-1 text-xs text-gray-500">
-              {isPerson ? "Add a canonical person record to People." : "Add a canonical People group."}
+            <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+              {isPerson ? "Add a person record to People." : "Add a People group."}
             </p>
           </div>
           <button
             type="button"
             onClick={onClose}
             disabled={isSubmitting}
-            className="rounded p-1 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 disabled:opacity-50"
+            className="rounded p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700 disabled:opacity-50 dark:hover:bg-white/10 dark:hover:text-gray-200"
             aria-label="Close create dialog"
           >
             <X className="h-4 w-4" />
@@ -148,7 +148,7 @@ export function PeopleCreateDialog({
               value={name}
               onChange={(event) => setName(event.target.value)}
               placeholder={isPerson ? "Bob Smith" : "Friends"}
-              className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition-colors placeholder:text-gray-500 focus:border-gold-primary/60"
+              className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition-colors placeholder:text-gray-400 focus:border-gold-primary/60 dark:border-white/10 dark:bg-white/5 dark:text-gray-100 dark:placeholder:text-gray-600"
             />
           </label>
 
@@ -165,7 +165,7 @@ export function PeopleCreateDialog({
                   onChange={(event) => setEmail(event.target.value)}
                   placeholder="Optional"
                   type="email"
-                  className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition-colors placeholder:text-gray-500 focus:border-gold-primary/60"
+                  className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition-colors placeholder:text-gray-400 focus:border-gold-primary/60 dark:border-white/10 dark:bg-white/5 dark:text-gray-100 dark:placeholder:text-gray-600"
                 />
               </label>
               <label className="block">
@@ -174,7 +174,7 @@ export function PeopleCreateDialog({
                   value={phone}
                   onChange={(event) => setPhone(event.target.value)}
                   placeholder="Optional"
-                  className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition-colors placeholder:text-gray-500 focus:border-gold-primary/60"
+                  className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition-colors placeholder:text-gray-400 focus:border-gold-primary/60 dark:border-white/10 dark:bg-white/5 dark:text-gray-100 dark:placeholder:text-gray-600"
                 />
               </label>
               <TextField label="Avatar URL" value={avatarUrl} onChange={setAvatarUrl} placeholder="Optional" />
@@ -210,20 +210,20 @@ export function PeopleCreateDialog({
           ) : null}
         </div>
 
-        <div className="flex items-center justify-end border-t border-gray-200 px-4 py-3">
+        <div className="flex items-center justify-end border-t border-gray-200/60 px-4 py-3 dark:border-white/10">
           <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={onClose}
               disabled={isSubmitting}
-              className="rounded-lg px-3 py-1.5 text-sm text-gray-600 transition-colors hover:bg-gray-100 disabled:opacity-50"
+              className="rounded-lg px-3 py-1.5 text-sm text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 disabled:opacity-50 dark:text-gray-400 dark:hover:bg-white/10"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={!name.trim() || isSubmitting}
-              className="whitespace-nowrap rounded-lg bg-gray-900 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
+              className="whitespace-nowrap rounded-lg bg-gray-900 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-200"
             >
               {isSubmitting ? "Creating..." : isPerson ? "Create Person" : "Create Group"}
             </button>
@@ -247,12 +247,12 @@ function TextField({
 }) {
   return (
     <label className="block">
-      <span className="mb-1 block text-xs font-medium text-gray-700">{label}</span>
+      <span className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">{label}</span>
       <input
         value={value}
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
-        className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition-colors placeholder:text-gray-500 focus:border-gold-primary/60"
+        className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition-colors placeholder:text-gray-400 focus:border-gold-primary/60 dark:border-white/10 dark:bg-white/5 dark:text-gray-100 dark:placeholder:text-gray-600"
       />
     </label>
   );

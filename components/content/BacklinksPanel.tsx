@@ -34,6 +34,15 @@ interface BacklinksPanelProps {
   contentId?: string | null;
 }
 
+function isOfflineLikeError(value: unknown) {
+  const message = value instanceof Error ? value.message : String(value);
+  return (
+    (typeof navigator !== "undefined" && !navigator.onLine) ||
+    message.includes("Can't reach database server") ||
+    message.includes("Failed to fetch")
+  );
+}
+
 export function BacklinksPanel({ contentId }: BacklinksPanelProps) {
   const setSelectedContentId = useContentStore((state) => state.setSelectedContentId);
   const clearSelection = useContentStore((state) => state.clearSelection);
@@ -57,6 +66,12 @@ export function BacklinksPanel({ contentId }: BacklinksPanelProps) {
     }
 
     const fetchBacklinks = async () => {
+      if (typeof navigator !== "undefined" && !navigator.onLine) {
+        setError("Backlinks are unavailable while offline.");
+        setIsLoading(false);
+        return;
+      }
+
       setIsLoading(true);
       setError(null);
 
@@ -64,8 +79,6 @@ export function BacklinksPanel({ contentId }: BacklinksPanelProps) {
         const response = await fetch(`/api/content/backlinks/${contentId}`, {
           credentials: "include",
         });
-
-        console.log('[BacklinksPanel] Response status:', response.status);
 
         if (!response.ok) {
           // Handle 404: Note not found (likely deleted)
@@ -77,12 +90,10 @@ export function BacklinksPanel({ contentId }: BacklinksPanelProps) {
           }
 
           const errorText = await response.text();
-          console.error('[BacklinksPanel] Error response:', errorText);
           throw new Error(`HTTP ${response.status}: ${errorText}`);
         }
 
         const result = await response.json();
-        console.log('[BacklinksPanel] Result:', result);
 
         if (!result.success) {
           throw new Error(result.error?.message || "Failed to fetch backlinks");
@@ -90,8 +101,12 @@ export function BacklinksPanel({ contentId }: BacklinksPanelProps) {
 
         setBacklinks(result.data);
       } catch (err) {
-        console.error("[BacklinksPanel] Failed to fetch backlinks:", err);
-        setError(err instanceof Error ? err.message : "Failed to load backlinks");
+        if (isOfflineLikeError(err)) {
+          setError("Backlinks are unavailable while offline.");
+        } else {
+          console.error("[BacklinksPanel] Failed to fetch backlinks:", err);
+          setError(err instanceof Error ? err.message : "Failed to load backlinks");
+        }
       } finally {
         setIsLoading(false);
       }

@@ -1,9 +1,9 @@
 ---
 status: planned
-last_updated: 2026-04-07
+last_updated: 2026-04-12
 start_sprint: 58
-worktree: /Users/davidvalentine/Documents/Digital-Garden/.worktrees/epoch-13-people-collab
-branch: codex/epoch-13-people-collab
+worktree: /Users/davidvalentine/Documents/Digital-Garden/.worktrees/epoch-13-hocuspocus-collab
+branch: codex/epoch-13-hocuspocus-collab
 base_pr: 22
 base_merge_commit: 2acc6d9b9fc8bad4a8e7e634f865c19607b0e0ce
 ---
@@ -62,6 +62,18 @@ Build the People system and safe collaboration foundations without destabilizing
 - Public `/share` access is view-only for non-users in v1.
 - Add same-repo Hocuspocus service and Yjs persistence after the People tree guardrails are in place.
 - Prevent legacy REST autosave from racing Hocuspocus/Yjs once a note is collaboration-enabled.
+
+## Collaboration Schema Hardening
+
+- Use one server-safe collaboration schema path for all JSON to Yjs and Yjs to JSON conversion.
+- Server-safe editor extension registration must stay separate from client runtime registration; server code must not import React components or browser-only editor modules to discover schema.
+- Every TipTap `Node.create` and `Mark.create` under core editor extensions and built-in extension editor modules must have collaboration server coverage.
+- Run `pnpm collab:schema:check` after adding or changing any TipTap node, mark, extension block, or built-in extension `editorClientExtensions`/`editorServerExtensions` declaration.
+- Collaboration bootstrap order is: create `Y.Doc`, attach IndexedDB, wait for local persistence, load canonical Yjs state if present and meaningful, otherwise seed from saved TipTap JSON, then attach the editor only after bootstrap is ready.
+- If schema conversion fails, the editor must remain read-only on the saved snapshot. It must not mount an editable blank collaborative document.
+- Empty canonical Yjs state must never overwrite meaningful saved JSON. Meaningful content includes text, marks, atom nodes, extension blocks, media, mentions, tags, dividers, calendars, and other non-structural nodes.
+- Hocuspocus persistence must refuse to store an empty default field over existing meaningful note content.
+- Destroying or demoting the Hocuspocus provider must never destroy the `Y.Doc`, clear IndexedDB, or remount the editor from a payload snapshot.
 
 ## Mentions
 

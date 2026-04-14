@@ -441,9 +441,9 @@ export const Tabs = Node.create({
         if (!button) return false;
         dom.setAttribute("data-keyboard-tab-mode", "tab");
         dom.setAttribute("data-keyboard-tab-index", String(index));
-        requestAnimationFrame(() => {
-          button.focus({ preventScroll: true });
-        });
+        // Focus synchronously — rAF was causing a window where PM's updateState
+        // could land focus elsewhere before the frame fired, breaking tab walking.
+        button.focus({ preventScroll: true });
         return true;
       }
 
@@ -755,6 +755,16 @@ export const Tabs = Node.create({
           currentNode,
           e.key === "ArrowUp" ? "before" : "after"
         );
+      });
+
+      // Clear keyboard-tab-mode when focus moves outside this tabs block entirely.
+      // Without this, clicking away leaves the mode attribute set and the global
+      // capture listener below intercepts arrow keys anywhere in the document.
+      dom.addEventListener("focusout", (e) => {
+        const related = e.relatedTarget as EventTarget | null;
+        if (!related || !dom.contains(related as globalThis.Node)) {
+          clearKeyboardTabSurface();
+        }
       });
 
       const handleDocumentKeyDown = (event: KeyboardEvent) => {

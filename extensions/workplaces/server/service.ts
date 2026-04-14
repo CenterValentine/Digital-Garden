@@ -12,6 +12,7 @@ import type {
   ContentWorkspaceResponse,
   WorkspaceOpenIntentResponse,
   WorkspacePaneId,
+  WorkspacePaneSnapshot,
   WorkspaceStatePayload,
   WorkspacePaneStatePayload,
 } from "./types";
@@ -72,6 +73,88 @@ function normalizeWorkspaceState(workspace: ContentWorkspace): WorkspaceStatePay
       ...emptyPaneState(),
       ...(rawPaneState.paneTabContentIds ?? {}),
     },
+  };
+}
+
+function normalizeWorkspaceStatePayload(value: unknown): WorkspaceStatePayload {
+  const rawState =
+    value && typeof value === "object" && !Array.isArray(value)
+      ? (value as Partial<WorkspaceStatePayload>)
+      : {};
+  const rawPaneState =
+    rawState.paneTabContentIds &&
+    typeof rawState.paneTabContentIds === "object" &&
+    !Array.isArray(rawState.paneTabContentIds)
+      ? rawState.paneTabContentIds
+      : {};
+  const paneTabContentIds: WorkspacePaneStatePayload = {};
+
+  for (const paneId of WORKSPACE_PANE_IDS) {
+    const rawPane = rawPaneState[paneId];
+    const pane: Partial<WorkspacePaneSnapshot> =
+      rawPane && typeof rawPane === "object" && !Array.isArray(rawPane)
+        ? (rawPane as Partial<WorkspacePaneSnapshot>)
+        : {};
+    const contentIds = Array.isArray(pane.contentIds)
+      ? Array.from(
+          new Set(
+            pane.contentIds.filter(
+              (contentId): contentId is string => typeof contentId === "string"
+            )
+          )
+        )
+      : [];
+
+    paneTabContentIds[paneId] = {
+      contentIds,
+      activeContentId:
+        typeof pane.activeContentId === "string" ? pane.activeContentId : null,
+    };
+  }
+
+  return {
+    layoutMode:
+      rawState.layoutMode === "dual-vertical" ||
+      rawState.layoutMode === "dual-horizontal" ||
+      rawState.layoutMode === "quad"
+        ? rawState.layoutMode
+        : DEFAULT_LAYOUT_MODE,
+    activePaneId: normalizePaneId(rawState.activePaneId),
+    activeContentId:
+      typeof rawState.activeContentId === "string" ? rawState.activeContentId : null,
+    paneTabContentIds,
+  };
+}
+
+function filterWorkspaceStateToContentIds(
+  state: WorkspaceStatePayload,
+  allowedContentIds: Set<string>
+): WorkspaceStatePayload {
+  const paneTabContentIds: WorkspacePaneStatePayload = {};
+
+  for (const paneId of WORKSPACE_PANE_IDS) {
+    const pane = state.paneTabContentIds[paneId];
+    const contentIds = (pane?.contentIds ?? []).filter((contentId) =>
+      allowedContentIds.has(contentId)
+    );
+    const activeContentId =
+      pane?.activeContentId && allowedContentIds.has(pane.activeContentId)
+        ? pane.activeContentId
+        : contentIds[0] ?? null;
+
+    paneTabContentIds[paneId] = {
+      contentIds,
+      activeContentId,
+    };
+  }
+
+  return {
+    ...state,
+    activeContentId:
+      state.activeContentId && allowedContentIds.has(state.activeContentId)
+        ? state.activeContentId
+        : paneTabContentIds[state.activePaneId]?.activeContentId ?? null,
+    paneTabContentIds,
   };
 }
 
@@ -229,6 +312,9 @@ export async function listWorkspaces(ownerId: string, includeArchived = false) {
     },
     include: {
       items: {
+        where: {
+          content: { ownerId, deletedAt: null },
+        },
         include: {
           content: {
             select: {
@@ -255,6 +341,9 @@ export async function getWorkspace(ownerId: string, workspaceId: string) {
     where: { id: workspaceId, ownerId },
     include: {
       items: {
+        where: {
+          content: { ownerId, deletedAt: null },
+        },
         include: {
           content: {
             select: { id: true, title: true, contentType: true, parentId: true },
@@ -286,6 +375,9 @@ export async function createWorkspace(ownerId: string, name: string) {
     },
     include: {
       items: {
+        where: {
+          content: { ownerId, deletedAt: null },
+        },
         include: {
           content: {
             select: { id: true, title: true, contentType: true, parentId: true },
@@ -308,7 +400,11 @@ export async function duplicateWorkspace(
   const source = await prisma.contentWorkspace.findFirst({
     where: { id: workspaceId, ownerId, status: "active" },
     include: {
-      items: true,
+      items: {
+        where: {
+          content: { ownerId, deletedAt: null },
+        },
+      },
     },
   });
 
@@ -332,6 +428,9 @@ export async function duplicateWorkspace(
       },
       include: {
         items: {
+          where: {
+            content: { ownerId, deletedAt: null },
+          },
           include: {
             content: {
               select: { id: true, title: true, contentType: true, parentId: true },
@@ -359,6 +458,9 @@ export async function duplicateWorkspace(
       where: { id: workspace.id, ownerId },
       include: {
         items: {
+          where: {
+            content: { ownerId, deletedAt: null },
+          },
           include: {
             content: {
               select: { id: true, title: true, contentType: true, parentId: true },
@@ -414,6 +516,9 @@ export async function updateWorkspace(
     data,
     include: {
       items: {
+        where: {
+          content: { ownerId, deletedAt: null },
+        },
         include: {
           content: {
             select: { id: true, title: true, contentType: true, parentId: true },
@@ -491,7 +596,7 @@ function getStateContentIds(state: WorkspaceStatePayload) {
 export async function saveWorkspaceState(
   ownerId: string,
   workspaceId: string,
-  state: WorkspaceStatePayload
+  state: unknown
 ) {
   const workspace = await prisma.contentWorkspace.findFirst({
     where: { id: workspaceId, ownerId, status: "active" },
@@ -499,15 +604,25 @@ export async function saveWorkspaceState(
 
   if (!workspace) return null;
 
-  const contentIds = getStateContentIds(state);
+  const normalizedState = normalizeWorkspaceStatePayload(state);
+  const requestedContentIds = getStateContentIds(normalizedState);
+  const ownedContent = requestedContentIds.length
+    ? await prisma.contentNode.findMany({
+        where: { ownerId, id: { in: requestedContentIds }, deletedAt: null },
+        select: { id: true },
+      })
+    : [];
+  const allowedContentIds = new Set(ownedContent.map((content) => content.id));
+  const filteredState = filterWorkspaceStateToContentIds(normalizedState, allowedContentIds);
+  const contentIds = getStateContentIds(filteredState);
 
   await prisma.$transaction(async (tx) => {
     await tx.contentWorkspace.update({
       where: { id: workspaceId },
       data: {
-        layoutMode: state.layoutMode,
-        activePaneId: state.activePaneId,
-        paneState: state as unknown as Prisma.InputJsonValue,
+        layoutMode: filteredState.layoutMode,
+        activePaneId: filteredState.activePaneId,
+        paneState: filteredState as unknown as Prisma.InputJsonValue,
       },
     });
 
@@ -521,11 +636,6 @@ export async function saveWorkspaceState(
     });
 
     if (contentIds.length === 0) return;
-
-    const ownedContent = await tx.contentNode.findMany({
-      where: { ownerId, id: { in: contentIds }, deletedAt: null },
-      select: { id: true },
-    });
 
     await Promise.all(
       ownedContent.map((content) =>
@@ -630,7 +740,11 @@ export async function resolveOpenIntent(
 ): Promise<WorkspaceOpenIntentResponse> {
   await ensureMainWorkspace(ownerId);
 
-  const [content, currentAssignment] = await Promise.all([
+  const [workspace, content, currentAssignment] = await Promise.all([
+    prisma.contentWorkspace.findFirst({
+      where: { id: workspaceId, ownerId, status: "active" },
+      select: { id: true },
+    }),
     prisma.contentNode.findFirst({
       where: { id: contentId, ownerId, deletedAt: null },
       select: {
@@ -653,6 +767,7 @@ export async function resolveOpenIntent(
     }),
   ]);
 
+  if (!workspace) return { allowed: false, conflict: null };
   if (!content) return { allowed: false, conflict: null };
   if (currentAssignment) return { allowed: true, conflict: null };
 

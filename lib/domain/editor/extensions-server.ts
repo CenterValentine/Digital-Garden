@@ -38,6 +38,10 @@ import { ServerDateInput } from "./extensions/blocks/date-input";
 import { ServerNumberInput } from "./extensions/blocks/number-input";
 import { ServerRatingInput } from "./extensions/blocks/rating-input";
 import { ServerPromptInput } from "./extensions/blocks/prompt-input";
+import { ServerTimestamp } from "./extensions/blocks/timestamp";
+import { ServerPersonMention } from "./extensions/person-mention-server";
+import { ServerTag } from "./extensions/tag-server";
+import { ServerWikiLink } from "./extensions/wiki-link-server";
 import { getExtensionServerEditorExtensions } from "@/lib/extensions/server-registry";
 
 // Create lowlight instance with common languages
@@ -71,6 +75,7 @@ export function getServerExtensions(): Extensions {
         keepMarks: false,
       },
       horizontalRule: {},
+      link: false,
     }),
 
     CodeBlockLowlight.configure({
@@ -142,7 +147,11 @@ export function getServerExtensions(): Extensions {
     ServerNumberInput,
     ServerRatingInput,
     ServerPromptInput,
+    ServerTimestamp,
     ...getExtensionServerEditorExtensions(),
+    ServerTag,
+    ServerWikiLink,
+    ServerPersonMention,
 
     // Note: SlashCommands excluded - it uses React components
   ];

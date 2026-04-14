@@ -12,7 +12,7 @@
 "use client";
 
 import { useEditor, EditorContent } from "@tiptap/react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { getEditorExtensions } from "@/lib/domain/editor/extensions-client";
 import type { JSONContent } from "@tiptap/core";
 import { LinkDialog } from "./LinkDialog";
@@ -25,6 +25,65 @@ import { isImageUrl } from "@/lib/domain/editor/utils/image-url";
 import { useEditorInstanceStore } from "@/state/editor-instance-store";
 import { useSettingsStore } from "@/state/settings-store";
 import { toast } from "sonner";
+import type { HocuspocusProvider } from "@hocuspocus/provider";
+import * as Y from "yjs";
+import type {
+  CollaborationRuntimeHandle,
+  CollaborationUser,
+} from "@/lib/domain/collaboration/runtime";
+
+interface RemoteCollaborator extends CollaborationUser {
+  clientId: number;
+}
+
+interface CollaborationCursorLabel extends RemoteCollaborator {
+  left: number;
+  top: number;
+}
+
+interface EditorImageAttrs {
+  src: string;
+  alt?: string;
+  contentId?: string | null;
+  source?: string;
+  uploading?: boolean;
+}
+
+function remoteCollaboratorsFromProvider(
+  provider: HocuspocusProvider | null,
+  document: Y.Doc | null
+): RemoteCollaborator[] {
+  const states = provider?.awareness?.getStates();
+  if (!states || !document) return [];
+
+  return Array.from(states.entries())
+    .filter(([clientId]) => clientId !== document.clientID)
+    .filter(([, state]) => state.activeSurfaceCount !== 0)
+    .map(([clientId, state]) => {
+      const user = state.user as Partial<CollaborationUser> | undefined;
+      return {
+        clientId,
+        id: user?.id,
+        name: user?.name?.trim() || `Collaborator ${clientId}`,
+        email: user?.email ?? null,
+        color: user?.color || "#c4a15a",
+      };
+    });
+}
+
+function collaboratorsKey(collaborators: RemoteCollaborator[]): string {
+  return collaborators
+    .map((collaborator) => collaborator.clientId)
+    .sort((a, b) => a - b)
+    .join(",");
+}
+
+function cursorLabelsKey(labels: CollaborationCursorLabel[]): string {
+  return labels
+    .map((label) => `${label.clientId}:${Math.round(label.left)}:${Math.round(label.top)}`)
+    .sort()
+    .join("|");
+}
 
 export interface EditorStats {
   /** Word count */
@@ -38,6 +97,8 @@ export interface EditorStats {
 export interface MarkdownEditorProps {
   /** Content ID this editor is bound to — used to prevent cross-document saves */
   contentId?: string;
+  /** Human-readable content title for collaboration warnings */
+  title?: string;
   /** Parent folder ID — used for referenced content (image uploads) placement */
   parentId?: string | null;
   /** Initial content in TipTap JSON format */
@@ -70,6 +131,16 @@ export interface MarkdownEditorProps {
   autoSaveDelay?: number;
   /** Read-only mode */
   editable?: boolean;
+  /** Opt-in Hocuspocus/Yjs collaboration mode. Disabled by default. */
+  collaborationEnabled?: boolean;
+  /** Shared workspace-aware collaboration runtime. The editor never owns runtime infrastructure. */
+  collaborationRuntime?: CollaborationRuntimeHandle | null;
+  /** Callback when collaborative sync state changes */
+  onCollaborationSyncChange?: (sync: {
+    isSaving: boolean;
+    hasUnsavedChanges: boolean;
+    lastSaved?: Date;
+  }) => void;
   /** Compact mode for secondary/embedded editors (less padding, smaller prose) */
   compact?: boolean;
   /** Placeholder text when editor is empty */
@@ -96,14 +167,20 @@ export function MarkdownEditor({
   onPersonMentionClick,
   autoSaveDelay = 2000,
   editable = true,
+  collaborationEnabled = false,
+  collaborationRuntime = null,
+  onCollaborationSyncChange,
   compact = false,
-  placeholder,
   className = "",
 }: MarkdownEditorProps) {
-  const [isSaving, setIsSaving] = useState(false);
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [, setIsSaving] = useState(false);
+  const [, setHasUnsavedChanges] = useState(false);
   const [isLinkDialogOpen, setIsLinkDialogOpen] = useState(false);
+  const [remoteCollaborators, setRemoteCollaborators] = useState<RemoteCollaborator[]>([]);
+  const [cursorLabels, setCursorLabels] = useState<CollaborationCursorLabel[]>([]);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const editorScrollRef = useRef<HTMLDivElement>(null);
+  const appliedEditableRef = useRef<boolean | null>(null);
   // Track the last content we saved so we can distinguish save-echoes
   // (parent updating state after our save) from genuine external updates
   // (navigation, refetch). Prevents cursor-jump-on-autosave bug.
@@ -123,10 +200,133 @@ export function MarkdownEditor({
   // (useEditor doesn't re-apply editorProps on re-renders), so they'd capture a
   // stale version where editor=null. Same pattern as onSaveRef/contentIdRef.
   const insertImageFromFileRef = useRef<(file: File) => void>(() => {});
+  const shouldUseCollaboration =
+    collaborationEnabled && Boolean(contentId) && Boolean(collaborationRuntime);
+  const runtimeYdoc = collaborationRuntime?.ydoc ?? null;
+  const runtimeProvider = collaborationRuntime?.provider ?? null;
+  const runtimeUser = collaborationRuntime?.user ?? null;
+  const runtimePersistenceState = collaborationRuntime?.state.persistenceState ?? null;
+  const runtimeBootstrapState = collaborationRuntime?.state.bootstrapState ?? null;
+  const runtimeReadOnly = collaborationRuntime?.state.readOnly ?? false;
+  const runtimeEditPolicy = collaborationRuntime?.state.editPolicy ?? null;
+  const runtimeConnectionState = collaborationRuntime?.state.connectionState ?? null;
+  const runtimeNetworkState = collaborationRuntime?.state.networkState ?? null;
+  const runtimeLocalDirty = collaborationRuntime?.state.localDirty ?? false;
+  const runtimeUnsyncedUpdateCount = collaborationRuntime?.state.unsyncedUpdateCount ?? 0;
+  const collaborationState = useMemo(
+    () =>
+      shouldUseCollaboration &&
+      runtimeYdoc &&
+      runtimePersistenceState === "localReady" &&
+      runtimeBootstrapState === "ready"
+        ? {
+            document: runtimeYdoc,
+            provider: runtimeProvider,
+            readOnly: runtimeEditPolicy ? !runtimeEditPolicy.editable : runtimeReadOnly,
+            user: runtimeUser ?? {
+              name: "Collaborator",
+              color: "#c4a15a",
+            },
+          }
+        : null,
+    [
+      shouldUseCollaboration,
+      runtimeProvider,
+      runtimeEditPolicy,
+      runtimeBootstrapState,
+      runtimePersistenceState,
+      runtimeReadOnly,
+      runtimeUser,
+      runtimeYdoc,
+    ]
+  );
+  const collaborationWarning = collaborationRuntime?.state.warning ?? null;
+  const collaborationNotice = runtimeEditPolicy?.warning ?? collaborationWarning;
+  const isCollaborationEditBlocked =
+    shouldUseCollaboration && runtimeEditPolicy ? !runtimeEditPolicy.editable : false;
+  const isCollaborationBooting =
+    shouldUseCollaboration && runtimeEditPolicy?.reason === "booting-local-state";
+  const isCollaborationConnecting =
+    runtimeNetworkState !== "offline" &&
+    runtimeEditPolicy?.reason !== "offline-local-durable" &&
+    (runtimeConnectionState === "promoting" || runtimeConnectionState === "connecting");
+  const effectiveEditable =
+    editable &&
+    (!shouldUseCollaboration || Boolean(runtimeEditPolicy?.editable));
+  const shouldSkipRestAutosaveForCollaboration =
+    shouldUseCollaboration &&
+    (runtimeNetworkState === "offline" ||
+      runtimeConnectionState === "disconnectedButDirty" ||
+      runtimeEditPolicy?.reason === "offline-local-durable");
+
+  useEffect(() => {
+    if (!collaborationState) {
+      setRemoteCollaborators((current) => (current.length === 0 ? current : []));
+      setCursorLabels((current) => (current.length === 0 ? current : []));
+      return;
+    }
+
+    const syncRemoteCollaborators = () => {
+      const nextCollaborators = remoteCollaboratorsFromProvider(
+        collaborationState.provider,
+        collaborationState.document
+      );
+      setRemoteCollaborators((current) =>
+        collaboratorsKey(current) === collaboratorsKey(nextCollaborators)
+          ? current
+          : nextCollaborators
+      );
+    };
+
+    syncRemoteCollaborators();
+    const presenceInterval = setInterval(syncRemoteCollaborators, 1000);
+    return () => {
+      clearInterval(presenceInterval);
+      setRemoteCollaborators((current) => (current.length === 0 ? current : []));
+      setCursorLabels((current) => (current.length === 0 ? current : []));
+    };
+  }, [collaborationState]);
+
+  useEffect(() => {
+    if (!collaborationRuntime || !onCollaborationSyncChange) return;
+    const isSaving =
+      runtimeConnectionState === "promoting" ||
+      runtimeConnectionState === "connecting" ||
+      runtimeUnsyncedUpdateCount > 0;
+    const hasUnsavedChanges =
+      runtimeLocalDirty ||
+      runtimeUnsyncedUpdateCount > 0 ||
+      runtimeConnectionState === "disconnectedButDirty";
+
+    onCollaborationSyncChange({
+      isSaving,
+      hasUnsavedChanges,
+      ...(!hasUnsavedChanges && runtimeConnectionState === "synced"
+        ? { lastSaved: new Date() }
+        : {}),
+    });
+  }, [
+    collaborationRuntime,
+    runtimeConnectionState,
+    runtimeLocalDirty,
+    runtimeUnsyncedUpdateCount,
+    onCollaborationSyncChange,
+  ]);
 
   // Initialize editor
   const editor = useEditor({
     extensions: getEditorExtensions({
+      collaboration: collaborationState
+        ? {
+            document: collaborationState.document,
+            provider: collaborationState.provider,
+            field: "default",
+            user: {
+              name: collaborationState.user.name,
+              color: collaborationState.user.color,
+            },
+          }
+        : undefined,
       onWikiLinkClick,
       fetchNotesForWikiLink,
       onTagClick,
@@ -136,8 +336,8 @@ export function MarkdownEditor({
       fetchPeopleMentions,
       onPersonMentionClick,
     }),
-    content,
-    editable,
+    content: collaborationState ? undefined : content,
+    editable: effectiveEditable,
     immediatelyRender: false, // Prevent SSR hydration mismatch
     editorProps: {
       attributes: {
@@ -242,6 +442,10 @@ export function MarkdownEditor({
         clearTimeout(saveTimeoutRef.current);
       }
 
+      if (collaborationState?.provider || shouldSkipRestAutosaveForCollaboration) {
+        return;
+      }
+
       // Schedule auto-save.
       // IMPORTANT: Snapshot the save callback AND contentId at the moment the
       // edit happens. This prevents the race condition where the user navigates
@@ -274,7 +478,96 @@ export function MarkdownEditor({
         }, autoSaveDelay);
       }
     },
-  });
+  }, [collaborationState, effectiveEditable, shouldSkipRestAutosaveForCollaboration]);
+
+  useEffect(() => {
+    if (!editor) return;
+    if (
+      appliedEditableRef.current === effectiveEditable &&
+      editor.isEditable === effectiveEditable
+    ) {
+      return;
+    }
+    appliedEditableRef.current = effectiveEditable;
+    if (editor.isEditable !== effectiveEditable) {
+      editor.setEditable(effectiveEditable);
+    }
+  }, [editor, effectiveEditable]);
+
+  const refreshCursorLabels = useCallback(() => {
+    const container = editorScrollRef.current;
+    if (!container || remoteCollaborators.length === 0) {
+      setCursorLabels((current) => (current.length === 0 ? current : []));
+      return;
+    }
+
+    const containerRect = container.getBoundingClientRect();
+    const nextLabels = remoteCollaborators.flatMap((collaborator) => {
+      const caret = container.querySelector<HTMLElement>(
+        `[data-collaboration-client-id="${collaborator.clientId}"]`
+      );
+      if (!caret) return [];
+
+      const caretRect = caret.getBoundingClientRect();
+      return [
+        {
+          ...collaborator,
+          left: caretRect.left - containerRect.left + container.scrollLeft,
+          top: caretRect.top - containerRect.top + container.scrollTop,
+        },
+      ];
+    });
+
+    setCursorLabels((current) =>
+      cursorLabelsKey(current) === cursorLabelsKey(nextLabels) ? current : nextLabels
+    );
+  }, [remoteCollaborators]);
+
+  useEffect(() => {
+    if (!collaborationState || !editor) {
+      setCursorLabels([]);
+      return;
+    }
+
+    const container = editorScrollRef.current;
+    if (!container) return;
+
+    let frame: number | null = null;
+    const scheduleRefresh = () => {
+      if (frame !== null) {
+        window.cancelAnimationFrame(frame);
+      }
+      frame = window.requestAnimationFrame(() => {
+        frame = null;
+        refreshCursorLabels();
+      });
+    };
+
+    scheduleRefresh();
+    const prosemirror = container.querySelector(".ProseMirror");
+    const observer = new MutationObserver(scheduleRefresh);
+    if (prosemirror) {
+      observer.observe(prosemirror, {
+        attributes: true,
+        childList: true,
+        subtree: true,
+      });
+    }
+
+    container.addEventListener("scroll", scheduleRefresh, { passive: true });
+    window.addEventListener("resize", scheduleRefresh);
+    const interval = window.setInterval(scheduleRefresh, 500);
+
+    return () => {
+      if (frame !== null) {
+        window.cancelAnimationFrame(frame);
+      }
+      observer.disconnect();
+      container.removeEventListener("scroll", scheduleRefresh);
+      window.removeEventListener("resize", scheduleRefresh);
+      window.clearInterval(interval);
+    };
+  }, [collaborationState, editor, refreshCursorLabels]);
 
   // Sync editor content when the prop changes from an EXTERNAL source
   // (navigation to a different note, refetch after rename).
@@ -283,6 +576,7 @@ export function MarkdownEditor({
   // any content the user typed during the save round-trip.
   useEffect(() => {
     if (!editor || !content) return;
+    if (collaborationState) return;
 
     // If this content matches what we just saved, it's a save-echo — skip it
     if (content === lastSavedContentRef.current) {
@@ -292,7 +586,7 @@ export function MarkdownEditor({
 
     // Genuine external update — apply it
     editor.commands.setContent(content);
-  }, [content, editor]);
+  }, [collaborationState, content, editor]);
 
   // Initial stats update when editor is created
   useEffect(() => {
@@ -393,7 +687,7 @@ export function MarkdownEditor({
           alt: alt || "AI generated image",
           contentId: imgContentId || null,
           source: source || "ai-generated",
-        } as any)
+        } as EditorImageAttrs)
         .run();
     };
 
@@ -420,7 +714,7 @@ export function MarkdownEditor({
           alt: file.name,
           uploading: true,
           source: "user-uploaded",
-        } as any)
+        } as EditorImageAttrs)
         .run();
 
       // Upload in the background
@@ -488,6 +782,28 @@ export function MarkdownEditor({
 
   return (
     <div className={`flex flex-col h-full ${className} ${showAiHighlight ? "" : "ai-highlight-hidden"}`}>
+      {collaborationEnabled && collaborationNotice && !isCollaborationBooting ? (
+        <div
+          className={
+            isCollaborationEditBlocked
+              ? "border-b border-red-500/20 bg-red-500/10 px-4 py-2 text-sm text-red-700"
+              : "border-b border-amber-500/20 bg-amber-500/10 px-4 py-2 text-sm text-amber-800"
+          }
+        >
+          {isCollaborationEditBlocked ? "Editing blocked" : "Collaboration notice"}:{" "}
+          {collaborationNotice}
+        </div>
+      ) : null}
+      {isCollaborationBooting ? (
+        <div className="border-b border-amber-500/20 bg-amber-500/10 px-4 py-2 text-sm text-amber-700">
+          Loading local collaborative state...
+        </div>
+      ) : null}
+      {isCollaborationConnecting ? (
+        <div className="border-b border-amber-500/20 bg-amber-500/10 px-4 py-2 text-sm text-amber-700">
+          Connecting collaborative editor...
+        </div>
+      ) : null}
       {/* Sprint 37: Hidden file input for image upload */}
       <input
         ref={fileInputRef}
@@ -502,7 +818,8 @@ export function MarkdownEditor({
           may not fire 'drop' on the contenteditable). React handlers on the wrapper
           catch drops reliably regardless of where they land in the editor area. */}
       <div
-        className="flex-1 overflow-y-auto"
+        ref={editorScrollRef}
+        className="relative flex-1 overflow-y-auto"
         onDragOver={(e) => {
           if (
             e.dataTransfer.types.includes("Files") ||
@@ -557,7 +874,7 @@ export function MarkdownEditor({
                 editor
                   .chain()
                   .focus()
-                  .setImage(imageAttrs as any)
+                  .setImage(imageAttrs as EditorImageAttrs)
                   .run();
               }
             } catch (err) {
@@ -578,6 +895,23 @@ export function MarkdownEditor({
         }}
       >
         <EditorContent editor={editor} />
+        {cursorLabels.length > 0 ? (
+          <div className="pointer-events-none absolute inset-0 z-30">
+            {cursorLabels.map((label) => (
+              <div
+                key={label.clientId}
+                className="dg-collaboration-caret-floating-label"
+                style={{
+                  "--collaborator-color": label.color,
+                  left: label.left + 8,
+                  top: Math.max(label.top - 28, 4),
+                } as CSSProperties}
+              >
+                {label.name}
+              </div>
+            ))}
+          </div>
+        ) : null}
       </div>
 
       {/* Bubble Menu - floating toolbar on text selection */}

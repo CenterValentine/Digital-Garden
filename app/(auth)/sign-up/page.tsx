@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, FormEvent } from 'react'
+import { useState, type FormEvent, type MouseEvent } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import type {
@@ -8,6 +8,16 @@ import type {
   ApiResponse,
   SessionData,
 } from '@/lib/infrastructure/auth/types'
+
+function safeRedirectPath(value: string | null): string {
+  if (!value || !value.startsWith('/') || value.startsWith('//')) return '/content'
+  return value
+}
+
+function getRedirectPathFromLocation(): string {
+  if (typeof window === 'undefined') return '/content'
+  return safeRedirectPath(new URLSearchParams(window.location.search).get('redirect'))
+}
 
 export default function SignUpPage() {
   const router = useRouter()
@@ -54,17 +64,23 @@ export default function SignUpPage() {
         return
       }
 
-      // Redirect to home page
-      router.push('/')
+      router.push(getRedirectPathFromLocation())
       router.refresh()
-    } catch (err) {
+    } catch {
       setError('An unexpected error occurred')
       setIsLoading(false)
     }
   }
 
   const handleGoogleSignUp = () => {
-    window.location.href = '/api/auth/google'
+    const redirectTo = getRedirectPathFromLocation()
+    window.location.href = `/api/auth/google?redirect=${encodeURIComponent(redirectTo)}`
+  }
+
+  const handleExistingAccount = (event: MouseEvent<HTMLAnchorElement>) => {
+    event.preventDefault()
+    const redirectTo = getRedirectPathFromLocation()
+    router.push(`/sign-in?redirect=${encodeURIComponent(redirectTo)}`)
   }
 
   return (
@@ -78,6 +94,7 @@ export default function SignUpPage() {
             Or{' '}
             <Link
               href="/sign-in"
+              onClick={handleExistingAccount}
               className="font-medium text-indigo-600 hover:text-indigo-500"
             >
               sign in to your existing account
@@ -198,4 +215,3 @@ export default function SignUpPage() {
     </div>
   )
 }
-
