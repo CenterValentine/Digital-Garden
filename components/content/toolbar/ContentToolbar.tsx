@@ -31,7 +31,7 @@ export function ContentToolbar() {
 
   return (
     <div
-      className="sticky top-0 z-20 flex min-h-11 shrink-0 items-center gap-1 overflow-x-auto border-b border-border bg-background/95 px-3 py-1.5 shadow-[0_1px_0_rgba(15,23,42,0.04)] backdrop-blur"
+      className="flex min-h-11 shrink-0 items-center gap-1 overflow-x-auto bg-background/95 px-3 py-1.5 backdrop-blur"
       role="toolbar"
       aria-label="Content actions"
     >

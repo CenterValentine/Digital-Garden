@@ -8,7 +8,7 @@
 
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Allotment } from "allotment";
 import "allotment/dist/style.css";
 import { usePanelStore } from "@/state/panel-store";
@@ -17,6 +17,7 @@ import { useLeftPanelCollapseStore } from "@/state/left-panel-collapse-store";
 import { useRightPanelCollapseStore } from "@/state/right-panel-collapse-store";
 import { ContextMenu } from "./context-menu/ContextMenu";
 import { fileTreeActionProvider } from "./context-menu/file-tree-actions";
+import { editorActionProvider } from "./context-menu/editor-actions";
 
 interface ResizablePanelsProps {
   children: [
@@ -42,6 +43,19 @@ export function ResizablePanels({ children }: ResizablePanelsProps) {
   const { isCollapsed: isRightPanelCollapsed } = useRightPanelCollapseStore();
 
   const [isMounted, setIsMounted] = useState(false);
+
+  // Track panel mode changes to enable CSS transitions only during toggle,
+  // not during drag (which would make dragging feel laggy).
+  const [isPanelTransitioning, setIsPanelTransitioning] = useState(false);
+  const prevPanelMode = useRef(panelMode);
+  useEffect(() => {
+    if (prevPanelMode.current !== panelMode) {
+      prevPanelMode.current = panelMode;
+      setIsPanelTransitioning(true);
+      const timer = setTimeout(() => setIsPanelTransitioning(false), 280);
+      return () => clearTimeout(timer);
+    }
+  }, [panelMode]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -94,6 +108,10 @@ export function ResizablePanels({ children }: ResizablePanelsProps) {
 
   return (
     <>
+    <div
+      className="contents"
+      data-panel-transitioning={isPanelTransitioning || undefined}
+    >
     <Allotment
       onDragEnd={(sizes) => {
         if (!isMounted) return;
@@ -141,11 +159,13 @@ export function ResizablePanels({ children }: ResizablePanelsProps) {
         </Allotment>
       </Allotment.Pane>
     </Allotment>
+    </div>
 
     {/* Global context menu */}
     <ContextMenu
       actionProviders={{
         "file-tree": fileTreeActionProvider,
+        "main-editor": editorActionProvider,
       }}
     />
   </>

@@ -2,6 +2,11 @@
 @import "../dist/variables.css";
 @import "tippy.js/dist/tippy.css";
 
+/* Exclude git worktrees from Tailwind v4 automatic source scanning.
+   Without this, @tailwindcss/postcss traverses .worktrees/** and times out
+   reading files from nested worktree checkouts (e.g. public/site.webmanifest). */
+@source not "../.worktrees/**/*";
+
 @custom-variant dark (&:is(.dark *));
 
 /* Hide default navbar on notes routes (uses its own NotesNavBar) */
@@ -2593,4 +2598,30 @@ mark {
 
 .ProseMirror .dg-collaboration-selection {
   border-radius: 0.12rem;
+}
+
+/* ─── Allotment sash overrides ─────────────────────────────────────────── */
+
+/* Vertical sash visibility: the ::before indicator is transparent at rest, blue
+   on hover — no additional override needed. Tab headers use z-40 to sit above
+   the sash (z-35), so tab close buttons remain clickable even when the sash
+   occupies the same horizontal region. */
+
+/* ─── Panel collapse/expand transition ──────────────────────────────────── */
+
+/* Only animate allotment pane positions during programmatic toggle events,
+   not during drag (which would add 200ms lag per mousemove). ResizablePanels
+   adds data-panel-transitioning for ~250ms on toggle, then removes it. */
+[data-panel-transitioning] .allotment-module_splitViewView__MGZ6O {
+  transition: left 0.22s ease-out, width 0.22s ease-out;
+}
+
+/* ─── Scrollbar utility ─────────────────────────────────────────────────── */
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }

@@ -7,7 +7,7 @@
 
 "use client";
 
-import { createElement, useState, useCallback, useEffect } from "react";
+import { createElement, useState, useCallback, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { LeftSidebarHeader } from "./headers/LeftSidebarHeader";
 import { LeftSidebarContent } from "./content/LeftSidebarContent";
@@ -23,6 +23,22 @@ import { useExtensionLeftSidebarPanel } from "@/lib/extensions/client-registry";
 export function LeftSidebar() {
   const { mode } = useLeftPanelCollapseStore();
   const { activeView } = useLeftPanelViewStore();
+
+  // Delay content switch on collapse so the panel width can animate before
+  // the content snaps to the icon bar. On expand, show full content immediately.
+  const [displayMode, setDisplayMode] = useState(mode);
+  const collapseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (collapseTimerRef.current) clearTimeout(collapseTimerRef.current);
+    if (mode === "hidden") {
+      collapseTimerRef.current = setTimeout(() => setDisplayMode("hidden"), 200);
+    } else {
+      setDisplayMode("full");
+    }
+    return () => {
+      if (collapseTimerRef.current) clearTimeout(collapseTimerRef.current);
+    };
+  }, [mode]);
   const ExtensionPanel = useExtensionLeftSidebarPanel(activeView);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [createTrigger, setCreateTrigger] = useState<{
@@ -195,7 +211,7 @@ export function LeftSidebar() {
   }, []);
 
   // If panel is in hidden mode, show only the collapsed icon bar
-  if (mode === "hidden") {
+  if (displayMode === "hidden") {
     return <LeftSidebarCollapsed />;
   }
 

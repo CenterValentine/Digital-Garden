@@ -61,8 +61,8 @@ export function LeftSidebarHeader({
   const extensionNavItems = useExtensionNavItems();
 
   return (
-    <div className="flex h-12 shrink-0 items-center justify-between border-b border-white/10 px-4">
-      <div className="flex items-center gap-1">
+    <div className="flex h-12 shrink-0 items-center border-b border-white/10 px-2 gap-1">
+      <div className="scrollbar-hide flex min-w-0 flex-1 items-center gap-1 overflow-x-auto">
         {/* Files icon button - always visible, active when files view is open */}
         <button
           onClick={() => {
@@ -157,8 +157,8 @@ export function LeftSidebarHeader({
         })}
       </div>
 
-      {/* Right side: Actions + Toggle */}
-      <div className="flex items-center gap-1">
+      {/* Right side: Actions + Toggle — must never be clipped */}
+      <div className="flex shrink-0 items-center gap-1">
         <LeftSidebarHeaderActions
           onCreateFolder={onCreateFolder ? () => onCreateFolder() : undefined}
           onCreateNote={onCreateNote ? () => onCreateNote() : undefined}

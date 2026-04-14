@@ -17,6 +17,8 @@ import { getEditorExtensions } from "@/lib/domain/editor/extensions-client";
 import type { JSONContent } from "@tiptap/core";
 import { LinkDialog } from "./LinkDialog";
 import { BubbleMenu } from "./BubbleMenu";
+import { TemplatePicker } from "./TemplatePicker";
+import { SnippetPicker } from "./SnippetPicker";
 import { TableBubbleMenu } from "./TableBubbleMenu";
 import { ImageBubbleMenu } from "./ImageBubbleMenu";
 import { extractOutline, type OutlineHeading } from "@/lib/domain/content/outline-extractor";
@@ -24,6 +26,9 @@ import { uploadImage } from "@/lib/domain/editor/hooks/use-image-upload";
 import { isImageUrl } from "@/lib/domain/editor/utils/image-url";
 import { useEditorInstanceStore } from "@/state/editor-instance-store";
 import { useSettingsStore } from "@/state/settings-store";
+import { useContextMenuStore } from "@/state/context-menu-store";
+import { useTemplateStore } from "@/state/template-store";
+import { useSnippetStore } from "@/state/snippet-store";
 import { toast } from "sonner";
 import type { HocuspocusProvider } from "@hocuspocus/provider";
 import * as Y from "yjs";
@@ -173,6 +178,15 @@ export function MarkdownEditor({
   compact = false,
   className = "",
 }: MarkdownEditorProps) {
+  const openMenu = useContextMenuStore((s) => s.openMenu);
+
+  // Pre-load template/snippet data so right-click context menu has categories ready
+  useEffect(() => {
+    useTemplateStore.getState().fetchCategories();
+    useTemplateStore.getState().fetchTemplates();
+    useSnippetStore.getState().fetchCategories();
+    useSnippetStore.getState().fetchSnippets();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const [, setIsSaving] = useState(false);
   const [, setHasUnsavedChanges] = useState(false);
   const [isLinkDialogOpen, setIsLinkDialogOpen] = useState(false);
@@ -838,6 +852,20 @@ export function MarkdownEditor({
             e.dataTransfer.dropEffect = "copy";
           }
         }}
+        onContextMenu={(e) => {
+          // Allow the browser's native context menu when the dev "Inspect Element" action re-fires it
+          if ((window as any).__passNativeContextMenu) {
+            (window as any).__passNativeContextMenu = false;
+            return;
+          }
+          e.preventDefault();
+          const hasSelection = editor ? !editor.state.selection.empty : false;
+          openMenu(
+            "main-editor",
+            { x: e.clientX, y: e.clientY },
+            { hasSelection, contextTarget: e.target, contextX: e.clientX, contextY: e.clientY }
+          );
+        }}
         onDrop={(e) => {
           // Sprint 42: Handle AI image drop from chat
           const aiImageData = e.dataTransfer.getData("application/x-dg-ai-image");
@@ -932,6 +960,10 @@ export function MarkdownEditor({
         open={isLinkDialogOpen}
         onOpenChange={setIsLinkDialogOpen}
       />
+
+      {/* Template / Snippet pickers — event-driven, no props needed */}
+      <TemplatePicker />
+      <SnippetPicker />
     </div>
   );
 }
