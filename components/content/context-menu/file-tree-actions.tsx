@@ -61,6 +61,7 @@ export interface FileTreeContext {
     title: string;
     contentType: string;
     isFolder: boolean;
+    treeNodeKind?: "content" | "peopleGroup" | "person";
     parentId?: string | null;
     includeReferencedContent?: boolean; // Phase 2: Folder setting
     externalUrl?: string; // Phase 2: External link URL
@@ -96,6 +97,7 @@ export interface FileTreeContext {
   /** Phase 2: New content type creators */
   onCreateExternal?: (parentId: string | null) => Promise<void>;
   onCreateChat?: (parentId: string | null) => Promise<void>;
+  onAddPeopleTarget?: (parentId: string | null) => Promise<void>;
   /** Visualization engine-specific creators */
   onCreateVisualizationMermaid?: (parentId: string | null) => Promise<void>;
   onCreateVisualizationExcalidraw?: (parentId: string | null) => Promise<void>;
@@ -145,6 +147,7 @@ export const fileTreeActionProvider: ContextMenuActionProvider = (ctx) => {
     onCreateSpreadsheet,
     onCreateExternal,
     onCreateChat,
+    onAddPeopleTarget,
     onCreateVisualizationMermaid,
     onCreateVisualizationExcalidraw,
     onCreateVisualizationDiagramsNet,
@@ -158,6 +161,7 @@ export const fileTreeActionProvider: ContextMenuActionProvider = (ctx) => {
   const isSingleSelection = selectedIds.length === 1;
   const isMultiSelection = selectedIds.length > 1;
   const isFolder = clickedNode?.isFolder || false;
+  const isPeopleMount = clickedNode?.treeNodeKind === "peopleGroup" || clickedNode?.treeNodeKind === "person";
   const { layoutMode, openContentInPane } = useContentStore.getState();
   const visiblePaneIds = new Set(getVisiblePaneIds(layoutMode));
 
@@ -185,29 +189,30 @@ export const fileTreeActionProvider: ContextMenuActionProvider = (ctx) => {
     const callbacks: NewContentCallbacks = {
       onCreateNote,
       onCreateFolder,
-      onCreateFile,
-      onCreateCode,
-      onCreateHtml,
-      onCreateDocument,
-      onCreateSpreadsheet,
-      onCreateExternal,
-      onCreateChat,
-      onCreateVisualizationMermaid,
-      onCreateVisualizationExcalidraw,
-      onCreateVisualizationDiagramsNet,
-      onCreateData,
-      onCreateHope,
-      onCreateWorkflow,
+      onCreateFile: isPeopleMount ? undefined : onCreateFile,
+      onCreateCode: isPeopleMount ? undefined : onCreateCode,
+      onCreateHtml: isPeopleMount ? undefined : onCreateHtml,
+      onCreateDocument: isPeopleMount ? undefined : onCreateDocument,
+      onCreateSpreadsheet: isPeopleMount ? undefined : onCreateSpreadsheet,
+      onCreateExternal: isPeopleMount ? undefined : onCreateExternal,
+      onCreateChat: isPeopleMount ? undefined : onCreateChat,
+      onAddPeopleTarget: isPeopleMount ? undefined : onAddPeopleTarget,
+      onCreateVisualizationMermaid: isPeopleMount ? undefined : onCreateVisualizationMermaid,
+      onCreateVisualizationExcalidraw: isPeopleMount ? undefined : onCreateVisualizationExcalidraw,
+      onCreateVisualizationDiagramsNet: isPeopleMount ? undefined : onCreateVisualizationDiagramsNet,
+      onCreateData: isPeopleMount ? undefined : onCreateData,
+      onCreateHope: isPeopleMount ? undefined : onCreateHope,
+      onCreateWorkflow: isPeopleMount ? undefined : onCreateWorkflow,
     };
 
     const newMenuItems = getNewContentMenuItems(callbacks, targetId);
 
     sections.push({
-      title: "New",
+      title: "Add",
       actions: [
         {
           id: "create-submenu",
-          label: "New",
+          label: "Add",
           icon: <Plus className="h-4 w-4" />,
           submenu: newMenuItems.map((item) => ({
             id: item.id,
@@ -229,6 +234,21 @@ export const fileTreeActionProvider: ContextMenuActionProvider = (ctx) => {
         },
       ],
     });
+  }
+
+  if (isPeopleMount) {
+    sections.push({
+      actions: [
+        {
+          id: "refresh",
+          label: "Refresh Tree",
+          icon: <RefreshCw className="h-4 w-4" />,
+          onClick: async () => await onRefresh?.(),
+          disabled: !onRefresh,
+        },
+      ],
+    });
+    return sections;
   }
 
   // Section 2: Folder view mode (folder only, single selection)

@@ -1,6 +1,6 @@
 ---
 status: stubs
-last_updated: 2026-03-05
+last_updated: 2026-04-07
 ---
 
 # Future Epochs (Unplanned)
@@ -10,6 +10,8 @@ These epochs are not yet numbered or scheduled. They represent major feature are
 ---
 
 ## Collaboration & Sharing Epoch
+
+> Promoted to [Epoch 13: People + Collaboration](epoch-13-people-and-collaboration.md), starting at Sprint 58. This section remains as historical backlog context.
 
 **Theme:** Real-time collaboration, content sharing, permissions
 

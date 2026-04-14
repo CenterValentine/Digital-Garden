@@ -8,12 +8,15 @@
 
 "use client";
 
+import { Suspense } from "react";
 import { usePathname } from "next/navigation";
 import { ResizablePanels } from "./ResizablePanels";
 import { LeftSidebar } from "./LeftSidebar";
 import { CollapsibleRightPanel } from "./CollapsibleRightPanel";
 import { StatusBar } from "./StatusBar";
 import NotesNavBar from "@/components/client/nav/NotesNavBar";
+import { ExtensionGlobalDialogs } from "@/lib/extensions/ExtensionGlobalDialogs";
+import { AuthSessionSync } from "./AuthSessionSync";
 
 interface ConditionalNotesLayoutProps {
   children: React.ReactNode;
@@ -32,12 +35,22 @@ export function ConditionalNotesLayout({
 
   // Fullscreen mode: just render children directly
   if (isFullscreen) {
-    return <>{children}</>;
+    return (
+      <>
+        <Suspense fallback={null}>
+          <AuthSessionSync />
+        </Suspense>
+        {children}
+      </>
+    );
   }
 
   // Normal mode: render full panel structure
   return (
     <>
+      <Suspense fallback={null}>
+        <AuthSessionSync />
+      </Suspense>
       {/* Notes-specific navbar */}
       <NotesNavBar />
 
@@ -78,6 +91,7 @@ export function ConditionalNotesLayout({
           <StatusBar />
         </div>
       </div>
+      <ExtensionGlobalDialogs />
     </>
   );
 }

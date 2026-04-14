@@ -15,11 +15,20 @@
  */
 
 import type { Node as ProseMirrorNode } from "@tiptap/pm/model";
+import { NodeSelection, TextSelection } from "@tiptap/pm/state";
 import type { EditorView } from "@tiptap/pm/view";
 import type { Editor } from "@tiptap/core";
 import { useBlockStore } from "@/state/block-store";
+import { useRightPanelCollapseStore } from "@/state/right-panel-collapse-store";
 import { getAllSlashBlocks, getBlockDefinition } from "./registry";
 import { calculateMenuPosition } from "@/lib/core/menu-positioning";
+
+function focusEditorView(view: EditorView) {
+  const element = view.dom as HTMLElement;
+  if (typeof element.focus === "function") {
+    element.focus({ preventScroll: true });
+  }
+}
 
 /**
  * Dispatch real node attrs to PropertiesPanel after it mounts.
@@ -50,19 +59,142 @@ export interface BlockNodeViewOptions {
   renderContent: (
     node: ProseMirrorNode,
     contentDom: HTMLElement,
-    editor: Editor
+    editor: Editor,
+    getPos?: () => number | undefined
   ) => void;
   /** Update the content area when node attrs change. Return false to force re-render. */
   updateContent?: (
     node: ProseMirrorNode,
     contentDom: HTMLElement,
-    editor: Editor
+    editor: Editor,
+    getPos?: () => number | undefined
   ) => boolean;
   /**
    * If provided, the named attr (boolean) controls whether block-container-hidden
    * is applied to the outer dom element. When false → hidden; when true → visible.
    */
   containerAttr?: string;
+}
+
+function isEmptyParagraph(node: ProseMirrorNode | null | undefined) {
+  return Boolean(
+    node &&
+      node.type.name === "paragraph" &&
+      node.content.size === 0 &&
+      node.textContent.length === 0
+  );
+}
+
+export function placeCursorAroundBlock(
+  editor: Editor,
+  getPos: (() => number | undefined) | undefined,
+  node: ProseMirrorNode,
+  side: "before" | "after"
+) {
+  if (!getPos) return;
+  const pos = getPos();
+  if (pos === undefined) return;
+
+  const { state, view } = editor;
+  const boundary = side === "before" ? pos : pos + node.nodeSize;
+  const $boundary = state.doc.resolve(boundary);
+  const adjacentNode = side === "before" ? $boundary.nodeBefore : $boundary.nodeAfter;
+  const tr = state.tr;
+
+  if (isEmptyParagraph(adjacentNode)) {
+    const targetPos =
+      side === "before"
+        ? Math.max(0, boundary - 1)
+        : Math.min(boundary + 1, tr.doc.content.size);
+    tr.setSelection(TextSelection.near(tr.doc.resolve(targetPos), side === "before" ? -1 : 1));
+    view.dispatch(tr);
+    focusEditorView(view);
+    return;
+  }
+
+  const paragraph = state.schema.nodes.paragraph?.create();
+  if (!paragraph) return;
+
+  tr.insert(boundary, paragraph);
+  const targetPos = Math.min(boundary + 1, tr.doc.content.size);
+  tr.setSelection(TextSelection.near(tr.doc.resolve(targetPos), 1));
+  view.dispatch(tr);
+  focusEditorView(view);
+}
+
+export function selectBlockNode(
+  editor: Editor,
+  getPos: (() => number | undefined) | undefined
+) {
+  if (!getPos) return false;
+  const pos = getPos();
+  if (pos === undefined) return false;
+
+  editor.view.dispatch(
+    editor.state.tr.setSelection(NodeSelection.create(editor.state.doc, pos))
+  );
+  focusEditorView(editor.view);
+  return true;
+}
+
+export function moveCursorToAdjacentParagraphAroundBlock(
+  editor: Editor,
+  getPos: (() => number | undefined) | undefined,
+  node: ProseMirrorNode,
+  side: "before" | "after"
+) {
+  if (!getPos) return false;
+  const pos = getPos();
+  if (pos === undefined) return false;
+
+  const { state, view } = editor;
+  const boundary = side === "before" ? pos : pos + node.nodeSize;
+  const $boundary = state.doc.resolve(boundary);
+  const adjacentNode = side === "before" ? $boundary.nodeBefore : $boundary.nodeAfter;
+  if (!adjacentNode || adjacentNode.type.name !== "paragraph") {
+    return false;
+  }
+
+  const targetPos =
+    side === "before"
+      ? Math.max(0, boundary - 1)
+      : Math.min(boundary + 1, state.doc.content.size);
+
+  // Save the scroll position of the nearest scrollable ancestor before
+  // dispatching. ProseMirror's selectionToDOM places the cursor in the DOM
+  // which can trigger browser scroll-into-view on the selection, jumping
+  // the viewport unexpectedly. We restore it immediately after.
+  const scrollEl = findScrollContainer(view.dom);
+  const savedScrollTop = scrollEl?.scrollTop ?? 0;
+
+  view.dispatch(
+    state.tr.setSelection(
+      TextSelection.near(
+        state.doc.resolve(targetPos),
+        side === "before" ? -1 : 1
+      )
+    )
+  );
+  focusEditorView(view);
+
+  if (scrollEl) {
+    scrollEl.scrollTop = savedScrollTop;
+  }
+
+  return true;
+}
+
+function findScrollContainer(el: Element): HTMLElement | null {
+  let current: Element | null = el.parentElement;
+  while (current && current !== document.documentElement) {
+    const style = window.getComputedStyle(current);
+    const overflowY = style.overflowY;
+    if (overflowY === "auto" || overflowY === "scroll") {
+      return current as HTMLElement;
+    }
+    current = current.parentElement;
+  }
+  return null;
 }
 
 /** Open the block insertion menu at a specific position */
@@ -155,23 +287,42 @@ export function openBlockInsertMenu(
 /** Build TipTap JSON for inserting a new block */
 export function buildBlockInsertJson(blockType: string): Record<string, unknown> {
   const id = crypto.randomUUID();
+  const def = getBlockDefinition(blockType);
+  const baseAttrs = {
+    ...(def?.defaultAttrs ?? {}),
+    blockId: id,
+    blockType,
+  };
   switch (blockType) {
     case "cardPanel":
       return {
         type: "cardPanel",
-        attrs: { blockId: id, blockType: "cardPanel", cardBorder: "subtle", showBackground: true },
+        attrs: { ...baseAttrs, cardBorder: "subtle", showBackground: true },
         content: [{ type: "paragraph" }],
       };
     case "accordion":
       return {
         type: "accordion",
-        attrs: { blockId: id, blockType: "accordion", headerText: "", headerLevel: "2", defaultOpen: true, showContainer: false },
+        attrs: {
+          ...baseAttrs,
+          headerText: "",
+          headerLevel: "2",
+          openBehavior: "lastInteraction",
+          openState: true,
+          showContainer: false,
+          showDivider: false,
+        },
         content: [{ type: "paragraph" }],
       };
     case "columns":
       return {
         type: "columns",
-        attrs: { blockId: id, blockType: "columns", columnCount: 2, gapSize: "medium" },
+        attrs: {
+          ...baseAttrs,
+          columnCount: 2,
+          gapSize: "medium",
+          showContainer: false,
+        },
         content: [
           { type: "column", content: [{ type: "paragraph" }] },
           { type: "column", content: [{ type: "paragraph" }] },
@@ -180,7 +331,12 @@ export function buildBlockInsertJson(blockType: string): Record<string, unknown>
     case "tabs":
       return {
         type: "tabs",
-        attrs: { blockId: id, blockType: "tabs", activeTab: 0, tabStyle: "underline" },
+        attrs: {
+          ...baseAttrs,
+          activeTab: 0,
+          tabStyle: "underline",
+          showContainer: false,
+        },
         content: [
           { type: "tabPanel", attrs: { label: "Tab 1" }, content: [{ type: "paragraph" }] },
           { type: "tabPanel", attrs: { label: "Tab 2" }, content: [{ type: "paragraph" }] },
@@ -189,21 +345,49 @@ export function buildBlockInsertJson(blockType: string): Record<string, unknown>
     case "blockColumns":
       return {
         type: "blockColumns",
-        attrs: { blockId: id, blockType: "blockColumns", columnCount: 2 },
+        attrs: {
+          ...baseAttrs,
+          columnCount: 2,
+          showContainer: false,
+        },
         content: [
           { type: "blockColumn", content: [{ type: "paragraph" }] },
           { type: "blockColumn", content: [{ type: "paragraph" }] },
         ],
       };
+    case "listContainer":
+      return {
+        type: "listContainer",
+        attrs: { ...baseAttrs, listType: "bullet" },
+        content: [
+          {
+            type: "bulletList",
+            content: [
+              {
+                type: "listItem",
+                content: [{ type: "paragraph" }],
+              },
+            ],
+          },
+        ],
+      };
     default: {
-      // Atom blocks have no content children — only include content for non-atoms
-      const def = getBlockDefinition(blockType);
-      if (def?.atom) {
-        return { type: blockType, attrs: { blockId: id, blockType } };
+      if (def?.atom || def?.contentModel === null) {
+        return { type: blockType, attrs: baseAttrs };
+      }
+      if (def?.contentModel === "inline*") {
+        return { type: blockType, attrs: baseAttrs };
+      }
+      if (def?.contentModel?.includes("block")) {
+        return {
+          type: blockType,
+          attrs: baseAttrs,
+          content: [{ type: "paragraph" }],
+        };
       }
       return {
         type: blockType,
-        attrs: { blockId: id, blockType },
+        attrs: baseAttrs,
         content: [{ type: "paragraph" }],
       };
     }
@@ -244,6 +428,19 @@ export function createBlockNodeView(options: BlockNodeViewOptions) {
     if (options.containerAttr) {
       dom.classList.toggle("block-container-hidden", !node.attrs[options.containerAttr]);
     }
+
+    const getNodePos = typeof getPos === "function" ? getPos : undefined;
+
+    const cursorBefore = document.createElement("button");
+    cursorBefore.classList.add("block-cursor-anchor", "block-cursor-anchor-before");
+    cursorBefore.type = "button";
+    cursorBefore.title = "Place cursor above";
+    cursorBefore.addEventListener("mousedown", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      selectBlockNode(editor, getNodePos);
+    });
+    dom.appendChild(cursorBefore);
 
     // --- "+" button ABOVE block ---
     const insertAbove = document.createElement("button");
@@ -291,6 +488,7 @@ export function createBlockNodeView(options: BlockNodeViewOptions) {
       const blockId = node.attrs.blockId || "";
       useBlockStore.getState().setSelectedBlock(blockId, options.blockType);
       useBlockStore.getState().openProperties();
+      useRightPanelCollapseStore.getState().setCollapsed(false);
       syncAttrsToPanel(blockId, node.attrs);
     });
     chrome.appendChild(menuBtn);
@@ -326,7 +524,7 @@ export function createBlockNodeView(options: BlockNodeViewOptions) {
     dom.appendChild(contentDom);
 
     // Render block-specific content (may insert siblings via parentElement)
-    options.renderContent(node, contentDom, editor);
+    options.renderContent(node, contentDom, editor, getNodePos);
 
     // --- "+" button BELOW block ---
     const insertBelow = document.createElement("button");
@@ -348,13 +546,41 @@ export function createBlockNodeView(options: BlockNodeViewOptions) {
     });
     dom.appendChild(insertBelow);
 
+    const cursorAfter = document.createElement("button");
+    cursorAfter.classList.add("block-cursor-anchor", "block-cursor-anchor-after");
+    cursorAfter.type = "button";
+    cursorAfter.title = "Place cursor below";
+    cursorAfter.addEventListener("mousedown", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      selectBlockNode(editor, getNodePos);
+    });
+    dom.appendChild(cursorAfter);
+
     // --- Selection handling (chrome only, not content area) ---
-    // Using chrome instead of dom prevents React re-renders from interfering
-    // with ProseMirror's cursor placement in the content area.
-    chrome.addEventListener("click", () => {
+    const syncBlockSelection = () => {
       const blockId = node.attrs.blockId || "";
       useBlockStore.getState().setSelectedBlock(blockId, options.blockType);
-    });
+      syncAttrsToPanel(blockId, node.attrs);
+    };
+
+    // Clicking anywhere inside a block should update the selected block in the
+    // properties sidebar, but should not force the right panel open.
+    dom.addEventListener(
+      "mousedown",
+      (event) => {
+        const target = event.target as HTMLElement;
+        const interactive =
+          target.closest(".block-menu-btn") ||
+          target.closest(".block-delete-btn") ||
+          target.closest(".block-insert-btn");
+        if (interactive) return;
+        syncBlockSelection();
+      },
+      true
+    );
+
+    chrome.addEventListener("click", syncBlockSelection);
 
     return {
       dom,
@@ -363,8 +589,7 @@ export function createBlockNodeView(options: BlockNodeViewOptions) {
 
       selectNode() {
         dom.classList.add("block-selected", "ProseMirror-selectednode");
-        const blockId = node.attrs.blockId || "";
-        useBlockStore.getState().setSelectedBlock(blockId, options.blockType);
+        syncBlockSelection();
       },
 
       deselectNode() {
@@ -402,12 +627,13 @@ export function createBlockNodeView(options: BlockNodeViewOptions) {
           const handled = options.updateContent(
             updatedNode,
             contentDom,
-            editor
+            editor,
+            getNodePos
           );
           if (!handled) {
             // Re-render from scratch if update returns false
             contentDom.innerHTML = "";
-            options.renderContent(updatedNode, contentDom, editor);
+            options.renderContent(updatedNode, contentDom, editor, getNodePos);
           }
         }
 

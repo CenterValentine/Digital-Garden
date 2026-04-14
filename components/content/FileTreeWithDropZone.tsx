@@ -15,7 +15,7 @@ interface FileTreeWithDropZoneProps {
   }) => Promise<void>;
   onSelect?: (nodes: TreeNode[]) => void;
   onRename?: (id: string, name: string) => Promise<void>;
-  onCreate?: (parentId: string | null, type: "folder" | "note" | "file" | "code" | "html") => Promise<void>;
+  onCreate?: (parentId: string | null, type: "folder" | "note" | "file" | "code" | "html" | "docx" | "xlsx" | "json" | "external" | "chat" | "visualization" | "data" | "hope" | "workflow") => Promise<void>;
   onDelete?: (ids: string | string[]) => Promise<void>;
   onDuplicate?: (ids: string[]) => Promise<void>;
   onDownload?: (ids: string[]) => Promise<void>;
@@ -28,6 +28,7 @@ interface FileTreeWithDropZoneProps {
   onCreateVisualizationMermaid?: (parentId: string | null) => Promise<void>;
   onCreateVisualizationExcalidraw?: (parentId: string | null) => Promise<void>;
   onCreateVisualizationDiagramsNet?: (parentId: string | null) => Promise<void>;
+  onAddPeopleTarget?: (parentId: string | null) => Promise<void>;
   height?: number;
   editingNodeId?: string;
   expandNodeId?: string | null;

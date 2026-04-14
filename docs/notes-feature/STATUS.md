@@ -1,8 +1,8 @@
 ---
-last_updated: 2026-03-25
-current_epoch: 12
-current_sprint: 54
-sprint_status: in_progress
+last_updated: 2026-04-07
+current_epoch: 13
+current_sprint: 58
+sprint_status: planned
 ---
 
 # Digital Garden Content IDE - Status
@@ -35,18 +35,29 @@ before planning and executing. There may be additions or modifications.
 
 ## Current Work
 
-### Active Epoch: Epoch 12 - Main Panel Tabs + Split Workspace
-**Duration**: 5 sprints (50-54)
-**Theme**: Tabbed main-panel workspaces, per-tab runtime isolation, split-pane foundation
+### Active Epoch: Epoch 13 - People + Collaboration
+**Duration**: 6 sprints (58-63)
+**Theme**: People/domain tree mirroring, person mentions, safe sharing, and Hocuspocus-backed collaboration
 
 **Sprint Plan**:
-- Sprint 50: Tab Foundation (complete)
-- Sprint 51: Sidebar Isolation + Workspace Preservation (complete)
-- Sprint 52: Dual-Pane Split (complete)
-- Sprint 53: Quad Split (complete)
-- Sprint 54: Tab Drag + Adaptive Pane Reshaping (in progress)
+- Sprint 58: Foundations (planned)
+- Sprint 59: People View + Mount UX (planned)
+- Sprint 60: Tree Policy Hardening (planned)
+- Sprint 61: Person Mentions (planned)
+- Sprint 62: Hocuspocus Collaboration (planned)
+- Sprint 63: Share + Media Prototype (planned)
+
+**Worktree**: `/Users/davidvalentine/Documents/Digital-Garden/.worktrees/epoch-13-people-collab`
+**Branch**: `codex/epoch-13-people-collab`
+**Detailed Plan**: `docs/notes-feature/work-tracking/epochs/epoch-13-people-and-collaboration.md`
 
 ## Recent Completions (Last 30 Days)
+
+**Apr 7, 2026**: Epoch 13 planning initialized
+- Created isolated worktree from `origin/main` after PR #22 merge commit `2acc6d9b9fc8bad4a8e7e634f865c19607b0e0ce`
+- Documented the People + Collaboration epoch starting at Sprint 58
+- Locked the architecture decision to render People groups/subgroups folder-like without adding `ContentType.group`
+- Captured collaboration route/access decisions: owners and signed-in grantees use `/content`; public `/share` is view-only for non-users in v1
 
 **Mar 25, 2026**: Sprint 53 Quad Split — COMPLETE
 - Added four layout modes: single, dual vertical, dual horizontal, and quad split from the same workspace model

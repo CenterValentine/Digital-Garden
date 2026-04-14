@@ -6,8 +6,8 @@
 
 "use client";
 
+import { createElement, useEffect, useState, useCallback, useRef, memo } from "react";
 import type { ComponentType, RefObject } from "react";
-import { useEffect, useState, useCallback, useRef, memo } from "react";
 import {
   ChevronDown,
   ChevronLeft,
@@ -28,6 +28,10 @@ import {
   useNavigationHistoryStore,
 } from "@/state/navigation-history-store";
 import { NavigationHistoryDropdown } from "./NavigationHistoryDropdown";
+import {
+  useExtensionShellNavigationControls,
+  useExtensionShellNavigationTrailingControls,
+} from "@/lib/extensions/client-registry";
 
 const HOLD_THRESHOLD_MS = 250;
 
@@ -97,6 +101,8 @@ export function MainPanelNavigation({ paneId }: MainPanelNavigationProps) {
   const paneContentId = useContentStore((state) => getPaneActiveContentId(state, paneId));
   const setSelectedContentId = useContentStore((state) => state.setSelectedContentId);
   const setLayoutMode = useContentStore((state) => state.setLayoutMode);
+  const shellNavigationControls = useExtensionShellNavigationControls();
+  const shellNavigationTrailingControls = useExtensionShellNavigationTrailingControls();
 
   const paneHistory = useNavigationHistoryStore((state) =>
     state.byPaneId[paneId] ?? EMPTY_PANE_HISTORY
@@ -228,8 +234,8 @@ export function MainPanelNavigation({ paneId }: MainPanelNavigationProps) {
 
   return (
     <>
-      <div className="flex items-center border-b border-white/10 px-2 py-1">
-        <div className="flex items-center gap-2">
+      <div className="flex items-center justify-between gap-3 border-b border-white/10 px-2 py-1">
+        <div className="flex min-w-0 items-center gap-2">
           <NavigationButtons
             canGoBack={canGoBack}
             canGoForward={canGoForward}
@@ -239,7 +245,12 @@ export function MainPanelNavigation({ paneId }: MainPanelNavigationProps) {
             onForwardClick={goForward}
             backButtonRef={backButtonRef}
           />
-          <div className="h-4 w-px bg-black/10 dark:bg-white/10" />
+          {shellNavigationControls.map((Control) =>
+            createElement(Control, {
+              key: Control.displayName ?? Control.name,
+              paneId,
+            })
+          )}
           <div className="relative">
             <button
               ref={layoutButtonRef}
@@ -288,6 +299,12 @@ export function MainPanelNavigation({ paneId }: MainPanelNavigationProps) {
               </div>
             )}
           </div>
+          {shellNavigationTrailingControls.map((Control) =>
+            createElement(Control, {
+              key: Control.displayName ?? Control.name,
+              paneId,
+            })
+          )}
         </div>
       </div>
 

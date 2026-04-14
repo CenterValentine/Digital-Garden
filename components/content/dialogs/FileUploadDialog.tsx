@@ -23,6 +23,8 @@ interface Folder {
 
 interface FileUploadDialogProps {
   parentId: string | null;
+  peopleGroupId?: string | null;
+  personId?: string | null;
   onSuccess: (fileId: string) => void;
   onCancel: () => void;
   initialFiles?: File[];
@@ -38,7 +40,14 @@ interface FileUploadStatus {
   slug?: string;
 }
 
-export function FileUploadDialog({ parentId, onSuccess, onCancel, initialFiles }: FileUploadDialogProps) {
+export function FileUploadDialog({
+  parentId,
+  peopleGroupId = null,
+  personId = null,
+  onSuccess,
+  onCancel,
+  initialFiles,
+}: FileUploadDialogProps) {
   const glass1 = getSurfaceStyles("glass-1");
   const { uploadMode } = useUploadSettingsStore();
   const [uploadMethod, setUploadMethod] = useState<UploadMethod>("file");
@@ -62,6 +71,12 @@ export function FileUploadDialog({ parentId, onSuccess, onCancel, initialFiles }
   // Load folder tree on mount
   useEffect(() => {
     const loadFolders = async () => {
+      if (peopleGroupId || personId) {
+        setFolders([]);
+        setLoadingFolders(false);
+        return;
+      }
+
       setLoadingFolders(true);
       try {
         const response = await fetch('/api/content/content/tree');
@@ -116,7 +131,11 @@ export function FileUploadDialog({ parentId, onSuccess, onCancel, initialFiles }
       }
     };
     loadFolders();
-  }, []);
+  }, [peopleGroupId, personId]);
+
+  useEffect(() => {
+    setSelectedFolderId(parentId);
+  }, [parentId]);
 
   // Handle initialFiles based on upload mode
   useEffect(() => {
@@ -172,6 +191,8 @@ export function FileUploadDialog({ parentId, onSuccess, onCancel, initialFiles }
       const formData = new FormData();
       formData.append("file", fileToUpload);
       if (selectedFolderId) formData.append("parentId", selectedFolderId);
+      if (peopleGroupId) formData.append("peopleGroupId", peopleGroupId);
+      if (personId) formData.append("personId", personId);
       formData.append("provider", selectedProvider);
       formData.append("enableOCR", enableOCR.toString());
 
@@ -456,35 +477,41 @@ export function FileUploadDialog({ parentId, onSuccess, onCancel, initialFiles }
         <h2 className="text-xl font-semibold mb-4 text-white">Upload File</h2>
 
         {/* Folder Path Selector */}
-        <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-300 mb-2">
-            Upload to folder:
-          </label>
-          <div className="relative">
-            <select
-              value={selectedFolderId || ""}
-              onChange={(e) => setSelectedFolderId(e.target.value || null)}
-              disabled={isUploading || loadingFolders}
-              className="w-full px-4 py-2 pl-10 bg-white/5 border border-white/10 rounded-lg text-white text-sm appearance-none cursor-pointer hover:bg-white/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <option value="">Root (no folder)</option>
-              {folders.map((folder) => (
-                <option key={folder.id} value={folder.id} className="bg-gray-800">
-                  {folder.title}
-                </option>
-              ))}
-            </select>
-            <Folder className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
-            <svg
-              className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-            </svg>
+        {!peopleGroupId && !personId ? (
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-300 mb-2">
+              Upload to folder:
+            </label>
+            <div className="relative">
+              <select
+                value={selectedFolderId || ""}
+                onChange={(e) => setSelectedFolderId(e.target.value || null)}
+                disabled={isUploading || loadingFolders}
+                className="w-full px-4 py-2 pl-10 bg-white/5 border border-white/10 rounded-lg text-white text-sm appearance-none cursor-pointer hover:bg-white/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <option value="">Root (no folder)</option>
+                {folders.map((folder) => (
+                  <option key={folder.id} value={folder.id} className="bg-gray-800">
+                    {folder.title}
+                  </option>
+                ))}
+              </select>
+              <Folder className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+              <svg
+                className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="mb-4 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-gray-300">
+            Uploading into the selected People record.
+          </div>
+        )}
 
         {/* Upload Method Tabs */}
         <div className="flex gap-2 mb-6 border-b border-white/10">

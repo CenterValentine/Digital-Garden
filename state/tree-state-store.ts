@@ -15,6 +15,10 @@ interface TreeStateStore {
   expandedIds: Set<string>;
   /** Array of selected node IDs (for highlighting and active state) */
   selectedIds: string[];
+  /** Virtualized tree scroll offset */
+  scrollOffset: number;
+  /** Bumps when a workspace-level tree snapshot is restored */
+  restoreVersion: number;
   /** Toggle expansion state */
   toggleExpanded: (id: string) => void;
   /** Set expanded state */
@@ -27,6 +31,18 @@ interface TreeStateStore {
   isExpanded: (id: string) => boolean;
   /** Set selected node IDs */
   setSelectedIds: (ids: string[]) => void;
+  /** Set tree scroll offset */
+  setScrollOffset: (offset: number) => void;
+  /** Capture file-tree UI state for workspace switching */
+  getSnapshot: () => TreeStateSnapshot;
+  /** Restore file-tree UI state for workspace switching */
+  restoreSnapshot: (snapshot?: TreeStateSnapshot | null) => void;
+}
+
+export interface TreeStateSnapshot {
+  expandedIds: string[];
+  selectedIds: string[];
+  scrollOffset: number;
 }
 
 export const useTreeStateStore = create<TreeStateStore>()(
@@ -34,6 +50,8 @@ export const useTreeStateStore = create<TreeStateStore>()(
     (set, get) => ({
       expandedIds: new Set<string>(),
       selectedIds: [],
+      scrollOffset: 0,
+      restoreVersion: 0,
 
       toggleExpanded: (id) => {
         set((state) => {
@@ -78,6 +96,25 @@ export const useTreeStateStore = create<TreeStateStore>()(
       setSelectedIds: (ids) => {
         set({ selectedIds: ids });
       },
+
+      setScrollOffset: (offset) => {
+        set({ scrollOffset: Math.max(0, offset) });
+      },
+
+      getSnapshot: () => ({
+        expandedIds: Array.from(get().expandedIds),
+        selectedIds: get().selectedIds,
+        scrollOffset: get().scrollOffset,
+      }),
+
+      restoreSnapshot: (snapshot) => {
+        set((state) => ({
+          expandedIds: new Set(snapshot?.expandedIds ?? []),
+          selectedIds: snapshot?.selectedIds ?? [],
+          scrollOffset: snapshot?.scrollOffset ?? 0,
+          restoreVersion: state.restoreVersion + 1,
+        }));
+      },
     }),
     {
       name: "tree-state-storage",
@@ -90,10 +127,12 @@ export const useTreeStateStore = create<TreeStateStore>()(
           const { state } = JSON.parse(str);
           return {
             state: {
-              ...state,
-              expandedIds: new Set(state.expandedIds || []),
-              selectedIds: state.selectedIds || [],
-            },
+                ...state,
+                expandedIds: new Set(state.expandedIds || []),
+                selectedIds: state.selectedIds || [],
+                scrollOffset: state.scrollOffset || 0,
+                restoreVersion: state.restoreVersion || 0,
+              },
           };
         },
         setItem: (name, value) => {
@@ -105,6 +144,7 @@ export const useTreeStateStore = create<TreeStateStore>()(
                 ...state,
                 expandedIds: Array.from(state.expandedIds),
                 selectedIds: state.selectedIds,
+                scrollOffset: state.scrollOffset,
               },
             })
           );

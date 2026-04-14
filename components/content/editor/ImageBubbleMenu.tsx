@@ -12,7 +12,7 @@
 
 import { BubbleMenu as TipTapBubbleMenu } from "@tiptap/react/menus";
 import type { Editor } from "@tiptap/core";
-import { PluginKey } from "@tiptap/pm/state";
+import { NodeSelection, PluginKey } from "@tiptap/pm/state";
 
 const imageBubbleMenuKey = new PluginKey("imageBubbleMenu");
 
@@ -27,11 +27,12 @@ const preventFocusLoss = (e: React.MouseEvent) => {
  */
 const imageShouldShow = ({
   editor,
+  state,
 }: {
   editor: Editor;
-  [key: string]: any;
+  state: import("@tiptap/pm/state").EditorState;
 }): boolean => {
-  return editor.isActive("image");
+  return state.selection instanceof NodeSelection && editor.isActive("image");
 };
 
 /** Size preset: label + width value (null = full/auto) */

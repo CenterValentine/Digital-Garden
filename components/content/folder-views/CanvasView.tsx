@@ -12,6 +12,7 @@ import { useState, useEffect, useCallback } from "react";
 import ReactFlow, {
   Node,
   Edge,
+  NodeChange,
   Background,
   Controls,
   MiniMap,
@@ -27,6 +28,7 @@ import { toast } from "sonner";
 import type { FolderViewProps } from "./FolderViewContainer";
 import { getDisplayExtension } from "@/lib/domain/content/file-extension-utils";
 import { useContentStore } from "@/state/content-store";
+import { buildContentListUrl } from "./content-query";
 
 interface ContentChild {
   id: string;
@@ -44,6 +46,7 @@ export function CanvasView({
   folderId,
   paneId,
   folderTitle,
+  contentQuery,
   viewPrefs = {},
   onUpdateView,
 }: FolderViewProps) {
@@ -51,20 +54,22 @@ export function CanvasView({
   const [items, setItems] = useState<ContentChild[]>([]);
   const [links, setLinks] = useState<ContentLink[]>([]);
   const [loading, setLoading] = useState(true);
+  const contentQueryKey = JSON.stringify(contentQuery ?? { parentId: folderId });
+  const viewPrefsKey = JSON.stringify(viewPrefs);
 
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
 
   useEffect(() => {
     loadCanvasData();
-  }, [folderId]);
+  }, [folderId, contentQueryKey, viewPrefsKey]);
 
   const loadCanvasData = async () => {
     try {
       setLoading(true);
 
       // Load folder contents
-      const contentResponse = await fetch(`/api/content/content?parentId=${folderId}`, { credentials: "include" });
+      const contentResponse = await fetch(buildContentListUrl(contentQuery ?? { parentId: folderId }), { credentials: "include" });
       if (!contentResponse.ok) {
         throw new Error("Failed to load folder contents");
       }
@@ -170,7 +175,7 @@ export function CanvasView({
   }, [items, paneId, setSelectedContentId]);
 
   const handleNodesChangeWithSave = useCallback(
-    (changes: any[]) => {
+    (changes: NodeChange[]) => {
       onNodesChange(changes);
 
       // Save node positions after drag

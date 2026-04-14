@@ -15,6 +15,7 @@ import Suggestion from "@tiptap/suggestion";
 import { PluginKey } from "@tiptap/pm/state";
 import tippy, { Instance as TippyInstance } from "tippy.js";
 import { SlashCommandsList, type SlashCommandsListRef } from "./slash-commands-menu";
+import { getExtensionSlashCommands } from "@/lib/extensions/editor-client-registry";
 
 // Plugin key for slash commands
 export const slashCommandsPluginKey = new PluginKey("slashCommands");
@@ -330,7 +331,14 @@ export function getSlashCommands(editor: Editor): SlashCommand[] {
       command: ({ editor, range }) => {
         editor.chain().focus().deleteRange(range).insertContent({
           type: "accordion",
-          attrs: {},
+          attrs: {
+            headerText: "",
+            headerLevel: "2",
+            openBehavior: "lastInteraction",
+            openState: true,
+            showContainer: false,
+            showDivider: false,
+          },
           content: [{ type: "paragraph" }],
         }).run();
       },
@@ -458,6 +466,7 @@ export function getSlashCommands(editor: Editor): SlashCommand[] {
       },
       aliases: ["prompt", "ai", "instruction", "template"],
     },
+    ...getExtensionSlashCommands(),
     // Report Issue - Always at the bottom
     {
       title: "Report an Issue",

@@ -15,16 +15,19 @@
 
 "use client";
 
-import type { ComponentType } from "react";
+import { useCallback, useEffect, useRef, useState, type ComponentType } from "react";
 import { BubbleMenu as TipTapBubbleMenu } from "@tiptap/react/menus";
 import type { Editor } from "@tiptap/core";
-import { PluginKey } from "@tiptap/pm/state";
+import { NodeSelection, PluginKey } from "@tiptap/pm/state";
 import {
   Bold,
+  Check,
+  Link2Off,
   Italic,
   Strikethrough,
   Code,
   Link as LinkIcon,
+  X,
   Heading1,
   Heading2,
   Heading3,
@@ -45,6 +48,87 @@ const textFormattingBubbleMenuKey = new PluginKey("textFormattingBubbleMenu");
 const preventFocusLoss = (e: React.MouseEvent) => {
   e.preventDefault();
 };
+
+type LinkSegment = {
+  href: string;
+  from: number;
+  to: number;
+};
+
+type SelectionFormattingState = {
+  bold: boolean;
+  italic: boolean;
+  strikethrough: boolean;
+  code: boolean;
+  heading1: boolean;
+  heading2: boolean;
+  heading3: boolean;
+  links: LinkSegment[];
+};
+
+type LinkEditorTarget = {
+  href: string;
+  from: number;
+  to: number;
+  existing: boolean;
+};
+
+const EMPTY_FORMATTING: SelectionFormattingState = {
+  bold: false,
+  italic: false,
+  strikethrough: false,
+  code: false,
+  heading1: false,
+  heading2: false,
+  heading3: false,
+  links: [],
+};
+
+function getSelectionFormattingState(editor: Editor): SelectionFormattingState {
+  const { state } = editor;
+  const { selection, doc } = state;
+  if (selection.empty) return EMPTY_FORMATTING;
+
+  const summary: SelectionFormattingState = {
+    ...EMPTY_FORMATTING,
+    links: [],
+  };
+
+  let lastLink: LinkSegment | null = null;
+
+  doc.nodesBetween(selection.from, selection.to, (node, pos) => {
+    const start = Math.max(selection.from, pos);
+    const end = Math.min(selection.to, pos + node.nodeSize);
+    if (start >= end) return;
+
+    if (node.type.name === "heading") {
+      const level = Number(node.attrs.level);
+      if (level === 1) summary.heading1 = true;
+      if (level === 2) summary.heading2 = true;
+      if (level === 3) summary.heading3 = true;
+    }
+
+    if (!node.isText) return;
+
+    for (const mark of node.marks) {
+      if (mark.type.name === "bold") summary.bold = true;
+      if (mark.type.name === "italic") summary.italic = true;
+      if (mark.type.name === "strike") summary.strikethrough = true;
+      if (mark.type.name === "code") summary.code = true;
+      if (mark.type.name === "link") {
+        const href = String(mark.attrs.href || "");
+        if (lastLink && lastLink.href === href && lastLink.to === start) {
+          lastLink.to = end;
+        } else {
+          lastLink = { href, from: start, to: end };
+          summary.links.push(lastLink);
+        }
+      }
+    }
+  });
+
+  return summary;
+}
 
 // ─── Static registry data (computed once at module load, no hooks) ───
 
@@ -96,13 +180,7 @@ function getEditorCommand(
     italic: () => editor.chain().toggleItalic().run(),
     strikethrough: () => editor.chain().toggleStrike().run(),
     "code-inline": () => editor.chain().toggleCode().run(),
-    link: () => {
-      if (editor.isActive("link")) {
-        editor.chain().unsetLink().run();
-      } else {
-        onLinkClick?.();
-      }
-    },
+    link: () => onLinkClick?.(),
     "heading-1": () => editor.chain().toggleHeading({ level: 1 }).run(),
     "heading-2": () => editor.chain().toggleHeading({ level: 2 }).run(),
     "heading-3": () => editor.chain().toggleHeading({ level: 3 }).run(),
@@ -111,18 +189,18 @@ function getEditorCommand(
 }
 
 /** Map tool IDs to editor active-state checks */
-function isToolActive(toolId: string, editor: Editor): boolean {
-  const checks: Record<string, () => boolean> = {
-    bold: () => editor.isActive("bold"),
-    italic: () => editor.isActive("italic"),
-    strikethrough: () => editor.isActive("strike"),
-    "code-inline": () => editor.isActive("code"),
-    link: () => editor.isActive("link"),
-    "heading-1": () => editor.isActive("heading", { level: 1 }),
-    "heading-2": () => editor.isActive("heading", { level: 2 }),
-    "heading-3": () => editor.isActive("heading", { level: 3 }),
+function isToolActive(toolId: string, formatting: SelectionFormattingState): boolean {
+  const checks: Record<string, boolean> = {
+    bold: formatting.bold,
+    italic: formatting.italic,
+    strikethrough: formatting.strikethrough,
+    "code-inline": formatting.code,
+    link: formatting.links.length > 0,
+    "heading-1": formatting.heading1,
+    "heading-2": formatting.heading2,
+    "heading-3": formatting.heading3,
   };
-  return checks[toolId]?.() ?? false;
+  return checks[toolId] ?? false;
 }
 
 /** Get tooltip text for a tool */
@@ -139,39 +217,146 @@ function getToolTitle(toolId: string, editor: Editor, shortcut?: string): string
   return shortcut ? `${label} (${shortcut})` : label;
 }
 
-/**
- * Stable shouldShow callback — defined at module level to avoid creating
- * a new function reference on every render. The TipTap React BubbleMenu
- * wrapper includes `shouldShow` in its useEffect dependency array; an
- * inline arrow function creates a new reference each render, triggering
- * constant `updateOptions` transaction dispatches.
- */
-const bubbleMenuShouldShow = ({
-  state,
-  editor: ed,
-}: {
-  editor: Editor;
-  element: HTMLElement;
-  view: import("@tiptap/pm/view").EditorView;
-  state: import("@tiptap/pm/state").EditorState;
-  oldState?: import("@tiptap/pm/state").EditorState;
-  from: number;
-  to: number;
-}): boolean => {
-  const { selection } = state;
-  const { empty } = selection;
-  if (empty) return false;
-  if (ed.isActive("table")) return false;
-  if (ed.isActive("image")) return false;
-  return true;
-};
-
 export interface BubbleMenuProps {
   editor: Editor | null;
   onLinkClick?: () => void;
 }
 
 export function BubbleMenu({ editor, onLinkClick }: BubbleMenuProps) {
+  const [, forceRender] = useState(0);
+  const [linkEditorTarget, setLinkEditorTarget] = useState<LinkEditorTarget | null>(null);
+  const [linkInputValue, setLinkInputValue] = useState("");
+  const linkInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!editor) return;
+    const rerender = () => forceRender((value) => value + 1);
+    editor.on("selectionUpdate", rerender);
+    editor.on("transaction", rerender);
+    editor.on("focus", rerender);
+    editor.on("blur", rerender);
+    return () => {
+      editor.off("selectionUpdate", rerender);
+      editor.off("transaction", rerender);
+      editor.off("focus", rerender);
+      editor.off("blur", rerender);
+    };
+  }, [editor]);
+
+  const formatting = editor ? getSelectionFormattingState(editor) : EMPTY_FORMATTING;
+  const visibleLinks = formatting.links.slice(0, 3);
+
+  const openLinkEditor = useCallback(
+    (target?: LinkSegment) => {
+      if (!editor) return;
+      const currentSelection = editor.state.selection;
+      const nextTarget: LinkEditorTarget = target
+        ? {
+            href: target.href,
+            from: target.from,
+            to: target.to,
+            existing: true,
+          }
+        : {
+            href: String(editor.getAttributes("link").href || ""),
+            from: currentSelection.from,
+            to: currentSelection.to,
+            existing: editor.isActive("link"),
+          };
+
+      setLinkEditorTarget(nextTarget);
+      setLinkInputValue(nextTarget.href);
+    },
+    [editor]
+  );
+
+  const closeLinkEditor = useCallback(() => {
+    setLinkEditorTarget(null);
+    setLinkInputValue("");
+  }, []);
+
+  const applyLink = useCallback(() => {
+    if (!editor || !linkEditorTarget) return;
+    const rawUrl = linkInputValue.trim();
+    if (!rawUrl) return;
+
+    let finalUrl = rawUrl;
+    if (!/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(finalUrl)) {
+      finalUrl = `https://${finalUrl}`;
+    }
+
+    if (linkEditorTarget.from !== linkEditorTarget.to) {
+      let chain = editor
+        .chain()
+        .focus()
+        .setTextSelection({ from: linkEditorTarget.from, to: linkEditorTarget.to });
+      if (linkEditorTarget.existing) {
+        chain = chain.extendMarkRange("link");
+      }
+      chain.setLink({ href: finalUrl }).run();
+    } else {
+      editor
+        .chain()
+        .focus()
+        .insertContent({
+          type: "text",
+          marks: [{ type: "link", attrs: { href: finalUrl } }],
+          text: finalUrl,
+        })
+        .run();
+    }
+
+    closeLinkEditor();
+  }, [closeLinkEditor, editor, linkEditorTarget, linkInputValue]);
+
+  const removeLink = useCallback(() => {
+    if (!editor || !linkEditorTarget) return;
+
+    let chain = editor
+      .chain()
+      .focus()
+      .setTextSelection({ from: linkEditorTarget.from, to: linkEditorTarget.to });
+    if (linkEditorTarget.existing) {
+      chain = chain.extendMarkRange("link");
+    }
+    chain.unsetLink().run();
+    closeLinkEditor();
+  }, [closeLinkEditor, editor, linkEditorTarget]);
+
+  const shouldShow = useCallback(
+    ({
+      state,
+      editor: ed,
+    }: {
+      editor: Editor;
+      element: HTMLElement;
+      view: import("@tiptap/pm/view").EditorView;
+      state: import("@tiptap/pm/state").EditorState;
+      oldState?: import("@tiptap/pm/state").EditorState;
+      from: number;
+      to: number;
+    }): boolean => {
+      if (linkEditorTarget) return true;
+      const { selection } = state;
+      const { empty } = selection;
+      if (empty) return false;
+      if (selection instanceof NodeSelection) return false;
+      if (ed.isActive("table")) return false;
+      if (ed.isActive("image")) return false;
+      return true;
+    },
+    [linkEditorTarget]
+  );
+
+  useEffect(() => {
+    if (!linkEditorTarget) return;
+    const timer = setTimeout(() => {
+      linkInputRef.current?.focus();
+      linkInputRef.current?.select();
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [linkEditorTarget]);
+
   if (!editor) {
     return null;
   }
@@ -181,35 +366,123 @@ export function BubbleMenu({ editor, onLinkClick }: BubbleMenuProps) {
       editor={editor}
       pluginKey={textFormattingBubbleMenuKey}
       updateDelay={100}
-      shouldShow={bubbleMenuShouldShow}
-      className="flex items-center gap-1 rounded-lg border border-white/10 bg-black/80 p-1 shadow-lg backdrop-blur-md"
+      shouldShow={shouldShow}
+      className="flex flex-col gap-2 rounded-lg border border-white/10 bg-black/80 p-2 shadow-lg backdrop-blur-md"
     >
-      {TOOLBELT_GROUPS.map((group, groupIdx) => (
-        <div key={group.groupId} className="flex items-center gap-1">
-          {groupIdx > 0 && <div className="mx-1 h-6 w-px bg-white/10" />}
+      <div className="flex items-center gap-1">
+        {TOOLBELT_GROUPS.map((group, groupIdx) => (
+          <div key={group.groupId} className="flex items-center gap-1">
+            {groupIdx > 0 && <div className="mx-1 h-6 w-px bg-white/10" />}
 
-          {group.tools.map((tool) => {
-            const IconComponent = TOOLBELT_ICONS[tool.id];
-            const active = isToolActive(tool.id, editor);
-            const command = getEditorCommand(tool.id, editor, onLinkClick);
+            {group.tools.map((tool) => {
+              const IconComponent = TOOLBELT_ICONS[tool.id];
+              const active = isToolActive(tool.id, formatting);
+              const command = getEditorCommand(tool.id, editor, onLinkClick);
 
-            return (
+              if (tool.id === "link") {
+                const linkTargets = visibleLinks.length > 0 ? visibleLinks : [null];
+                return (
+                  <div key={tool.id} className="flex items-center gap-1">
+                    {linkTargets.map((linkTarget, linkIndex) => (
+                      <button
+                        key={`${tool.id}-${linkTarget?.href || "new"}-${linkIndex}`}
+                        onMouseDown={preventFocusLoss}
+                        onClick={() => openLinkEditor(linkTarget ?? undefined)}
+                        className={`rounded p-1.5 transition-colors hover:bg-white/10 ${
+                          linkTarget ? "bg-white/20 text-white" : "text-gray-400"
+                        }`}
+                        title={
+                          linkTarget
+                            ? `Edit Link ${linkIndex + 1}: ${linkTarget.href}`
+                            : getToolTitle(tool.id, editor, tool.shortcut)
+                        }
+                        type="button"
+                      >
+                        <LinkIcon className="h-4 w-4" />
+                      </button>
+                    ))}
+                  </div>
+                );
+              }
+
+              return (
+                <button
+                  key={tool.id}
+                  onMouseDown={preventFocusLoss}
+                  onClick={() => command?.()}
+                  className={`rounded p-1.5 transition-colors hover:bg-white/10 ${
+                    active ? "bg-white/20 text-white" : "text-gray-400"
+                  }`}
+                  title={getToolTitle(tool.id, editor, tool.shortcut)}
+                  type="button"
+                >
+                  {IconComponent && <IconComponent className="h-4 w-4" />}
+                </button>
+              );
+            })}
+          </div>
+        ))}
+      </div>
+      {linkEditorTarget && (
+        <>
+          <div className="h-px w-full bg-white/10" />
+          <div
+            className="flex items-center gap-1"
+            onMouseDown={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+            }}
+          >
+            <input
+              ref={linkInputRef}
+              type="url"
+              value={linkInputValue}
+              onChange={(e) => setLinkInputValue(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  applyLink();
+                }
+                if (e.key === "Escape") {
+                  e.preventDefault();
+                  closeLinkEditor();
+                }
+              }}
+              className="w-44 rounded bg-white/10 px-2 py-1 text-sm text-white outline-none ring-1 ring-white/10 focus:ring-white/30"
+              placeholder="https://example.com"
+            />
+            {linkEditorTarget.existing && (
               <button
-                key={tool.id}
-                onMouseDown={preventFocusLoss}
-                onClick={() => command?.()}
-                className={`rounded p-1.5 transition-colors hover:bg-white/10 ${
-                  active ? "bg-white/20 text-white" : "text-gray-400"
-                }`}
-                title={getToolTitle(tool.id, editor, tool.shortcut)}
                 type="button"
+                onMouseDown={preventFocusLoss}
+                onClick={removeLink}
+                className="rounded p-1.5 text-gray-300 transition-colors hover:bg-white/10 hover:text-white"
+                title="Remove link"
               >
-                {IconComponent && <IconComponent className="h-4 w-4" />}
+                <Link2Off className="h-4 w-4" />
               </button>
-            );
-          })}
-        </div>
-      ))}
+            )}
+            <button
+              type="button"
+              onMouseDown={preventFocusLoss}
+              onClick={applyLink}
+              className="rounded p-1.5 text-gray-300 transition-colors hover:bg-white/10 hover:text-white"
+              title="Apply link"
+            >
+              <Check className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onMouseDown={preventFocusLoss}
+              onClick={closeLinkEditor}
+              className="rounded p-1.5 text-gray-300 transition-colors hover:bg-white/10 hover:text-white"
+              title="Cancel"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        </>
+      )}
     </TipTapBubbleMenu>
   );
 }

@@ -19,10 +19,16 @@ import TableRow from "@tiptap/extension-table-row";
 import TableHeader from "@tiptap/extension-table-header";
 import TableCell from "@tiptap/extension-table-cell";
 import CharacterCount from "@tiptap/extension-character-count";
+import Collaboration from "@tiptap/extension-collaboration";
+import CollaborationCaret from "@tiptap/extension-collaboration-caret";
+import type { HocuspocusProvider } from "@hocuspocus/provider";
+import type { Doc } from "yjs";
 import { common, createLowlight } from "lowlight";
 import { SlashCommands } from "./commands/slash-commands";
 import { TaskListInputRule } from "./extensions/task-list";
 import { BulletListBackspace } from "./extensions/bullet-list";
+import { BlockBoundaryInsert } from "./extensions/block-boundary-insert";
+import { BlockSpacerGuard } from "./extensions/block-spacer-guard";
 import { HeadingBackspace } from "./extensions/heading-backspace";
 import { HeadingHardbreakSplit } from "./extensions/heading-hardbreak-split";
 import { BlockquoteLineOnly } from "./extensions/blockquote-line-only";
@@ -30,6 +36,7 @@ import { Callout } from "./extensions/callout";
 import { WikiLink } from "./extensions/wiki-link";
 import { createWikiLinkSuggestion } from "./extensions/wiki-link-suggestion";
 import { Tag } from "./extensions/tag";
+import { PersonMention } from "./extensions/person-mention";
 import { EditorImage } from "./extensions/image";
 import { AiHighlight } from "./extensions/ai-highlight";
 import { BlockFocusExtension } from "./extensions/block-focus-ext";
@@ -50,6 +57,8 @@ import { DateInput } from "./extensions/blocks/date-input";
 import { NumberInput } from "./extensions/blocks/number-input";
 import { RatingInput } from "./extensions/blocks/rating-input";
 import { PromptInput } from "./extensions/blocks/prompt-input";
+import { Timestamp } from "./extensions/blocks/timestamp";
+import { getExtensionClientEditorExtensions } from "@/lib/extensions/editor-client-registry";
 
 // Create lowlight instance with common languages
 const lowlight = createLowlight(common);
@@ -58,6 +67,15 @@ const lowlight = createLowlight(common);
  * Options for configuring editor extensions
  */
 export interface EditorExtensionsOptions {
+  collaboration?: {
+    document: Doc;
+    provider?: HocuspocusProvider | null;
+    field?: string;
+    user: {
+      name: string;
+      color: string;
+    };
+  };
   /** Callback when a wiki-link is clicked */
   onWikiLinkClick?: (targetTitle: string) => void;
   /** Fetch notes for wiki-link autocomplete */
@@ -70,6 +88,10 @@ export interface EditorExtensionsOptions {
   createTag?: (tagName: string) => Promise<{ id: string; name: string; slug: string; color: string | null; usageCount: number }>;
   /** Callback when a tag is selected from autocomplete */
   onTagSelect?: (tag: { id: string; name: string; slug: string; color: string | null }) => void;
+  /** Fetch people for @ mentions */
+  fetchPeopleMentions?: (query: string) => Promise<Array<{ id: string; personId: string; label: string; slug: string; email: string | null; phone: string | null; avatarUrl: string | null }>>;
+  /** Callback when a person mention is clicked */
+  onPersonMentionClick?: (personId: string) => void;
 }
 
 /**
@@ -79,6 +101,8 @@ export interface EditorExtensionsOptions {
  * @returns TipTap extensions array
  */
 export function getEditorExtensions(options?: EditorExtensionsOptions): Extensions {
+  const collaboration = options?.collaboration;
+
   return [
     StarterKit.configure({
       // Heading levels with markdown shortcuts (# ## ###)
@@ -108,7 +132,41 @@ export function getEditorExtensions(options?: EditorExtensionsOptions): Extensio
       },
       // Enable horizontal rule with ---
       horizontalRule: {},
+      link: false,
+      undoRedo: collaboration ? false : {},
     }),
+
+    ...(collaboration
+      ? [
+          Collaboration.configure({
+            document: collaboration.document,
+            field: collaboration.field ?? "default",
+          }),
+          ...(collaboration.provider
+            ? [
+                CollaborationCaret.configure({
+                  provider: collaboration.provider,
+                  user: collaboration.user,
+                  render: (user, clientId?: number) => {
+                    const cursor = document.createElement("span");
+                    cursor.classList.add("dg-collaboration-caret");
+                    cursor.style.setProperty("--collaborator-color", user.color);
+                    if (clientId !== undefined) {
+                      cursor.dataset.collaborationClientId = String(clientId);
+                    }
+                    cursor.title = user.name;
+                    return cursor;
+                  },
+                  selectionRender: (user) => ({
+                    nodeName: "span",
+                    class: "dg-collaboration-selection",
+                    style: `background-color: ${user.color}24`,
+                  }),
+                }),
+              ]
+            : []),
+        ]
+      : []),
 
     // Syntax-highlighted code blocks
     CodeBlockLowlight.configure({
@@ -140,6 +198,8 @@ export function getEditorExtensions(options?: EditorExtensionsOptions): Extensio
 
     // M6: Bullet list backspace behavior (Obsidian-style)
     BulletListBackspace, // Backspace in empty bullet → plain text "-"
+    BlockBoundaryInsert, // Enter/Shift+Enter from selected block creates editable space after/before it
+    BlockSpacerGuard, // Empty spacer paragraphs next to custom blocks delete themselves, not the block
     HeadingBackspace, // Backspace in empty heading → paragraph with # chain
 
     // M6: External links
@@ -214,6 +274,8 @@ export function getEditorExtensions(options?: EditorExtensionsOptions): Extensio
     NumberInput,
     RatingInput,
     PromptInput,
+    Timestamp,
+    ...getExtensionClientEditorExtensions(),
 
     // M6: Tags with autocomplete
     Tag.configure({
@@ -221,6 +283,11 @@ export function getEditorExtensions(options?: EditorExtensionsOptions): Extensio
       createTag: options?.createTag,
       onTagClick: options?.onTagClick,
       onTagSelect: options?.onTagSelect,
+    }),
+
+    PersonMention.configure({
+      fetchPeople: options?.fetchPeopleMentions || (async () => []),
+      onPersonClick: options?.onPersonMentionClick,
     }),
   ];
 }

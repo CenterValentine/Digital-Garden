@@ -36,7 +36,7 @@ const { schema: dateInputSchema, defaults: dateInputDefaults } =
       .string()
       .default("")
       .describe("Custom format string (date-fns tokens, e.g. DD MMM YYYY)"),
-    showContainer: z.boolean().default(false).describe("Show outer container border"),
+    showContainer: z.boolean().default(false).describe("Show border"),
   });
 
 registerBlock({

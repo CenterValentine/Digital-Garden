@@ -39,6 +39,8 @@ interface ExpandableEditorProps {
   fetchNotesForWikiLink?: (query: string) => Promise<Array<{ id: string; title: string; slug: string }>>;
   /** Fetch tags for tag autocomplete */
   fetchTags?: (query: string) => Promise<Array<{ id: string; name: string; slug: string; color: string | null; usageCount: number }>>;
+  fetchPeopleMentions?: (query: string) => Promise<Array<{ id: string; personId: string; label: string; slug: string; email: string | null; phone: string | null; avatarUrl: string | null }>>;
+  onPersonMentionClick?: (personId: string) => void;
   /** Create a new tag */
   createTag?: (tagName: string) => Promise<{ id: string; name: string; slug: string; color: string | null; usageCount: number }>;
   /** Callback to open Save as Page Template dialog */
@@ -80,6 +82,8 @@ export function ExpandableEditor({
   onWikiLinkClick,
   fetchNotesForWikiLink,
   fetchTags,
+  fetchPeopleMentions,
+  onPersonMentionClick,
   createTag,
   onSaveAsPageTemplate,
 }: ExpandableEditorProps) {
@@ -176,6 +180,8 @@ export function ExpandableEditor({
             onWikiLinkClick={onWikiLinkClick}
             fetchNotesForWikiLink={fetchNotesForWikiLink}
             fetchTags={fetchTags}
+            fetchPeopleMentions={fetchPeopleMentions}
+            onPersonMentionClick={onPersonMentionClick}
             createTag={createTag}
           />
         </div>

@@ -24,7 +24,7 @@ const { schema: dividerSchema, defaults: dividerDefaults } =
       .default("normal")
       .describe("Vertical spacing"),
     label: z.string().default("").describe("Optional center label text"),
-    showContainer: z.boolean().default(false).describe("Show outer container border"),
+    showContainer: z.boolean().default(false).describe("Show border"),
   });
 
 registerBlock({

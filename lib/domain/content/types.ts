@@ -41,6 +41,8 @@ export interface TreeNode {
   title: string;
   slug: string;
   parentId: string | null;
+  peopleGroupId?: string | null;
+  personId?: string | null;
   displayOrder: number;
   customIcon: string | null;
   iconColor: string | null;
@@ -50,6 +52,12 @@ export interface TreeNode {
   createdAt: Date;
   updatedAt: Date;
   deletedAt: Date | null;
+  treeNodeKind?: "content" | "peopleGroup" | "person";
+  peopleMount?: {
+    mountId: string;
+    groupId?: string;
+    personId?: string;
+  };
 
   // Optional payload summaries
   note?: {

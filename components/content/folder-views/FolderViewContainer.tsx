@@ -20,6 +20,11 @@ export interface FolderViewProps {
   folderId: string;
   paneId: WorkspacePaneId;
   folderTitle: string;
+  contentQuery?: {
+    parentId?: string | null;
+    personId?: string | null;
+    peopleGroupId?: string | null;
+  };
   viewPrefs?: Record<string, unknown>;
   sortMode?: string | null;
   includeReferencedContent?: boolean;
@@ -40,6 +45,7 @@ export function FolderViewContainer({
   folderId,
   paneId,
   folderTitle,
+  contentQuery,
   viewPrefs = {},
   sortMode = null,
   includeReferencedContent = false,
@@ -49,6 +55,7 @@ export function FolderViewContainer({
     folderId,
     paneId,
     folderTitle,
+    contentQuery,
     viewPrefs,
     sortMode,
     includeReferencedContent,

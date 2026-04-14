@@ -10,7 +10,8 @@
  * Epoch 11 Sprint 43 (updated Sprint 44b: attrs bridge)
  */
 
-import { Extension } from "@tiptap/core";
+import { Extension, type Editor } from "@tiptap/core";
+import type { Node as ProseMirrorNode } from "@tiptap/pm/model";
 import { createBlockFocusPlugin } from "../plugins/block-focus";
 
 export const BlockFocusExtension = Extension.create({
@@ -123,14 +124,14 @@ export const BlockFocusExtension = Extension.create({
 
 /** Find a node by blockId in the current editor doc */
 function findNodeByBlockId(
-  editor: { state: { doc: any } },
+  editor: Editor,
   blockId: string
 ): { attrs: Record<string, unknown> } | null {
   let result: { attrs: Record<string, unknown> } | null = null;
-  editor.state.doc.descendants((node: any) => {
+  editor.state.doc.descendants((node: ProseMirrorNode) => {
     if (result) return false;
     if (node.attrs.blockId === blockId) {
-      result = node;
+      result = { attrs: node.attrs };
       return false;
     }
     return true;

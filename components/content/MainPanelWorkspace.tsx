@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { createElement, useEffect, useState, type ReactNode } from "react";
 import { Allotment } from "allotment";
 import {
   BOTTOM_LEFT_PANE_ID,
@@ -15,6 +15,7 @@ import {
 import { MainPanelNavigation } from "./MainPanelNavigation";
 import { MainPanelHeader } from "./headers/MainPanelHeader";
 import { MainPanelContent } from "./content/MainPanelContent";
+import { useExtensionShellControllers } from "@/lib/extensions/client-registry";
 
 interface TabDropRequest {
   paneId: WorkspacePaneId;
@@ -408,6 +409,7 @@ export function MainPanelWorkspace() {
   const moveContentTabToPane = useContentStore((state) => state.moveContentTabToPane);
   const restoreWorkspace = useContentStore((state) => state.restoreWorkspace);
   const setSelectedContentId = useContentStore((state) => state.setSelectedContentId);
+  const shellControllers = useExtensionShellControllers();
   const [draggedTabId, setDraggedTabId] = useState<string | null>(null);
   const [draggedFromPaneId, setDraggedFromPaneId] = useState<WorkspacePaneId | null>(null);
   const [hoveredSinglePaneTargetId, setHoveredSinglePaneTargetId] = useState<string | null>(null);
@@ -449,6 +451,7 @@ export function MainPanelWorkspace() {
     if (openContentIds.length > 0) return;
 
     const urlParams = new URLSearchParams(window.location.search);
+    const workspaceIdFromUrl = urlParams.get("workspace");
     const contentIdFromUrl = urlParams.get("content");
     const layoutModeFromUrl = urlParams.get("layout");
     const activePaneIdFromUrl = urlParams.get("pane");
@@ -489,6 +492,16 @@ export function MainPanelWorkspace() {
     const hasPaneTabs = Object.values(paneTabContentIds).some(
       (contentIds) => contentIds && contentIds.length > 0
     );
+
+    if (
+      workspaceIdFromUrl &&
+      !contentIdFromUrl &&
+      !hasPaneTabs &&
+      (!tabsFromUrl || tabsFromUrl.length === 0) &&
+      (!secondaryTabsFromUrl || secondaryTabsFromUrl.length === 0)
+    ) {
+      return;
+    }
 
     if (
       contentIdFromUrl ||
@@ -653,6 +666,11 @@ export function MainPanelWorkspace() {
           />
         )}
       </div>
+      {shellControllers.map((Controller) =>
+        createElement(Controller, {
+          key: Controller.displayName ?? Controller.name,
+        })
+      )}
     </div>
   );
 }

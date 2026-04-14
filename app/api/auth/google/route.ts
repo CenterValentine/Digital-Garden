@@ -1,8 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { v4 as uuidv4 } from 'uuid'
+import { getGoogleOAuthScopesForRequest } from '@/lib/extensions'
 
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID
 const GOOGLE_AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth'
+const GOOGLE_DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive'
+
+function safeRedirectPath(value: string | null): string {
+  if (!value || !value.startsWith('/') || value.startsWith('//')) return '/content'
+  return value
+}
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
   if (!GOOGLE_CLIENT_ID) {
@@ -14,6 +21,25 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
   // Generate state for CSRF protection
   const state = uuidv4()
+  const redirectTo = safeRedirectPath(request.nextUrl.searchParams.get('redirect'))
+  const requestedScope = request.nextUrl.searchParams.get('scope') || ''
+  const requestedScopes = requestedScope
+    .split(/[,\s]+/)
+    .map((scope) => scope.trim())
+    .filter(Boolean)
+  const scopes = new Set([
+    'openid',
+    'email',
+    'profile',
+    GOOGLE_DRIVE_SCOPE,
+  ])
+
+  for (const scope of getGoogleOAuthScopesForRequest({
+    redirectPath: redirectTo,
+    requestedScopes,
+  })) {
+    scopes.add(scope)
+  }
 
   // Get redirect URI
   const redirectUri = new URL('/api/auth/google/callback', request.url).toString()
@@ -26,9 +52,10 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     client_id: GOOGLE_CLIENT_ID,
     redirect_uri: redirectUri,
     response_type: 'code',
-    scope: 'openid email profile https://www.googleapis.com/auth/drive',
+    scope: Array.from(scopes).join(' '),
     state,
     access_type: 'offline',
+    include_granted_scopes: 'true',
     prompt: 'consent',
   })
 
@@ -45,7 +72,13 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     maxAge: 600,
     path: '/',
   })
+  response.cookies.set('oauth_redirect', redirectTo, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    maxAge: 600,
+    path: '/',
+  })
 
   return response
 }
-

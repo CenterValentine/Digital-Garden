@@ -22,6 +22,7 @@ const { schema: numberInputSchema, defaults: numberInputDefaults } =
     step: z.number().default(1).describe("Step increment"),
     unit: z.string().default("").describe("Unit suffix (e.g., kg, %, $)"),
     required: z.boolean().default(false).describe("Required field"),
+    showContainer: z.boolean().default(false).describe("Show border"),
   });
 
 registerBlock({
@@ -111,6 +112,7 @@ export const NumberInput = Node.create({
       step: { default: 1, parseHTML: (el) => parseFloat(el.getAttribute("data-step") || "1"), renderHTML: (attrs) => ({ "data-step": String(attrs.step) }) },
       unit: { default: "", parseHTML: (el) => el.getAttribute("data-unit") || "", renderHTML: (attrs) => attrs.unit ? { "data-unit": attrs.unit } : {} },
       required: { default: false, parseHTML: (el) => el.getAttribute("data-required") === "true", renderHTML: (attrs) => attrs.required ? { "data-required": "true" } : {} },
+      showContainer: { default: false, parseHTML: (el) => el.getAttribute("data-show-container") === "true", renderHTML: (attrs) => attrs.showContainer ? { "data-show-container": "true" } : {} },
     };
   },
 
@@ -123,6 +125,7 @@ export const NumberInput = Node.create({
       label: "Number Input",
       iconName: "Hash",
       atom: true,
+      containerAttr: "showContainer",
       renderContent: renderNumberInput,
       updateContent(node, contentDom, editor) {
         contentDom.innerHTML = "";
@@ -149,6 +152,7 @@ export const ServerNumberInput = Node.create({
       step: { default: 1, parseHTML: (el) => parseFloat(el.getAttribute("data-step") || "1"), renderHTML: (attrs) => ({ "data-step": String(attrs.step) }) },
       unit: { default: "", parseHTML: (el) => el.getAttribute("data-unit") || "", renderHTML: (attrs) => attrs.unit ? { "data-unit": attrs.unit } : {} },
       required: { default: false, parseHTML: (el) => el.getAttribute("data-required") === "true", renderHTML: (attrs) => attrs.required ? { "data-required": "true" } : {} },
+      showContainer: { default: false, parseHTML: (el) => el.getAttribute("data-show-container") === "true", renderHTML: (attrs) => attrs.showContainer ? { "data-show-container": "true" } : {} },
     };
   },
 

@@ -49,6 +49,88 @@ interface LeftSidebarContentProps {
   } | null;
   onSelectionChange?: (hasMultipleSelections: boolean) => void;
   onFileDrop?: (files: File[]) => void;
+  onAddPeopleTarget?: (parentId: string | null) => void;
+}
+
+type CreateTarget = {
+  treeParentId: string | null;
+  requestParentId: string | null;
+  peopleGroupId: string | null;
+  personId: string | null;
+};
+
+function parsePeopleVirtualParentId(parentId: string | null): Pick<CreateTarget, "peopleGroupId" | "personId"> {
+  if (parentId?.startsWith("peopleGroup:")) {
+    return {
+      peopleGroupId: parentId.replace("peopleGroup:", ""),
+      personId: null,
+    };
+  }
+
+  if (parentId?.startsWith("person:")) {
+    return {
+      peopleGroupId: null,
+      personId: parentId.replace("person:", ""),
+    };
+  }
+
+  return {
+    peopleGroupId: null,
+    personId: null,
+  };
+}
+
+function findTreeNode(nodes: TreeNode[], id: string): TreeNode | null {
+  for (const node of nodes) {
+    if (node.id === id) return node;
+    const found = node.children ? findTreeNode(node.children, id) : null;
+    if (found) return found;
+  }
+  return null;
+}
+
+function getCreateTarget(parentId: string | null, treeData: TreeNode[]): CreateTarget {
+  const virtualAssignment = parsePeopleVirtualParentId(parentId);
+  if (virtualAssignment.peopleGroupId || virtualAssignment.personId) {
+    return {
+      treeParentId: parentId,
+      requestParentId: null,
+      ...virtualAssignment,
+    };
+  }
+
+  const parentNode = parentId ? findTreeNode(treeData, parentId) : null;
+
+  return {
+    treeParentId: parentId,
+    requestParentId: parentId,
+    peopleGroupId: parentNode?.peopleGroupId ?? null,
+    personId: parentNode?.personId ?? null,
+  };
+}
+
+function isPeopleTreeNode(node: TreeNode | null): node is TreeNode & {
+  treeNodeKind: "person" | "peopleGroup";
+} {
+  return Boolean(node && (node.treeNodeKind === "person" || node.treeNodeKind === "peopleGroup"));
+}
+
+function toPeopleMountTarget(node: TreeNode) {
+  if (node.treeNodeKind === "person" && node.personId) {
+    return {
+      kind: "person" as const,
+      personId: node.personId,
+    };
+  }
+
+  if (node.treeNodeKind === "peopleGroup" && node.peopleGroupId) {
+    return {
+      kind: "peopleGroup" as const,
+      groupId: node.peopleGroupId,
+    };
+  }
+
+  throw new Error("Invalid People mount target");
 }
 
 export function LeftSidebarContent({
@@ -56,6 +138,7 @@ export function LeftSidebarContent({
   createTrigger,
   onSelectionChange,
   onFileDrop,
+  onAddPeopleTarget,
 }: LeftSidebarContentProps) {
   const [treeData, setTreeData] = useState<TreeNode[] | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -389,6 +472,7 @@ export function LeftSidebarContent({
     // Check if this is actually a position change
     const isSameParent = currentParentId === parentId;
     const isSamePosition = isSameParent && (currentIndex === index || currentIndex === index - 1);
+    const draggedNode = findTreeNode(originalTree, dragIds[0]);
 
     // Debug logging
     console.log('[handleMove] Drag analysis:', {
@@ -401,6 +485,31 @@ export function LeftSidebarContent({
     if (isSamePosition) {
       console.log('[handleMove] No position change detected, skipping API call');
       return; // Skip the move - item is being dropped in same position
+    }
+
+    if (!draggedNode) {
+      toast.error("Failed to move item", {
+        description: "The dragged item could not be found in the current tree.",
+      });
+      return;
+    }
+
+    if (isPeopleTreeNode(draggedNode) && dragIds.length > 1) {
+      toast.error("Failed to move item", {
+        description: "People mounts can only be moved one at a time.",
+      });
+      return;
+    }
+
+    if (
+      isPeopleTreeNode(draggedNode) &&
+      (parentId?.startsWith("peopleGroup:") || parentId?.startsWith("person:"))
+    ) {
+      toast.error("Failed to move item", {
+        description:
+          "Contacts and groups can only be placed at the root or inside real folders. Use the People view to change group membership.",
+      });
+      return;
     }
 
     try {
@@ -421,19 +530,32 @@ export function LeftSidebarContent({
         newDisplayOrder: apiIndex,
       });
 
-      // Make API call in background
-      const response = await fetch("/api/content/content/move", {
-        method: "POST",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          contentId: dragIds[0], // Only support single drag for now
-          targetParentId: parentId,
-          newDisplayOrder: apiIndex,
-        }),
-      });
+      const response = isPeopleTreeNode(draggedNode)
+        ? await fetch("/api/people/mounts", {
+            method: "POST",
+            credentials: "include",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              target: toPeopleMountTarget(draggedNode),
+              contentParentId: parentId,
+              displayOrder: apiIndex,
+              allowRemount: true,
+            }),
+          })
+        : await fetch("/api/content/content/move", {
+            method: "POST",
+            credentials: "include",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              contentId: dragIds[0], // Only support single drag for now
+              targetParentId: parentId,
+              newDisplayOrder: apiIndex,
+            }),
+          });
 
       const result = await response.json();
 
@@ -449,6 +571,10 @@ export function LeftSidebarContent({
 
       // Success! Optimistic update is complete, no refetch needed
       console.log("Move successful, optimistic update complete");
+      if (isPeopleTreeNode(draggedNode)) {
+        window.dispatchEvent(new CustomEvent("dg:tree-refresh"));
+        window.dispatchEvent(new CustomEvent("dg:people-refresh"));
+      }
     } catch (err) {
       console.error("Failed to move node:", err);
       // Rollback to original tree state on any error
@@ -494,6 +620,18 @@ export function LeftSidebarContent({
     const firstNode = nodes[0];
     if (firstNode) {
       console.log("Selected node:", firstNode);
+      if (firstNode.treeNodeKind === "person") {
+        setSelectedContentId(firstNode.id, {
+          title: firstNode.title,
+          contentType: "person-profile",
+        });
+        return;
+      }
+
+      if (firstNode.treeNodeKind === "peopleGroup") {
+        return;
+      }
+
       setSelectedContentId(firstNode.id, {
         title: firstNode.title,
         contentType: firstNode.contentType,
@@ -617,6 +755,11 @@ export function LeftSidebarContent({
     }
 
     const { type, parentId, tempId } = creatingItem;
+    const createTarget = treeData ? getCreateTarget(parentId, treeData) : {
+      treeParentId: parentId,
+      requestParentId: parentId,
+      ...parsePeopleVirtualParentId(parentId),
+    };
     const optimisticContentType: ContentType =
       type === "docx" || type === "xlsx" || type === "json"
         ? "file"
@@ -723,8 +866,14 @@ export function LeftSidebarContent({
       // Build request body
       const requestBody: any = {
         title: config.title,
-        parentId,
+        parentId: createTarget.requestParentId,
       };
+      if (createTarget.peopleGroupId) {
+        requestBody.peopleGroupId = createTarget.peopleGroupId;
+      }
+      if (createTarget.personId) {
+        requestBody.personId = createTarget.personId;
+      }
 
       // Add type-specific payloads or use special endpoints
       if (type === "docx" || type === "xlsx" || type === "json") {
@@ -736,7 +885,7 @@ export function LeftSidebarContent({
           body: JSON.stringify({
             fileName: config.title,
             fileType: config.fileType,
-            parentId,
+            parentId: createTarget.requestParentId,
           }),
         });
 
@@ -848,7 +997,9 @@ export function LeftSidebarContent({
           id: apiResponse.id,
           title: apiResponse.title,
           slug: apiResponse.slug,
-          parentId: apiResponse.parentId,
+          parentId: createTarget.treeParentId,
+          peopleGroupId: apiResponse.peopleGroupId ?? createTarget.peopleGroupId,
+          personId: apiResponse.personId ?? createTarget.personId,
           displayOrder: apiResponse.displayOrder,
           customIcon: apiResponse.customIcon,
           iconColor: apiResponse.iconColor,
@@ -1650,6 +1801,14 @@ export function LeftSidebarContent({
       }
     }
 
+    const createTarget = getCreateTarget(parentId, treeData);
+    if ((createTarget.peopleGroupId || createTarget.personId) && !["folder", "note"].includes(type)) {
+      toast.info("People content", {
+        description: "Only notes and folders can be added under People records in this phase.",
+      });
+      return;
+    }
+
     // Generate temporary ID for the placeholder node
     const tempId = `temp-${Date.now()}-${Math.random()}`;
 
@@ -1663,7 +1822,9 @@ export function LeftSidebarContent({
       title: "", // Empty - user will type the name
       slug: "",
       contentType,
-      parentId: parentId,
+      parentId: createTarget.treeParentId,
+      peopleGroupId: createTarget.peopleGroupId,
+      personId: createTarget.personId,
       displayOrder: 0,
       customIcon: null,
       iconColor: null,
@@ -1686,13 +1847,13 @@ export function LeftSidebarContent({
 
     // Insert temporary node into tree data
     const insertTempNode = (nodes: TreeNode[]): TreeNode[] => {
-      if (parentId === null) {
+      if (createTarget.treeParentId === null) {
         // Insert at root level (at the beginning)
         return [tempNode, ...nodes];
       }
 
       return nodes.map((node) => {
-        if (node.id === parentId) {
+        if (node.id === createTarget.treeParentId) {
           // Found parent - insert temp node as first child
           return {
             ...node,
@@ -1716,15 +1877,15 @@ export function LeftSidebarContent({
     // Set creating state to track the temporary node
     setCreatingItem({
       type,
-      parentId,
+      parentId: createTarget.treeParentId,
       tempId,
     });
 
     // IMPORTANT: If creating inside a folder, we need to auto-expand it
     // so the temporary node becomes visible and can enter edit mode
-    if (parentId !== null) {
+    if (createTarget.treeParentId !== null) {
       // Signal FileTree to expand this node imperatively
-      setExpandNodeId(parentId);
+      setExpandNodeId(createTarget.treeParentId);
     }
 
     // Note: The actual API call happens in handleCreateSubmit when user presses Enter
@@ -1820,6 +1981,7 @@ export function LeftSidebarContent({
             onCreateVisualizationMermaid={handleCreateVisualizationMermaid}
             onCreateVisualizationExcalidraw={handleCreateVisualizationExcalidraw}
             onCreateVisualizationDiagramsNet={handleCreateVisualizationDiagramsNet}
+            onAddPeopleTarget={onAddPeopleTarget ? async (parentId) => onAddPeopleTarget(parentId) : undefined}
             height={Math.max(treeHeight - 36, 100)}
             editingNodeId={creatingItem?.tempId}
             expandNodeId={expandNodeId}

@@ -25,6 +25,7 @@ const { schema: textInputSchema, defaults: textInputDefaults } =
       .describe("Input type"),
     maxLength: z.number().int().min(0).default(0).describe("Character limit (0 = no limit)"),
     required: z.boolean().default(false).describe("Required field"),
+    showContainer: z.boolean().default(false).describe("Show border"),
   });
 
 registerBlock({
@@ -153,6 +154,11 @@ export const TextInput = Node.create({
         parseHTML: (el) => el.getAttribute("data-required") === "true",
         renderHTML: (attrs) => attrs.required ? { "data-required": "true" } : {},
       },
+      showContainer: {
+        default: false,
+        parseHTML: (el) => el.getAttribute("data-show-container") === "true",
+        renderHTML: (attrs) => attrs.showContainer ? { "data-show-container": "true" } : {},
+      },
     };
   },
 
@@ -176,6 +182,7 @@ export const TextInput = Node.create({
       label: "Text Input",
       iconName: "Type",
       atom: true,
+      containerAttr: "showContainer",
       renderContent: renderTextInput,
       updateContent(node, contentDom, editor) {
         contentDom.innerHTML = "";
@@ -224,6 +231,11 @@ export const ServerTextInput = Node.create({
         default: false,
         parseHTML: (el) => el.getAttribute("data-required") === "true",
         renderHTML: (attrs) => attrs.required ? { "data-required": "true" } : {},
+      },
+      showContainer: {
+        default: false,
+        parseHTML: (el) => el.getAttribute("data-show-container") === "true",
+        renderHTML: (attrs) => attrs.showContainer ? { "data-show-container": "true" } : {},
       },
     };
   },

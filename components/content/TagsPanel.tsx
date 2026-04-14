@@ -49,7 +49,7 @@ export function TagsPanel({ contentId }: TagsPanelProps) {
     }
 
     // Skip fetching for temporary IDs (files being created)
-    if (contentId.startsWith("temp-")) {
+    if (contentId.startsWith("temp-") || contentId.startsWith("person:") || contentId.startsWith("peopleGroup:")) {
       setTags([]);
       setIsLoading(false);
       return;

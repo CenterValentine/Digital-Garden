@@ -17,6 +17,7 @@ import { getSurfaceStyles } from "@/lib/design/system";
 import type { FolderViewProps } from "./FolderViewContainer";
 import { getDisplayExtension } from "@/lib/domain/content/file-extension-utils";
 import { useContentStore } from "@/state/content-store";
+import { buildContentListUrl } from "./content-query";
 
 interface ContentChild {
   id: string;
@@ -37,6 +38,7 @@ export function DashboardView({
   folderId,
   paneId,
   folderTitle,
+  contentQuery,
   viewPrefs = {},
   onUpdateView,
 }: FolderViewProps) {
@@ -45,18 +47,20 @@ export function DashboardView({
   const [items, setItems] = useState<ContentChild[]>([]);
   const [loading, setLoading] = useState(true);
   const [layout, setLayout] = useState<Layout>([]);
+  const contentQueryKey = JSON.stringify(contentQuery ?? { parentId: folderId });
+  const viewPrefsKey = JSON.stringify(viewPrefs);
   // Tracks whether the initial layout has settled so we don't fire onUpdateView
   // on the first react-grid-layout onLayoutChange that fires during initialization.
   const isLayoutInitializedRef = useRef(false);
 
   useEffect(() => {
     loadItems();
-  }, [folderId]);
+  }, [folderId, contentQueryKey, viewPrefsKey]);
 
   const loadItems = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`/api/content/content?parentId=${folderId}`, { credentials: "include" });
+      const response = await fetch(buildContentListUrl(contentQuery ?? { parentId: folderId }), { credentials: "include" });
 
       if (!response.ok) {
         throw new Error("Failed to load folder contents");

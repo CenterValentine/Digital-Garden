@@ -1,5 +1,5 @@
 ---
-last_updated: 2026-03-12
+last_updated: 2026-04-09
 ---
 
 # Sprint Backlog
@@ -209,6 +209,68 @@ The following sprints were originally 38-42 in Epoch 9 but are deferred to Epoch
 - [ ] **1. Folder double-click not expanding** — `node.open()`/`node.close()` + `node.select()` attempted but react-arborist is still not reliably expanding. Root cause: `node.open()` may not exist on the `NodeApi` — need to verify the exact API surface on the installed version, or handle via `onToggle` callback. Also check whether `e.stopPropagation()` is preventing the tree's internal click handler from running `select` (which triggers `onSelect` / navigation).
 - [ ] **2. Scrollbar still visible in content panel** — Overflow is being set to `overflow-hidden` on the wrapper but FolderViewer (and potentially other viewers) have internal `overflow-auto` that are escaping. Check the full ancestor chain: `MainPanel → MainPanelContent → isNonNoteContent wrapper → content div → FolderViewer` — ensure every level in the chain has `overflow-hidden` or `min-h-0` as appropriate. The scrollbar appears most visibly when a folder is open.
 - [ ] **3. "Failed to load content" on new note creation** — After creating a new note, the main panel shows "Failed to load content / Failed to fetch content". The temp-ID guard in MainPanelContent was added but the error persists. Likely the GET `/api/content/content/[id]` is firing before the real ID is swapped in — check console logs for the actual status code and response body to confirm root cause.
+- [ ] **4. Tabs block: keyboard tab walking does not iterate** — First ArrowDown from a paragraph above a tabs block correctly focuses Tab 1 and sets `data-keyboard-tab-mode="tab"`. Second ArrowDown does NOT step to Tab 2; instead the editor scroll takes over and subsequent arrows scroll the note. Suspect that focus on the `.block-tab-btn` is being stolen between keystrokes (ProseMirror `updateState` / DOM observer after the `activeTab` attr dispatch may refocus the editor DOM), so the global capture listener's `if (!mode) return` check short-circuits because the mode attribute was cleared by the `focusout` handler when PM re-grabbed focus. Fixes attempted (did not work): (a) removed `requestAnimationFrame` wrapper around `button.focus()` in `focusTabSurfaceButton` — made focus sync. Still fails. Investigate: is `focusout` firing during the second keystroke? Is the capture listener even running? Add a breakpoint/log in `handleDocumentKeyDown` to confirm whether it reaches `handleKeyboardTabSurfaceNavigation` on the second press. Alternative architecture: move the entire tab-walking state machine into a ProseMirror plugin with its own plugin state (not DOM attributes), and handle the arrow keys via a `handleKeyDown` prop that checks plugin state rather than relying on DOM focus. See `lib/domain/editor/extensions/blocks/tabs.ts:459` and `lib/domain/editor/extensions/block-boundary-insert.ts:292`.
+- [ ] **6. People tree: contacts not reorderable within a group** — `PeoplePersonRow` sets `draggable` and fires `onDragStart` with `kind: "person"`, but the drop targets (`onDrop`) only exist on `PeopleGroupRow` — dragging a person onto a group reassigns their `primaryGroupId` (via `/api/people/move`), it does not change display order within the same group. The `Person` model has no `displayOrder` column. To support within-group reordering: add `displayOrder Int` to the `Person` schema, expose it in the tree API sort, and add a reorder endpoint (or extend `/api/people/move` with `displayOrder` patching). Also need drop-indicator UI between person rows (not just on groups). See `components/content/people/PeoplePanel.tsx:1220` (`PeoplePersonRow`) and `app/api/people/move/route.ts`.
+- [ ] **5. Accordion block: arrow navigation scrolls to top** — Pressing Up/Down through a list of accordion blocks causes the main panel scroll container to jump to the top of the page. `moveCursorToAdjacentParagraphAroundBlock` in `lib/domain/blocks/node-view-factory.ts:140` dispatches a selection change, and ProseMirror's `selectionToDOM` then places the cursor via the browser Selection API, which triggers an uncontrolled scroll. Fix attempted (did not work): added `findScrollContainer` helper to save/restore `scrollTop` on the nearest `overflow-y: auto` ancestor around the `view.dispatch()` call. Still jumps. Investigate: (a) is the scroll happening BEFORE the save (i.e., does another layer dispatch first?), (b) is there an additional scroll event from `focusEditorView` itself, (c) try restoring via `requestAnimationFrame` instead of synchronously, (d) walk the ancestor chain and save scroll on ALL scrollable ancestors not just the nearest, (e) consider using `view.dispatch(tr, { scrollIntoView: false })` or setting the selection WITHOUT scrollIntoView flag. Also check whether the accordion nodeview's `selectNode`/`deselectNode` is triggering focus/scroll.
+
+---
+
+## Epoch 13: People + Collaboration (Starts Sprint 58)
+
+**Goal**: Add a People system with safe file-tree representations, person mentions, and Hocuspocus-backed collaboration.
+**Detailed plan**: [epoch-13-people-and-collaboration.md](epochs/epoch-13-people-and-collaboration.md)
+
+### Sprint 58: Foundations
+- [ ] Work from `/Users/davidvalentine/Documents/Digital-Garden/.worktrees/epoch-13-people-collab`
+- [ ] Rename file-tree creation menu wording from `New` to `Add`
+- [ ] Add People schema foundations: default `People` group, group/subgroup, person, mount, mention planning
+- [ ] Keep group/subgroup as People-domain mount nodes rendered folder-like; do not add `ContentType.group`
+- [ ] Add server-side People tree policy scaffolding for create/move/duplicate/delete/mount APIs
+- [ ] Add collaboration access planning for owner, signed-in `view`/`edit`, and public `/share` view-only paths
+
+### Sprint 59: People View + Mount UX
+- [ ] Build People view with canonical group/subgroup tree
+- [ ] Build person detail surface with person-scoped content
+- [ ] Add `Add -> Person/Group` searchable mount flow in file-tree context menu and `+` menu
+- [ ] Add conflict detection for already-mounted people/groups/subgroups
+
+### Sprint 60: Tree Policy Hardening
+- [ ] Enforce exactly-one file-tree representation per person/group/subgroup
+- [ ] Implement confirmed remount transactions for conflicting group/subgroup mounts
+- [ ] Implement controlled-content reassignment inside People mirrored areas
+- [ ] Implement warning + preference when moving controlled content out to normal folder jurisdiction
+
+### Sprint 61: Person Mentions
+- [ ] Add `@person` TipTap extension and autocomplete
+- [ ] Sync mentions to normalized storage
+- [ ] Clicking an `@person` opens the person and focuses their file-tree mount if present
+
+### Sprint 62: Hocuspocus Collaboration
+- [ ] Add same-repo Hocuspocus service and Yjs persistence
+- [ ] Support owner `/content` collaboration access
+- [ ] Support signed-in collaborator `/content` access with `view` and `edit`
+- [ ] Prevent legacy autosave from racing collaboration persistence
+
+### Sprint 63: Share + Media Prototype
+- [ ] Add public `/share` view-only access for non-users
+- [ ] Preserve expected signed-in `view`/`edit` access when entering through `/share`
+- [ ] Prototype small P2P WebRTC rooms only after Hocuspocus stability gates pass
+
+## Epoch 14: Saved Content Workspaces
+
+**Goal**: Persist named tab/pane workspaces with locked claims, temporary borrowing, permanent sharing, and expiration cleanup.
+**Detailed plan**: [epoch-14-saved-content-workspaces.md](epochs/epoch-14-saved-content-workspaces.md)
+
+### Sprint 65: Workspace Persistence + Claims
+- [ ] DB-backed `ContentWorkspace` and `ContentWorkspaceItem` models
+- [ ] Main Workspace fallback for unassigned/catchall tabs
+- [ ] Workspace selector and settings popup in the main-panel navigation chrome
+- [ ] Per-workspace tab/pane layout persistence and restoration
+- [ ] Locked recursive folder/content claims with conflict reminder
+- [ ] Temporary borrowing with auto-release and permanent sharing
+- [ ] Tab context menu actions to move or share tabs across workspaces
+- [ ] Workspace expiration archive/release flow
+- [ ] Build + smoke gate on port `3014`
 
 ---
 

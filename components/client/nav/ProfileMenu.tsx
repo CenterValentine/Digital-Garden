@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { ChevronDown, Shield, LogOut, MessageSquare, Bug, Settings } from "lucide-react";
 import type { SessionData } from "@/lib/infrastructure/auth/types";
 import { getSurfaceStyles } from "@/lib/design/system";
+import { publishSignedOut } from "@/lib/infrastructure/auth/client-session-events";
 
 export default function ProfileMenu() {
   const router = useRouter();
@@ -64,6 +65,7 @@ export default function ProfileMenu() {
 
       // Clear local session state
       setSession(null);
+      publishSignedOut("manual");
 
       // Close the menu
       setIsOpen(false);
