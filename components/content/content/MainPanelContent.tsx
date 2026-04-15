@@ -1386,7 +1386,7 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
     const editorElement = (
       <div className="flex flex-col h-full">
         {/* Note title header with debug toggle */}
-        <div className="flex-none px-6 pt-6 pb-4 flex items-start justify-between shadow-[0_2px_4px_rgba(15,23,42,0.09),0_8px_28px_rgba(15,23,42,0.06),0_24px_64px_rgba(15,23,42,0.03)]">
+        <div className="flex-none px-6 pt-6 pb-4 flex items-start justify-between shadow-[0_4px_8px_-2px_rgba(15,23,42,0.08),0_10px_24px_-6px_rgba(15,23,42,0.05)]">
           {isTitleEditing ? (
             <input
               ref={titleInputRef}
@@ -1490,7 +1490,7 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
                 onSaveAsPageTemplate={handleSaveAsTemplate}
               />
             )}
-            <div className="flex-1 min-h-0 overflow-auto">{contentElement}</div>
+            <div className="flex-1 min-h-[150px] overflow-auto">{contentElement}</div>
             {notesPanelPosition !== "above" && (
               <ExpandableEditor
                 contentId={selectedContentId}

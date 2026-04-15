@@ -122,6 +122,12 @@ export function PeoplePanel() {
   const [renameValue, setRenameValue] = useState("");
   const [isSubmittingRename, setIsSubmittingRename] = useState(false);
   const [dragOverGroupId, setDragOverGroupId] = useState<string | null>(null);
+  const [isDragOverRoot, setIsDragOverRoot] = useState(false);
+  const [insertTarget, setInsertTarget] = useState<{
+    groupId: string;
+    position: "before" | "after";
+    parentGroupId: string | null;
+  } | null>(null);
   const [selection, setSelection] = useState<PeopleSelection | null>(null);
   const [contextMenu, setContextMenu] = useState<PeopleContextMenuState>(null);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(() => new Set());
@@ -132,6 +138,25 @@ export function PeoplePanel() {
   const [contextMenuPosition, setContextMenuPosition] = useState<{ x: number; y: number; maxHeight: number } | null>(null);
 
   const setSelectedContentId = useContentStore((state) => state.setSelectedContentId);
+  const updateContentTab = useContentStore((state) => state.updateContentTab);
+
+  // Optimistically update a content node title in the local tree state so the
+  // sidebar reflects the rename immediately, without waiting for the refetch.
+  const patchTreeContentTitle = useCallback((contentId: string, newTitle: string) => {
+    const patchNodes = (nodes: PeopleTreeContentNode[]): PeopleTreeContentNode[] =>
+      nodes.map((n) =>
+        n.contentId === contentId
+          ? { ...n, title: newTitle, children: patchNodes(n.children) }
+          : { ...n, children: patchNodes(n.children) }
+      );
+    const patchGroup = (g: PeopleTreeGroupNode): PeopleTreeGroupNode => ({
+      ...g,
+      content: patchNodes(g.content),
+      people: g.people.map((p) => ({ ...p, content: patchNodes(p.content) })),
+      childGroups: g.childGroups.map(patchGroup),
+    });
+    setTree((prev) => prev ? { ...prev, groups: prev.groups.map(patchGroup) } : prev);
+  }, []);
 
   const trimmedQuery = query.trim();
   const isSearchMode = trimmedQuery.length > 0;
@@ -342,7 +367,7 @@ export function PeoplePanel() {
     });
   }, [setSelectedContentId]);
 
-  const movePeopleRecord = useCallback(async (payload: PeopleDragPayload, targetGroupId: string) => {
+  const movePeopleRecord = useCallback(async (payload: PeopleDragPayload, targetGroupId: string | null) => {
     try {
       const response = await fetch("/api/people/move", {
         method: "POST",
@@ -599,8 +624,14 @@ export function PeoplePanel() {
         }
       }
 
+      const trimmedName = renameValue.trim();
+      // Keep open tabs and sidebar tree in sync immediately — don't wait for refetch.
+      if (renameTarget.kind === "content") {
+        updateContentTab(renameTarget.contentId, { title: trimmedName });
+        patchTreeContentTitle(renameTarget.contentId, trimmedName);
+      }
       toast.success("Renamed", {
-        description: renameValue.trim(),
+        description: trimmedName,
       });
       setRenameTarget(null);
       setRenameValue("");
@@ -613,7 +644,7 @@ export function PeoplePanel() {
     } finally {
       setIsSubmittingRename(false);
     }
-  }, [refreshViews, renameTarget, renameValue]);
+  }, [refreshViews, renameTarget, renameValue, updateContentTab, patchTreeContentTitle]);
 
   const handleDeleteSelection = useCallback(async (target: PeopleSelection) => {
     const label = target.kind === "content" ? target.title : target.label;
@@ -824,13 +855,27 @@ export function PeoplePanel() {
             description="Your default People group will be created automatically."
           />
         ) : (
-          <div className="space-y-1">
+          <div
+            className="space-y-1"
+            onDragLeave={(event) => {
+              if (!event.currentTarget.contains(event.relatedTarget as Node)) {
+                setInsertTarget(null);
+                setIsDragOverRoot(false);
+              }
+            }}
+            onDrop={() => {
+              // If no group row captured it, clear states
+              setInsertTarget(null);
+              setIsDragOverRoot(false);
+            }}
+          >
             {visibleGroups.map((group) => (
               <PeopleGroupRow
                 key={group.id}
                 group={group}
                 depth={0}
                 dragOverGroupId={dragOverGroupId}
+                insertTarget={insertTarget}
                 selectedId={selection?.id ?? null}
                 expandedIds={expandedIds}
                 onSelect={setSelection}
@@ -839,8 +884,16 @@ export function PeoplePanel() {
                 onOpenProfile={openProfile}
                 onOpenPersonWorkspace={openPersonWorkspace}
                 onOpenContent={openContentWorkspace}
-                onDragOverGroup={setDragOverGroupId}
+                onDragOverGroup={(id) => {
+                  setDragOverGroupId(id);
+                  if (id) { setInsertTarget(null); setIsDragOverRoot(false); }
+                }}
+                onDragInsertNear={(groupId, position, parentGroupId) => {
+                  setDragOverGroupId(null);
+                  setInsertTarget(groupId ? { groupId, position, parentGroupId } : null);
+                }}
                 onDropOnGroup={(payload, targetGroupId) => void movePeopleRecord(payload, targetGroupId)}
+                onDropInsertNear={(payload, parentGroupId) => void movePeopleRecord(payload, parentGroupId)}
               />
             ))}
           </div>
@@ -1029,6 +1082,7 @@ function PeopleGroupRow({
   group,
   depth,
   dragOverGroupId,
+  insertTarget,
   selectedId,
   expandedIds,
   onSelect,
@@ -1038,11 +1092,14 @@ function PeopleGroupRow({
   onOpenPersonWorkspace,
   onOpenContent,
   onDragOverGroup,
+  onDragInsertNear,
   onDropOnGroup,
+  onDropInsertNear,
 }: {
   group: PeopleTreeGroupNode;
   depth: number;
   dragOverGroupId: string | null;
+  insertTarget: { groupId: string; position: "before" | "after"; parentGroupId: string | null } | null;
   selectedId: string | null;
   expandedIds: Set<string>;
   onSelect: (selection: PeopleSelection) => void;
@@ -1052,7 +1109,9 @@ function PeopleGroupRow({
   onOpenPersonWorkspace: (person: { personId: string; label: string }) => void;
   onOpenContent: (content: PeopleTreeContentNode) => void;
   onDragOverGroup: (groupId: string | null) => void;
-  onDropOnGroup: (payload: PeopleDragPayload, targetGroupId: string) => void;
+  onDragInsertNear: (groupId: string | null, position: "before" | "after", parentGroupId: string | null) => void;
+  onDropOnGroup: (payload: PeopleDragPayload, targetGroupId: string | null) => void;
+  onDropInsertNear: (payload: PeopleDragPayload, parentGroupId: string | null) => void;
 }) {
   const isDragTarget = dragOverGroupId === group.groupId;
   const isSelected = selectedId === group.id;
@@ -1060,8 +1119,15 @@ function PeopleGroupRow({
   const isExpanded = expandedIds.has(group.id);
   const hasChildren = group.content.length > 0 || group.people.length > 0 || group.childGroups.length > 0;
 
+  const isInsertBefore = insertTarget?.groupId === group.groupId && insertTarget.position === "before";
+  const isInsertAfter = insertTarget?.groupId === group.groupId && insertTarget.position === "after";
+
   return (
     <div>
+      {/* Insert-before indicator */}
+      {isInsertBefore && (
+        <div className="pointer-events-none mx-1 h-0.5 rounded-full bg-gold-primary/70" style={{ marginLeft: 8 + depth * 14 }} />
+      )}
       <div
         role="treeitem"
         tabIndex={0}
@@ -1094,14 +1160,44 @@ function PeopleGroupRow({
           if (!hasPeopleDrag(event)) return;
           event.preventDefault();
           event.dataTransfer.dropEffect = "move";
-          onDragOverGroup(group.groupId);
+
+          const rect = event.currentTarget.getBoundingClientRect();
+          const relY = (event.clientY - rect.top) / rect.height;
+          const edgeZone = 0.3;
+
+          if (relY < edgeZone) {
+            // Top edge → insert before (move to same parent)
+            onDragInsertNear(group.groupId, "before", group.parentGroupId ?? null);
+            onDragOverGroup(null);
+          } else if (relY > 1 - edgeZone) {
+            // Bottom edge → insert after (move to same parent)
+            onDragInsertNear(group.groupId, "after", group.parentGroupId ?? null);
+            onDragOverGroup(null);
+          } else {
+            // Center → drop into this group
+            onDragInsertNear(null, "before", null);
+            onDragOverGroup(group.groupId);
+          }
         }}
-        onDragLeave={() => onDragOverGroup(null)}
+        onDragLeave={() => {
+          onDragOverGroup(null);
+          onDragInsertNear(null, "before", null);
+        }}
         onDrop={(event) => {
           const payload = getPeopleDragPayload(event);
           if (!payload) return;
+          // Prevent dropping a group onto itself
+          if (payload.kind === "peopleGroup" && payload.groupId === group.groupId) {
+            event.preventDefault();
+            return;
+          }
           event.preventDefault();
-          onDropOnGroup(payload, group.groupId);
+          // If an insert indicator is active for this group, move to parent level
+          if (insertTarget?.groupId === group.groupId) {
+            onDropInsertNear(payload, group.parentGroupId ?? null);
+          } else {
+            onDropOnGroup(payload, group.groupId);
+          }
         }}
         className={`flex items-center gap-2 rounded px-2 py-1.5 text-sm outline-none transition-colors hover:bg-gray-50 focus:bg-gray-50 ${
           isSelected ? "bg-gold-primary/10 ring-1 ring-gold-primary/30" : ""
@@ -1129,6 +1225,10 @@ function PeopleGroupRow({
         </div>
         <MountBadge mounted={Boolean(group.mount)} />
       </div>
+      {/* Insert-after indicator */}
+      {isInsertAfter && (
+        <div className="pointer-events-none mx-1 h-0.5 rounded-full bg-gold-primary/70" style={{ marginLeft: 8 + depth * 14 }} />
+      )}
 
       {isExpanded ? (
         <>
@@ -1168,6 +1268,7 @@ function PeopleGroupRow({
               group={childGroup}
               depth={depth + 1}
               dragOverGroupId={dragOverGroupId}
+              insertTarget={insertTarget}
               selectedId={selectedId}
               expandedIds={expandedIds}
               onSelect={onSelect}
@@ -1177,7 +1278,9 @@ function PeopleGroupRow({
               onOpenPersonWorkspace={onOpenPersonWorkspace}
               onOpenContent={onOpenContent}
               onDragOverGroup={onDragOverGroup}
+              onDragInsertNear={onDragInsertNear}
               onDropOnGroup={onDropOnGroup}
+              onDropInsertNear={onDropInsertNear}
             />
           ))}
         </>
@@ -1596,6 +1699,8 @@ function NestedAddMenuButton({
   onLeafAction: () => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [submenuPos, setSubmenuPos] = useState<{ x: number; y: number } | null>(null);
+  const triggerRef = useRef<HTMLDivElement>(null);
   const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const scheduleClose = () => {
@@ -1609,30 +1714,42 @@ function NestedAddMenuButton({
     }
   };
 
+  const openSubmenu = () => {
+    if (disabled) return;
+    const rect = triggerRef.current?.getBoundingClientRect();
+    if (rect) {
+      setSubmenuPos({ x: rect.right + 2, y: rect.top });
+    }
+    setOpen(true);
+  };
+
   return (
     <div
+      ref={triggerRef}
       className="relative"
-      onMouseEnter={() => { cancelClose(); if (!disabled) setOpen(true); }}
+      onMouseEnter={() => { cancelClose(); openSubmenu(); }}
       onMouseLeave={scheduleClose}
     >
       <button
         type="button"
         disabled={disabled}
-        onClick={() => { if (!disabled) setOpen((c) => !c); }}
+        onClick={() => { if (!disabled) setOpen((c) => { if (!c) openSubmenu(); return !c; }); }}
         className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-gray-700 transition-colors hover:bg-primary/8 hover:text-primary disabled:cursor-not-allowed disabled:text-gray-300 dark:text-gray-300 dark:hover:text-primary"
       >
         <span className="shrink-0 text-gray-400 dark:text-gray-500">{icon}</span>
         <span className="flex-1">{label}</span>
         <ChevronRight className="h-3.5 w-3.5 text-gray-400" />
       </button>
-      {open ? (
+      {open && submenuPos ? createPortal(
         <div
-          className="absolute left-full top-0 z-30 min-w-52 overflow-visible rounded-md border border-white/20 bg-white/95 py-1 shadow-lg backdrop-blur-sm dark:bg-gray-900/95"
+          className="fixed z-[250] min-w-52 rounded-md border border-white/20 bg-white/95 py-1 shadow-lg backdrop-blur-sm dark:bg-gray-900/95"
+          style={{ left: submenuPos.x, top: submenuPos.y }}
           onMouseEnter={cancelClose}
           onMouseLeave={scheduleClose}
         >
           <RecursiveMenuItems items={items} onLeafAction={onLeafAction} />
-        </div>
+        </div>,
+        document.body
       ) : null}
     </div>
   );

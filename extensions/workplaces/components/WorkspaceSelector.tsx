@@ -378,6 +378,19 @@ export function WorkspaceSelector() {
     workspaceId: string;
     action: "settings" | "delete";
   } | null>(null);
+  const renameInputRef = useRef<HTMLInputElement>(null);
+
+  // Imperatively focus the rename input after Radix has released focus management.
+  // autoFocus alone is unreliable here because createWorkspace is async and the
+  // dropdown may still be in Radix's open animation when the input first mounts.
+  useEffect(() => {
+    if (!editingWorkspaceId) return;
+    const raf = requestAnimationFrame(() => {
+      renameInputRef.current?.focus();
+      renameInputRef.current?.select();
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [editingWorkspaceId]);
 
   const recursiveFolderClaims = useMemo(
     () =>
@@ -1216,7 +1229,7 @@ export function WorkspaceSelector() {
               >
                 {isEditing ? (
                   <input
-                    autoFocus
+                    ref={renameInputRef}
                     value={editingName}
                     onChange={(event) => setEditingName(event.target.value)}
                     onBlur={() => void commitInlineRename()}

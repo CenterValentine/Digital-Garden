@@ -136,7 +136,7 @@ export function FolderViewer({
       </div>
 
       {/* Content - Delegated to FolderViewContainer */}
-      <div className="flex-1 overflow-hidden">
+      <div className="flex-1 overflow-auto">
         <FolderViewContainer
           viewMode={viewMode}
           folderId={contentId}
