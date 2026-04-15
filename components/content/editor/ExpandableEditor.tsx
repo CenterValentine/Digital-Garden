@@ -167,7 +167,8 @@ export function ExpandableEditor({
       {/* Expandable Editor */}
       {isExpanded && (
         <div
-          className="px-2 pt-0 pb-1"
+          className="overflow-y-auto px-2 pb-1 pt-0"
+          style={{ maxHeight: "35vh" }}
           onKeyDown={(e) => e.stopPropagation()}
         >
           <MarkdownEditor

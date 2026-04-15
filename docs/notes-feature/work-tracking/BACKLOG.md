@@ -315,6 +315,9 @@ The following sprints were originally 38-42 in Epoch 9 but are deferred to Epoch
 - [ ] **Settings: back arrow navigation** — Add a back arrow at the top of the Settings page to navigate back to the content IDE. Should return to the last viewed note (or once tabs exist, restore the full workspace state). (2 pts)
 - [ ] **Storage Settings: show existing providers** — The Providers tab should list all currently configured storage providers (with status, type, default indicator) and allow editing/removing them. Currently only shows "+ Add Provider" with no visibility into what's already configured. (3 pts)
 
+### Refactoring / Tech Debt
+- [ ] **People panel drag-and-drop: consolidate with file tree** — The People panel reimplements drag logic (insert indicators, edge-zone detection, drop-into-group vs drop-beside) that mirrors the file tree. Extract the shared logic into a reusable hook or utility (`useSortableDragDrop` or similar) so both trees use the same implementation. Currently in `components/content/people/PeoplePanel.tsx` (`PeopleGroupRow`) and `components/content/FileTree.tsx`. (3 pts)
+
 ### Bug Fixes
 - [ ] **Desktop logo missing in content layout** — The Digital Garden tree logo inside the gold medallion (NotesNavBar → NotesLogo → CompactLogo) renders on mobile and the home page but is invisible on desktop in the content layout. The gold medallion ring appears but the animated SVG tree inside is blank. Likely a `useLogoAnimation` issue where SVG paths stay at `opacity: 0` if the draw animation fails silently on desktop. (2 pts)
 

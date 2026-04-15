@@ -2,11 +2,9 @@
  * Navigation History Dropdown
  *
  * Shows navigation history when holding down the back button.
- * Features:
- * - Compact list with file name and preview
- * - Max height with scrolling
- * - Click to navigate to history item
- * - Portal rendering with boundary-aware positioning
+ * Titles and content types are stored directly in the history entries
+ * (set at navigation time), so display is instant with no network round-trip.
+ * A secondary fetch enriches entries with a text preview snippet.
  */
 
 "use client";
@@ -18,10 +16,8 @@ import { calculateMenuPosition } from "@/lib/core/menu-positioning";
 import { getContentTypeIcon } from "@/lib/domain/content/types";
 import * as LucideIcons from "lucide-react";
 
-interface PreviewData {
+interface PreviewSnippet {
   id: string;
-  title: string;
-  contentType: string;
   preview: string | null;
 }
 
@@ -42,48 +38,39 @@ export function NavigationHistoryDropdown({
 }: NavigationHistoryDropdownProps) {
   const menuRef = useRef<HTMLDivElement>(null);
   const [menuPosition, setMenuPosition] = useState<{ x: number; y: number } | null>(null);
-  const [previews, setPreviews] = useState<Map<string, PreviewData>>(new Map());
-  const [isLoading, setIsLoading] = useState(false);
+  const [snippets, setSnippets] = useState<Map<string, string>>(new Map());
 
   // Close on outside click
   useEffect(() => {
     if (!isOpen) return;
-
     const handleClickOutside = (e: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
         onClose();
       }
     };
-
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [isOpen, onClose]);
 
-  // Close on Escape key
+  // Close on Escape
   useEffect(() => {
     if (!isOpen) return;
-
     const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        onClose();
-      }
+      if (e.key === "Escape") onClose();
     };
-
     document.addEventListener("keydown", handleEscape);
     return () => document.removeEventListener("keydown", handleEscape);
   }, [isOpen, onClose]);
 
-  // Fetch previews for history items (lazy load)
+  // Secondary fetch: enrich with text preview snippets (best-effort, non-blocking)
   useEffect(() => {
     if (!isOpen || historyItems.length === 0) return;
 
     const contentIds = historyItems
       .map((item) => item.contentId)
-      .filter((id): id is string => id !== null);
+      .filter((id): id is string => id !== null && !id.startsWith("person:"));
 
     if (contentIds.length === 0) return;
-
-    setIsLoading(true);
 
     fetch("/api/content/content/preview", {
       method: "POST",
@@ -92,26 +79,20 @@ export function NavigationHistoryDropdown({
     })
       .then((res) => res.json())
       .then((data) => {
-        if (data.previews) {
-          const previewMap = new Map<string, PreviewData>();
-          data.previews.forEach((preview: PreviewData) => {
-            previewMap.set(preview.id, preview);
+        if (Array.isArray(data.previews)) {
+          const map = new Map<string, string>();
+          data.previews.forEach((p: { id: string; preview: string | null }) => {
+            if (p.preview) map.set(p.id, p.preview);
           });
-          setPreviews(previewMap);
+          setSnippets(map);
         }
       })
-      .catch((err) => {
-        console.error("[NavigationHistoryDropdown] Failed to fetch previews:", err);
-      })
-      .finally(() => {
-        setIsLoading(false);
-      });
-  }, [isOpen, historyItems]);
+      .catch(() => {/* best-effort, ignore errors */});
+  }, [isOpen]);  // intentionally omit historyItems — stale snippets are fine
 
-  // Calculate menu position (two-phase rendering)
+  // Two-phase menu positioning
   useEffect(() => {
     if (!isOpen || !menuRef.current) return;
-
     const menuRect = menuRef.current.getBoundingClientRect();
     const calculatedPosition = calculateMenuPosition({
       triggerPosition,
@@ -119,7 +100,6 @@ export function NavigationHistoryDropdown({
       preferredPlacementX: "right",
       preferredPlacementY: "bottom",
     });
-
     setMenuPosition(calculatedPosition);
   }, [isOpen, triggerPosition]);
 
@@ -127,17 +107,13 @@ export function NavigationHistoryDropdown({
 
   const menuStyle = !menuPosition
     ? { visibility: "hidden" as const, position: "fixed" as const, left: 0, top: 0 }
-    : {
-        position: "fixed" as const,
-        left: `${menuPosition.x}px`,
-        top: `${menuPosition.y}px`,
-        zIndex: 9999,
-      };
+    : { position: "fixed" as const, left: `${menuPosition.x}px`, top: `${menuPosition.y}px`, zIndex: 9999 };
 
-  const getIcon = (contentType: string) => {
+  const getIcon = (contentType?: string) => {
+    if (!contentType) return <div className="h-4 w-4" />;
     const iconName = getContentTypeIcon(contentType as any);
     const LucideIcon = (LucideIcons as any)[iconName];
-    return LucideIcon ? <LucideIcon className="h-4 w-4 text-gray-400" /> : null;
+    return LucideIcon ? <LucideIcon className="h-4 w-4 text-gray-400" /> : <div className="h-4 w-4" />;
   };
 
   const menuContent = (
@@ -153,20 +129,17 @@ export function NavigationHistoryDropdown({
         </div>
       </div>
 
-      {/* Content */}
+      {/* Items */}
       <div className="max-h-96 overflow-y-auto">
-        {isLoading ? (
-          <div className="px-3 py-4 text-center text-sm text-gray-500">
-            Loading previews...
-          </div>
-        ) : historyItems.length === 0 ? (
+        {historyItems.length === 0 ? (
           <div className="px-3 py-4 text-center text-sm text-gray-500">
             No history available
           </div>
         ) : (
           <div className="py-1">
             {historyItems.map((item, index) => {
-              const preview = item.contentId ? previews.get(item.contentId) : null;
+              const title = item.title || null;
+              const snippet = item.contentId ? snippets.get(item.contentId) : null;
 
               return (
                 <button
@@ -177,22 +150,19 @@ export function NavigationHistoryDropdown({
                   }}
                   className="w-full px-3 py-2 flex items-start gap-2 hover:bg-white/5 transition-colors text-left"
                 >
-                  {/* Icon */}
                   <div className="flex-shrink-0 mt-0.5">
-                    {preview ? getIcon(preview.contentType) : <div className="h-4 w-4" />}
+                    {getIcon(item.contentType)}
                   </div>
 
-                  {/* Content */}
                   <div className="flex-1 min-w-0">
-                    {/* Title */}
                     <div className="text-sm font-medium text-gray-200 truncate">
-                      {preview ? preview.title : item.contentId || "Unknown"}
+                      {title ?? (
+                        <span className="text-gray-500 italic">No title</span>
+                      )}
                     </div>
-
-                    {/* Preview */}
-                    {preview && preview.preview && (
-                      <div className="text-xs text-gray-400 truncate mt-0.5">
-                        {preview.preview}
+                    {snippet && (
+                      <div className="text-xs text-gray-500 truncate mt-0.5">
+                        {snippet}
                       </div>
                     )}
                   </div>

@@ -31,7 +31,7 @@ export function ContentToolbar() {
 
   return (
     <div
-      className="flex min-h-11 shrink-0 items-center gap-1 overflow-x-auto bg-background px-3 py-1.5"
+      className="flex min-h-11 shrink-0 items-center gap-1 overflow-x-auto px-3 py-1.5"
       role="toolbar"
       aria-label="Content actions"
     >

@@ -16,6 +16,7 @@ import { PluginKey } from "@tiptap/pm/state";
 import tippy, { Instance as TippyInstance } from "tippy.js";
 import { SlashCommandsList, type SlashCommandsListRef } from "./slash-commands-menu";
 import { getExtensionSlashCommands } from "@/lib/extensions/editor-client-registry";
+import { useTimestampFormatStore } from "@/state/timestamp-format-store";
 
 // Plugin key for slash commands
 export const slashCommandsPluginKey = new PluginKey("slashCommands");
@@ -487,15 +488,18 @@ export function getSlashCommands(editor: Editor): SlashCommand[] {
       },
       aliases: ["snip", "snippets", "reusable"],
     },
-    // Sprint 65: Timestamp block
+    // upnext: Inline timestamp — flows inside text, click to set format/mode
     {
       title: "Timestamp",
-      description: "Insert today's date as a frozen timestamp",
+      description: "Insert today's date inline — click to set format & mode",
       icon: "🕐",
       command: ({ editor, range }) => {
+        const { defaultFormat, defaultMode } = useTimestampFormatStore.getState();
+        const d = new Date();
+        const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
         editor.chain().focus().deleteRange(range).insertContent({
-          type: "timestamp",
-          attrs: { isoDate: new Date().toISOString().slice(0, 10) },
+          type: "inlineTimestamp",
+          attrs: { isoDate: iso, format: defaultFormat, mode: defaultMode },
         }).run();
       },
       aliases: ["date", "today", "now", "stamp", "datestamp"],
