@@ -202,9 +202,10 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
   const [isShareGrantsLoading, setIsShareGrantsLoading] = useState(false);
   const [isSharing, setIsSharing] = useState(false);
   const collaborationEnabled = process.env.NEXT_PUBLIC_COLLABORATION_ENABLED === "true";
+  const visualizationEngine = contentType === "visualization" ? (contentData?.engine as string | null | undefined) ?? null : null;
   const collaborationCapability = useMemo(
-    () => (collaborationEnabled ? getContentCollaborationCapability(contentType) : null),
-    [collaborationEnabled, contentType]
+    () => (collaborationEnabled ? getContentCollaborationCapability(contentType, visualizationEngine) : null),
+    [collaborationEnabled, contentType, visualizationEngine]
   );
   const collaborationDescriptor = useMemo(
     () => ({
@@ -213,19 +214,25 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
       paneId,
       tabId: activeTabId,
       viewInstanceId: `${paneId}:${activeTabId ?? selectedContentId ?? "empty"}`,
-      requiresEditableField: contentType === "note" ? "default" : null,
+      requiresEditableField:
+        contentType === "note" ? "default" :
+        contentType === "visualization" ? "primary" :
+        null,
       requiresLiveTransport: false,
     }),
     [activeTabId, contentType, paneId, selectedContentId]
   );
   const collaborationRuntime = useCollaborationRuntime({
     contentId:
-      collaborationEnabled && contentType === "note" && noteContent && selectedContentId
+      collaborationEnabled &&
+      (contentType === "note" || contentType === "visualization") &&
+      (contentType !== "note" || !!noteContent) &&
+      !!selectedContentId
         ? selectedContentId
         : null,
     capability: collaborationCapability,
     descriptor: collaborationDescriptor,
-    initialContent: noteContent,
+    initialContent: contentType === "note" ? noteContent : null,
   });
 
   // AbortController for in-flight save requests. When the user navigates to
@@ -1344,6 +1351,7 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
         engine={contentData?.engine}
         config={contentData?.config}
         data={contentData?.data}
+        collaborationRuntime={collaborationRuntime}
       />
     );
   } else if (contentType === "data") {

@@ -30,10 +30,12 @@ export async function POST(request: NextRequest) {
       require: "view",
     });
 
+    const COLLABORATIVE_CONTENT_TYPES = ["note", "visualization"];
+
     const content = await prisma.contentNode.findFirst({
       where: {
         id: contentId,
-        contentType: "note",
+        contentType: { in: COLLABORATIVE_CONTENT_TYPES },
         deletedAt: null,
       },
       select: { id: true },
@@ -45,7 +47,7 @@ export async function POST(request: NextRequest) {
           success: false,
           error: {
             code: "UNSUPPORTED_CONTENT",
-            message: "Only note documents have collaborative state in this sprint",
+            message: "This content type does not support real-time collaboration",
           },
         },
         { status: 400 }

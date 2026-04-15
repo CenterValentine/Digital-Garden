@@ -24,18 +24,18 @@ interface ExcalidrawToolbarProps {
   elementCount: number;
   onExport: (format: "png" | "svg" | "json") => void;
   onFullView: () => void;
-  onStartCollaboration: () => void;
   isModified: boolean;
   isSaving: boolean;
+  isCollaborating?: boolean;
 }
 
 export function ExcalidrawToolbar({
   elementCount,
   onExport,
   onFullView,
-  onStartCollaboration,
   isModified,
   isSaving,
+  isCollaborating = false,
 }: ExcalidrawToolbarProps) {
   return (
     <div className="flex items-center justify-between border-t px-4 py-3 bg-gray-50">
@@ -84,17 +84,16 @@ export function ExcalidrawToolbar({
           <span className="hidden sm:inline">Full View</span>
         </Button>
 
-        {/* Collaboration Button (disabled stub) */}
-        <Button
-          onClick={onStartCollaboration}
-          disabled
-          variant="ghost"
-          size="sm"
-          title="Real-time collaboration coming soon"
+        {/* Collaboration status indicator */}
+        <div
+          className="flex items-center gap-1.5 px-2 py-1 rounded text-xs"
+          title={isCollaborating ? "Real-time collaboration active" : "Collaboration inactive — enable NEXT_PUBLIC_COLLABORATION_ENABLED"}
         >
-          <Users className="h-4 w-4 mr-2" />
-          <span className="hidden sm:inline">Collaborate</span>
-        </Button>
+          <Users className="h-3.5 w-3.5" />
+          <span
+            className={`h-1.5 w-1.5 rounded-full ${isCollaborating ? "bg-green-400" : "bg-gray-400"}`}
+          />
+        </div>
       </div>
     </div>
   );

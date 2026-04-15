@@ -16,7 +16,7 @@
 
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { Network, ExternalLink, Check, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/glass/button";
 import { toast } from "sonner";
@@ -24,6 +24,7 @@ import { DiagramsNetEditor } from "./DiagramsNetEditor";
 import { DiagramsNetToolbar } from "./DiagramsNetToolbar";
 import { useCollaboration } from "@/lib/domain/visualization/diagrams-net/use-collaboration";
 import type { DiagramsNetConfig, DiagramsNetData, DiagramsNetTheme } from "@/lib/domain/visualization/types";
+import type { CollaborationRuntimeHandle } from "@/lib/domain/collaboration/runtime";
 
 // Debounce utility
 function debounce<T extends (...args: any[]) => any>(
@@ -44,6 +45,7 @@ interface DiagramsNetViewerProps {
   data?: DiagramsNetData;
   onSave?: (xml: string) => Promise<void>;
   isFullScreen?: boolean; // Used in full-screen page
+  collaborationRuntime?: CollaborationRuntimeHandle | null;
 }
 
 export function DiagramsNetViewer({
@@ -53,8 +55,10 @@ export function DiagramsNetViewer({
   data = { xml: "" },
   onSave,
   isFullScreen = false,
+  collaborationRuntime,
 }: DiagramsNetViewerProps) {
   const [xml, setXml] = useState(data.xml || "");
+  const xmlRef = useRef(data.xml || "");
   const [isModified, setIsModified] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
@@ -87,10 +91,41 @@ export function DiagramsNetViewer({
     [onSave]
   );
 
+  // ── Y.js collaboration binding ─────────────────────────────────────────
+  useEffect(() => {
+    const ydoc = collaborationRuntime?.ydoc;
+    if (!ydoc) return;
+
+    const ydocXml = ydoc.getText("xml");
+
+    const handleRemoteChange = () => {
+      const remoteXml = ydocXml.toString();
+      if (remoteXml !== xmlRef.current) {
+        xmlRef.current = remoteXml;
+        setXml(remoteXml);
+      }
+    };
+
+    ydocXml.observe(handleRemoteChange);
+    return () => ydocXml.unobserve(handleRemoteChange);
+  }, [collaborationRuntime?.ydoc]);
+
   // Handle diagram changes from iframe
   const handleChange = (newXml: string) => {
+    xmlRef.current = newXml;
     setXml(newXml);
     setIsModified(true);
+
+    // Sync to Y.js for collaboration
+    const ydoc = collaborationRuntime?.ydoc;
+    if (ydoc) {
+      const ydocXml = ydoc.getText("xml");
+      ydoc.transact(() => {
+        ydocXml.delete(0, ydocXml.length);
+        ydocXml.insert(0, newXml);
+      });
+    }
+
     debouncedSave(newXml);
   };
 

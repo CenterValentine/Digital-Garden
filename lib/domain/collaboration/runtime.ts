@@ -247,6 +247,39 @@ const NOTE_CAPABILITY: ContentCollaborationCapability = {
   hocuspocusPersistence: true,
 };
 
+const EXCALIDRAW_CAPABILITY: ContentCollaborationCapability = {
+  contentType: "visualization",
+  syncCapability: "syncCapable",
+  defaultEditableField: "primary",
+  fields: [
+    { field: "primary", kind: "array", editable: true, required: true },
+    { field: "meta", kind: "map", editable: true, required: false },
+  ],
+  promotionAllowed: true,
+  localPersistence: true,
+  hocuspocusPersistence: true,
+};
+
+const MERMAID_CAPABILITY: ContentCollaborationCapability = {
+  contentType: "visualization",
+  syncCapability: "syncCapable",
+  defaultEditableField: "primary",
+  fields: [{ field: "primary", kind: "text", editable: true, required: true }],
+  promotionAllowed: true,
+  localPersistence: true,
+  hocuspocusPersistence: true,
+};
+
+const DIAGRAMS_NET_CAPABILITY: ContentCollaborationCapability = {
+  contentType: "visualization",
+  syncCapability: "syncCapable",
+  defaultEditableField: "primary",
+  fields: [{ field: "primary", kind: "text", editable: true, required: true }],
+  promotionAllowed: true,
+  localPersistence: true,
+  hocuspocusPersistence: true,
+};
+
 const COLLABORATION_CHANNEL_NAME = "dg-collaboration-runtime";
 const SESSION_STALE_AFTER_MS = 6000;
 const SESSION_ANNOUNCE_INTERVAL_MS = 2000;
@@ -451,9 +484,15 @@ async function readJsonResponse<T>(response: Response): Promise<T | null> {
 }
 
 export function getContentCollaborationCapability(
-  contentType: string | null | undefined
+  contentType: string | null | undefined,
+  engine?: string | null
 ): ContentCollaborationCapability | null {
   if (contentType === "note") return NOTE_CAPABILITY;
+  if (contentType === "visualization") {
+    if (engine === "excalidraw") return EXCALIDRAW_CAPABILITY;
+    if (engine === "mermaid") return MERMAID_CAPABILITY;
+    if (engine === "diagrams-net") return DIAGRAMS_NET_CAPABILITY;
+  }
   return null;
 }
 
