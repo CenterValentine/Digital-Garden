@@ -641,6 +641,11 @@ export const ServerInlineTimestamp = Node.create({
         parseHTML: (el) => (el.getAttribute("data-mode") || "frozen") as TimestampMode,
         renderHTML: (attrs) => ({ "data-mode": attrs.mode }),
       },
+      customIso: {
+        default: "",
+        parseHTML: (el) => el.getAttribute("data-custom-iso") || "",
+        renderHTML: (attrs) => attrs.customIso ? { "data-custom-iso": attrs.customIso } : {},
+      },
     };
   },
 
@@ -649,17 +654,22 @@ export const ServerInlineTimestamp = Node.create({
   },
 
   renderHTML({ HTMLAttributes }) {
-    const isoDate = String(HTMLAttributes["data-iso-date"] || "");
+    const attrs = {
+      isoDate: String(HTMLAttributes["data-iso-date"] || ""),
+      mode: (HTMLAttributes["data-mode"] || "frozen") as TimestampMode,
+      customIso: String(HTMLAttributes["data-custom-iso"] || ""),
+    };
     const format = (HTMLAttributes["data-format"] || "MMMM D, YYYY") as TimestampFormat;
-    const text = formatTimestampDate(isoDate, format);
+    const resolvedIso = resolveIso(attrs);
+    const text = formatTimestampWithTime(resolvedIso, format);
     return [
       "time",
       mergeAttributes(HTMLAttributes, {
         "data-inline-timestamp": "",
         class: "inline-timestamp",
-        datetime: isoDate,
+        datetime: resolvedIso,
       }),
-      text || isoDate,
+      text || resolvedIso,
     ];
   },
 });
