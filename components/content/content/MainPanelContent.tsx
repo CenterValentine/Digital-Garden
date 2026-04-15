@@ -51,6 +51,7 @@ import type { OutlineHeading } from "@/lib/domain/content/outline-extractor";
 import { extractOutline } from "@/lib/domain/content/outline-extractor";
 import { SaveAsPageTemplateDialog } from "../dialogs/SaveAsPageTemplateDialog";
 import { useNotesPanelStore } from "@/state/notes-panel-store";
+import { setDocumentDates } from "@/lib/domain/editor/extensions/inline-timestamp";
 import {
   Dialog,
   DialogContent,
@@ -77,6 +78,8 @@ interface ContentResponse {
     isPublished: boolean;
     customIcon?: string | null;
     iconColor?: string | null;
+    createdAt?: string;
+    updatedAt?: string;
     note?: {
       tiptapJson: any; // Prisma Json type
       searchText: string;
@@ -317,6 +320,11 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
         setContentType(result.data.contentType);
         setContentCustomIcon(result.data.customIcon ?? null);
         setContentIconColor(result.data.iconColor ?? null);
+        // Provide creation/updated dates to inline-timestamp nodes
+        setDocumentDates(
+          result.data.createdAt ? new Date(result.data.createdAt).toISOString().slice(0, 10) : "",
+          result.data.updatedAt ? new Date(result.data.updatedAt).toISOString().slice(0, 10) : ""
+        );
         updateContentTab(selectedContentId, {
           title: result.data.title,
           contentType: result.data.contentType,

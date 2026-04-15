@@ -20,7 +20,7 @@ export const FORMAT_PRESETS = [
 
 export type TimestampFormat = (typeof FORMAT_PRESETS)[number];
 
-export type TimestampMode = "frozen" | "document-date" | "live";
+export type TimestampMode = "frozen" | "document-date" | "content-updated" | "custom" | "live";
 
 interface TimestampFormatState {
   defaultFormat: TimestampFormat;

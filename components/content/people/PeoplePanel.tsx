@@ -1600,12 +1600,14 @@ const PeopleContextMenu = forwardRef<HTMLDivElement, {
     >
       <PeopleContextMenuButton
         disabled={!canCreatePeopleRecords}
+        icon={<LucideIcons.UserPlus className="h-3.5 w-3.5" />}
         onClick={() => { onCreatePerson(); onClose(); }}
       >
         Add Contact
       </PeopleContextMenuButton>
       <PeopleContextMenuButton
         disabled={!canCreatePeopleRecords}
+        icon={<LucideIcons.FolderPlus className="h-3.5 w-3.5" />}
         onClick={() => { onCreateGroup(); onClose(); }}
       >
         Add Subgroup
@@ -1619,14 +1621,24 @@ const PeopleContextMenu = forwardRef<HTMLDivElement, {
       />
       <div className="my-0.5 border-t border-gray-200/50 dark:border-gray-700/50" />
       {isPerson ? (
-        <PeopleContextMenuButton onClick={() => { onEditProfile(); onClose(); }}>
+        <PeopleContextMenuButton
+          icon={<LucideIcons.UserCog className="h-3.5 w-3.5" />}
+          onClick={() => { onEditProfile(); onClose(); }}
+        >
           Edit Contact
         </PeopleContextMenuButton>
       ) : null}
-      <PeopleContextMenuButton onClick={() => { onRename(); onClose(); }}>
+      <PeopleContextMenuButton
+        icon={<LucideIcons.PencilLine className="h-3.5 w-3.5" />}
+        onClick={() => { onRename(); onClose(); }}
+      >
         Rename
       </PeopleContextMenuButton>
-      <PeopleContextMenuButton destructive onClick={() => { onDelete(); onClose(); }}>
+      <PeopleContextMenuButton
+        destructive
+        icon={<LucideIcons.Trash2 className="h-3.5 w-3.5" />}
+        onClick={() => { onDelete(); onClose(); }}
+      >
         Delete
       </PeopleContextMenuButton>
     </div>
@@ -1636,11 +1648,13 @@ PeopleContextMenu.displayName = "PeopleContextMenu";
 
 function PeopleContextMenuButton({
   children,
+  icon,
   disabled = false,
   destructive = false,
   onClick,
 }: {
   children: ReactNode;
+  icon?: ReactNode;
   disabled?: boolean;
   destructive?: boolean;
   onClick: () => void;
@@ -1650,12 +1664,17 @@ function PeopleContextMenuButton({
       type="button"
       disabled={disabled}
       onClick={onClick}
-      className={`flex w-full items-center px-2.5 py-1 text-left text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
+      className={`flex w-full items-center gap-2 px-2.5 py-1 text-left text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
         destructive
           ? "text-gray-900 hover:bg-red-500/10 hover:text-red-600 dark:text-gray-100 dark:hover:text-red-400"
           : "text-gray-900 hover:bg-primary/10 hover:text-primary dark:text-gray-100"
       }`}
     >
+      {icon && (
+        <span className={`shrink-0 ${destructive ? "text-red-400" : "text-gray-400 dark:text-gray-500"}`}>
+          {icon}
+        </span>
+      )}
       {children}
     </button>
   );

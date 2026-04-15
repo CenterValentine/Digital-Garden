@@ -99,6 +99,16 @@ NavigationButtons.displayName = "NavigationButtons";
 export function MainPanelNavigation({ paneId }: MainPanelNavigationProps) {
   const layoutMode = useContentStore((state) => state.layoutMode);
   const paneContentId = useContentStore((state) => getPaneActiveContentId(state, paneId));
+  const activeTabTitle = useContentStore((state) => {
+    const pane = state.panes[paneId];
+    if (!pane?.activeTabId) return null;
+    return state.tabs[pane.activeTabId]?.title ?? null;
+  });
+  const activeTabContentType = useContentStore((state) => {
+    const pane = state.panes[paneId];
+    if (!pane?.activeTabId) return null;
+    return state.tabs[pane.activeTabId]?.contentType ?? null;
+  });
   const setSelectedContentId = useContentStore((state) => state.setSelectedContentId);
   const setLayoutMode = useContentStore((state) => state.setLayoutMode);
   const shellNavigationControls = useExtensionShellNavigationControls();
@@ -129,8 +139,11 @@ export function MainPanelNavigation({ paneId }: MainPanelNavigationProps) {
       return;
     }
 
-    addToHistory(paneContentId, paneId);
-  }, [paneContentId, paneId, addToHistory]);
+    addToHistory(paneContentId, paneId, activeTabTitle
+      ? { title: activeTabTitle, contentType: activeTabContentType ?? undefined }
+      : undefined
+    );
+  }, [paneContentId, paneId, addToHistory, activeTabTitle, activeTabContentType]);
 
   useEffect(() => {
     if (!isLayoutMenuOpen) return;
