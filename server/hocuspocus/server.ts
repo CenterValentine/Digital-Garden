@@ -210,8 +210,22 @@ const server = new Server({
       });
     }, accessRevalidationIntervalMs);
 
+    // Send a Y.js stateless keepalive every 25 seconds so the client's
+    // messageReconnectTimeout (90s) is never exceeded on idle documents.
+    // Without this, the HocuspocusProvider closes idle WebSocket connections
+    // after 30s of no data frames (WebSocket pings are control frames and
+    // don't count), causing visible "Connecting..." banners every ~30s.
+    const keepaliveInterval = setInterval(() => {
+      try {
+        data.connection.sendStateless(JSON.stringify({ type: "keepalive" }));
+      } catch {
+        // Connection may have closed before interval fires; safe to ignore.
+      }
+    }, 25_000);
+
     data.connection.onClose(() => {
       clearInterval(interval);
+      clearInterval(keepaliveInterval);
     });
   },
 

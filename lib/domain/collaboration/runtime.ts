@@ -1,6 +1,6 @@
 "use client";
 
-import { HocuspocusProvider } from "@hocuspocus/provider";
+import { HocuspocusProvider, HocuspocusProviderWebsocket } from "@hocuspocus/provider";
 import { TiptapTransformer } from "@hocuspocus/transformer";
 import type { JSONContent } from "@tiptap/core";
 import { IndexeddbPersistence } from "y-indexeddb";
@@ -1272,7 +1272,13 @@ class CollaborationRuntimeManager {
     }
 
     entry.hocuspocusProvider = new HocuspocusProvider({
-      url: result.data.websocketUrl,
+      // Use a shared websocketProvider so we can set messageReconnectTimeout (90s).
+      // 90s > 25s server keepalive, so idle connections never trigger the
+      // "no data received" client-side close loop.
+      websocketProvider: new HocuspocusProviderWebsocket({
+        url: result.data.websocketUrl,
+        messageReconnectTimeout: 90_000,
+      }),
       name: result.data.documentName,
       token: result.data.token,
       document: entry.ydoc,
@@ -1305,7 +1311,9 @@ class CollaborationRuntimeManager {
       onAwarenessUpdate: () => this.updateProviderPresence(entry),
       onStateless: ({ payload }) => this.handleServerEvent(entry, payload),
       onAuthenticationFailed: ({ reason }) => this.handleAuthenticationFailed(entry, reason),
-      onClose: () => this.handleProviderDisconnected(entry),
+      // onClose is intentionally omitted: HocuspocusProvider fires both onClose
+      // and onStatus("disconnected") for the same WebSocket close event.
+      // Registering both would call handleProviderDisconnected twice per disconnect.
     });
     entry.hocuspocusProvider.awareness?.setLocalStateField(
       "activeSurfaceCount",
@@ -1669,8 +1677,11 @@ class CollaborationRuntimeManager {
   }
 
   private destroyProviderOnly(entry: DocumentRuntimeEntry) {
-    entry.hocuspocusProvider?.destroy();
+    // Null the ref BEFORE destroy() so that disconnect events fired
+    // synchronously during teardown don't trigger handleProviderDisconnected.
+    const provider = entry.hocuspocusProvider;
     entry.hocuspocusProvider = null;
+    provider?.destroy();
   }
 
   private refreshEditPolicy(entry: DocumentRuntimeEntry) {
