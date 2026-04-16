@@ -238,7 +238,8 @@ interface ExcalidrawBlockAttrs {
 function renderExcalidrawBlock(
   attrs: ExcalidrawBlockAttrs,
   contentDom: HTMLElement,
-  editor: ReturnType<typeof Node.prototype.editor extends infer E ? () => E : never> | any,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  editor: any,
   getPos: (() => number | undefined) | undefined
 ) {
   contentDom.className = "block-excalidraw-content";

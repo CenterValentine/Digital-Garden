@@ -216,7 +216,7 @@ export async function storeCollaborationYDocState(
       // Write authoritative data back to the visualization payload
       await tx.visualizationPayload.update({
         where: { contentId },
-        data: { data: snapshot },
+        data: { data: snapshot as never },
       });
     });
 

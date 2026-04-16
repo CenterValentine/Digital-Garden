@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { prisma } from "@/lib/database/client";
+import type { ContentType } from "@/lib/database/generated/prisma";
 import { resolveContentAccess } from "@/lib/domain/collaboration/access";
 import {
   createCollaborationToken,
@@ -54,7 +55,7 @@ export async function POST(request: NextRequest) {
       require: "view",
     });
 
-    const COLLABORATIVE_CONTENT_TYPES = ["note", "visualization"];
+    const COLLABORATIVE_CONTENT_TYPES: ContentType[] = ["note", "visualization"];
 
     const content = await prisma.contentNode.findFirst({
       where: {
