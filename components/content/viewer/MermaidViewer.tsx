@@ -18,6 +18,7 @@ import { GitBranch, Loader2, Check, ExternalLink, Code, Eye } from "lucide-react
 import { Button } from "@/components/ui/glass/button";
 import { MermaidToolbar } from "./MermaidToolbar";
 import { toast } from "sonner";
+import type { CollaborationRuntimeHandle } from "@/lib/domain/collaboration/runtime";
 
 // Dynamically import mermaid to avoid SSR issues
 const initializeMermaid = async () => {
@@ -40,6 +41,8 @@ interface MermaidViewerProps {
   };
   onSave?: (source: string) => Promise<void>;
   isFullScreen?: boolean;
+  isEmbedded?: boolean;
+  collaborationRuntime?: CollaborationRuntimeHandle | null;
 }
 
 export function MermaidViewer({
@@ -49,8 +52,11 @@ export function MermaidViewer({
   data,
   onSave,
   isFullScreen = false,
+  isEmbedded = false,
+  collaborationRuntime,
 }: MermaidViewerProps) {
   const [source, setSource] = useState(data?.source || "graph TD\n    A[Start] --> B[End]");
+  const sourceRef = useRef(source);
   const [isEditMode, setIsEditMode] = useState(false);
   const [isModified, setIsModified] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -98,19 +104,49 @@ export function MermaidViewer({
     [onSave]
   );
 
+  // ── Y.js collaboration binding ─────────────────────────────────────────
+  useEffect(() => {
+    const ydoc = collaborationRuntime?.ydoc;
+    if (!ydoc) return;
+
+    const ydocSource = ydoc.getText("source");
+
+    const handleRemoteChange = () => {
+      const remoteSource = ydocSource.toString();
+      // Only update if value actually differs to avoid cursor jumps on own edits
+      if (remoteSource !== sourceRef.current) {
+        sourceRef.current = remoteSource;
+        setSource(remoteSource);
+      }
+    };
+
+    ydocSource.observe(handleRemoteChange);
+    return () => ydocSource.unobserve(handleRemoteChange);
+  }, [collaborationRuntime?.ydoc]);
+
   // Handle source change
   const handleSourceChange = (newSource: string) => {
+    sourceRef.current = newSource;
     setSource(newSource);
     setIsModified(true);
+
+    // Sync to Y.js for collaboration
+    const ydoc = collaborationRuntime?.ydoc;
+    if (ydoc) {
+      const ydocSource = ydoc.getText("source");
+      ydoc.transact(() => {
+        ydocSource.delete(0, ydocSource.length);
+        ydocSource.insert(0, newSource);
+      });
+    }
+
     debouncedSave(newSource);
   };
 
-  // Handle template insertion
+  // Handle template insertion — routes through handleSourceChange for Y.js sync
   const handleInsertTemplate = (template: string) => {
-    setSource(template);
-    setIsModified(true);
-    debouncedSave(template);
-    setIsEditMode(true); // Switch to edit mode to show the inserted template
+    handleSourceChange(template);
+    setIsEditMode(true);
   };
 
   // Render Mermaid diagram with validation
@@ -294,10 +330,8 @@ export function MermaidViewer({
 
   return (
     <div className="h-full flex flex-col">
-      {/* Header */}
-      <div className={`flex items-center justify-between border-b px-6 py-4 ${
-        isFullScreen ? "border-white/10 bg-black" : "border-gray-200"
-      }`}>
+      {/* Header (hidden in full-screen mode or when embedded in a block) */}
+      {!isFullScreen && !isEmbedded && <div className="flex items-center justify-between border-b px-6 py-4 border-gray-200">
         <div className="flex items-center gap-3">
           <GitBranch className="h-5 w-5 text-blue-400" />
           <h1 className={`text-lg font-semibold ${
@@ -349,7 +383,7 @@ export function MermaidViewer({
             </Button>
           )}
         </div>
-      </div>
+      </div>}
 
       {/* Mermaid Editor/Preview */}
       <div className="flex-1 overflow-hidden">

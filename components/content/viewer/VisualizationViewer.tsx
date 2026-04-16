@@ -19,6 +19,7 @@ import type {
   MermaidConfig,
   MermaidData,
 } from "@/lib/domain/visualization/types";
+import type { CollaborationRuntimeHandle } from "@/lib/domain/collaboration/runtime";
 
 // Dynamically import viewer components to avoid loading until needed
 // This prevents Excalidraw's heavy CSS from blocking /content route compilation
@@ -43,6 +44,7 @@ interface VisualizationViewerProps {
   engine?: string;
   config?: Record<string, unknown>;
   data?: Record<string, unknown>;
+  collaborationRuntime?: CollaborationRuntimeHandle | null;
 }
 
 export function VisualizationViewer({
@@ -51,6 +53,7 @@ export function VisualizationViewer({
   engine = "unknown",
   config,
   data,
+  collaborationRuntime,
 }: VisualizationViewerProps) {
   // Save handler for auto-save
   const handleSave = async (updatedData: any) => {
@@ -91,6 +94,7 @@ export function VisualizationViewer({
           onSave={async (xml: string) => {
             await handleSave({ ...data, xml });
           }}
+          collaborationRuntime={collaborationRuntime}
         />
       );
 
@@ -102,8 +106,9 @@ export function VisualizationViewer({
           config={config as any}
           data={data as any}
           onSave={async (updatedData: any) => {
-            await handleSave(updatedData); // Send only updated data, not merged
+            await handleSave(updatedData);
           }}
+          collaborationRuntime={collaborationRuntime}
         />
       );
 
@@ -117,6 +122,7 @@ export function VisualizationViewer({
           onSave={async (source: string) => {
             await handleSave({ source });
           }}
+          collaborationRuntime={collaborationRuntime}
         />
       );
 

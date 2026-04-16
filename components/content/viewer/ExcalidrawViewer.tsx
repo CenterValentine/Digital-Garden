@@ -23,6 +23,7 @@ type BinaryFiles = any;
 import { Button } from "@/components/ui/glass/button";
 import { ExcalidrawToolbar } from "./ExcalidrawToolbar";
 import { toast } from "sonner";
+import type { CollaborationRuntimeHandle } from "@/lib/domain/collaboration/runtime";
 
 // Dynamically import Excalidraw to avoid SSR issues (component uses window)
 const Excalidraw = dynamic(
@@ -55,6 +56,8 @@ interface ExcalidrawViewerProps {
     files: BinaryFiles;
   }) => Promise<void>;
   isFullScreen?: boolean;
+  isEmbedded?: boolean;
+  collaborationRuntime?: CollaborationRuntimeHandle | null;
 }
 
 export function ExcalidrawViewer({
@@ -64,6 +67,8 @@ export function ExcalidrawViewer({
   data,
   onSave,
   isFullScreen = false,
+  isEmbedded = false,
+  collaborationRuntime,
 }: ExcalidrawViewerProps) {
   // Log initial data for debugging
   useEffect(() => {
@@ -139,10 +144,30 @@ export function ExcalidrawViewer({
   const [hasMounted, setHasMounted] = useState(false);
   // Track previous elements to detect actual content changes vs viewport changes
   const previousElementsRef = useRef<ExcalidrawElement[]>(data?.elements || []);
+  // Ref to track the current elements — used to skip echoing our own Y.js updates
+  const isApplyingRemoteRef = useRef(false);
 
   useEffect(() => {
     setHasMounted(true);
   }, []);
+
+  // ── Y.js collaboration binding ─────────────────────────────────────────
+  useEffect(() => {
+    const ydoc = collaborationRuntime?.ydoc;
+    if (!ydoc) return;
+
+    const ydocElements = ydoc.getArray<ExcalidrawElement>("elements");
+
+    const handleRemoteElements = () => {
+      if (isApplyingRemoteRef.current) return;
+      const remoteElements = ydocElements.toArray();
+      setElements(remoteElements);
+      previousElementsRef.current = remoteElements;
+    };
+
+    ydocElements.observe(handleRemoteElements);
+    return () => ydocElements.unobserve(handleRemoteElements);
+  }, [collaborationRuntime?.ydoc]);
 
   // Handle Excalidraw onChange
   const handleChange = useCallback(
@@ -174,6 +199,18 @@ export function ExcalidrawViewer({
       if (hasMounted && elementsChanged) {
         setIsModified(true);
         previousElementsRef.current = mutableElements;
+
+        // Sync to Y.js for collaboration (marks update as local to avoid echo)
+        const ydoc = collaborationRuntime?.ydoc;
+        if (ydoc) {
+          const ydocElements = ydoc.getArray<ExcalidrawElement>("elements");
+          isApplyingRemoteRef.current = true;
+          ydoc.transact(() => {
+            ydocElements.delete(0, ydocElements.length);
+            ydocElements.insert(0, mutableElements);
+          });
+          isApplyingRemoteRef.current = false;
+        }
 
         // Remove collaborators from appState before saving (Map doesn't serialize to JSON)
         const { collaborators, ...serializableAppState } = newAppState;
@@ -262,16 +299,13 @@ export function ExcalidrawViewer({
     }
   };
 
-  // Collaboration stub
-  const startCollaboration = () => {
-    console.log("[ExcalidrawViewer] Collaboration not yet implemented");
-    toast.info("Real-time collaboration coming soon!");
-  };
+  const isCollaborating = !!collaborationRuntime?.ydoc &&
+    collaborationRuntime.state.connectionState !== "localOnly";
 
   return (
     <div className="h-full flex flex-col">
-      {/* Header (hidden in full-screen mode) */}
-      {!isFullScreen && (
+      {/* Header (hidden in full-screen mode or when embedded in a block) */}
+      {!isFullScreen && !isEmbedded && (
         <div className="flex items-center justify-between border-b px-6 py-4">
           <div className="flex items-center gap-3">
             <Pencil className="h-5 w-5 text-blue-400" />
@@ -323,9 +357,9 @@ export function ExcalidrawViewer({
           elementCount={elements.length}
           onExport={handleExport}
           onFullView={openFullscreen}
-          onStartCollaboration={startCollaboration}
           isModified={isModified}
           isSaving={isSaving}
+          isCollaborating={isCollaborating}
         />
       )}
     </div>

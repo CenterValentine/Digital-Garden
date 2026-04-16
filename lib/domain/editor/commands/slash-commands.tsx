@@ -504,6 +504,30 @@ export function getSlashCommands(editor: Editor): SlashCommand[] {
       },
       aliases: ["date", "today", "now", "stamp", "datestamp"],
     },
+    {
+      title: "Drawing",
+      description: "Embed a hand-drawn whiteboard canvas",
+      icon: "✏️",
+      command: ({ editor, range }) => {
+        editor.chain().focus().deleteRange(range).insertContent({
+          type: "excalidrawBlock",
+          attrs: { title: "Untitled Drawing", expanded: false },
+        }).run();
+      },
+      aliases: ["excalidraw", "drawing", "canvas", "whiteboard", "sketch", "freehand"],
+    },
+    {
+      title: "Mermaid Diagram",
+      description: "Embed a text-based flowchart or diagram",
+      icon: "📊",
+      command: ({ editor, range }) => {
+        editor.chain().focus().deleteRange(range).insertContent({
+          type: "mermaidBlock",
+          attrs: { title: "Untitled Diagram", expanded: false },
+        }).run();
+      },
+      aliases: ["mermaid", "diagram", "flowchart", "graph", "chart", "sequence"],
+    },
     ...getExtensionSlashCommands(),
     // Report Issue - Always at the bottom
     {

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { prisma } from "@/lib/database/client";
+import type { ContentType } from "@/lib/database/generated/prisma";
 import { resolveContentAccess } from "@/lib/domain/collaboration/access";
 import {
   createCollaborationToken,
@@ -54,10 +55,12 @@ export async function POST(request: NextRequest) {
       require: "view",
     });
 
+    const COLLABORATIVE_CONTENT_TYPES: ContentType[] = ["note", "visualization"];
+
     const content = await prisma.contentNode.findFirst({
       where: {
         id: contentId,
-        contentType: "note",
+        contentType: { in: COLLABORATIVE_CONTENT_TYPES },
         deletedAt: null,
       },
       select: {
@@ -72,7 +75,7 @@ export async function POST(request: NextRequest) {
           success: false,
           error: {
             code: "UNSUPPORTED_CONTENT",
-            message: "Only note documents can be edited collaboratively in this sprint",
+            message: "This content type does not support real-time collaboration",
           },
         },
         { status: 400 }

@@ -1,7 +1,6 @@
 import { Database } from "@hocuspocus/extension-database";
 import { Server } from "@hocuspocus/server";
 import type {
-  beforeHandleMessagePayload,
   connectedPayload,
   onAuthenticatePayload,
   onRequestPayload,
@@ -17,7 +16,7 @@ import { verifyCollaborationToken } from "../../lib/domain/collaboration/tokens"
 
 const port = Number(process.env.PORT || process.env.HOCUSPOCUS_PORT || 1234);
 const accessRevalidationIntervalMs = Number(
-  process.env.HOCUSPOCUS_ACCESS_REVALIDATION_MS || 2000
+  process.env.HOCUSPOCUS_ACCESS_REVALIDATION_MS || 30_000
 );
 const startedAt = Date.now();
 
@@ -185,21 +184,11 @@ const server = new Server({
     };
   },
 
-  async beforeHandleMessage(data: beforeHandleMessagePayload) {
-    try {
-      await revalidateConnectionAccess(data);
-    } catch (error) {
-      if (isConfirmedAccessRevocation(error)) {
-        closeRevokedConnection(data);
-        throw error;
-      }
-
-      console.warn(
-        `[hocuspocus] transient access revalidation failure for ${data.documentName}:`,
-        getErrorMessage(error)
-      );
-    }
-  },
+  // beforeHandleMessage is intentionally omitted: running a DB access-check
+  // on every Y.js protocol message (awareness updates, sync handshakes, etc.)
+  // caused hundreds of DB queries per minute and transient failures that
+  // triggered connection-close → reconnect loops. The periodic interval in
+  // `connected` (below) is sufficient for access revalidation.
 
   async connected(data: connectedPayload) {
     const interval = setInterval(() => {

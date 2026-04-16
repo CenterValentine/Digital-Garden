@@ -38,16 +38,17 @@ export async function POST(request: NextRequest) {
     });
 
     if (!result.created) {
+      const failedResult = result as { created: false; status: "denied" | "confirmation-required"; decision: typeof result.decision };
       return NextResponse.json(
         {
           success: false,
           error: {
-            code: result.status === "denied" ? "PEOPLE_MOUNT_DENIED" : "PEOPLE_MOUNT_CONFLICT",
-            message: getPolicyMessage(result.decision),
+            code: failedResult.status === "denied" ? "PEOPLE_MOUNT_DENIED" : "PEOPLE_MOUNT_CONFLICT",
+            message: getPolicyMessage(failedResult.decision),
           },
-          data: result,
+          data: failedResult,
         },
-        { status: result.status === "denied" ? 409 : 412 }
+        { status: failedResult.status === "denied" ? 409 : 412 }
       );
     }
 

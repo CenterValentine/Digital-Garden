@@ -40,6 +40,8 @@ import { ServerRatingInput } from "./extensions/blocks/rating-input";
 import { ServerPromptInput } from "./extensions/blocks/prompt-input";
 import { ServerTimestamp } from "./extensions/blocks/timestamp";
 import { ServerInlineTimestamp } from "./extensions/inline-timestamp";
+import { ServerExcalidrawBlock } from "./extensions/blocks/excalidraw-block";
+import { ServerMermaidBlock } from "./extensions/blocks/mermaid-block";
 import { ServerPersonMention } from "./extensions/person-mention-server";
 import { ServerTag } from "./extensions/tag-server";
 import { ServerWikiLink } from "./extensions/wiki-link-server";
@@ -150,6 +152,8 @@ export function getServerExtensions(): Extensions {
     ServerPromptInput,
     ServerTimestamp,
     ServerInlineTimestamp,
+    ServerExcalidrawBlock,
+    ServerMermaidBlock,
     ...getExtensionServerEditorExtensions(),
     ServerTag,
     ServerWikiLink,

@@ -31,6 +31,8 @@ import { ServerRatingInput } from "@/lib/domain/editor/extensions/blocks/rating-
 import { ServerPromptInput } from "@/lib/domain/editor/extensions/blocks/prompt-input";
 import { ServerTimestamp } from "@/lib/domain/editor/extensions/blocks/timestamp";
 import { ServerInlineTimestamp } from "@/lib/domain/editor/extensions/inline-timestamp";
+import { ServerExcalidrawBlock } from "@/lib/domain/editor/extensions/blocks/excalidraw-block";
+import { ServerMermaidBlock } from "@/lib/domain/editor/extensions/blocks/mermaid-block";
 import { ServerPersonMention } from "@/lib/domain/editor/extensions/person-mention-server";
 import { ServerTag } from "@/lib/domain/editor/extensions/tag-server";
 import { ServerWikiLink } from "@/lib/domain/editor/extensions/wiki-link-server";
@@ -89,6 +91,8 @@ export function getCollaborationServerExtensions(): Extensions {
     ServerPromptInput,
     ServerTimestamp,
     ServerInlineTimestamp,
+    ServerExcalidrawBlock,
+    ServerMermaidBlock,
     ...getExtensionServerEditorExtensions(),
     ServerTag,
     ServerPersonMention,

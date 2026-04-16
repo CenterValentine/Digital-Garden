@@ -685,6 +685,78 @@ export function MarkdownEditor({
     return () => window.removeEventListener("editor-image-upload", handleImageUpload);
   }, []);
 
+  // Embedded diagram blocks (ExcalidrawBlock, MermaidBlock): when a block
+  // without a contentId is clicked, it fires this event so we can create the
+  // visualization ContentNode via the API and write the new id back into attrs.
+  useEffect(() => {
+    const handleEmbedDiagramCreate = async (e: Event) => {
+      const { engine, blockId, defaultTitle, getPos, editor: blockEditor } =
+        (e as CustomEvent).detail;
+
+      try {
+        const response = await fetch("/api/content/content", {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            // API uses `engine` (not contentType) to branch into visualization creation
+            engine,
+            title: defaultTitle || "Untitled",
+            parentId: parentId ?? null,
+          }),
+        });
+
+        if (!response.ok) {
+          const errBody = await response.json().catch(() => ({}));
+          throw new Error(errBody?.error?.message || `Failed to create visualization: ${response.status}`);
+        }
+
+        const { data: newContent } = await response.json();
+        const newContentId: string = newContent.id;
+
+        // Write the new contentId back into the block node attrs and auto-expand.
+        // TipTap's chain does not expose setNodeMarkup — use ProseMirror tr directly.
+        // After an async API call, getPos() may be stale if the document shifted;
+        // fall back to a blockId search so the write always lands.
+        const targetEditor = blockEditor ?? editor;
+        if (!targetEditor) return;
+
+        let targetPos: number | undefined = getPos ? getPos() : undefined;
+
+        // Fallback: scan by blockId if position is stale
+        if (targetPos === undefined && blockId) {
+          targetEditor.state.doc.descendants((n, p) => {
+            if (n.attrs.blockId === blockId) {
+              targetPos = p;
+              return false;
+            }
+          });
+        }
+
+        if (targetPos === undefined) return;
+        const node = targetEditor.state.doc.nodeAt(targetPos);
+        if (!node) return;
+
+        // Auto-expand so the canvas opens immediately after creation
+        targetEditor.view.dispatch(
+          targetEditor.state.tr.setNodeMarkup(targetPos, undefined, {
+            ...node.attrs,
+            contentId: newContentId,
+            expanded: true,
+          })
+        );
+      } catch (err: any) {
+        console.error("[MarkdownEditor] embed-diagram-create failed:", err);
+        toast.error("Failed to create diagram", {
+          description: err.message || "Could not create visualization",
+        });
+      }
+    };
+
+    window.addEventListener("embed-diagram-create", handleEmbedDiagramCreate);
+    return () => window.removeEventListener("embed-diagram-create", handleEmbedDiagramCreate);
+  }, [editor, parentId]);
+
   // Sprint 42: Listen for AI-generated image insertion at cursor position
   useEffect(() => {
     if (!editor) return;
