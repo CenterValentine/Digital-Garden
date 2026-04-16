@@ -59,6 +59,8 @@ import { RatingInput } from "./extensions/blocks/rating-input";
 import { PromptInput } from "./extensions/blocks/prompt-input";
 import { Timestamp } from "./extensions/blocks/timestamp";
 import { InlineTimestamp } from "./extensions/inline-timestamp";
+import { ExcalidrawBlock } from "./extensions/blocks/excalidraw-block";
+import { MermaidBlock } from "./extensions/blocks/mermaid-block";
 import { getExtensionClientEditorExtensions } from "@/lib/extensions/editor-client-registry";
 
 // Create lowlight instance with common languages
@@ -277,6 +279,8 @@ export function getEditorExtensions(options?: EditorExtensionsOptions): Extensio
     PromptInput,
     Timestamp,
     InlineTimestamp,
+    ExcalidrawBlock,
+    MermaidBlock,
     ...getExtensionClientEditorExtensions(),
 
     // M6: Tags with autocomplete

@@ -56,6 +56,7 @@ interface ExcalidrawViewerProps {
     files: BinaryFiles;
   }) => Promise<void>;
   isFullScreen?: boolean;
+  isEmbedded?: boolean;
   collaborationRuntime?: CollaborationRuntimeHandle | null;
 }
 
@@ -66,6 +67,7 @@ export function ExcalidrawViewer({
   data,
   onSave,
   isFullScreen = false,
+  isEmbedded = false,
   collaborationRuntime,
 }: ExcalidrawViewerProps) {
   // Log initial data for debugging
@@ -302,8 +304,8 @@ export function ExcalidrawViewer({
 
   return (
     <div className="h-full flex flex-col">
-      {/* Header (hidden in full-screen mode) */}
-      {!isFullScreen && (
+      {/* Header (hidden in full-screen mode or when embedded in a block) */}
+      {!isFullScreen && !isEmbedded && (
         <div className="flex items-center justify-between border-b px-6 py-4">
           <div className="flex items-center gap-3">
             <Pencil className="h-5 w-5 text-blue-400" />

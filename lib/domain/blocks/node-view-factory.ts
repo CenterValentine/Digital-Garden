@@ -596,10 +596,20 @@ export function createBlockNodeView(options: BlockNodeViewOptions) {
         dom.classList.remove("block-selected", "ProseMirror-selectednode");
       },
 
-      // Prevent ProseMirror from stealing focus on form inputs (for atom blocks)
+      // Prevent ProseMirror from stealing events inside interactive atom blocks.
+      // For canvas/diagram mounts, ALL events must pass through to the underlying
+      // component — otherwise ProseMirror intercepts mousedown and triggers
+      // drag-selection ("grab") behavior across the whole editor.
       stopEvent(event: Event) {
         if (!options.atom) return false;
         const target = event.target as HTMLElement;
+        // Any interactive mount (canvas, iframe, React-rendered diagram) gets full event control
+        if (
+          target.closest(".block-excalidraw-mount") ||
+          target.closest(".block-mermaid-mount")
+        ) {
+          return true;
+        }
         const isFormElement =
           target instanceof HTMLInputElement ||
           target instanceof HTMLTextAreaElement ||
