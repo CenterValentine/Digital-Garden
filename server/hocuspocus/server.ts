@@ -250,4 +250,4 @@ const server = new Server({
 
 server.listen(port);
 
-console.log(`[hocuspocus] listening on ws://localhost:${port}`);
+console.log(`[hocuspocus] listening on ws://localhost:${port} (build: collaboration-crash-fix)`);
