@@ -13,7 +13,7 @@ import { useLeftPanelViewStore } from "@/state/left-panel-view-store";
 import { LeftSidebarHeaderActions } from "./LeftSidebarHeaderActions";
 import { PanelLeftClose, PanelLeft } from "lucide-react";
 import { renderExtensionIcon } from "@/lib/extensions";
-import { useExtensionNavItems } from "@/lib/extensions/client-registry";
+import { useExtensionHeaderNavItems } from "@/lib/extensions/client-registry";
 
 interface LeftSidebarHeaderProps {
   onCreateFolder: () => void;
@@ -58,7 +58,7 @@ export function LeftSidebarHeader({
   const { isSearchOpen, toggleSearch } = useSearchStore();
   const { mode, toggleMode } = useLeftPanelCollapseStore();
   const { activeView, setActiveView } = useLeftPanelViewStore();
-  const extensionNavItems = useExtensionNavItems();
+  const extensionNavItems = useExtensionHeaderNavItems();
 
   return (
     <div className="flex h-12 shrink-0 items-center border-b border-white/10 px-2 gap-1">
@@ -135,7 +135,18 @@ export function LeftSidebarHeader({
           </svg>
         </button>
 
-        {extensionNavItems.map((item) => {
+        {extensionNavItems.map(({ item, ActionComponent }) => {
+          if (item.type === "action") {
+            return ActionComponent ? (
+              <ActionComponent
+                key={item.id}
+                item={item}
+                className="rounded p-1.5 text-gray-400 transition-colors hover:bg-white/10 hover:text-gold-primary"
+                iconClassName="h-5 w-5"
+              />
+            ) : null;
+          }
+
           return (
             <button
               key={item.view}

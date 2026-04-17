@@ -29,6 +29,7 @@ interface SettingsStore extends UserSettings {
   setEditorSettings: (editor: Partial<UserSettings["editor"]>) => Promise<void>;
   setAISettings: (ai: Partial<UserSettings["ai"]>) => Promise<void>;
   setCalendarSettings: (calendar: Partial<NonNullable<UserSettings["calendar"]>>) => Promise<void>;
+  setPeriodicNotesSettings: (periodicNotes: Partial<NonNullable<UserSettings["periodicNotes"]>>) => Promise<void>;
 }
 
 export const useSettingsStore = create<SettingsStore>()(
@@ -77,8 +78,20 @@ export const useSettingsStore = create<SettingsStore>()(
 
       // Save to backend
       saveToBackend: async () => {
-        const { isSyncing, lastSyncedAt, hasPendingChanges, error, ...settings } =
-          get();
+        const current = get();
+        const settings: UserSettings = {
+          version: current.version,
+          ui: current.ui,
+          files: current.files,
+          fileTree: current.fileTree,
+          external: current.external,
+          search: current.search,
+          editor: current.editor,
+          ai: current.ai,
+          exportBackup: current.exportBackup,
+          calendar: current.calendar,
+          periodicNotes: current.periodicNotes,
+        };
 
         set({ isSyncing: true, error: null });
         try {
@@ -183,6 +196,25 @@ export const useSettingsStore = create<SettingsStore>()(
       setCalendarSettings: async (calendar) => {
         set((state) => ({
           calendar: { ...state.calendar, ...calendar },
+          hasPendingChanges: true,
+        }));
+        await get().saveToBackend();
+      },
+
+      setPeriodicNotesSettings: async (periodicNotes) => {
+        set((state) => ({
+          periodicNotes: {
+            ...state.periodicNotes,
+            ...periodicNotes,
+            daily: {
+              ...state.periodicNotes?.daily,
+              ...periodicNotes.daily,
+            },
+            weekly: {
+              ...state.periodicNotes?.weekly,
+              ...periodicNotes.weekly,
+            },
+          },
           hasPendingChanges: true,
         }));
         await get().saveToBackend();

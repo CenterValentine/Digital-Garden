@@ -13,9 +13,11 @@ import {
 } from "@/lib/extensions";
 import { useExtensionActivationStore } from "@/state/extension-activation-store";
 import type {
+  ExtensionActionNavItem,
   ExtensionContentViewerMatch,
   ExtensionContentViewerProps,
   ExtensionNavItem,
+  ExtensionHeaderNavActionProps,
   ExtensionShellNavigationProps,
   ExtensionShellTabMenuSectionProps,
 } from "./types";
@@ -85,6 +87,31 @@ export function useExtensionNavItems(): ExtensionNavItem[] {
   );
 }
 
+export function useExtensionHeaderNavItems(): Array<{
+  item: ExtensionNavItem;
+  ActionComponent?: ComponentType<ExtensionHeaderNavActionProps>;
+}> {
+  const manifests = useEnabledExtensionManifests();
+  const runtimes = useEnabledExtensionRuntimes();
+
+  return useMemo(
+    () =>
+      manifests
+        .flatMap((extension) => {
+          const runtime = runtimes.find((candidate) => candidate.id === extension.id);
+          return extension.navItems.map((item) => ({
+            item,
+            ActionComponent:
+              item.type === "action"
+                ? runtime?.headerNavActions?.[(item as ExtensionActionNavItem).id]
+                : undefined,
+          }));
+        })
+        .sort((a, b) => a.item.order - b.item.order),
+    [manifests, runtimes]
+  );
+}
+
 export function useExtensionSettingsEntries(): Array<
   ExtensionSettingsEntry & { extensionId: string; iconName: string }
 > {
@@ -114,7 +141,7 @@ export function useExtensionLeftSidebarPanel(
   const manifests = useEnabledExtensionManifests();
   const runtimes = useEnabledExtensionRuntimes();
   const extensionId = manifests.find((manifest) =>
-    manifest.navItems.some((item) => item.view === view)
+    manifest.navItems.some((item) => item.type !== "action" && item.view === view)
   )?.id;
   return runtimes.find((runtime) => runtime.id === extensionId)?.leftSidebarPanel;
 }
@@ -125,7 +152,7 @@ export function useExtensionMainWorkspace(
   const manifests = useEnabledExtensionManifests();
   const runtimes = useEnabledExtensionRuntimes();
   const extensionId = manifests.find((manifest) =>
-    manifest.navItems.some((item) => item.view === view)
+    manifest.navItems.some((item) => item.type !== "action" && item.view === view)
   )?.id;
   return runtimes.find((runtime) => runtime.id === extensionId)?.mainWorkspace;
 }
@@ -151,7 +178,7 @@ export function useExtensionRightSidebarPanel(
   const manifests = useEnabledExtensionManifests();
   const runtimes = useEnabledExtensionRuntimes();
   const extensionId = manifests.find((manifest) =>
-    manifest.navItems.some((item) => item.view === view)
+    manifest.navItems.some((item) => item.type !== "action" && item.view === view)
   )?.id;
   return runtimes.find((runtime) => runtime.id === extensionId)?.rightSidebarPanel;
 }

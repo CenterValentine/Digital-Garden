@@ -164,7 +164,7 @@ function TabPresenceDiscs({
 
   return createPortal(
     <div
-      className="group/presence fixed z-[90] flex max-w-[8rem] items-center overflow-visible pr-1"
+      className="group/presence fixed z-40 flex max-w-[8rem] items-center overflow-visible pr-1"
       style={{ left, top }}
     >
       {visibleGroups.map((group, index) => {

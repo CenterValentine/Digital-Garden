@@ -12,11 +12,12 @@ import { Extension } from "@tiptap/core";
 import type { Editor, Range } from "@tiptap/core";
 import { ReactRenderer } from "@tiptap/react";
 import Suggestion from "@tiptap/suggestion";
-import { PluginKey } from "@tiptap/pm/state";
+import { PluginKey, type EditorState } from "@tiptap/pm/state";
 import tippy, { Instance as TippyInstance } from "tippy.js";
 import { SlashCommandsList, type SlashCommandsListRef } from "./slash-commands-menu";
 import { getExtensionSlashCommands } from "@/lib/extensions/editor-client-registry";
 import { useTimestampFormatStore } from "@/state/timestamp-format-store";
+import { getDefaultPeriodicSummaryDate } from "@/lib/domain/periodic-summary";
 
 // Plugin key for slash commands
 export const slashCommandsPluginKey = new PluginKey("slashCommands");
@@ -30,13 +31,35 @@ export interface SlashCommand {
   aliases?: string[];
 }
 
+interface SlashAllowProps {
+  state: EditorState;
+  range: Range;
+}
+
+interface SlashSuggestionCommandProps {
+  editor: Editor;
+  range: Range;
+  props: SlashCommand;
+}
+
+interface SlashSuggestionItemsProps {
+  query: string;
+  editor: Editor;
+}
+
+interface SlashSuggestionRenderProps {
+  editor: Editor;
+  clientRect?: (() => DOMRect | null) | null;
+  event: KeyboardEvent;
+}
+
 /**
  * Get available slash commands
  *
  * TODO: You can customize this list based on your needs.
  * Add/remove commands, change descriptions, or add new shortcuts.
  */
-export function getSlashCommands(editor: Editor): SlashCommand[] {
+export function getSlashCommands(): SlashCommand[] {
   return [
     {
       title: "Heading 1",
@@ -467,6 +490,44 @@ export function getSlashCommands(editor: Editor): SlashCommand[] {
       },
       aliases: ["prompt", "ai", "instruction", "template"],
     },
+    {
+      title: "Daily Summary",
+      description: "Files created or edited during one workday",
+      icon: "☑",
+      command: ({ editor, range }) => {
+        editor.chain().focus().deleteRange(range).insertContent({
+          type: "dailySummary",
+          attrs: {
+            summaryDate: getDefaultPeriodicSummaryDate("daily"),
+            workdayCutoffHour: 0,
+            autoBorrowDurationMinutes: 60,
+            pathOrder: "Root > File",
+            showBackground: true,
+            showBorder: true,
+          },
+        }).run();
+      },
+      aliases: ["daily summary", "day summary", "activity", "worklog"],
+    },
+    {
+      title: "Weekly Summary",
+      description: "Files created or edited during one ISO week",
+      icon: "☑",
+      command: ({ editor, range }) => {
+        editor.chain().focus().deleteRange(range).insertContent({
+          type: "weeklySummary",
+          attrs: {
+            weekStartDate: getDefaultPeriodicSummaryDate("weekly"),
+            workdayCutoffHour: 0,
+            autoBorrowDurationMinutes: 60,
+            pathOrder: "Root > File",
+            showBackground: true,
+            showBorder: true,
+          },
+        }).run();
+      },
+      aliases: ["weekly summary", "week summary", "activity", "worklog"],
+    },
     // Epoch 11 Sprint 45: Template + Snippet insertion
     {
       title: "Template",
@@ -559,7 +620,7 @@ export const SlashCommands = Extension.create({
         char: "/",
         pluginKey: slashCommandsPluginKey,
         // Only trigger on first character of an empty line
-        allow: ({ state, range }: any) => {
+        allow: ({ state, range }: SlashAllowProps) => {
           const $from = state.doc.resolve(range.from);
           // Trigger must be at the beginning of the parent node
           if ($from.parentOffset !== 0) {
@@ -572,11 +633,11 @@ export const SlashCommands = Extension.create({
           }
           return true;
         },
-        command: ({ editor, range, props }: any) => {
+        command: ({ editor, range, props }: SlashSuggestionCommandProps) => {
           props.command({ editor, range });
         },
-        items: ({ query, editor }: { query: string; editor: any }) => {
-          const commands = getSlashCommands(editor);
+        items: ({ query }: SlashSuggestionItemsProps) => {
+          const commands = getSlashCommands();
 
           return commands.filter((item) => {
             // Search in title, description, and aliases
@@ -589,7 +650,7 @@ export const SlashCommands = Extension.create({
           let popup: TippyInstance[];
 
           return {
-            onStart: (props: any) => {
+            onStart: (props: SlashSuggestionRenderProps) => {
               component = new ReactRenderer(SlashCommandsList, {
                 props,
                 editor: props.editor,
@@ -610,7 +671,7 @@ export const SlashCommands = Extension.create({
               });
             },
 
-            onUpdate(props: any) {
+            onUpdate(props: SlashSuggestionRenderProps) {
               component.updateProps(props);
 
               if (!props.clientRect) {
@@ -622,7 +683,7 @@ export const SlashCommands = Extension.create({
               });
             },
 
-            onKeyDown(props: any) {
+            onKeyDown(props: SlashSuggestionRenderProps) {
               if (props.event.key === "Escape") {
                 popup?.[0]?.hide();
                 return true;

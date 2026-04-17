@@ -58,6 +58,7 @@ import { NumberInput } from "./extensions/blocks/number-input";
 import { RatingInput } from "./extensions/blocks/rating-input";
 import { PromptInput } from "./extensions/blocks/prompt-input";
 import { Timestamp } from "./extensions/blocks/timestamp";
+import { DailySummary, WeeklySummary } from "./extensions/blocks/periodic-summary";
 import { InlineTimestamp } from "./extensions/inline-timestamp";
 import { ExcalidrawBlock } from "./extensions/blocks/excalidraw-block";
 import { MermaidBlock } from "./extensions/blocks/mermaid-block";
@@ -278,6 +279,8 @@ export function getEditorExtensions(options?: EditorExtensionsOptions): Extensio
     RatingInput,
     PromptInput,
     Timestamp,
+    DailySummary,
+    WeeklySummary,
     InlineTimestamp,
     ExcalidrawBlock,
     MermaidBlock,
