@@ -70,17 +70,6 @@ export function ExcalidrawViewer({
   isEmbedded = false,
   collaborationRuntime,
 }: ExcalidrawViewerProps) {
-  // Log initial data for debugging
-  useEffect(() => {
-    console.log("[ExcalidrawViewer] Initial props:", {
-      contentId,
-      title,
-      config,
-      data,
-      elementsCount: data?.elements?.length || 0,
-    });
-  }, []);
-
   const [elements, setElements] = useState<ExcalidrawElement[]>(
     data?.elements || []
   );
@@ -131,7 +120,6 @@ export function ExcalidrawViewer({
             await onSave({ elements, appState, files });
             setLastSaved(new Date());
             setIsModified(false);
-            console.log("[ExcalidrawViewer] Auto-saved successfully");
           } catch (error: any) {
             console.error("[ExcalidrawViewer] Save failed:", error);
             toast.error("Failed to save drawing", {
@@ -162,11 +150,14 @@ export function ExcalidrawViewer({
     const ydoc = collaborationRuntime?.ydoc;
     if (!ydoc) return;
 
-    const ydocElements = ydoc.getArray<ExcalidrawElement>("elements");
+    // Y.Map<elementId, element> — each element is an independent CRDT entry.
+    // Concurrent draws from two clients merge at the element level instead of
+    // last-write-wins on the whole array (the old Y.Array delete+reinsert approach).
+    const elementMap = ydoc.getMap<ExcalidrawElement>("elementMap");
 
     const handleRemoteElements = () => {
       if (isApplyingRemoteRef.current) return;
-      const remoteElements = ydocElements.toArray();
+      const remoteElements = Array.from(elementMap.values());
       setElements(remoteElements);
       previousElementsRef.current = remoteElements;
       // Imperatively update the canvas — initialData is mount-only, not reactive.
@@ -179,24 +170,23 @@ export function ExcalidrawViewer({
       }
     };
 
-    ydocElements.observe(handleRemoteElements);
-    return () => ydocElements.unobserve(handleRemoteElements);
+    elementMap.observe(handleRemoteElements);
+    return () => elementMap.unobserve(handleRemoteElements);
   }, [collaborationRuntime?.ydoc]);
 
   // Handle Excalidraw onChange
   const handleChange = useCallback(
     (newElements: readonly ExcalidrawElement[], newAppState: AppState) => {
-      // Convert readonly to mutable for state
       const mutableElements = [...newElements];
 
-      // Check if elements actually changed (not just viewport pan/zoom)
+      // ID-based comparison: index-based fails when Y.Map returns elements in a
+      // different order than the local canvas (e.g. after a remote update).
+      const prevById = new Map(previousElementsRef.current.map(el => [el.id, el]));
       const elementsChanged =
         mutableElements.length !== previousElementsRef.current.length ||
-        mutableElements.some((el, i) => {
-          const prevEl = previousElementsRef.current[i];
-          if (!prevEl) return true;
-          // Compare element IDs and versions (Excalidraw increments version on change)
-          return el.id !== prevEl.id || el.version !== prevEl.version;
+        mutableElements.some(el => {
+          const prev = prevById.get(el.id);
+          return !prev || prev.version !== el.version;
         });
 
       setElements(mutableElements);
@@ -208,14 +198,24 @@ export function ExcalidrawViewer({
         setIsModified(true);
         previousElementsRef.current = mutableElements;
 
-        // Sync to Y.js for collaboration (marks update as local to avoid echo)
+        // Sync to Y.js — upsert changed elements, delete removed ones.
+        // Version check avoids redundant writes for unchanged elements.
         const ydoc = collaborationRuntime?.ydoc;
         if (ydoc) {
-          const ydocElements = ydoc.getArray<ExcalidrawElement>("elements");
+          const elementMap = ydoc.getMap<ExcalidrawElement>("elementMap");
           isApplyingRemoteRef.current = true;
           ydoc.transact(() => {
-            ydocElements.delete(0, ydocElements.length);
-            ydocElements.insert(0, mutableElements);
+            const currentIds = new Set(mutableElements.map(el => el.id));
+            for (const el of mutableElements) {
+              const existing = elementMap.get(el.id);
+              if (!existing || existing.version !== el.version) {
+                elementMap.set(el.id, el);
+              }
+            }
+            // Remove elements deleted from the canvas
+            for (const existingId of elementMap.keys()) {
+              if (!currentIds.has(existingId)) elementMap.delete(existingId);
+            }
           });
           isApplyingRemoteRef.current = false;
         }
@@ -291,20 +291,8 @@ export function ExcalidrawViewer({
     }
   };
 
-  // Open in new browser tab (full-screen mode)
   const openFullscreen = () => {
-    console.log("[ExcalidrawViewer] openFullscreen called, contentId:", contentId);
-    try {
-      const url = `/content/visualization/${contentId}/fullscreen`;
-      console.log("[ExcalidrawViewer] Opening URL:", url);
-      const newWindow = window.open(url, "_blank", "noopener,noreferrer");
-      console.log("[ExcalidrawViewer] window.open result:", newWindow);
-      if (!newWindow) {
-        console.error("[ExcalidrawViewer] window.open returned null - popup may be blocked");
-      }
-    } catch (error) {
-      console.error("[ExcalidrawViewer] Error opening fullscreen:", error);
-    }
+    window.open(`/content/visualization/${contentId}/fullscreen`, "_blank", "noopener,noreferrer");
   };
 
   const isCollaborating = !!collaborationRuntime?.ydoc &&

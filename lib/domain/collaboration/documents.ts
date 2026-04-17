@@ -16,16 +16,22 @@ import { getCollaborationDocumentName } from "./tokens";
 /**
  * Bootstrap a fresh Y.Doc from existing visualization payload data.
  * Engine-specific mapping:
- *   excalidraw  → Y.Array("elements") + Y.Map("appState")
+ *   excalidraw  → Y.Map("elementMap") keyed by element ID + Y.Map("appState")
  *   mermaid     → Y.Text("source")
  *   diagrams-net → Y.Text("xml")
  */
 function bootstrapVisualizationYDoc(ydoc: Y.Doc, engine: string, data: Record<string, unknown>) {
   if (engine === "excalidraw") {
-    const elements = ydoc.getArray<unknown>("elements");
+    const elementMap = ydoc.getMap<unknown>("elementMap");
     const rawElements = Array.isArray(data.elements) ? data.elements : [];
     if (rawElements.length > 0) {
-      elements.insert(0, rawElements);
+      ydoc.transact(() => {
+        for (const el of rawElements) {
+          if (el && typeof el === "object" && "id" in el) {
+            elementMap.set((el as { id: string }).id, el);
+          }
+        }
+      });
     }
     if (data.appState && typeof data.appState === "object") {
       const appState = ydoc.getMap<unknown>("appState");
@@ -52,10 +58,10 @@ function extractVisualizationSnapshot(
   engine: string
 ): Record<string, unknown> {
   if (engine === "excalidraw") {
-    const elementsArray = ydoc.getArray<unknown>("elements");
+    const elementMap = ydoc.getMap<unknown>("elementMap");
     const appStateMap = ydoc.getMap<unknown>("appState");
     return {
-      elements: elementsArray.toArray(),
+      elements: Array.from(elementMap.values()),
       appState: Object.fromEntries(appStateMap.entries()),
     };
   } else if (engine === "mermaid") {
@@ -88,8 +94,29 @@ export async function loadCollaborationYDocState(
       select: { ydocState: true },
     });
 
-    // Return existing ydoc state if present — Hocuspocus is authoritative after first connect
+    // Return existing ydoc state if present — Hocuspocus is authoritative after first connect.
+    // For excalidraw: migrate legacy Y.Array("elements") state to Y.Map("elementMap") if needed.
     if (record?.ydocState) {
+      const { engine, data } = content.visualizationPayload ?? { engine: "", data: {} };
+      if (engine === "excalidraw") {
+        const ydoc = new Y.Doc();
+        Y.applyUpdate(ydoc, new Uint8Array(record.ydocState));
+        if (ydoc.getMap("elementMap").size === 0) {
+          // Legacy state — re-bootstrap from visualization payload using new Y.Map structure
+          const payload = content.visualizationPayload;
+          if (payload) {
+            bootstrapVisualizationYDoc(ydoc, engine, data as Record<string, unknown>);
+            const migrated = Y.encodeStateAsUpdate(ydoc);
+            await prisma.collaborationDocument.update({
+              where: { documentName },
+              data: { ydocState: Buffer.from(migrated) },
+            });
+            ydoc.destroy();
+            return migrated;
+          }
+        }
+        ydoc.destroy();
+      }
       return new Uint8Array(record.ydocState);
     }
 

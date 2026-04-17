@@ -397,8 +397,9 @@ function renderExcalidrawBlock(
 
       root.render(el);
 
-      // Clean up on block destroy — hoisted via parentElement marker
-      (mountEl as any).__cleanup = () => {
+      // Set cleanup on contentDom (not mountEl) — updateContent and destroy()
+      // both look for __cleanup on contentDom, not on child elements.
+      (contentDom as any).__cleanup = () => {
         try { root.unmount(); } catch {}
         try { runtimeHandle?.release(); } catch {}
       };
