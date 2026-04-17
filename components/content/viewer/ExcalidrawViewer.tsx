@@ -199,12 +199,6 @@ export function ExcalidrawViewer({
           return el.id !== prevEl.id || el.version !== prevEl.version;
         });
 
-      console.log("[ExcalidrawViewer] onChange called", {
-        elementsCount: mutableElements.length,
-        elementsChanged,
-        hasMounted,
-      });
-
       setElements(mutableElements);
       setAppState(newAppState);
 
