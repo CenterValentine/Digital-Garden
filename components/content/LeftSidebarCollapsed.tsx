@@ -12,13 +12,13 @@ import { useSearchStore } from "@/state/search-store";
 import { useLeftPanelCollapseStore } from "@/state/left-panel-collapse-store";
 import { useLeftPanelViewStore } from "@/state/left-panel-view-store";
 import { renderExtensionIcon } from "@/lib/extensions";
-import { useExtensionNavItems } from "@/lib/extensions/client-registry";
+import { useExtensionHeaderNavItems } from "@/lib/extensions/client-registry";
 
 export function LeftSidebarCollapsed() {
   const { isSearchOpen, toggleSearch } = useSearchStore();
   const { setMode } = useLeftPanelCollapseStore();
   const { activeView, setActiveView } = useLeftPanelViewStore();
-  const extensionNavItems = useExtensionNavItems();
+  const extensionNavItems = useExtensionHeaderNavItems();
 
   const handleSearchClick = () => {
     // Expand panel and open search
@@ -91,7 +91,19 @@ export function LeftSidebarCollapsed() {
         <Puzzle className="h-5 w-5" />
       </button>
 
-      {extensionNavItems.map((item) => {
+      {extensionNavItems.map(({ item, ActionComponent }) => {
+        if (item.type === "action") {
+          return ActionComponent ? (
+            <ActionComponent
+              key={item.id}
+              item={item}
+              collapsed
+              className="rounded p-2 text-gray-400 transition-colors hover:bg-white/10 hover:text-gold-primary"
+              iconClassName="h-5 w-5"
+            />
+          ) : null;
+        }
+
         return (
           <button
             key={item.view}

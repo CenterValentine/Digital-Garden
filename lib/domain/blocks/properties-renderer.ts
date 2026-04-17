@@ -101,7 +101,15 @@ function zodToField(
   description?: string
 ): PropertiesField | null {
   const label = humanize(key);
-  const tooltip = key === "openBehavior" ? description : undefined;
+  const tooltip =
+    key === "openBehavior" ||
+    key === "workdayCutoffHour" ||
+    key === "autoBorrowDurationMinutes" ||
+    key === "pathOrder" ||
+    key === "summaryDate" ||
+    key === "weekStartDate"
+      ? description
+      : undefined;
   const typeName = getZodTypeName(def);
 
   // String — detect icon fields by key name
@@ -190,6 +198,12 @@ function zodToField(
 function humanize(key: string): string {
   if (key === "showContainer" || key === "showBorder") return "Border";
   if (key === "openBehavior") return "Expand/Collapse Default";
+  if (key === "summaryDate") return "Date";
+  if (key === "weekStartDate") return "Week Start";
+  if (key === "workdayCutoffHour") return "Day Cutoff";
+  if (key === "autoBorrowDurationMinutes") return "Auto-borrow Duration";
+  if (key === "pathOrder") return "Path Order";
+  if (key === "showBackground") return "Background";
   return key
     .replace(/([A-Z])/g, " $1")
     .replace(/^./, (s) => s.toUpperCase())

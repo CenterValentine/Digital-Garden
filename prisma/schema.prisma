@@ -109,7 +109,8 @@ model ContentNode {
   trashBinEntry        TrashBin?
   viewGrants           ViewGrant[]
   calendarEvents       CalendarEvent[]
-  workspaceItems  ContentWorkspaceItem[]
+  workspaceItems        ContentWorkspaceItem[]
+  periodicNoteIndexes  PeriodicNoteIndex[]
 
   @@unique([ownerId, slug])
   @@index([ownerId, deletedAt])
@@ -119,6 +120,21 @@ model ContentNode {
   @@index([personId, displayOrder])
   @@index([deletedAt])
   @@index([role]) // Phase 2: for filtering by visibility
+}
+
+model PeriodicNoteIndex {
+  id        String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ownerId   String      @db.Uuid
+  kind      String      @db.VarChar(20)
+  periodKey String      @db.VarChar(32)
+  contentId String      @db.Uuid
+  createdAt DateTime    @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime    @updatedAt @db.Timestamptz(6)
+  owner     User        @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  content   ContentNode @relation(fields: [contentId], references: [id], onDelete: Cascade)
+
+  @@unique([ownerId, kind, periodKey])
+  @@index([contentId])
 }
 
 model NotePayload {
@@ -338,6 +354,7 @@ model User {
   calendarEvents       CalendarEvent[]
   contentWorkspaces    ContentWorkspace[]
   collaborationDocuments CollaborationDocument[]
+  periodicNoteIndexes  PeriodicNoteIndex[]
 
   @@index([email])
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { useDragDropManager } from "react-dnd";
 import { validateFileBatch } from "@/lib/infrastructure/media/file-validation";
 import { toast } from "sonner";
 import { FileTree } from "./FileTree";
@@ -41,6 +42,7 @@ interface FileTreeWithDropZoneProps {
  * react-dnd backend alongside react-arborist's internal one.
  */
 function FileTreeDropZoneInner({ onFileDrop, ...treeProps }: FileTreeWithDropZoneProps) {
+  const dndManager = useDragDropManager();
   const dragDepthRef = useRef(0);
   const [isDragActive, setIsDragActive] = useState(false);
 
@@ -134,7 +136,7 @@ function FileTreeDropZoneInner({ onFileDrop, ...treeProps }: FileTreeWithDropZon
         </div>
       )}
 
-      <FileTree {...treeProps} />
+      <FileTree {...treeProps} dndManager={dndManager} />
     </div>
   );
 }

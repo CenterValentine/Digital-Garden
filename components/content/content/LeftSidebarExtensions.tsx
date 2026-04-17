@@ -53,7 +53,8 @@ export function LeftSidebarExtensions() {
   const renderedSettingsDialog = useRenderExtensionSettingsDialog(
     dialogExtension?.id ?? ""
   );
-  const selectedPrimaryNavItem = dialogExtension?.navItems[0] ?? null;
+  const selectedPrimaryNavItem =
+    dialogExtension?.navItems.find((item) => item.type !== "action") ?? null;
 
   const handleToggleExtension = async (extensionId: string, enabled: boolean) => {
     setPendingToggleExtensionId(extensionId);
