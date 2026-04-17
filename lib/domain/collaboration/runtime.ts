@@ -1,6 +1,6 @@
 "use client";
 
-import { HocuspocusProvider, HocuspocusProviderWebsocket } from "@hocuspocus/provider";
+import { HocuspocusProvider } from "@hocuspocus/provider";
 import { TiptapTransformer } from "@hocuspocus/transformer";
 import type { JSONContent } from "@tiptap/core";
 import { IndexeddbPersistence } from "y-indexeddb";
@@ -1235,7 +1235,7 @@ class CollaborationRuntimeManager {
   }
 
   private async promoteInternal(entry: DocumentRuntimeEntry, reason: PromotionReason) {
-    void reason;
+    console.log(`[collab:diag] promote START ${entry.contentId} reason=${reason} t=${Date.now()}`);
     entry.state.connectionState = "promoting";
     entry.state.warning = null;
     this.emit(entry);
@@ -1272,17 +1272,14 @@ class CollaborationRuntimeManager {
     }
 
     entry.hocuspocusProvider = new HocuspocusProvider({
-      // Use a shared websocketProvider so we can set messageReconnectTimeout (90s).
-      // 90s > 25s server keepalive, so idle connections never trigger the
-      // "no data received" client-side close loop.
-      websocketProvider: new HocuspocusProviderWebsocket({
-        url: result.data.websocketUrl,
-        messageReconnectTimeout: 90_000,
-      }),
+      url: result.data.websocketUrl,
       name: result.data.documentName,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ...({ messageReconnectTimeout: 90_000 } as any),
       token: result.data.token,
       document: entry.ydoc,
       onStatus: ({ status }) => {
+        console.log(`[collab:diag] onStatus ${entry.contentId} status=${status} t=${Date.now()}`);
         if (status === "connecting") {
           entry.state.connectionState = "connecting";
         } else if (status === "connected") {
@@ -1293,6 +1290,7 @@ class CollaborationRuntimeManager {
         this.emit(entry);
       },
       onSynced: ({ state }) => {
+        console.log(`[collab:diag] onSynced ${entry.contentId} state=${state} t=${Date.now()}`);
         if (!state) return;
         this.clearProviderReconnect(entry);
         entry.state.connectionState = "synced";
@@ -1424,6 +1422,7 @@ class CollaborationRuntimeManager {
   }
 
   private handleAuthenticationFailed(entry: DocumentRuntimeEntry, reason?: string) {
+    console.warn(`[collab:diag] AUTH FAILED ${entry.contentId} reason=${reason} t=${Date.now()}`);
     const browserOffline = typeof navigator !== "undefined" && !navigator.onLine;
     if (entry.state.networkState === "offline" || browserOffline) {
       entry.state.networkState = "offline";
@@ -1538,6 +1537,7 @@ class CollaborationRuntimeManager {
   }
 
   private handleProviderDisconnected(entry: DocumentRuntimeEntry) {
+    console.warn(`[collab:diag] DISCONNECTED ${entry.contentId} dirty=${entry.state.localDirty} unsynced=${entry.state.unsyncedUpdateCount} t=${Date.now()}`);
     if (entry.state.localDirty || entry.state.unsyncedUpdateCount > 0) {
       entry.state.connectionState = "disconnectedButDirty";
       entry.state.reconnectIntent = true;

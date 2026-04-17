@@ -147,13 +147,19 @@ export const ExcalidrawBlock = Node.create({
       },
 
       updateContent(node, contentDom, editor, getPos) {
-        contentDom.innerHTML = "";
-        // Unmount any existing React root before re-rendering
+        // Run cleanup (unmount + runtime release) before clearing DOM
+        const cleanup = (contentDom as any).__cleanup;
+        if (cleanup) {
+          try { cleanup(); } catch {}
+          delete (contentDom as any).__cleanup;
+        }
+        // Also unmount any root not yet cleaned up
         const existingRoot = (contentDom as any).__reactRoot;
         if (existingRoot) {
           try { existingRoot.unmount(); } catch {}
           delete (contentDom as any).__reactRoot;
         }
+        contentDom.innerHTML = "";
         renderExcalidrawBlock(node.attrs as ExcalidrawBlockAttrs, contentDom, editor, getPos);
         return true;
       },

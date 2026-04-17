@@ -181,12 +181,19 @@ export async function storeCollaborationYDocState(
     include: { notePayload: true, visualizationPayload: true },
   });
 
-  if (!content) throw new Error("Collaboration content not found");
+  if (!content) {
+    // Content may have been deleted while a collaboration session was still active.
+    // Log and skip — do not throw, as Hocuspocus re-throws errors from storeDocumentHooks
+    // as unhandled promise rejections that crash the Node.js process.
+    console.warn(`[hocuspocus] store skipped: content not found for ${documentName}`);
+    return;
+  }
 
   // ── Visualization ──────────────────────────────────────────────────────
   if (content.contentType === "visualization") {
     if (!content.visualizationPayload) {
-      throw new Error("Visualization payload not found for collaboration document");
+      console.warn(`[hocuspocus] store skipped: visualization payload not found for ${documentName}`);
+      return;
     }
 
     const { engine } = content.visualizationPayload;

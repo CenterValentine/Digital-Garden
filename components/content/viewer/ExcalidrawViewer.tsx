@@ -106,6 +106,12 @@ export function ExcalidrawViewer({
   const [isModified, setIsModified] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const excalidrawAPIRef = useRef<any>(null);
+  // Stable reference — passing a new function each render causes Excalidraw to re-call
+  // the callback every render, triggering a setState → re-render infinite loop.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const setExcalidrawAPI = useCallback((api: any) => { excalidrawAPIRef.current = api; }, []);
 
   // Debounced save function
   const debouncedSave = useCallback(
@@ -163,6 +169,14 @@ export function ExcalidrawViewer({
       const remoteElements = ydocElements.toArray();
       setElements(remoteElements);
       previousElementsRef.current = remoteElements;
+      // Imperatively update the canvas — initialData is mount-only, not reactive.
+      // Hold isApplyingRemoteRef through the next frame so Excalidraw's onChange
+      // (which fires after updateScene) doesn't echo the update back to Y.js.
+      if (excalidrawAPIRef.current) {
+        isApplyingRemoteRef.current = true;
+        excalidrawAPIRef.current.updateScene({ elements: remoteElements });
+        requestAnimationFrame(() => { isApplyingRemoteRef.current = false; });
+      }
     };
 
     ydocElements.observe(handleRemoteElements);
@@ -195,8 +209,8 @@ export function ExcalidrawViewer({
       setAppState(newAppState);
 
       // Only trigger save if component has mounted AND elements actually changed
-      // (filters out viewport changes like pan/zoom)
-      if (hasMounted && elementsChanged) {
+      // (filters out viewport changes like pan/zoom and remote updateScene echoes)
+      if (hasMounted && elementsChanged && !isApplyingRemoteRef.current) {
         setIsModified(true);
         previousElementsRef.current = mutableElements;
 
@@ -339,6 +353,7 @@ export function ExcalidrawViewer({
               appState: appState,
               files: files,
             }}
+            excalidrawAPI={setExcalidrawAPI}
             onChange={handleChange}
             UIOptions={{
               canvasActions: {

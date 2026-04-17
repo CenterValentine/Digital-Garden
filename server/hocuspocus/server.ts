@@ -233,8 +233,17 @@ const server = new Server({
     new Database({
       fetch: async ({ documentName }) =>
         loadCollaborationYDocState(prisma, documentName),
-      store: async ({ documentName, state }) =>
-        storeCollaborationYDocState(prisma, documentName, state),
+      store: async ({ documentName, state }) => {
+        // Errors thrown here propagate through Hocuspocus's storeDocumentHooks,
+        // which re-throws any Error with a .message. That rejection is unhandled
+        // at the call site (no await / no .catch), crashing the Node process and
+        // dropping all active connections. Log and continue instead.
+        try {
+          await storeCollaborationYDocState(prisma, documentName, state);
+        } catch (error) {
+          console.error(`[hocuspocus] store failed for ${documentName}:`, error);
+        }
+      },
     }),
   ],
 });
