@@ -400,8 +400,11 @@ function renderExcalidrawBlock(
       // Set cleanup on contentDom (not mountEl) — updateContent and destroy()
       // both look for __cleanup on contentDom, not on child elements.
       (contentDom as any).__cleanup = () => {
-        try { root.unmount(); } catch {}
         try { runtimeHandle?.release(); } catch {}
+        // Defer unmount — synchronous unmount during a React render cycle throws
+        // "Attempted to synchronously unmount a root while React was already rendering"
+        // which causes an error boundary re-render → new acquire() → cycling reconnects.
+        queueMicrotask(() => { try { root.unmount(); } catch {} });
       };
     }).catch(console.error);
   }

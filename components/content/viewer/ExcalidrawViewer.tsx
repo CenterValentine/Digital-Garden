@@ -166,10 +166,14 @@ export function ExcalidrawViewer({
       if (excalidrawAPIRef.current) {
         isApplyingRemoteRef.current = true;
         excalidrawAPIRef.current.updateScene({ elements: remoteElements });
-        requestAnimationFrame(() => { isApplyingRemoteRef.current = false; });
+        // Reset immediately — previousElementsRef is already set to remoteElements above,
+        // so the elementsChanged check in onChange will block any echo without needing a delay.
+        isApplyingRemoteRef.current = false;
       }
     };
 
+    // Populate canvas from pre-existing Y.Doc state (observe only fires on future changes).
+    handleRemoteElements();
     elementMap.observe(handleRemoteElements);
     return () => elementMap.unobserve(handleRemoteElements);
   }, [collaborationRuntime?.ydoc]);
