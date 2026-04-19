@@ -158,7 +158,16 @@ pnpm db:seed              # Seed test data
 npx prisma generate       # Regenerate Prisma client
 npx prisma migrate dev    # Create new migration
 npx prisma studio         # Open database GUI
+
 ```
+
+## Hocuspocus Collaboration
+The Next.js app can remain on Vercel, but the Hocuspocus process should run on a long-lived Node host like Railway or Google Cloud Run to maintain persistent WebSocket connections.
+
+For google cloud run, you can use a `cloudbuild.hocuspocus.yaml` configuration to build and deploy the Hocuspocus service.
+
+```bash
+gcloud builds submit --config=cloudbuild.hocuspocus.yaml .
 
 ## Project Structure
 
@@ -422,3 +431,5 @@ For issues, questions, or feature requests, please open an issue on GitHub or co
 ---
 
 Built with ❤️ using Next.js 16 and React 19
+
+

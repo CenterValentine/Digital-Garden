@@ -43,7 +43,13 @@ export async function GET(
 
     const content = await prisma.contentNode.findUnique({
       where: { id },
-      include: CONTENT_WITH_PAYLOADS,
+      include: {
+        ...CONTENT_WITH_PAYLOADS,
+        // Path A: include the owning note (if any) so the standalone viewer
+        // can render read-only and link back. Kept inline to avoid widening
+        // CONTENT_WITH_PAYLOADS for every caller.
+        ownedByNote: { select: { id: true, title: true } },
+      },
     });
 
     if (!content) {
@@ -94,6 +100,10 @@ export async function GET(
       createdAt: content.createdAt,
       updatedAt: content.updatedAt,
       deletedAt: content.deletedAt,
+      ownedByNoteId: content.ownedByNoteId,
+      ownedByNote: content.ownedByNote
+        ? { id: content.ownedByNote.id, title: content.ownedByNote.title }
+        : null,
     };
 
     // Include full payload data

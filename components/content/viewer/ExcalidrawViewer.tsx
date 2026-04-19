@@ -14,7 +14,8 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import dynamic from "next/dynamic";
 import "@excalidraw/excalidraw/index.css"; // Import CSS at top level (safe for SSR)
-import { Pencil, Loader2, Check, ExternalLink } from "lucide-react";
+import { Pencil, Loader2, Check, ExternalLink, Maximize2, Minimize2, BookOpen } from "lucide-react";
+import type * as Y from "yjs";
 
 // Type aliases for Excalidraw (types not exported in current version)
 type ExcalidrawElement = any;
@@ -24,6 +25,38 @@ import { Button } from "@/components/ui/glass/button";
 import { ExcalidrawToolbar } from "./ExcalidrawToolbar";
 import { toast } from "sonner";
 import type { CollaborationRuntimeHandle } from "@/lib/domain/collaboration/runtime";
+
+// Fields to compare when deciding if an element *meaningfully* changed.
+// Excludes `version` / `versionNonce` / `updated` — those get bumped by
+// Excalidraw's own updateScene (applied during remote merges), so comparing
+// them causes the well-known "remote update comes in → onChange fires →
+// write version-bumped element back → peer echoes → divergence" loop.
+const SEMANTIC_FIELDS: readonly string[] = [
+  "type", "x", "y", "width", "height", "angle",
+  "strokeColor", "backgroundColor", "fillStyle", "strokeWidth", "strokeStyle",
+  "roughness", "opacity", "roundness", "text", "fontSize", "fontFamily",
+  "textAlign", "verticalAlign", "baseline", "containerId", "originalText",
+  "lineHeight", "points", "lastCommittedPoint", "startBinding", "endBinding",
+  "startArrowhead", "endArrowhead", "isDeleted", "groupIds", "frameId",
+  "link", "locked",
+];
+
+function sameExcalidrawElement(a: ExcalidrawElement, b: ExcalidrawElement): boolean {
+  if (a === b) return true;
+  for (const k of SEMANTIC_FIELDS) {
+    if (JSON.stringify(a?.[k]) !== JSON.stringify(b?.[k])) return false;
+  }
+  return true;
+}
+
+// Deep-clone before writing to Y.Map so the stored value is a snapshot, not
+// a live reference Excalidraw will continue mutating.
+function cloneElement(el: ExcalidrawElement): ExcalidrawElement {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const sc = (globalThis as any).structuredClone as ((v: unknown) => unknown) | undefined;
+  if (typeof sc === "function") return sc(el) as ExcalidrawElement;
+  return JSON.parse(JSON.stringify(el));
+}
 
 // Dynamically import Excalidraw to avoid SSR issues (component uses window)
 const Excalidraw = dynamic(
@@ -57,7 +90,28 @@ interface ExcalidrawViewerProps {
   }) => Promise<void>;
   isFullScreen?: boolean;
   isEmbedded?: boolean;
+  /**
+   * Path A: when embedded inside a note, the drawing binds to a sub-map on the
+   * note's own Y.Doc instead of acquiring a separate collaboration runtime.
+   */
+  embedYdoc?: Y.Doc | null;
+  embedYMapKey?: string | null;
+  /**
+   * Legacy path: when standalone (not owned by a note), the drawing may still
+   * have its own collaboration runtime with a top-level "elementMap". Ignored
+   * when embedYdoc is provided.
+   */
   collaborationRuntime?: CollaborationRuntimeHandle | null;
+  /**
+   * Read-only surfaces: standalone viewer for a drawing that lives inside a
+   * note — edits happen in the owning note, not here.
+   */
+  isReadOnly?: boolean;
+  ownerNoteInfo?: {
+    noteId: string;
+    noteTitle?: string;
+    blockId?: string | null;
+  } | null;
 }
 
 export function ExcalidrawViewer({
@@ -68,8 +122,20 @@ export function ExcalidrawViewer({
   onSave,
   isFullScreen = false,
   isEmbedded = false,
+  embedYdoc = null,
+  embedYMapKey = null,
   collaborationRuntime,
+  isReadOnly = false,
+  ownerNoteInfo = null,
 }: ExcalidrawViewerProps) {
+  // Resolve which ydoc + map key we bind to. embedYdoc wins (Path A); fall back
+  // to collaborationRuntime for legacy standalone drawings.
+  const boundYdoc: Y.Doc | null = embedYdoc ?? collaborationRuntime?.ydoc ?? null;
+  const boundMapKey: string = embedYMapKey ?? "elementMap";
+
+  // Expand-in-place (Path A): embedded viewer grows to cover the viewport
+  // without navigating away. Preserves the React tree + Y.Doc binding.
+  const [isExpandedInPlace, setIsExpandedInPlace] = useState(false);
   const [elements, setElements] = useState<ExcalidrawElement[]>(
     data?.elements || []
   );
@@ -140,6 +206,12 @@ export function ExcalidrawViewer({
   const previousElementsRef = useRef<ExcalidrawElement[]>(data?.elements || []);
   // Ref to track the current elements — used to skip echoing our own Y.js updates
   const isApplyingRemoteRef = useRef(false);
+  // A stable origin marker for our own Y.js writes. When the observer fires
+  // inside our own transact, it checks transaction.origin and skips — this
+  // avoids calling updateScene in the middle of the user's live stroke,
+  // which would replace the still-being-drawn element with a stale clone
+  // and freeze the stroke at its first point.
+  const localOriginRef = useRef(Symbol("excalidraw-local"));
 
   useEffect(() => {
     setHasMounted(true);
@@ -147,89 +219,138 @@ export function ExcalidrawViewer({
 
   // ── Y.js collaboration binding ─────────────────────────────────────────
   useEffect(() => {
-    const ydoc = collaborationRuntime?.ydoc;
-    if (!ydoc) return;
+    if (!boundYdoc) return;
 
     // Y.Map<elementId, element> — each element is an independent CRDT entry.
     // Concurrent draws from two clients merge at the element level instead of
     // last-write-wins on the whole array (the old Y.Array delete+reinsert approach).
-    const elementMap = ydoc.getMap<ExcalidrawElement>("elementMap");
+    const elementMap = boundYdoc.getMap<ExcalidrawElement>(boundMapKey);
 
-    const handleRemoteElements = () => {
-      if (isApplyingRemoteRef.current) return;
+    // Initial sync from pre-existing Y.Map state — observe only fires on
+    // future changes, so we seed the canvas once at mount.
+    {
+      const remoteElements = Array.from(elementMap.values());
+      if (remoteElements.length > 0) {
+        setElements(remoteElements);
+        previousElementsRef.current = remoteElements;
+        if (excalidrawAPIRef.current) {
+          isApplyingRemoteRef.current = true;
+          try {
+            excalidrawAPIRef.current.updateScene({ elements: remoteElements });
+          } finally {
+            requestAnimationFrame(() => {
+              isApplyingRemoteRef.current = false;
+            });
+          }
+        }
+      }
+    }
+
+    // Observer for REMOTE changes only. We tag our own transacts with
+    // localOriginRef and skip when transaction.origin matches — otherwise
+    // the observer would fire inside the user's live stroke (Yjs observers
+    // run synchronously at end of transact) and updateScene would replace
+    // the live element with a stale clone, freezing the draw.
+    const handleRemoteElements = (_event: unknown, transaction: { origin: unknown }) => {
+      if (transaction.origin === localOriginRef.current) return;
+
       const remoteElements = Array.from(elementMap.values());
       setElements(remoteElements);
       previousElementsRef.current = remoteElements;
-      // Imperatively update the canvas — initialData is mount-only, not reactive.
-      // Hold isApplyingRemoteRef through the next frame so Excalidraw's onChange
-      // (which fires after updateScene) doesn't echo the update back to Y.js.
       if (excalidrawAPIRef.current) {
         isApplyingRemoteRef.current = true;
-        excalidrawAPIRef.current.updateScene({ elements: remoteElements });
-        // Reset immediately — previousElementsRef is already set to remoteElements above,
-        // so the elementsChanged check in onChange will block any echo without needing a delay.
-        isApplyingRemoteRef.current = false;
+        try {
+          excalidrawAPIRef.current.updateScene({ elements: remoteElements });
+        } finally {
+          requestAnimationFrame(() => {
+            isApplyingRemoteRef.current = false;
+          });
+        }
       }
     };
 
-    // Populate canvas from pre-existing Y.Doc state (observe only fires on future changes).
-    handleRemoteElements();
     elementMap.observe(handleRemoteElements);
     return () => elementMap.unobserve(handleRemoteElements);
-  }, [collaborationRuntime?.ydoc]);
+  }, [boundYdoc, boundMapKey]);
 
   // Handle Excalidraw onChange
   const handleChange = useCallback(
     (newElements: readonly ExcalidrawElement[], newAppState: AppState) => {
       const mutableElements = [...newElements];
 
-      // ID-based comparison: index-based fails when Y.Map returns elements in a
-      // different order than the local canvas (e.g. after a remote update).
-      const prevById = new Map(previousElementsRef.current.map(el => [el.id, el]));
-      const elementsChanged =
-        mutableElements.length !== previousElementsRef.current.length ||
-        mutableElements.some(el => {
-          const prev = prevById.get(el.id);
-          return !prev || prev.version !== el.version;
-        });
-
       setElements(mutableElements);
       setAppState(newAppState);
 
-      // Only trigger save if component has mounted AND elements actually changed
-      // (filters out viewport changes like pan/zoom and remote updateScene echoes)
-      if (hasMounted && elementsChanged && !isApplyingRemoteRef.current) {
-        setIsModified(true);
-        previousElementsRef.current = mutableElements;
+      // Read-only viewers never write back. The canvas updates for local pan/zoom
+      // but drawing operations are effectively no-ops for persistence.
+      if (isReadOnly) return;
+      if (!hasMounted) return;
+      // Don't fire writes while we're applying a remote update — Excalidraw's
+      // updateScene triggers onChange synchronously inside our observer.
+      if (isApplyingRemoteRef.current) return;
 
-        // Sync to Y.js — upsert changed elements, delete removed ones.
-        // Version check avoids redundant writes for unchanged elements.
-        const ydoc = collaborationRuntime?.ydoc;
-        if (ydoc) {
-          const elementMap = ydoc.getMap<ExcalidrawElement>("elementMap");
-          isApplyingRemoteRef.current = true;
-          ydoc.transact(() => {
-            const currentIds = new Set(mutableElements.map(el => el.id));
-            for (const el of mutableElements) {
-              const existing = elementMap.get(el.id);
-              if (!existing || existing.version !== el.version) {
-                elementMap.set(el.id, el);
-              }
-            }
-            // Remove elements deleted from the canvas
-            for (const existingId of elementMap.keys()) {
-              if (!currentIds.has(existingId)) elementMap.delete(existingId);
-            }
-          });
-          isApplyingRemoteRef.current = false;
+      if (boundYdoc) {
+        const elementMap = boundYdoc.getMap<ExcalidrawElement>(boundMapKey);
+
+        // Compare against the Y.Map directly, not a local ref. The ref can lag
+        // when Excalidraw bumps `version` during updateScene — that bump is
+        // purely local and would otherwise trigger an echo write-back (the
+        // "one behind then diverges" bug).
+        const currentIds = new Set(mutableElements.map((el) => el.id));
+        let structuralChange = false;
+        const toWrite: ExcalidrawElement[] = [];
+        for (const el of mutableElements) {
+          const existing = elementMap.get(el.id);
+          if (!existing) {
+            toWrite.push(el);
+            structuralChange = true;
+            continue;
+          }
+          // Only write when a SEMANTIC field changed (geometry, style, text).
+          // We deliberately ignore `version` / `versionNonce` because
+          // Excalidraw rewrites those on every updateScene, even when nothing
+          // meaningful changed.
+          if (!sameExcalidrawElement(existing, el)) {
+            toWrite.push(el);
+          }
+        }
+        const toDelete: string[] = [];
+        for (const existingId of elementMap.keys()) {
+          if (!currentIds.has(existingId)) {
+            toDelete.push(existingId);
+            structuralChange = true;
+          }
         }
 
-        // Remove collaborators from appState before saving (Map doesn't serialize to JSON)
+        if (toWrite.length > 0 || toDelete.length > 0) {
+          setIsModified(true);
+          previousElementsRef.current = mutableElements;
+          boundYdoc.transact(() => {
+            // Clone before writing: Excalidraw mutates elements in place as a
+            // stroke is drawn (points[] gets appended per pointermove). If we
+            // wrote the live reference, Y.Map's stored value would share the
+            // same object — and subsequent comparisons (Y.Map.get(id) vs el)
+            // would see an identical reference and skip every update past the
+            // first. Cloning snapshots the element at write time so the next
+            // diff can see that points[] grew.
+            for (const el of toWrite) elementMap.set(el.id, cloneElement(el));
+            for (const id of toDelete) elementMap.delete(id);
+          }, localOriginRef.current);
+        } else if (structuralChange) {
+          // Pure-delete edge case (shouldn't hit since we'd push to toDelete)
+          setIsModified(true);
+        }
+      }
+
+      // REST autosave is only used for legacy standalone (non-embed) mode.
+      // For embedded drawings, the server store hook writes the non-canonical
+      // backup into visualizationPayload whenever the note's ydoc is stored.
+      if (!isEmbedded) {
         const { collaborators, ...serializableAppState } = newAppState;
         debouncedSave(mutableElements, serializableAppState, files);
       }
     },
-    [debouncedSave, files, hasMounted]
+    [debouncedSave, files, hasMounted, isReadOnly, isEmbedded, boundYdoc, boundMapKey]
   );
 
   // Export handler
@@ -295,16 +416,51 @@ export function ExcalidrawViewer({
     }
   };
 
-  const openFullscreen = () => {
+  // Expand target: embedded drawings grow to cover the viewport in-place so
+  // the React tree + ydoc binding stay mounted. Standalone (non-embedded) can
+  // still open a new tab — a separate URL for a standalone drawing is fine.
+  const handleFullView = () => {
+    if (isEmbedded) {
+      setIsExpandedInPlace((v) => !v);
+      return;
+    }
     window.open(`/content/visualization/${contentId}/fullscreen`, "_blank", "noopener,noreferrer");
   };
 
-  const isCollaborating = !!collaborationRuntime?.ydoc &&
-    collaborationRuntime.state.connectionState !== "localOnly";
+  const openOwningNote = () => {
+    if (!ownerNoteInfo) return;
+    const hash = ownerNoteInfo.blockId ? `#block-${ownerNoteInfo.blockId}` : "";
+    window.open(`/content/note/${ownerNoteInfo.noteId}${hash}`, "_blank", "noopener,noreferrer");
+  };
+
+  const isCollaborating =
+    (!!embedYdoc) ||
+    (!!collaborationRuntime?.ydoc &&
+      collaborationRuntime.state.connectionState !== "localOnly");
 
   return (
-    <div className="h-full flex flex-col">
-      {/* Header (hidden in full-screen mode or when embedded in a block) */}
+    <div
+      className={
+        isExpandedInPlace
+          ? "fixed inset-0 z-[9999] bg-background flex flex-col"
+          : "h-full flex flex-col"
+      }
+    >
+      {/* Read-only banner: shown when this drawing is owned by a note */}
+      {isReadOnly && ownerNoteInfo && (
+        <div className="flex items-center justify-between gap-3 border-b border-yellow-500/20 bg-yellow-500/10 px-6 py-2 text-xs">
+          <span className="text-yellow-300">
+            View-only — this drawing lives inside
+            {ownerNoteInfo.noteTitle ? ` “${ownerNoteInfo.noteTitle}”` : " a note"}. Edit it there to keep changes in sync.
+          </span>
+          <Button onClick={openOwningNote} variant="ghost" size="sm" type="button">
+            <BookOpen className="h-3.5 w-3.5 mr-1" />
+            Open in note
+          </Button>
+        </div>
+      )}
+
+      {/* Header (hidden when rendered inside a note block or in full-screen) */}
       {!isFullScreen && !isEmbedded && (
         <div className="flex items-center justify-between border-b px-6 py-4">
           <div className="flex items-center gap-3">
@@ -322,11 +478,23 @@ export function ExcalidrawViewer({
             )}
           </div>
           <div className="flex items-center gap-2">
-            {/* Full view button (opens new tab) */}
-            <Button onClick={openFullscreen} variant="ghost" size="sm" type="button">
+            <Button onClick={handleFullView} variant="ghost" size="sm" type="button">
               <ExternalLink className="h-4 w-4" />
             </Button>
           </div>
+        </div>
+      )}
+
+      {/* In-place expand toggle — only shown when embedded */}
+      {isEmbedded && (
+        <div className="flex items-center justify-end border-b px-3 py-1">
+          <Button onClick={handleFullView} variant="ghost" size="sm" type="button">
+            {isExpandedInPlace ? (
+              <><Minimize2 className="h-3.5 w-3.5 mr-1" /> Collapse</>
+            ) : (
+              <><Maximize2 className="h-3.5 w-3.5 mr-1" /> Expand</>
+            )}
+          </Button>
         </div>
       )}
 
@@ -341,6 +509,7 @@ export function ExcalidrawViewer({
             }}
             excalidrawAPI={setExcalidrawAPI}
             onChange={handleChange}
+            viewModeEnabled={isReadOnly}
             UIOptions={{
               canvasActions: {
                 loadScene: false,
@@ -357,7 +526,7 @@ export function ExcalidrawViewer({
         <ExcalidrawToolbar
           elementCount={elements.length}
           onExport={handleExport}
-          onFullView={openFullscreen}
+          onFullView={handleFullView}
           isModified={isModified}
           isSaving={isSaving}
           isCollaborating={isCollaborating}

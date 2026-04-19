@@ -45,6 +45,13 @@ interface VisualizationViewerProps {
   config?: Record<string, unknown>;
   data?: Record<string, unknown>;
   collaborationRuntime?: CollaborationRuntimeHandle | null;
+  /** Path A: drawings owned by a note are view-only in the standalone route. */
+  isReadOnly?: boolean;
+  ownerNoteInfo?: {
+    noteId: string;
+    noteTitle?: string;
+    blockId?: string | null;
+  } | null;
 }
 
 export function VisualizationViewer({
@@ -54,6 +61,8 @@ export function VisualizationViewer({
   config,
   data,
   collaborationRuntime,
+  isReadOnly = false,
+  ownerNoteInfo = null,
 }: VisualizationViewerProps) {
   // Save handler for auto-save
   const handleSave = async (updatedData: any) => {
@@ -106,9 +115,12 @@ export function VisualizationViewer({
           config={config as any}
           data={data as any}
           onSave={async (updatedData: any) => {
+            if (isReadOnly) return;
             await handleSave(updatedData);
           }}
-          collaborationRuntime={collaborationRuntime}
+          collaborationRuntime={isReadOnly ? null : collaborationRuntime}
+          isReadOnly={isReadOnly}
+          ownerNoteInfo={ownerNoteInfo}
         />
       );
 

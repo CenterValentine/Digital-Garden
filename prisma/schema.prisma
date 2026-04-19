@@ -97,6 +97,7 @@ model ContentNode {
   iconColor     String?     @db.VarChar(20)
   peopleGroupId String?     @db.Uuid
   personId      String?     @db.Uuid
+  ownedByNoteId String?     @db.Uuid
   auditLogs     AuditLog[]  @relation("AuditedContent")
 
   // Phase 1 payloads
@@ -121,6 +122,8 @@ model ContentNode {
   owner                User                  @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   parent               ContentNode?          @relation("Hierarchy", fields: [parentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   children             ContentNode[]         @relation("Hierarchy")
+  ownedByNote          ContentNode?          @relation("ContentOwnedByNote", fields: [ownedByNoteId], references: [id], onDelete: SetNull)
+  ownedEmbeds          ContentNode[]         @relation("ContentOwnedByNote")
   peopleGroup          PeopleGroup?          @relation("PeopleGroupContent", fields: [peopleGroupId], references: [id], onDelete: SetNull)
   person               Person?               @relation("PersonContent", fields: [personId], references: [id], onDelete: SetNull)
   peopleFileTreeMounts PeopleFileTreeMount[] @relation("ContentNodePeopleMounts")
@@ -144,6 +147,7 @@ model ContentNode {
   @@index([personId, displayOrder])
   @@index([deletedAt])
   @@index([role]) // Phase 2: for filtering by visibility
+  @@index([ownedByNoteId])
 }
 
 model PeriodicNoteIndex {

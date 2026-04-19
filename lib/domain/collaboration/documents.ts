@@ -72,6 +72,179 @@ function extractVisualizationSnapshot(
   return {};
 }
 
+// ─── Embed helpers (Path A: drawings live inside the note's Y.Doc) ──────────
+
+interface ExcalidrawEmbedRef {
+  blockId: string;
+  contentId: string;
+}
+
+function collectExcalidrawEmbeds(tiptapJson: unknown): ExcalidrawEmbedRef[] {
+  const refs: ExcalidrawEmbedRef[] = [];
+  const seen = new Set<string>();
+  const walk = (node: unknown) => {
+    if (!node || typeof node !== "object") return;
+    const n = node as { type?: unknown; attrs?: unknown; content?: unknown };
+    if (n.type === "excalidrawBlock" && n.attrs && typeof n.attrs === "object") {
+      const attrs = n.attrs as { blockId?: unknown; contentId?: unknown };
+      if (
+        typeof attrs.blockId === "string" &&
+        typeof attrs.contentId === "string" &&
+        attrs.contentId &&
+        !seen.has(attrs.blockId)
+      ) {
+        seen.add(attrs.blockId);
+        refs.push({ blockId: attrs.blockId, contentId: attrs.contentId });
+      }
+    }
+    if (Array.isArray(n.content)) {
+      for (const child of n.content) walk(child);
+    }
+  };
+  walk(tiptapJson);
+  return refs;
+}
+
+function excalidrawSubMapKey(blockId: string): string {
+  return `blockExcalidraw:${blockId}`;
+}
+
+/**
+ * Bootstrap empty per-block sub-maps from their referenced visualization payloads.
+ *
+ * Seeds once: if a block's sub-map is already populated, it stays canonical.
+ * Also performs inline claim — an unclaimed referenced ContentNode is stamped
+ * with ownedByNoteId, so the backfill is implicit on first load after deploy.
+ *
+ * Returns true if the ydoc was mutated (so the caller persists the new state).
+ */
+async function bootstrapNoteEmbedSubMaps(
+  prisma: PrismaClient,
+  noteId: string,
+  ydoc: Y.Doc,
+  tiptapJson: unknown
+): Promise<boolean> {
+  const refs = collectExcalidrawEmbeds(tiptapJson);
+  if (refs.length === 0) return false;
+
+  const candidates = await prisma.contentNode.findMany({
+    where: {
+      id: { in: refs.map((r) => r.contentId) },
+      deletedAt: null,
+    },
+    include: { visualizationPayload: true },
+  });
+  const byId = new Map(candidates.map((c) => [c.id, c]));
+
+  let mutated = false;
+  const claimIds: string[] = [];
+
+  for (const ref of refs) {
+    const subMap = ydoc.getMap<unknown>(excalidrawSubMapKey(ref.blockId));
+    if (subMap.size > 0) continue; // already canonical in ydoc
+
+    const node = byId.get(ref.contentId);
+    if (!node?.visualizationPayload) continue;
+    if (node.visualizationPayload.engine !== "excalidraw") continue;
+
+    // Skip if claimed by a different note
+    if (node.ownedByNoteId && node.ownedByNoteId !== noteId) {
+      console.warn(
+        `[bootstrap] skipping ${ref.contentId}: owned by different note ${node.ownedByNoteId}, expected ${noteId}`
+      );
+      continue;
+    }
+
+    const data = (node.visualizationPayload.data ?? {}) as { elements?: unknown };
+    const elements = Array.isArray(data.elements) ? data.elements : [];
+
+    if (elements.length > 0) {
+      ydoc.transact(() => {
+        for (const el of elements) {
+          if (el && typeof el === "object" && "id" in el) {
+            subMap.set((el as { id: string }).id, el);
+          }
+        }
+      });
+      mutated = true;
+    }
+
+    if (node.ownedByNoteId === null) {
+      claimIds.push(ref.contentId);
+    }
+  }
+
+  if (claimIds.length > 0) {
+    await prisma.contentNode.updateMany({
+      where: { id: { in: claimIds }, ownedByNoteId: null },
+      data: { ownedByNoteId: noteId, role: "referenced" },
+    });
+  }
+
+  return mutated;
+}
+
+/**
+ * Extract per-block sub-maps from the note's ydoc and upsert them into the
+ * respective visualization payloads as the non-canonical backup.
+ *
+ * Only writes to ContentNodes with role === "referenced" AND
+ * ownedByNoteId === this note's id — defensive guard against corrupting
+ * standalone drawings or drawings owned by a different note.
+ */
+async function extractAndPersistEmbedBackups(
+  tx: Parameters<Parameters<PrismaClient["$transaction"]>[0]>[0],
+  noteId: string,
+  ydoc: Y.Doc,
+  tiptapJson: unknown
+): Promise<void> {
+  const refs = collectExcalidrawEmbeds(tiptapJson);
+  if (refs.length === 0) return;
+
+  // Fetch status of all referenced nodes — we need to know both who's already
+  // owned by us AND who's unclaimed (so we can late-claim blocks that were
+  // inserted after the Hocuspocus load hook already ran).
+  const nodes = await tx.contentNode.findMany({
+    where: {
+      id: { in: refs.map((r) => r.contentId) },
+      deletedAt: null,
+    },
+    select: { id: true, ownedByNoteId: true, role: true },
+  });
+  const statusById = new Map(nodes.map((n) => [n.id, n]));
+
+  const lateClaimIds: string[] = [];
+  for (const ref of refs) {
+    const node = statusById.get(ref.contentId);
+    if (!node) continue;
+    if (node.ownedByNoteId === null) lateClaimIds.push(ref.contentId);
+  }
+  if (lateClaimIds.length > 0) {
+    await tx.contentNode.updateMany({
+      where: { id: { in: lateClaimIds }, ownedByNoteId: null },
+      data: { ownedByNoteId: noteId, role: "referenced" },
+    });
+  }
+
+  for (const ref of refs) {
+    const node = statusById.get(ref.contentId);
+    if (!node) continue;
+    const ownsThis =
+      node.ownedByNoteId === noteId ||
+      (node.ownedByNoteId === null && lateClaimIds.includes(ref.contentId));
+    if (!ownsThis) continue;
+
+    const subMap = ydoc.getMap<unknown>(excalidrawSubMapKey(ref.blockId));
+    const elements = Array.from(subMap.values());
+    const snapshot = { elements, appState: {} };
+
+    await tx.visualizationPayload.update({
+      where: { contentId: ref.contentId },
+      data: { data: snapshot as never },
+    });
+  }
+}
+
 // ─── Load ────────────────────────────────────────────────────────────────────
 
 export async function loadCollaborationYDocState(
@@ -152,48 +325,72 @@ export async function loadCollaborationYDocState(
   // ── Note (original path) ───────────────────────────────────────────────
   if (!content.notePayload) return null;
 
+  const tiptapJson = content.notePayload.tiptapJson as JSONContent;
+
   const record = await prisma.collaborationDocument.findUnique({
     where: { documentName },
     select: { ydocState: true },
   });
 
-  if (record?.ydocState) {
-    const state = new Uint8Array(record.ydocState);
-    const noteContent = content.notePayload.tiptapJson as JSONContent;
-    if (
-      ydocUpdateHasMeaningfulDefaultContent(state) ||
-      !hasMeaningfulTipTapContent(noteContent)
-    ) {
-      return state;
-    }
+  // Establish the base state: prefer an existing ydoc, otherwise seed from TipTap.
+  let state: Uint8Array;
+  let needsPersist = false;
+
+  if (
+    record?.ydocState &&
+    (ydocUpdateHasMeaningfulDefaultContent(new Uint8Array(record.ydocState)) ||
+      !hasMeaningfulTipTapContent(tiptapJson))
+  ) {
+    state = new Uint8Array(record.ydocState);
+  } else {
+    const seedDoc = TiptapTransformer.toYdoc(
+      tiptapJson,
+      "default",
+      getCollaborationServerExtensions()
+    );
+    state = Y.encodeStateAsUpdate(seedDoc);
+    seedDoc.destroy();
+    needsPersist = true;
   }
 
-  const ydoc = TiptapTransformer.toYdoc(
-    content.notePayload.tiptapJson as JSONContent,
-    "default",
-    getCollaborationServerExtensions()
-  );
-  const update = Y.encodeStateAsUpdate(ydoc);
-
-  await prisma.collaborationDocument.upsert({
-    where: { contentId },
-    update: {
-      documentName,
-      ownerId: content.ownerId,
-      ydocState: Buffer.from(update),
-      snapshotJson: content.notePayload.tiptapJson as JSONContent,
-    },
-    create: {
+  // Bootstrap per-block embed sub-maps (Path A). Idempotent across loads.
+  const ydoc = new Y.Doc();
+  try {
+    Y.applyUpdate(ydoc, state);
+    const mutated = await bootstrapNoteEmbedSubMaps(
+      prisma,
       contentId,
-      ownerId: content.ownerId,
-      documentName,
-      ydocState: Buffer.from(update),
-      snapshotJson: content.notePayload.tiptapJson as JSONContent,
-    },
-  });
+      ydoc,
+      tiptapJson
+    );
+    if (mutated) {
+      state = Y.encodeStateAsUpdate(ydoc);
+      needsPersist = true;
+    }
+  } finally {
+    ydoc.destroy();
+  }
 
-  ydoc.destroy();
-  return update;
+  if (needsPersist) {
+    await prisma.collaborationDocument.upsert({
+      where: { contentId },
+      update: {
+        documentName,
+        ownerId: content.ownerId,
+        ydocState: Buffer.from(state),
+        snapshotJson: tiptapJson,
+      },
+      create: {
+        contentId,
+        ownerId: content.ownerId,
+        documentName,
+        ydocState: Buffer.from(state),
+        snapshotJson: tiptapJson,
+      },
+    });
+  }
+
+  return state;
 }
 
 export async function storeCollaborationYDocState(
@@ -259,56 +456,63 @@ export async function storeCollaborationYDocState(
 
   // ── Note (original path) ───────────────────────────────────────────────
   const ydoc = new Y.Doc();
-  Y.applyUpdate(ydoc, state);
-  const snapshot = TiptapTransformer.fromYdoc(ydoc, "default") as JSONContent;
-  const snapshotHasMeaningfulContent = hasMeaningfulTipTapContent(snapshot);
-  const searchText = extractSearchTextFromTipTap(snapshot);
-  const wordCount = searchText.split(/\s+/).filter(Boolean).length;
-  ydoc.destroy();
+  try {
+    Y.applyUpdate(ydoc, state);
+    const snapshot = TiptapTransformer.fromYdoc(ydoc, "default") as JSONContent;
+    const snapshotHasMeaningfulContent = hasMeaningfulTipTapContent(snapshot);
+    const searchText = extractSearchTextFromTipTap(snapshot);
+    const wordCount = searchText.split(/\s+/).filter(Boolean).length;
 
-  await prisma.$transaction(async (tx) => {
-    const existingContent = content.notePayload?.tiptapJson as JSONContent | undefined;
-    if (
-      hasMeaningfulTipTapContent(existingContent) &&
-      !snapshotHasMeaningfulContent
-    ) {
-      throw new Error(
-        "Refusing to store an empty collaborative document over existing note content"
-      );
-    }
+    await prisma.$transaction(async (tx) => {
+      const existingContent = content.notePayload?.tiptapJson as JSONContent | undefined;
+      if (
+        hasMeaningfulTipTapContent(existingContent) &&
+        !snapshotHasMeaningfulContent
+      ) {
+        throw new Error(
+          "Refusing to store an empty collaborative document over existing note content"
+        );
+      }
 
-    await tx.collaborationDocument.upsert({
-      where: { contentId },
-      update: {
-        documentName,
-        ownerId: content.ownerId,
-        ydocState: Buffer.from(state),
-        snapshotJson: snapshot,
-      },
-      create: {
-        contentId,
-        ownerId: content.ownerId,
-        documentName,
-        ydocState: Buffer.from(state),
-        snapshotJson: snapshot,
-      },
-    });
-
-    await tx.notePayload.update({
-      where: { contentId },
-      data: {
-        tiptapJson: snapshot,
-        searchText,
-        metadata: {
-          wordCount,
-          characterCount: searchText.length,
-          readingTime: Math.ceil(wordCount / 200),
-          collaborationEnabled: true,
-          collaborationSnapshotAt: new Date().toISOString(),
+      await tx.collaborationDocument.upsert({
+        where: { contentId },
+        update: {
+          documentName,
+          ownerId: content.ownerId,
+          ydocState: Buffer.from(state),
+          snapshotJson: snapshot,
         },
-      },
+        create: {
+          contentId,
+          ownerId: content.ownerId,
+          documentName,
+          ydocState: Buffer.from(state),
+          snapshotJson: snapshot,
+        },
+      });
+
+      await tx.notePayload.update({
+        where: { contentId },
+        data: {
+          tiptapJson: snapshot,
+          searchText,
+          metadata: {
+            wordCount,
+            characterCount: searchText.length,
+            readingTime: Math.ceil(wordCount / 200),
+            collaborationEnabled: true,
+            collaborationSnapshotAt: new Date().toISOString(),
+          },
+        },
+      });
+
+      // Non-canonical backup for embedded drawings — only writes to referenced
+      // ContentNodes owned by this note. Safe no-op when the note has no embeds.
+      await extractAndPersistEmbedBackups(tx, contentId, ydoc, snapshot);
     });
-  });
+  } finally {
+    ydoc.destroy();
+  }
 }
 
 export function parseCollaborationDocumentName(documentName: string): string {

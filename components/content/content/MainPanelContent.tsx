@@ -80,6 +80,9 @@ interface ContentResponse {
     iconColor?: string | null;
     createdAt?: string;
     updatedAt?: string;
+    // Path A: populated when this visualization is owned by a note.
+    ownedByNoteId?: string | null;
+    ownedByNote?: { id: string; title: string } | null;
     note?: {
       tiptapJson: any; // Prisma Json type
       searchText: string;
@@ -191,6 +194,10 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
   const [contentParentId, setContentParentId] = useState<string | null>(null);
   const [contentIsPublished, setContentIsPublished] = useState(false);
   const [contentData, setContentData] = useState<any>(null); // Phase 2: Store payload data
+  // Path A: when this ContentNode is a visualization owned by a note, the
+  // standalone viewer is read-only. Non-null means "this is an embedded
+  // drawing; edits happen in the owning note."
+  const [ownedByNote, setOwnedByNote] = useState<{ id: string; title: string } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0); // Used to force refetch
@@ -227,6 +234,9 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
       collaborationEnabled &&
       (contentType === "note" || contentType === "visualization") &&
       (contentType !== "note" || !!noteContent) &&
+      // Path A: a visualization owned by a note is read-only here — the live
+      // canonical state lives in the owning note's ydoc. Skip the runtime.
+      !(contentType === "visualization" && ownedByNote) &&
       !!selectedContentId
         ? selectedContentId
         : null,
@@ -327,6 +337,7 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
         setContentType(result.data.contentType);
         setContentCustomIcon(result.data.customIcon ?? null);
         setContentIconColor(result.data.iconColor ?? null);
+        setOwnedByNote(result.data.ownedByNote ?? null);
         // Provide creation/updated dates to inline-timestamp nodes
         setDocumentDates(
           result.data.createdAt ? new Date(result.data.createdAt).toISOString().slice(0, 10) : "",
@@ -1352,6 +1363,12 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
         config={contentData?.config}
         data={contentData?.data}
         collaborationRuntime={collaborationRuntime}
+        isReadOnly={!!ownedByNote}
+        ownerNoteInfo={
+          ownedByNote
+            ? { noteId: ownedByNote.id, noteTitle: ownedByNote.title }
+            : null
+        }
       />
     );
   } else if (contentType === "data") {
