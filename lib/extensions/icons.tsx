@@ -2,6 +2,7 @@ import {
   Briefcase,
   CalendarCheck,
   CalendarDays,
+  Layers,
   Puzzle,
   Users,
   type LucideIcon,
@@ -12,6 +13,7 @@ const EXTENSION_ICONS: Record<string, LucideIcon> = {
   Briefcase,
   CalendarCheck,
   CalendarDays,
+  Layers,
   Puzzle,
   Users,
 };

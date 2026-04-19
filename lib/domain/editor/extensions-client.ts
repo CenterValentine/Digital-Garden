@@ -21,6 +21,7 @@ import TableCell from "@tiptap/extension-table-cell";
 import CharacterCount from "@tiptap/extension-character-count";
 import Collaboration from "@tiptap/extension-collaboration";
 import CollaborationCaret from "@tiptap/extension-collaboration-caret";
+import { Mathematics } from "@tiptap/extension-mathematics";
 import type { HocuspocusProvider } from "@hocuspocus/provider";
 import type { Doc } from "yjs";
 import { common, createLowlight } from "lowlight";
@@ -176,6 +177,12 @@ export function getEditorExtensions(options?: EditorExtensionsOptions): Extensio
     CodeBlockLowlight.configure({
       lowlight,
       defaultLanguage: "plaintext",
+    }),
+
+    Mathematics.configure({
+      katexOptions: {
+        throwOnError: false,
+      },
     }),
 
     // M6: Placeholder text for empty nodes

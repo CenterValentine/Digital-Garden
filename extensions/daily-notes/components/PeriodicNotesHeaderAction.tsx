@@ -12,9 +12,11 @@ import {
   type PeriodicNoteKind,
 } from "@/lib/domain/periodic-notes";
 import { useContentStore } from "@/state/content-store";
+import { useExtensionsUiStore } from "@/state/extensions-ui-store";
 import { useLeftPanelCollapseStore } from "@/state/left-panel-collapse-store";
 import { useLeftPanelViewStore } from "@/state/left-panel-view-store";
 import { useSettingsStore } from "@/state/settings-store";
+import { DAILY_NOTES_EXTENSION_ID } from "../manifest";
 
 const HOLD_TO_OPEN_MS = 550;
 
@@ -39,17 +41,23 @@ export function PeriodicNotesHeaderAction({
   const setSelectedContentId = useContentStore((state) => state.setSelectedContentId);
   const setActiveView = useLeftPanelViewStore((state) => state.setActiveView);
   const setLeftPanelMode = useLeftPanelCollapseStore((state) => state.setMode);
+  const openExtensionDialog = useExtensionsUiStore(
+    (state) => state.openExtensionDialog
+  );
   const settings = getPeriodicNotesSettings({ periodicNotes });
   const dailyEnabled = settings.daily.enabled;
   const weeklyEnabled = settings.weekly.enabled;
-  const hasBothKinds = dailyEnabled && weeklyEnabled;
 
   const openMenu = useCallback(() => {
     const rect = buttonRef.current?.getBoundingClientRect();
     if (!rect) return;
+    const menuWidth = 176;
+    const left = collapsed
+      ? rect.right + 8
+      : rect.left + rect.width / 2 - menuWidth / 2;
     setMenuPosition({
       top: rect.bottom + 6,
-      left: collapsed ? rect.right + 8 : rect.left,
+      left: Math.max(8, Math.min(left, window.innerWidth - menuWidth - 8)),
     });
     setMenuOpen(true);
   }, [collapsed]);
@@ -149,6 +157,19 @@ export function PeriodicNotesHeaderAction({
     toast.error("Enable daily or weekly notes in extension settings first");
   }, [dailyEnabled, openPeriodicNote, weeklyEnabled]);
 
+  const openSettings = useCallback(() => {
+    closeMenu();
+    if (collapsed) setLeftPanelMode("full");
+    setActiveView("extensions");
+    window.setTimeout(() => openExtensionDialog(DAILY_NOTES_EXTENSION_ID), 0);
+  }, [
+    closeMenu,
+    collapsed,
+    openExtensionDialog,
+    setActiveView,
+    setLeftPanelMode,
+  ]);
+
   const clearHoldTimer = () => {
     if (!holdTimerRef.current) return;
     window.clearTimeout(holdTimerRef.current);
@@ -163,8 +184,8 @@ export function PeriodicNotesHeaderAction({
         className={className}
         title={item.title ?? item.label}
         aria-label={item.title ?? item.label}
-        aria-haspopup={hasBothKinds ? "menu" : undefined}
-        aria-expanded={hasBothKinds ? menuOpen : undefined}
+        aria-haspopup="menu"
+        aria-expanded={menuOpen}
         onClick={() => {
           if (suppressClickRef.current) {
             suppressClickRef.current = false;
@@ -173,18 +194,16 @@ export function PeriodicNotesHeaderAction({
           openPrimaryNote();
         }}
         onContextMenu={(event) => {
-          if (!hasBothKinds) return;
           event.preventDefault();
           openMenu();
         }}
         onKeyDown={(event) => {
-          if (event.key === "ArrowDown" && hasBothKinds) {
+          if (event.key === "ArrowDown") {
             event.preventDefault();
             openMenu();
           }
         }}
         onPointerDown={() => {
-          if (!hasBothKinds) return;
           clearHoldTimer();
           holdTimerRef.current = window.setTimeout(() => {
             suppressClickRef.current = true;
@@ -205,21 +224,33 @@ export function PeriodicNotesHeaderAction({
           className="fixed z-50 min-w-40 rounded-md border border-white/10 bg-[#111318] p-1 text-sm text-gray-200 shadow-xl"
           style={{ top: menuPosition.top, left: menuPosition.left }}
         >
+          {dailyEnabled ? (
+            <button
+              type="button"
+              role="menuitem"
+              className="flex w-full items-center rounded px-3 py-2 text-left transition-colors hover:bg-white/10"
+              onClick={() => void openPeriodicNote("daily")}
+            >
+              Today
+            </button>
+          ) : null}
+          {weeklyEnabled ? (
+            <button
+              type="button"
+              role="menuitem"
+              className="flex w-full items-center rounded px-3 py-2 text-left transition-colors hover:bg-white/10"
+              onClick={() => void openPeriodicNote("weekly")}
+            >
+              This Week
+            </button>
+          ) : null}
           <button
             type="button"
             role="menuitem"
             className="flex w-full items-center rounded px-3 py-2 text-left transition-colors hover:bg-white/10"
-            onClick={() => void openPeriodicNote("daily")}
+            onClick={openSettings}
           >
-            Today
-          </button>
-          <button
-            type="button"
-            role="menuitem"
-            className="flex w-full items-center rounded px-3 py-2 text-left transition-colors hover:bg-white/10"
-            onClick={() => void openPeriodicNote("weekly")}
-          >
-            This Week
+            Settings
           </button>
         </div>
       ) : null}

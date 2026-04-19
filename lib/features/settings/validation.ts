@@ -206,6 +206,18 @@ const periodicNotesSettingsSchema = z
   })
   .optional();
 
+const flashcardsSettingsSchema = z
+  .object({
+    lastUsedCategory: z.string().min(1).max(120).optional(),
+    lastUsedSubcategory: z.string().max(120).optional(),
+    defaultFrontLabel: z.string().min(1).max(80).optional(),
+    defaultBackLabel: z.string().min(1).max(80).optional(),
+    defaultReviewMode: z
+      .enum(["front_to_back", "back_to_front", "random"])
+      .optional(),
+  })
+  .optional();
+
 // Complete Settings Schema
 export const userSettingsSchema = z.object({
   version: z.number().default(1),
@@ -219,6 +231,7 @@ export const userSettingsSchema = z.object({
   exportBackup: exportBackupSettingsSchema,
   calendar: calendarSettingsSchema,
   periodicNotes: periodicNotesSettingsSchema,
+  flashcards: flashcardsSettingsSchema,
 });
 
 export type UserSettings = z.infer<typeof userSettingsSchema>;
@@ -401,5 +414,12 @@ export const DEFAULT_SETTINGS: UserSettings = {
       templateId: null,
       autoCreateOnOpen: false,
     },
+  },
+  flashcards: {
+    lastUsedCategory: "General",
+    lastUsedSubcategory: "",
+    defaultFrontLabel: "Question",
+    defaultBackLabel: "Answer",
+    defaultReviewMode: "front_to_back",
   },
 };
