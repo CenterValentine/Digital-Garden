@@ -12,6 +12,7 @@
 "use client";
 
 import { useState, useCallback, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import dynamic from "next/dynamic";
 import "@excalidraw/excalidraw/index.css"; // Import CSS at top level (safe for SSR)
 import { Pencil, Loader2, Check, ExternalLink, Maximize2, Minimize2, BookOpen } from "lucide-react";
@@ -438,7 +439,7 @@ export function ExcalidrawViewer({
     (!!collaborationRuntime?.ydoc &&
       collaborationRuntime.state.connectionState !== "localOnly");
 
-  return (
+  const body = (
     <div
       className={
         isExpandedInPlace
@@ -521,8 +522,10 @@ export function ExcalidrawViewer({
         </div>
       </div>
 
-      {/* Toolbelt (minimal in full-screen) */}
-      {!isFullScreen && (
+      {/* Toolbelt — hidden in full-screen and in embed views.
+          Embeds rely on the top-right Expand/Collapse in the embed header
+          and reclaim the vertical space for Excalidraw's own menus. */}
+      {!isFullScreen && !isEmbedded && (
         <ExcalidrawToolbar
           elementCount={elements.length}
           onExport={handleExport}
@@ -534,4 +537,14 @@ export function ExcalidrawViewer({
       )}
     </div>
   );
+
+  // When expanded in place (embed → viewport), portal to document.body so the
+  // container isn't clipped by any ancestor with transform/backdrop-filter/
+  // filter set (those create a new containing block for position:fixed, which
+  // is why z-[9999] alone wasn't covering the app sidebar / presence badges /
+  // Excalidraw's own floating panels).
+  if (isExpandedInPlace && typeof document !== "undefined") {
+    return createPortal(body, document.body);
+  }
+  return body;
 }
