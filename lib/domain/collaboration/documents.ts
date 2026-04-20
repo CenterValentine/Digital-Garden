@@ -72,20 +72,30 @@ function extractVisualizationSnapshot(
   return {};
 }
 
-// ─── Embed helpers (Path A: drawings live inside the note's Y.Doc) ──────────
+// ─── Embed helpers (Path A: embedded viz lives inside the note's Y.Doc) ─────
 
-interface ExcalidrawEmbedRef {
+type EmbedEngine = "excalidraw" | "mermaid";
+
+interface EmbedRef {
+  engine: EmbedEngine;
   blockId: string;
   contentId: string;
 }
 
-function collectExcalidrawEmbeds(tiptapJson: unknown): ExcalidrawEmbedRef[] {
-  const refs: ExcalidrawEmbedRef[] = [];
+/**
+ * Walk a TipTap JSON tree and collect every embedded visualization block.
+ * Supports excalidrawBlock (Y.Map sub-map) and mermaidBlock (Y.Text sub-text).
+ */
+function collectEmbeds(tiptapJson: unknown): EmbedRef[] {
+  const refs: EmbedRef[] = [];
   const seen = new Set<string>();
   const walk = (node: unknown) => {
     if (!node || typeof node !== "object") return;
     const n = node as { type?: unknown; attrs?: unknown; content?: unknown };
-    if (n.type === "excalidrawBlock" && n.attrs && typeof n.attrs === "object") {
+    let engine: EmbedEngine | null = null;
+    if (n.type === "excalidrawBlock") engine = "excalidraw";
+    else if (n.type === "mermaidBlock") engine = "mermaid";
+    if (engine && n.attrs && typeof n.attrs === "object") {
       const attrs = n.attrs as { blockId?: unknown; contentId?: unknown };
       if (
         typeof attrs.blockId === "string" &&
@@ -94,7 +104,7 @@ function collectExcalidrawEmbeds(tiptapJson: unknown): ExcalidrawEmbedRef[] {
         !seen.has(attrs.blockId)
       ) {
         seen.add(attrs.blockId);
-        refs.push({ blockId: attrs.blockId, contentId: attrs.contentId });
+        refs.push({ engine, blockId: attrs.blockId, contentId: attrs.contentId });
       }
     }
     if (Array.isArray(n.content)) {
@@ -107,6 +117,10 @@ function collectExcalidrawEmbeds(tiptapJson: unknown): ExcalidrawEmbedRef[] {
 
 function excalidrawSubMapKey(blockId: string): string {
   return `blockExcalidraw:${blockId}`;
+}
+
+function mermaidSubTextKey(blockId: string): string {
+  return `blockMermaid:${blockId}`;
 }
 
 /**
@@ -124,7 +138,7 @@ async function bootstrapNoteEmbedSubMaps(
   ydoc: Y.Doc,
   tiptapJson: unknown
 ): Promise<boolean> {
-  const refs = collectExcalidrawEmbeds(tiptapJson);
+  const refs = collectEmbeds(tiptapJson);
   if (refs.length === 0) return false;
 
   const candidates = await prisma.contentNode.findMany({
@@ -140,12 +154,9 @@ async function bootstrapNoteEmbedSubMaps(
   const claimIds: string[] = [];
 
   for (const ref of refs) {
-    const subMap = ydoc.getMap<unknown>(excalidrawSubMapKey(ref.blockId));
-    if (subMap.size > 0) continue; // already canonical in ydoc
-
     const node = byId.get(ref.contentId);
     if (!node?.visualizationPayload) continue;
-    if (node.visualizationPayload.engine !== "excalidraw") continue;
+    if (node.visualizationPayload.engine !== ref.engine) continue;
 
     // Skip if claimed by a different note
     if (node.ownedByNoteId && node.ownedByNoteId !== noteId) {
@@ -155,18 +166,34 @@ async function bootstrapNoteEmbedSubMaps(
       continue;
     }
 
-    const data = (node.visualizationPayload.data ?? {}) as { elements?: unknown };
-    const elements = Array.isArray(data.elements) ? data.elements : [];
+    const data = (node.visualizationPayload.data ?? {}) as Record<string, unknown>;
 
-    if (elements.length > 0) {
-      ydoc.transact(() => {
-        for (const el of elements) {
-          if (el && typeof el === "object" && "id" in el) {
-            subMap.set((el as { id: string }).id, el);
-          }
+    if (ref.engine === "excalidraw") {
+      const subMap = ydoc.getMap<unknown>(excalidrawSubMapKey(ref.blockId));
+      if (subMap.size === 0) {
+        const elements = Array.isArray(data.elements) ? data.elements : [];
+        if (elements.length > 0) {
+          ydoc.transact(() => {
+            for (const el of elements) {
+              if (el && typeof el === "object" && "id" in el) {
+                subMap.set((el as { id: string }).id, el);
+              }
+            }
+          });
+          mutated = true;
         }
-      });
-      mutated = true;
+      }
+    } else if (ref.engine === "mermaid") {
+      const subText = ydoc.getText(mermaidSubTextKey(ref.blockId));
+      if (subText.length === 0) {
+        const source = typeof data.source === "string" ? data.source : "";
+        if (source.length > 0) {
+          ydoc.transact(() => {
+            subText.insert(0, source);
+          });
+          mutated = true;
+        }
+      }
     }
 
     if (node.ownedByNoteId === null) {
@@ -198,7 +225,7 @@ async function extractAndPersistEmbedBackups(
   ydoc: Y.Doc,
   tiptapJson: unknown
 ): Promise<void> {
-  const refs = collectExcalidrawEmbeds(tiptapJson);
+  const refs = collectEmbeds(tiptapJson);
   if (refs.length === 0) return;
 
   // Fetch status of all referenced nodes — we need to know both who's already
@@ -234,9 +261,16 @@ async function extractAndPersistEmbedBackups(
       (node.ownedByNoteId === null && lateClaimIds.includes(ref.contentId));
     if (!ownsThis) continue;
 
-    const subMap = ydoc.getMap<unknown>(excalidrawSubMapKey(ref.blockId));
-    const elements = Array.from(subMap.values());
-    const snapshot = { elements, appState: {} };
+    let snapshot: Record<string, unknown>;
+    if (ref.engine === "excalidraw") {
+      const subMap = ydoc.getMap<unknown>(excalidrawSubMapKey(ref.blockId));
+      snapshot = { elements: Array.from(subMap.values()), appState: {} };
+    } else if (ref.engine === "mermaid") {
+      const subText = ydoc.getText(mermaidSubTextKey(ref.blockId));
+      snapshot = { source: subText.toString() };
+    } else {
+      continue;
+    }
 
     await tx.visualizationPayload.update({
       where: { contentId: ref.contentId },
