@@ -14,6 +14,12 @@ interface FullscreenExcalidrawViewerProps {
   title: string;
   config: any;
   data: any;
+  isReadOnly?: boolean;
+  ownerNoteInfo?: {
+    noteId: string;
+    noteTitle?: string;
+    blockId?: string | null;
+  } | null;
 }
 
 export function FullscreenExcalidrawViewer({
@@ -21,9 +27,12 @@ export function FullscreenExcalidrawViewer({
   title,
   config,
   data,
+  isReadOnly = false,
+  ownerNoteInfo = null,
 }: FullscreenExcalidrawViewerProps) {
-  // Client-side save handler
+  // Client-side save handler (disabled in read-only mode).
   const handleSave = async (updatedData: any) => {
+    if (isReadOnly) return;
     try {
       console.log("[FullscreenExcalidrawViewer] Saving data:", updatedData);
 
@@ -60,6 +69,8 @@ export function FullscreenExcalidrawViewer({
       data={data}
       onSave={handleSave}
       isFullScreen={true}
+      isReadOnly={isReadOnly}
+      ownerNoteInfo={ownerNoteInfo}
     />
   );
 }

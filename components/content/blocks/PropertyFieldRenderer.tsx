@@ -22,6 +22,16 @@ import {
   TooltipTrigger,
 } from "@/components/client/ui/tooltip";
 
+const WORKDAY_CUTOFF_OPTIONS = [
+  { value: 0, label: "12 AM (midnight)" },
+  { value: 1, label: "1 AM" },
+  { value: 2, label: "2 AM" },
+  { value: 3, label: "3 AM" },
+  { value: 4, label: "4 AM" },
+];
+
+const MOMENT_FORMAT_DOCS_URL = "https://momentjs.com/docs/#/displaying/format/";
+
 /** Renders a single property field based on its fieldType */
 export function PropertyField({
   field,
@@ -33,6 +43,8 @@ export function PropertyField({
   const [iconSelectorOpen, setIconSelectorOpen] = useState(false);
   const [iconTriggerPos, setIconTriggerPos] = useState({ x: 0, y: 0 });
   const iconBtnRef = useRef<HTMLButtonElement>(null);
+  const showMomentDocsLink =
+    field.key === "summaryDate" || field.key === "weekStartDate";
 
   return (
     <div className="space-y-1">
@@ -51,7 +63,17 @@ export function PropertyField({
                 </button>
               </TooltipTrigger>
               <TooltipContent side="top" className="max-w-56 text-xs leading-relaxed">
-                {field.tooltip}
+                <span>{field.tooltip}</span>
+                {showMomentDocsLink ? (
+                  <a
+                    href={MOMENT_FORMAT_DOCS_URL}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="mt-1 block text-amber-300 underline-offset-2 hover:underline"
+                  >
+                    Moment format reference
+                  </a>
+                ) : null}
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>
@@ -68,7 +90,21 @@ export function PropertyField({
         />
       )}
 
-      {field.fieldType === "number" && (
+      {field.fieldType === "number" && field.key === "workdayCutoffHour" && (
+        <select
+          value={String(field.value ?? 0)}
+          onChange={(e) => onChange(Number(e.target.value))}
+          className="w-full px-2 py-1.5 text-sm rounded-md bg-white/8 border border-white/15 text-gray-200 focus:border-blue-500/50 focus:outline-none"
+        >
+          {WORKDAY_CUTOFF_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+      )}
+
+      {field.fieldType === "number" && field.key !== "workdayCutoffHour" && (
         <input
           type="number"
           value={(field.value as number) ?? 0}

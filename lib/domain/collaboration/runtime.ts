@@ -1235,7 +1235,6 @@ class CollaborationRuntimeManager {
   }
 
   private async promoteInternal(entry: DocumentRuntimeEntry, reason: PromotionReason) {
-    void reason;
     entry.state.connectionState = "promoting";
     entry.state.warning = null;
     this.emit(entry);
@@ -1274,6 +1273,8 @@ class CollaborationRuntimeManager {
     entry.hocuspocusProvider = new HocuspocusProvider({
       url: result.data.websocketUrl,
       name: result.data.documentName,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ...({ messageReconnectTimeout: 90_000 } as any),
       token: result.data.token,
       document: entry.ydoc,
       onStatus: ({ status }) => {
@@ -1305,7 +1306,9 @@ class CollaborationRuntimeManager {
       onAwarenessUpdate: () => this.updateProviderPresence(entry),
       onStateless: ({ payload }) => this.handleServerEvent(entry, payload),
       onAuthenticationFailed: ({ reason }) => this.handleAuthenticationFailed(entry, reason),
-      onClose: () => this.handleProviderDisconnected(entry),
+      // onClose is intentionally omitted: HocuspocusProvider fires both onClose
+      // and onStatus("disconnected") for the same WebSocket close event.
+      // Registering both would call handleProviderDisconnected twice per disconnect.
     });
     entry.hocuspocusProvider.awareness?.setLocalStateField(
       "activeSurfaceCount",
@@ -1669,8 +1672,11 @@ class CollaborationRuntimeManager {
   }
 
   private destroyProviderOnly(entry: DocumentRuntimeEntry) {
-    entry.hocuspocusProvider?.destroy();
+    // Null the ref BEFORE destroy() so that disconnect events fired
+    // synchronously during teardown don't trigger handleProviderDisconnected.
+    const provider = entry.hocuspocusProvider;
     entry.hocuspocusProvider = null;
+    provider?.destroy();
   }
 
   private refreshEditPolicy(entry: DocumentRuntimeEntry) {

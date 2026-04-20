@@ -12,6 +12,7 @@ import Placeholder from "@tiptap/extension-placeholder";
 import TaskList from "@tiptap/extension-task-list";
 import TaskItem from "@tiptap/extension-task-item";
 import Link from "@tiptap/extension-link";
+import { Mathematics } from "@tiptap/extension-mathematics";
 import { Table } from "@tiptap/extension-table";
 import TableRow from "@tiptap/extension-table-row";
 import TableHeader from "@tiptap/extension-table-header";
@@ -39,6 +40,10 @@ import { ServerNumberInput } from "./extensions/blocks/number-input";
 import { ServerRatingInput } from "./extensions/blocks/rating-input";
 import { ServerPromptInput } from "./extensions/blocks/prompt-input";
 import { ServerTimestamp } from "./extensions/blocks/timestamp";
+import {
+  ServerDailySummary,
+  ServerWeeklySummary,
+} from "./extensions/blocks/periodic-summary";
 import { ServerInlineTimestamp } from "./extensions/inline-timestamp";
 import { ServerExcalidrawBlock } from "./extensions/blocks/excalidraw-block";
 import { ServerMermaidBlock } from "./extensions/blocks/mermaid-block";
@@ -84,6 +89,12 @@ export function getServerExtensions(): Extensions {
     CodeBlockLowlight.configure({
       lowlight,
       defaultLanguage: "plaintext",
+    }),
+
+    Mathematics.configure({
+      katexOptions: {
+        throwOnError: false,
+      },
     }),
 
     Placeholder.configure({
@@ -151,6 +162,8 @@ export function getServerExtensions(): Extensions {
     ServerRatingInput,
     ServerPromptInput,
     ServerTimestamp,
+    ServerDailySummary,
+    ServerWeeklySummary,
     ServerInlineTimestamp,
     ServerExcalidrawBlock,
     ServerMermaidBlock,

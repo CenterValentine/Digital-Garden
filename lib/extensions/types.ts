@@ -15,12 +15,31 @@ export type ExtensionSurface =
   | "global-dialog"
   | "shell";
 
-export interface ExtensionNavItem {
+export interface ExtensionViewNavItem {
+  type?: "view";
   view: string;
   label: string;
   title?: string;
   iconName: string;
   order: number;
+}
+
+export interface ExtensionActionNavItem {
+  type: "action";
+  id: string;
+  label: string;
+  title?: string;
+  iconName: string;
+  order: number;
+}
+
+export type ExtensionNavItem = ExtensionViewNavItem | ExtensionActionNavItem;
+
+export interface ExtensionHeaderNavActionProps {
+  item: ExtensionActionNavItem;
+  collapsed?: boolean;
+  className: string;
+  iconClassName: string;
 }
 
 export interface ExtensionSettingsEntry {
@@ -88,6 +107,10 @@ export interface ExtensionRuntime {
   shellNavigationTrailingControls?: ComponentType<ExtensionShellNavigationProps>[];
   shellControllers?: ComponentType[];
   shellTabMenuSections?: ComponentType<ExtensionShellTabMenuSectionProps>[];
+  headerNavActions?: Record<
+    string,
+    ComponentType<ExtensionHeaderNavActionProps>
+  >;
   globalDialogs?: ComponentType[];
   settingsDialog?: ComponentType;
   getSlashCommands?: () => SlashCommand[];

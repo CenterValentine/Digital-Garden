@@ -55,6 +55,29 @@ enum ContentWorkspaceItemScope {
   recursive
 }
 
+enum FlashcardReviewStatus {
+  new
+  review
+  mastered
+  archived
+}
+
+enum FlashcardReviewOutcome {
+  review
+  mastered
+}
+
+enum FlashcardReviewMode {
+  front_to_back
+  back_to_front
+  random
+}
+
+enum FlashcardShownSide {
+  front
+  back
+}
+
 model ContentNode {
   id            String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   ownerId       String      @db.Uuid
@@ -74,6 +97,7 @@ model ContentNode {
   iconColor     String?     @db.VarChar(20)
   peopleGroupId String?     @db.Uuid
   personId      String?     @db.Uuid
+  ownedByNoteId String?     @db.Uuid
   auditLogs     AuditLog[]  @relation("AuditedContent")
 
   // Phase 1 payloads
@@ -98,6 +122,8 @@ model ContentNode {
   owner                        User                    @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   parent                       ContentNode?            @relation("Hierarchy", fields: [parentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   children                     ContentNode[]           @relation("Hierarchy")
+  ownedByNote                  ContentNode?            @relation("ContentOwnedByNote", fields: [ownedByNoteId], references: [id], onDelete: SetNull)
+  ownedEmbeds                  ContentNode[]           @relation("ContentOwnedByNote")
   peopleGroup                  PeopleGroup?            @relation("PeopleGroupContent", fields: [peopleGroupId], references: [id], onDelete: SetNull)
   person                       Person?                 @relation("PersonContent", fields: [personId], references: [id], onDelete: SetNull)
   peopleFileTreeMounts         PeopleFileTreeMount[]   @relation("ContentNodePeopleMounts")
@@ -110,6 +136,8 @@ model ContentNode {
   viewGrants                   ViewGrant[]
   calendarEvents               CalendarEvent[]
   workspaceItems               ContentWorkspaceItem[]
+  periodicNoteIndexes          PeriodicNoteIndex[]
+  sourceFlashcards             Flashcard[]             @relation("FlashcardSourceContent")
 
   @@unique([ownerId, slug])
   @@index([ownerId, deletedAt])
@@ -119,6 +147,66 @@ model ContentNode {
   @@index([personId, displayOrder])
   @@index([deletedAt])
   @@index([role]) // Phase 2: for filtering by visibility
+  @@index([ownedByNoteId])
+}
+
+model PeriodicNoteIndex {
+  id        String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ownerId   String      @db.Uuid
+  kind      String      @db.VarChar(20)
+  periodKey String      @db.VarChar(32)
+  contentId String      @db.Uuid
+  createdAt DateTime    @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime    @updatedAt @db.Timestamptz(6)
+  owner     User        @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  content   ContentNode @relation(fields: [contentId], references: [id], onDelete: Cascade)
+
+  @@unique([ownerId, kind, periodKey])
+  @@index([contentId])
+}
+
+model Flashcard {
+  id              String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ownerId         String                   @db.Uuid
+  sourceContentId String?                  @db.Uuid
+  frontLabel      String                   @default("Question") @db.VarChar(80)
+  backLabel       String                   @default("Answer") @db.VarChar(80)
+  frontContent    Json
+  backContent     Json
+  isFrontRichText Boolean                  @default(false)
+  category        String                   @default("General") @db.VarChar(120)
+  subcategory     String                   @default("") @db.VarChar(120)
+  reviewStatus    FlashcardReviewStatus    @default(new)
+  reviewCount     Int                      @default(0)
+  viewCount       Int                      @default(0)
+  lastReviewedAt  DateTime?                @db.Timestamptz(6)
+  lastViewedAt    DateTime?                @db.Timestamptz(6)
+  masteredAt      DateTime?                @db.Timestamptz(6)
+  createdAt       DateTime                 @default(now()) @db.Timestamptz(6)
+  updatedAt       DateTime                 @updatedAt @db.Timestamptz(6)
+  owner           User                     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  sourceContent   ContentNode?             @relation("FlashcardSourceContent", fields: [sourceContentId], references: [id], onDelete: SetNull)
+  reviewAttempts  FlashcardReviewAttempt[]
+
+  @@index([ownerId, category, subcategory])
+  @@index([ownerId, reviewStatus])
+  @@index([sourceContentId])
+}
+
+model FlashcardReviewAttempt {
+  id             String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  flashcardId    String                 @db.Uuid
+  ownerId        String                 @db.Uuid
+  outcome        FlashcardReviewOutcome
+  reviewMode     FlashcardReviewMode
+  shownSide      FlashcardShownSide
+  responseTimeMs Int?
+  createdAt      DateTime               @default(now()) @db.Timestamptz(6)
+  flashcard      Flashcard              @relation(fields: [flashcardId], references: [id], onDelete: Cascade)
+  owner          User                   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@index([flashcardId, createdAt])
+  @@index([ownerId, createdAt])
 }
 
 model NotePayload {
@@ -302,42 +390,45 @@ model AIProviderKey {
 }
 
 model User {
-  id                     String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  username               String                  @unique @db.VarChar(50)
-  passwordHash           String?                 @db.Char(60)
-  email                  String                  @unique @db.VarChar(255)
-  role                   UserRole                @default(guest)
-  createdAt              DateTime                @default(now()) @db.Timestamptz(6)
-  updatedAt              DateTime                @updatedAt @db.Timestamptz(6)
-  settings               Json?
-  settingsVersion        Int                     @default(1)
-  accounts               Account[]
-  aiProviderKeys         AIProviderKey[]
-  auditTargets           AuditLog[]              @relation("AuditTargets")
-  adminActions           AuditLog[]              @relation("AdminActions")
-  categories             Category[]
-  contentHistory         ContentHistory[]
-  contentNodes           ContentNode[]
-  sessions               Session[]
-  storageConfigs         StorageProviderConfig[]
-  tags                   Tag[]
-  trashedContent         TrashBin[]
-  viewGrants             ViewGrant[]
-  peopleGroups           PeopleGroup[]
-  peopleDefaultGroups    PeopleGroup[]           @relation("DefaultPeopleGroup")
-  people                 Person[]
-  peopleFileTreeMounts   PeopleFileTreeMount[]
-  personMentions         PersonMention[]
-  reusableCategories     ReusableCategory[]
-  savedBlocks            SavedBlock[]
-  contentTemplates       ContentTemplate[]
-  snippets               Snippet[]
-  pageTemplates          PageTemplate[]
-  calendarConnections    CalendarConnection[]
-  calendarSources        CalendarSource[]
-  calendarEvents         CalendarEvent[]
-  contentWorkspaces      ContentWorkspace[]
-  collaborationDocuments CollaborationDocument[]
+  id                      String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  username                String                   @unique @db.VarChar(50)
+  passwordHash            String?                  @db.Char(60)
+  email                   String                   @unique @db.VarChar(255)
+  role                    UserRole                 @default(guest)
+  createdAt               DateTime                 @default(now()) @db.Timestamptz(6)
+  updatedAt               DateTime                 @updatedAt @db.Timestamptz(6)
+  settings                Json?
+  settingsVersion         Int                      @default(1)
+  accounts                Account[]
+  aiProviderKeys          AIProviderKey[]
+  auditTargets            AuditLog[]               @relation("AuditTargets")
+  adminActions            AuditLog[]               @relation("AdminActions")
+  categories              Category[]
+  contentHistory          ContentHistory[]
+  contentNodes            ContentNode[]
+  sessions                Session[]
+  storageConfigs          StorageProviderConfig[]
+  tags                    Tag[]
+  trashedContent          TrashBin[]
+  viewGrants              ViewGrant[]
+  peopleGroups            PeopleGroup[]
+  peopleDefaultGroups     PeopleGroup[]            @relation("DefaultPeopleGroup")
+  people                  Person[]
+  peopleFileTreeMounts    PeopleFileTreeMount[]
+  personMentions          PersonMention[]
+  reusableCategories      ReusableCategory[]
+  savedBlocks             SavedBlock[]
+  contentTemplates        ContentTemplate[]
+  snippets                Snippet[]
+  pageTemplates           PageTemplate[]
+  calendarConnections     CalendarConnection[]
+  calendarSources         CalendarSource[]
+  calendarEvents          CalendarEvent[]
+  contentWorkspaces       ContentWorkspace[]
+  collaborationDocuments  CollaborationDocument[]
+  periodicNoteIndexes     PeriodicNoteIndex[]
+  flashcards              Flashcard[]
+  flashcardReviewAttempts FlashcardReviewAttempt[]
 
   @@index([email])
 }

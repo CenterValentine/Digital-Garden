@@ -559,6 +559,32 @@ export async function POST(request: NextRequest) {
           },
         },
       } as CreatePayloadData;
+
+      // Path A: drawings created from inside a note's block claim ownership
+      // at creation. We validate the parent note actually exists + belongs to
+      // the same user — otherwise we silently drop the claim (safer than
+      // accepting a forged ownership link).
+      const embedBody = body as unknown as {
+        ownedByNoteId?: string | null;
+        role?: string | null;
+      };
+      if (embedBody.ownedByNoteId) {
+        const host = await prisma.contentNode.findFirst({
+          where: {
+            id: embedBody.ownedByNoteId,
+            ownerId: session.user.id,
+            deletedAt: null,
+            contentType: "note",
+          },
+          select: { id: true },
+        });
+        if (host) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (payloadData as any).ownedByNoteId = host.id;
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (payloadData as any).role = "referenced";
+        }
+      }
     } else if (requestedContentType === "chat") {
       // Chat payload
       contentType = "chat";
@@ -584,23 +610,47 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create content node
-    const content = await prisma.contentNode.create({
-      data: {
-        ownerId: session.user.id,
-        title,
-        slug,
-        contentType,
-        parentId: parentId || null,
-        categoryId: categoryId || null,
-        peopleGroupId: resolvedPeopleGroupId,
-        personId: resolvedPersonId,
-        customIcon: customIcon || null,
-        iconColor: iconColor || null,
-        ...payloadData,
-      },
-      include: CONTENT_WITH_PAYLOADS,
-    });
+    // Create content node — retry on slug uniqueness collisions.
+    // generateUniqueSlug's check-then-insert isn't atomic, so two concurrent
+    // creates with the same title can both resolve to the same slug and then
+    // race on INSERT. Rapid NodeView re-mounts of embedded drawings tripped
+    // this. We retry with a short random suffix on P2002 against (ownerId, slug).
+    const createWithSlug = (attemptSlug: string) =>
+      prisma.contentNode.create({
+        data: {
+          ownerId: session.user.id,
+          title,
+          slug: attemptSlug,
+          contentType,
+          parentId: parentId || null,
+          categoryId: categoryId || null,
+          peopleGroupId: resolvedPeopleGroupId,
+          personId: resolvedPersonId,
+          customIcon: customIcon || null,
+          iconColor: iconColor || null,
+          ...payloadData,
+        },
+        include: CONTENT_WITH_PAYLOADS,
+      });
+
+    let content: Awaited<ReturnType<typeof createWithSlug>> | null = null;
+    let attemptSlug = slug;
+    for (let attempt = 0; attempt < 3 && !content; attempt++) {
+      try {
+        content = await createWithSlug(attemptSlug);
+      } catch (e) {
+        const err = e as { code?: string; meta?: { target?: string[] } };
+        const isSlugConflict =
+          err.code === "P2002" &&
+          (err.meta?.target?.includes("slug") ?? true);
+        if (!isSlugConflict) throw e;
+        const suffix = Math.random().toString(36).slice(2, 8);
+        attemptSlug = `${slug}-${suffix}`;
+      }
+    }
+    if (!content) {
+      throw new Error("Could not resolve unique slug after retries");
+    }
 
     // Format response
     const response: ContentDetailResponse = {
@@ -678,12 +728,20 @@ export async function POST(request: NextRequest) {
     );
   } catch (error) {
     console.error("POST /api/content/content error:", error);
+    // In development, surface the real error to the client so toasts become
+    // actionable. In production, keep the generic message to avoid leaking
+    // internal details. Prisma errors have a `.code` (e.g. "P2002") which
+    // is safe to pass through either way.
+    const isDev = process.env.NODE_ENV !== "production";
+    const err = error as { code?: string; message?: string };
     return NextResponse.json(
       {
         success: false,
         error: {
-          code: "SERVER_ERROR",
-          message: "Failed to create content",
+          code: err.code || "SERVER_ERROR",
+          message: isDev
+            ? `Failed to create content: ${err.message || String(error)}`
+            : "Failed to create content",
         },
       },
       { status: 500 }

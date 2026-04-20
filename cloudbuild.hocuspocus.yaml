@@ -3,11 +3,18 @@ steps:
   - name: gcr.io/cloud-builders/docker
     args:
       - build
+      - --no-cache
       - -f
       - Dockerfile.hocuspocus
       - -t
       - $_IMAGE
       - .
+
+ # Push the image to Artifact Registry
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - push
+      - $_IMAGE
 
   # Deploy to Cloud Run
   # IMPORTANT: max-instances=1 is required for WebSocket-based Y.js collaboration.
@@ -27,12 +34,13 @@ steps:
       - --port=8080
       - --min-instances=1
       - --max-instances=1
-      - --request-timeout=3600
+      - --timeout=3600s
       - --cpu=1
       - --memory=512Mi
       - --no-allow-unauthenticated
       - --set-env-vars=NODE_ENV=production
-      - --update-secrets=DATABASE_URL=DATABASE_URL:latest,COLLABORATION_TOKEN_SECRET=COLLABORATION_TOKEN_SECRET:latest
+      - --update-secrets=DATABASE_URL=DATABASE_URL:latest,COLLABORATION_TOKEN_SECRET=digital-garden-collaboration-token-secret:2
+
 
 images:
   - $_IMAGE
@@ -40,3 +48,4 @@ images:
 substitutions:
   _SERVICE_NAME: digital-garden-hocuspocus
   _REGION: us-central1
+  _IMAGE: us-west1-docker.pkg.dev/digital-garden-482805/digital-garden-containers/digital-garden-hocuspocus

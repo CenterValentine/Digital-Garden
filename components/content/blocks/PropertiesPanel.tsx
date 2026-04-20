@@ -20,14 +20,39 @@ import { schemaToFields } from "@/lib/domain/blocks/properties-renderer";
 import type { PropertiesField, BlockDefinition } from "@/lib/domain/blocks/types";
 import { Settings2 } from "lucide-react";
 import { PropertyField } from "./PropertyFieldRenderer";
+import { useExtensionActivationStore } from "@/state/extension-activation-store";
 
 export function PropertiesPanel() {
   const selectedBlockId = useBlockStore((s) => s.selectedBlockId);
   const selectedBlockType = useBlockStore((s) => s.selectedBlockType);
+  const workplacesEnabled = useExtensionActivationStore((state) =>
+    state.isExtensionEnabled("workplaces")
+  );
 
   const [definition, setDefinition] = useState<BlockDefinition | null>(null);
   const [fields, setFields] = useState<PropertiesField[]>([]);
   const [attrs, setAttrs] = useState<Record<string, unknown>>({});
+
+  const filterVisibleFields = useCallback(
+    (def: BlockDefinition, allFields: PropertiesField[]) => {
+      let visibleFields = def.hiddenFields
+        ? allFields.filter((field) => !def.hiddenFields!.includes(field.key))
+        : allFields;
+
+      if (
+        (selectedBlockType === "dailySummary" ||
+          selectedBlockType === "weeklySummary") &&
+        !workplacesEnabled
+      ) {
+        visibleFields = visibleFields.filter(
+          (field) => field.key !== "autoBorrowDurationMinutes"
+        );
+      }
+
+      return visibleFields;
+    },
+    [selectedBlockType, workplacesEnabled]
+  );
 
   // Look up block definition when selection changes
   useEffect(() => {
@@ -47,12 +72,12 @@ export function PropertiesPanel() {
 
     setDefinition(def);
 
-    // Use default attrs as starting point — editor will push real values via block-attrs-update event
+    // Use default attrs as starting point; editor pushes real values via block-attrs-update.
     const currentAttrs = def.defaultAttrs;
     setAttrs(currentAttrs);
     const allFields = schemaToFields(def.attrsSchema, currentAttrs);
-    setFields(def.hiddenFields ? allFields.filter(f => !def.hiddenFields!.includes(f.key)) : allFields);
-  }, [selectedBlockId, selectedBlockType]);
+    setFields(filterVisibleFields(def, allFields));
+  }, [selectedBlockId, selectedBlockType, filterVisibleFields]);
 
   // Listen for block attrs updates from the editor
   useEffect(() => {
@@ -61,14 +86,14 @@ export function PropertiesPanel() {
       if (detail.blockId === selectedBlockId && definition) {
         setAttrs(detail.attrs);
         const allFields = schemaToFields(definition.attrsSchema, detail.attrs);
-        setFields(definition.hiddenFields ? allFields.filter(f => !definition.hiddenFields!.includes(f.key)) : allFields);
+        setFields(filterVisibleFields(definition, allFields));
       }
     };
 
     window.addEventListener("block-attrs-update", handleAttrsUpdate);
     return () =>
       window.removeEventListener("block-attrs-update", handleAttrsUpdate);
-  }, [selectedBlockId, definition]);
+  }, [selectedBlockId, definition, filterVisibleFields]);
 
   // Dispatch attr change to the editor
   const handleFieldChange = useCallback(
@@ -80,7 +105,7 @@ export function PropertiesPanel() {
 
       if (definition) {
         const allFields = schemaToFields(definition.attrsSchema, newAttrs);
-        setFields(definition.hiddenFields ? allFields.filter(f => !definition.hiddenFields!.includes(f.key)) : allFields);
+        setFields(filterVisibleFields(definition, allFields));
       }
 
       // Dispatch to editor via CustomEvent
@@ -90,7 +115,7 @@ export function PropertiesPanel() {
         })
       );
     },
-    [selectedBlockId, attrs, definition]
+    [selectedBlockId, attrs, definition, filterVisibleFields]
   );
 
   if (!selectedBlockId || !definition) {
@@ -127,4 +152,3 @@ export function PropertiesPanel() {
     </div>
   );
 }
-

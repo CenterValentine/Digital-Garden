@@ -18,12 +18,46 @@
 
 import { Node, mergeAttributes } from "@tiptap/core";
 import { z } from "zod";
-import * as Y from "yjs";
+import type * as Y from "yjs";
 import { createBlockSchema } from "@/lib/domain/blocks/schema";
 import { registerBlock } from "@/lib/domain/blocks/registry";
 import { createBlockNodeView } from "@/lib/domain/blocks/node-view-factory";
-import { collaborationRuntimeManager } from "@/lib/domain/collaboration/runtime";
-import { getContentCollaborationCapability } from "@/lib/domain/collaboration/runtime";
+
+/**
+ * Sub-map naming convention — kept in one place so server (documents.ts) and
+ * client (block node-view + viewer) agree on the key.
+ */
+export function excalidrawEmbedSubMapKey(blockId: string): string {
+  return `blockExcalidraw:${blockId}`;
+}
+
+/**
+ * De-dupe guard: if updateContent fires again while the original POST is
+ * still in flight (e.g. because a remote Y.js sync re-renders the doc), the
+ * block would dispatch a second embed-diagram-create event → two concurrent
+ * creates → slug collision. Track which blockIds have already dispatched so
+ * we only fire once per block until the contentId lands back in attrs.
+ */
+const pendingCreateBlockIds = new Set<string>();
+
+/**
+ * Look up the note's Y.Doc via the Collaboration extension's options. This
+ * is reliable *at NodeView mount time*, which a useEffect-populated
+ * editor.storage.noteYdoc is not (useEffect runs after the first render).
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function resolveNoteYdoc(editor: any): Y.Doc | null {
+  try {
+    const ext = editor?.extensionManager?.extensions?.find(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (e: any) => e.name === "collaboration"
+    );
+    const doc = ext?.options?.document ?? null;
+    return doc as Y.Doc | null;
+  } catch {
+    return null;
+  }
+}
 
 const { schema: excalidrawBlockSchema, defaults: excalidrawBlockDefaults } =
   createBlockSchema("excalidrawBlock", {
@@ -147,13 +181,19 @@ export const ExcalidrawBlock = Node.create({
       },
 
       updateContent(node, contentDom, editor, getPos) {
-        contentDom.innerHTML = "";
-        // Unmount any existing React root before re-rendering
+        // Run cleanup (unmount + runtime release) before clearing DOM
+        const cleanup = (contentDom as any).__cleanup;
+        if (cleanup) {
+          try { cleanup(); } catch {}
+          delete (contentDom as any).__cleanup;
+        }
+        // Also unmount any root not yet cleaned up
         const existingRoot = (contentDom as any).__reactRoot;
         if (existingRoot) {
           try { existingRoot.unmount(); } catch {}
           delete (contentDom as any).__reactRoot;
         }
+        contentDom.innerHTML = "";
         renderExcalidrawBlock(node.attrs as ExcalidrawBlockAttrs, contentDom, editor, getPos);
         return true;
       },
@@ -250,21 +290,28 @@ function renderExcalidrawBlock(
     creating.className = "block-excalidraw-creating";
     creating.textContent = "Creating drawing…";
     contentDom.appendChild(creating);
-    // Defer by one frame so the NodeView is fully mounted before dispatching
-    requestAnimationFrame(() => {
-      window.dispatchEvent(
-        new CustomEvent("embed-diagram-create", {
-          detail: {
-            engine: "excalidraw",
-            blockId: attrs.blockId,
-            defaultTitle: attrs.title,
-            getPos,
-            editor,
-          },
-        })
-      );
-    });
+    // Guard: a remote Y.js sync or any tr.dispatch can re-fire updateContent
+    // before the POST completes. Only dispatch once per blockId.
+    if (attrs.blockId && !pendingCreateBlockIds.has(attrs.blockId)) {
+      pendingCreateBlockIds.add(attrs.blockId);
+      requestAnimationFrame(() => {
+        window.dispatchEvent(
+          new CustomEvent("embed-diagram-create", {
+            detail: {
+              engine: "excalidraw",
+              blockId: attrs.blockId,
+              defaultTitle: attrs.title,
+              getPos,
+              editor,
+            },
+          })
+        );
+      });
+    }
     return;
+  } else if (attrs.blockId) {
+    // Clear the guard now that the block has a contentId.
+    pendingCreateBlockIds.delete(attrs.blockId);
   }
 
   // ── Collapsed/expanded toggle — matches accordion style ───────────────
@@ -316,15 +363,17 @@ function renderExcalidrawBlock(
     }));
   });
 
-  // Live element count badge
+  // Live element count badge — read from the note's sub-map (Path A).
+  // The Collaboration extension's options.document holds the authoritative
+  // note ydoc. We read from there (not editor.storage.noteYdoc) because the
+  // latter is set in a useEffect that runs AFTER this NodeView first mounts,
+  // leaving boundYdoc null on initial render and breaking sync for good.
+  const noteYdoc = resolveNoteYdoc(editor);
   let elementCount = 0;
-  const capability = getContentCollaborationCapability("visualization", "excalidraw");
-  if (capability && process.env.NEXT_PUBLIC_COLLABORATION_ENABLED === "true") {
+  if (noteYdoc && attrs.blockId) {
     try {
-      const handle = collaborationRuntimeManager.getHandle(attrs.contentId, "__pill__");
-      if (handle?.ydoc) {
-        elementCount = handle.ydoc.getArray("elements").length;
-      }
+      const subMap = noteYdoc.getMap<unknown>(excalidrawEmbedSubMapKey(attrs.blockId));
+      elementCount = subMap.size;
     } catch {}
   }
 
@@ -345,65 +394,39 @@ function renderExcalidrawBlock(
     mountEl.style.height = `${attrs.height}px`;
     contentDom.appendChild(mountEl);
 
-    // Dynamically import React + ExcalidrawViewer to avoid SSR and keep
-    // the TipTap extension itself server-safe.
+    // Path A: drawing data lives inside the note's Y.Doc as a sub-map keyed
+    // by blockId. No separate Hocuspocus session, no acquire/release. Saves
+    // happen through the note's existing ydoc sync; server store hook writes
+    // the non-canonical backup into the visualization payload.
+    const yMapKey = attrs.blockId ? excalidrawEmbedSubMapKey(attrs.blockId) : null;
+    // Re-resolve at mount time so we always pick up the current note ydoc,
+    // even if it became available after the first synchronous pass above.
+    const mountYdoc = resolveNoteYdoc(editor);
+
     Promise.all([
       import("react"),
       import("react-dom/client"),
       import("@/components/content/viewer/ExcalidrawViewer"),
-      import("@/lib/domain/collaboration/runtime"),
-    ]).then(([React, ReactDOM, { ExcalidrawViewer }, { collaborationRuntimeManager: mgr, getContentCollaborationCapability: getCap }]) => {
-      // Acquire collab runtime for the embedded viewer
-      const colabEnabled = process.env.NEXT_PUBLIC_COLLABORATION_ENABLED === "true";
-      const cap = colabEnabled ? getCap("visualization", "excalidraw") : null;
-      const viewInstanceId = `excalidrawBlock:${attrs.blockId ?? "unknown"}`;
-      const runtimeHandle = cap && attrs.contentId
-        ? mgr.acquire(
-            attrs.contentId,
-            cap,
-            {
-              surfaceKind: "other",
-              viewInstanceId,
-            }
-          )
-        : null;
-
+    ]).then(([React, ReactDOM, { ExcalidrawViewer }]) => {
       const root = ReactDOM.createRoot(mountEl);
       (contentDom as any).__reactRoot = root;
-      (contentDom as any).__runtimeHandle = runtimeHandle;
 
       const el = React.createElement(ExcalidrawViewer, {
         contentId: attrs.contentId!,
         title: attrs.title,
         isEmbedded: true,
-        collaborationRuntime: runtimeHandle,
-        onSave: async (data: any) => {
-          try {
-            await fetch(`/api/content/content/${attrs.contentId}`, {
-              method: "PATCH",
-              credentials: "include",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ visualizationData: data }),
-            });
-          } catch {}
-        },
+        embedYdoc: mountYdoc,
+        embedYMapKey: yMapKey,
       });
 
       root.render(el);
 
-      // Clean up on block destroy — hoisted via parentElement marker
-      (mountEl as any).__cleanup = () => {
-        try { root.unmount(); } catch {}
-        try { runtimeHandle?.release(); } catch {}
+      // Defer unmount — synchronous unmount during a React render cycle throws
+      // "Attempted to synchronously unmount a root while React was already rendering".
+      (contentDom as any).__cleanup = () => {
+        queueMicrotask(() => { try { root.unmount(); } catch {} });
       };
     }).catch(console.error);
   }
 }
 
-function escapeHtml(str: string): string {
-  return str
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-}

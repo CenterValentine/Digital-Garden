@@ -210,8 +210,22 @@ const server = new Server({
       });
     }, accessRevalidationIntervalMs);
 
+    // Send a Y.js stateless keepalive every 25 seconds so the client's
+    // messageReconnectTimeout (90s) is never exceeded on idle documents.
+    // Without this, the HocuspocusProvider closes idle WebSocket connections
+    // after 30s of no data frames (WebSocket pings are control frames and
+    // don't count), causing visible "Connecting..." banners every ~30s.
+    const keepaliveInterval = setInterval(() => {
+      try {
+        data.connection.sendStateless(JSON.stringify({ type: "keepalive" }));
+      } catch {
+        // Connection may have closed before interval fires; safe to ignore.
+      }
+    }, 25_000);
+
     data.connection.onClose(() => {
       clearInterval(interval);
+      clearInterval(keepaliveInterval);
     });
   },
 
@@ -219,12 +233,21 @@ const server = new Server({
     new Database({
       fetch: async ({ documentName }) =>
         loadCollaborationYDocState(prisma, documentName),
-      store: async ({ documentName, state }) =>
-        storeCollaborationYDocState(prisma, documentName, state),
+      store: async ({ documentName, state }) => {
+        // Errors thrown here propagate through Hocuspocus's storeDocumentHooks,
+        // which re-throws any Error with a .message. That rejection is unhandled
+        // at the call site (no await / no .catch), crashing the Node process and
+        // dropping all active connections. Log and continue instead.
+        try {
+          await storeCollaborationYDocState(prisma, documentName, state);
+        } catch (error) {
+          console.error(`[hocuspocus] store failed for ${documentName}:`, error);
+        }
+      },
     }),
   ],
 });
 
 server.listen(port);
 
-console.log(`[hocuspocus] listening on ws://localhost:${port}`);
+console.log(`[hocuspocus] listening on ws://localhost:${port} (build: collaboration-crash-fix)`);

@@ -508,6 +508,22 @@ export function MarkdownEditor({
     }
   }, [editor, effectiveEditable]);
 
+  // Expose the note's Y.Doc on editor.storage so embedded block node-views
+  // (e.g. excalidrawBlock) can attach to sub-maps without acquiring a second
+  // collaboration runtime. Path A: one note = one ydoc = one WebSocket.
+  // TipTap's Storage type is per-extension; we stash this under an ad-hoc key,
+  // which is why the cast is necessary.
+  useEffect(() => {
+    if (!editor) return;
+    const storage = editor.storage as unknown as Record<string, unknown>;
+    storage.noteYdoc = runtimeYdoc;
+    return () => {
+      if (storage.noteYdoc === runtimeYdoc) {
+        storage.noteYdoc = null;
+      }
+    };
+  }, [editor, runtimeYdoc]);
+
   const refreshCursorLabels = useCallback(() => {
     const container = editorScrollRef.current;
     if (!container || remoteCollaborators.length === 0) {
@@ -703,6 +719,11 @@ export function MarkdownEditor({
             engine,
             title: defaultTitle || "Untitled",
             parentId: parentId ?? null,
+            // Path A: stamp ownership at creation so the drawing is bound to
+            // THIS note. Any attempt to render it elsewhere falls back to
+            // read-only mode (guarded on server extract + bootstrap).
+            ownedByNoteId: contentId ?? null,
+            role: contentId ? "referenced" : undefined,
           }),
         });
 

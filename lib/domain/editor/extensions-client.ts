@@ -21,6 +21,7 @@ import TableCell from "@tiptap/extension-table-cell";
 import CharacterCount from "@tiptap/extension-character-count";
 import Collaboration from "@tiptap/extension-collaboration";
 import CollaborationCaret from "@tiptap/extension-collaboration-caret";
+import { Mathematics } from "@tiptap/extension-mathematics";
 import type { HocuspocusProvider } from "@hocuspocus/provider";
 import type { Doc } from "yjs";
 import { common, createLowlight } from "lowlight";
@@ -58,6 +59,7 @@ import { NumberInput } from "./extensions/blocks/number-input";
 import { RatingInput } from "./extensions/blocks/rating-input";
 import { PromptInput } from "./extensions/blocks/prompt-input";
 import { Timestamp } from "./extensions/blocks/timestamp";
+import { DailySummary, WeeklySummary } from "./extensions/blocks/periodic-summary";
 import { InlineTimestamp } from "./extensions/inline-timestamp";
 import { ExcalidrawBlock } from "./extensions/blocks/excalidraw-block";
 import { MermaidBlock } from "./extensions/blocks/mermaid-block";
@@ -177,6 +179,12 @@ export function getEditorExtensions(options?: EditorExtensionsOptions): Extensio
       defaultLanguage: "plaintext",
     }),
 
+    Mathematics.configure({
+      katexOptions: {
+        throwOnError: false,
+      },
+    }),
+
     // M6: Placeholder text for empty nodes
     Placeholder.configure({
       placeholder: ({ node }) => {
@@ -278,6 +286,8 @@ export function getEditorExtensions(options?: EditorExtensionsOptions): Extensio
     RatingInput,
     PromptInput,
     Timestamp,
+    DailySummary,
+    WeeklySummary,
     InlineTimestamp,
     ExcalidrawBlock,
     MermaidBlock,

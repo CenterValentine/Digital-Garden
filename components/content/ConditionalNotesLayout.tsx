@@ -14,6 +14,7 @@ import { ResizablePanels } from "./ResizablePanels";
 import { LeftSidebar } from "./LeftSidebar";
 import { CollapsibleRightPanel } from "./CollapsibleRightPanel";
 import { StatusBar } from "./StatusBar";
+import { DndWrapper } from "./DndWrapper";
 import NotesNavBar from "@/components/client/nav/NotesNavBar";
 import { ExtensionGlobalDialogs } from "@/lib/extensions/ExtensionGlobalDialogs";
 import { AuthSessionSync } from "./AuthSessionSync";
@@ -59,37 +60,41 @@ export function ConditionalNotesLayout({
         data-notes-layout
         className="fixed top-[56px] left-0 right-0 bottom-0 flex flex-col overflow-hidden"
       >
-        <div className="flex-1 overflow-hidden">
-          <ResizablePanels>
-            {/* Left Panel */}
-            <div
-              className="flex h-full flex-col overflow-hidden border-r border-white/10"
-              style={{
-                background: glass0.background,
-                backdropFilter: glass0.backdropFilter,
-              }}
-            >
-              <LeftSidebar />
-            </div>
+        <DndWrapper>
+          <div className="flex-1 overflow-hidden">
+            <ResizablePanels>
+              {/* Left Panel */}
+              <div
+                className="relative z-20 flex h-full flex-col overflow-hidden border-r border-white/10"
+                style={{
+                  background: glass0.background,
+                  backdropFilter: glass0.backdropFilter,
+                }}
+              >
+                <LeftSidebar />
+              </div>
 
-            {/* Main Panel */}
-            <div className="flex h-full min-h-0 flex-col overflow-hidden">{children}</div>
+              {/* Main Panel */}
+              <div className="relative z-0 flex h-full min-h-0 flex-col overflow-hidden">
+                {children}
+              </div>
 
-            {/* Right Panel - Collapsible with smooth transitions */}
-            <CollapsibleRightPanel />
-          </ResizablePanels>
-        </div>
+              {/* Right Panel - Collapsible with smooth transitions */}
+              <CollapsibleRightPanel />
+            </ResizablePanels>
+          </div>
 
-        {/* Status bar */}
-        <div
-          className="h-6 border-t border-white/10 px-4 py-1 text-xs"
-          style={{
-            background: glass0.background,
-            backdropFilter: glass0.backdropFilter,
-          }}
-        >
-          <StatusBar />
-        </div>
+          {/* Status bar */}
+          <div
+            className="h-6 border-t border-white/10 px-4 py-1 text-xs"
+            style={{
+              background: glass0.background,
+              backdropFilter: glass0.backdropFilter,
+            }}
+          >
+            <StatusBar />
+          </div>
+        </DndWrapper>
       </div>
       <ExtensionGlobalDialogs />
     </>
