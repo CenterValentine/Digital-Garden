@@ -11,7 +11,7 @@
 
 "use client";
 
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
 import dynamic from "next/dynamic";
 import "@excalidraw/excalidraw/index.css"; // Import CSS at top level (safe for SSR)
@@ -431,19 +431,76 @@ export function ExcalidrawViewer({
   // Expand target: embedded drawings grow to cover the viewport in-place so
   // the React tree + ydoc binding stay mounted. Standalone (non-embedded) can
   // still open a new tab — a separate URL for a standalone drawing is fine.
-  const handleFullView = () => {
+  // Wrapped in useCallback so downstream memoized props (renderTopRightUI,
+  // toolbar handlers) keep a stable identity — Excalidraw treats a fresh
+  // prop identity as "something changed" and can trigger a setState loop.
+  const handleFullView = useCallback(() => {
     if (isEmbedded) {
       setIsExpandedInPlace((v) => !v);
       return;
     }
     window.open(`/content/visualization/${contentId}/fullscreen`, "_blank", "noopener,noreferrer");
-  };
+  }, [isEmbedded, contentId]);
 
-  const openOwningNote = () => {
+  const openOwningNote = useCallback(() => {
     if (!ownerNoteInfo) return;
     const hash = ownerNoteInfo.blockId ? `#block-${ownerNoteInfo.blockId}` : "";
     window.open(`/content/note/${ownerNoteInfo.noteId}${hash}`, "_blank", "noopener,noreferrer");
-  };
+  }, [ownerNoteInfo]);
+
+  // Memoized UIOptions — a new object literal each render causes Excalidraw
+  // to re-run internal effects that cascade into onChange → setState → loop.
+  const excalidrawUIOptions = useMemo(
+    () => ({
+      canvasActions: {
+        loadScene: false,
+        // `false` literal (not widened boolean) — Excalidraw treats `false` as
+        // "disabled" and an object as export options. useMemo inference
+        // otherwise widens to boolean, which fails the overload.
+        export: false as const,
+        saveAsImage: false,
+      },
+      // Below this container width, Excalidraw keeps the Library sidebar
+      // floating instead of allowing it to dock. Gives narrow embeds more
+      // canvas real estate.
+      dockedSidebarBreakpoint: 900,
+    }),
+    [],
+  );
+
+  // Memoized top-right render prop — stable identity prevents Excalidraw
+  // from treating every parent render as a UI change, which was triggering
+  // "Maximum update depth exceeded" on mount.
+  const renderTopRightUI = useCallback(
+    () => (
+      <button
+        onClick={handleFullView}
+        type="button"
+        title={isExpandedInPlace ? "Collapse" : "Expand"}
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          gap: "6px",
+          padding: "0 10px",
+          height: "2.5rem",
+          fontSize: "0.875rem",
+          fontWeight: 500,
+          background: "var(--island-bg-color, #fff)",
+          color: "var(--color-on-surface, inherit)",
+          border: "1px solid var(--default-border-color, rgba(0,0,0,0.1))",
+          borderRadius: "0.5rem",
+          cursor: "pointer",
+        }}
+      >
+        {isExpandedInPlace ? (
+          <><Minimize2 style={{ width: 14, height: 14 }} /> Collapse</>
+        ) : (
+          <><Maximize2 style={{ width: 14, height: 14 }} /> Expand</>
+        )}
+      </button>
+    ),
+    [handleFullView, isExpandedInPlace],
+  );
 
   const isCollaborating =
     (!!embedYdoc) ||
@@ -526,50 +583,8 @@ export function ExcalidrawViewer({
             excalidrawAPI={setExcalidrawAPI}
             onChange={handleChange}
             viewModeEnabled={isReadOnly}
-            UIOptions={{
-              canvasActions: {
-                loadScene: false,
-                export: false, // Use our custom export
-                saveAsImage: false,
-              },
-              // Below this container width, Excalidraw keeps the Library
-              // sidebar floating instead of allowing it to dock. Gives
-              // narrow embeds more canvas real estate.
-              dockedSidebarBreakpoint: 900,
-            }}
-            renderTopRightUI={
-              isEmbedded
-                ? () => (
-                    // Inline-styled so Excalidraw's CSS variables & spacing
-                    // scope match the adjacent native Library button.
-                    <button
-                      onClick={handleFullView}
-                      type="button"
-                      title={isExpandedInPlace ? "Collapse" : "Expand"}
-                      style={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: "6px",
-                        padding: "0 10px",
-                        height: "2.5rem",
-                        fontSize: "0.875rem",
-                        fontWeight: 500,
-                        background: "var(--island-bg-color, #fff)",
-                        color: "var(--color-on-surface, inherit)",
-                        border: "1px solid var(--default-border-color, rgba(0,0,0,0.1))",
-                        borderRadius: "0.5rem",
-                        cursor: "pointer",
-                      }}
-                    >
-                      {isExpandedInPlace ? (
-                        <><Minimize2 style={{ width: 14, height: 14 }} /> Collapse</>
-                      ) : (
-                        <><Maximize2 style={{ width: 14, height: 14 }} /> Expand</>
-                      )}
-                    </button>
-                  )
-                : undefined
-            }
+            UIOptions={excalidrawUIOptions}
+            renderTopRightUI={isEmbedded ? renderTopRightUI : undefined}
           />
         </div>
       </div>
