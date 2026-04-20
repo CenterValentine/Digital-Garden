@@ -1,0 +1,3 @@
+ALTER TABLE "Flashcard"
+  ADD COLUMN "viewCount" INTEGER NOT NULL DEFAULT 0,
+  ADD COLUMN "lastViewedAt" TIMESTAMPTZ(6);

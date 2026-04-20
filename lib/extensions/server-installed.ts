@@ -1,5 +1,6 @@
 import { calendarExtensionManifest } from "@/extensions/calendar/manifest";
 import { calendarExtensionServerRuntime } from "@/extensions/calendar/server-runtime";
+import { flashcardsExtensionManifest } from "@/extensions/flashcards/manifest";
 import { peopleExtensionManifest } from "@/extensions/people/manifest";
 import { workplacesExtensionManifest } from "@/extensions/workplaces/manifest";
 import type { BuiltInExtension } from "./types";
@@ -14,6 +15,9 @@ import type { BuiltInExtension } from "./types";
 export const SERVER_BUILT_IN_EXTENSIONS: BuiltInExtension[] = [
   {
     manifest: peopleExtensionManifest,
+  },
+  {
+    manifest: flashcardsExtensionManifest,
   },
   {
     manifest: calendarExtensionManifest,

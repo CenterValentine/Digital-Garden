@@ -55,6 +55,29 @@ enum ContentWorkspaceItemScope {
   recursive
 }
 
+enum FlashcardReviewStatus {
+  new
+  review
+  mastered
+  archived
+}
+
+enum FlashcardReviewOutcome {
+  review
+  mastered
+}
+
+enum FlashcardReviewMode {
+  front_to_back
+  back_to_front
+  random
+}
+
+enum FlashcardShownSide {
+  front
+  back
+}
+
 model ContentNode {
   id            String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   ownerId       String      @db.Uuid
@@ -111,6 +134,7 @@ model ContentNode {
   calendarEvents       CalendarEvent[]
   workspaceItems        ContentWorkspaceItem[]
   periodicNoteIndexes  PeriodicNoteIndex[]
+  sourceFlashcards      Flashcard[]              @relation("FlashcardSourceContent")
 
   @@unique([ownerId, slug])
   @@index([ownerId, deletedAt])
@@ -135,6 +159,50 @@ model PeriodicNoteIndex {
 
   @@unique([ownerId, kind, periodKey])
   @@index([contentId])
+}
+
+model Flashcard {
+  id              String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ownerId         String                @db.Uuid
+  sourceContentId String?               @db.Uuid
+  frontLabel      String                @default("Question") @db.VarChar(80)
+  backLabel       String                @default("Answer") @db.VarChar(80)
+  frontContent    Json
+  backContent     Json
+  isFrontRichText Boolean               @default(false)
+  category        String                @default("General") @db.VarChar(120)
+  subcategory     String                @default("") @db.VarChar(120)
+  reviewStatus    FlashcardReviewStatus @default(new)
+  reviewCount     Int                   @default(0)
+  viewCount       Int                   @default(0)
+  lastReviewedAt  DateTime?             @db.Timestamptz(6)
+  lastViewedAt    DateTime?             @db.Timestamptz(6)
+  masteredAt      DateTime?             @db.Timestamptz(6)
+  createdAt       DateTime              @default(now()) @db.Timestamptz(6)
+  updatedAt       DateTime              @updatedAt @db.Timestamptz(6)
+  owner           User                  @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  sourceContent   ContentNode?          @relation("FlashcardSourceContent", fields: [sourceContentId], references: [id], onDelete: SetNull)
+  reviewAttempts  FlashcardReviewAttempt[]
+
+  @@index([ownerId, category, subcategory])
+  @@index([ownerId, reviewStatus])
+  @@index([sourceContentId])
+}
+
+model FlashcardReviewAttempt {
+  id             String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  flashcardId    String                 @db.Uuid
+  ownerId        String                 @db.Uuid
+  outcome        FlashcardReviewOutcome
+  reviewMode     FlashcardReviewMode
+  shownSide      FlashcardShownSide
+  responseTimeMs Int?
+  createdAt      DateTime               @default(now()) @db.Timestamptz(6)
+  flashcard      Flashcard              @relation(fields: [flashcardId], references: [id], onDelete: Cascade)
+  owner          User                   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@index([flashcardId, createdAt])
+  @@index([ownerId, createdAt])
 }
 
 model NotePayload {
@@ -355,6 +423,8 @@ model User {
   contentWorkspaces    ContentWorkspace[]
   collaborationDocuments CollaborationDocument[]
   periodicNoteIndexes  PeriodicNoteIndex[]
+  flashcards           Flashcard[]
+  flashcardReviewAttempts FlashcardReviewAttempt[]
 
   @@index([email])
 }
