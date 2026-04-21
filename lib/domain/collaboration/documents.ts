@@ -18,7 +18,7 @@ import { getCollaborationDocumentName } from "./tokens";
  * Engine-specific mapping:
  *   excalidraw  → Y.Map("elementMap") keyed by element ID + Y.Map("appState")
  *   mermaid     → Y.Text("source")
- *   diagrams-net → Y.Text("xml")
+ *   diagrams-net → Y.Map("diagram") key "xml"
  */
 function bootstrapVisualizationYDoc(ydoc: Y.Doc, engine: string, data: Record<string, unknown>) {
   if (engine === "excalidraw") {
@@ -44,9 +44,11 @@ function bootstrapVisualizationYDoc(ydoc: Y.Doc, engine: string, data: Record<st
     const text = typeof data.source === "string" ? data.source : "";
     if (text) source.insert(0, text);
   } else if (engine === "diagrams-net") {
-    const xml = ydoc.getText("xml");
+    // Y.Map gives last-write-wins per key — correct for atomic diagram snapshots.
+    // Y.Text would cause concurrent delete+insert to concatenate both XMLs.
+    const diagram = ydoc.getMap<string>("diagram");
     const text = typeof data.xml === "string" ? data.xml : "";
-    if (text) xml.insert(0, text);
+    if (text) ydoc.transact(() => { diagram.set("xml", text); });
   }
 }
 
@@ -67,7 +69,7 @@ function extractVisualizationSnapshot(
   } else if (engine === "mermaid") {
     return { source: ydoc.getText("source").toString() };
   } else if (engine === "diagrams-net") {
-    return { xml: ydoc.getText("xml").toString() };
+    return { xml: ydoc.getMap<string>("diagram").get("xml") ?? "" };
   }
   return {};
 }

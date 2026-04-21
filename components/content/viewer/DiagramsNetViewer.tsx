@@ -136,65 +136,65 @@ export function DiagramsNetViewer({
   }, [connectionState, collaborationRuntime]);
 
   // ── Y.js collaboration binding ──────────────────────────────────────────
-  // Seed + remote-change observer. Uses LOCAL_ORIGIN echo guard so that
-  // local edits written in handleChange don't loop back through here.
+  // Uses Y.Map (not Y.Text) so concurrent saves don't concatenate XML strings.
+  // Y.Map gives last-write-wins per key — correct for atomic diagram snapshots.
+  // LOCAL_ORIGIN echo guard prevents looping on our own writes.
   useEffect(() => {
     const ydoc = collaborationRuntime?.ydoc;
     if (!ydoc) return;
 
-    const ydocXml = ydoc.getText("xml");
+    const ydocDiagram = ydoc.getMap<string>("diagram");
+    const dbg = () => (window as any).__dg_debug;
 
     // Seed from Y.js if the shared doc already has content, otherwise seed
     // Y.js from the database snapshot so latecomers see the latest state.
-    const existing = ydocXml.toString();
+    const existing = ydocDiagram.get("xml") ?? "";
     if (existing.length > 0) {
       if (existing !== xmlRef.current) {
+        if (dbg()) console.log("[dg/diagrams-net] seed from ydoc, len=", existing.length);
         xmlRef.current = existing;
         setXml(existing);
-        // Push into the iframe immediately (if it's already ready; otherwise
-        // DiagramsNetEditor will flush the pending xml on its next init).
         editorRef.current?.loadXml(existing);
       }
     } else if (data.xml && data.xml.length > 0) {
+      if (dbg()) console.log("[dg/diagrams-net] seed ydoc from db, len=", data.xml.length);
       ydoc.transact(() => {
-        ydocXml.insert(0, data.xml!);
+        ydocDiagram.set("xml", data.xml!);
       }, LOCAL_ORIGIN);
     }
 
     const handleRemoteChange = (_event: unknown, transaction: { origin: unknown }) => {
+      if (dbg()) console.log("[dg/diagrams-net] observer — origin=", transaction.origin);
       // Skip echo — this transaction was created by our own handleChange call.
       if (transaction.origin === LOCAL_ORIGIN) return;
-      const remoteXml = ydocXml.toString();
+      const remoteXml = ydocDiagram.get("xml") ?? "";
       if (remoteXml !== xmlRef.current) {
+        if (dbg()) console.log("[dg/diagrams-net] applying remote xml, len=", remoteXml.length);
         xmlRef.current = remoteXml;
         setXml(remoteXml);
-        // Push directly to the live iframe via the imperative handle.
         editorRef.current?.loadXml(remoteXml);
       }
     };
 
-    ydocXml.observe(handleRemoteChange);
-    return () => ydocXml.unobserve(handleRemoteChange);
+    ydocDiagram.observe(handleRemoteChange);
+    return () => ydocDiagram.unobserve(handleRemoteChange);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [collaborationRuntime?.ydoc]);
 
   // Stable identity so DiagramsNetEditor's [onChange]-dep useEffect doesn't
-  // re-register its message listener on every render. Previously, each re-
-  // registration reset isReadyRef, and since diagrams.net's `init` event only
-  // fires once per iframe load, readiness could never recover — remote Y.js
-  // updates got buffered into pendingXmlRef and never flushed.
+  // re-register its message listener on every render.
   const handleChange = useCallback((newXml: string) => {
+    const dbg = () => (window as any).__dg_debug;
+    if (dbg()) console.log("[dg/diagrams-net] local change, len=", newXml.length);
     xmlRef.current = newXml;
     setXml(newXml);
     setIsModified(true);
 
-    // Sync to Y.js. Tag with LOCAL_ORIGIN so the observer above skips the echo.
+    // Sync to Y.js with Y.Map.set — atomic last-write-wins, no concatenation risk.
     const ydoc = collaborationRuntime?.ydoc;
     if (ydoc) {
-      const ydocXml = ydoc.getText("xml");
       ydoc.transact(() => {
-        ydocXml.delete(0, ydocXml.length);
-        ydocXml.insert(0, newXml);
+        ydoc.getMap<string>("diagram").set("xml", newXml);
       }, LOCAL_ORIGIN);
     }
 
