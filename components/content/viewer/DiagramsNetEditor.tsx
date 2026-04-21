@@ -60,11 +60,13 @@ export const DiagramsNetEditor = forwardRef<DiagramsNetEditorHandle, DiagramsNet
       const params = new URLSearchParams({
         embed: "1",
         ui: THEME_MAP[theme] || "kennedy",
-        spin: "1",
         proto: "json",
         libraries: "1",
         plugins: "0",
         autosave: "1",
+        // Hide the Save button — autosave event handling covers persistence.
+        // The explicit Save affordance is confusing in an autosave-first collaboration model.
+        noSaveBtn: "1",
       });
       return `https://embed.diagrams.net/?${params.toString()}`;
     }, [theme]);

@@ -247,8 +247,9 @@ export function DiagramsNetViewer({
         </div>
       )}
 
-      {/* Iframe Editor */}
-      <div className="flex-1 relative">
+      {/* Iframe Editor — bg-white prevents the dark app background from bleeding
+          through the cross-origin iframe while diagrams.net finishes loading. */}
+      <div className="flex-1 relative bg-white">
         <DiagramsNetEditor
           ref={editorRef}
           xml={xml}
