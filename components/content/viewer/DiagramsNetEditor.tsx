@@ -64,9 +64,11 @@ export const DiagramsNetEditor = forwardRef<DiagramsNetEditorHandle, DiagramsNet
         libraries: "1",
         plugins: "0",
         autosave: "1",
-        // Hide the Save button — autosave event handling covers persistence.
-        // The explicit Save affordance is confusing in an autosave-first collaboration model.
+        // Hide Save — autosave event handling covers persistence.
         noSaveBtn: "1",
+        // Hide Exit — closing the tab/pane is the natural exit, and the embed's
+        // Exit button would fire a pointless 'exit' event we don't act on.
+        noExitBtn: "1",
       });
       return `https://embed.diagrams.net/?${params.toString()}`;
     }, [theme]);
