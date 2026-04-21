@@ -11,17 +11,27 @@
  * - init: Iframe ready, send diagram XML
  * - save: User saved diagram, extract XML
  * - export: Export complete, handle file
+ *
+ * Imperative API (via ref):
+ * - loadXml(xml): push a new diagram into the already-loaded iframe.
+ *   Buffers the call if the iframe hasn't sent "init" yet (e.g. after a
+ *   theme change reloads the src) and flushes automatically on next init.
  */
 
 "use client";
 
-import { useEffect, useRef, useMemo } from "react";
+import { useEffect, useRef, useMemo, useImperativeHandle, forwardRef } from "react";
 import type { DiagramsNetTheme } from "@/lib/domain/visualization/types";
 
 interface DiagramsNetEditorProps {
   xml: string;
   theme: DiagramsNetTheme;
   onChange: (xml: string) => void;
+}
+
+export interface DiagramsNetEditorHandle {
+  /** Push a new XML diagram into the live iframe without waiting for init. */
+  loadXml: (xml: string) => void;
 }
 
 // Map theme names to diagrams.net UI themes
@@ -32,103 +42,121 @@ const THEME_MAP: Record<DiagramsNetTheme, string> = {
   minimal: "min",
 };
 
-export function DiagramsNetEditor({ xml, theme, onChange }: DiagramsNetEditorProps) {
-  const iframeRef = useRef<HTMLIFrameElement>(null);
+export const DiagramsNetEditor = forwardRef<DiagramsNetEditorHandle, DiagramsNetEditorProps>(
+  ({ xml, theme, onChange }, ref) => {
+    const iframeRef = useRef<HTMLIFrameElement>(null);
+    // Ref-tracked xml so the init handler always uses the latest value
+    // without needing xml in the effect dependency array (which would re-register
+    // the listener on every keystroke and never push updates to the live iframe).
+    const xmlRef = useRef(xml);
+    const isReadyRef = useRef(false);
+    const pendingXmlRef = useRef<string | null>(null);
 
-  // Build embed URL with security parameters
-  const embedUrl = useMemo(() => {
-    const params = new URLSearchParams({
-      embed: "1", // Enable embed mode
-      ui: THEME_MAP[theme] || "kennedy",
-      spin: "1", // Show loading spinner
-      proto: "json", // Use JSON protocol for postMessage
-      libraries: "1", // Enable shape libraries
-      // Security: Disable plugins
-      plugins: "0", // Disable plugins
-      // Auto-save: Enable automatic saving
-      autosave: "1",
-    });
-    return `https://embed.diagrams.net/?${params.toString()}`;
-  }, [theme]);
+    // Keep ref in sync with prop (no effect needed — synchronous before render)
+    xmlRef.current = xml;
 
-  // postMessage handler with origin validation
-  useEffect(() => {
-    const handleMessage = (event: MessageEvent) => {
-      // SECURITY: Validate origin
-      if (event.origin !== "https://embed.diagrams.net") {
-        console.warn("[DiagramsNetEditor] Rejected message from unauthorized origin:", event.origin);
-        return;
-      }
+    // Reset ready state when the embed URL changes (theme change reloads iframe src).
+    const embedUrl = useMemo(() => {
+      const params = new URLSearchParams({
+        embed: "1",
+        ui: THEME_MAP[theme] || "kennedy",
+        spin: "1",
+        proto: "json",
+        libraries: "1",
+        plugins: "0",
+        autosave: "1",
+      });
+      return `https://embed.diagrams.net/?${params.toString()}`;
+    }, [theme]);
 
-      try {
-        const message = JSON.parse(event.data);
+    useEffect(() => {
+      isReadyRef.current = false;
+    }, [embedUrl]);
 
-        switch (message.event) {
-          case "init":
-            // Iframe is ready, send diagram XML
-            console.log("[DiagramsNetEditor] Iframe initialized");
-            if (iframeRef.current?.contentWindow) {
-              iframeRef.current.contentWindow.postMessage(
-                JSON.stringify({
-                  action: "load",
-                  xml: xml || "", // Send empty string if no XML
-                  autosave: 1,
-                }),
-                "https://embed.diagrams.net"
-              );
-            }
-            break;
-
-          case "save":
-            // User saved diagram, extract XML
-            console.log("[DiagramsNetEditor] Save event received");
-            if (message.xml) {
-              onChange(message.xml);
-            }
-            break;
-
-          case "autosave":
-            // Auto-save event (same as save)
-            console.log("[DiagramsNetEditor] Auto-save event received");
-            if (message.xml) {
-              onChange(message.xml);
-            }
-            break;
-
-          case "export":
-            // Export complete (handled by export handler)
-            console.log("[DiagramsNetEditor] Export event received");
-            break;
-
-          case "exit":
-            // User closed editor
-            console.log("[DiagramsNetEditor] Exit event received");
-            break;
-
-          default:
-            console.log("[DiagramsNetEditor] Unknown event:", message.event);
+    // Expose loadXml so DiagramsNetViewer can push remote Y.js updates into
+    // the live iframe without going through React state (which can't trigger
+    // a re-send because init only fires once per iframe load).
+    useImperativeHandle(ref, () => ({
+      loadXml: (newXml: string) => {
+        if (!isReadyRef.current) {
+          pendingXmlRef.current = newXml;
+          return;
         }
-      } catch (error) {
-        console.error("[DiagramsNetEditor] Failed to parse message:", error);
-      }
-    };
+        iframeRef.current?.contentWindow?.postMessage(
+          JSON.stringify({ action: "load", xml: newXml, autosave: 1 }),
+          "https://embed.diagrams.net"
+        );
+      },
+    }));
 
-    window.addEventListener("message", handleMessage);
-    return () => window.removeEventListener("message", handleMessage);
-  }, [xml, onChange]);
+    // postMessage handler — only [onChange] in deps so this doesn't re-register
+    // on every xml prop change (which would never push updates anyway since
+    // init is a one-time event per iframe lifecycle).
+    useEffect(() => {
+      const handleMessage = (event: MessageEvent) => {
+        // SECURITY: Validate origin
+        if (event.origin !== "https://embed.diagrams.net") {
+          return;
+        }
 
-  return (
-    <iframe
-      ref={iframeRef}
-      src={embedUrl}
-      className="w-full h-full border-none"
-      // SECURITY: Sandbox attributes
-      sandbox="allow-scripts allow-same-origin allow-downloads"
-      // Allow fullscreen for iframe
-      allow="fullscreen"
-      // ARIA for accessibility
-      title="Diagrams.net Editor"
-      aria-label="Diagram editor powered by diagrams.net"
-    />
-  );
-}
+        try {
+          const message = JSON.parse(event.data);
+
+          switch (message.event) {
+            case "init":
+              isReadyRef.current = true;
+              // Flush pending remote update, or fall back to current xml prop
+              const xmlToLoad = pendingXmlRef.current ?? xmlRef.current ?? "";
+              pendingXmlRef.current = null;
+              if (iframeRef.current?.contentWindow) {
+                iframeRef.current.contentWindow.postMessage(
+                  JSON.stringify({ action: "load", xml: xmlToLoad, autosave: 1 }),
+                  "https://embed.diagrams.net"
+                );
+              }
+              break;
+
+            case "save":
+            case "autosave":
+              if (message.xml) {
+                onChange(message.xml);
+              }
+              break;
+
+            case "export":
+            case "exit":
+              break;
+
+            default:
+              break;
+          }
+        } catch (error) {
+          console.error("[DiagramsNetEditor] Failed to parse message:", error);
+        }
+      };
+
+      window.addEventListener("message", handleMessage);
+      return () => {
+        window.removeEventListener("message", handleMessage);
+        isReadyRef.current = false;
+      };
+    }, [onChange]);
+
+    return (
+      <iframe
+        ref={iframeRef}
+        src={embedUrl}
+        className="w-full h-full border-none"
+        // SECURITY: Sandbox attributes
+        sandbox="allow-scripts allow-same-origin allow-downloads"
+        // Allow fullscreen for iframe
+        allow="fullscreen"
+        // ARIA for accessibility
+        title="Diagrams.net Editor"
+        aria-label="Diagram editor powered by diagrams.net"
+      />
+    );
+  }
+);
+
+DiagramsNetEditor.displayName = "DiagramsNetEditor";

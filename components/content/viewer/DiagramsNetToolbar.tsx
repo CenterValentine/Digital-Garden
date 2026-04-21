@@ -11,7 +11,7 @@
 
 "use client";
 
-import { Download, ExternalLink, Users, Palette } from "lucide-react";
+import { Download, ExternalLink, Palette } from "lucide-react";
 import { Button } from "@/components/ui/glass/button";
 import {
   DropdownMenu,
@@ -28,8 +28,6 @@ interface DiagramsNetToolbarProps {
   onFullView: () => void;
   isModified: boolean;
   isSaving: boolean;
-  collaborators: Array<{ userId: string; name: string; color: string }>;
-  onStartCollaboration: () => void;
 }
 
 // Theme labels for display
@@ -47,8 +45,6 @@ export function DiagramsNetToolbar({
   onFullView,
   isModified,
   isSaving,
-  collaborators,
-  onStartCollaboration,
 }: DiagramsNetToolbarProps) {
   return (
     <div className="flex items-center justify-between border-t px-4 py-3 bg-gray-50">
@@ -118,20 +114,6 @@ export function DiagramsNetToolbar({
           <span className="hidden sm:inline">Full View</span>
         </Button>
 
-        {/* Collaboration Button (disabled stub) */}
-        <Button
-          onClick={onStartCollaboration}
-          disabled
-          variant="ghost"
-          size="sm"
-          title="Real-time collaboration coming soon"
-        >
-          <Users className="h-4 w-4 mr-2" />
-          <span className="hidden sm:inline">Collaborate</span>
-          {collaborators.length > 0 && (
-            <span className="ml-1 text-xs">({collaborators.length})</span>
-          )}
-        </Button>
       </div>
     </div>
   );
