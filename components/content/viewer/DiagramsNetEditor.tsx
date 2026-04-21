@@ -64,10 +64,11 @@ export const DiagramsNetEditor = forwardRef<DiagramsNetEditorHandle, DiagramsNet
         libraries: "1",
         plugins: "0",
         autosave: "1",
-        // Hide Save — autosave event handling covers persistence.
+        // Suppress the combined "Save & Exit" button. With saveAndExit=1 (embed
+        // default), noSaveBtn/noExitBtn only hide the *individual* buttons —
+        // the combined one still renders unless saveAndExit is explicitly 0.
+        saveAndExit: "0",
         noSaveBtn: "1",
-        // Hide Exit — closing the tab/pane is the natural exit, and the embed's
-        // Exit button would fire a pointless 'exit' event we don't act on.
         noExitBtn: "1",
       });
       return `https://embed.diagrams.net/?${params.toString()}`;
@@ -142,7 +143,12 @@ export const DiagramsNetEditor = forwardRef<DiagramsNetEditorHandle, DiagramsNet
       window.addEventListener("message", handleMessage);
       return () => {
         window.removeEventListener("message", handleMessage);
-        isReadyRef.current = false;
+        // Do NOT reset isReadyRef here. Iframe readiness is tied to the iframe's
+        // lifetime, not to the listener's. The init event fires exactly once per
+        // iframe load, so if a re-registration (from an onChange identity change)
+        // resets isReadyRef, it can never go back to true — and remote Y.js
+        // updates would silently buffer into pendingXmlRef forever.
+        // isReadyRef is reset only on embedUrl change (separate effect above).
       };
     }, [onChange]);
 

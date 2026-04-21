@@ -76,6 +76,9 @@ export function DiagramsNetViewer({
   // the live iframe without re-triggering React state (which can't send
   // postMessages since the iframe's init event already fired).
   const editorRef = useRef<DiagramsNetEditorHandle | null>(null);
+  // Track WebSocket state to show a debounced toast when collaboration drops.
+  const collaborationToastTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const collaborationToastShownRef = useRef(false);
 
   // Auto-save with 2-second debounce
   const debouncedSave = useCallback(
@@ -96,6 +99,41 @@ export function DiagramsNetViewer({
     }, 2000),
     [onSave]
   );
+
+  // ── Collaboration connection health toast ───────────────────────────────
+  // Debounce: only show once per 30s to avoid toast spam during WS churn.
+  const connectionState = collaborationRuntime?.state.connectionState;
+  useEffect(() => {
+    if (!collaborationRuntime) return;
+    const isDisconnected =
+      connectionState === "disconnectedButDirty" ||
+      connectionState === "localOnly";
+    const isReconnected = connectionState === "synced" || connectionState === "connected";
+
+    if (isDisconnected && !collaborationToastShownRef.current) {
+      collaborationToastTimerRef.current = setTimeout(() => {
+        if (collaborationToastShownRef.current) return;
+        collaborationToastShownRef.current = true;
+        toast.warning("Collaboration sync paused", {
+          description: "WebSocket disconnected — changes save locally and will sync on reconnect.",
+          duration: 5000,
+        });
+      }, 4000);
+    }
+
+    if (isReconnected && collaborationToastShownRef.current) {
+      if (collaborationToastTimerRef.current) {
+        clearTimeout(collaborationToastTimerRef.current);
+        collaborationToastTimerRef.current = null;
+      }
+      collaborationToastShownRef.current = false;
+      toast.success("Collaboration reconnected", { duration: 3000 });
+    }
+
+    return () => {
+      if (collaborationToastTimerRef.current) clearTimeout(collaborationToastTimerRef.current);
+    };
+  }, [connectionState, collaborationRuntime]);
 
   // ── Y.js collaboration binding ──────────────────────────────────────────
   // Seed + remote-change observer. Uses LOCAL_ORIGIN echo guard so that
@@ -140,8 +178,12 @@ export function DiagramsNetViewer({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [collaborationRuntime?.ydoc]);
 
-  // Handle diagram changes from iframe
-  const handleChange = (newXml: string) => {
+  // Stable identity so DiagramsNetEditor's [onChange]-dep useEffect doesn't
+  // re-register its message listener on every render. Previously, each re-
+  // registration reset isReadyRef, and since diagrams.net's `init` event only
+  // fires once per iframe load, readiness could never recover — remote Y.js
+  // updates got buffered into pendingXmlRef and never flushed.
+  const handleChange = useCallback((newXml: string) => {
     xmlRef.current = newXml;
     setXml(newXml);
     setIsModified(true);
@@ -157,7 +199,7 @@ export function DiagramsNetViewer({
     }
 
     debouncedSave(newXml);
-  };
+  }, [collaborationRuntime?.ydoc, debouncedSave]);
 
   // Open in new browser tab (full-screen mode)
   const openFullscreen = () => {
