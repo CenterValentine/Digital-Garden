@@ -290,8 +290,11 @@ export function DiagramsNetViewer({
       )}
 
       {/* Iframe Editor — bg-white prevents the dark app background from bleeding
-          through the cross-origin iframe while diagrams.net finishes loading. */}
-      <div className="flex-1 relative bg-white">
+          through the cross-origin iframe while diagrams.net finishes loading.
+          onContextMenu stopPropagation prevents TipTap's context menu from
+          firing when right-clicking the diagram area; diagrams.net's own
+          iframe context menu still works normally. */}
+      <div className="flex-1 relative bg-white" onContextMenu={(e) => e.stopPropagation()}>
         <DiagramsNetEditor
           ref={editorRef}
           xml={xml}
