@@ -283,6 +283,9 @@ function renderExcalidrawBlock(
   getPos: (() => number | undefined) | undefined
 ) {
   contentDom.className = "block-excalidraw-content";
+  // Prevent right-clicks inside the Excalidraw canvas from bubbling up to
+  // TipTap's onContextMenu handler and showing the app's editor context menu.
+  contentDom.addEventListener("contextmenu", (e) => e.stopPropagation());
 
   // ── Unlinked state: auto-create immediately, show spinner ─────────────
   if (!attrs.contentId) {
