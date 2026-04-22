@@ -2,12 +2,18 @@
  * Fullscreen Diagrams.net Viewer (Client Component)
  *
  * Wraps DiagramsNetViewer with client-side save logic for fullscreen mode.
- * This avoids passing functions from Server Components to Client Components.
+ * Acquires a collaboration runtime so the standalone fullscreen tab
+ * participates in Y.js sync (Hocuspocus) just like the main content pane.
  */
 
 "use client";
 
+import { useId, useMemo } from "react";
 import { DiagramsNetViewer } from "./DiagramsNetViewer";
+import {
+  useCollaborationRuntime,
+  getContentCollaborationCapability,
+} from "@/lib/domain/collaboration/runtime";
 
 interface FullscreenDiagramsNetViewerProps {
   contentId: string;
@@ -22,7 +28,22 @@ export function FullscreenDiagramsNetViewer({
   config,
   data,
 }: FullscreenDiagramsNetViewerProps) {
-  // Client-side save handler
+  const viewInstanceId = useId();
+
+  const capability = useMemo(
+    () => getContentCollaborationCapability("visualization", "diagrams-net"),
+    []
+  );
+
+  const collaborationRuntime = useCollaborationRuntime({
+    contentId,
+    capability,
+    descriptor: {
+      surfaceKind: "workspace-pane",
+      viewInstanceId,
+    },
+  });
+
   const handleSave = async (xml: string) => {
     try {
       const response = await fetch(`/api/content/content/${contentId}`, {
@@ -41,8 +62,6 @@ export function FullscreenDiagramsNetViewer({
       if (!response.ok || !result.success) {
         throw new Error(result.error?.message || "Failed to save diagram");
       }
-
-      console.log("[FullscreenDiagramsNetViewer] Saved successfully");
     } catch (err) {
       console.error("[FullscreenDiagramsNetViewer] Save failed:", err);
       throw err;
@@ -57,6 +76,7 @@ export function FullscreenDiagramsNetViewer({
       data={data}
       onSave={handleSave}
       isFullScreen={true}
+      collaborationRuntime={collaborationRuntime}
     />
   );
 }

@@ -7,11 +7,15 @@
  * - Auto-save with 2s debounce → Database only (no bucket)
  * - Full-screen mode (opens in new browser tab)
  * - Export: PNG, SVG, PDF, XML
- * - Collaboration stub (structure only)
+ * - Y.js collaboration via collaborationRuntime prop
  *
  * Autosave Chain:
  * User Edit → postMessage → onChange → debounced → onSave prop →
  * PATCH API → Prisma.visualizationPayload.update() → PostgreSQL
+ *
+ * Collaboration:
+ * Remote Y.js change → observer → editorRef.current.loadXml() → iframe postMessage
+ * Local user edit → onChange → ydoc.transact(LOCAL_ORIGIN) → observer skipped (echo guard)
  */
 
 "use client";
@@ -20,11 +24,13 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import { Network, ExternalLink, Check, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/glass/button";
 import { toast } from "sonner";
-import { DiagramsNetEditor } from "./DiagramsNetEditor";
+import { DiagramsNetEditor, type DiagramsNetEditorHandle } from "./DiagramsNetEditor";
 import { DiagramsNetToolbar } from "./DiagramsNetToolbar";
-import { useCollaboration } from "@/lib/domain/visualization/diagrams-net/use-collaboration";
 import type { DiagramsNetConfig, DiagramsNetData, DiagramsNetTheme } from "@/lib/domain/visualization/types";
 import type { CollaborationRuntimeHandle } from "@/lib/domain/collaboration/runtime";
+
+// Transaction origin tag for local edits — lets the Y.js observer skip its own writes.
+const LOCAL_ORIGIN = "diagramsnet-local";
 
 // Debounce utility
 function debounce<T extends (...args: any[]) => any>(
@@ -44,7 +50,7 @@ interface DiagramsNetViewerProps {
   config?: Partial<DiagramsNetConfig>;
   data?: DiagramsNetData;
   onSave?: (xml: string) => Promise<void>;
-  isFullScreen?: boolean; // Used in full-screen page
+  isFullScreen?: boolean;
   collaborationRuntime?: CollaborationRuntimeHandle | null;
 }
 
@@ -66,11 +72,15 @@ export function DiagramsNetViewer({
     (config.theme as DiagramsNetTheme) || "kennedy"
   );
 
-  // Collaboration stub
-  const { isConnected, collaborators, startCollaboration } = useCollaboration(contentId);
+  // Ref to the editor's imperative handle so we can push remote updates into
+  // the live iframe without re-triggering React state (which can't send
+  // postMessages since the iframe's init event already fired).
+  const editorRef = useRef<DiagramsNetEditorHandle | null>(null);
+  // Track WebSocket state to show a debounced toast when collaboration drops.
+  const collaborationToastTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const collaborationToastShownRef = useRef(false);
 
   // Auto-save with 2-second debounce
-  // Chain: onChange → debouncedSave → onSave prop → PATCH API → Prisma → PostgreSQL
   const debouncedSave = useCallback(
     debounce(async (newXml: string) => {
       setIsSaving(true);
@@ -78,7 +88,6 @@ export function DiagramsNetViewer({
         await onSave?.(newXml);
         setLastSaved(new Date());
         setIsModified(false);
-        // Silent success (no toast on auto-save)
       } catch (error: any) {
         console.error("Diagrams.net save failed:", error);
         toast.error("Failed to save diagram", {
@@ -91,57 +100,113 @@ export function DiagramsNetViewer({
     [onSave]
   );
 
-  // ── Y.js collaboration binding ─────────────────────────────────────────
+  // ── Collaboration connection health toast ───────────────────────────────
+  // Debounce: only show once per 30s to avoid toast spam during WS churn.
+  const connectionState = collaborationRuntime?.state.connectionState;
+  useEffect(() => {
+    if (!collaborationRuntime) return;
+    const isDisconnected =
+      connectionState === "disconnectedButDirty" ||
+      connectionState === "localOnly";
+    const isReconnected = connectionState === "synced" || connectionState === "connected";
+
+    if (isDisconnected && !collaborationToastShownRef.current) {
+      collaborationToastTimerRef.current = setTimeout(() => {
+        if (collaborationToastShownRef.current) return;
+        collaborationToastShownRef.current = true;
+        toast.warning("Collaboration sync paused", {
+          description: "WebSocket disconnected — changes save locally and will sync on reconnect.",
+          duration: 5000,
+        });
+      }, 4000);
+    }
+
+    if (isReconnected && collaborationToastShownRef.current) {
+      if (collaborationToastTimerRef.current) {
+        clearTimeout(collaborationToastTimerRef.current);
+        collaborationToastTimerRef.current = null;
+      }
+      collaborationToastShownRef.current = false;
+      toast.success("Collaboration reconnected", { duration: 3000 });
+    }
+
+    return () => {
+      if (collaborationToastTimerRef.current) clearTimeout(collaborationToastTimerRef.current);
+    };
+  }, [connectionState, collaborationRuntime]);
+
+  // ── Y.js collaboration binding ──────────────────────────────────────────
+  // Uses Y.Map (not Y.Text) so concurrent saves don't concatenate XML strings.
+  // Y.Map gives last-write-wins per key — correct for atomic diagram snapshots.
+  // LOCAL_ORIGIN echo guard prevents looping on our own writes.
   useEffect(() => {
     const ydoc = collaborationRuntime?.ydoc;
     if (!ydoc) return;
 
-    const ydocXml = ydoc.getText("xml");
+    const ydocDiagram = ydoc.getMap<string>("diagram");
+    const dbg = () => (window as any).__dg_debug;
 
-    const handleRemoteChange = () => {
-      const remoteXml = ydocXml.toString();
+    // Seed from Y.js if the shared doc already has content, otherwise seed
+    // Y.js from the database snapshot so latecomers see the latest state.
+    const existing = ydocDiagram.get("xml") ?? "";
+    if (existing.length > 0) {
+      if (existing !== xmlRef.current) {
+        if (dbg()) console.log("[dg/diagrams-net] seed from ydoc, len=", existing.length);
+        xmlRef.current = existing;
+        setXml(existing);
+        editorRef.current?.loadXml(existing);
+      }
+    } else if (data.xml && data.xml.length > 0) {
+      if (dbg()) console.log("[dg/diagrams-net] seed ydoc from db, len=", data.xml.length);
+      ydoc.transact(() => {
+        ydocDiagram.set("xml", data.xml!);
+      }, LOCAL_ORIGIN);
+    }
+
+    const handleRemoteChange = (_event: unknown, transaction: { origin: unknown }) => {
+      if (dbg()) console.log("[dg/diagrams-net] observer — origin=", transaction.origin);
+      // Skip echo — this transaction was created by our own handleChange call.
+      if (transaction.origin === LOCAL_ORIGIN) return;
+      const remoteXml = ydocDiagram.get("xml") ?? "";
       if (remoteXml !== xmlRef.current) {
+        if (dbg()) console.log("[dg/diagrams-net] applying remote xml, len=", remoteXml.length);
         xmlRef.current = remoteXml;
         setXml(remoteXml);
+        editorRef.current?.loadXml(remoteXml);
       }
     };
 
-    ydocXml.observe(handleRemoteChange);
-    return () => ydocXml.unobserve(handleRemoteChange);
+    ydocDiagram.observe(handleRemoteChange);
+    return () => ydocDiagram.unobserve(handleRemoteChange);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [collaborationRuntime?.ydoc]);
 
-  // Handle diagram changes from iframe
-  const handleChange = (newXml: string) => {
+  // Stable identity so DiagramsNetEditor's [onChange]-dep useEffect doesn't
+  // re-register its message listener on every render.
+  const handleChange = useCallback((newXml: string) => {
+    const dbg = () => (window as any).__dg_debug;
+    if (dbg()) console.log("[dg/diagrams-net] local change, len=", newXml.length);
     xmlRef.current = newXml;
     setXml(newXml);
     setIsModified(true);
 
-    // Sync to Y.js for collaboration
+    // Sync to Y.js with Y.Map.set — atomic last-write-wins, no concatenation risk.
     const ydoc = collaborationRuntime?.ydoc;
     if (ydoc) {
-      const ydocXml = ydoc.getText("xml");
       ydoc.transact(() => {
-        ydocXml.delete(0, ydocXml.length);
-        ydocXml.insert(0, newXml);
-      });
+        ydoc.getMap<string>("diagram").set("xml", newXml);
+      }, LOCAL_ORIGIN);
     }
 
     debouncedSave(newXml);
-  };
+  }, [collaborationRuntime?.ydoc, debouncedSave]);
 
   // Open in new browser tab (full-screen mode)
   const openFullscreen = () => {
-    console.log("[DiagramsNetViewer] openFullscreen called, contentId:", contentId);
-    try {
-      const url = `/content/visualization/${contentId}/fullscreen`;
-      console.log("[DiagramsNetViewer] Opening URL:", url);
-      const newWindow = window.open(url, "_blank", "noopener,noreferrer");
-      console.log("[DiagramsNetViewer] window.open result:", newWindow);
-      if (!newWindow) {
-        console.error("[DiagramsNetViewer] window.open returned null - popup may be blocked");
-      }
-    } catch (error) {
-      console.error("[DiagramsNetViewer] Error opening fullscreen:", error);
+    const url = `/content/visualization/${contentId}/fullscreen`;
+    const newWindow = window.open(url, "_blank", "noopener,noreferrer");
+    if (!newWindow) {
+      toast.error("Popup blocked", { description: "Please allow popups to open full-screen mode." });
     }
   };
 
@@ -149,14 +214,12 @@ export function DiagramsNetViewer({
   const handleThemeChange = (newTheme: DiagramsNetTheme) => {
     setTheme(newTheme);
     toast.success(`Theme changed to ${newTheme}`);
-    // Note: Theme is passed to DiagramsNetEditor, which updates iframe URL
   };
 
   // Export handler (PNG, SVG, PDF, XML)
   const handleExport = async (format: "png" | "svg" | "pdf" | "xml") => {
     try {
       if (format === "xml") {
-        // Direct XML download
         const blob = new Blob([xml], { type: "application/xml" });
         const url = URL.createObjectURL(blob);
         const link = document.createElement("a");
@@ -165,14 +228,11 @@ export function DiagramsNetViewer({
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
-
-        // Delay cleanup to ensure download starts
         setTimeout(() => URL.revokeObjectURL(url), 100);
         toast.success("Exported as XML");
         return;
       }
 
-      // For PNG/SVG/PDF, use server-side export API
       toast.info(`Exporting as ${format.toUpperCase()}...`);
 
       const response = await fetch("/api/visualization/diagrams-net/export", {
@@ -193,8 +253,6 @@ export function DiagramsNetViewer({
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-
-      // Delay cleanup to ensure download starts
       setTimeout(() => URL.revokeObjectURL(url), 100);
       toast.success(`Exported as ${format.toUpperCase()}`);
     } catch (error: any) {
@@ -213,7 +271,6 @@ export function DiagramsNetViewer({
           <div className="flex items-center gap-3">
             <Network className="h-5 w-5 text-blue-400" />
             <h1 className="text-lg font-semibold">{title}</h1>
-            {/* Auto-save indicator */}
             {isModified && (
               <span className="text-xs text-yellow-400">Unsaved changes</span>
             )}
@@ -225,7 +282,6 @@ export function DiagramsNetViewer({
             )}
           </div>
           <div className="flex items-center gap-2">
-            {/* Full view button (opens new tab) */}
             <Button onClick={openFullscreen} variant="ghost" size="sm" type="button">
               <ExternalLink className="h-4 w-4" />
             </Button>
@@ -233,16 +289,18 @@ export function DiagramsNetViewer({
         </div>
       )}
 
-      {/* Iframe Editor */}
-      <div className="flex-1 relative">
+      {/* Iframe Editor — bg-white prevents the dark app background from bleeding
+          through the cross-origin iframe while diagrams.net finishes loading. */}
+      <div className="flex-1 relative bg-white">
         <DiagramsNetEditor
+          ref={editorRef}
           xml={xml}
           theme={theme}
           onChange={handleChange}
         />
       </div>
 
-      {/* Toolbelt (minimal in full-screen) */}
+      {/* Toolbelt (hidden in full-screen) */}
       {!isFullScreen && (
         <DiagramsNetToolbar
           theme={theme}
@@ -251,8 +309,6 @@ export function DiagramsNetViewer({
           onFullView={openFullscreen}
           isModified={isModified}
           isSaving={isSaving}
-          collaborators={collaborators}
-          onStartCollaboration={startCollaboration}
         />
       )}
     </div>

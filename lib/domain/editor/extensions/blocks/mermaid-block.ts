@@ -1,28 +1,65 @@
 /**
  * Mermaid Block
  *
- * Embeds a live Mermaid diagram canvas inside a TipTap note.
+ * Embeds a live Mermaid diagram inside a TipTap note (Path A).
  * The block stores a `contentId` referencing a real `visualization` ContentNode
  * (engine: "mermaid"). When first inserted the contentId is null — the editor
  * fires an `embed-diagram-create` CustomEvent so MarkdownEditor can call the API,
  * receive the new contentId, and write it back into the node attrs.
  *
- * Collaboration is free: the runtime attaches to the contentId exactly as it does
- * for standalone Mermaid viewers (Y.Text "source").
+ * Path A: the diagram source lives as a Y.Text on the NOTE's Y.Doc keyed by
+ * `blockMermaid:{blockId}`. No separate Hocuspocus session; piggybacks on the
+ * note's existing collaboration. Server load/store hooks seed/extract the
+ * Y.Text from the visualization payload as a non-canonical backup.
  *
  * Block states:
- *   collapsed  — default; shows a pill with title + character count
+ *   collapsed  — pill with title + character count
  *   expanded   — renders the full MermaidViewer at a fixed height
- *   unlinked   — contentId is null; shows a "Create diagram" prompt
+ *   unlinked   — contentId is null; shows a spinner while creating
  */
 
 import { Node, mergeAttributes } from "@tiptap/core";
 import { z } from "zod";
+import type * as Y from "yjs";
 import { createBlockSchema } from "@/lib/domain/blocks/schema";
 import { registerBlock } from "@/lib/domain/blocks/registry";
 import { createBlockNodeView } from "@/lib/domain/blocks/node-view-factory";
-import { collaborationRuntimeManager } from "@/lib/domain/collaboration/runtime";
-import { getContentCollaborationCapability } from "@/lib/domain/collaboration/runtime";
+
+/**
+ * Sub-Y.Text naming convention — kept in one place so server (documents.ts)
+ * and client (block node-view + viewer) agree on the key.
+ */
+export function mermaidEmbedSubTextKey(blockId: string): string {
+  return `blockMermaid:${blockId}`;
+}
+
+/**
+ * De-dupe guard: if updateContent fires again while the original POST is
+ * still in flight (e.g. because a remote Y.js sync re-renders the doc), the
+ * block would dispatch a second embed-diagram-create event → two concurrent
+ * creates → slug collision. Track which blockIds have already dispatched so
+ * we only fire once per block until the contentId lands back in attrs.
+ */
+const pendingCreateBlockIds = new Set<string>();
+
+/**
+ * Look up the note's Y.Doc via the Collaboration extension's options. This is
+ * reliable at NodeView mount time, which a useEffect-populated
+ * editor.storage.noteYdoc is not.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function resolveNoteYdoc(editor: any): Y.Doc | null {
+  try {
+    const ext = editor?.extensionManager?.extensions?.find(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (e: any) => e.name === "collaboration"
+    );
+    const doc = ext?.options?.document ?? null;
+    return doc as Y.Doc | null;
+  } catch {
+    return null;
+  }
+}
 
 const { schema: mermaidBlockSchema, defaults: mermaidBlockDefaults } =
   createBlockSchema("mermaidBlock", {
@@ -146,13 +183,19 @@ export const MermaidBlock = Node.create({
       },
 
       updateContent(node, contentDom, editor, getPos) {
-        contentDom.innerHTML = "";
-        // Unmount any existing React root before re-rendering
+        // Run cleanup (unmount) before clearing DOM
+        const cleanup = (contentDom as any).__cleanup;
+        if (cleanup) {
+          try { cleanup(); } catch {}
+          delete (contentDom as any).__cleanup;
+        }
+        // Also unmount any root not yet cleaned up
         const existingRoot = (contentDom as any).__reactRoot;
         if (existingRoot) {
           try { existingRoot.unmount(); } catch {}
           delete (contentDom as any).__reactRoot;
         }
+        contentDom.innerHTML = "";
         renderMermaidBlock(node.attrs as MermaidBlockAttrs, contentDom, editor, getPos);
         return true;
       },
@@ -216,7 +259,6 @@ export const ServerMermaidBlock = Node.create({
         class: "block-mermaid",
         "data-block-type": "mermaidBlock",
       }),
-      // Render a static placeholder for export/server contexts
       ["span", { class: "block-mermaid-export-label" },
         contentId ? `[Mermaid: ${title}]` : "[Mermaid: unlinked]"
       ],
@@ -243,34 +285,37 @@ function renderMermaidBlock(
 ) {
   contentDom.className = "block-mermaid-content";
 
-  // ── Unlinked state: auto-create immediately, show spinner ────────────
+  // ── Unlinked state: auto-create immediately, show spinner ─────────────
   if (!attrs.contentId) {
     const creating = document.createElement("div");
     creating.className = "block-mermaid-creating";
     creating.textContent = "Creating diagram…";
     contentDom.appendChild(creating);
-    // Defer by one frame so the NodeView is fully mounted before dispatching
-    requestAnimationFrame(() => {
-      window.dispatchEvent(
-        new CustomEvent("embed-diagram-create", {
-          detail: {
-            engine: "mermaid",
-            blockId: attrs.blockId,
-            defaultTitle: attrs.title,
-            getPos,
-            editor,
-          },
-        })
-      );
-    });
+    if (attrs.blockId && !pendingCreateBlockIds.has(attrs.blockId)) {
+      pendingCreateBlockIds.add(attrs.blockId);
+      requestAnimationFrame(() => {
+        window.dispatchEvent(
+          new CustomEvent("embed-diagram-create", {
+            detail: {
+              engine: "mermaid",
+              blockId: attrs.blockId,
+              defaultTitle: attrs.title,
+              getPos,
+              editor,
+            },
+          })
+        );
+      });
+    }
     return;
+  } else if (attrs.blockId) {
+    pendingCreateBlockIds.delete(attrs.blockId);
   }
 
-  // ── Collapsed state: pill summary ─────────────────────────────────────
+  // ── Collapsed/expanded toggle (accordion-style) ─────────────────────────
   const collapseRow = document.createElement("div");
   collapseRow.className = "block-accordion-summary block-accordion-no-divider";
 
-  // Chevron toggle
   const chevron = document.createElement("span");
   chevron.className = "block-accordion-chevron" + (attrs.expanded ? " block-accordion-chevron-open" : "");
   chevron.textContent = "▶";
@@ -290,7 +335,6 @@ function renderMermaidBlock(
     );
   });
 
-  // Inline-editable title
   const titleSpan = document.createElement("span");
   titleSpan.className = "block-accordion-title";
   titleSpan.contentEditable = "true";
@@ -315,15 +359,15 @@ function renderMermaidBlock(
     }));
   });
 
-  // Live character count badge
+  // Live character count pulled from the note's sub-Y.Text (Path A).
+  // Same motivation as excalidraw-block: editor.storage.noteYdoc lags (set in
+  // useEffect) so we go straight to the Collaboration extension's document.
+  const noteYdoc = resolveNoteYdoc(editor);
   let charCount = 0;
-  const capability = getContentCollaborationCapability("visualization", "mermaid");
-  if (capability && process.env.NEXT_PUBLIC_COLLABORATION_ENABLED === "true") {
+  if (noteYdoc && attrs.blockId) {
     try {
-      const handle = collaborationRuntimeManager.getHandle(attrs.contentId, "__pill__");
-      if (handle?.ydoc) {
-        charCount = handle.ydoc.getText("source").length;
-      }
+      const subText = noteYdoc.getText(mermaidEmbedSubTextKey(attrs.blockId));
+      charCount = subText.length;
     } catch {}
   }
 
@@ -337,72 +381,45 @@ function renderMermaidBlock(
   }
   contentDom.appendChild(collapseRow);
 
-  // ── Expanded state: mount React viewer ───────────────────────────────
+  // ── Expanded state: mount React viewer ────────────────────────────────
   if (attrs.expanded) {
     const mountEl = document.createElement("div");
     mountEl.className = "block-mermaid-mount";
     mountEl.style.height = `${attrs.height}px`;
     contentDom.appendChild(mountEl);
 
-    // Dynamically import React + MermaidViewer to avoid SSR and keep
-    // the TipTap extension itself server-safe.
+    // Path A: no runtime acquisition. The viewer binds directly to the note's
+    // Y.Doc via embedYdoc + embedYTextKey. Persistence is implicit through
+    // the note's ydoc sync + server store hook extracting the mermaid
+    // sub-Y.Text back into the visualization payload.
+    const yTextKey = attrs.blockId ? mermaidEmbedSubTextKey(attrs.blockId) : null;
+    // Re-resolve at mount time to pick up the current note ydoc even if it
+    // became available after the synchronous charCount pass above.
+    const mountYdoc = resolveNoteYdoc(editor);
+
     Promise.all([
       import("react"),
       import("react-dom/client"),
       import("@/components/content/viewer/MermaidViewer"),
-      import("@/lib/domain/collaboration/runtime"),
-    ]).then(([React, ReactDOM, { MermaidViewer }, { collaborationRuntimeManager: mgr, getContentCollaborationCapability: getCap }]) => {
-      // Acquire collab runtime for the embedded viewer
-      const colabEnabled = process.env.NEXT_PUBLIC_COLLABORATION_ENABLED === "true";
-      const cap = colabEnabled ? getCap("visualization", "mermaid") : null;
-      const viewInstanceId = `mermaidBlock:${attrs.blockId ?? "unknown"}`;
-      const runtimeHandle = cap && attrs.contentId
-        ? mgr.acquire(
-            attrs.contentId,
-            cap,
-            {
-              surfaceKind: "other",
-              viewInstanceId,
-            }
-          )
-        : null;
-
+    ]).then(([React, ReactDOM, { MermaidViewer }]) => {
       const root = ReactDOM.createRoot(mountEl);
       (contentDom as any).__reactRoot = root;
-      (contentDom as any).__runtimeHandle = runtimeHandle;
 
       const el = React.createElement(MermaidViewer, {
         contentId: attrs.contentId!,
         title: attrs.title,
         isEmbedded: true,
-        collaborationRuntime: runtimeHandle,
-        onSave: async (source: string) => {
-          try {
-            await fetch(`/api/content/content/${attrs.contentId}`, {
-              method: "PATCH",
-              credentials: "include",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ visualizationData: { source } }),
-            });
-          } catch {}
-        },
+        embedYdoc: mountYdoc,
+        embedYTextKey: yTextKey,
       });
 
       root.render(el);
 
-      // Clean up on block destroy — hoisted via parentElement marker
-      (mountEl as any).__cleanup = () => {
-        try { root.unmount(); } catch {}
-        try { runtimeHandle?.release(); } catch {}
+      // Defer unmount — synchronous unmount during a React render cycle throws
+      // "Attempted to synchronously unmount a root while React was already rendering".
+      (contentDom as any).__cleanup = () => {
+        queueMicrotask(() => { try { root.unmount(); } catch {} });
       };
     }).catch(console.error);
   }
-}
-
-function escapeHtml(str: string): string {
-  return str
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
 }
