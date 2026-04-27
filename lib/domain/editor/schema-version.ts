@@ -81,7 +81,7 @@
  * See: docs/notes-feature/TIPTAP-SCHEMA-EVOLUTION-GUIDE.md
  */
 
-export const TIPTAP_SCHEMA_VERSION = "1.0.0";
+export const TIPTAP_SCHEMA_VERSION = "1.1.0";
 
 export interface SchemaVersion {
   version: string;
@@ -109,6 +109,31 @@ export interface SchemaChange {
  * 4. Run tests: pnpm test lib/domain/export
  */
 export const SCHEMA_HISTORY: SchemaVersion[] = [
+  {
+    version: "1.1.0",
+    date: "2026-04-26",
+    changes: [
+      {
+        type: "add",
+        target: "node",
+        name: "unsupportedBlock",
+        description:
+          "Safety block that preserves deprecated or unavailable block nodes without blocking document load",
+        breaking: false,
+        migrationsAvailable: [],
+      },
+      {
+        type: "add",
+        target: "node",
+        name: "unsupportedInline",
+        description:
+          "Inline safety node that preserves unavailable inline content when the active schema cannot load it directly",
+        breaking: false,
+        migrationsAvailable: [],
+      },
+    ],
+    migrationsRequired: false,
+  },
   {
     version: "1.0.0",
     date: "2026-01-26",
@@ -291,9 +316,34 @@ export function getCurrentSchemaSnapshot() {
       "taskItem",
 
       // Custom nodes
+      "image",
       "wikiLink",
       "tag",
+      "personMention",
       "callout",
+      "sectionHeader",
+      "cardPanel",
+      "blockDivider",
+      "accordion",
+      "columns",
+      "column",
+      "blockColumns",
+      "blockColumn",
+      "tabs",
+      "tabPanel",
+      "listContainer",
+      "textInput",
+      "selectInput",
+      "checkboxInput",
+      "dateInput",
+      "numberInput",
+      "ratingInput",
+      "promptInput",
+      "timestamp",
+      "dailySummary",
+      "weeklySummary",
+      "unsupportedBlock",
+      "unsupportedInline",
     ],
     marks: [
       // StarterKit marks
@@ -302,6 +352,7 @@ export function getCurrentSchemaSnapshot() {
       "strike",
       "code",
       "link",
+      "aiHighlight",
     ],
     extensions: [
       "StarterKit",
@@ -312,9 +363,32 @@ export function getCurrentSchemaSnapshot() {
       "Link",
       "Table",
       "CharacterCount",
+      "EditorImage",
       "WikiLink",
       "Tag",
+      "PersonMention",
       "Callout",
+      "AiHighlight",
+      "SectionHeader",
+      "CardPanel",
+      "BlockDivider",
+      "Accordion",
+      "Columns",
+      "BlockColumns",
+      "Tabs",
+      "ListContainer",
+      "TextInput",
+      "SelectInput",
+      "CheckboxInput",
+      "DateInput",
+      "NumberInput",
+      "RatingInput",
+      "PromptInput",
+      "Timestamp",
+      "DailySummary",
+      "WeeklySummary",
+      "UnsupportedBlock",
+      "UnsupportedInline",
     ],
   };
 }

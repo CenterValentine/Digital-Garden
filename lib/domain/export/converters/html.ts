@@ -6,6 +6,7 @@
 
 import { generateHTML } from "@tiptap/core";
 import { getServerExtensions } from "@/lib/domain/editor";
+import { sanitizeTipTapJsonWithExtensions } from "@/lib/domain/editor/unsupported-content";
 import type {
   DocumentConverter,
   ConversionOptions,
@@ -24,7 +25,8 @@ export class HTMLConverter implements DocumentConverter {
 
     // Generate HTML from TipTap JSON using server extensions
     const extensions = getServerExtensions();
-    const htmlContent = generateHTML(tiptapJson, extensions);
+    const sanitized = sanitizeTipTapJsonWithExtensions(tiptapJson, extensions).json;
+    const htmlContent = generateHTML(sanitized, extensions);
 
     let finalHTML = htmlContent;
 

@@ -11,9 +11,19 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { X, Search, FileText } from "lucide-react";
+import type { JSONContent } from "@tiptap/core";
 import { useEditorInstanceStore } from "@/state/editor-instance-store";
 import { useTemplateStore } from "@/state/template-store";
 import type { ContentTemplateWithCategory } from "@/lib/domain/templates";
+import { getViewerExtensions } from "@/lib/domain/editor/extensions-client";
+import { sanitizeTipTapJsonWithExtensions } from "@/lib/domain/editor/unsupported-content";
+
+let templateInsertExtensions: ReturnType<typeof getViewerExtensions> | null = null;
+
+function getTemplateInsertExtensions() {
+  if (!templateInsertExtensions) templateInsertExtensions = getViewerExtensions();
+  return templateInsertExtensions;
+}
 
 export function TemplatePicker() {
   const [isOpen, setIsOpen] = useState(false);
@@ -50,7 +60,14 @@ export function TemplatePicker() {
 
     const tiptapJson = template.tiptapJson as { content?: unknown[] };
     if (tiptapJson?.content) {
-      editor.chain().focus().insertContent(tiptapJson.content).run();
+      const sanitized = sanitizeTipTapJsonWithExtensions(
+        {
+          type: "doc",
+          content: tiptapJson.content as JSONContent[],
+        },
+        getTemplateInsertExtensions()
+      );
+      editor.chain().focus().insertContent(sanitized.json.content ?? []).run();
     }
 
     setIsOpen(false);

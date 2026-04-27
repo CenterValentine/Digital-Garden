@@ -1,6 +1,7 @@
 import { Node, mergeAttributes, type Editor } from "@tiptap/core";
 import type { Node as ProseMirrorNode } from "@tiptap/pm/model";
 import { z } from "zod";
+
 import { createBlockSchema } from "@/lib/domain/blocks/schema";
 import { registerBlock } from "@/lib/domain/blocks/registry";
 import { createBlockNodeView } from "@/lib/domain/blocks/node-view-factory";
@@ -51,7 +52,8 @@ const SUMMARY_ICON_PATHS: Record<string, string> = {
     '<path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>',
   image:
     '<rect width="18" height="18" x="3" y="3" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/>',
-  braces: '<path d="M8 3H7a2 2 0 0 0-2 2v5a2 2 0 0 1-2 2 2 2 0 0 1 2 2v5a2 2 0 0 0 2 2h1"/><path d="M16 21h1a2 2 0 0 0 2-2v-5a2 2 0 0 1 2-2 2 2 0 0 1-2-2V5a2 2 0 0 0-2-2h-1"/>',
+  braces:
+    '<path d="M8 3H7a2 2 0 0 0-2 2v5a2 2 0 0 1-2 2 2 2 0 0 1 2 2v5a2 2 0 0 0 2 2h1"/><path d="M16 21h1a2 2 0 0 0 2-2v-5a2 2 0 0 1 2-2 2 2 0 0 1-2-2V5a2 2 0 0 0-2-2h-1"/>',
   spreadsheet:
     '<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M8 13h8"/><path d="M8 17h8"/><path d="M10 9v8"/><path d="M14 9v8"/>',
   archive:
@@ -83,10 +85,7 @@ const summaryBaseAttrs = {
 
 const { schema: dailySummarySchema, defaults: dailySummaryDefaults } =
   createBlockSchema("dailySummary", {
-    summaryDate: z
-      .string()
-      .default("")
-      .describe("YYYY-MM-DD date summarized by this block."),
+    summaryDate: z.string().default("").describe("YYYY-MM-DD date summarized by this block."),
     ...summaryBaseAttrs,
   });
 
@@ -133,10 +132,7 @@ function getDateKey(kind: PeriodicSummaryKind) {
   return kind === "weekly" ? "weekStartDate" : "summaryDate";
 }
 
-function normalizeSummaryAttrs(
-  kind: PeriodicSummaryKind,
-  attrs: Record<string, unknown>
-) {
+function normalizeSummaryAttrs(kind: PeriodicSummaryKind, attrs: Record<string, unknown>) {
   const dateKey = getDateKey(kind);
   const cutoffHour = clampSummaryCutoffHour(attrs.workdayCutoffHour);
   const rawDate = String(attrs[dateKey] || "");
@@ -339,8 +335,10 @@ function truncateDisplayPath(path: string, pathOrder: unknown, maxLength = 72) {
     return `${kept.join(" < ")} < ...`;
   }
 
-  return truncatePathFromRoot(displayPath.replaceAll(" > ", " / "), maxLength)
-    .replaceAll(" / ", " > ");
+  return truncatePathFromRoot(displayPath.replaceAll(" > ", " / "), maxLength).replaceAll(
+    " / ",
+    " > "
+  );
 }
 
 function renderSummarySkeleton(
@@ -351,10 +349,7 @@ function renderSummarySkeleton(
 ) {
   contentDom.innerHTML = "";
   contentDom.classList.add("block-periodic-summary-content");
-  contentDom.setAttribute(
-    "data-summary-background",
-    showBackground ? "visible" : "hidden"
-  );
+  contentDom.setAttribute("data-summary-background", showBackground ? "visible" : "hidden");
 
   const header = document.createElement("div");
   header.className = "block-periodic-summary-header";
@@ -378,10 +373,7 @@ function renderSummaryItems(
 ) {
   contentDom.innerHTML = "";
   contentDom.classList.add("block-periodic-summary-content");
-  contentDom.setAttribute(
-    "data-summary-background",
-    showBackground ? "visible" : "hidden"
-  );
+  contentDom.setAttribute("data-summary-background", showBackground ? "visible" : "hidden");
 
   const header = document.createElement("div");
   header.className = "block-periodic-summary-header";
@@ -453,9 +445,7 @@ function renderSummaryItems(
       kind
     );
     const displayPath = truncateDisplayPath(item.path, pathOrder);
-    itemMeta.textContent = activityTime
-      ? `${displayPath} · ${activityTime}`
-      : displayPath;
+    itemMeta.textContent = activityTime ? `${displayPath} · ${activityTime}` : displayPath;
     body.appendChild(itemMeta);
     row.appendChild(body);
 
@@ -488,7 +478,12 @@ function renderPeriodicSummary(
   fetch(`/api/periodic-notes/summary?${params.toString()}`, {
     credentials: "include",
   })
-    .then((response) => response.json())
+    .then((response) => {
+      if (!response.ok) {
+        throw new Error(`Failed to load activity (HTTP ${response.status})`);
+      }
+      return response.json();
+    })
     .then((result) => {
       if (!result?.success) {
         throw new Error(result?.error?.message || "Failed to load activity");
@@ -506,10 +501,7 @@ function renderPeriodicSummary(
     .catch((error) => {
       contentDom.innerHTML = "";
       contentDom.classList.add("block-periodic-summary-content");
-      contentDom.setAttribute(
-        "data-summary-background",
-        showBackground ? "visible" : "hidden"
-      );
+      contentDom.setAttribute("data-summary-background", showBackground ? "visible" : "hidden");
       const message = document.createElement("div");
       message.className = "block-periodic-summary-empty";
       message.textContent =
@@ -543,9 +535,7 @@ function createPeriodicSummaryNode(kind: PeriodicSummaryKind) {
           parseHTML: (el) =>
             clampSummaryCutoffHour(el.getAttribute("data-workday-cutoff-hour")),
           renderHTML: (attrs) => ({
-            "data-workday-cutoff-hour": clampSummaryCutoffHour(
-              attrs.workdayCutoffHour
-            ),
+            "data-workday-cutoff-hour": clampSummaryCutoffHour(attrs.workdayCutoffHour),
           }),
         },
         autoBorrowDurationMinutes: {
@@ -570,12 +560,9 @@ function createPeriodicSummaryNode(kind: PeriodicSummaryKind) {
         },
         showBackground: {
           default: true,
-          parseHTML: (el) =>
-            el.getAttribute("data-show-background") !== "false",
+          parseHTML: (el) => el.getAttribute("data-show-background") !== "false",
           renderHTML: (attrs) =>
-            attrs.showBackground === false
-              ? { "data-show-background": "false" }
-              : {},
+            attrs.showBackground === false ? { "data-show-background": "false" } : {},
         },
         showBorder: {
           default: true,
@@ -643,9 +630,7 @@ function createServerPeriodicSummaryNode(kind: PeriodicSummaryKind) {
           parseHTML: (el) =>
             clampSummaryCutoffHour(el.getAttribute("data-workday-cutoff-hour")),
           renderHTML: (attrs) => ({
-            "data-workday-cutoff-hour": clampSummaryCutoffHour(
-              attrs.workdayCutoffHour
-            ),
+            "data-workday-cutoff-hour": clampSummaryCutoffHour(attrs.workdayCutoffHour),
           }),
         },
         autoBorrowDurationMinutes: { default: 60 },

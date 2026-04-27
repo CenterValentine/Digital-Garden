@@ -11,9 +11,19 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { X, Search, Scissors } from "lucide-react";
+import type { JSONContent } from "@tiptap/core";
 import { useEditorInstanceStore } from "@/state/editor-instance-store";
 import { useSnippetStore } from "@/state/snippet-store";
 import type { SnippetWithCategory } from "@/lib/domain/snippets";
+import { getViewerExtensions } from "@/lib/domain/editor/extensions-client";
+import { sanitizeTipTapJsonWithExtensions } from "@/lib/domain/editor/unsupported-content";
+
+let snippetInsertExtensions: ReturnType<typeof getViewerExtensions> | null = null;
+
+function getSnippetInsertExtensions() {
+  if (!snippetInsertExtensions) snippetInsertExtensions = getViewerExtensions();
+  return snippetInsertExtensions;
+}
 
 export function SnippetPicker() {
   const [isOpen, setIsOpen] = useState(false);
@@ -51,7 +61,14 @@ export function SnippetPicker() {
     if (snippet.tiptapJson) {
       const json = snippet.tiptapJson as { content?: unknown[] };
       if (json.content) {
-        editor.chain().focus().insertContent(json.content).run();
+        const sanitized = sanitizeTipTapJsonWithExtensions(
+          {
+            type: "doc",
+            content: json.content as JSONContent[],
+          },
+          getSnippetInsertExtensions()
+        );
+        editor.chain().focus().insertContent(sanitized.json.content ?? []).run();
       }
     } else {
       editor.chain().focus().insertContent(snippet.content).run();

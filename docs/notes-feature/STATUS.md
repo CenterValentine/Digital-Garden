@@ -1,5 +1,5 @@
 ---
-last_updated: 2026-04-07
+last_updated: 2026-04-26
 current_epoch: 13
 current_sprint: 58
 sprint_status: planned
@@ -52,6 +52,20 @@ before planning and executing. There may be additions or modifications.
 **Detailed Plan**: `docs/notes-feature/work-tracking/epochs/epoch-13-people-and-collaboration.md`
 
 ## Recent Completions (Last 30 Days)
+
+**Apr 26, 2026**: Unsupported TipTap block safety net
+- Added schema-aware TipTap normalization that rewrites unknown/deprecated nodes before editor load, collaboration bootstrap, or server rendering
+- Introduced `unsupportedBlock` and `unsupportedInline` safety nodes so deprecated content stays visible and preserved instead of crashing schema bootstrap
+- Collaboration bootstrap now seeds through the sanitized schema path, preventing old block definitions from forcing blank documents or false hard-block states
+- Note create/update APIs normalize incoming TipTap JSON before persistence so deprecated blocks are gated consistently after save
+- Template and snippet insertion now sanitize structured TipTap inserts before applying them to live editors
+
+**Apr 26, 2026**: Collaboration bootstrap fallback hardening
+- Narrowed `bootstrap-failed` to true structural/bootstrap invalidity instead of transient collaboration service unavailability
+- Added staged collaboration boot messaging: normal boot, "taking longer than expected", and warned local fallback after prolonged canonical-state delays
+- Enabled warned local editing from saved note TipTap JSON when canonical collaboration bootstrap is unavailable but durable local persistence is ready
+- Kept editing blocked when canonical state is structurally inconsistent, saved note content cannot be transformed safely, or local persistence cannot initialize
+- Markdown editor now surfaces runtime-provided collaboration boot warnings instead of a fixed loading banner
 
 **Apr 7, 2026**: Epoch 13 planning initialized
 - Created isolated worktree from `origin/main` after PR #22 merge commit `2acc6d9b9fc8bad4a8e7e634f865c19607b0e0ce`

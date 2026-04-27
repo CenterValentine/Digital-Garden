@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import moment from "moment";
 import { toast } from "sonner";
-import { renderExtensionIcon } from "@/lib/extensions";
+import { renderExtensionIcon } from "@/lib/extensions/icons";
 import type {
   ExtensionHeaderNavActionProps,
 } from "@/lib/extensions/types";

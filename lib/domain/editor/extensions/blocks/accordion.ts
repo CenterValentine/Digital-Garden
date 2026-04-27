@@ -113,6 +113,19 @@ export const Accordion = Node.create({
   addKeyboardShortcuts() {
     return {
       Backspace: () => {
+        // Don't fire if a non-PM contenteditable (e.g., accordion title) has focus.
+        // The title lives inside editor.view.dom but is outside ProseMirror's
+        // managed contentDOM — a NodeSelection on the accordion would otherwise
+        // cause this handler to delete content while the title is being edited.
+        const active = document.activeElement as HTMLElement | null;
+        if (
+          active &&
+          active !== this.editor.view.dom &&
+          active.getAttribute("contenteditable") === "true"
+        ) {
+          return false;
+        }
+
         const { state, view } = this.editor;
         const { selection } = state;
         if (!selection.empty) return false;
@@ -558,7 +571,13 @@ export const Accordion = Node.create({
           const interactive =
             target.closest(".block-menu-btn") ||
             target.closest(".block-delete-btn") ||
-            target.closest(".block-insert-btn");
+            target.closest(".block-insert-btn") ||
+            // Don't set NodeSelection when clicking the inline-editable title.
+            // The capture-phase listener fires before the title's own mousedown
+            // handler, so without this guard every title click would put a
+            // NodeSelection on the accordion — and the PM Backspace shortcut
+            // would then fire against it while the title is being edited.
+            target.closest(".block-accordion-title");
           if (interactive) return;
           selectBlockNode(editor, getNodePos);
           syncBlockSelection();

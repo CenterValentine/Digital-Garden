@@ -12,7 +12,6 @@ import Placeholder from "@tiptap/extension-placeholder";
 import TaskList from "@tiptap/extension-task-list";
 import TaskItem from "@tiptap/extension-task-item";
 import Link from "@tiptap/extension-link";
-import { Mathematics } from "@tiptap/extension-mathematics";
 import { Table } from "@tiptap/extension-table";
 import TableRow from "@tiptap/extension-table-row";
 import TableHeader from "@tiptap/extension-table-header";
@@ -44,12 +43,16 @@ import {
   ServerDailySummary,
   ServerWeeklySummary,
 } from "./extensions/blocks/periodic-summary";
-import { ServerInlineTimestamp } from "./extensions/inline-timestamp";
-import { ServerExcalidrawBlock } from "./extensions/blocks/excalidraw-block";
-import { ServerMermaidBlock } from "./extensions/blocks/mermaid-block";
+import {
+  ServerUnsupportedBlock,
+  ServerUnsupportedInline,
+} from "./extensions/blocks/unsupported-content";
 import { ServerPersonMention } from "./extensions/person-mention-server";
 import { ServerTag } from "./extensions/tag-server";
 import { ServerWikiLink } from "./extensions/wiki-link-server";
+import { ServerExcalidrawBlock } from "./extensions/blocks/excalidraw-block";
+import { ServerInlineTimestamp } from "./extensions/inline-timestamp";
+import { ServerMermaidBlock } from "./extensions/blocks/mermaid-block";
 import { getExtensionServerEditorExtensions } from "@/lib/extensions/server-registry";
 
 // Create lowlight instance with common languages
@@ -89,12 +92,6 @@ export function getServerExtensions(): Extensions {
     CodeBlockLowlight.configure({
       lowlight,
       defaultLanguage: "plaintext",
-    }),
-
-    Mathematics.configure({
-      katexOptions: {
-        throwOnError: false,
-      },
     }),
 
     Placeholder.configure({
@@ -164,13 +161,15 @@ export function getServerExtensions(): Extensions {
     ServerTimestamp,
     ServerDailySummary,
     ServerWeeklySummary,
-    ServerInlineTimestamp,
-    ServerExcalidrawBlock,
-    ServerMermaidBlock,
+    ServerUnsupportedBlock,
+    ServerUnsupportedInline,
     ...getExtensionServerEditorExtensions(),
     ServerTag,
     ServerWikiLink,
     ServerPersonMention,
+    ServerExcalidrawBlock,
+    ServerInlineTimestamp,
+    ServerMermaidBlock,
 
     // Note: SlashCommands excluded - it uses React components
   ];

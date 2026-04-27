@@ -30,12 +30,20 @@ import { ServerNumberInput } from "@/lib/domain/editor/extensions/blocks/number-
 import { ServerRatingInput } from "@/lib/domain/editor/extensions/blocks/rating-input";
 import { ServerPromptInput } from "@/lib/domain/editor/extensions/blocks/prompt-input";
 import { ServerTimestamp } from "@/lib/domain/editor/extensions/blocks/timestamp";
-import { ServerInlineTimestamp } from "@/lib/domain/editor/extensions/inline-timestamp";
-import { ServerExcalidrawBlock } from "@/lib/domain/editor/extensions/blocks/excalidraw-block";
-import { ServerMermaidBlock } from "@/lib/domain/editor/extensions/blocks/mermaid-block";
+import {
+  ServerDailySummary,
+  ServerWeeklySummary,
+} from "@/lib/domain/editor/extensions/blocks/periodic-summary";
+import {
+  ServerUnsupportedBlock,
+  ServerUnsupportedInline,
+} from "@/lib/domain/editor/extensions/blocks/unsupported-content";
 import { ServerPersonMention } from "@/lib/domain/editor/extensions/person-mention-server";
 import { ServerTag } from "@/lib/domain/editor/extensions/tag-server";
 import { ServerWikiLink } from "@/lib/domain/editor/extensions/wiki-link-server";
+import { ServerExcalidrawBlock } from "@/lib/domain/editor/extensions/blocks/excalidraw-block";
+import { ServerInlineTimestamp } from "@/lib/domain/editor/extensions/inline-timestamp";
+import { ServerMermaidBlock } from "@/lib/domain/editor/extensions/blocks/mermaid-block";
 import { getExtensionServerEditorExtensions } from "@/lib/extensions/server-registry";
 
 export function getCollaborationServerExtensions(): Extensions {
@@ -90,12 +98,16 @@ export function getCollaborationServerExtensions(): Extensions {
     ServerRatingInput,
     ServerPromptInput,
     ServerTimestamp,
-    ServerInlineTimestamp,
-    ServerExcalidrawBlock,
-    ServerMermaidBlock,
+    ServerDailySummary,
+    ServerWeeklySummary,
+    ServerUnsupportedBlock,
+    ServerUnsupportedInline,
     ...getExtensionServerEditorExtensions(),
     ServerTag,
     ServerPersonMention,
     ServerWikiLink,
+    ServerExcalidrawBlock,
+    ServerInlineTimestamp,
+    ServerMermaidBlock,
   ];
 }

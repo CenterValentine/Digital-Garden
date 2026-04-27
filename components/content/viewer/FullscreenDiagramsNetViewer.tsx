@@ -31,7 +31,7 @@ export function FullscreenDiagramsNetViewer({
   const viewInstanceId = useId();
 
   const capability = useMemo(
-    () => getContentCollaborationCapability("visualization", "diagrams-net"),
+    () => getContentCollaborationCapability("visualization"),
     []
   );
 

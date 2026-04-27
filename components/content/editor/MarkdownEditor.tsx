@@ -13,7 +13,7 @@
 
 import { useEditor, EditorContent } from "@tiptap/react";
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import { getEditorExtensions } from "@/lib/domain/editor/extensions-client";
+import { getEditorExtensions, getViewerExtensions } from "@/lib/domain/editor/extensions-client";
 import type { JSONContent } from "@tiptap/core";
 import { LinkDialog } from "./LinkDialog";
 import { BubbleMenu } from "./BubbleMenu";
@@ -36,6 +36,7 @@ import type {
   CollaborationRuntimeHandle,
   CollaborationUser,
 } from "@/lib/domain/collaboration/runtime";
+import { sanitizeTipTapJsonWithExtensions } from "@/lib/domain/editor/unsupported-content";
 
 interface RemoteCollaborator extends CollaborationUser {
   clientId: number;
@@ -227,9 +228,17 @@ export function MarkdownEditor({
   const runtimeNetworkState = collaborationRuntime?.state.networkState ?? null;
   const runtimeLocalDirty = collaborationRuntime?.state.localDirty ?? false;
   const runtimeUnsyncedUpdateCount = collaborationRuntime?.state.unsyncedUpdateCount ?? 0;
+  const viewerExtensions = useMemo(() => getViewerExtensions(), []);
+  const safeContent = useMemo(
+    () => sanitizeTipTapJsonWithExtensions(content, viewerExtensions).json,
+    [content, viewerExtensions]
+  );
+  const isPlainEditorFallback =
+    shouldUseCollaboration && runtimeEditPolicy?.reason === "degraded-plain-fallback";
   const collaborationState = useMemo(
     () =>
       shouldUseCollaboration &&
+      !isPlainEditorFallback &&
       runtimeYdoc &&
       runtimePersistenceState === "localReady" &&
       runtimeBootstrapState === "ready"
@@ -245,6 +254,7 @@ export function MarkdownEditor({
         : null,
     [
       shouldUseCollaboration,
+      isPlainEditorFallback,
       runtimeProvider,
       runtimeEditPolicy,
       runtimeBootstrapState,
@@ -260,6 +270,8 @@ export function MarkdownEditor({
     shouldUseCollaboration && runtimeEditPolicy ? !runtimeEditPolicy.editable : false;
   const isCollaborationBooting =
     shouldUseCollaboration && runtimeEditPolicy?.reason === "booting-local-state";
+  const collaborationBootMessage =
+    runtimeEditPolicy?.warning ?? "Loading local collaborative state before editing is enabled.";
   const isCollaborationConnecting =
     runtimeNetworkState !== "offline" &&
     runtimeEditPolicy?.reason !== "offline-local-durable" &&
@@ -267,11 +279,19 @@ export function MarkdownEditor({
   const effectiveEditable =
     editable &&
     (!shouldUseCollaboration || Boolean(runtimeEditPolicy?.editable));
+  const editorMode = collaborationState
+    ? collaborationState.provider
+      ? "collaboration"
+      : "collaboration-local"
+    : isPlainEditorFallback
+      ? "plain-fallback"
+      : "plain";
   const shouldSkipRestAutosaveForCollaboration =
     shouldUseCollaboration &&
     (runtimeNetworkState === "offline" ||
       runtimeConnectionState === "disconnectedButDirty" ||
-      runtimeEditPolicy?.reason === "offline-local-durable");
+      runtimeEditPolicy?.reason === "offline-local-durable" ||
+      runtimeEditPolicy?.reason === "degraded-local-fallback");
 
   useEffect(() => {
     if (!collaborationState) {
@@ -350,7 +370,7 @@ export function MarkdownEditor({
       fetchPeopleMentions,
       onPersonMentionClick,
     }),
-    content: collaborationState ? undefined : content,
+    content: collaborationState ? undefined : safeContent,
     editable: effectiveEditable,
     immediatelyRender: false, // Prevent SSR hydration mismatch
     editorProps: {
@@ -492,7 +512,7 @@ export function MarkdownEditor({
         }, autoSaveDelay);
       }
     },
-  }, [collaborationState, effectiveEditable, shouldSkipRestAutosaveForCollaboration]);
+  }, [editorMode, effectiveEditable, shouldSkipRestAutosaveForCollaboration]);
 
   useEffect(() => {
     if (!editor) return;
@@ -605,18 +625,18 @@ export function MarkdownEditor({
   // our own autosave — applying that would reset the cursor and lose
   // any content the user typed during the save round-trip.
   useEffect(() => {
-    if (!editor || !content) return;
+    if (!editor || !safeContent) return;
     if (collaborationState) return;
 
     // If this content matches what we just saved, it's a save-echo — skip it
-    if (content === lastSavedContentRef.current) {
+    if (safeContent === lastSavedContentRef.current) {
       lastSavedContentRef.current = null;
       return;
     }
 
     // Genuine external update — apply it
-    editor.commands.setContent(content);
-  }, [collaborationState, content, editor]);
+    editor.commands.setContent(safeContent);
+  }, [collaborationState, editor, safeContent]);
 
   // Initial stats update when editor is created
   useEffect(() => {
@@ -903,7 +923,7 @@ export function MarkdownEditor({
       ) : null}
       {isCollaborationBooting ? (
         <div className="border-b border-amber-500/20 bg-amber-500/10 px-4 py-2 text-sm text-amber-700">
-          Loading local collaborative state...
+          {collaborationBootMessage}
         </div>
       ) : null}
       {isCollaborationConnecting ? (

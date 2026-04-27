@@ -21,7 +21,6 @@ import TableCell from "@tiptap/extension-table-cell";
 import CharacterCount from "@tiptap/extension-character-count";
 import Collaboration from "@tiptap/extension-collaboration";
 import CollaborationCaret from "@tiptap/extension-collaboration-caret";
-import { Mathematics } from "@tiptap/extension-mathematics";
 import type { HocuspocusProvider } from "@hocuspocus/provider";
 import type { Doc } from "yjs";
 import { common, createLowlight } from "lowlight";
@@ -60,9 +59,10 @@ import { RatingInput } from "./extensions/blocks/rating-input";
 import { PromptInput } from "./extensions/blocks/prompt-input";
 import { Timestamp } from "./extensions/blocks/timestamp";
 import { DailySummary, WeeklySummary } from "./extensions/blocks/periodic-summary";
-import { InlineTimestamp } from "./extensions/inline-timestamp";
-import { ExcalidrawBlock } from "./extensions/blocks/excalidraw-block";
-import { MermaidBlock } from "./extensions/blocks/mermaid-block";
+import {
+  UnsupportedBlock,
+  UnsupportedInline,
+} from "./extensions/blocks/unsupported-content";
 import { getExtensionClientEditorExtensions } from "@/lib/extensions/editor-client-registry";
 
 // Create lowlight instance with common languages
@@ -152,14 +152,17 @@ export function getEditorExtensions(options?: EditorExtensionsOptions): Extensio
                 CollaborationCaret.configure({
                   provider: collaboration.provider,
                   user: collaboration.user,
-                  render: (user, clientId?: number) => {
+                  render: (user) => {
                     const cursor = document.createElement("span");
                     cursor.classList.add("dg-collaboration-caret");
                     cursor.style.setProperty("--collaborator-color", user.color);
-                    if (clientId !== undefined) {
-                      cursor.dataset.collaborationClientId = String(clientId);
-                    }
-                    cursor.title = user.name;
+                    cursor.dataset.collaborationClientId = String(user.clientId);
+
+                    const label = document.createElement("span");
+                    label.classList.add("dg-collaboration-caret-label");
+                    label.textContent = user.name || `User ${user.clientId}`;
+                    cursor.appendChild(label);
+
                     return cursor;
                   },
                   selectionRender: (user) => ({
@@ -177,12 +180,6 @@ export function getEditorExtensions(options?: EditorExtensionsOptions): Extensio
     CodeBlockLowlight.configure({
       lowlight,
       defaultLanguage: "plaintext",
-    }),
-
-    Mathematics.configure({
-      katexOptions: {
-        throwOnError: false,
-      },
     }),
 
     // M6: Placeholder text for empty nodes
@@ -288,9 +285,8 @@ export function getEditorExtensions(options?: EditorExtensionsOptions): Extensio
     Timestamp,
     DailySummary,
     WeeklySummary,
-    InlineTimestamp,
-    ExcalidrawBlock,
-    MermaidBlock,
+    UnsupportedBlock,
+    UnsupportedInline,
     ...getExtensionClientEditorExtensions(),
 
     // M6: Tags with autocomplete

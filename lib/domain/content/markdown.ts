@@ -15,6 +15,7 @@ import { extractSearchTextFromTipTap } from "./search-text";
 // Import TipTap extensions
 // Use server-only file to avoid loading React components
 import { getServerExtensions } from "@/lib/domain/editor/extensions-server";
+import { sanitizeTipTapJsonWithExtensions } from "@/lib/domain/editor/unsupported-content";
 
 // ============================================================
 // MARKDOWN → TIPTAP JSON
@@ -82,10 +83,11 @@ export function tiptapToMarkdown(json: JSONContent): string {
 
   try {
     const extensions = getServerExtensions();
+    const sanitized = sanitizeTipTapJsonWithExtensions(json, extensions).json;
 
     // Use TipTap's markdown serializer
     // Note: This requires @tiptap/extension-markdown to be configured
-    const markdown = serializeToMarkdown(json, extensions);
+    const markdown = serializeToMarkdown(sanitized, extensions);
     return markdown;
   } catch (error) {
     console.error("Failed to convert TipTap to markdown:", error);

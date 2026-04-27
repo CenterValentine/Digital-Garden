@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+
 import { prisma } from "@/lib/database/client";
 import { requireAuth } from "@/lib/infrastructure/auth/middleware";
 
@@ -30,10 +31,7 @@ interface PersonPathNode {
   primaryGroupId: string;
 }
 
-function buildFolderPathSegments(
-  parentId: string | null,
-  folderMap: Map<string, PathNode>
-) {
+function buildFolderPathSegments(parentId: string | null, folderMap: Map<string, PathNode>) {
   const labels: string[] = [];
   const seen = new Set<string>();
   let currentId: string | null = parentId;
@@ -91,10 +89,7 @@ function buildPeoplePathSegments(
   return ["Root"];
 }
 
-function getInheritedPeopleAssignment(
-  node: PathNode,
-  folderMap: Map<string, PathNode>
-) {
+function getInheritedPeopleAssignment(node: PathNode, folderMap: Map<string, PathNode>) {
   if (node.peopleGroupId || node.personId) {
     return {
       peopleGroupId: node.peopleGroupId,
@@ -260,19 +255,15 @@ export async function GET(request: NextRequest) {
         },
       }),
     ]);
-    const peopleGroupMap = new Map(
-      peopleGroups.map((group) => [group.id, group])
-    );
+    const peopleGroupMap = new Map(peopleGroups.map((group) => [group.id, group]));
     const personMap = new Map(people.map((person) => [person.id, person]));
 
     const items = nodes
       .map((node) => {
         const createdAt = node.createdAt.getTime();
         const updatedAt = node.updatedAt.getTime();
-        const createdInPeriod =
-          createdAt >= start.getTime() && createdAt < end.getTime();
-        const editedInPeriod =
-          updatedAt >= start.getTime() && updatedAt < end.getTime();
+        const createdInPeriod = createdAt >= start.getTime() && createdAt < end.getTime();
+        const editedInPeriod = updatedAt >= start.getTime() && updatedAt < end.getTime();
         const locationPath = buildLocationPathLabel(
           node,
           folderMap,
