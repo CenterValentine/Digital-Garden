@@ -50,6 +50,9 @@ import {
 import { ServerPersonMention } from "./extensions/person-mention-server";
 import { ServerTag } from "./extensions/tag-server";
 import { ServerWikiLink } from "./extensions/wiki-link-server";
+import { ServerExcalidrawBlock } from "./extensions/blocks/excalidraw-block";
+import { ServerInlineTimestamp } from "./extensions/inline-timestamp";
+import { ServerMermaidBlock } from "./extensions/blocks/mermaid-block";
 import { getExtensionServerEditorExtensions } from "@/lib/extensions/server-registry";
 
 // Create lowlight instance with common languages
@@ -164,6 +167,9 @@ export function getServerExtensions(): Extensions {
     ServerTag,
     ServerWikiLink,
     ServerPersonMention,
+    ServerExcalidrawBlock,
+    ServerInlineTimestamp,
+    ServerMermaidBlock,
 
     // Note: SlashCommands excluded - it uses React components
   ];

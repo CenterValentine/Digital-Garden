@@ -41,6 +41,9 @@ import {
 import { ServerPersonMention } from "@/lib/domain/editor/extensions/person-mention-server";
 import { ServerTag } from "@/lib/domain/editor/extensions/tag-server";
 import { ServerWikiLink } from "@/lib/domain/editor/extensions/wiki-link-server";
+import { ServerExcalidrawBlock } from "@/lib/domain/editor/extensions/blocks/excalidraw-block";
+import { ServerInlineTimestamp } from "@/lib/domain/editor/extensions/inline-timestamp";
+import { ServerMermaidBlock } from "@/lib/domain/editor/extensions/blocks/mermaid-block";
 import { getExtensionServerEditorExtensions } from "@/lib/extensions/server-registry";
 
 export function getCollaborationServerExtensions(): Extensions {
@@ -103,5 +106,8 @@ export function getCollaborationServerExtensions(): Extensions {
     ServerTag,
     ServerPersonMention,
     ServerWikiLink,
+    ServerExcalidrawBlock,
+    ServerInlineTimestamp,
+    ServerMermaidBlock,
   ];
 }
