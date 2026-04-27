@@ -17,6 +17,7 @@ import { useTemplateStore } from "@/state/template-store";
 import type { ContentTemplateWithCategory } from "@/lib/domain/templates";
 import { getViewerExtensions } from "@/lib/domain/editor/extensions-client";
 import { sanitizeTipTapJsonWithExtensions } from "@/lib/domain/editor/unsupported-content";
+import { GlassyScroll } from "@/components/GlassyScroll";
 
 let templateInsertExtensions: ReturnType<typeof getViewerExtensions> | null = null;
 
@@ -158,7 +159,8 @@ export function TemplatePicker() {
         </div>
 
         {/* Template list */}
-        <div className="max-h-80 overflow-y-auto p-2">
+        <GlassyScroll className="max-h-80">
+          <div className="p-2">
           {isLoading && (
             <p className="text-xs text-gray-400 text-center py-4">Loading templates...</p>
           )}
@@ -209,7 +211,8 @@ export function TemplatePicker() {
               ))}
             </div>
           ))}
-        </div>
+          </div>
+        </GlassyScroll>
       </div>
     </div>
   );

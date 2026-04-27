@@ -15,6 +15,7 @@ import { ToolDebugPanel } from "../toolbar/ToolDebugPanel";
 import type { ContentType as ToolContentType } from "@/lib/domain/tools";
 import { toast } from "sonner";
 import { Allotment } from "allotment";
+import { GlassyScroll } from "@/components/GlassyScroll";
 import {
   getPaneActiveContentId,
   getPaneActiveTab,
@@ -1538,7 +1539,7 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
                 onSaveAsPageTemplate={handleSaveAsTemplate}
               />
             )}
-            <div className="flex-1 min-h-[150px] overflow-auto">{contentElement}</div>
+            <GlassyScroll className="flex-1 min-h-[150px]" axis="both">{contentElement}</GlassyScroll>
             {notesPanelPosition !== "above" && (
               <ExpandableEditor
                 contentId={selectedContentId}

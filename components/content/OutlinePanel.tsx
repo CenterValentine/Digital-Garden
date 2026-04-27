@@ -16,6 +16,7 @@
 
 import { useOutlineStore } from "@/state/outline-store";
 import type { OutlineHeading } from "@/lib/domain/content/outline-extractor";
+import { GlassyScroll } from "@/components/GlassyScroll";
 
 interface OutlinePanelProps {
   /** Content id this outline belongs to */
@@ -108,8 +109,8 @@ export function OutlinePanel({
       </div>
 
       {/* Headings List */}
-      <div className="flex-1 overflow-y-auto p-2">
-        <div className="space-y-0.5">
+      <GlassyScroll className="flex-1">
+        <div className="p-2 space-y-0.5">
           {outline.map((heading) => {
             const isActive = activeHeadingId === heading.id;
             const indentation = getIndentation(heading.level);
@@ -143,7 +144,7 @@ export function OutlinePanel({
             );
           })}
         </div>
-      </div>
+      </GlassyScroll>
 
       {/* Footer hint (optional) */}
       <div className="shrink-0 border-t border-white/10 px-4 py-2">

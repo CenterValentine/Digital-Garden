@@ -14,6 +14,7 @@
 
 import { useOutlineStore } from "@/state/outline-store";
 import type { ChatOutlineEntry } from "@/lib/domain/ai/chat-outline";
+import { GlassyScroll } from "@/components/GlassyScroll";
 
 interface ChatOutlinePanelProps {
   /** Content id this chat outline belongs to */
@@ -123,8 +124,8 @@ export function ChatOutlinePanel({
       </div>
 
       {/* Entries list */}
-      <div className="flex-1 overflow-y-auto p-2">
-        <div className="space-y-0.5">
+      <GlassyScroll className="flex-1">
+        <div className="p-2 space-y-0.5">
           {chatOutline.map((entry) => (
             <OutlineEntryRow
               key={entry.id}
@@ -135,7 +136,7 @@ export function ChatOutlinePanel({
             />
           ))}
         </div>
-      </div>
+      </GlassyScroll>
 
       {/* Footer hint */}
       <div className="shrink-0 border-t border-white/10 px-4 py-2">

@@ -17,6 +17,7 @@ import { createPortal } from "react-dom";
 import * as LucideIcons from "lucide-react";
 import { X, Search } from "lucide-react";
 import { calculateMenuPosition } from "@/lib/core/menu-positioning";
+import { GlassyScroll } from "@/components/GlassyScroll";
 
 interface IconSelectorProps {
   isOpen: boolean;
@@ -240,7 +241,8 @@ export function IconSelector({
       )}
 
       {/* Content Area */}
-      <div className="flex-1 overflow-y-auto p-3">
+      <GlassyScroll className="flex-1">
+        <div className="p-3">
         {activeTab === "icons" ? (
           <div className="grid grid-cols-6 gap-1">
             {filteredIcons.length > 0 ? (
@@ -290,7 +292,8 @@ export function IconSelector({
             })}
           </div>
         )}
-      </div>
+        </div>
+      </GlassyScroll>
 
       {/* Footer */}
       <div className="border-t border-black/10 px-3 py-1.5 text-[10px] text-gray-500 dark:border-white/10">

@@ -12,6 +12,103 @@
   display: none;
 }
 
+/* Default fallback for any scroll surface NOT wrapped by <GlassyScroll>.
+   Surgical OverlayScrollbars wrappers handle the polished glassy fade-in/out
+   on key surfaces; this rule keeps unwrapped scrollbars unobtrusive. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(120, 120, 130, 0.4) transparent;
+}
+*::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background: rgba(120, 120, 130, 0.4);
+  border-radius: 999px;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: rgba(120, 120, 130, 0.65);
+}
+*::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* OverlayScrollbars — glassy theme used by <GlassyScroll>.
+   The theme class `os-theme-glassy` is applied BOTH to the host element AND
+   to each scrollbar element (via the `theme` option) so CSS variables cascade
+   reliably and selectors can target either. We use !important on the visual
+   properties because the library's base CSS uses `var(--os-handle-bg)` with
+   a default that loses to ours otherwise on some specificity paths. */
+
+@keyframes os-glassy-sheen-vertical {
+  0%   { background-position: 50% -100%; }
+  100% { background-position: 50% 250%; }
+}
+@keyframes os-glassy-sheen-horizontal {
+  0%   { background-position: -100% 50%; }
+  100% { background-position: 250% 50%; }
+}
+
+/* CSS variables — applied at the host so they cascade to all OS internals */
+.os-theme-glassy {
+  --os-size: 10px;
+  --os-padding-perpendicular: 2px;
+  --os-padding-axis: 2px;
+  --os-track-border-radius: 999px;
+  --os-track-bg: transparent;
+  --os-track-bg-hover: transparent;
+  --os-track-bg-active: transparent;
+  --os-handle-border-radius: 999px;
+  --os-handle-bg: rgba(110, 115, 175, 0.55);
+  --os-handle-bg-hover: rgba(140, 145, 205, 0.78);
+  --os-handle-bg-active: rgba(160, 165, 225, 0.92);
+  --os-handle-min-size: 36px;
+}
+
+/* Custom thumb visuals — high specificity + !important to win against base */
+.os-theme-glassy .os-scrollbar-vertical .os-scrollbar-handle,
+.os-scrollbar.os-theme-glassy.os-scrollbar-vertical .os-scrollbar-handle {
+  background-color: rgba(110, 115, 175, 0.55) !important;
+  background-image: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0)    0%,
+    rgba(255, 255, 255, 0.55) 50%,
+    rgba(255, 255, 255, 0)    100%
+  ) !important;
+  background-size: 100% 300% !important;
+  background-position: 50% -100% !important;
+  background-repeat: no-repeat !important;
+  box-shadow:
+    inset 1px 0 0 rgba(255, 255, 255, 0.4),
+    inset -1px 0 0 rgba(0, 0, 0, 0.18) !important;
+  animation: os-glassy-sheen-vertical 2.4s ease-in-out infinite !important;
+}
+.os-theme-glassy .os-scrollbar-horizontal .os-scrollbar-handle,
+.os-scrollbar.os-theme-glassy.os-scrollbar-horizontal .os-scrollbar-handle {
+  background-color: rgba(110, 115, 175, 0.55) !important;
+  background-image: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0)    0%,
+    rgba(255, 255, 255, 0.55) 50%,
+    rgba(255, 255, 255, 0)    100%
+  ) !important;
+  background-size: 300% 100% !important;
+  background-position: -100% 50% !important;
+  background-repeat: no-repeat !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.4),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.18) !important;
+  animation: os-glassy-sheen-horizontal 2.4s ease-in-out infinite !important;
+}
+.os-theme-glassy .os-scrollbar-handle:hover,
+.os-scrollbar.os-theme-glassy .os-scrollbar-handle:hover {
+  background-color: rgba(140, 145, 205, 0.78) !important;
+}
+
 /* Hide default navbar on notes routes (uses its own NotesNavBar) */
 body[data-notes-route] .notes-route-hides-default-nav {
   display: none !important;
@@ -2765,6 +2862,23 @@ mark {
   vertical-align: text-top;
   width: 0;
   z-index: 20;
+}
+
+.ProseMirror .dg-collaboration-caret-label {
+  background: var(--collaborator-color);
+  border-radius: 4px 4px 4px 0;
+  color: white;
+  font-size: 0.68rem;
+  font-style: normal;
+  font-weight: 600;
+  left: -1px;
+  line-height: 1;
+  padding: 0.2rem 0.4rem;
+  pointer-events: none;
+  position: absolute;
+  top: -1.6em;
+  user-select: none;
+  white-space: nowrap;
 }
 
 .dg-collaboration-caret-floating-label {

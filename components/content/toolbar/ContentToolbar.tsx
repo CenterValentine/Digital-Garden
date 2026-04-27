@@ -21,6 +21,7 @@ import {
 import { useIsExtensionEnabled } from "@/lib/extensions/client-registry";
 import { useContentStore } from "@/state/content-store";
 import { useLeftPanelViewStore } from "@/state/left-panel-view-store";
+import { GlassyScroll } from "@/components/GlassyScroll";
 
 /** Map iconName strings to lucide-react components */
 const ICON_MAP: Record<string, ComponentType<{ className?: string }>> = {
@@ -112,11 +113,12 @@ export function ContentToolbar() {
   }
 
   return (
-    <div
-      className="flex min-h-11 shrink-0 items-center gap-1 overflow-x-auto px-3 py-1.5"
-      role="toolbar"
-      aria-label="Content actions"
-    >
+    <GlassyScroll axis="x" className="min-h-11 shrink-0 px-3 py-1.5">
+      <div
+        className="flex items-center gap-1"
+        role="toolbar"
+        aria-label="Content actions"
+      >
       {tools.map((tool) => {
         const Icon = ICON_MAP[tool.definition.iconName];
         return (
@@ -146,6 +148,7 @@ export function ContentToolbar() {
           <span className="whitespace-nowrap">View Flashcards</span>
         </button>
       ) : null}
-    </div>
+      </div>
+    </GlassyScroll>
   );
 }

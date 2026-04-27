@@ -157,7 +157,12 @@ export function getEditorExtensions(options?: EditorExtensionsOptions): Extensio
                     cursor.classList.add("dg-collaboration-caret");
                     cursor.style.setProperty("--collaborator-color", user.color);
                     cursor.dataset.collaborationClientId = String(user.clientId);
-                    cursor.title = user.name;
+
+                    const label = document.createElement("span");
+                    label.classList.add("dg-collaboration-caret-label");
+                    label.textContent = user.name || `User ${user.clientId}`;
+                    cursor.appendChild(label);
+
                     return cursor;
                   },
                   selectionRender: (user) => ({

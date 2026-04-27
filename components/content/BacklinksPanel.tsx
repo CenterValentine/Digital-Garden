@@ -13,6 +13,7 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { useContentStore } from "@/state/content-store";
 import { ArrowLeft } from "lucide-react";
+import { GlassyScroll } from "@/components/GlassyScroll";
 
 interface Backlink {
   id: string;
@@ -178,7 +179,8 @@ export function BacklinksPanel({ contentId }: BacklinksPanelProps) {
       </div>
 
       {/* Backlinks list */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-3">
+      <GlassyScroll className="flex-1">
+        <div className="p-4 space-y-3">
         {backlinks?.backlinks.map((backlink) => (
           <button
             key={backlink.id}
@@ -211,7 +213,8 @@ export function BacklinksPanel({ contentId }: BacklinksPanelProps) {
             </div>
           </button>
         ))}
-      </div>
+        </div>
+      </GlassyScroll>
     </div>
   );
 }
