@@ -59,7 +59,7 @@ export default function SignUpPage() {
       const data: ApiResponse<SessionData> = await response.json()
 
       if (!data.success) {
-        setError(data.error.message)
+        setError((data as { success: false; error: { message: string } }).error.message)
         setIsLoading(false)
         return
       }

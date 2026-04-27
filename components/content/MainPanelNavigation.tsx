@@ -99,6 +99,16 @@ NavigationButtons.displayName = "NavigationButtons";
 export function MainPanelNavigation({ paneId }: MainPanelNavigationProps) {
   const layoutMode = useContentStore((state) => state.layoutMode);
   const paneContentId = useContentStore((state) => getPaneActiveContentId(state, paneId));
+  const activeTabTitle = useContentStore((state) => {
+    const pane = state.panes[paneId];
+    if (!pane?.activeTabId) return null;
+    return state.tabs[pane.activeTabId]?.title ?? null;
+  });
+  const activeTabContentType = useContentStore((state) => {
+    const pane = state.panes[paneId];
+    if (!pane?.activeTabId) return null;
+    return state.tabs[pane.activeTabId]?.contentType ?? null;
+  });
   const setSelectedContentId = useContentStore((state) => state.setSelectedContentId);
   const setLayoutMode = useContentStore((state) => state.setLayoutMode);
   const shellNavigationControls = useExtensionShellNavigationControls();
@@ -129,8 +139,11 @@ export function MainPanelNavigation({ paneId }: MainPanelNavigationProps) {
       return;
     }
 
-    addToHistory(paneContentId, paneId);
-  }, [paneContentId, paneId, addToHistory]);
+    addToHistory(paneContentId, paneId, activeTabTitle
+      ? { title: activeTabTitle, contentType: activeTabContentType ?? undefined }
+      : undefined
+    );
+  }, [paneContentId, paneId, addToHistory, activeTabTitle, activeTabContentType]);
 
   useEffect(() => {
     if (!isLayoutMenuOpen) return;
@@ -271,7 +284,7 @@ export function MainPanelNavigation({ paneId }: MainPanelNavigationProps) {
             {isLayoutMenuOpen && (
               <div
                 ref={layoutMenuRef}
-                className="absolute left-0 top-full z-40 mt-2 min-w-48 rounded-md border border-white/10 bg-white/95 p-1 shadow-lg backdrop-blur-sm dark:bg-gray-900/95"
+                className="absolute left-0 top-full z-50 mt-2 min-w-48 rounded-md border border-white/10 bg-white/95 p-1 shadow-lg backdrop-blur-sm dark:bg-gray-900/95"
               >
                 {LAYOUT_OPTIONS.map((option) => {
                   const Icon = option.icon;

@@ -164,7 +164,7 @@ function TabPresenceDiscs({
 
   return createPortal(
     <div
-      className="group/presence fixed z-[90] flex max-w-[8rem] items-center overflow-visible pr-1"
+      className="group/presence fixed z-40 flex max-w-[8rem] items-center overflow-visible pr-1"
       style={{ left, top }}
     >
       {visibleGroups.map((group, index) => {
@@ -440,15 +440,14 @@ export function MainPanelHeader({
   return (
     <>
       <div
-        className="flex w-full max-w-full shrink-0 items-center overflow-visible border-b border-white/10"
+        className="relative z-40 flex w-full max-w-full shrink-0 items-center overflow-hidden border-b border-white/10 bg-white/[0.06] dark:bg-black/[0.5]"
         style={{
-          background: glass1.background,
           backdropFilter: glass1.backdropFilter,
         }}
       >
-        <div className="flex min-w-0 max-w-full flex-1 items-stretch overflow-visible pr-1">
+        <div className="flex min-w-0 max-w-full flex-1 items-stretch overflow-x-auto scrollbar-hide pr-1">
           {tabs.length === 0 ? (
-            <div className="flex items-center px-3 py-2 text-xs font-medium uppercase tracking-[0.18em] text-gray-500">
+            <div className="flex items-center px-2 py-1.5 text-xs font-medium uppercase tracking-[0.18em] text-gray-500">
               {getPaneLabel(layoutMode, paneId)}
             </div>
           ) : tabs.map((tab) => {
@@ -466,9 +465,9 @@ export function MainPanelHeader({
                     tabElementsRef.current.delete(tab.id);
                   }
                 }}
-                className={`group relative flex min-w-0 max-w-[14rem] shrink items-center gap-2 overflow-visible border-r border-white/10 px-3 py-2 text-sm transition-colors ${
+                className={`group relative flex min-w-[6rem] max-w-[22rem] shrink items-center gap-1.5 overflow-hidden border-r border-r-black/[0.08] px-2 py-1.5 text-[13px] transition-colors dark:border-r-white/10 ${
                   isActive
-                    ? "-mb-px border-b-2 border-gold-primary bg-black/[0.04] text-gold-primary shadow-[0_1px_2px_rgba(15,23,42,0.04)]"
+                    ? "border-b-2 border-gold-primary bg-black/[0.04] text-gold-primary shadow-[0_1px_2px_rgba(15,23,42,0.04)]"
                     : "text-gray-600 hover:bg-black/[0.035] hover:text-gray-900"
                 } ${isDragging ? "cursor-grabbing opacity-60" : "cursor-grab"}`}
                 data-pane-id={paneId}
@@ -518,30 +517,21 @@ export function MainPanelHeader({
                 ) : (
                   <button
                     type="button"
-                    className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden text-left"
+                    className="flex min-w-0 flex-1 items-center gap-1.5 overflow-hidden text-left"
                     onClick={() => activateContentTab(tab.id)}
                     onDoubleClick={(e) => { e.preventDefault(); startRename(tab.id, tab.title); }}
                   >
-                    <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
+                    <Icon className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                     <span className="truncate">{tab.title}</span>
                   </button>
                 )}
-                <span
-                  className={`ml-auto flex shrink-0 items-center ${
-                    isActive ? "opacity-100" : "opacity-70 group-hover:opacity-100"
-                  }`}
-                >
-                  <span
-                    className={`mr-1 h-1.5 w-1.5 rounded-full ${
-                      tab.isPinned ? "bg-gold-primary/80" : "bg-transparent"
-                    }`}
-                  />
+                <span className="absolute inset-y-0 right-0 flex items-center px-1 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
                   <button
                     type="button"
                     className={`rounded p-0.5 transition-colors ${
                       isActive
-                        ? "hover:bg-gold-primary/10 hover:text-gold-primary"
-                        : "hover:bg-black/[0.05] hover:text-gray-900"
+                        ? "bg-[#f5f1e8] text-gold-primary hover:bg-[#ede7d5] dark:bg-[#2a2218]"
+                        : "bg-white text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:bg-[#1e2830] dark:text-gray-300 dark:hover:bg-[#253340]"
                     }`}
                     aria-label={`Close ${tab.title}`}
                     onClick={() => closeContentTab(tab.id)}

@@ -1,12 +1,51 @@
 steps:
+  # Build the Hocuspocus server image
   - name: gcr.io/cloud-builders/docker
     args:
       - build
+      - --no-cache
       - -f
       - Dockerfile.hocuspocus
       - -t
       - $_IMAGE
       - .
 
+ # Push the image to Artifact Registry
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - push
+      - $_IMAGE
+
+  # Deploy to Cloud Run
+  # IMPORTANT: max-instances=1 is required for WebSocket-based Y.js collaboration.
+  # Hocuspocus keeps Y.js documents in memory — if Cloud Run scales to multiple
+  # instances, two clients may land on different instances with separate document
+  # state and will never sync. Single-instance is the correct topology for a
+  # stateful WebSocket server. Scale vertically (cpu/memory) if needed.
+  - name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    entrypoint: gcloud
+    args:
+      - run
+      - deploy
+      - $_SERVICE_NAME
+      - --image=$_IMAGE
+      - --region=$_REGION
+      - --platform=managed
+      - --port=8080
+      - --min-instances=1
+      - --max-instances=1
+      - --timeout=3600s
+      - --cpu=1
+      - --memory=512Mi
+      - --no-allow-unauthenticated
+      - --set-env-vars=NODE_ENV=production
+      - --update-secrets=DATABASE_URL=DATABASE_URL:latest,COLLABORATION_TOKEN_SECRET=digital-garden-collaboration-token-secret:2
+
+
 images:
   - $_IMAGE
+
+substitutions:
+  _SERVICE_NAME: digital-garden-hocuspocus
+  _REGION: us-central1
+  _IMAGE: us-west1-docker.pkg.dev/digital-garden-482805/digital-garden-containers/digital-garden-hocuspocus

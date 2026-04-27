@@ -12,12 +12,13 @@
 
 "use client";
 
-import { useState, useCallback, useEffect, useRef } from "react";
-import dynamic from "next/dynamic";
+import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { GitBranch, Loader2, Check, ExternalLink, Code, Eye } from "lucide-react";
 import { Button } from "@/components/ui/glass/button";
 import { MermaidToolbar } from "./MermaidToolbar";
 import { toast } from "sonner";
+import type * as Y from "yjs";
+import type { CollaborationRuntimeHandle } from "@/lib/domain/collaboration/runtime";
 
 // Dynamically import mermaid to avoid SSR issues
 const initializeMermaid = async () => {
@@ -40,7 +41,22 @@ interface MermaidViewerProps {
   };
   onSave?: (source: string) => Promise<void>;
   isFullScreen?: boolean;
+  isEmbedded?: boolean;
+  /**
+   * Path A: when embedded inside a note, the diagram binds to a Y.Text on the
+   * note's own Y.Doc instead of acquiring a separate collaboration runtime.
+   */
+  embedYdoc?: Y.Doc | null;
+  embedYTextKey?: string | null;
+  /**
+   * Legacy path: standalone mermaid content may still bind to its own
+   * collaboration runtime with a top-level Y.Text("source"). Ignored when
+   * embedYdoc is provided.
+   */
+  collaborationRuntime?: CollaborationRuntimeHandle | null;
 }
+
+const DEFAULT_SOURCE = "graph TD\n    A[Start] --> B[End]";
 
 export function MermaidViewer({
   contentId,
@@ -49,9 +65,24 @@ export function MermaidViewer({
   data,
   onSave,
   isFullScreen = false,
+  isEmbedded = false,
+  embedYdoc = null,
+  embedYTextKey = null,
+  collaborationRuntime,
 }: MermaidViewerProps) {
-  const [source, setSource] = useState(data?.source || "graph TD\n    A[Start] --> B[End]");
-  const [isEditMode, setIsEditMode] = useState(false);
+  // Resolve the Y.Doc we bind to: Path A (embedYdoc on note) wins over the
+  // legacy per-content collaboration runtime. boundYTextKey names the Y.Text
+  // entry inside that Y.Doc.
+  const boundYdoc: Y.Doc | null = embedYdoc ?? collaborationRuntime?.ydoc ?? null;
+  const boundYTextKey: string = embedYTextKey ?? "source";
+
+  const [source, setSource] = useState(data?.source || DEFAULT_SOURCE);
+  const sourceRef = useRef(source);
+  // Embedded diagrams default to edit mode — a blank preview is useless when
+  // the user just dropped /mermaid into a note. Standalone viewers keep the
+  // existing read-first default so navigating to an existing diagram shows
+  // the result, not the source.
+  const [isEditMode, setIsEditMode] = useState(isEmbedded);
   const [isModified, setIsModified] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
@@ -98,20 +129,85 @@ export function MermaidViewer({
     [onSave]
   );
 
-  // Handle source change
-  const handleSourceChange = (newSource: string) => {
-    setSource(newSource);
-    setIsModified(true);
-    debouncedSave(newSource);
-  };
+  // ── Y.js collaboration binding ─────────────────────────────────────────
+  // Binds to either the note's shared Y.Doc (Path A — preferred) or a legacy
+  // per-content collaboration runtime. The text CRDT is simpler than
+  // Excalidraw's element map: one Y.Text for the whole source.
+  useEffect(() => {
+    if (!boundYdoc) return;
 
-  // Handle template insertion
-  const handleInsertTemplate = (template: string) => {
-    setSource(template);
-    setIsModified(true);
-    debouncedSave(template);
-    setIsEditMode(true); // Switch to edit mode to show the inserted template
-  };
+    const yText = boundYdoc.getText(boundYTextKey);
+
+    // Initial sync: if the Y.Text already has content (bootstrapped by the
+    // server or filled by a peer), adopt it. Otherwise, if we have a
+    // meaningful local seed, write it in once — important for freshly
+    // created embed blocks where the note load-hook hasn't run yet.
+    const existing = yText.toString();
+    if (existing.length > 0) {
+      if (existing !== sourceRef.current) {
+        sourceRef.current = existing;
+        setSource(existing);
+      }
+    } else if (data?.source && data.source.length > 0) {
+      boundYdoc.transact(() => {
+        yText.insert(0, data.source!);
+      });
+      sourceRef.current = data.source;
+      // setSource isn't needed here — we already initialized state with data.source.
+    }
+
+    const handleRemoteChange = () => {
+      const remoteSource = yText.toString();
+      if (remoteSource !== sourceRef.current) {
+        sourceRef.current = remoteSource;
+        setSource(remoteSource);
+      }
+    };
+
+    yText.observe(handleRemoteChange);
+    return () => yText.unobserve(handleRemoteChange);
+    // data?.source is intentionally excluded — we only seed once per bind,
+    // not whenever the prop reference changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [boundYdoc, boundYTextKey]);
+
+  // Handle source change
+  const handleSourceChange = useCallback(
+    (newSource: string) => {
+      sourceRef.current = newSource;
+      setSource(newSource);
+      setIsModified(true);
+
+      // Sync to the bound Y.Doc (note ydoc via Path A, or legacy runtime).
+      // Replace-whole-text keeps the implementation simple at the cost of
+      // fine-grained merge — acceptable since mermaid source is short and
+      // users rarely collaborate on the same diagram character-by-character.
+      if (boundYdoc) {
+        const yText = boundYdoc.getText(boundYTextKey);
+        boundYdoc.transact(() => {
+          yText.delete(0, yText.length);
+          yText.insert(0, newSource);
+        });
+      }
+
+      // REST autosave is only for standalone mode. When embedded, the note's
+      // own ydoc sync persists the text (and server store hook writes the
+      // non-canonical backup to visualizationPayload).
+      if (!isEmbedded) {
+        debouncedSave(newSource);
+      }
+    },
+    [boundYdoc, boundYTextKey, isEmbedded, debouncedSave],
+  );
+
+  // Handle template insertion — routes through handleSourceChange for Y.js sync
+  const handleInsertTemplate = useCallback(
+    (template: string) => {
+      handleSourceChange(template);
+      setIsEditMode(true);
+    },
+    [handleSourceChange],
+  );
 
   // Render Mermaid diagram with validation
   useEffect(() => {
@@ -278,26 +374,23 @@ export function MermaidViewer({
   };
 
   // Open fullscreen
-  const openFullscreen = () => {
-    console.log("[MermaidViewer] openFullscreen called, contentId:", contentId);
+  const openFullscreen = useCallback(() => {
     try {
       const url = `/content/visualization/${contentId}/fullscreen`;
-      console.log("[MermaidViewer] Opening URL:", url);
-      const newWindow = window.open(url, "_blank", "noopener,noreferrer");
-      if (!newWindow) {
-        console.error("[MermaidViewer] window.open returned null - popup may be blocked");
-      }
+      window.open(url, "_blank", "noopener,noreferrer");
     } catch (error) {
       console.error("[MermaidViewer] Error opening fullscreen:", error);
     }
-  };
+  }, [contentId]);
+
+  const toggleEditMode = useCallback(() => {
+    setIsEditMode((v) => !v);
+  }, []);
 
   return (
     <div className="h-full flex flex-col">
-      {/* Header */}
-      <div className={`flex items-center justify-between border-b px-6 py-4 ${
-        isFullScreen ? "border-white/10 bg-black" : "border-gray-200"
-      }`}>
+      {/* Header (hidden in full-screen mode or when embedded in a block) */}
+      {!isFullScreen && !isEmbedded && <div className="flex items-center justify-between border-b px-6 py-4 border-gray-200">
         <div className="flex items-center gap-3">
           <GitBranch className="h-5 w-5 text-blue-400" />
           <h1 className={`text-lg font-semibold ${
@@ -349,7 +442,42 @@ export function MermaidViewer({
             </Button>
           )}
         </div>
-      </div>
+      </div>}
+
+      {/* Compact embed header — the standalone header is hidden when embedded,
+          but without this strip the user has no way to toggle Edit mode or
+          jump to fullscreen. Kept minimal so it doesn't eat vertical space. */}
+      {isEmbedded && !isFullScreen && (
+        <div className="flex items-center justify-between gap-2 border-b border-white/10 bg-white/5 px-3 py-1.5 text-xs">
+          <div className="flex items-center gap-2 text-gray-300">
+            <GitBranch className="h-3.5 w-3.5 text-blue-400" />
+            <span className="font-medium">{title}</span>
+            {isModified && <span className="text-yellow-400">• Unsaved</span>}
+            {isSaving && <Loader2 className="h-3 w-3 animate-spin text-yellow-400" />}
+            {!isModified && !isSaving && lastSaved && (
+              <Check className="h-3 w-3 text-green-400" />
+            )}
+          </div>
+          <div className="flex items-center gap-1">
+            <Button onClick={toggleEditMode} variant="ghost" size="sm" type="button">
+              {isEditMode ? (
+                <>
+                  <Eye className="h-3.5 w-3.5 mr-1" />
+                  View
+                </>
+              ) : (
+                <>
+                  <Code className="h-3.5 w-3.5 mr-1" />
+                  Edit
+                </>
+              )}
+            </Button>
+            <Button onClick={openFullscreen} variant="ghost" size="sm" type="button" title="Full screen">
+              <ExternalLink className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Mermaid Editor/Preview */}
       <div className="flex-1 overflow-hidden">

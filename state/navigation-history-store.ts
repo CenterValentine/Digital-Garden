@@ -15,6 +15,8 @@ const CURRENT_VERSION = 3;
 export interface NavigationHistoryItem {
   contentId: string | null;
   timestamp: number;
+  title?: string;
+  contentType?: string;
 }
 
 export interface PaneHistoryState {
@@ -24,7 +26,7 @@ export interface PaneHistoryState {
 
 interface NavigationHistoryStore {
   byPaneId: Record<string, PaneHistoryState>;
-  addToHistory: (contentId: string | null, paneId?: string | null) => void;
+  addToHistory: (contentId: string | null, paneId?: string | null, meta?: { title?: string; contentType?: string }) => void;
   goBack: (paneId?: string | null) => string | null;
   goForward: (paneId?: string | null) => string | null;
   getPaneHistory: (paneId?: string | null) => PaneHistoryState;
@@ -77,7 +79,7 @@ export const useNavigationHistoryStore = create<NavigationHistoryStore>()(
     (set, get) => ({
       byPaneId: {},
 
-      addToHistory: (contentId, paneId) => {
+      addToHistory: (contentId, paneId, meta) => {
         if (!contentId) {
           return;
         }
@@ -99,6 +101,8 @@ export const useNavigationHistoryStore = create<NavigationHistoryStore>()(
             updatedHistory[paneState.currentIndex] = {
               contentId,
               timestamp: Date.now(),
+              title: meta?.title ?? paneState.history[paneState.currentIndex]?.title,
+              contentType: meta?.contentType ?? paneState.history[paneState.currentIndex]?.contentType,
             };
 
             return {
@@ -117,7 +121,7 @@ export const useNavigationHistoryStore = create<NavigationHistoryStore>()(
           );
           const nextHistory = [
             ...deduplicated,
-            { contentId, timestamp: Date.now() },
+            { contentId, timestamp: Date.now(), title: meta?.title, contentType: meta?.contentType },
           ];
           const limitedHistory =
             nextHistory.length > MAX_HISTORY_ITEMS

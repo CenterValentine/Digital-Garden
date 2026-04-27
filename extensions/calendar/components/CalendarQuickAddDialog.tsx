@@ -55,6 +55,7 @@ export function CalendarQuickAddDialog() {
   const [endAt, setEndAt] = useState("");
   const [allDay, setAllDay] = useState(false);
   const [sourceId, setSourceId] = useState("");
+  const [recurrence, setRecurrence] = useState<string>("none");
 
   const writableSources = useMemo(
     () => sources.filter((source) => !source.isReadOnly),
@@ -69,6 +70,7 @@ export function CalendarQuickAddDialog() {
     setEndAt(toLocalDateTimeValue(quickAddDraft?.endAt || null, nextAllDay));
     setAllDay(nextAllDay);
     setSourceId(quickAddDraft?.sourceId || writableSources[0]?.id || "");
+    setRecurrence("none");
   }, [quickAddDraft, writableSources]);
 
   useEffect(() => {
@@ -121,6 +123,7 @@ export function CalendarQuickAddDialog() {
             fromLocalDateTimeValue(endAt, allDay) ||
             new Date(Date.now() + 60 * 60 * 1000).toISOString(),
           allDay,
+          recurrenceRule: recurrence === "none" ? null : recurrence,
           linkedContentId: quickAddDraft?.linkedContentId || selectedContentId || null,
         }),
       });
@@ -164,9 +167,16 @@ export function CalendarQuickAddDialog() {
                 id="calendar-event-start"
                 type={allDay ? "date" : "datetime-local"}
                 value={startAt}
-                onChange={(event) => {
-                  setStartAt(event.target.value);
-                  if (!allDay) return;
+                onChange={(event) => setStartAt(event.target.value)}
+                onBlur={(event) => {
+                  const nextStart = event.target.value;
+                  if (!nextStart || !endAt) return;
+                  const startMs = new Date(nextStart).getTime();
+                  const endMs = new Date(endAt).getTime();
+                  if (!isNaN(startMs) && !isNaN(endMs) && endMs <= startMs) {
+                    const autoEnd = new Date(startMs + 60 * 60 * 1000);
+                    setEndAt(toLocalDateTimeValue(autoEnd.toISOString(), allDay));
+                  }
                 }}
                 className="border-white/10 bg-white/5"
               />
@@ -178,10 +188,7 @@ export function CalendarQuickAddDialog() {
                 id="calendar-event-end"
                 type={allDay ? "date" : "datetime-local"}
                 value={endAt}
-                onChange={(event) => {
-                  setEndAt(event.target.value);
-                  if (!allDay) return;
-                }}
+                onChange={(event) => setEndAt(event.target.value)}
                 className="border-white/10 bg-white/5"
               />
             </div>
@@ -221,6 +228,23 @@ export function CalendarQuickAddDialog() {
               />
               All day
             </label>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="calendar-event-recurrence">Repeat</Label>
+            <select
+              id="calendar-event-recurrence"
+              value={recurrence}
+              onChange={(event) => setRecurrence(event.target.value)}
+              className="flex h-10 w-full rounded-md border border-white/10 bg-white/5 px-3 text-sm text-white"
+            >
+              <option value="none">Does not repeat</option>
+              <option value="RRULE:FREQ=DAILY">Daily</option>
+              <option value="RRULE:FREQ=WEEKLY">Weekly</option>
+              <option value="RRULE:FREQ=WEEKLY;INTERVAL=2">Biweekly (every other week)</option>
+              <option value="RRULE:FREQ=MONTHLY">Monthly</option>
+              <option value="RRULE:FREQ=YEARLY">Annually</option>
+            </select>
           </div>
 
           <div className="space-y-2">

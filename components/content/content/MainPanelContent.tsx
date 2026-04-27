@@ -53,6 +53,7 @@ import { getViewerExtensions } from "@/lib/domain/editor/extensions-client";
 import { sanitizeTipTapJsonWithExtensions } from "@/lib/domain/editor/unsupported-content";
 import { SaveAsPageTemplateDialog } from "../dialogs/SaveAsPageTemplateDialog";
 import { useNotesPanelStore } from "@/state/notes-panel-store";
+import { setDocumentDates } from "@/lib/domain/editor/extensions/inline-timestamp";
 import {
   Dialog,
   DialogContent,
@@ -79,6 +80,11 @@ interface ContentResponse {
     isPublished: boolean;
     customIcon?: string | null;
     iconColor?: string | null;
+    createdAt?: string;
+    updatedAt?: string;
+    // Path A: populated when this visualization is owned by a note.
+    ownedByNoteId?: string | null;
+    ownedByNote?: { id: string; title: string } | null;
     note?: {
       tiptapJson: any; // Prisma Json type
       searchText: string;
@@ -190,6 +196,10 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
   const [contentParentId, setContentParentId] = useState<string | null>(null);
   const [contentIsPublished, setContentIsPublished] = useState(false);
   const [contentData, setContentData] = useState<any>(null); // Phase 2: Store payload data
+  // Path A: when this ContentNode is a visualization owned by a note, the
+  // standalone viewer is read-only. Non-null means "this is an embedded
+  // drawing; edits happen in the owning note."
+  const [ownedByNote, setOwnedByNote] = useState<{ id: string; title: string } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0); // Used to force refetch
@@ -201,9 +211,10 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
   const [isShareGrantsLoading, setIsShareGrantsLoading] = useState(false);
   const [isSharing, setIsSharing] = useState(false);
   const collaborationEnabled = process.env.NEXT_PUBLIC_COLLABORATION_ENABLED === "true";
+  const visualizationEngine = contentType === "visualization" ? (contentData?.engine as string | null | undefined) ?? null : null;
   const collaborationCapability = useMemo(
-    () => (collaborationEnabled ? getContentCollaborationCapability(contentType) : null),
-    [collaborationEnabled, contentType]
+    () => (collaborationEnabled ? getContentCollaborationCapability(contentType, visualizationEngine) : null),
+    [collaborationEnabled, contentType, visualizationEngine]
   );
   const collaborationDescriptor = useMemo(
     () => ({
@@ -212,19 +223,28 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
       paneId,
       tabId: activeTabId,
       viewInstanceId: `${paneId}:${activeTabId ?? selectedContentId ?? "empty"}`,
-      requiresEditableField: contentType === "note" ? "default" : null,
+      requiresEditableField:
+        contentType === "note" ? "default" :
+        contentType === "visualization" ? "primary" :
+        null,
       requiresLiveTransport: false,
     }),
     [activeTabId, contentType, paneId, selectedContentId]
   );
   const collaborationRuntime = useCollaborationRuntime({
     contentId:
-      collaborationEnabled && contentType === "note" && noteContent && selectedContentId
+      collaborationEnabled &&
+      (contentType === "note" || contentType === "visualization") &&
+      (contentType !== "note" || !!noteContent) &&
+      // Path A: a visualization owned by a note is read-only here — the live
+      // canonical state lives in the owning note's ydoc. Skip the runtime.
+      !(contentType === "visualization" && ownedByNote) &&
+      !!selectedContentId
         ? selectedContentId
         : null,
     capability: collaborationCapability,
     descriptor: collaborationDescriptor,
-    initialContent: noteContent,
+    initialContent: contentType === "note" ? noteContent : null,
   });
 
   // AbortController for in-flight save requests. When the user navigates to
@@ -319,6 +339,12 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
         setContentType(result.data.contentType);
         setContentCustomIcon(result.data.customIcon ?? null);
         setContentIconColor(result.data.iconColor ?? null);
+        setOwnedByNote(result.data.ownedByNote ?? null);
+        // Provide creation/updated dates to inline-timestamp nodes
+        setDocumentDates(
+          result.data.createdAt ? new Date(result.data.createdAt).toISOString().slice(0, 10) : "",
+          result.data.updatedAt ? new Date(result.data.updatedAt).toISOString().slice(0, 10) : ""
+        );
         updateContentTab(selectedContentId, {
           title: result.data.title,
           contentType: result.data.contentType,
@@ -1253,7 +1279,7 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
     "share": handleShareOpen,
   }), [handleImportMarkdown, handleExportMarkdown, handleExportChat, handleCopyLink, handleSaveAsTemplate, handleShareOpen]);
 
-  // Calendar workspace — shown in pane 1 when calendar view is active
+  // Extension workspace — shown in pane 1 when an extension view is active
   const ExtensionMainWorkspace = useExtensionMainWorkspace(activeView);
   const ExtensionContentViewer = useExtensionContentViewer({
     selectedContentId,
@@ -1351,6 +1377,13 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
         engine={contentData?.engine}
         config={contentData?.config}
         data={contentData?.data}
+        collaborationRuntime={collaborationRuntime}
+        isReadOnly={!!ownedByNote}
+        ownerNoteInfo={
+          ownedByNote
+            ? { noteId: ownedByNote.id, noteTitle: ownedByNote.title }
+            : null
+        }
       />
     );
   } else if (contentType === "data") {
@@ -1401,7 +1434,7 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
     const editorElement = (
       <div className="flex flex-col h-full">
         {/* Note title header with debug toggle */}
-        <div className="flex-none px-6 pt-6 pb-3 flex items-start justify-between border-b border-black/5 shadow-[inset_0_-1px_0_rgba(15,23,42,0.08),0_3px_10px_rgba(15,23,42,0.035)]">
+        <div className="flex-none px-6 pt-6 pb-4 flex items-start justify-between shadow-[0_4px_8px_-2px_rgba(15,23,42,0.08),0_10px_24px_-6px_rgba(15,23,42,0.05)]">
           {isTitleEditing ? (
             <input
               ref={titleInputRef}
@@ -1505,7 +1538,7 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
                 onSaveAsPageTemplate={handleSaveAsTemplate}
               />
             )}
-            <div className="flex-1 min-h-0 overflow-hidden">{contentElement}</div>
+            <div className="flex-1 min-h-[150px] overflow-auto">{contentElement}</div>
             {notesPanelPosition !== "above" && (
               <ExpandableEditor
                 contentId={selectedContentId}

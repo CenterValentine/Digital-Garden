@@ -13,7 +13,7 @@ import { useLeftPanelViewStore } from "@/state/left-panel-view-store";
 import { LeftSidebarHeaderActions } from "./LeftSidebarHeaderActions";
 import { PanelLeftClose, PanelLeft } from "lucide-react";
 import { renderExtensionIcon } from "@/lib/extensions";
-import { useExtensionNavItems } from "@/lib/extensions/client-registry";
+import { useExtensionHeaderNavItems } from "@/lib/extensions/client-registry";
 
 interface LeftSidebarHeaderProps {
   onCreateFolder: () => void;
@@ -58,11 +58,11 @@ export function LeftSidebarHeader({
   const { isSearchOpen, toggleSearch } = useSearchStore();
   const { mode, toggleMode } = useLeftPanelCollapseStore();
   const { activeView, setActiveView } = useLeftPanelViewStore();
-  const extensionNavItems = useExtensionNavItems();
+  const extensionNavItems = useExtensionHeaderNavItems();
 
   return (
-    <div className="flex h-12 shrink-0 items-center justify-between border-b border-white/10 px-4">
-      <div className="flex items-center gap-1">
+    <div className="flex h-12 shrink-0 items-center border-b border-white/10 px-2 gap-1">
+      <div className="scrollbar-hide flex min-w-0 flex-1 items-center gap-1 overflow-x-auto">
         {/* Files icon button - always visible, active when files view is open */}
         <button
           onClick={() => {
@@ -135,7 +135,18 @@ export function LeftSidebarHeader({
           </svg>
         </button>
 
-        {extensionNavItems.map((item) => {
+        {extensionNavItems.map(({ item, ActionComponent }) => {
+          if (item.type === "action") {
+            return ActionComponent ? (
+              <ActionComponent
+                key={item.id}
+                item={item}
+                className="rounded p-1.5 text-gray-400 transition-colors hover:bg-white/10 hover:text-gold-primary"
+                iconClassName="h-5 w-5"
+              />
+            ) : null;
+          }
+
           return (
             <button
               key={item.view}
@@ -157,8 +168,8 @@ export function LeftSidebarHeader({
         })}
       </div>
 
-      {/* Right side: Actions + Toggle */}
-      <div className="flex items-center gap-1">
+      {/* Right side: Actions + Toggle — must never be clipped */}
+      <div className="flex shrink-0 items-center gap-1">
         <LeftSidebarHeaderActions
           onCreateFolder={onCreateFolder ? () => onCreateFolder() : undefined}
           onCreateNote={onCreateNote ? () => onCreateNote() : undefined}

@@ -57,3 +57,9 @@ next-env.d.ts
 .local.*.md
 
 archive/
+
+# git worktrees (local-only dev artifact)
+.worktrees/
+
+# Office lock/temp files
+~$*

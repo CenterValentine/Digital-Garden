@@ -87,8 +87,8 @@ export function RightSidebarHeader({ activeTab, onTabChange }: RightSidebarHeade
   });
 
   return (
-    <div className="flex h-12 shrink-0 items-center justify-between border-b border-white/10 px-4">
-      <div className="flex flex-1 items-center justify-around">
+    <div className="flex h-12 shrink-0 items-center border-b border-white/10 px-2 gap-1">
+      <div className="scrollbar-hide flex min-w-0 flex-1 items-center justify-around overflow-x-auto">
         {uniqueTabs.map((tool: ToolDefinition) => {
           const tabKey = tool.tabKey as RightSidebarTab | undefined;
           if (!tabKey) return null;
@@ -126,10 +126,10 @@ export function RightSidebarHeader({ activeTab, onTabChange }: RightSidebarHeade
         })}
       </div>
 
-      {/* Panel collapse toggle */}
+      {/* Panel collapse toggle — must never be clipped */}
       <button
         onClick={toggleCollapsed}
-        className="rounded p-1 transition-colors hover:bg-white/10 text-gray-400 hover:text-gold-primary"
+        className="shrink-0 rounded p-1 transition-colors hover:bg-white/10 text-gray-400 hover:text-gold-primary"
         title="Collapse sidebar (Cmd+.)"
         type="button"
       >

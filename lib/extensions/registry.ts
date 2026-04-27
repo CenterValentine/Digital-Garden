@@ -56,7 +56,7 @@ export function getExtensionManifestForView(
   view: string
 ): ExtensionManifest | undefined {
   return getEnabledExtensionManifests().find((extension) =>
-    extension.navItems.some((item) => item.view === view)
+    extension.navItems.some((item) => item.type !== "action" && item.view === view)
   );
 }
 

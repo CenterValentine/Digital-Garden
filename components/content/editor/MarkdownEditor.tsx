@@ -17,6 +17,8 @@ import { getEditorExtensions, getViewerExtensions } from "@/lib/domain/editor/ex
 import type { JSONContent } from "@tiptap/core";
 import { LinkDialog } from "./LinkDialog";
 import { BubbleMenu } from "./BubbleMenu";
+import { TemplatePicker } from "./TemplatePicker";
+import { SnippetPicker } from "./SnippetPicker";
 import { TableBubbleMenu } from "./TableBubbleMenu";
 import { ImageBubbleMenu } from "./ImageBubbleMenu";
 import { extractOutline, type OutlineHeading } from "@/lib/domain/content/outline-extractor";
@@ -24,6 +26,9 @@ import { uploadImage } from "@/lib/domain/editor/hooks/use-image-upload";
 import { isImageUrl } from "@/lib/domain/editor/utils/image-url";
 import { useEditorInstanceStore } from "@/state/editor-instance-store";
 import { useSettingsStore } from "@/state/settings-store";
+import { useContextMenuStore } from "@/state/context-menu-store";
+import { useTemplateStore } from "@/state/template-store";
+import { useSnippetStore } from "@/state/snippet-store";
 import { toast } from "sonner";
 import type { HocuspocusProvider } from "@hocuspocus/provider";
 import * as Y from "yjs";
@@ -174,6 +179,15 @@ export function MarkdownEditor({
   compact = false,
   className = "",
 }: MarkdownEditorProps) {
+  const openMenu = useContextMenuStore((s) => s.openMenu);
+
+  // Pre-load template/snippet data so right-click context menu has categories ready
+  useEffect(() => {
+    useTemplateStore.getState().fetchCategories();
+    useTemplateStore.getState().fetchTemplates();
+    useSnippetStore.getState().fetchCategories();
+    useSnippetStore.getState().fetchSnippets();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const [, setIsSaving] = useState(false);
   const [, setHasUnsavedChanges] = useState(false);
   const [isLinkDialogOpen, setIsLinkDialogOpen] = useState(false);
@@ -512,6 +526,22 @@ export function MarkdownEditor({
     }
   }, [editor, effectiveEditable]);
 
+  // Expose the note's Y.Doc on editor.storage so embedded block node-views
+  // (e.g. excalidrawBlock) can attach to sub-maps without acquiring a second
+  // collaboration runtime. Path A: one note = one ydoc = one WebSocket.
+  // TipTap's Storage type is per-extension; we stash this under an ad-hoc key,
+  // which is why the cast is necessary.
+  useEffect(() => {
+    if (!editor) return;
+    const storage = editor.storage as unknown as Record<string, unknown>;
+    storage.noteYdoc = runtimeYdoc;
+    return () => {
+      if (storage.noteYdoc === runtimeYdoc) {
+        storage.noteYdoc = null;
+      }
+    };
+  }, [editor, runtimeYdoc]);
+
   const refreshCursorLabels = useCallback(() => {
     const container = editorScrollRef.current;
     if (!container || remoteCollaborators.length === 0) {
@@ -689,6 +719,83 @@ export function MarkdownEditor({
     return () => window.removeEventListener("editor-image-upload", handleImageUpload);
   }, []);
 
+  // Embedded diagram blocks (ExcalidrawBlock, MermaidBlock): when a block
+  // without a contentId is clicked, it fires this event so we can create the
+  // visualization ContentNode via the API and write the new id back into attrs.
+  useEffect(() => {
+    const handleEmbedDiagramCreate = async (e: Event) => {
+      const { engine, blockId, defaultTitle, getPos, editor: blockEditor } =
+        (e as CustomEvent).detail;
+
+      try {
+        const response = await fetch("/api/content/content", {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            // API uses `engine` (not contentType) to branch into visualization creation
+            engine,
+            title: defaultTitle || "Untitled",
+            parentId: parentId ?? null,
+            // Path A: stamp ownership at creation so the drawing is bound to
+            // THIS note. Any attempt to render it elsewhere falls back to
+            // read-only mode (guarded on server extract + bootstrap).
+            ownedByNoteId: contentId ?? null,
+            role: contentId ? "referenced" : undefined,
+          }),
+        });
+
+        if (!response.ok) {
+          const errBody = await response.json().catch(() => ({}));
+          throw new Error(errBody?.error?.message || `Failed to create visualization: ${response.status}`);
+        }
+
+        const { data: newContent } = await response.json();
+        const newContentId: string = newContent.id;
+
+        // Write the new contentId back into the block node attrs and auto-expand.
+        // TipTap's chain does not expose setNodeMarkup — use ProseMirror tr directly.
+        // After an async API call, getPos() may be stale if the document shifted;
+        // fall back to a blockId search so the write always lands.
+        const targetEditor = blockEditor ?? editor;
+        if (!targetEditor) return;
+
+        let targetPos: number | undefined = getPos ? getPos() : undefined;
+
+        // Fallback: scan by blockId if position is stale
+        if (targetPos === undefined && blockId) {
+          targetEditor.state.doc.descendants((n, p) => {
+            if (n.attrs.blockId === blockId) {
+              targetPos = p;
+              return false;
+            }
+          });
+        }
+
+        if (targetPos === undefined) return;
+        const node = targetEditor.state.doc.nodeAt(targetPos);
+        if (!node) return;
+
+        // Auto-expand so the canvas opens immediately after creation
+        targetEditor.view.dispatch(
+          targetEditor.state.tr.setNodeMarkup(targetPos, undefined, {
+            ...node.attrs,
+            contentId: newContentId,
+            expanded: true,
+          })
+        );
+      } catch (err: any) {
+        console.error("[MarkdownEditor] embed-diagram-create failed:", err);
+        toast.error("Failed to create diagram", {
+          description: err.message || "Could not create visualization",
+        });
+      }
+    };
+
+    window.addEventListener("embed-diagram-create", handleEmbedDiagramCreate);
+    return () => window.removeEventListener("embed-diagram-create", handleEmbedDiagramCreate);
+  }, [editor, parentId]);
+
   // Sprint 42: Listen for AI-generated image insertion at cursor position
   useEffect(() => {
     if (!editor) return;
@@ -856,6 +963,20 @@ export function MarkdownEditor({
             e.dataTransfer.dropEffect = "copy";
           }
         }}
+        onContextMenu={(e) => {
+          // Allow the browser's native context menu when the dev "Inspect Element" action re-fires it
+          if ((window as any).__passNativeContextMenu) {
+            (window as any).__passNativeContextMenu = false;
+            return;
+          }
+          e.preventDefault();
+          const hasSelection = editor ? !editor.state.selection.empty : false;
+          openMenu(
+            "main-editor",
+            { x: e.clientX, y: e.clientY },
+            { hasSelection, contextTarget: e.target, contextX: e.clientX, contextY: e.clientY }
+          );
+        }}
         onDrop={(e) => {
           // Sprint 42: Handle AI image drop from chat
           const aiImageData = e.dataTransfer.getData("application/x-dg-ai-image");
@@ -950,6 +1071,10 @@ export function MarkdownEditor({
         open={isLinkDialogOpen}
         onOpenChange={setIsLinkDialogOpen}
       />
+
+      {/* Template / Snippet pickers — event-driven, no props needed */}
+      <TemplatePicker />
+      <SnippetPicker />
     </div>
   );
 }

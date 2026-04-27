@@ -22,11 +22,16 @@ import { NodeSelection, PluginKey } from "@tiptap/pm/state";
 import {
   Bold,
   Check,
-  Link2Off,
+  ClipboardPaste,
+  Copy,
   Italic,
+  LayoutTemplate,
+  Link2Off,
+  Link as LinkIcon,
+  Paintbrush,
   Strikethrough,
   Code,
-  Link as LinkIcon,
+  TextQuote,
   X,
   Heading1,
   Heading2,
@@ -34,6 +39,7 @@ import {
 } from "lucide-react";
 import { queryTools } from "@/lib/domain/tools";
 import type { ToolDefinition } from "@/lib/domain/tools";
+import { useContextMenuStore } from "@/state/context-menu-store";
 
 // Create unique plugin key for this bubble menu
 const textFormattingBubbleMenuKey = new PluginKey("textFormattingBubbleMenu");
@@ -222,11 +228,50 @@ export interface BubbleMenuProps {
   onLinkClick?: () => void;
 }
 
+/** Captured inline + block formatting snapshot for Format Painter */
+interface CapturedFormat {
+  bold: boolean;
+  italic: boolean;
+  strike: boolean;
+  code: boolean;
+  heading: 1 | 2 | 3 | null;
+}
+
+function captureFormat(editor: Editor): CapturedFormat {
+  return {
+    bold: editor.isActive("bold"),
+    italic: editor.isActive("italic"),
+    strike: editor.isActive("strike"),
+    code: editor.isActive("code"),
+    heading: editor.isActive("heading", { level: 1 }) ? 1
+      : editor.isActive("heading", { level: 2 }) ? 2
+      : editor.isActive("heading", { level: 3 }) ? 3
+      : null,
+  };
+}
+
+function applyFormat(editor: Editor, fmt: CapturedFormat) {
+  const chain = editor.chain();
+  if (fmt.bold !== editor.isActive("bold")) chain.toggleBold();
+  if (fmt.italic !== editor.isActive("italic")) chain.toggleItalic();
+  if (fmt.strike !== editor.isActive("strike")) chain.toggleStrike();
+  if (fmt.code !== editor.isActive("code")) chain.toggleCode();
+  if (fmt.heading) {
+    if (!editor.isActive("heading", { level: fmt.heading })) chain.setHeading({ level: fmt.heading });
+  } else if (editor.isActive("heading")) {
+    chain.setParagraph();
+  }
+  chain.run();
+}
+
 export function BubbleMenu({ editor, onLinkClick }: BubbleMenuProps) {
   const [, forceRender] = useState(0);
   const [linkEditorTarget, setLinkEditorTarget] = useState<LinkEditorTarget | null>(null);
   const [linkInputValue, setLinkInputValue] = useState("");
   const linkInputRef = useRef<HTMLInputElement>(null);
+  const [paintMode, setPaintMode] = useState(false);
+  const fmtRef = useRef<CapturedFormat | null>(null);
+  const originRef = useRef<{ from: number; to: number } | null>(null);
 
   useEffect(() => {
     if (!editor) return;
@@ -242,6 +287,41 @@ export function BubbleMenu({ editor, onLinkClick }: BubbleMenuProps) {
       editor.off("blur", rerender);
     };
   }, [editor]);
+
+  // Apply format when user makes a new selection in paint mode
+  useEffect(() => {
+    if (!editor || !paintMode) return () => {};
+    const handleSelectionUpdate = () => {
+      if (!fmtRef.current) return;
+      const { from, to } = editor.state.selection;
+      if (from === to) return;
+      const orig = originRef.current;
+      if (orig && orig.from === from && orig.to === to) return;
+      applyFormat(editor, fmtRef.current);
+      fmtRef.current = null;
+      originRef.current = null;
+      setPaintMode(false);
+    };
+    editor.on("selectionUpdate", handleSelectionUpdate);
+    return () => editor.off("selectionUpdate", handleSelectionUpdate);
+  }, [editor, paintMode]);
+
+  // Crosshair cursor in paint mode
+  useEffect(() => {
+    if (!editor) return () => {};
+    const el = editor.view.dom as HTMLElement;
+    el.style.cursor = paintMode ? "crosshair" : "";
+    return () => { el.style.cursor = ""; };
+  }, [editor, paintMode]);
+
+  useEffect(() => {
+    if (!paintMode) return;
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") { fmtRef.current = null; originRef.current = null; setPaintMode(false); }
+    };
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, [paintMode]);
 
   const formatting = editor ? getSelectionFormattingState(editor) : EMPTY_FORMATTING;
   const visibleLinks = formatting.links.slice(0, 3);
@@ -422,6 +502,106 @@ export function BubbleMenu({ editor, onLinkClick }: BubbleMenuProps) {
             })}
           </div>
         ))}
+
+        {/* Copy / Paste */}
+        <div className="flex items-center gap-1">
+          <div className="mx-1 h-6 w-px bg-white/10" />
+          <button
+            onMouseDown={preventFocusLoss}
+            onClick={() => {
+              const { from, to } = editor.state.selection;
+              if (from !== to) {
+                const text = editor.state.doc.textBetween(from, to, "\n");
+                navigator.clipboard.writeText(text).catch(() => {});
+              }
+            }}
+            className="rounded p-1.5 transition-colors hover:bg-white/10 text-gray-400"
+            title="Copy (⌘C)"
+            type="button"
+          >
+            <Copy className="h-4 w-4" />
+          </button>
+          <button
+            onMouseDown={preventFocusLoss}
+            onClick={async () => {
+              try {
+                const text = await navigator.clipboard.readText();
+                if (text) editor.chain().insertContent(text).run();
+              } catch { /* clipboard permission denied */ }
+            }}
+            className="rounded p-1.5 transition-colors hover:bg-white/10 text-gray-400"
+            title="Paste (⌘V)"
+            type="button"
+          >
+            <ClipboardPaste className="h-4 w-4" />
+          </button>
+        </div>
+
+        {/* Format Painter */}
+        <div className="flex items-center gap-1">
+          <div className="mx-1 h-6 w-px bg-white/10" />
+          <button
+            onMouseDown={preventFocusLoss}
+            onClick={() => {
+              if (paintMode) {
+                fmtRef.current = null;
+                originRef.current = null;
+                setPaintMode(false);
+              } else {
+                const { from, to } = editor.state.selection;
+                if (from !== to) {
+                  fmtRef.current = captureFormat(editor);
+                  originRef.current = { from, to };
+                  setPaintMode(true);
+                }
+              }
+            }}
+            className={`rounded p-1.5 transition-colors hover:bg-white/10 ${
+              paintMode ? "bg-amber-500/30 text-amber-300" : "text-gray-400"
+            }`}
+            title={paintMode ? "Format Painter active — select to apply (Esc to cancel)" : "Format Painter"}
+            type="button"
+          >
+            <Paintbrush className="h-4 w-4" />
+          </button>
+        </div>
+
+        {/* Save as Template / Snippet */}
+        <div className="flex items-center gap-1">
+          <div className="mx-1 h-6 w-px bg-white/10" />
+          <button
+            onMouseDown={preventFocusLoss}
+            onClick={(e) => {
+              const rect = e.currentTarget.getBoundingClientRect();
+              useContextMenuStore.getState().openMenu(
+                "main-editor",
+                { x: rect.left, y: rect.bottom + 4 },
+                { hasSelection: true, bubbleMenuAction: "save-template" },
+              );
+            }}
+            className="rounded p-1.5 transition-colors hover:bg-white/10 text-gray-400"
+            title="Save as Template"
+            type="button"
+          >
+            <LayoutTemplate className="h-4 w-4" />
+          </button>
+          <button
+            onMouseDown={preventFocusLoss}
+            onClick={(e) => {
+              const rect = e.currentTarget.getBoundingClientRect();
+              useContextMenuStore.getState().openMenu(
+                "main-editor",
+                { x: rect.left, y: rect.bottom + 4 },
+                { hasSelection: true, bubbleMenuAction: "save-snippet" },
+              );
+            }}
+            className="rounded p-1.5 transition-colors hover:bg-white/10 text-gray-400"
+            title="Save as Snippet"
+            type="button"
+          >
+            <TextQuote className="h-4 w-4" />
+          </button>
+        </div>
       </div>
       {linkEditorTarget && (
         <>

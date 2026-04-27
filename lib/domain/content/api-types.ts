@@ -109,7 +109,16 @@ export interface ContentDetailResponse {
   createdAt: Date;
   updatedAt: Date;
   deletedAt: Date | null;
-  
+
+  // Path A — Embedded drawings: when a visualization ContentNode is owned by a
+  // note, these fields surface the link so the standalone viewer can render
+  // read-only with a "Open in note" banner.
+  ownedByNoteId?: string | null;
+  ownedByNote?: {
+    id: string;
+    title: string;
+  } | null;
+
   // Full payload data (one of these will be present)
   note?: {
     tiptapJson: JSONContent;

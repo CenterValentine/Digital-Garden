@@ -14,6 +14,7 @@ import { FileTreeSkeleton } from "../skeletons/FileTreeSkeleton";
 import { SearchPanel } from "../SearchPanel";
 import { ConfirmDialog } from "../ConfirmDialog";
 import { ExternalLinkDialog } from "../external/ExternalLinkDialog";
+import { FileUploadDialog } from "../dialogs/FileUploadDialog";
 import { IconSelector } from "../IconSelector";
 import { LeftSidebarStatusBar } from "../LeftSidebarStatusBar";
 import { RootNodeHeader } from "../file-tree/RootNodeHeader";
@@ -191,6 +192,10 @@ export function LeftSidebarContent({
     title: string;
     message: string;
   } | null>(null);
+  const [uploadDialog, setUploadDialog] = useState<{
+    open: boolean;
+    parentId: string | null;
+  }>({ open: false, parentId: null });
   const [hasGoogleAuth, setHasGoogleAuth] = useState(false);
   const [deleteFromGoogleDrive, setDeleteFromGoogleDrive] = useState(true); // Default to true
 
@@ -1753,12 +1758,9 @@ export function LeftSidebarContent({
     requestedParentId: string | null,
     type: "folder" | "note" | "file" | "code" | "html" | "docx" | "xlsx" | "json" | "external" | "chat" | "visualization" | "data" | "hope" | "workflow"
   ) => {
-    // File upload requires special two-phase flow - show dialog instead
+    // File upload requires special two-phase flow - open upload dialog
     if (type === "file") {
-      setErrorDialog({
-        title: "File upload not implemented",
-        message: "File upload requires selecting a file. This will be implemented with a file picker dialog in a future update.",
-      });
+      setUploadDialog({ open: true, parentId: requestedParentId });
       return;
     }
 
@@ -2043,6 +2045,19 @@ export function LeftSidebarContent({
         currentIcon={iconSelector.currentIcon}
         triggerPosition={iconSelector.triggerPosition}
       />
+
+      {/* File upload dialog */}
+      {uploadDialog.open && (
+        <FileUploadDialog
+          parentId={uploadDialog.parentId}
+          onSuccess={async (fileId) => {
+            setUploadDialog({ open: false, parentId: null });
+            await fetchTree();
+            setSelectedContentId(fileId);
+          }}
+          onCancel={() => setUploadDialog({ open: false, parentId: null })}
+        />
+      )}
 
       {/* Error dialog */}
       {errorDialog && (

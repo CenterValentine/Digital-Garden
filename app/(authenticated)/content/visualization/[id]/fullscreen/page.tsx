@@ -32,7 +32,7 @@ export default async function VisualizationFullscreenPage({
   const session = await requireAuth();
   const { id } = await params;
 
-  // Fetch visualization data
+  // Fetch visualization data (+ owning note for Path A read-only handling)
   const viz = await prisma.contentNode.findUnique({
     where: {
       id: id,
@@ -40,6 +40,7 @@ export default async function VisualizationFullscreenPage({
     },
     include: {
       visualizationPayload: true,
+      ownedByNote: { select: { id: true, title: true } },
     },
   });
 
@@ -48,6 +49,10 @@ export default async function VisualizationFullscreenPage({
   }
 
   const payload = viz.visualizationPayload;
+  const isReadOnly = !!viz.ownedByNoteId;
+  const ownerNoteInfo = viz.ownedByNote
+    ? { noteId: viz.ownedByNote.id, noteTitle: viz.ownedByNote.title }
+    : null;
 
   return (
     <FullscreenVisualizationWrapper title={viz.title} engine={payload.engine}>
@@ -66,6 +71,8 @@ export default async function VisualizationFullscreenPage({
           title={viz.title}
           config={payload.config as any}
           data={payload.data as any}
+          isReadOnly={isReadOnly}
+          ownerNoteInfo={ownerNoteInfo}
         />
       )}
 

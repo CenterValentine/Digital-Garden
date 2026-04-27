@@ -450,7 +450,7 @@ export async function PATCH(
             country: mergeOptionalString(existingAddress.country, body.country),
           },
           notes: nextNotesText,
-          notesTiptapJson: nextNotesTiptapJson ?? null,
+          notesTiptapJson: (nextNotesTiptapJson ?? null) as never,
           contentView: {
             viewMode: body.contentViewMode ?? existingContentView.viewMode,
             viewPrefs:
@@ -477,7 +477,7 @@ export async function PATCH(
         displayName: updated.displayName,
         slug: updated.slug,
         primaryGroupId: updated.primaryGroupId,
-        primaryGroupName: updated.primaryGroup.name,
+        primaryGroupName: (updated as any).primaryGroup?.name ?? null,
         metadata: {
           contentView: readContentViewMetadata(asObject(updated.metadata)),
         },
