@@ -22,6 +22,10 @@ steps:
   # instances, two clients may land on different instances with separate document
   # state and will never sync. Single-instance is the correct topology for a
   # stateful WebSocket server. Scale vertically (cpu/memory) if needed.
+  #
+  # min-instances=0: scale to zero when idle. The client has IndexedDB-backed local
+  # persistence and automatic reconnection with exponential backoff, so a cold start
+  # (~2-5s) is handled transparently. This eliminates ~$0.90/day in idle instance costs.
   - name: gcr.io/google.com/cloudsdktool/cloud-sdk
     entrypoint: gcloud
     args:
@@ -32,11 +36,11 @@ steps:
       - --region=$_REGION
       - --platform=managed
       - --port=8080
-      - --min-instances=1
+      - --min-instances=0
       - --max-instances=1
       - --timeout=3600s
       - --cpu=1
-      - --memory=512Mi
+      - --memory=256Mi
       - --no-allow-unauthenticated
       - --set-env-vars=NODE_ENV=production
       - --update-secrets=DATABASE_URL=DATABASE_URL:latest,COLLABORATION_TOKEN_SECRET=digital-garden-collaboration-token-secret:2
