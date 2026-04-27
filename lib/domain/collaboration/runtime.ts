@@ -201,6 +201,9 @@ interface DocumentRuntimeEntry {
   listeners: Set<() => void>;
   cooldownTimer: ReturnType<typeof setTimeout> | null;
   idleEvictionTimer: ReturnType<typeof setTimeout> | null;
+  bootstrapSlowTimer: ReturnType<typeof setTimeout> | null;
+  bootstrapFallbackTimer: ReturnType<typeof setTimeout> | null;
+  bootstrapAbortController: AbortController | null;
   sessionAnnounceTimer: ReturnType<typeof setInterval> | null;
   sessionSweepTimer: ReturnType<typeof setInterval> | null;
   presenceHeartbeatTimer: ReturnType<typeof setTimeout> | null;
@@ -256,6 +259,8 @@ const PRESENCE_HEARTBEAT_HIDDEN_INTERVAL_MS = 30_000;
 const PRESENCE_IDLE_AFTER_MS = 60_000;
 const PROVIDER_RECONNECT_BASE_MS = 1000;
 const PROVIDER_RECONNECT_MAX_MS = 30_000;
+const BOOTSTRAP_SLOW_WARNING_MS = 10_000;
+const BOOTSTRAP_LOCAL_FALLBACK_MS = 25_000;
 const COOLDOWN_MS = 120_000;
 const IDLE_EVICTION_MS = 300_000;
 const LOCAL_CACHE_MANIFEST_KEY = "dg-collab-local-cache-manifest";
@@ -404,7 +409,7 @@ function deriveEditPolicy(
     return {
       editable: false,
       reason: "booting-local-state",
-      warning: "Loading local collaborative state before editing is enabled.",
+      warning: state.warning || "Loading local collaborative state before editing is enabled.",
     };
   }
 
@@ -547,6 +552,9 @@ class CollaborationRuntimeManager {
       consumers: new Map(),
       cooldownTimer: null,
       idleEvictionTimer: null,
+      bootstrapSlowTimer: null,
+      bootstrapFallbackTimer: null,
+      bootstrapAbortController: null,
       sessionAnnounceTimer: null,
       sessionSweepTimer: null,
       presenceHeartbeatTimer: null,
@@ -620,11 +628,24 @@ class CollaborationRuntimeManager {
     };
     entry.ydoc.on("update", entry.ydocUpdateHandler);
 
-    indexedDbProvider.whenSynced.then(() => {
-      entry.state.persistenceState = "localReady";
-      void this.bootstrapInitialContent(entry);
-      this.emit(entry);
-    });
+    indexedDbProvider.whenSynced
+      .then(() => {
+        entry.state.persistenceState = "localReady";
+        void this.bootstrapInitialContent(entry);
+        this.emit(entry);
+      })
+      .catch((error) => {
+        this.markBootstrapFailed(
+          entry,
+          "Local collaborative storage could not be initialized. Editing is blocked to avoid data loss."
+        );
+        if (process.env.NODE_ENV === "development") {
+          console.error(
+            "[collaboration] failed to initialize local persistence",
+            error instanceof Error ? error.message : error
+          );
+        }
+      });
 
     this.startBrowserSessionDetection(entry);
     this.startRemotePresenceDetection(entry);
@@ -641,11 +662,14 @@ class CollaborationRuntimeManager {
     if (!content || entry.hasSeededInitialContent) return;
     entry.pendingInitialContent = content;
     if (!hasMeaningfulTipTapContent(content)) {
+      this.clearBootstrapWatch(entry);
       entry.hasSeededInitialContent = true;
       entry.state.bootstrapState = "ready";
+      entry.state.warning = null;
       this.emit(entry);
       return;
     }
+    this.startBootstrapWatch(entry);
     if (entry.state.persistenceState !== "localReady") return;
     void this.bootstrapInitialContent(entry);
   }
@@ -668,80 +692,200 @@ class CollaborationRuntimeManager {
       localYdocIsMeaningful ||
       (entry.ydoc.getXmlFragment("default").length > 0 && !pendingContentIsMeaningful)
     ) {
+      this.clearBootstrapWatch(entry);
       entry.hasSeededInitialContent = true;
       entry.state.bootstrapState = "ready";
+      entry.state.warning = null;
       return;
     }
 
     if (!entry.pendingInitialContent || !pendingContentIsMeaningful) {
+      this.clearBootstrapWatch(entry);
       entry.hasSeededInitialContent = true;
       entry.state.bootstrapState = "ready";
+      entry.state.warning = null;
       this.emit(entry);
       return;
     }
 
     entry.isBootstrappingInitialContent = true;
+    this.startBootstrapWatch(entry);
+    const abortController =
+      typeof AbortController === "undefined" ? null : new AbortController();
+    entry.bootstrapAbortController = abortController;
     try {
-      const canonicalState = await this.fetchCanonicalYDocState(entry.contentId);
-      if (canonicalState?.update) {
+      const canonicalState = await this.fetchCanonicalYDocState(
+        entry.contentId,
+        abortController?.signal
+      );
+      if (entry.hasSeededInitialContent) return;
+
+      if (canonicalState.update) {
         if (
           pendingContentIsMeaningful &&
           !ydocUpdateHasMeaningfulDefaultContent(canonicalState.update)
         ) {
-          throw new Error(
-            "Canonical collaboration state was empty while saved note content exists"
+          this.markBootstrapFailed(
+            entry,
+            "Canonical collaboration state is inconsistent with the saved note content. Editing is blocked until the collaboration state is repaired."
           );
+          return;
         }
         Y.applyUpdate(entry.ydoc, canonicalState.update);
-        entry.state.documentName = canonicalState.documentName;
-        entry.state.readOnly = canonicalState.readOnly;
-        entry.hasSeededInitialContent = true;
-        entry.state.bootstrapState = "ready";
-        entry.state.warning = null;
+      } else if (pendingContentIsMeaningful) {
+        this.markBootstrapFailed(
+          entry,
+          "Canonical collaboration state is empty while saved note content exists. Editing is blocked until the collaboration state is repaired."
+        );
         return;
       }
+
+      this.clearBootstrapWatch(entry);
+      entry.state.documentName = canonicalState.documentName;
+      entry.state.readOnly = canonicalState.readOnly;
+      entry.hasSeededInitialContent = true;
+      entry.state.bootstrapState = "ready";
+      entry.state.warning = null;
+      return;
     } catch (error) {
+      if (entry.hasSeededInitialContent || abortController?.signal.aborted) {
+        return;
+      }
       if (process.env.NODE_ENV === "development") {
         console.warn(
           "[collaboration] using local-only bootstrap fallback",
           error instanceof Error ? error.message : error
         );
       }
+      this.bootstrapFromSavedContent(
+        entry,
+        "Live collaboration bootstrap is unavailable. Editing is using saved local content, but collaboration exclusivity and remote sync are not guaranteed until collaboration reconnects."
+      );
     } finally {
+      if (entry.bootstrapAbortController === abortController) {
+        entry.bootstrapAbortController = null;
+      }
       entry.isBootstrappingInitialContent = false;
       this.emit(entry);
+    }
+  }
+
+  private clearBootstrapWatch(entry: DocumentRuntimeEntry) {
+    if (entry.bootstrapSlowTimer) {
+      clearTimeout(entry.bootstrapSlowTimer);
+      entry.bootstrapSlowTimer = null;
+    }
+    if (entry.bootstrapFallbackTimer) {
+      clearTimeout(entry.bootstrapFallbackTimer);
+      entry.bootstrapFallbackTimer = null;
+    }
+  }
+
+  private startBootstrapWatch(entry: DocumentRuntimeEntry) {
+    if (entry.bootstrapSlowTimer || entry.bootstrapFallbackTimer) return;
+
+    entry.bootstrapSlowTimer = setTimeout(() => {
+      entry.bootstrapSlowTimer = null;
+      if (entry.hasSeededInitialContent || entry.state.bootstrapState !== "pending") {
+        return;
+      }
+      entry.state.warning =
+        entry.state.persistenceState === "localReady"
+          ? "Collaboration bootstrap is taking longer than expected. Waiting for canonical state before editing is enabled."
+          : "Loading local collaborative state is taking longer than expected. Editing remains blocked until local persistence is ready.";
+      this.emit(entry);
+    }, BOOTSTRAP_SLOW_WARNING_MS);
+
+    entry.bootstrapFallbackTimer = setTimeout(() => {
+      entry.bootstrapFallbackTimer = null;
+      if (entry.hasSeededInitialContent || entry.state.bootstrapState !== "pending") {
+        return;
+      }
+
+      if (entry.state.persistenceState !== "localReady") {
+        entry.state.warning =
+          "Local collaborative persistence is still loading. Editing remains blocked until durable local state is ready.";
+        this.emit(entry);
+        return;
+      }
+
+      if (!entry.pendingInitialContent || !hasMeaningfulTipTapContent(entry.pendingInitialContent)) {
+        entry.state.warning =
+          "Collaboration bootstrap is still validating document state. Editing remains blocked until the document can be loaded safely.";
+        this.emit(entry);
+        return;
+      }
+
+      entry.bootstrapAbortController?.abort();
+      this.bootstrapFromSavedContent(
+        entry,
+        "Live collaboration bootstrap is taking longer than expected. Editing is using saved local content, but collaboration exclusivity and remote sync are not guaranteed until collaboration reconnects."
+      );
+    }, BOOTSTRAP_LOCAL_FALLBACK_MS);
+  }
+
+  private markBootstrapFailed(entry: DocumentRuntimeEntry, warning: string) {
+    this.clearBootstrapWatch(entry);
+    entry.state.bootstrapState = "failed";
+    entry.state.warning = warning;
+    entry.hasSeededInitialContent = false;
+    entry.isBootstrappingInitialContent = false;
+    this.emit(entry);
+  }
+
+  private bootstrapFromSavedContent(entry: DocumentRuntimeEntry, warning: string) {
+    if (entry.state.persistenceState !== "localReady") {
+      this.markBootstrapFailed(
+        entry,
+        "Local collaborative persistence is unavailable. Editing is blocked to avoid data loss."
+      );
+      return;
+    }
+
+    const pendingContent = entry.pendingInitialContent;
+    if (!pendingContent || !hasMeaningfulTipTapContent(pendingContent)) {
+      this.clearBootstrapWatch(entry);
+      entry.hasSeededInitialContent = true;
+      entry.state.bootstrapState = "ready";
+      entry.state.warning = warning;
+      this.emit(entry);
+      return;
     }
 
     try {
       const seededDoc = TiptapTransformer.toYdoc(
-        entry.pendingInitialContent,
+        pendingContent,
         "default",
         getCollaborationServerExtensions()
       );
       Y.applyUpdate(entry.ydoc, Y.encodeStateAsUpdate(seededDoc));
       seededDoc.destroy();
+      this.clearBootstrapWatch(entry);
       entry.hasSeededInitialContent = true;
       entry.state.bootstrapState = "ready";
-      entry.state.warning = null;
+      entry.state.warning = warning;
     } catch (error) {
-      entry.state.bootstrapState = "failed";
-      entry.state.warning =
-        "Collaborative editing could not initialize. Showing saved content read-only to prevent overwrite.";
+      this.markBootstrapFailed(
+        entry,
+        "Saved note content could not be safely loaded into collaborative state. Editing is blocked to prevent overwrite."
+      );
       if (process.env.NODE_ENV === "development") {
         console.error(
           "[collaboration] failed to bootstrap collaborative document",
           error instanceof Error ? error.message : error
         );
       }
+      return;
     }
     this.emit(entry);
   }
 
-  private async fetchCanonicalYDocState(contentId: string) {
+  private async fetchCanonicalYDocState(contentId: string, signal?: AbortSignal) {
     const response = await fetch("/api/collaboration/state", {
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
+      signal,
       body: JSON.stringify({ contentId }),
     });
     const result = (await response.json()) as CollaborationStateResponse;
@@ -1613,6 +1757,9 @@ class CollaborationRuntimeManager {
     if (entry.state.localDirty || entry.state.unsyncedUpdateCount > 0) return;
 
     this.destroyProviderOnly(entry);
+    this.clearBootstrapWatch(entry);
+    entry.bootstrapAbortController?.abort();
+    entry.bootstrapAbortController = null;
     entry.indexedDbProvider.destroy?.();
     if (entry.presenceHeartbeatTimer) clearTimeout(entry.presenceHeartbeatTimer);
     this.closePresenceStream(entry);
@@ -1630,8 +1777,9 @@ class CollaborationRuntimeManager {
   }
 
   private destroyProviderOnly(entry: DocumentRuntimeEntry) {
-    entry.hocuspocusProvider?.destroy();
+    const provider = entry.hocuspocusProvider;
     entry.hocuspocusProvider = null;
+    provider?.destroy();
   }
 
   private refreshEditPolicy(entry: DocumentRuntimeEntry) {

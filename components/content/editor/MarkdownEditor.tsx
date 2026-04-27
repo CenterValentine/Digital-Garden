@@ -246,6 +246,8 @@ export function MarkdownEditor({
     shouldUseCollaboration && runtimeEditPolicy ? !runtimeEditPolicy.editable : false;
   const isCollaborationBooting =
     shouldUseCollaboration && runtimeEditPolicy?.reason === "booting-local-state";
+  const collaborationBootMessage =
+    runtimeEditPolicy?.warning ?? "Loading local collaborative state before editing is enabled.";
   const isCollaborationConnecting =
     runtimeNetworkState !== "offline" &&
     runtimeEditPolicy?.reason !== "offline-local-durable" &&
@@ -796,7 +798,7 @@ export function MarkdownEditor({
       ) : null}
       {isCollaborationBooting ? (
         <div className="border-b border-amber-500/20 bg-amber-500/10 px-4 py-2 text-sm text-amber-700">
-          Loading local collaborative state...
+          {collaborationBootMessage}
         </div>
       ) : null}
       {isCollaborationConnecting ? (
