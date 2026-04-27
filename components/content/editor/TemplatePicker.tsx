@@ -18,7 +18,12 @@ import type { ContentTemplateWithCategory } from "@/lib/domain/templates";
 import { getViewerExtensions } from "@/lib/domain/editor/extensions-client";
 import { sanitizeTipTapJsonWithExtensions } from "@/lib/domain/editor/unsupported-content";
 
-const templateInsertExtensions = getViewerExtensions();
+let templateInsertExtensions: ReturnType<typeof getViewerExtensions> | null = null;
+
+function getTemplateInsertExtensions() {
+  if (!templateInsertExtensions) templateInsertExtensions = getViewerExtensions();
+  return templateInsertExtensions;
+}
 
 export function TemplatePicker() {
   const [isOpen, setIsOpen] = useState(false);
@@ -60,7 +65,7 @@ export function TemplatePicker() {
           type: "doc",
           content: tiptapJson.content as JSONContent[],
         },
-        templateInsertExtensions
+        getTemplateInsertExtensions()
       );
       editor.chain().focus().insertContent(sanitized.json.content ?? []).run();
     }

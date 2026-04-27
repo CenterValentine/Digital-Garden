@@ -213,8 +213,8 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
   const collaborationEnabled = process.env.NEXT_PUBLIC_COLLABORATION_ENABLED === "true";
   const visualizationEngine = contentType === "visualization" ? (contentData?.engine as string | null | undefined) ?? null : null;
   const collaborationCapability = useMemo(
-    () => (collaborationEnabled ? getContentCollaborationCapability(contentType, visualizationEngine) : null),
-    [collaborationEnabled, contentType, visualizationEngine]
+    () => (collaborationEnabled ? getContentCollaborationCapability(contentType) : null),
+    [collaborationEnabled, contentType]
   );
   const collaborationDescriptor = useMemo(
     () => ({

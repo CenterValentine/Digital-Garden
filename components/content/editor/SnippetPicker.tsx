@@ -18,7 +18,12 @@ import type { SnippetWithCategory } from "@/lib/domain/snippets";
 import { getViewerExtensions } from "@/lib/domain/editor/extensions-client";
 import { sanitizeTipTapJsonWithExtensions } from "@/lib/domain/editor/unsupported-content";
 
-const snippetInsertExtensions = getViewerExtensions();
+let snippetInsertExtensions: ReturnType<typeof getViewerExtensions> | null = null;
+
+function getSnippetInsertExtensions() {
+  if (!snippetInsertExtensions) snippetInsertExtensions = getViewerExtensions();
+  return snippetInsertExtensions;
+}
 
 export function SnippetPicker() {
   const [isOpen, setIsOpen] = useState(false);
@@ -61,7 +66,7 @@ export function SnippetPicker() {
             type: "doc",
             content: json.content as JSONContent[],
           },
-          snippetInsertExtensions
+          getSnippetInsertExtensions()
         );
         editor.chain().focus().insertContent(sanitized.json.content ?? []).run();
       }

@@ -111,16 +111,6 @@ export function AdaptiveFlashcardEditor({
           </button>
           <button
             type="button"
-            onClick={() => {
-              const latex = window.prompt("LaTeX", "x^2");
-              if (latex) editor?.chain().focus().insertInlineMath({ latex }).run();
-            }}
-            className="min-h-9 rounded px-2 text-gray-300 hover:bg-white/10"
-          >
-            Math
-          </button>
-          <button
-            type="button"
             onClick={() => editor?.chain().focus().toggleCodeBlock().run()}
             className="min-h-9 rounded px-2 text-gray-300 hover:bg-white/10"
           >
