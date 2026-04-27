@@ -280,7 +280,9 @@ export function MarkdownEditor({
     editable &&
     (!shouldUseCollaboration || Boolean(runtimeEditPolicy?.editable));
   const editorMode = collaborationState
-    ? "collaboration"
+    ? collaborationState.provider
+      ? "collaboration"
+      : "collaboration-local"
     : isPlainEditorFallback
       ? "plain-fallback"
       : "plain";

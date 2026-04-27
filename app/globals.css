@@ -2767,6 +2767,23 @@ mark {
   z-index: 20;
 }
 
+.ProseMirror .dg-collaboration-caret-label {
+  background: var(--collaborator-color);
+  border-radius: 4px 4px 4px 0;
+  color: white;
+  font-size: 0.68rem;
+  font-style: normal;
+  font-weight: 600;
+  left: -1px;
+  line-height: 1;
+  padding: 0.2rem 0.4rem;
+  pointer-events: none;
+  position: absolute;
+  top: -1.6em;
+  user-select: none;
+  white-space: nowrap;
+}
+
 .dg-collaboration-caret-floating-label {
   background: var(--collaborator-color);
   border-radius: 999px;
