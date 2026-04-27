@@ -53,6 +53,13 @@ before planning and executing. There may be additions or modifications.
 
 ## Recent Completions (Last 30 Days)
 
+**Apr 26, 2026**: Unsupported TipTap block safety net
+- Added schema-aware TipTap normalization that rewrites unknown/deprecated nodes before editor load, collaboration bootstrap, or server rendering
+- Introduced `unsupportedBlock` and `unsupportedInline` safety nodes so deprecated content stays visible and preserved instead of crashing schema bootstrap
+- Collaboration bootstrap now seeds through the sanitized schema path, preventing old block definitions from forcing blank documents or false hard-block states
+- Note create/update APIs normalize incoming TipTap JSON before persistence so deprecated blocks are gated consistently after save
+- Template and snippet insertion now sanitize structured TipTap inserts before applying them to live editors
+
 **Apr 26, 2026**: Collaboration bootstrap fallback hardening
 - Narrowed `bootstrap-failed` to true structural/bootstrap invalidity instead of transient collaboration service unavailability
 - Added staged collaboration boot messaging: normal boot, "taking longer than expected", and warned local fallback after prolonged canonical-state delays

@@ -13,12 +13,18 @@ import {
   ydocUpdateHasMeaningfulDefaultContent,
 } from "@/lib/domain/collaboration/content-safety";
 import { getCollaborationServerExtensions } from "@/lib/domain/collaboration/extensions";
+import { sanitizeTipTapJsonWithExtensions } from "@/lib/domain/editor/unsupported-content";
 
 export type LocalSurfaceTopology = "singleSurface" | "multiSurface";
 export type BrowserSessionTopology = "singleSession" | "multiSession";
 export type RemoteCollaborationTopology = "solo" | "remotePresent";
 export type PersistenceState = "booting" | "localReady";
 export type BootstrapState = "pending" | "ready" | "failed";
+export type CollaborationAvailabilityState = "canonical" | "localFallback" | "plainFallback";
+export type LocalFallbackReason =
+  | "canonical-unavailable"
+  | "transport-unavailable"
+  | "bootstrap-timeout";
 export type SyncCapability = "localOnly" | "syncCapable";
 export type ConnectionState =
   | "localOnly"
@@ -38,6 +44,8 @@ export type PromotionReason =
   | "reconnect-after-offline";
 export type CollaborationEditPolicyReason =
   | "local-ready"
+  | "degraded-local-fallback"
+  | "degraded-plain-fallback"
   | "offline-local-durable"
   | "booting-local-state"
   | "bootstrap-failed"
@@ -99,6 +107,8 @@ export interface CollaborationRuntimeState {
   sessionId: string;
   persistenceState: PersistenceState;
   bootstrapState: BootstrapState;
+  availabilityState: CollaborationAvailabilityState;
+  localFallbackReason: LocalFallbackReason | null;
   syncCapability: SyncCapability;
   connectionState: ConnectionState;
   localSurfaceTopology: LocalSurfaceTopology;
@@ -367,6 +377,10 @@ function getEditableFieldNames(capability: ContentCollaborationCapability) {
   return capability.fields.filter((field) => field.editable).map((field) => field.field);
 }
 
+function canUsePlainEditorFallback(content: JSONContent | null | undefined) {
+  return Boolean(content && typeof content === "object" && content.type === "doc");
+}
+
 function deriveEditPolicy(
   state: CollaborationRuntimeState,
   capability: ContentCollaborationCapability
@@ -384,6 +398,16 @@ function deriveEditPolicy(
       editable: false,
       reason: "auth-revoked",
       warning: state.warning || "Editing is blocked because access was revoked.",
+    };
+  }
+
+  if (state.availabilityState === "plainFallback") {
+    return {
+      editable: true,
+      reason: "degraded-plain-fallback",
+      warning:
+        state.warning ||
+        "Collaborative state could not be created for this note, so editing is using the saved note content directly until collaboration becomes available again.",
     };
   }
 
@@ -410,6 +434,16 @@ function deriveEditPolicy(
       editable: false,
       reason: "booting-local-state",
       warning: state.warning || "Loading local collaborative state before editing is enabled.",
+    };
+  }
+
+  if (state.availabilityState === "localFallback") {
+    return {
+      editable: true,
+      reason: "degraded-local-fallback",
+      warning:
+        state.warning ||
+        "Editing is using durable local collaborative state, but collaboration exclusivity and remote sync are not guaranteed until collaboration reconnects.",
     };
   }
 
@@ -583,6 +617,8 @@ class CollaborationRuntimeManager {
         sessionId: this.sessionId,
         persistenceState: "booting",
         bootstrapState: "pending",
+        availabilityState: "canonical",
+        localFallbackReason: null,
         syncCapability: capability.syncCapability,
         connectionState: "localOnly",
         localSurfaceTopology: "singleSurface",
@@ -665,6 +701,8 @@ class CollaborationRuntimeManager {
       this.clearBootstrapWatch(entry);
       entry.hasSeededInitialContent = true;
       entry.state.bootstrapState = "ready";
+      entry.state.availabilityState = "canonical";
+      entry.state.localFallbackReason = null;
       entry.state.warning = null;
       this.emit(entry);
       return;
@@ -695,6 +733,8 @@ class CollaborationRuntimeManager {
       this.clearBootstrapWatch(entry);
       entry.hasSeededInitialContent = true;
       entry.state.bootstrapState = "ready";
+      entry.state.availabilityState = "canonical";
+      entry.state.localFallbackReason = null;
       entry.state.warning = null;
       return;
     }
@@ -703,6 +743,8 @@ class CollaborationRuntimeManager {
       this.clearBootstrapWatch(entry);
       entry.hasSeededInitialContent = true;
       entry.state.bootstrapState = "ready";
+      entry.state.availabilityState = "canonical";
+      entry.state.localFallbackReason = null;
       entry.state.warning = null;
       this.emit(entry);
       return;
@@ -745,6 +787,8 @@ class CollaborationRuntimeManager {
       entry.state.readOnly = canonicalState.readOnly;
       entry.hasSeededInitialContent = true;
       entry.state.bootstrapState = "ready";
+      entry.state.availabilityState = "canonical";
+      entry.state.localFallbackReason = null;
       entry.state.warning = null;
       return;
     } catch (error) {
@@ -759,7 +803,8 @@ class CollaborationRuntimeManager {
       }
       this.bootstrapFromSavedContent(
         entry,
-        "Live collaboration bootstrap is unavailable. Editing is using saved local content, but collaboration exclusivity and remote sync are not guaranteed until collaboration reconnects."
+        "Live collaboration bootstrap is unavailable. Editing is using saved local content, but collaboration exclusivity and remote sync are not guaranteed until collaboration reconnects.",
+        "canonical-unavailable"
       );
     } finally {
       if (entry.bootstrapAbortController === abortController) {
@@ -819,7 +864,8 @@ class CollaborationRuntimeManager {
       entry.bootstrapAbortController?.abort();
       this.bootstrapFromSavedContent(
         entry,
-        "Live collaboration bootstrap is taking longer than expected. Editing is using saved local content, but collaboration exclusivity and remote sync are not guaranteed until collaboration reconnects."
+        "Live collaboration bootstrap is taking longer than expected. Editing is using saved local content, but collaboration exclusivity and remote sync are not guaranteed until collaboration reconnects.",
+        "bootstrap-timeout"
       );
     }, BOOTSTRAP_LOCAL_FALLBACK_MS);
   }
@@ -827,13 +873,19 @@ class CollaborationRuntimeManager {
   private markBootstrapFailed(entry: DocumentRuntimeEntry, warning: string) {
     this.clearBootstrapWatch(entry);
     entry.state.bootstrapState = "failed";
+    entry.state.availabilityState = "canonical";
+    entry.state.localFallbackReason = null;
     entry.state.warning = warning;
     entry.hasSeededInitialContent = false;
     entry.isBootstrappingInitialContent = false;
     this.emit(entry);
   }
 
-  private bootstrapFromSavedContent(entry: DocumentRuntimeEntry, warning: string) {
+  private bootstrapFromSavedContent(
+    entry: DocumentRuntimeEntry,
+    warning: string,
+    fallbackReason: LocalFallbackReason
+  ) {
     if (entry.state.persistenceState !== "localReady") {
       this.markBootstrapFailed(
         entry,
@@ -847,14 +899,20 @@ class CollaborationRuntimeManager {
       this.clearBootstrapWatch(entry);
       entry.hasSeededInitialContent = true;
       entry.state.bootstrapState = "ready";
+      entry.state.availabilityState = "localFallback";
+      entry.state.localFallbackReason = fallbackReason;
       entry.state.warning = warning;
       this.emit(entry);
       return;
     }
 
     try {
-      const seededDoc = TiptapTransformer.toYdoc(
+      const sanitizedPendingContent = sanitizeTipTapJsonWithExtensions(
         pendingContent,
+        getCollaborationServerExtensions()
+      ).json;
+      const seededDoc = TiptapTransformer.toYdoc(
+        sanitizedPendingContent,
         "default",
         getCollaborationServerExtensions()
       );
@@ -863,12 +921,26 @@ class CollaborationRuntimeManager {
       this.clearBootstrapWatch(entry);
       entry.hasSeededInitialContent = true;
       entry.state.bootstrapState = "ready";
+      entry.state.availabilityState = "localFallback";
+      entry.state.localFallbackReason = fallbackReason;
       entry.state.warning = warning;
     } catch (error) {
-      this.markBootstrapFailed(
-        entry,
-        "Saved note content could not be safely loaded into collaborative state. Editing is blocked to prevent overwrite."
-      );
+      if (canUsePlainEditorFallback(pendingContent)) {
+        this.clearBootstrapWatch(entry);
+        entry.state.bootstrapState = "failed";
+        entry.state.availabilityState = "plainFallback";
+        entry.state.localFallbackReason = fallbackReason;
+        entry.state.warning =
+          "Saved note content could not be loaded into collaborative state while collaboration bootstrap is unavailable. Editing is falling back to the saved note directly, and collaboration exclusivity and remote sync are not guaranteed.";
+        entry.hasSeededInitialContent = false;
+        entry.isBootstrappingInitialContent = false;
+        this.emit(entry);
+      } else {
+        this.markBootstrapFailed(
+          entry,
+          "Saved note content could not be safely loaded into collaborative state. Editing is blocked to prevent overwrite."
+        );
+      }
       if (process.env.NODE_ENV === "development") {
         console.error(
           "[collaboration] failed to bootstrap collaborative document",
@@ -1342,7 +1414,12 @@ class CollaborationRuntimeManager {
   private async promoteInternal(entry: DocumentRuntimeEntry, reason: PromotionReason) {
     void reason;
     entry.state.connectionState = "promoting";
-    entry.state.warning = null;
+    if (
+      entry.state.availabilityState !== "localFallback" &&
+      entry.state.availabilityState !== "plainFallback"
+    ) {
+      entry.state.warning = null;
+    }
     this.emit(entry);
 
     let tokenResponse: { response: Response; result: CollaborationTokenResponse | null };
@@ -1395,6 +1472,9 @@ class CollaborationRuntimeManager {
         if (!state) return;
         this.clearProviderReconnect(entry);
         entry.state.connectionState = "synced";
+        entry.state.bootstrapState = "ready";
+        entry.state.availabilityState = "canonical";
+        entry.state.localFallbackReason = null;
         entry.state.warning = null;
         entry.state.reconnectIntent = false;
         entry.state.localDirty = false;
@@ -1508,8 +1588,18 @@ class CollaborationRuntimeManager {
 
   private markTransportUnavailable(entry: DocumentRuntimeEntry, reason?: string) {
     this.destroyProviderOnly(entry);
-    entry.state.connectionState = "disconnectedButDirty";
+    entry.state.connectionState =
+      entry.state.localDirty || entry.state.unsyncedUpdateCount > 0
+        ? "disconnectedButDirty"
+        : "localOnly";
     entry.state.reconnectIntent = true;
+    if (
+      entry.state.bootstrapState === "ready" &&
+      entry.state.persistenceState === "localReady"
+    ) {
+      entry.state.availabilityState = "localFallback";
+      entry.state.localFallbackReason = "transport-unavailable";
+    }
     entry.state.warning =
       entry.state.networkState === "offline" ||
       (typeof navigator !== "undefined" && !navigator.onLine)
@@ -1642,6 +1732,16 @@ class CollaborationRuntimeManager {
         "Live collaboration is unavailable. Local edits are durable and will sync when the collaboration server reconnects.";
     } else if (entry.hocuspocusProvider) {
       entry.state.connectionState = "localOnly";
+      entry.state.reconnectIntent = true;
+      entry.state.warning =
+        "Live collaboration is unavailable. Editing continues from durable local collaborative state, but collaboration exclusivity and remote sync are not guaranteed until collaboration reconnects.";
+    }
+    if (
+      entry.state.bootstrapState === "ready" &&
+      entry.state.persistenceState === "localReady"
+    ) {
+      entry.state.availabilityState = "localFallback";
+      entry.state.localFallbackReason = "transport-unavailable";
     }
     this.emit(entry);
     this.scheduleProviderReconnect(entry, "reconnect-after-offline");

@@ -58,6 +58,11 @@ import { NumberInput } from "./extensions/blocks/number-input";
 import { RatingInput } from "./extensions/blocks/rating-input";
 import { PromptInput } from "./extensions/blocks/prompt-input";
 import { Timestamp } from "./extensions/blocks/timestamp";
+import { DailySummary, WeeklySummary } from "./extensions/blocks/periodic-summary";
+import {
+  UnsupportedBlock,
+  UnsupportedInline,
+} from "./extensions/blocks/unsupported-content";
 import { getExtensionClientEditorExtensions } from "@/lib/extensions/editor-client-registry";
 
 // Create lowlight instance with common languages
@@ -275,6 +280,10 @@ export function getEditorExtensions(options?: EditorExtensionsOptions): Extensio
     RatingInput,
     PromptInput,
     Timestamp,
+    DailySummary,
+    WeeklySummary,
+    UnsupportedBlock,
+    UnsupportedInline,
     ...getExtensionClientEditorExtensions(),
 
     // M6: Tags with autocomplete

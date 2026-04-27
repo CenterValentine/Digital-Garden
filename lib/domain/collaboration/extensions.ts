@@ -30,6 +30,14 @@ import { ServerNumberInput } from "@/lib/domain/editor/extensions/blocks/number-
 import { ServerRatingInput } from "@/lib/domain/editor/extensions/blocks/rating-input";
 import { ServerPromptInput } from "@/lib/domain/editor/extensions/blocks/prompt-input";
 import { ServerTimestamp } from "@/lib/domain/editor/extensions/blocks/timestamp";
+import {
+  ServerDailySummary,
+  ServerWeeklySummary,
+} from "@/lib/domain/editor/extensions/blocks/periodic-summary";
+import {
+  ServerUnsupportedBlock,
+  ServerUnsupportedInline,
+} from "@/lib/domain/editor/extensions/blocks/unsupported-content";
 import { ServerPersonMention } from "@/lib/domain/editor/extensions/person-mention-server";
 import { ServerTag } from "@/lib/domain/editor/extensions/tag-server";
 import { ServerWikiLink } from "@/lib/domain/editor/extensions/wiki-link-server";
@@ -87,6 +95,10 @@ export function getCollaborationServerExtensions(): Extensions {
     ServerRatingInput,
     ServerPromptInput,
     ServerTimestamp,
+    ServerDailySummary,
+    ServerWeeklySummary,
+    ServerUnsupportedBlock,
+    ServerUnsupportedInline,
     ...getExtensionServerEditorExtensions(),
     ServerTag,
     ServerPersonMention,

@@ -22,6 +22,8 @@ import { syncImageReferences } from "@/lib/domain/content/image-refs";
 import { syncPersonMentions } from "@/lib/domain/content/person-mention-sync";
 import { resolveContentAccess } from "@/lib/domain/collaboration/access";
 import type { JSONContent } from "@tiptap/core";
+import { getServerExtensions } from "@/lib/domain/editor/extensions-server";
+import { sanitizeTipTapJsonWithExtensions } from "@/lib/domain/editor/unsupported-content";
 import type {
   ContentDetailResponse,
   UpdateContentRequest,
@@ -336,9 +338,13 @@ export async function PATCH(
 
     // Update payload data (upsert: create NotePayload if it doesn't exist)
     if (tiptapJson || markdown) {
-      const json: JSONContent = markdown
+      const parsedJson: JSONContent = markdown
         ? markdownToTiptap(markdown)
         : (tiptapJson as JSONContent);
+      const json = sanitizeTipTapJsonWithExtensions(
+        parsedJson,
+        getServerExtensions()
+      ).json;
 
       const searchText = extractSearchTextFromTipTap(json);
       const wordCount = searchText.split(/\s+/).filter(Boolean).length;

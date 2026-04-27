@@ -39,6 +39,14 @@ import { ServerNumberInput } from "./extensions/blocks/number-input";
 import { ServerRatingInput } from "./extensions/blocks/rating-input";
 import { ServerPromptInput } from "./extensions/blocks/prompt-input";
 import { ServerTimestamp } from "./extensions/blocks/timestamp";
+import {
+  ServerDailySummary,
+  ServerWeeklySummary,
+} from "./extensions/blocks/periodic-summary";
+import {
+  ServerUnsupportedBlock,
+  ServerUnsupportedInline,
+} from "./extensions/blocks/unsupported-content";
 import { ServerPersonMention } from "./extensions/person-mention-server";
 import { ServerTag } from "./extensions/tag-server";
 import { ServerWikiLink } from "./extensions/wiki-link-server";
@@ -148,6 +156,10 @@ export function getServerExtensions(): Extensions {
     ServerRatingInput,
     ServerPromptInput,
     ServerTimestamp,
+    ServerDailySummary,
+    ServerWeeklySummary,
+    ServerUnsupportedBlock,
+    ServerUnsupportedInline,
     ...getExtensionServerEditorExtensions(),
     ServerTag,
     ServerWikiLink,

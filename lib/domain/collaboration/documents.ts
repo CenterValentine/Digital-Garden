@@ -9,6 +9,7 @@ import {
   ydocUpdateHasMeaningfulDefaultContent,
 } from "./content-safety";
 import { getCollaborationServerExtensions } from "./extensions";
+import { sanitizeTipTapJsonWithExtensions } from "@/lib/domain/editor/unsupported-content";
 import { getCollaborationDocumentName } from "./tokens";
 
 export async function loadCollaborationYDocState(
@@ -38,7 +39,10 @@ export async function loadCollaborationYDocState(
 
   if (record?.ydocState) {
     const state = new Uint8Array(record.ydocState);
-    const noteContent = content.notePayload.tiptapJson as JSONContent;
+    const noteContent = sanitizeTipTapJsonWithExtensions(
+      content.notePayload.tiptapJson as JSONContent,
+      getCollaborationServerExtensions()
+    ).json;
     if (
       ydocUpdateHasMeaningfulDefaultContent(state) ||
       !hasMeaningfulTipTapContent(noteContent)
@@ -47,8 +51,13 @@ export async function loadCollaborationYDocState(
     }
   }
 
-  const ydoc = TiptapTransformer.toYdoc(
+  const sanitizedContent = sanitizeTipTapJsonWithExtensions(
     content.notePayload.tiptapJson as JSONContent,
+    getCollaborationServerExtensions()
+  ).json;
+
+  const ydoc = TiptapTransformer.toYdoc(
+    sanitizedContent,
     "default",
     getCollaborationServerExtensions()
   );
@@ -60,14 +69,14 @@ export async function loadCollaborationYDocState(
       documentName,
       ownerId: content.ownerId,
       ydocState: Buffer.from(update),
-      snapshotJson: content.notePayload.tiptapJson as JSONContent,
+      snapshotJson: sanitizedContent,
     },
     create: {
       contentId,
       ownerId: content.ownerId,
       documentName,
       ydocState: Buffer.from(update),
-      snapshotJson: content.notePayload.tiptapJson as JSONContent,
+      snapshotJson: sanitizedContent,
     },
   });
 

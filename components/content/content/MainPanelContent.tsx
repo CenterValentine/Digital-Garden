@@ -49,6 +49,8 @@ import type { JSONContent } from "@tiptap/core";
 import type { EditorStats } from "../editor/MarkdownEditor";
 import type { OutlineHeading } from "@/lib/domain/content/outline-extractor";
 import { extractOutline } from "@/lib/domain/content/outline-extractor";
+import { getViewerExtensions } from "@/lib/domain/editor/extensions-client";
+import { sanitizeTipTapJsonWithExtensions } from "@/lib/domain/editor/unsupported-content";
 import { SaveAsPageTemplateDialog } from "../dialogs/SaveAsPageTemplateDialog";
 import { useNotesPanelStore } from "@/state/notes-panel-store";
 import {
@@ -373,10 +375,23 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
             } else {
               console.log('Setting note content:', content);
               const validContent = content as JSONContent;
-              setNoteContent(validContent);
+              const sanitized = sanitizeTipTapJsonWithExtensions(
+                validContent,
+                getViewerExtensions()
+              );
+              if (
+                sanitized.rewritten.length > 0 &&
+                process.env.NODE_ENV === "development"
+              ) {
+                console.warn(
+                  "[content] rewrote unsupported TipTap content while loading note",
+                  sanitized.rewritten
+                );
+              }
+              setNoteContent(sanitized.json);
 
               // Extract initial outline from loaded content
-              const initialOutline = extractOutline(validContent);
+              const initialOutline = extractOutline(sanitized.json);
               setOutline(selectedContentId, initialOutline);
             }
           } catch (parseError) {

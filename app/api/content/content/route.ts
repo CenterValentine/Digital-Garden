@@ -17,6 +17,8 @@ import {
   CONTENT_WITH_PAYLOADS,
 } from "@/lib/domain/content";
 import type { JSONContent } from "@tiptap/core";
+import { getServerExtensions } from "@/lib/domain/editor/extensions-server";
+import { sanitizeTipTapJsonWithExtensions } from "@/lib/domain/editor/unsupported-content";
 import type { ContentType } from "@/lib/database/generated/prisma";
 import type {
   ContentWhereInput,
@@ -479,9 +481,13 @@ export async function POST(request: NextRequest) {
     } else if (tiptapJson || markdown) {
       contentType = "note";
       // Note payload
-      const json: JSONContent = markdown
+      const parsedJson: JSONContent = markdown
         ? markdownToTiptap(markdown)
         : (tiptapJson as JSONContent);
+      const json = sanitizeTipTapJsonWithExtensions(
+        parsedJson,
+        getServerExtensions()
+      ).json;
 
       const searchText = extractSearchTextFromTipTap(json);
       const wordCount = searchText.split(/\s+/).filter(Boolean).length;
