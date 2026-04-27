@@ -152,13 +152,11 @@ export function getEditorExtensions(options?: EditorExtensionsOptions): Extensio
                 CollaborationCaret.configure({
                   provider: collaboration.provider,
                   user: collaboration.user,
-                  render: (user, clientId?: number) => {
+                  render: (user) => {
                     const cursor = document.createElement("span");
                     cursor.classList.add("dg-collaboration-caret");
                     cursor.style.setProperty("--collaborator-color", user.color);
-                    if (clientId !== undefined) {
-                      cursor.dataset.collaborationClientId = String(clientId);
-                    }
+                    cursor.dataset.collaborationClientId = String(user.clientId);
                     cursor.title = user.name;
                     return cursor;
                   },

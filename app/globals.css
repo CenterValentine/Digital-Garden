@@ -4,6 +4,14 @@
 
 @custom-variant dark (&:is(.dark *));
 
+.scrollbar-hide {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
 /* Hide default navbar on notes routes (uses its own NotesNavBar) */
 body[data-notes-route] .notes-route-hides-default-nav {
   display: none !important;
