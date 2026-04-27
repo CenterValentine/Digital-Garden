@@ -18,6 +18,7 @@ import {
 } from "@/lib/domain/content";
 import type { JSONContent } from "@tiptap/core";
 import { getServerExtensions } from "@/lib/domain/editor/extensions-server";
+import { instantiateTemplateContent } from "@/lib/domain/editor/template-instantiation";
 import { sanitizeTipTapJsonWithExtensions } from "@/lib/domain/editor/unsupported-content";
 import type { ContentType } from "@/lib/database/generated/prisma";
 import type {
@@ -284,12 +285,12 @@ export async function POST(request: NextRequest) {
     const body = (await request.json()) as CreateContentRequest;
 
     const {
-      title,
+      title: rawTitle,
       parentId,
       categoryId,
       peopleGroupId,
       personId,
-      tiptapJson,
+      tiptapJson: rawTiptapJson,
       markdown,
       html,
       isTemplate,
@@ -311,7 +312,56 @@ export async function POST(request: NextRequest) {
       contentType: requestedContentType,
       chatMessages,
       chatMetadata,
+      fromTemplateId,
     } = body;
+
+    let title = rawTitle;
+    let tiptapJson = rawTiptapJson;
+
+    if (fromTemplateId) {
+      const pageTemplate = await prisma.pageTemplate.findFirst({
+        where: {
+          id: fromTemplateId,
+          OR: [{ userId: session.user.id }, { userId: null }],
+        },
+        select: {
+          id: true,
+          title: true,
+          defaultTitle: true,
+          tiptapJson: true,
+        },
+      });
+
+      if (!pageTemplate) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: {
+              code: "NOT_FOUND",
+              message: "Page template not found",
+            },
+          },
+          { status: 404 }
+        );
+      }
+
+      tiptapJson = instantiateTemplateContent(
+        JSON.parse(JSON.stringify(pageTemplate.tiptapJson)) as JSONContent
+      );
+
+      if (!title || !title.trim()) {
+        title = pageTemplate.defaultTitle || pageTemplate.title;
+      }
+
+      prisma.pageTemplate
+        .update({
+          where: { id: pageTemplate.id },
+          data: {
+            usageCount: { increment: 1 },
+          },
+        })
+        .catch(() => {});
+    }
 
     // Validation
     if (!title || title.trim().length === 0) {

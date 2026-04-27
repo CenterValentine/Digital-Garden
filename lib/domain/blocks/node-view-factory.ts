@@ -408,11 +408,14 @@ export function createBlockNodeView(options: BlockNodeViewOptions) {
     editor: Editor;
     view: EditorView;
   }) => {
+    let resolvedBlockId = String(node.attrs.blockId || "");
+
     // Auto-assign blockId if missing (e.g., block created before schema update)
     if (!node.attrs.blockId && typeof getPos === "function") {
       const pos = getPos();
       if (pos !== undefined) {
         const newId = crypto.randomUUID();
+        resolvedBlockId = newId;
         const { tr } = editor.state;
         tr.setNodeMarkup(pos, undefined, { ...node.attrs, blockId: newId });
         editor.view.dispatch(tr);
@@ -423,7 +426,7 @@ export function createBlockNodeView(options: BlockNodeViewOptions) {
     const dom = document.createElement("div");
     dom.classList.add("block-node", `block-${options.blockType}`);
     dom.setAttribute("data-block-type", options.blockType);
-    dom.setAttribute("data-block-id", node.attrs.blockId || "");
+    dom.setAttribute("data-block-id", resolvedBlockId);
     // containerAttr: toggle block-container-hidden based on a boolean attr
     if (options.containerAttr) {
       dom.classList.toggle("block-container-hidden", !node.attrs[options.containerAttr]);
@@ -485,11 +488,11 @@ export function createBlockNodeView(options: BlockNodeViewOptions) {
     menuBtn.addEventListener("click", (e) => {
       e.preventDefault();
       e.stopPropagation();
-      const blockId = node.attrs.blockId || "";
+      const blockId = resolvedBlockId;
       useBlockStore.getState().setSelectedBlock(blockId, options.blockType);
       useBlockStore.getState().openProperties();
       useRightPanelCollapseStore.getState().setCollapsed(false);
-      syncAttrsToPanel(blockId, node.attrs);
+      syncAttrsToPanel(blockId, { ...node.attrs, blockId });
     });
     chrome.appendChild(menuBtn);
 
@@ -559,9 +562,9 @@ export function createBlockNodeView(options: BlockNodeViewOptions) {
 
     // --- Selection handling (chrome only, not content area) ---
     const syncBlockSelection = () => {
-      const blockId = node.attrs.blockId || "";
+      const blockId = resolvedBlockId;
       useBlockStore.getState().setSelectedBlock(blockId, options.blockType);
-      syncAttrsToPanel(blockId, node.attrs);
+      syncAttrsToPanel(blockId, { ...node.attrs, blockId });
     };
 
     // Clicking anywhere inside a block should update the selected block in the
@@ -620,11 +623,12 @@ export function createBlockNodeView(options: BlockNodeViewOptions) {
 
       update(updatedNode: ProseMirrorNode) {
         if (updatedNode.type.name !== node.type.name) return false;
+        resolvedBlockId = String(updatedNode.attrs.blockId || resolvedBlockId || "");
 
         // Update the data attribute
         dom.setAttribute(
           "data-block-id",
-          updatedNode.attrs.blockId || ""
+          resolvedBlockId
         );
 
         // Sync containerAttr-driven visibility
@@ -660,7 +664,7 @@ export function createBlockNodeView(options: BlockNodeViewOptions) {
         }
         // Clean up if this block was selected
         const store = useBlockStore.getState();
-        if (store.selectedBlockId === node.attrs.blockId) {
+        if (store.selectedBlockId === resolvedBlockId) {
           store.clearSelection();
         }
         // Clean up any open insert menus

@@ -683,6 +683,11 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   },
 
   requestOpenContent: async (contentId, options = {}) => {
+    if (options.contentType === "page-template") {
+      directOpenContent(contentId, options);
+      return;
+    }
+
     const state = get();
     const activeWorkspace = getWorkspace(state.workspaces, state.activeWorkspaceId);
     if (!activeWorkspace) {

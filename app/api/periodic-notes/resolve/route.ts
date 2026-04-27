@@ -5,6 +5,7 @@ import { requireAuth } from "@/lib/infrastructure/auth/middleware";
 import { getUserSettings } from "@/lib/features/settings/operations";
 import {
   EMPTY_TIPTAP_NOTE,
+  getMomentForPeriodicNote,
   getPeriodicNotePeriod,
   getPeriodicNoteSettings,
   type PeriodicNoteKind,
@@ -13,6 +14,7 @@ import {
   extractSearchTextFromTipTap,
   generateUniqueSlug,
 } from "@/lib/domain/content";
+import { instantiateTemplateContent } from "@/lib/domain/editor/template-instantiation";
 
 interface ResolvePeriodicNoteRequest {
   kind?: PeriodicNoteKind;
@@ -59,14 +61,15 @@ export async function POST(request: NextRequest) {
     }
 
     await validatePeriodicNoteFolder(session.user.id, noteSettings.folderId);
-    const templateJson = await resolveTemplateJson(
-      session.user.id,
-      noteSettings.templateId
-    );
     const period = getPeriodicNotePeriod(
       kind,
       noteSettings.filenameFormat,
       body.localDateTime
+    );
+    const currentMoment = getMomentForPeriodicNote(body.localDateTime);
+    const templateJson = await resolveTemplateJson(
+      session.user.id,
+      noteSettings.templateId
     );
 
     const resolved = await prisma.$transaction(async (tx) => {
@@ -101,7 +104,16 @@ export async function POST(request: NextRequest) {
         };
       }
 
-      const tiptapJson = templateJson ?? EMPTY_TIPTAP_NOTE;
+      const tiptapJson = templateJson
+        ? instantiateTemplateContent(templateJson, {
+            regenerateBlockIds: true,
+            now: currentMoment.toDate(),
+            periodicSummaryDates: {
+              daily: currentMoment.format("YYYY-MM-DD"),
+              weekly: currentMoment.clone().startOf("isoWeek").format("YYYY-MM-DD"),
+            },
+          })
+        : EMPTY_TIPTAP_NOTE;
       const searchText = extractSearchTextFromTipTap(tiptapJson);
       const wordCount = searchText.split(/\s+/).filter(Boolean).length;
       const slug = await generateUniqueSlug(period.title, session.user.id);

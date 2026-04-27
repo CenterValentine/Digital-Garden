@@ -26,6 +26,13 @@ interface PeriodicSummaryItem {
   path: string;
 }
 
+interface PeriodicSummaryResponseData {
+  items: PeriodicSummaryItem[];
+}
+
+const summaryRequestCache = new Map<string, Promise<PeriodicSummaryResponseData>>();
+const summaryResultCache = new Map<string, PeriodicSummaryResponseData>();
+
 const SUMMARY_ICON_PATHS: Record<string, string> = {
   fileText:
     '<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/>',
@@ -61,6 +68,10 @@ const SUMMARY_ICON_PATHS: Record<string, string> = {
 };
 
 const summaryBaseAttrs = {
+  templateDateMode: z
+    .enum(["refresh", "preserve"])
+    .default("refresh")
+    .describe("When inserted from a template, refresh this summary to the created note date or preserve the saved date."),
   workdayCutoffHour: z
     .number()
     .int()
@@ -148,47 +159,107 @@ function normalizeSummaryAttrs(kind: PeriodicSummaryKind, attrs: Record<string, 
   };
 }
 
-function syncNormalizedAttrs(
-  node: ProseMirrorNode,
-  editor: Editor,
-  getPos: (() => number | undefined) | undefined,
-  kind: PeriodicSummaryKind
-) {
-  if (!getPos) return;
-  const pos = getPos();
-  if (pos === undefined) return;
-
-  const normalized = normalizeSummaryAttrs(kind, node.attrs);
-  const updates: Record<string, unknown> = {};
-
-  if (node.attrs[normalized.dateKey] !== normalized.periodDate) {
-    updates[normalized.dateKey] = normalized.periodDate;
-  }
-  if (node.attrs.workdayCutoffHour !== normalized.cutoffHour) {
-    updates.workdayCutoffHour = normalized.cutoffHour;
-  }
-
-  if (Object.keys(updates).length === 0) return;
-
-  requestAnimationFrame(() => {
-    const currentPos = getPos();
-    if (currentPos === undefined) return;
-    editor.view.dispatch(
-      editor.state.tr.setNodeMarkup(currentPos, undefined, {
-        ...node.attrs,
-        ...updates,
-      })
-    );
-  });
+function getSummaryCacheKey(window: { startIso: string; endIso: string }) {
+  return `${window.startIso}|${window.endIso}`;
 }
 
-function formatActivityTime(value: string, kind: PeriodicSummaryKind) {
+function loadPeriodicSummary(window: {
+  startIso: string;
+  endIso: string;
+}) {
+  const cacheKey = getSummaryCacheKey(window);
+  const cachedResult = summaryResultCache.get(cacheKey);
+  if (cachedResult) {
+    return Promise.resolve(cachedResult);
+  }
+
+  const cachedRequest = summaryRequestCache.get(cacheKey);
+  if (cachedRequest) {
+    return cachedRequest;
+  }
+
+  const params = new URLSearchParams({
+    start: window.startIso,
+    end: window.endIso,
+  });
+
+  const request = fetch(`/api/periodic-notes/summary?${params.toString()}`, {
+    credentials: "include",
+  })
+    .then((response) => {
+      if (!response.ok) {
+        throw new Error(`Failed to load activity (HTTP ${response.status})`);
+      }
+      return response.json();
+    })
+    .then((result) => {
+      if (!result?.success) {
+        throw new Error(result?.error?.message || "Failed to load activity");
+      }
+
+      const data = {
+        items: result.data.items as PeriodicSummaryItem[],
+      };
+      summaryResultCache.set(cacheKey, data);
+      summaryRequestCache.delete(cacheKey);
+      return data;
+    })
+    .catch((error) => {
+      summaryRequestCache.delete(cacheKey);
+      throw error;
+    });
+
+  summaryRequestCache.set(cacheKey, request);
+  return request;
+}
+
+function getResolvedSummaryTimeZone() {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone;
+  } catch {
+    return undefined;
+  }
+}
+
+function formatDateParts(value: string, timeZone?: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+  const parts = formatter.formatToParts(date);
+  const year = parts.find((part) => part.type === "year")?.value;
+  const month = parts.find((part) => part.type === "month")?.value;
+  const day = parts.find((part) => part.type === "day")?.value;
+
+  if (!year || !month || !day) return null;
+  return `${year}-${month}-${day}`;
+}
+
+function formatActivityTime(
+  value: string,
+  kind: PeriodicSummaryKind,
+  periodDate: string,
+  timeZone?: string
+) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "";
+
+  const localDate = formatDateParts(value, timeZone);
+  const includeDate = kind === "daily" && localDate !== null && localDate !== periodDate;
+
   return new Intl.DateTimeFormat(undefined, {
+    month: includeDate ? "short" : undefined,
+    day: includeDate ? "numeric" : undefined,
     weekday: kind === "weekly" ? "short" : undefined,
     hour: "numeric",
     minute: "2-digit",
+    timeZone,
+    timeZoneName: "short",
   }).format(date);
 }
 
@@ -365,7 +436,7 @@ function renderSummarySkeleton(
 function renderSummaryItems(
   contentDom: HTMLElement,
   kind: PeriodicSummaryKind,
-  label: string,
+  window: { label: string; periodDate: string },
   items: PeriodicSummaryItem[],
   autoBorrowDurationMinutes: number,
   pathOrder: unknown,
@@ -380,7 +451,7 @@ function renderSummaryItems(
 
   const title = document.createElement("span");
   title.className = "block-periodic-summary-heading";
-  title.textContent = getSummaryTitle(kind, label);
+  title.textContent = getSummaryTitle(kind, window.label);
   header.appendChild(title);
 
   const meta = document.createElement("span");
@@ -399,6 +470,7 @@ function renderSummaryItems(
 
   const list = document.createElement("div");
   list.className = "block-periodic-summary-list";
+  const timeZone = getResolvedSummaryTimeZone();
 
   for (const item of items) {
     const row = document.createElement("button");
@@ -442,7 +514,9 @@ function renderSummaryItems(
     itemMeta.title = item.path;
     const activityTime = formatActivityTime(
       item.activity === "created" ? item.createdAt : item.updatedAt,
-      kind
+      kind,
+      window.periodDate,
+      timeZone
     );
     const displayPath = truncateDisplayPath(item.path, pathOrder);
     itemMeta.textContent = activityTime ? `${displayPath} · ${activityTime}` : displayPath;
@@ -462,43 +536,36 @@ function renderPeriodicSummary(
   editor: Editor,
   getPos?: () => number | undefined
 ) {
-  syncNormalizedAttrs(node, editor, getPos, kind);
   const { window } = normalizeSummaryAttrs(kind, node.attrs);
   const duration = Number(node.attrs.autoBorrowDurationMinutes) || 60;
   const pathOrder = node.attrs.pathOrder || "Root > File";
   const showBackground = node.attrs.showBackground !== false;
+  const cacheKey = getSummaryCacheKey(window);
+  contentDom.dataset.summaryRequestKey = cacheKey;
 
-  renderSummarySkeleton(contentDom, kind, window.label, showBackground);
-
-  const params = new URLSearchParams({
-    start: window.startIso,
-    end: window.endIso,
-  });
-
-  fetch(`/api/periodic-notes/summary?${params.toString()}`, {
-    credentials: "include",
-  })
-    .then((response) => {
-      if (!response.ok) {
-        throw new Error(`Failed to load activity (HTTP ${response.status})`);
-      }
-      return response.json();
-    })
-    .then((result) => {
-      if (!result?.success) {
-        throw new Error(result?.error?.message || "Failed to load activity");
-      }
+  const cachedResult = summaryResultCache.get(cacheKey);
+  if (cachedResult) {
       renderSummaryItems(
         contentDom,
         kind,
-        window.label,
-        result.data.items as PeriodicSummaryItem[],
+        window,
+        cachedResult.items,
         duration,
         pathOrder,
         showBackground
       );
+      return;
+  }
+
+  renderSummarySkeleton(contentDom, kind, window.label, showBackground);
+
+  loadPeriodicSummary(window)
+    .then((result) => {
+      if (contentDom.dataset.summaryRequestKey !== cacheKey) return;
+      renderSummaryItems(contentDom, kind, window, result.items, duration, pathOrder, showBackground);
     })
     .catch((error) => {
+      if (contentDom.dataset.summaryRequestKey !== cacheKey) return;
       contentDom.innerHTML = "";
       contentDom.classList.add("block-periodic-summary-content");
       contentDom.setAttribute("data-summary-background", showBackground ? "visible" : "hidden");
@@ -557,6 +624,17 @@ function createPeriodicSummaryNode(kind: PeriodicSummaryKind) {
             "data-path-order":
               attrs.pathOrder === "File < Root" ? "File < Root" : "Root > File",
           }),
+        },
+        templateDateMode: {
+          default: "refresh",
+          parseHTML: (el) =>
+            el.getAttribute("data-template-date-mode") === "preserve"
+              ? "preserve"
+              : "refresh",
+          renderHTML: (attrs) =>
+            attrs.templateDateMode === "preserve"
+              ? { "data-template-date-mode": "preserve" }
+              : {},
         },
         showBackground: {
           default: true,

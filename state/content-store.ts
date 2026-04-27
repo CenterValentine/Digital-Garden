@@ -335,6 +335,7 @@ function shouldAllowWorkspaceOpen(
   options: ContentSelectionOptions
 ) {
   if (typeof window === "undefined") return true;
+  if (options.contentType === "page-template") return true;
   return window.__dgWorkspaceOpenGuard?.({ contentId: id, options }) !== false;
 }
 

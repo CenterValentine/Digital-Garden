@@ -14,6 +14,7 @@ import { getSurfaceStyles } from "@/lib/design/system";
 import { Plus, Trash2, GripVertical, Pencil, Check, X, FileText, ChevronDown, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 import { usePageTemplateStore } from "@/state/page-template-store";
+import { PageTemplateEditorDialog } from "@/components/content/dialogs/PageTemplateEditorDialog";
 
 interface CategoryItem {
   id: string;
@@ -252,9 +253,8 @@ function PageTemplateManager() {
   const [templates, setTemplates] = useState<PageTemplateItem[]>([]);
   const [categories, setCategories] = useState<CategoryItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editingTitle, setEditingTitle] = useState("");
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
+  const [editorTemplateId, setEditorTemplateId] = useState<string | null>(null);
 
   // Also refresh the global page template store so menus stay in sync
   const refreshGlobalStore = usePageTemplateStore((s) => s.fetchTemplates);
@@ -300,27 +300,6 @@ function PageTemplateManager() {
       else next.add(id);
       return next;
     });
-  };
-
-  const handleRenameTemplate = async (id: string) => {
-    const trimmed = editingTitle.trim();
-    if (!trimmed) return;
-
-    try {
-      const res = await fetch(`/api/content/page-templates/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ title: trimmed }),
-      });
-      if (!res.ok) throw new Error("Failed to rename");
-      setEditingId(null);
-      toast.success("Template renamed");
-      fetchData();
-      refreshGlobalStore();
-    } catch {
-      toast.error("Failed to rename template");
-    }
   };
 
   const handleDeleteTemplate = async (id: string, title: string) => {
@@ -421,6 +400,10 @@ function PageTemplateManager() {
   // Templates without a matching category (orphaned)
   const categoryIds = new Set(categories.map((c) => c.id));
   const orphanedTemplates = templates.filter((t) => !categoryIds.has(t.categoryId));
+  const refreshTemplateViews = useCallback(() => {
+    fetchData();
+    refreshGlobalStore();
+  }, [fetchData, refreshGlobalStore]);
 
   return (
     <div
@@ -535,64 +518,46 @@ function PageTemplateManager() {
                         >
                           <FileText className="h-3.5 w-3.5 text-gray-500 shrink-0" />
 
-                          {editingId === tpl.id ? (
-                            <div className="flex-1 flex items-center gap-2">
-                              <input
-                                type="text"
-                                value={editingTitle}
-                                onChange={(e) => setEditingTitle(e.target.value)}
-                                onKeyDown={(e) => {
-                                  if (e.key === "Enter") handleRenameTemplate(tpl.id);
-                                  if (e.key === "Escape") setEditingId(null);
-                                }}
-                                autoFocus
-                                className="flex-1 px-2 py-0.5 bg-black/20 border border-white/20 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
-                              />
-                              <button
-                                onClick={() => handleRenameTemplate(tpl.id)}
-                                className="p-1 rounded hover:bg-green-500/10 text-green-400"
-                              >
-                                <Check className="h-3.5 w-3.5" />
-                              </button>
-                              <button
-                                onClick={() => setEditingId(null)}
-                                className="p-1 rounded hover:bg-white/10 text-gray-400"
-                              >
-                                <X className="h-3.5 w-3.5" />
-                              </button>
-                            </div>
-                          ) : (
-                            <>
-                              <span className="flex-1 text-sm text-gray-300">{tpl.title}</span>
-                              {tpl.isSystem && (
-                                <span className="text-[10px] text-gray-500 bg-white/5 px-1.5 py-0.5 rounded">System</span>
-                              )}
-                              {tpl.usageCount > 0 && (
-                                <span className="text-[10px] text-gray-500">
-                                  used {tpl.usageCount}x
-                                </span>
-                              )}
-                              {!tpl.isSystem && (
-                                <>
-                                  <button
-                                    onClick={() => {
-                                      setEditingId(tpl.id);
-                                      setEditingTitle(tpl.title);
-                                    }}
-                                    className="p-1 rounded hover:bg-white/10 text-gray-500 opacity-0 group-hover/tpl:opacity-100 transition-opacity"
-                                  >
-                                    <Pencil className="h-3 w-3" />
-                                  </button>
-                                  <button
-                                    onClick={() => handleDeleteTemplate(tpl.id, tpl.title)}
-                                    className="p-1 rounded hover:bg-red-500/10 text-gray-500 hover:text-red-400 opacity-0 group-hover/tpl:opacity-100 transition-opacity"
-                                  >
-                                    <Trash2 className="h-3 w-3" />
-                                  </button>
-                                </>
-                              )}
-                            </>
-                          )}
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (!tpl.isSystem) setEditorTemplateId(tpl.id);
+                              }}
+                              className={`flex-1 text-left text-sm ${
+                                tpl.isSystem
+                                  ? "cursor-default text-gray-300"
+                                  : "text-gray-300 hover:text-white"
+                              }`}
+                            >
+                              {tpl.title}
+                            </button>
+                            {tpl.isSystem && (
+                              <span className="text-[10px] text-gray-500 bg-white/5 px-1.5 py-0.5 rounded">System</span>
+                            )}
+                            {tpl.usageCount > 0 && (
+                              <span className="text-[10px] text-gray-500">
+                                used {tpl.usageCount}x
+                              </span>
+                            )}
+                            {!tpl.isSystem && (
+                              <>
+                                <button
+                                  onClick={() => setEditorTemplateId(tpl.id)}
+                                  className="p-1 rounded hover:bg-white/10 text-gray-500 opacity-0 group-hover/tpl:opacity-100 transition-opacity"
+                                  title="Edit page template"
+                                >
+                                  <Pencil className="h-3 w-3" />
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteTemplate(tpl.id, tpl.title)}
+                                  className="p-1 rounded hover:bg-red-500/10 text-gray-500 hover:text-red-400 opacity-0 group-hover/tpl:opacity-100 transition-opacity"
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </button>
+                              </>
+                            )}
+                          </>
                         </div>
                       ))
                     )}
@@ -617,14 +582,35 @@ function PageTemplateManager() {
                       className="flex items-center gap-2 px-4 py-1.5 border-t border-white/5 first:border-t-0 group/tpl"
                     >
                       <FileText className="h-3.5 w-3.5 text-gray-500 shrink-0" />
-                      <span className="flex-1 text-sm text-gray-300">{tpl.title}</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (!tpl.isSystem) setEditorTemplateId(tpl.id);
+                        }}
+                        className={`flex-1 text-left text-sm ${
+                          tpl.isSystem
+                            ? "cursor-default text-gray-300"
+                            : "text-gray-300 hover:text-white"
+                        }`}
+                      >
+                        {tpl.title}
+                      </button>
                       {!tpl.isSystem && (
-                        <button
-                          onClick={() => handleDeleteTemplate(tpl.id, tpl.title)}
-                          className="p-1 rounded hover:bg-red-500/10 text-gray-500 hover:text-red-400 opacity-0 group-hover/tpl:opacity-100 transition-opacity"
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </button>
+                        <>
+                          <button
+                            onClick={() => setEditorTemplateId(tpl.id)}
+                            className="p-1 rounded hover:bg-white/10 text-gray-500 opacity-0 group-hover/tpl:opacity-100 transition-opacity"
+                            title="Edit page template"
+                          >
+                            <Pencil className="h-3 w-3" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteTemplate(tpl.id, tpl.title)}
+                            className="p-1 rounded hover:bg-red-500/10 text-gray-500 hover:text-red-400 opacity-0 group-hover/tpl:opacity-100 transition-opacity"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </button>
+                        </>
                       )}
                     </div>
                   ))}
@@ -659,6 +645,15 @@ function PageTemplateManager() {
           </div>
         </>
       )}
+      <PageTemplateEditorDialog
+        open={editorTemplateId !== null}
+        templateId={editorTemplateId}
+        onOpenChange={(open) => {
+          if (!open) setEditorTemplateId(null);
+        }}
+        onSaved={refreshTemplateViews}
+        onDeleted={refreshTemplateViews}
+      />
     </div>
   );
 }

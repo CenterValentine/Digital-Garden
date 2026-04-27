@@ -59,6 +59,7 @@ const VISITOR_ANIMALS = ["Raccoon", "Fox", "Heron", "Otter", "Finch", "Badger"];
 function getTabIcon(contentType: string | null) {
   switch (contentType) {
     case "note":
+    case "page-template":
       return FileText;
     case "folder":
       return Folder;
@@ -280,7 +281,9 @@ export function MainPanelHeader({
     setTimeout(() => renameInputRef.current?.select(), 0);
   }, []);
 
-  const commitRename = useCallback(async (tab: { id: string; contentId: string; title: string }) => {
+  const commitRename = useCallback(async (
+    tab: { id: string; contentId: string; title: string; contentType: string | null }
+  ) => {
     const newTitle = editingTitle.trim();
     setEditingTabId(null);
     if (!newTitle || newTitle === tab.title) return;
@@ -289,15 +292,29 @@ export function MainPanelHeader({
     updateContentTab(tab.contentId, { title: newTitle });
 
     try {
-      const response = await fetch(`/api/content/content/${tab.contentId}`, {
-        method: "PATCH",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: newTitle }),
-      });
-      if (!response.ok) throw new Error("Failed to rename");
-      // Notify tree to refresh title
-      window.dispatchEvent(new CustomEvent("dg:tree-refresh"));
+      const isPageTemplate = tab.contentType === "page-template";
+      const response = await fetch(
+        isPageTemplate
+          ? `/api/content/page-templates/${tab.contentId}`
+          : `/api/content/content/${tab.contentId}`,
+        {
+          method: "PATCH",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ title: newTitle }),
+        }
+      );
+      const result = await response.json().catch(() => null);
+      if (!response.ok || (!isPageTemplate && !result?.success)) {
+        throw new Error(
+          isPageTemplate
+            ? result?.error || "Failed to rename template"
+            : result?.error?.message || "Failed to rename"
+        );
+      }
+      if (!isPageTemplate) {
+        window.dispatchEvent(new CustomEvent("dg:tree-refresh"));
+      }
     } catch {
       // Revert on failure
       updateContentTab(tab.contentId, { title: tab.title });
@@ -414,14 +431,28 @@ export function MainPanelHeader({
     void Promise.all(
       pendingTabs.map(async (tab) => {
         try {
-          const response = await fetch(`/api/content/content/${tab.contentId}`, {
-            credentials: "include",
-          });
+          const response = await fetch(
+            tab.contentType === "page-template"
+              ? `/api/content/page-templates/${tab.contentId}`
+              : `/api/content/content/${tab.contentId}`,
+            {
+              credentials: "include",
+            }
+          );
           if (!response.ok) return;
 
           const result = await response.json();
-          if (!result.success || isCancelled) return;
+          if (isCancelled) return;
 
+          if (tab.contentType === "page-template") {
+            updateContentTab(tab.contentId, {
+              title: result.title,
+              contentType: "page-template",
+            });
+            return;
+          }
+
+          if (!result.success) return;
           updateContentTab(tab.contentId, {
             title: result.data.title,
             contentType: result.data.contentType,

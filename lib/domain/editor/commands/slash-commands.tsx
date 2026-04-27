@@ -495,9 +495,12 @@ export function getSlashCommands(): SlashCommand[] {
       description: "Files created or edited during one workday",
       icon: "☑",
       command: ({ editor, range }) => {
+        const blockId = crypto.randomUUID();
         editor.chain().focus().deleteRange(range).insertContent({
           type: "dailySummary",
           attrs: {
+            blockId,
+            blockType: "dailySummary",
             summaryDate: getDefaultPeriodicSummaryDate("daily"),
             workdayCutoffHour: 0,
             autoBorrowDurationMinutes: 60,
@@ -514,9 +517,12 @@ export function getSlashCommands(): SlashCommand[] {
       description: "Files created or edited during one ISO week",
       icon: "☑",
       command: ({ editor, range }) => {
+        const blockId = crypto.randomUUID();
         editor.chain().focus().deleteRange(range).insertContent({
           type: "weeklySummary",
           attrs: {
+            blockId,
+            blockType: "weeklySummary",
             weekStartDate: getDefaultPeriodicSummaryDate("weekly"),
             workdayCutoffHour: 0,
             autoBorrowDurationMinutes: 60,

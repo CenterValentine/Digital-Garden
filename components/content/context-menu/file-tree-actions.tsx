@@ -34,7 +34,12 @@ import {
   ArrowDownRight,
 } from "lucide-react";
 import type { ContextMenuActionProvider, ContextMenuSection, ContextMenuAction } from "./types";
-import { getNewContentMenuItems, type NewContentCallbacks } from "@/components/content/menu-items/new-content-menu";
+import {
+  getNewContentMenuItems,
+  type NewContentCallbacks,
+  type NewContentMenuItem,
+  type PageTemplateMenuData,
+} from "@/components/content/menu-items/new-content-menu";
 import { supportsCustomIcon } from "@/lib/domain/content/file-extension-utils";
 import {
   BOTTOM_LEFT_PANE_ID,
@@ -46,6 +51,7 @@ import {
   useContentStore,
   type WorkspacePaneId,
 } from "@/state/content-store";
+import { usePageTemplateStore } from "@/state/page-template-store";
 
 /**
  * Context passed to file tree action provider
@@ -205,7 +211,53 @@ export const fileTreeActionProvider: ContextMenuActionProvider = (ctx) => {
       onCreateWorkflow: isPeopleMount ? undefined : onCreateWorkflow,
     };
 
-    const newMenuItems = getNewContentMenuItems(callbacks, targetId);
+    const { categories: ptCategories, templates: ptTemplates } =
+      usePageTemplateStore.getState();
+    const pageTemplateData: PageTemplateMenuData | undefined =
+      ptTemplates.length > 0
+        ? {
+            categories: ptCategories.map((category) => ({
+              id: category.id,
+              name: category.name,
+              isSystem: category.isSystem,
+            })),
+          templates: ptTemplates.map((template) => ({
+            id: template.id,
+            title: template.title,
+            categoryId: template.categoryId,
+            isSystem: template.isSystem,
+            defaultTitle: template.defaultTitle,
+          })),
+        }
+        : undefined;
+
+    if (pageTemplateData) {
+      callbacks.onOpenPageTemplate = (templateId: string, title: string) => {
+        useContentStore.getState().setSelectedContentId(templateId, {
+          title,
+          contentType: "page-template",
+          pin: true,
+        });
+      };
+
+      callbacks.onCreateNoteFromTemplate = (
+        parentId: string | null,
+        templateId: string,
+        defaultTitle?: string
+      ) => {
+        window.dispatchEvent(
+          new CustomEvent("dg:create-from-template", {
+            detail: { parentId, templateId, defaultTitle },
+          })
+        );
+      };
+    }
+
+    const newMenuItems = getNewContentMenuItems(
+      callbacks,
+      targetId,
+      pageTemplateData
+    );
 
     sections.push({
       title: "Add",
@@ -214,22 +266,7 @@ export const fileTreeActionProvider: ContextMenuActionProvider = (ctx) => {
           id: "create-submenu",
           label: "Add",
           icon: <Plus className="h-4 w-4" />,
-          submenu: newMenuItems.map((item) => ({
-            id: item.id,
-            label: item.label,
-            icon: item.icon,
-            shortcut: item.shortcut,
-            onClick: item.onClick,
-            disabled: item.disabled,
-            submenu: item.submenu ? item.submenu.map((subItem) => ({
-              id: subItem.id,
-              label: subItem.label,
-              icon: subItem.icon,
-              shortcut: subItem.shortcut,
-              onClick: subItem.onClick,
-              disabled: subItem.disabled,
-            })) : undefined,
-          })),
+          submenu: newMenuItems.map(mapMenuItem),
           divider: true,
         },
       ],
@@ -535,3 +572,12 @@ export const fileTreeActionProvider: ContextMenuActionProvider = (ctx) => {
 
   return sections;
 };
+  const mapMenuItem = (item: NewContentMenuItem): ContextMenuAction => ({
+    id: item.id,
+    label: item.label,
+    icon: item.icon,
+    shortcut: item.shortcut,
+    onClick: item.onClick,
+    disabled: item.disabled,
+    submenu: item.submenu?.map(mapMenuItem),
+  });

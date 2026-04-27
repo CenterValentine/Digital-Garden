@@ -9,6 +9,7 @@
 "use client";
 
 import { createElement, useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { AlertTriangle } from "lucide-react";
 import { ToolSurfaceProvider } from "@/lib/domain/tools";
 import { ContentToolbar } from "../toolbar";
 import { ToolDebugPanel } from "../toolbar/ToolDebugPanel";
@@ -22,6 +23,7 @@ import {
   type WorkspacePaneId,
 } from "@/state/content-store";
 import { useLeftPanelViewStore } from "@/state/left-panel-view-store";
+import { usePageTemplateStore } from "@/state/page-template-store";
 import { useTreeStateStore } from "@/state/tree-state-store";
 import {
   useExtensionContentViewer,
@@ -64,6 +66,12 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/client/ui/tooltip";
 import {
   getContentCollaborationCapability,
   useCollaborationRuntime,
@@ -164,6 +172,23 @@ interface MainPanelContentProps {
   paneId: WorkspacePaneId;
 }
 
+interface PageTemplateResponse {
+  id: string;
+  title: string;
+  tiptapJson: unknown;
+  categoryId: string;
+  categoryName: string;
+  userId: string | null;
+  isSystem: boolean;
+  defaultTitle: string | null;
+  customIcon: string | null;
+  iconColor: string | null;
+  usageCount: number;
+  createdAt: string;
+  updatedAt: string;
+  error?: string;
+}
+
 export function MainPanelContent({ paneId }: MainPanelContentProps) {
   const { activeView, setActiveView } = useLeftPanelViewStore();
   const { position: notesPanelPosition } = useNotesPanelStore();
@@ -174,6 +199,7 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
   );
   const activeTab = useContentStore((state) => getPaneActiveTab(state, paneId));
   const activeTabId = activeTab?.id ?? null;
+  const isPageTemplateTab = activeTab?.contentType === "page-template";
   const setSelectedContentId = useContentStore((state) => state.setSelectedContentId);
   const setSelectedContentType = useContentStore((state) => state.setSelectedContentType);
   const updateContentTab = useContentStore((state) => state.updateContentTab);
@@ -210,6 +236,7 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
   const [shareGrants, setShareGrants] = useState<ShareGrant[]>([]);
   const [isShareGrantsLoading, setIsShareGrantsLoading] = useState(false);
   const [isSharing, setIsSharing] = useState(false);
+  const refreshPageTemplates = usePageTemplateStore((state) => state.fetchTemplates);
   const collaborationEnabled = process.env.NEXT_PUBLIC_COLLABORATION_ENABLED === "true";
   const visualizationEngine = contentType === "visualization" ? (contentData?.engine as string | null | undefined) ?? null : null;
   const collaborationCapability = useMemo(
@@ -274,6 +301,7 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
       setContentData(null);
       setContentCustomIcon(null);
       setContentIconColor(null);
+      setOwnedByNote(null);
       return;
     }
 
@@ -286,6 +314,7 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
       setContentCustomIcon(null);
       setContentIconColor(null);
       setContentType("person-profile");
+      setOwnedByNote(null);
       return;
     }
 
@@ -299,6 +328,7 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
       setNoteTitle("");
       setContentType(null);
       setContentData(null);
+      setOwnedByNote(null);
       return;
     }
 
@@ -307,6 +337,80 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
       setError(null);
 
       try {
+        if (isPageTemplateTab) {
+          const response = await fetch(
+            `/api/content/page-templates/${selectedContentId}`,
+            {
+              credentials: "include",
+            }
+          );
+
+          if (response.status === 404) {
+            console.warn(
+              `Page template ${selectedContentId} not found (404). Closing stale tab.`
+            );
+            toast.error("Page template not found. It may have been deleted.");
+            closeContentTabs([selectedContentId]);
+            return;
+          }
+
+          const result = (await response.json()) as PageTemplateResponse;
+
+          if (!response.ok) {
+            throw new Error(result.error || "Failed to fetch page template");
+          }
+
+          setNoteTitle(result.title);
+          setContentParentId(null);
+          setContentIsPublished(false);
+          setContentType("page-template");
+          setContentCustomIcon(result.customIcon ?? null);
+          setContentIconColor(result.iconColor ?? null);
+          setOwnedByNote(null);
+          setContentData({
+            categoryId: result.categoryId,
+            categoryName: result.categoryName,
+            userId: result.userId,
+            isSystem: result.isSystem,
+            defaultTitle: result.defaultTitle,
+            usageCount: result.usageCount,
+          });
+          setDocumentDates(
+            result.createdAt
+              ? new Date(result.createdAt).toISOString().slice(0, 10)
+              : "",
+            result.updatedAt
+              ? new Date(result.updatedAt).toISOString().slice(0, 10)
+              : ""
+          );
+          updateContentTab(selectedContentId, {
+            title: result.title,
+            contentType: "page-template",
+            isTemporary: false,
+          });
+
+          const rawContent =
+            typeof result.tiptapJson === "string"
+              ? JSON.parse(result.tiptapJson)
+              : result.tiptapJson;
+          const validContent =
+            rawContent &&
+            typeof rawContent === "object" &&
+            "type" in (rawContent as object)
+              ? (rawContent as JSONContent)
+              : ({
+                  type: "doc",
+                  content: [{ type: "paragraph" }],
+                } as JSONContent);
+          const sanitized = sanitizeTipTapJsonWithExtensions(
+            validContent,
+            getViewerExtensions()
+          );
+          setNoteContent(sanitized.json);
+          setOutline(selectedContentId, extractOutline(sanitized.json));
+          return;
+        }
+
         const response = await fetch(`/api/content/content/${selectedContentId}`, {
           credentials: "include",
         });
@@ -459,6 +563,7 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
     selectedContentId,
     refreshTrigger,
     closeContentTabs,
+    isPageTemplateTab,
     setOutline,
     updateContentTab,
   ]);
@@ -570,7 +675,11 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
       setHasUnsavedChanges(true);
 
       try {
-        const response = await fetch(`/api/content/content/${selectedContentId}`, {
+        const response = await fetch(
+          isPageTemplateTab
+            ? `/api/content/page-templates/${selectedContentId}`
+            : `/api/content/content/${selectedContentId}`,
+          {
           method: "PATCH",
           credentials: "include",
           headers: {
@@ -580,11 +689,16 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
             tiptapJson: content,
           }),
           signal: abortController.signal,
-        });
+          }
+        );
 
         const result = await response.json();
 
-        if (!response.ok || !result.success) {
+        if (isPageTemplateTab) {
+          if (!response.ok) {
+            throw new Error(result.error || "Failed to save page template");
+          }
+        } else if (!response.ok || !result.success) {
           throw new Error(result.error?.message || "Failed to save note");
         }
 
@@ -625,7 +739,14 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
         setIsSaving(false);
       }
     },
-    [paneId, selectedContentId, setIsSaving, setHasUnsavedChanges, setLastSaved]
+    [
+      isPageTemplateTab,
+      paneId,
+      selectedContentId,
+      setHasUnsavedChanges,
+      setIsSaving,
+      setLastSaved,
+    ]
   );
 
   // Wiki-link click handler - navigate to note or folder by title
@@ -1018,22 +1139,44 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
     updateContentTab(selectedContentId, { title: newTitle });
 
     try {
-      const response = await fetch(`/api/content/content/${selectedContentId}`, {
+      const response = await fetch(
+        isPageTemplateTab
+          ? `/api/content/page-templates/${selectedContentId}`
+          : `/api/content/content/${selectedContentId}`,
+        {
         method: "PATCH",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ title: newTitle }),
-      });
-      if (!response.ok) throw new Error("Failed to rename");
-      // Refresh file tree to reflect new name
-      window.dispatchEvent(new CustomEvent("dg:tree-refresh"));
+        }
+      );
+      const result = await response.json().catch(() => null);
+      if (!response.ok || (!isPageTemplateTab && !result?.success)) {
+        throw new Error(
+          isPageTemplateTab
+            ? result?.error || "Failed to rename template"
+            : result?.error?.message || "Failed to rename"
+        );
+      }
+      if (isPageTemplateTab) {
+        await refreshPageTemplates();
+      } else {
+        window.dispatchEvent(new CustomEvent("dg:tree-refresh"));
+      }
     } catch {
       // Revert
       setNoteTitle(noteTitle);
       updateContentTab(selectedContentId, { title: noteTitle });
       toast.error("Failed to rename");
     }
-  }, [titleDraft, noteTitle, selectedContentId, updateContentTab]);
+  }, [
+    isPageTemplateTab,
+    noteTitle,
+    refreshPageTemplates,
+    selectedContentId,
+    titleDraft,
+    updateContentTab,
+  ]);
 
   const fetchShareGrants = useCallback(async () => {
     if (!selectedContentId || selectedContentId.startsWith("person:")) {
@@ -1316,6 +1459,14 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
 
   // Render content based on type
   let contentElement: React.ReactNode;
+  const isReadOnlyPageTemplate =
+    contentType === "page-template" && Boolean(contentData?.isSystem);
+  const templateWarningText =
+    contentType === "page-template"
+      ? isReadOnlyPageTemplate
+        ? "You are viewing a system page template. It can be used to create notes, but it cannot be edited."
+        : "You are editing a page template. Changes here affect future notes created from this template."
+      : null;
 
   if (error) {
     contentElement = (
@@ -1449,16 +1600,51 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
               className="flex-1 text-3xl font-semibold text-foreground bg-transparent border-b border-primary/40 focus:border-primary focus:outline-none mb-0 mr-4"
             />
           ) : (
-            <h1
-              className="text-3xl font-semibold text-foreground mb-0 cursor-text hover:opacity-80 transition-opacity"
-              title="Click to rename"
-              onClick={handleTitleEditStart}
-            >
-              {noteTitle}
-            </h1>
+            <div className="mr-4 flex min-w-0 flex-1 items-start gap-3">
+              <h1
+                className={`min-w-0 text-3xl font-semibold text-foreground mb-0 transition-opacity ${
+                  isReadOnlyPageTemplate
+                    ? "cursor-default"
+                    : "cursor-text hover:opacity-80"
+                }`}
+                title={
+                  contentType === "page-template"
+                    ? isReadOnlyPageTemplate
+                      ? "System template (read-only)"
+                      : "Click to rename template"
+                    : "Click to rename"
+                }
+                onClick={isReadOnlyPageTemplate ? undefined : handleTitleEditStart}
+              >
+                {noteTitle}
+              </h1>
+              {contentType === "page-template" && templateWarningText ? (
+                <TooltipProvider delayDuration={150}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-amber-300/80 bg-amber-50 px-2 py-1 text-xs font-medium text-amber-800">
+                        <AlertTriangle className="h-3.5 w-3.5" />
+                        Template
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" className="max-w-xs text-xs">
+                      {templateWarningText}
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              ) : null}
+            </div>
           )}
           {process.env.NODE_ENV === "development" && !isMultiPane && <DebugViewToggle />}
         </div>
+
+        {contentType === "page-template" && templateWarningText ? (
+          <div className="mx-6 mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            {isReadOnlyPageTemplate
+              ? "Viewing a system page template. It can be used to create notes, but it is read-only here."
+              : "Editing a page template. Changes here affect future notes created from this template."}
+          </div>
+        ) : null}
 
         {/* Editor */}
         <div className="flex-1 overflow-hidden">
@@ -1477,7 +1663,8 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
             fetchPeopleMentions={fetchPeopleMentions}
             onPersonMentionClick={handlePersonMentionClick}
             autoSaveDelay={2000}
-            collaborationEnabled={collaborationEnabled}
+            editable={!isReadOnlyPageTemplate}
+            collaborationEnabled={contentType === "note" ? collaborationEnabled : false}
             collaborationRuntime={collaborationRuntime}
             onCollaborationSyncChange={handleCollaborationSyncChange}
           />
@@ -1502,11 +1689,24 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
 
   // For non-note content types, append the expandable notes editor
   // This lets any content type (file, folder, external, etc.) have attached notes
-  const isNonNoteContent = contentType && contentType !== "note" && contentType !== "person-profile" && selectedContentId && !error;
+  const isNonNoteContent =
+    contentType &&
+    contentType !== "note" &&
+    contentType !== "page-template" &&
+    contentType !== "person-profile" &&
+    selectedContentId &&
+    !error;
 
   // Render navigation once, then content below
   return (
-    <ToolSurfaceProvider contentType={contentType === "person-profile" ? null : (contentType as ToolContentType) ?? null} handlers={toolHandlers}>
+    <ToolSurfaceProvider
+      contentType={
+        contentType === "person-profile" || contentType === "page-template"
+          ? null
+          : (contentType as ToolContentType) ?? null
+      }
+      handlers={toolHandlers}
+    >
       <div
         className="flex h-full min-h-0 flex-col overflow-hidden"
         onPointerDownCapture={() => {
@@ -1520,7 +1720,9 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
           }
         }}
       >
-        {selectedContentId && !selectedContentId.startsWith("person:") && <ContentToolbar />}
+        {selectedContentId &&
+          !selectedContentId.startsWith("person:") &&
+          contentType !== "page-template" && <ContentToolbar />}
         {isNonNoteContent ? (
           <div className="flex flex-1 min-h-0 flex-col overflow-hidden">
             {notesPanelPosition === "above" && (

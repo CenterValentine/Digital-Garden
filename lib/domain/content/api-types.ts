@@ -217,6 +217,7 @@ export interface CreateContentRequest {
   contentType?: string;
   chatMessages?: StoredChatMessage[];
   chatMetadata?: ChatMetadata;
+  fromTemplateId?: string;
 
   // Phase 2: Folder-specific options (optional)
   viewMode?: "list" | "gallery" | "kanban" | "dashboard" | "canvas";

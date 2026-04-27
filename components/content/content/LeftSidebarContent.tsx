@@ -22,6 +22,7 @@ import { useContentStore } from "@/state/content-store";
 import { useSearchStore } from "@/state/search-store";
 import { useTreeStateStore } from "@/state/tree-state-store";
 import { useContextMenuStore } from "@/state/context-menu-store";
+import { usePageTemplateStore } from "@/state/page-template-store";
 import type { TreeNode, ContentType } from "@/lib/domain/content/types";
 
 interface TreeApiResponse {
@@ -149,6 +150,7 @@ export function LeftSidebarContent({
     type: "folder" | "note" | "file" | "code" | "html" | "docx" | "xlsx" | "json" | "external" | "chat" | "visualization" | "data" | "hope" | "workflow";
     parentId: string | null;
     tempId: string; // Temporary ID for the placeholder node
+    fromTemplateId?: string;
   } | null>(null);
   const [expandNodeId, setExpandNodeId] = useState<string | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<{
@@ -268,6 +270,14 @@ export function LeftSidebarContent({
     checkGoogleAuth();
   }, []);
 
+  useEffect(() => {
+    const pageTemplateStore = usePageTemplateStore.getState();
+    if (!pageTemplateStore.isLoaded && !pageTemplateStore.isLoading) {
+      pageTemplateStore.fetchCategories();
+      pageTemplateStore.fetchTemplates();
+    }
+  }, []);
+
   // Load and save checkbox preference to/from localStorage
   useEffect(() => {
     // Load from localStorage on mount
@@ -356,6 +366,96 @@ export function LeftSidebarContent({
       window.removeEventListener('edit-external-link' as any, handleEditExternal);
     };
   }, []);
+
+  useEffect(() => {
+    const handleCreateFromTemplate = (
+      event: CustomEvent<{
+        parentId: string | null;
+        templateId: string;
+        defaultTitle?: string;
+      }>
+    ) => {
+      const { parentId: requestedParentId, templateId, defaultTitle } =
+        event.detail;
+      if (!treeData) return;
+
+      let parentId = requestedParentId;
+      if (parentId === null) {
+        const { selectedIds: treeSelectedIds } = useTreeStateStore.getState();
+        if (treeSelectedIds.length === 1) {
+          const selectedNode = findTreeNode(treeData, treeSelectedIds[0]);
+          if (selectedNode) {
+            parentId =
+              selectedNode.contentType === "folder"
+                ? selectedNode.id
+                : selectedNode.parentId || null;
+          }
+        }
+      }
+
+      const tempId = `temp-${Date.now()}-${Math.random()}`;
+      const tempNode: TreeNode = {
+        id: tempId,
+        title: defaultTitle || "",
+        slug: "",
+        contentType: "note",
+        parentId,
+        displayOrder: 0,
+        customIcon: null,
+        iconColor: null,
+        isPublished: false,
+        children: [],
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        deletedAt: null,
+      };
+
+      const insertTempNode = (nodes: TreeNode[]): TreeNode[] => {
+        if (parentId === null) {
+          return [tempNode, ...nodes];
+        }
+
+        return nodes.map((node) => {
+          if (node.id === parentId) {
+            return {
+              ...node,
+              children: [tempNode, ...(node.children || [])],
+            };
+          }
+          if (node.children) {
+            return {
+              ...node,
+              children: insertTempNode(node.children),
+            };
+          }
+          return node;
+        });
+      };
+
+      setTreeData(insertTempNode(treeData));
+      setCreatingItem({
+        type: "note",
+        parentId,
+        tempId,
+        fromTemplateId: templateId,
+      });
+
+      if (parentId !== null) {
+        setExpandNodeId(parentId);
+      }
+    };
+
+    window.addEventListener(
+      "dg:create-from-template" as any,
+      handleCreateFromTemplate
+    );
+    return () => {
+      window.removeEventListener(
+        "dg:create-from-template" as any,
+        handleCreateFromTemplate
+      );
+    };
+  }, [treeData]);
 
 
   // Apply move operation to tree structure (for optimistic updates)
@@ -759,7 +859,7 @@ export function LeftSidebarContent({
       return;
     }
 
-    const { type, parentId, tempId } = creatingItem;
+    const { type, parentId, tempId, fromTemplateId } = creatingItem;
     const createTarget = treeData ? getCreateTarget(parentId, treeData) : {
       treeParentId: parentId,
       requestParentId: parentId,
@@ -934,9 +1034,13 @@ export function LeftSidebarContent({
         return;
       }
 
+      if (fromTemplateId) {
+        requestBody.fromTemplateId = fromTemplateId;
+      }
+
       if (type === "folder") {
         requestBody.isFolder = true;
-      } else if (type === "note") {
+      } else if (type === "note" && !fromTemplateId) {
         requestBody.tiptapJson = config.payload?.tiptapJson;
       } else if (type === "code") {
         requestBody.code = config.payload?.code;

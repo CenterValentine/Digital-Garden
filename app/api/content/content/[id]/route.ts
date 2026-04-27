@@ -480,12 +480,33 @@ export async function PATCH(
       });
     }
 
-    // Update content node
-    const updated = await prisma.contentNode.update({
-      where: { id },
-      data: updateData,
-      include: CONTENT_WITH_PAYLOADS,
-    });
+    // Update content node only when top-level metadata actually changed.
+    // Pure payload saves should not bump ContentNode.updatedAt, because that
+    // timestamp is too coarse for worklog-style activity summaries.
+    const updated =
+      Object.keys(updateData).length > 0
+        ? await prisma.contentNode.update({
+            where: { id },
+            data: updateData,
+            include: CONTENT_WITH_PAYLOADS,
+          })
+        : await prisma.contentNode.findUnique({
+            where: { id },
+            include: CONTENT_WITH_PAYLOADS,
+          });
+
+    if (!updated) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: {
+            code: "NOT_FOUND",
+            message: "Content not found",
+          },
+        },
+        { status: 404 }
+      );
+    }
 
     // If this is a file with Google Drive integration, rename the Google Drive file
     if (title && title !== existing.title && existing.filePayload) {

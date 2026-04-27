@@ -15,7 +15,12 @@ import {
   getNewContentMenuItems,
   type NewContentCallbacks,
   type NewContentMenuItem,
+  type PageTemplateMenuData,
 } from "@/components/content/menu-items/new-content-menu";
+import { usePageTemplateStore } from "@/state/page-template-store";
+import { useContentStore } from "@/state/content-store";
+
+const SUBMENU_HOVER_BRIDGE_PX = 12;
 
 interface LeftSidebarHeaderActionsProps extends NewContentCallbacks {
   disabled?: boolean;
@@ -116,44 +121,151 @@ function SubMenu({
 }) {
   const submenuRef = useRef<HTMLDivElement>(null);
   const [mounted, setMounted] = useState(false);
+  const [openSubmenu, setOpenSubmenu] = useState<{
+    id: string;
+    position: { x: number; y: number };
+    maxHeight: number;
+  } | null>(null);
+  const submenuCloseTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  const submenuContent = (
-    <div
-      ref={submenuRef}
-      className="fixed z-[120] min-w-[180px] rounded-md border border-white/10 bg-[#1a1a1a] shadow-lg overflow-y-auto"
-      style={{
-        left: `${position.x}px`,
-        top: `${position.y}px`,
-        maxHeight: `${maxHeight}px`,
-      }}
-      onMouseEnter={onMouseEnter}
-      onMouseLeave={onMouseLeave}
-    >
-      {items.map((subItem, index) => (
+  useEffect(() => {
+    return () => {
+      if (submenuCloseTimeoutRef.current) {
+        clearTimeout(submenuCloseTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const handleNestedSubmenuOpen = (itemId: string, buttonRect: DOMRect) => {
+    const menuRect = submenuRef.current?.getBoundingClientRect();
+    if (!menuRect) return;
+
+    const item = items.find((candidate) => candidate.id === itemId);
+    if (!item?.submenu?.length) return;
+
+    const estimatedHeight = Math.min(item.submenu.length * 32 + 8, 400);
+    const estimatedWidth = 220;
+    const calculatedPosition = calculateSubmenuPosition({
+      parentMenuRect: menuRect,
+      parentItemRect: buttonRect,
+      submenuDimensions: {
+        width: estimatedWidth,
+        height: estimatedHeight,
+      },
+      viewportPadding: 8,
+    });
+
+    setOpenSubmenu({
+      id: itemId,
+      position: {
+        x: calculatedPosition.x,
+        y: calculatedPosition.y,
+      },
+      maxHeight: calculatedPosition.maxHeight,
+    });
+  };
+
+  const handleNestedSubmenuClose = () => {
+    submenuCloseTimeoutRef.current = setTimeout(() => {
+      setOpenSubmenu(null);
+    }, 200);
+  };
+
+  const handleNestedSubmenuMouseEnter = () => {
+    if (submenuCloseTimeoutRef.current) {
+      clearTimeout(submenuCloseTimeoutRef.current);
+      submenuCloseTimeoutRef.current = null;
+    }
+  };
+
+  function SubMenuItemRow({
+    subItem,
+    index,
+  }: {
+    subItem: NewContentMenuItem;
+    index: number;
+  }) {
+    const buttonRef = useRef<HTMLButtonElement>(null);
+    const hasSubmenu = Boolean(subItem.submenu?.length);
+
+    return (
+      <div className="relative">
         <button
-          key={subItem.id}
+          ref={buttonRef}
           onClick={() => {
-            if (subItem.onClick) {
+            if (!hasSubmenu && subItem.onClick) {
               subItem.onClick();
               onClose();
             }
           }}
-          disabled={subItem.disabled}
+          onMouseEnter={() => {
+            handleNestedSubmenuMouseEnter();
+            if (hasSubmenu && buttonRef.current) {
+              handleNestedSubmenuOpen(
+                subItem.id,
+                buttonRef.current.getBoundingClientRect()
+              );
+            }
+          }}
+          disabled={subItem.disabled && !hasSubmenu}
           className={`flex w-full items-center gap-2 px-3 py-2 text-sm text-left text-white hover:bg-white/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
             index === 0 ? "first:rounded-t-md" : "border-t border-white/5"
           } ${index === items.length - 1 ? "last:rounded-b-md" : ""}`}
         >
           {subItem.icon}
           <span>{subItem.label}</span>
-          {subItem.shortcut && (
-            <span className="ml-auto text-[11px] text-gray-400">{subItem.shortcut}</span>
-          )}
+          {hasSubmenu ? (
+            <ChevronRight className="ml-auto h-3 w-3 text-gray-400" />
+          ) : subItem.shortcut ? (
+            <span className="ml-auto text-[11px] text-gray-400">
+              {subItem.shortcut}
+            </span>
+          ) : null}
         </button>
-      ))}
+
+        {hasSubmenu && openSubmenu?.id === subItem.id && subItem.submenu && (
+          <SubMenu
+            items={subItem.submenu}
+            position={openSubmenu.position}
+            maxHeight={openSubmenu.maxHeight}
+            onClose={onClose}
+            onMouseEnter={handleNestedSubmenuMouseEnter}
+            onMouseLeave={handleNestedSubmenuClose}
+          />
+        )}
+      </div>
+    );
+  }
+
+  const submenuContent = (
+    <div
+      className="fixed z-[120] overflow-visible"
+      style={{
+        left: `${position.x - SUBMENU_HOVER_BRIDGE_PX}px`,
+        top: `${position.y}px`,
+        paddingLeft: `${SUBMENU_HOVER_BRIDGE_PX}px`,
+      }}
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={() => {
+        handleNestedSubmenuClose();
+        onMouseLeave();
+      }}
+    >
+      <div
+        ref={submenuRef}
+        className="min-w-[180px] rounded-md border border-white/10 bg-[#1a1a1a] shadow-lg overflow-y-auto"
+        style={{
+          maxHeight: `${maxHeight}px`,
+        }}
+      >
+        {items.map((subItem, index) => (
+          <SubMenuItemRow key={subItem.id} subItem={subItem} index={index} />
+        ))}
+      </div>
     </div>
   );
 
@@ -174,6 +286,7 @@ export function LeftSidebarHeaderActions({
   const [openSubmenu, setOpenSubmenu] = useState<{ id: string; position: { x: number; y: number }; maxHeight: number } | null>(null);
   const submenuCloseTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [mounted, setMounted] = useState(false);
+  const setSelectedContentId = useContentStore((state) => state.setSelectedContentId);
 
   // Set mounted state for portal rendering
   useEffect(() => {
@@ -273,13 +386,63 @@ export function LeftSidebarHeaderActions({
       callback
         ? (parentId: string | null) => {
             setShowMenu(false);
-            return callback(parentId);
+            return (
+              callback as (parentId: string | null) => void | Promise<void>
+            )(parentId);
           }
         : undefined,
     ])
   ) as NewContentCallbacks;
 
-  const menuItems = getNewContentMenuItems(wrappedCallbacks, null);
+  const ptCategories = usePageTemplateStore((state) => state.categories);
+  const ptTemplates = usePageTemplateStore((state) => state.templates);
+  const pageTemplateData: PageTemplateMenuData | undefined =
+    ptTemplates.length > 0
+      ? {
+          categories: ptCategories.map((category) => ({
+            id: category.id,
+            name: category.name,
+            isSystem: category.isSystem,
+          })),
+          templates: ptTemplates.map((template) => ({
+            id: template.id,
+            title: template.title,
+            categoryId: template.categoryId,
+            isSystem: template.isSystem,
+            defaultTitle: template.defaultTitle,
+          })),
+        }
+      : undefined;
+
+  if (pageTemplateData) {
+    wrappedCallbacks.onOpenPageTemplate = (templateId: string, title: string) => {
+      setShowMenu(false);
+      setSelectedContentId(templateId, {
+        title,
+        contentType: "page-template",
+        pin: true,
+      });
+    };
+
+    wrappedCallbacks.onCreateNoteFromTemplate = (
+      parentId: string | null,
+      templateId: string,
+      defaultTitle?: string
+    ) => {
+      setShowMenu(false);
+      window.dispatchEvent(
+        new CustomEvent("dg:create-from-template", {
+          detail: { parentId, templateId, defaultTitle },
+        })
+      );
+    };
+  }
+
+  const menuItems = getNewContentMenuItems(
+    wrappedCallbacks,
+    null,
+    pageTemplateData
+  );
 
   // Initial render without positioning (to measure dimensions)
   const menuStyle = !menuPosition
