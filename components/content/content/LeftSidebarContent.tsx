@@ -21,6 +21,7 @@ import { RootNodeHeader } from "../file-tree/RootNodeHeader";
 import { useContentStore } from "@/state/content-store";
 import { useSearchStore } from "@/state/search-store";
 import { useTreeStateStore } from "@/state/tree-state-store";
+import { useWorkspaceStore } from "@/extensions/workplaces/state/workspace-store";
 import { useContextMenuStore } from "@/state/context-menu-store";
 import { usePageTemplateStore } from "@/state/page-template-store";
 import type { TreeNode, ContentType } from "@/lib/domain/content/types";
@@ -211,13 +212,33 @@ export function LeftSidebarContent({
   // Search store - conditionally show search panel
   const isSearchOpen = useSearchStore((state) => state.isSearchOpen);
 
+  // Active workspace — used to scope the file tree when workspace is a view
+  const activeWorkspaceId = useWorkspaceStore((state) => state.activeWorkspaceId);
+  const activeWorkspaceIsView = useWorkspaceStore((state) => {
+    const ws = state.workspaces.find((w) => w.id === state.activeWorkspaceId);
+    return ws?.isView ?? false;
+  });
+  const activeViewRootContentId = useWorkspaceStore((state) => {
+    const ws = state.workspaces.find((w) => w.id === state.activeWorkspaceId);
+    return ws?.isView ? (ws.viewRootContentId ?? null) : null;
+  });
+  const activeViewRootTitle = useWorkspaceStore((state) => {
+    const ws = state.workspaces.find((w) => w.id === state.activeWorkspaceId);
+    return ws?.isView ? (ws.viewRoot?.title ?? null) : null;
+  });
+
   // Fetch tree data
   const fetchTree = useCallback(async () => {
     try {
       setIsLoading(true);
       setError(null);
 
-      const response = await fetch("/api/content/content/tree", {
+      const url = new URL("/api/content/content/tree", window.location.origin);
+      if (activeWorkspaceIsView && activeViewRootContentId) {
+        url.searchParams.set("viewRootContentId", activeViewRootContentId);
+      }
+
+      const response = await fetch(url.toString(), {
         credentials: "include",
       });
 
@@ -247,10 +268,9 @@ export function LeftSidebarContent({
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [activeWorkspaceId, activeWorkspaceIsView, activeViewRootContentId]);
 
-
-  // Initial load and refresh when trigger changes
+  // Initial load and refresh when trigger or active workspace changes
   useEffect(() => {
     fetchTree();
   }, [fetchTree, refreshTrigger]);
@@ -2067,6 +2087,8 @@ export function LeftSidebarContent({
             workspaceName="root"
             totalFiles={countTotalNodes(treeData)}
             isSelected={!selectedContentId}
+            isView={activeWorkspaceIsView}
+            viewRootTitle={activeViewRootTitle}
             onClick={() => {
               setSelectedContentId(null);
               setSelectedIds([]);

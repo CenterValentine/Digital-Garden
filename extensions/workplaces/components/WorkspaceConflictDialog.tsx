@@ -72,10 +72,15 @@ function WorkspaceConflictDialogBody({
     return `Also apply this to ${conflict.folderScopeContentTitle} and all descendants`;
   }, [conflict]);
 
+  const isViewScope = conflict.conflictType === "viewScope";
+
   const description = useMemo(() => {
+    if (isViewScope) {
+      return `${conflict.contentTitle} is outside the scope of this view (rooted at "${conflict.claimContentTitle}"). You can borrow it temporarily or share it permanently to open it here.`;
+    }
     const scopeText = conflict.scope === "recursive" ? "a folder claim" : "a tab claim";
     return `${conflict.contentTitle} is already claimed by ${conflict.workspaceName} through ${scopeText}. Overlapping files across workspaces can lead to duplicate work; consider opening the workspace that owns it or sharing intentionally.`;
-  }, [conflict]);
+  }, [conflict, isViewScope]);
 
   const selectPreset = (preset: BorrowPreset) => {
     setBorrowPreset(preset);
@@ -94,7 +99,7 @@ function WorkspaceConflictDialogBody({
   return (
       <DialogContent className="max-w-2xl border-white/10 bg-white/95 text-gray-900 shadow-xl backdrop-blur-sm dark:bg-gray-950/95 dark:text-white">
         <DialogHeader>
-          <DialogTitle>Workspace overlap detected</DialogTitle>
+          <DialogTitle>{isViewScope ? "Outside view scope" : "Workspace overlap detected"}</DialogTitle>
           <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
 
@@ -174,7 +179,7 @@ function WorkspaceConflictDialogBody({
           </p>
         </div>
 
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <div className={`grid gap-2 ${isViewScope ? "grid-cols-3" : "grid-cols-2 sm:grid-cols-4"}`}>
           <button
             type="button"
             onClick={() => cancelOpenConflict()}
@@ -182,13 +187,15 @@ function WorkspaceConflictDialogBody({
           >
             Cancel
           </button>
-          <button
-            type="button"
-            onClick={() => void switchToConflictWorkspace()}
-            className="whitespace-nowrap rounded-md border border-black/10 px-3 py-2 text-sm transition-colors hover:bg-black/5 dark:border-white/10 dark:hover:bg-white/10"
-          >
-            Open workspace
-          </button>
+          {!isViewScope && (
+            <button
+              type="button"
+              onClick={() => void switchToConflictWorkspace()}
+              className="whitespace-nowrap rounded-md border border-black/10 px-3 py-2 text-sm transition-colors hover:bg-black/5 dark:border-white/10 dark:hover:bg-white/10"
+            >
+              Open workspace
+            </button>
+          )}
           <button
             type="button"
             onClick={() =>

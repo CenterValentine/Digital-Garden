@@ -40,9 +40,23 @@ export function ResizablePanels({ children }: ResizablePanelsProps) {
   const toggleSearch = useSearchStore((state) => state.toggleSearch);
   const { mode: panelMode, setMode: setPanelMode } = useLeftPanelCollapseStore();
   const togglePanelCollapse = useLeftPanelCollapseStore((state) => state.toggleMode);
-  const { isCollapsed: isRightPanelCollapsed } = useRightPanelCollapseStore();
+  const { isCollapsed: isRightPanelCollapsed, setCollapsed: setRightPanelCollapsed } = useRightPanelCollapseStore();
 
   const [isMounted, setIsMounted] = useState(false);
+
+  // Auto-collapse the right panel when the viewport is too narrow for it.
+  // Only collapses — never auto-expands — so the user's manual toggle is respected.
+  useEffect(() => {
+    const COLLAPSE_THRESHOLD_PX = 960;
+    const check = () => {
+      if (window.innerWidth < COLLAPSE_THRESHOLD_PX) {
+        setRightPanelCollapsed(true);
+      }
+    };
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, [setRightPanelCollapsed]);
 
   // Track panel mode changes to enable CSS transitions only during toggle,
   // not during drag (which would make dragging feel laggy).

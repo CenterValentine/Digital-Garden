@@ -19,6 +19,7 @@ import type {
   ContentWorkspaceItemAssignmentType,
   ContentWorkspaceItemScope,
 } from "@/lib/database/generated/prisma";
+import { warmContentSummaryCache } from "@/lib/domain/content/content-summary-cache";
 
 type ApiResponse<T> = {
   success: boolean;
@@ -48,6 +49,7 @@ interface WorkspaceState {
       isLocked?: boolean;
       expiresAt?: string | null;
       settings?: Record<string, unknown>;
+      viewRootContentId?: string | null;
     }
   ) => Promise<void>;
   reorderWorkspaces: (workspaceIds: string[]) => Promise<void>;
@@ -79,9 +81,20 @@ interface WorkspaceState {
     contentId: string
   ) => Promise<void>;
   resetWorkspaces: () => Promise<void>;
+  receiveRefreshedWorkspaces: (workspaces: ContentWorkspaceResponse[]) => void;
 }
 
 let isBypassingWorkspaceGuard = false;
+// Tracks the updatedAt we last applied from this tab so receiveRefreshedWorkspaces
+// can detect when another tab saved a newer pane state.
+const lastAppliedUpdatedAt: Record<string, string> = {};
+let onMutationBroadcast: (() => void) | null = null;
+export function registerMutationBroadcast(fn: () => void) {
+  onMutationBroadcast = fn;
+}
+function notifyMutation() {
+  onMutationBroadcast?.();
+}
 const WORKSPACE_EXPIRATION_WARNINGS_DISABLED_KEY =
   "workspace-expiration-warnings-disabled";
 
@@ -387,7 +400,12 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
         isLoading: false,
       });
 
+      warmContentSummaryCache(
+        workspaces.flatMap((ws) => ws.items.map((item) => item.content))
+      );
+
       if (activeWorkspace) {
+        lastAppliedUpdatedAt[activeWorkspace.id] = activeWorkspace.updatedAt;
         syncWorkspaceUrl(activeWorkspace.id);
         if (useContentStore.getState().openContentIds.length === 0) {
           restoreContentWorkspace(activeWorkspace);
@@ -421,6 +439,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       conflict: null,
       pendingOpenIntent: null,
     });
+    lastAppliedUpdatedAt[workspace.id] = workspace.updatedAt;
     syncWorkspaceUrl(workspace.id);
     restoreContentWorkspace(workspace);
     restoreTreeSnapshotForWorkspace(workspace.id);
@@ -472,6 +491,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
         ...state.workspaces.filter((candidate) => candidate.id !== workspace.id),
       ]),
     }));
+    notifyMutation();
     await get().activateWorkspace(workspace.id);
     return get().workspaces.find((candidate) => candidate.id === workspace.id) ?? workspace;
   },
@@ -518,6 +538,18 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
               ...updates.settings,
             }
           : existingWorkspace.settings,
+        viewRootContentId:
+          "viewRootContentId" in updates
+            ? updates.viewRootContentId ?? null
+            : existingWorkspace.viewRootContentId,
+        isView:
+          "viewRootContentId" in updates
+            ? updates.viewRootContentId !== null && updates.viewRootContentId !== undefined
+            : existingWorkspace.isView,
+        viewRoot:
+          "viewRootContentId" in updates && updates.viewRootContentId === null
+            ? null
+            : existingWorkspace.viewRoot,
       };
 
       set((state) => ({
@@ -547,6 +579,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
           )
         ),
       }));
+      notifyMutation();
     } catch (error) {
       set({ workspaces: previousWorkspaces });
       throw error;
@@ -633,6 +666,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     } else {
       set({ workspaces });
     }
+    notifyMutation();
   },
 
   persistActiveWorkspace: async () => {
@@ -675,11 +709,13 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       }
       return;
     }
+    lastAppliedUpdatedAt[workspace.id] = workspace.updatedAt;
     set((state) => ({
       workspaces: state.workspaces.map((candidate) =>
         candidate.id === workspace.id ? workspace : candidate
       ),
     }));
+    notifyMutation();
   },
 
   requestOpenContent: async (contentId, options = {}) => {
@@ -823,6 +859,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     ) {
       useContentStore.getState().closeContentTabs([contentId]);
     }
+    notifyMutation();
   },
 
   unassignContentFromWorkspace: async (workspaceId, contentId) => {
@@ -843,6 +880,27 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
         candidate.id === workspace.id ? workspace : candidate
       ),
     }));
+    notifyMutation();
+  },
+
+  receiveRefreshedWorkspaces: (incoming) => {
+    const state = get();
+    const ordered = applyWorkspaceOrder(incoming);
+    notifyExpiredWorkspaceRemoval(state.workspaces, ordered);
+    closeReleasedBorrowedTabs(state.workspaces, ordered, state.activeWorkspaceId);
+
+    // If the active workspace was saved by another tab (its updatedAt changed),
+    // apply the remote pane state so open tabs stay in sync across windows.
+    const incomingActive = ordered.find((ws) => ws.id === state.activeWorkspaceId);
+    if (incomingActive) {
+      const knownUpdatedAt = lastAppliedUpdatedAt[incomingActive.id];
+      if (knownUpdatedAt && incomingActive.updatedAt !== knownUpdatedAt) {
+        lastAppliedUpdatedAt[incomingActive.id] = incomingActive.updatedAt;
+        restoreContentWorkspace(incomingActive);
+      }
+    }
+
+    set({ workspaces: ordered });
   },
 
   resetWorkspaces: async () => {

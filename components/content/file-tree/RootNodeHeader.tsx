@@ -1,20 +1,14 @@
-/**
- * Root Node Header
- *
- * Displays workspace/root information above the file tree.
- * Shows a compact visual indicator for the root level.
- * Phase 2: File tree enhancements
- */
-
 "use client";
 
-import { Home } from "lucide-react";
+import { Eye, Home } from "lucide-react";
 
 interface RootNodeHeaderProps {
   workspaceName?: string;
   totalFiles?: number;
   onClick?: () => void;
   isSelected?: boolean;
+  isView?: boolean;
+  viewRootTitle?: string | null;
 }
 
 export function RootNodeHeader({
@@ -22,6 +16,8 @@ export function RootNodeHeader({
   totalFiles,
   onClick,
   isSelected = false,
+  isView = false,
+  viewRootTitle,
 }: RootNodeHeaderProps) {
   return (
     <div
@@ -39,18 +35,21 @@ export function RootNodeHeader({
           : ""
       }`}
     >
-      <div className="flex items-center gap-2">
-        {/* Root/Home icon */}
-        <Home className={`h-4 w-4 ${isSelected ? "text-gold-primary" : "text-gray-600"}`} />
-        {/* Workspace name */}
-        <span className={`text-sm font-medium ${isSelected ? "text-gold-primary" : "text-gray-900"}`}>
-          {workspaceName}
-        </span>
+      <div className="flex items-center gap-2 min-w-0">
+        {isView ? (
+          <Eye className={`h-4 w-4 shrink-0 ${isSelected ? "text-gold-primary" : "text-gold-primary/60"}`} />
+        ) : (
+          <Home className={`h-4 w-4 shrink-0 ${isSelected ? "text-gold-primary" : "text-gray-600"}`} />
+        )}
+        <div className="flex flex-col min-w-0">
+          <span className={`text-sm font-medium truncate ${isSelected ? "text-gold-primary" : "text-gray-900 dark:text-white"}`}>
+            {isView && viewRootTitle ? viewRootTitle : workspaceName}
+          </span>
+        </div>
       </div>
 
-      {/* File count badge (if provided) */}
       {totalFiles !== undefined && (
-        <span className="rounded-full bg-white/5 px-2 py-0.5 text-xs text-gray-400">
+        <span className="ml-2 shrink-0 rounded-full bg-white/5 px-2 py-0.5 text-xs text-gray-400">
           {totalFiles} {totalFiles === 1 ? "file" : "files"}
         </span>
       )}

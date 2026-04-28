@@ -71,6 +71,28 @@ type ContentTreeNode = {
 // GET /api/content/content/tree - Get Content Tree
 // ============================================================
 
+function collectSubtreeIds(nodeMap: Map<string, ContentTreeNode>, rootId: string): Set<string> {
+  const childrenByParent = new Map<string, string[]>();
+  for (const [id, node] of nodeMap) {
+    if (node.parentId !== null) {
+      const list = childrenByParent.get(node.parentId) ?? [];
+      list.push(id);
+      childrenByParent.set(node.parentId, list);
+    }
+  }
+  const visited = new Set<string>();
+  const queue = [rootId];
+  while (queue.length > 0) {
+    const id = queue.shift()!;
+    if (visited.has(id)) continue;
+    visited.add(id);
+    for (const childId of childrenByParent.get(id) ?? []) {
+      queue.push(childId);
+    }
+  }
+  return visited;
+}
+
 export async function GET(request: NextRequest) {
   try {
     const session = await requireAuth();
@@ -78,6 +100,17 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const includeDeleted = searchParams.get("includeDeleted") === "true";
     const showReferencedContent = searchParams.get("showReferencedContent") === "true";
+    const workspaceId = searchParams.get("workspaceId");
+    const directViewRootContentId = searchParams.get("viewRootContentId");
+
+    let viewRootContentId: string | null = directViewRootContentId;
+    if (!viewRootContentId && workspaceId) {
+      const workspace = await prisma.contentWorkspace.findFirst({
+        where: { id: workspaceId, ownerId: session.user.id, status: "active" },
+        select: { viewRootContentId: true },
+      });
+      viewRootContentId = workspace?.viewRootContentId ?? null;
+    }
 
     // Fetch all content for user (flat list)
     // IMPORTANT: Don't apply orderBy here - we'll sort after building the tree
@@ -475,6 +508,16 @@ export async function GET(request: NextRequest) {
           mountId: mount.id,
         });
       }
+    }
+
+    // View filtering: scope tree to view root subtree when workspace is a view
+    if (viewRootContentId && nodeMap.has(viewRootContentId)) {
+      const included = collectSubtreeIds(nodeMap, viewRootContentId);
+      for (const id of [...nodeMap.keys()]) {
+        if (!included.has(id)) nodeMap.delete(id);
+      }
+      const viewRoot = nodeMap.get(viewRootContentId);
+      if (viewRoot) viewRoot.parentId = null;
     }
 
     // Second pass: Build hierarchy

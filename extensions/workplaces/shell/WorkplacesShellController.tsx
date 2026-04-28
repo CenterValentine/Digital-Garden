@@ -6,6 +6,7 @@ import {
   installWorkspaceOpenGuard,
   useWorkspaceStore,
 } from "@/extensions/workplaces/state/workspace-store";
+import { installWorkspaceSync } from "@/extensions/workplaces/state/workspace-sync";
 import { useContentStore } from "@/state/content-store";
 
 export function WorkplacesShellController() {
@@ -19,6 +20,7 @@ export function WorkplacesShellController() {
   );
 
   useEffect(() => installWorkspaceOpenGuard(), []);
+  useEffect(() => installWorkspaceSync(), []);
 
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
