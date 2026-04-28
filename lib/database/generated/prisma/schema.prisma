@@ -93,6 +93,7 @@ model ContentNode {
   updatedAt     DateTime    @updatedAt @db.Timestamptz(6)
   deletedAt     DateTime?   @db.Timestamptz(6)
   deletedBy     String?     @db.Uuid
+  lastViewedAt  DateTime?   @db.Timestamptz(6)
   customIcon    String?     @db.VarChar(100)
   iconColor     String?     @db.VarChar(20)
   peopleGroupId String?     @db.Uuid
@@ -136,6 +137,7 @@ model ContentNode {
   viewGrants                   ViewGrant[]
   calendarEvents               CalendarEvent[]
   workspaceItems               ContentWorkspaceItem[]
+  viewWorkspaces               ContentWorkspace[]      @relation("WorkspaceViewRoot")
   periodicNoteIndexes          PeriodicNoteIndex[]
   sourceFlashcards             Flashcard[]             @relation("FlashcardSourceContent")
 
@@ -148,6 +150,7 @@ model ContentNode {
   @@index([deletedAt])
   @@index([role]) // Phase 2: for filtering by visibility
   @@index([ownedByNoteId])
+  @@index([ownerId, lastViewedAt])
 }
 
 model PeriodicNoteIndex {
@@ -434,24 +437,26 @@ model User {
 }
 
 model ContentWorkspace {
-  id           String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  ownerId      String                 @db.Uuid
-  name         String                 @db.VarChar(120)
-  slug         String                 @db.VarChar(120)
-  isMain       Boolean                @default(false)
-  isLocked     Boolean                @default(false)
-  status       ContentWorkspaceStatus @default(active)
-  expiresAt    DateTime?              @db.Timestamptz(6)
-  archivedAt   DateTime?              @db.Timestamptz(6)
-  layoutMode   String                 @default("single") @db.VarChar(32)
-  activePaneId String                 @default("top-left") @db.VarChar(32)
-  paneState    Json                   @default("{}")
-  settings     Json                   @default("{}")
-  createdAt    DateTime               @default(now()) @db.Timestamptz(6)
-  updatedAt    DateTime               @updatedAt @db.Timestamptz(6)
+  id                String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ownerId           String                 @db.Uuid
+  name              String                 @db.VarChar(120)
+  slug              String                 @db.VarChar(120)
+  isMain            Boolean                @default(false)
+  isLocked          Boolean                @default(false)
+  status            ContentWorkspaceStatus @default(active)
+  expiresAt         DateTime?              @db.Timestamptz(6)
+  archivedAt        DateTime?              @db.Timestamptz(6)
+  layoutMode        String                 @default("single") @db.VarChar(32)
+  activePaneId      String                 @default("top-left") @db.VarChar(32)
+  paneState         Json                   @default("{}")
+  settings          Json                   @default("{}")
+  viewRootContentId String?                @db.Uuid
+  createdAt         DateTime               @default(now()) @db.Timestamptz(6)
+  updatedAt         DateTime               @updatedAt @db.Timestamptz(6)
 
-  owner User                   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  items ContentWorkspaceItem[]
+  owner    User                   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  viewRoot ContentNode?           @relation("WorkspaceViewRoot", fields: [viewRootContentId], references: [id], onDelete: SetNull)
+  items    ContentWorkspaceItem[]
 
   @@unique([ownerId, slug])
   @@index([ownerId, status])
@@ -595,26 +600,27 @@ model PeopleGroup {
 }
 
 model Person {
-  id             String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  ownerId        String                @db.Uuid
-  primaryGroupId String                @db.Uuid
-  displayName    String                @db.VarChar(160)
-  slug           String                @db.VarChar(180)
-  givenName      String?               @db.VarChar(120)
-  familyName     String?               @db.VarChar(120)
-  email          String?               @db.VarChar(255)
-  phone          String?               @db.VarChar(50)
-  avatarUrl      String?
-  metadata       Json                  @default("{}")
-  displayOrder   Int                   @default(0)
-  createdAt      DateTime              @default(now()) @db.Timestamptz(6)
-  updatedAt      DateTime              @updatedAt @db.Timestamptz(6)
-  deletedAt      DateTime?             @db.Timestamptz(6)
-  owner          User                  @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  primaryGroup   PeopleGroup           @relation(fields: [primaryGroupId], references: [id], onDelete: Restrict)
-  contentNodes   ContentNode[]         @relation("PersonContent")
-  fileTreeMounts PeopleFileTreeMount[]
-  mentions       PersonMention[]
+  id                      String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ownerId                 String                @db.Uuid
+  primaryGroupId          String                @db.Uuid
+  displayName             String                @db.VarChar(160)
+  slug                    String                @db.VarChar(180)
+  givenName               String?               @db.VarChar(120)
+  familyName              String?               @db.VarChar(120)
+  email                   String?               @db.VarChar(255)
+  phone                   String?               @db.VarChar(50)
+  avatarUrl               String?
+  metadata                Json                  @default("{}")
+  displayOrder            Int                   @default(0)
+  excludeFromAutocomplete Boolean               @default(false)
+  createdAt               DateTime              @default(now()) @db.Timestamptz(6)
+  updatedAt               DateTime              @updatedAt @db.Timestamptz(6)
+  deletedAt               DateTime?             @db.Timestamptz(6)
+  owner                   User                  @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  primaryGroup            PeopleGroup           @relation(fields: [primaryGroupId], references: [id], onDelete: Restrict)
+  contentNodes            ContentNode[]         @relation("PersonContent")
+  fileTreeMounts          PeopleFileTreeMount[]
+  mentions                PersonMention[]
 
   @@unique([ownerId, slug])
   @@index([ownerId, primaryGroupId, displayOrder])
@@ -882,20 +888,21 @@ model SavedBlock {
 }
 
 model ContentTemplate {
-  id         String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  title      String           @db.VarChar(255)
-  tiptapJson Json
-  searchText String           @default("")
-  categoryId String           @db.Uuid
-  userId     String           @db.Uuid
-  usageCount Int              @default(0)
-  lastUsedAt DateTime?        @db.Timestamptz(6)
-  createdAt  DateTime         @default(now()) @db.Timestamptz(6)
-  updatedAt  DateTime         @updatedAt @db.Timestamptz(6)
-  category   ReusableCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
-  user       User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id           String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  title        String           @db.VarChar(255)
+  tiptapJson   Json
+  searchText   String           @default("")
+  categoryId   String           @db.Uuid
+  userId       String           @db.Uuid
+  usageCount   Int              @default(0)
+  displayOrder Int              @default(0)
+  lastUsedAt   DateTime?        @db.Timestamptz(6)
+  createdAt    DateTime         @default(now()) @db.Timestamptz(6)
+  updatedAt    DateTime         @updatedAt @db.Timestamptz(6)
+  category     ReusableCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  user         User             @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@index([userId, categoryId])
+  @@index([userId, categoryId, displayOrder])
   @@index([userId, lastUsedAt(sort: Desc)])
   @@index([searchText(ops: raw("gin_trgm_ops"))], type: Gin)
 }
@@ -909,6 +916,7 @@ model Snippet {
   categoryId    String           @db.Uuid
   userId        String           @db.Uuid
   usageCount    Int              @default(0)
+  displayOrder  Int              @default(0)
   lastUsedAt    DateTime?        @db.Timestamptz(6)
   isAiContext   Boolean          @default(true)
   isVisibleInUI Boolean          @default(true)
@@ -917,7 +925,7 @@ model Snippet {
   category      ReusableCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
   user          User             @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@index([userId, categoryId])
+  @@index([userId, categoryId, displayOrder])
   @@index([userId, isAiContext])
   @@index([userId, isVisibleInUI])
   @@index([searchText(ops: raw("gin_trgm_ops"))], type: Gin)
@@ -934,12 +942,13 @@ model PageTemplate {
   customIcon   String?          @db.VarChar(100)
   iconColor    String?          @db.VarChar(20)
   usageCount   Int              @default(0)
+  displayOrder Int              @default(0)
   createdAt    DateTime         @default(now()) @db.Timestamptz(6)
   updatedAt    DateTime         @updatedAt @db.Timestamptz(6)
   category     ReusableCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
   user         User?            @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@index([userId, categoryId])
+  @@index([userId, categoryId, displayOrder])
   @@index([searchText(ops: raw("gin_trgm_ops"))], type: Gin)
 }
 
