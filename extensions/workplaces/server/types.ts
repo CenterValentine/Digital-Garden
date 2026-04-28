@@ -48,12 +48,20 @@ export interface WorkspaceItemResponse {
   content: WorkspaceContentSummary;
 }
 
+export interface WorkspaceViewRoot {
+  id: string;
+  title: string;
+}
+
 export interface ContentWorkspaceResponse {
   id: string;
   name: string;
   slug: string;
   isMain: boolean;
   isLocked: boolean;
+  isView: boolean;
+  viewRootContentId: string | null;
+  viewRoot: WorkspaceViewRoot | null;
   status: "active" | "archived";
   expiresAt: string | null;
   archivedAt: string | null;
@@ -67,6 +75,7 @@ export interface ContentWorkspaceResponse {
 }
 
 export interface WorkspaceOpenConflict {
+  conflictType: "overlap" | "viewScope";
   workspaceId: string;
   workspaceName: string;
   contentId: string;

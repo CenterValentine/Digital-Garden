@@ -39,9 +39,29 @@ export interface NewContentMenuItem {
   submenu?: NewContentMenuItem[]; // NEW: Support for submenus
 }
 
+export interface PageTemplateMenuData {
+  categories: { id: string; name: string; isSystem: boolean }[];
+  templates: {
+    id: string;
+    title: string;
+    categoryId: string;
+    isSystem: boolean;
+    defaultTitle?: string | null;
+  }[];
+}
+
 export interface NewContentCallbacks {
   onCreateFolder?: (parentId: string | null) => void | Promise<void>;
   onCreateNote?: (parentId: string | null) => void | Promise<void>;
+  onCreateNoteFromTemplate?: (
+    parentId: string | null,
+    templateId: string,
+    defaultTitle?: string
+  ) => void | Promise<void>;
+  onOpenPageTemplate?: (
+    templateId: string,
+    title: string
+  ) => void | Promise<void>;
   onCreateFile?: (parentId: string | null) => void | Promise<void>;
   onCreateCode?: (parentId: string | null) => void | Promise<void>;
   onCreateHtml?: (parentId: string | null) => void | Promise<void>;
@@ -69,7 +89,8 @@ export interface NewContentCallbacks {
  */
 export function getNewContentMenuItems(
   callbacks: NewContentCallbacks,
-  parentId?: string | null
+  parentId?: string | null,
+  pageTemplateData?: PageTemplateMenuData
 ): NewContentMenuItem[] {
   const items: NewContentMenuItem[] = [];
   // Normalize parentId: undefined becomes null
@@ -77,14 +98,100 @@ export function getNewContentMenuItems(
 
   // Phase 1: Core content types
   if (callbacks.onCreateNote) {
-    items.push({
-      id: "new-note",
-      label: "Note (Markdown)",
-      icon: <File className="h-4 w-4" />,
-      shortcut: "A",
-      onClick: () => callbacks.onCreateNote?.(normalizedParentId),
-      disabled: !callbacks.onCreateNote,
-    });
+    const hasTemplates = Boolean(
+      pageTemplateData &&
+        pageTemplateData.templates.length > 0 &&
+        callbacks.onCreateNoteFromTemplate
+    );
+
+    if (hasTemplates) {
+      const submenu: NewContentMenuItem[] = [
+        {
+          id: "new-note-blank",
+          label: "Blank Note",
+          icon: <File className="h-4 w-4" />,
+          shortcut: "A",
+          onClick: () => callbacks.onCreateNote?.(normalizedParentId),
+        },
+      ];
+
+      const templatesByCategory = new Map<
+        string,
+        {
+          name: string;
+          templates: PageTemplateMenuData["templates"];
+        }
+      >();
+
+      for (const category of pageTemplateData!.categories) {
+        const matchingTemplates = pageTemplateData!.templates.filter(
+          (template) => template.categoryId === category.id
+        );
+        if (matchingTemplates.length > 0) {
+          templatesByCategory.set(category.id, {
+            name: category.name,
+            templates: matchingTemplates,
+          });
+        }
+      }
+
+      for (const [categoryId, { name, templates }] of templatesByCategory) {
+        submenu.push({
+          id: `new-note-cat-${categoryId}`,
+          label: name,
+          icon: <Folder className="h-4 w-4" />,
+          submenu: templates.map((template) => {
+            const canOpenTemplate = Boolean(callbacks.onOpenPageTemplate);
+
+            return {
+              id: `new-note-tpl-${template.id}`,
+              label: template.title,
+              icon: <FileText className="h-4 w-4" />,
+              submenu: [
+                {
+                  id: `new-note-tpl-${template.id}-create`,
+                  label: "Create Note",
+                  icon: <File className="h-4 w-4" />,
+                  onClick: () =>
+                    callbacks.onCreateNoteFromTemplate?.(
+                      normalizedParentId,
+                      template.id,
+                      template.defaultTitle || template.title
+                    ),
+                },
+                {
+                  id: `new-note-tpl-${template.id}-edit`,
+                  label: template.isSystem ? "View Template" : "Edit Template",
+                  icon: <Pencil className="h-4 w-4" />,
+                  onClick: () =>
+                    callbacks.onOpenPageTemplate?.(
+                      template.id,
+                      template.title
+                    ),
+                  disabled: !canOpenTemplate,
+                },
+              ],
+            };
+          }),
+        });
+      }
+
+      items.push({
+        id: "new-note",
+        label: "Note (Markdown)",
+        icon: <File className="h-4 w-4" />,
+        submenu,
+      });
+    } else {
+      items.push({
+        id: "new-note",
+        label: "Note (Markdown)",
+        icon: <File className="h-4 w-4" />,
+        shortcut: "A",
+        onClick: () => callbacks.onCreateNote?.(normalizedParentId),
+        disabled: !callbacks.onCreateNote,
+      });
+    }
   }
 
   if (callbacks.onCreateFolder) {

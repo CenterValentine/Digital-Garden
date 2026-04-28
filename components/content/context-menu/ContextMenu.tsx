@@ -30,6 +30,8 @@ interface ContextMenuProps {
   actionProviders: Partial<Record<string, ContextMenuActionProvider>>;
 }
 
+const SUBMENU_HOVER_BRIDGE_PX = 12;
+
 /**
  * MenuAction Component - Renders individual menu action with optional submenu.
  * Supports inline input mode: clicking an action with `inlineInput` transforms
@@ -354,58 +356,66 @@ function SubMenu({
 
   const submenuContent = (
     <div
-      ref={refToUse}
       data-context-menu
-      className="fixed z-[130] min-w-[180px] rounded-md border border-white/20 bg-white/95 shadow-lg backdrop-blur-sm dark:bg-gray-900/95 overflow-y-auto"
+      className="fixed z-[130] overflow-visible"
       style={{
-        left: `${position.x}px`,
+        left: `${position.x - SUBMENU_HOVER_BRIDGE_PX}px`,
         top: `${position.y}px`,
-        maxHeight: `${position.maxHeight || 400}px`,
+        paddingLeft: `${SUBMENU_HOVER_BRIDGE_PX}px`,
       }}
       onMouseEnter={onMouseEnter}
     >
-      {searchable && (
-        <div className="px-1.5 pt-1.5 pb-1">
-          <input
-            ref={searchInputRef}
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            onKeyDown={(e) => e.stopPropagation()}
-            placeholder="Search..."
-            className="w-full px-2 py-1 text-xs rounded bg-gray-100 border border-gray-300 text-gray-900 placeholder:text-gray-400 focus:border-gray-400 focus:outline-none dark:bg-white/10 dark:border-white/20 dark:text-gray-100 dark:placeholder:text-gray-500 dark:focus:border-white/40"
-          />
+      <div
+        ref={refToUse}
+        data-context-menu
+        className="min-w-[180px] rounded-md border border-white/20 bg-white/95 shadow-lg backdrop-blur-sm dark:bg-gray-900/95 overflow-y-auto"
+        style={{
+          maxHeight: `${position.maxHeight || 400}px`,
+        }}
+      >
+        {searchable && (
+          <div className="px-1.5 pt-1.5 pb-1">
+            <input
+              ref={searchInputRef}
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={(e) => e.stopPropagation()}
+              placeholder="Search..."
+              className="w-full px-2 py-1 text-xs rounded bg-gray-100 border border-gray-300 text-gray-900 placeholder:text-gray-400 focus:border-gray-400 focus:outline-none dark:bg-white/10 dark:border-white/20 dark:text-gray-100 dark:placeholder:text-gray-500 dark:focus:border-white/40"
+            />
+          </div>
+        )}
+        <div className="py-0.5">
+          {actions.map((subAction) => (
+            <MenuAction
+              key={subAction.id}
+              action={subAction}
+              onClose={onClose}
+              onSubmenuOpen={handleNestedSubmenuOpen}
+              onSubmenuClose={handleNestedSubmenuClose}
+              openSubmenuId={nestedSubmenu?.id || null}
+              onReplaceActions={setDynamicActions}
+            />
+          ))}
         </div>
-      )}
-      <div className="py-0.5">
-        {actions.map((subAction) => (
-          <MenuAction
-            key={subAction.id}
-            action={subAction}
-            onClose={onClose}
-            onSubmenuOpen={handleNestedSubmenuOpen}
-            onSubmenuClose={handleNestedSubmenuClose}
-            openSubmenuId={nestedSubmenu?.id || null}
-            onReplaceActions={setDynamicActions}
-          />
-        ))}
+
+        {/* Render nested submenu if open */}
+        {nestedSubmenu && (() => {
+          const action = actions.find(a => a.id === nestedSubmenu.id);
+          if (!action || !action.submenu) return null;
+
+          return (
+            <SubMenu
+              actions={action.submenu}
+              position={nestedSubmenu.position}
+              onClose={onClose}
+              onMouseEnter={handleNestedSubmenuMouseEnter}
+              searchable={action.searchable}
+            />
+          );
+        })()}
       </div>
-
-      {/* Render nested submenu if open */}
-      {nestedSubmenu && (() => {
-        const action = actions.find(a => a.id === nestedSubmenu.id);
-        if (!action || !action.submenu) return null;
-
-        return (
-          <SubMenu
-            actions={action.submenu}
-            position={nestedSubmenu.position}
-            onClose={onClose}
-            onMouseEnter={handleNestedSubmenuMouseEnter}
-            searchable={action.searchable}
-          />
-        );
-      })()}
     </div>
   );
 

@@ -9,9 +9,11 @@
  */
 
 import type { ContextMenuActionProvider, ContextMenuSection, ContextMenuAction } from "./types";
+import type { JSONContent } from "@tiptap/core";
 import { useTemplateStore } from "@/state/template-store";
 import { useSnippetStore } from "@/state/snippet-store";
 import { useEditorInstanceStore } from "@/state/editor-instance-store";
+import { instantiateTemplateContent } from "@/lib/domain/editor/template-instantiation";
 import { toast } from "sonner";
 
 /** Captured selection data — frozen when the context menu opens */
@@ -307,7 +309,16 @@ function insertTemplate(templateId: string) {
 
   const tiptapJson = template.tiptapJson as { content?: unknown[] };
   if (tiptapJson?.content) {
-    editor.chain().focus().insertContent(tiptapJson.content).run();
+    const instantiated = instantiateTemplateContent(
+      {
+        type: "doc",
+        content: tiptapJson.content as JSONContent[],
+      },
+      {
+        regenerateBlockIds: true,
+      }
+    );
+    editor.chain().focus().insertContent(instantiated.content ?? []).run();
   }
 
   fetch(`/api/content/templates/${templateId}/use`, { method: "POST" }).catch(() => {});

@@ -45,7 +45,10 @@ export async function handleListWorkplaces(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const includeArchived = searchParams.get("includeArchived") === "true";
     const data = await listWorkspaces(session.user.id, includeArchived);
-    return NextResponse.json({ success: true, data });
+    return NextResponse.json(
+      { success: true, data },
+      { headers: { "Cache-Control": "no-store" } }
+    );
   } catch (error) {
     console.error("[Workplaces API] GET error:", error);
     return errorResponse(error, "Failed to fetch workspaces");
@@ -148,6 +151,10 @@ export async function handleUpdateWorkplace(
       settings:
         body.settings && typeof body.settings === "object" && !Array.isArray(body.settings)
           ? body.settings
+          : undefined,
+      viewRootContentId:
+        body.viewRootContentId === null || typeof body.viewRootContentId === "string"
+          ? body.viewRootContentId
           : undefined,
     });
 

@@ -106,6 +106,7 @@ function zodToField(
     key === "workdayCutoffHour" ||
     key === "autoBorrowDurationMinutes" ||
     key === "pathOrder" ||
+    key === "templateDateMode" ||
     key === "summaryDate" ||
     key === "weekStartDate"
       ? description
@@ -200,6 +201,7 @@ function humanize(key: string): string {
   if (key === "openBehavior") return "Expand/Collapse Default";
   if (key === "summaryDate") return "Date";
   if (key === "weekStartDate") return "Week Start";
+  if (key === "templateDateMode") return "Template Date";
   if (key === "workdayCutoffHour") return "Day Cutoff";
   if (key === "autoBorrowDurationMinutes") return "Auto-borrow Duration";
   if (key === "pathOrder") return "Path Order";

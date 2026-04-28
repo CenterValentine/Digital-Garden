@@ -7,6 +7,7 @@ import {
   Check,
   ChevronDown,
   Copy,
+  Eye,
   Folder,
   GripVertical,
   Loader2,
@@ -39,8 +40,8 @@ import {
   PopoverTrigger,
 } from "@/components/client/ui/popover";
 import { Switch } from "@/components/client/ui/switch";
-import { useContentStore } from "@/state/content-store";
 import { useWorkspaceStore } from "@/extensions/workplaces/state/workspace-store";
+import { triggerMenuOpenSync } from "@/extensions/workplaces/state/workspace-sync";
 import type { TreeNode } from "@/lib/domain/content/types";
 import type { ContentWorkspaceResponse } from "@/extensions/workplaces/server";
 
@@ -220,10 +221,6 @@ function getWorkspaceDescription(workspace: ContentWorkspaceResponse | null) {
     : "";
 }
 
-function isClaimOpenFoldersEnabled(workspace: ContentWorkspaceResponse | null) {
-  return workspace?.settings.claimOpenFolders === true;
-}
-
 function normalizeSearchValue(value: string) {
   return value.toLowerCase().trim();
 }
@@ -291,7 +288,6 @@ function workspaceStateHasContent(
 }
 
 export function WorkspaceSelector() {
-  const openContentIds = useContentStore((state) => state.openContentIds);
   const workspaces = useWorkspaceStore((state) => state.workspaces);
   const activeWorkspaceId = useWorkspaceStore((state) => state.activeWorkspaceId);
   const activateWorkspace = useWorkspaceStore((state) => state.activateWorkspace);
@@ -317,14 +313,16 @@ export function WorkspaceSelector() {
 
   const [menuOpen, setMenuOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [settingsTab, setSettingsTab] = useState<"general" | "claims">("general");
+  const [settingsTab, setSettingsTab] = useState<"general" | "view">("general");
   const [settingsWorkspaceId, setSettingsWorkspaceId] = useState<string | null>(null);
   const [editingWorkspaceId, setEditingWorkspaceId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState("");
   const [draftName, setDraftName] = useState("");
   const [draftDescription, setDraftDescription] = useState("");
   const [draftWorkspaceIcon, setDraftWorkspaceIcon] = useState<string | null>(null);
-  const [draftClaimOpenFolders, setDraftClaimOpenFolders] = useState(false);
+  const [draftIsView, setDraftIsView] = useState(false);
+  const [draftViewRootContentId, setDraftViewRootContentId] = useState<string | null>(null);
+  const [viewRootFolderQuery, setViewRootFolderQuery] = useState("");
   const [draftExpiresAt, setDraftExpiresAt] = useState("");
   const [folderOptions, setFolderOptions] = useState<FolderOption[]>([]);
   const [nodesById, setNodesById] = useState<Record<string, FolderOption>>({});
@@ -345,7 +343,6 @@ export function WorkspaceSelector() {
   const [claimConflictState, setClaimConflictState] = useState<{
     folderIds: string[];
     conflicts: ClaimConflictItem[];
-    enableClaimOpenFolders: boolean;
   } | null>(null);
   const [claimBorrowPreset, setClaimBorrowPreset] = useState<BorrowPreset>("3h");
   const [claimBorrowUntil, setClaimBorrowUntil] = useState(() =>
@@ -379,6 +376,7 @@ export function WorkspaceSelector() {
     action: "settings" | "delete";
   } | null>(null);
   const renameInputRef = useRef<HTMLInputElement>(null);
+  const settingsInitKeyRef = useRef("");
 
   // Imperatively focus the rename input after Radix has released focus management.
   // autoFocus alone is unreliable here because createWorkspace is async and the
@@ -417,13 +415,13 @@ export function WorkspaceSelector() {
     if (settingsWorkspace.isMain) {
       return "Main Workspace is the catchall workspace and cannot reserve folders.";
     }
-    if (draftClaimOpenFolders) {
-      return "Turn off Claim open folders to manage manual assignments.";
+    if (!draftIsView || !draftViewRootContentId) {
+      return "Enable view and select a root folder before adding exceptions.";
     }
     if (foldersLoading) return "Folder list is still loading.";
-    if (folderOptions.length === 0) return "No folders are available to claim.";
+    if (folderOptions.length === 0) return "No folders are available.";
     return null;
-  }, [settingsWorkspace, draftClaimOpenFolders, folderOptions.length, foldersLoading]);
+  }, [settingsWorkspace, draftIsView, draftViewRootContentId, folderOptions.length, foldersLoading]);
 
   const manualClaimsDisabled = Boolean(manualClaimsDisabledReason);
 
@@ -447,11 +445,19 @@ export function WorkspaceSelector() {
 
   useEffect(() => {
     if (!settingsOpen || !settingsWorkspace) return;
+    // Re-initialize only when the dialog opens or the target workspace changes —
+    // NOT when background sync refreshes the workspace object reference.
+    const initKey = `${settingsWorkspace.id}:${String(settingsOpen)}`;
+    if (settingsInitKeyRef.current === initKey) return;
+    settingsInitKeyRef.current = initKey;
+
     const workspaceIcon = getWorkspaceIconValue(settingsWorkspace);
     setDraftName(settingsWorkspace.name);
     setDraftDescription(getWorkspaceDescription(settingsWorkspace));
     setDraftWorkspaceIcon(workspaceIcon);
-    setDraftClaimOpenFolders(isClaimOpenFoldersEnabled(settingsWorkspace));
+    setDraftIsView(settingsWorkspace.isView);
+    setDraftViewRootContentId(settingsWorkspace.viewRootContentId);
+    setViewRootFolderQuery("");
     setDraftExpiresAt(toDatetimeLocalValue(settingsWorkspace.expiresAt));
   }, [settingsOpen, settingsWorkspace]);
 
@@ -540,15 +546,12 @@ export function WorkspaceSelector() {
 
   const closeClaimConflictDialog = () => {
     if (claimResolutionInFlight) return;
-    if (claimConflictState?.enableClaimOpenFolders) {
-      setDraftClaimOpenFolders(false);
-    }
     setClaimConflictState(null);
   };
 
   const openWorkspaceSettings = (
     workspaceId: string,
-    tab: "general" | "claims" = "general"
+    tab: "general" | "view" = "general"
   ) => {
     setMenuOpen(false);
     window.setTimeout(() => {
@@ -698,10 +701,7 @@ export function WorkspaceSelector() {
     );
   }, [buildClaimConflicts, claimConflictState, claimResolutionInFlight, settingsWorkspace]);
 
-  const applyFolderClaims = async (
-    folderIds: string[],
-    options: { enableClaimOpenFolders: boolean }
-  ) => {
+  const applyFolderClaims = async (folderIds: string[]) => {
     if (!settingsWorkspace || settingsWorkspace.isMain) return;
 
     const uniqueFolderIds = Array.from(new Set(folderIds)).filter(Boolean);
@@ -714,17 +714,10 @@ export function WorkspaceSelector() {
 
     await updateWorkspace(settingsWorkspace.id, {
       isLocked: uniqueFolderIds.length > 0 || recursiveFolderClaims.length > 0,
-      settings: {
-        ...settingsWorkspace.settings,
-        claimOpenFolders: options.enableClaimOpenFolders,
-      },
     });
   };
 
-  const queueClaimFlow = async (
-    folderIds: string[],
-    options: { enableClaimOpenFolders: boolean }
-  ) => {
+  const queueClaimFlow = async (folderIds: string[]) => {
     if (!settingsWorkspace || settingsWorkspace.isMain) return false;
 
     const uniqueFolderIds = Array.from(new Set(folderIds)).filter(Boolean);
@@ -737,12 +730,11 @@ export function WorkspaceSelector() {
       setClaimConflictState({
         folderIds: uniqueFolderIds,
         conflicts,
-        enableClaimOpenFolders: options.enableClaimOpenFolders,
       });
       return false;
     }
 
-    await applyFolderClaims(uniqueFolderIds, options);
+    await applyFolderClaims(uniqueFolderIds);
     return true;
   };
 
@@ -767,9 +759,7 @@ export function WorkspaceSelector() {
         });
       }
 
-      await applyFolderClaims(claimConflictState.folderIds, {
-        enableClaimOpenFolders: claimConflictState.enableClaimOpenFolders,
-      });
+      await applyFolderClaims(claimConflictState.folderIds);
       setClaimConflictState(null);
     } finally {
       setClaimResolutionInFlight(false);
@@ -811,9 +801,7 @@ export function WorkspaceSelector() {
 
     setClaimResolutionInFlight(true);
     try {
-      await applyFolderClaims(claimConflictState.folderIds, {
-        enableClaimOpenFolders: claimConflictState.enableClaimOpenFolders,
-      });
+      await applyFolderClaims(claimConflictState.folderIds);
       setClaimConflictState(null);
       toast.success("Claim applied");
     } catch (error) {
@@ -957,14 +945,18 @@ export function WorkspaceSelector() {
 
   const handleSaveSettings = async () => {
     if (!settingsWorkspace) return;
+    if (draftIsView && !draftViewRootContentId) {
+      toast.error("Select a view root folder before saving.");
+      return;
+    }
     setIsSavingSettings(true);
     try {
       await updateWorkspace(settingsWorkspace.id, {
         name: draftName,
         expiresAt: fromDatetimeLocalValue(draftExpiresAt),
+        viewRootContentId: draftIsView ? draftViewRootContentId : null,
         settings: {
           ...settingsWorkspace.settings,
-          claimOpenFolders: draftClaimOpenFolders,
           workspaceDescription: draftDescription.trim() || null,
           workspaceIcon: draftWorkspaceIcon,
         },
@@ -1004,71 +996,6 @@ export function WorkspaceSelector() {
     setDeleteWorkspaceTarget(settingsWorkspace);
   };
 
-  const handleClaimOpenFileFolders = async () => {
-    if (!activeWorkspace || activeWorkspace.isMain) return;
-    if (foldersLoading) {
-      toast.info("Folder list is still loading");
-      return;
-    }
-
-    const folderIds = new Set<string>();
-    openContentIds.forEach((contentId) => {
-      const node = nodesById[contentId];
-      if (!node) return;
-      if (node.contentType === "folder") {
-        folderIds.add(node.id);
-      } else if (node.parentId) {
-        folderIds.add(node.parentId);
-      }
-    });
-
-    if (folderIds.size === 0) {
-      toast.info("No open files with a parent folder to claim");
-      return;
-    }
-
-    try {
-      const applied = await queueClaimFlow([...folderIds], {
-        enableClaimOpenFolders: true,
-      });
-      if (applied) {
-        toast.success("Open file folders claimed");
-      }
-    } catch (error) {
-      console.error("[WorkspaceSelector] Failed to claim open file folders:", error);
-      toast.error(
-        error instanceof Error ? error.message : "Failed to claim open file folders"
-      );
-    }
-  };
-
-  const handleClaimOpenFoldersToggle = async (enabled: boolean) => {
-    if (!settingsWorkspace || settingsWorkspace.isMain || !settingsWorkspaceIsActive) return;
-    const previousValue = draftClaimOpenFolders;
-    setDraftClaimOpenFolders(enabled);
-
-    try {
-      if (enabled) {
-        await handleClaimOpenFileFolders();
-      } else {
-        await updateWorkspace(settingsWorkspace.id, {
-          isLocked: recursiveFolderClaims.length > 0,
-          settings: {
-            ...settingsWorkspace.settings,
-            claimOpenFolders: false,
-          },
-        });
-        toast.success("Manual claim assignments enabled");
-      }
-    } catch (error) {
-      setDraftClaimOpenFolders(previousValue);
-      console.error("[WorkspaceSelector] Failed to update claim setting:", error);
-      toast.error(
-        error instanceof Error ? error.message : "Failed to update claim setting"
-      );
-    }
-  };
-
   const handleAddManualFolderClaim = async (folderId = selectedFolderId) => {
     if (!folderId) return;
     if (recursiveClaimIds.has(folderId)) {
@@ -1076,9 +1003,7 @@ export function WorkspaceSelector() {
       return;
     }
     try {
-      const applied = await queueClaimFlow([folderId], {
-        enableClaimOpenFolders: false,
-      });
+      const applied = await queueClaimFlow([folderId]);
       if (applied) {
         toast.success("Folder claimed");
       }
@@ -1103,7 +1028,13 @@ export function WorkspaceSelector() {
 
   return (
     <>
-      <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
+      <DropdownMenu
+        open={menuOpen}
+        onOpenChange={(open) => {
+          setMenuOpen(open);
+          if (open) triggerMenuOpenSync();
+        }}
+      >
         <DropdownMenuTrigger asChild>
           <button
             type="button"
@@ -1221,7 +1152,11 @@ export function WorkspaceSelector() {
                   event.stopPropagation();
                   startInlineRename(workspace);
                 }}
-                className={`group gap-2 pl-1.5 pr-2 ${
+                className={`group gap-2 pr-2 ${
+                  workspace.isView
+                    ? `border-l-2 pl-1 ${isActive ? "border-gold-primary" : "border-gold-primary/35"}`
+                    : "pl-1.5"
+                } ${
                   isActive ? "bg-gold-primary/10 text-gold-primary" : ""
                 } ${isDragged ? "opacity-40" : ""} ${
                   isDropTarget ? "ring-1 ring-gold-primary/40" : ""
@@ -1254,6 +1189,9 @@ export function WorkspaceSelector() {
                     </span>
 
                     {renderWorkspaceName(workspace, "min-w-0 flex-1 truncate")}
+                    {workspace.isView ? (
+                      <Eye className="h-3 w-3 shrink-0 text-gold-primary/70" />
+                    ) : null}
                     {isActive ? <Check className="h-4 w-4 shrink-0" /> : null}
                     {workspace.isLocked ? (
                       <Lock className="h-3 w-3 shrink-0 text-gray-400/80" />
@@ -1370,7 +1308,7 @@ export function WorkspaceSelector() {
           <DialogHeader>
             <DialogTitle>Workspace Settings</DialogTitle>
             <DialogDescription>
-              Rename this workspace, set when it disassembles, and control folder claims.
+              Rename this workspace, set when it disassembles, and configure view settings.
             </DialogDescription>
           </DialogHeader>
 
@@ -1438,14 +1376,14 @@ export function WorkspaceSelector() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setSettingsTab("claims")}
+                  onClick={() => setSettingsTab("view")}
                   className={`rounded px-3 py-2 transition-colors ${
-                    settingsTab === "claims"
+                    settingsTab === "view"
                       ? "bg-white text-gold-primary shadow-sm dark:bg-white/10"
                       : "text-gray-500 hover:text-gray-900 dark:hover:text-white"
                   }`}
                 >
-                  Claims
+                  View
                 </button>
               </div>
 
@@ -1478,42 +1416,97 @@ export function WorkspaceSelector() {
                   </div>
                 </div>
               ) : (
-                <div className="overflow-hidden rounded-md border border-black/10 text-sm dark:border-white/10">
-                  <div className="flex items-start justify-between gap-4 border-b border-black/10 p-3 dark:border-white/10">
-                    <div>
-                      <div className="font-medium">Claim open folders</div>
-                      <div className="text-xs text-gray-500">
-                        Automatically reserves the parent folders of open files for this workspace.
+                <div className="space-y-4">
+                  {!settingsWorkspace.isMain && (
+                    <div className="overflow-hidden rounded-md border border-black/10 dark:border-white/10 text-sm">
+                      <div className="flex items-start justify-between gap-4 border-b border-black/10 p-3 dark:border-white/10">
+                        <div>
+                          <div className="font-medium">Enable as View</div>
+                          <div className="text-xs text-gray-500">
+                            Restricts the file tree to a specific folder. Opening files outside that tree will require a borrow or share decision.
+                          </div>
+                        </div>
+                        <Switch
+                          checked={draftIsView}
+                          disabled={isSavingSettings}
+                          onCheckedChange={(checked) => {
+                            setDraftIsView(Boolean(checked));
+                            if (!checked) setDraftViewRootContentId(null);
+                          }}
+                        />
                       </div>
-                    </div>
-                    <Switch
-                      checked={draftClaimOpenFolders}
-                      disabled={
-                        settingsWorkspace.isMain ||
-                        isSavingSettings ||
-                        !settingsWorkspaceIsActive
-                      }
-                      onCheckedChange={(checked) =>
-                        void handleClaimOpenFoldersToggle(Boolean(checked))
-                      }
-                    />
-                  </div>
 
-                  {settingsWorkspace.isMain ? (
-                    <div className="border-b border-black/10 bg-black/[0.025] px-3 py-2 text-xs text-gray-500 dark:border-white/10 dark:bg-white/[0.04]">
-                      Main Workspace is the catchall workspace, so it cannot reserve folders.
+                      {draftIsView && (
+                        <div className="space-y-2 border-b border-black/10 p-3 dark:border-white/10">
+                          <div className="text-xs font-medium text-gray-600 dark:text-gray-400">
+                            View root folder
+                          </div>
+                          {draftViewRootContentId ? (
+                            <div className="flex items-center justify-between gap-2 rounded-md border border-gold-primary/30 bg-gold-primary/5 px-3 py-2 text-xs">
+                              <span className="truncate font-medium text-gold-primary">
+                                {folderOptions.find((f) => f.id === draftViewRootContentId)?.path ??
+                                  settingsWorkspace.viewRoot?.title ??
+                                  "Selected folder"}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => setDraftViewRootContentId(null)}
+                                className="shrink-0 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                              >
+                                ✕
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="space-y-1">
+                              <input
+                                type="text"
+                                placeholder="Search folders…"
+                                value={viewRootFolderQuery}
+                                onChange={(e) => setViewRootFolderQuery(e.target.value)}
+                                className="w-full rounded-md border border-black/10 bg-white/70 px-3 py-2 text-xs outline-none focus:border-gold-primary dark:border-white/10 dark:bg-white/5"
+                              />
+                              <div className="max-h-40 overflow-y-auto rounded-md border border-black/10 dark:border-white/10">
+                                {folderOptions
+                                  .filter(
+                                    (f) =>
+                                      !viewRootFolderQuery ||
+                                      f.path.toLowerCase().includes(viewRootFolderQuery.toLowerCase())
+                                  )
+                                  .slice(0, 20)
+                                  .map((folder) => (
+                                    <button
+                                      key={folder.id}
+                                      type="button"
+                                      onClick={() => {
+                                        setDraftViewRootContentId(folder.id);
+                                        setViewRootFolderQuery("");
+                                      }}
+                                      className="block w-full truncate px-3 py-2 text-left text-xs hover:bg-black/5 dark:hover:bg-white/5"
+                                    >
+                                      {folder.path}
+                                    </button>
+                                  ))}
+                                {folderOptions.filter(
+                                  (f) =>
+                                    !viewRootFolderQuery ||
+                                    f.path.toLowerCase().includes(viewRootFolderQuery.toLowerCase())
+                                ).length === 0 && (
+                                  <div className="px-3 py-2 text-xs text-gray-400">No folders found</div>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
-                  ) : !settingsWorkspaceIsActive ? (
-                    <div className="border-b border-black/10 bg-black/[0.025] px-3 py-2 text-xs text-gray-500 dark:border-white/10 dark:bg-white/[0.04]">
-                      Open this workspace to claim its currently open folders.
-                    </div>
-                  ) : null}
+                  )}
 
-                  <div className="space-y-3 p-3">
+                  <div className="overflow-hidden rounded-md border border-black/10 text-sm dark:border-white/10">
+                    <div className="space-y-3 p-3">
                     <div>
-                      <div className="font-medium">Manual Claim Assignments</div>
+                      <div className="font-medium">View Exceptions</div>
                       <div className="text-xs text-gray-500">
-                        Assign specific folders to this workspace. Folder claims are recursive.
+                        Assign specific folders that are excluded from the view root restriction. Exceptions are recursive.
                       </div>
                     </div>
 
@@ -1606,6 +1599,7 @@ export function WorkspaceSelector() {
                     </div>
                   </div>
                 </div>
+              </div>
               )}
             </div>
           ) : null}

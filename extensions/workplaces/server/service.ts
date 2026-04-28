@@ -34,6 +34,7 @@ type WorkspaceWithItems = ContentWorkspace & {
       content: Pick<ContentNode, "id" | "title" | "contentType" | "parentId">;
     }
   >;
+  viewRoot: Pick<ContentNode, "id" | "title"> | null;
 };
 
 function emptyPaneState(): WorkspacePaneStatePayload {
@@ -182,18 +183,24 @@ function workspaceStateHasContent(
 }
 
 export function formatWorkspace(workspace: WorkspaceWithItems): ContentWorkspaceResponse {
+  const normalizedState = normalizeWorkspaceState(workspace);
   return {
     id: workspace.id,
     name: workspace.name,
     slug: workspace.slug,
     isMain: workspace.isMain,
     isLocked: workspace.isLocked,
+    isView: workspace.viewRootContentId !== null,
+    viewRootContentId: workspace.viewRootContentId ?? null,
+    viewRoot: workspace.viewRoot
+      ? { id: workspace.viewRoot.id, title: workspace.viewRoot.title }
+      : null,
     status: workspace.status,
     expiresAt: workspace.expiresAt?.toISOString() ?? null,
     archivedAt: workspace.archivedAt?.toISOString() ?? null,
-    layoutMode: normalizeWorkspaceState(workspace).layoutMode,
-    activePaneId: normalizeWorkspaceState(workspace).activePaneId,
-    paneState: normalizeWorkspaceState(workspace),
+    layoutMode: normalizedState.layoutMode,
+    activePaneId: normalizedState.activePaneId,
+    paneState: normalizedState,
     settings: normalizeSettings(workspace.settings),
     createdAt: workspace.createdAt.toISOString(),
     updatedAt: workspace.updatedAt.toISOString(),
@@ -327,6 +334,7 @@ export async function listWorkspaces(ownerId: string, includeArchived = false) {
         },
         orderBy: { updatedAt: "desc" },
       },
+      viewRoot: { select: { id: true, title: true } },
     },
     orderBy: [{ isMain: "desc" }, { updatedAt: "desc" }],
   });
@@ -351,6 +359,7 @@ export async function getWorkspace(ownerId: string, workspaceId: string) {
         },
         orderBy: { updatedAt: "desc" },
       },
+      viewRoot: { select: { id: true, title: true } },
     },
   });
 
@@ -384,6 +393,7 @@ export async function createWorkspace(ownerId: string, name: string) {
           },
         },
       },
+      viewRoot: { select: { id: true, title: true } },
     },
   });
 
@@ -468,6 +478,7 @@ export async function duplicateWorkspace(
           },
           orderBy: { updatedAt: "desc" },
         },
+        viewRoot: { select: { id: true, title: true } },
       },
     });
   });
@@ -483,6 +494,7 @@ export async function updateWorkspace(
     isLocked?: boolean;
     expiresAt?: string | null;
     settings?: Record<string, unknown>;
+    viewRootContentId?: string | null;
   }
 ) {
   const existing = await prisma.contentWorkspace.findFirst({
@@ -511,6 +523,20 @@ export async function updateWorkspace(
     data.settings = updates.settings as Prisma.InputJsonValue;
   }
 
+  if ("viewRootContentId" in updates && !existing.isMain) {
+    if (updates.viewRootContentId === null) {
+      data.viewRoot = { disconnect: true };
+    } else if (updates.viewRootContentId) {
+      const viewRootNode = await prisma.contentNode.findFirst({
+        where: { id: updates.viewRootContentId, ownerId, deletedAt: null },
+        select: { id: true },
+      });
+      if (viewRootNode) {
+        data.viewRoot = { connect: { id: viewRootNode.id } };
+      }
+    }
+  }
+
   const workspace = await prisma.contentWorkspace.update({
     where: { id: workspaceId },
     data,
@@ -525,6 +551,7 @@ export async function updateWorkspace(
           },
         },
       },
+      viewRoot: { select: { id: true, title: true } },
     },
   });
 
@@ -743,7 +770,13 @@ export async function resolveOpenIntent(
   const [workspace, content, currentAssignment] = await Promise.all([
     prisma.contentWorkspace.findFirst({
       where: { id: workspaceId, ownerId, status: "active" },
-      select: { id: true },
+      select: {
+        id: true,
+        name: true,
+        isLocked: true,
+        viewRootContentId: true,
+        viewRoot: { select: { id: true, title: true } },
+      },
     }),
     prisma.contentNode.findFirst({
       where: { id: contentId, ownerId, deletedAt: null },
@@ -772,6 +805,39 @@ export async function resolveOpenIntent(
   if (currentAssignment) return { allowed: true, conflict: null };
 
   const ancestorIds = await getAncestorIds(ownerId, contentId);
+
+  // View scope enforcement: if active workspace is a view, content must be inside the view root subtree
+  if (workspace.viewRootContentId) {
+    const isInScope =
+      contentId === workspace.viewRootContentId ||
+      ancestorIds.includes(workspace.viewRootContentId);
+
+    if (!isInScope) {
+      const folderScopeCandidate =
+        content.contentType === "folder"
+          ? { id: content.id, title: content.title }
+          : content.parent?.contentType === "folder"
+            ? { id: content.parent.id, title: content.parent.title }
+            : null;
+
+      return {
+        allowed: false,
+        conflict: {
+          conflictType: "viewScope",
+          workspaceId,
+          workspaceName: workspace.name,
+          contentId: content.id,
+          contentTitle: content.title,
+          claimContentId: workspace.viewRootContentId,
+          claimContentTitle: workspace.viewRoot?.title ?? "View root",
+          scope: "recursive",
+          folderScopeContentId: folderScopeCandidate?.id ?? null,
+          folderScopeContentTitle: folderScopeCandidate?.title ?? null,
+        },
+      };
+    }
+  }
+
   const claimFilters: Prisma.ContentWorkspaceItemWhereInput[] = [
     { contentId, scope: "item" },
     { contentId, scope: "recursive" },
@@ -804,10 +870,35 @@ export async function resolveOpenIntent(
     take: 25,
   });
 
-  const claim = candidates.find((candidate) => {
-    if (candidate.scope === "recursive") return true;
-    return workspaceStateHasContent(candidate.workspace, candidate.contentId);
-  });
+  // Downstream sharing: if active workspace is a view, its viewRoot's ancestor chain
+  // is used to exempt claims where the active view is downstream of the claiming workspace.
+  let viewRootAncestorIds: string[] | null = null;
+  if (workspace.viewRootContentId) {
+    viewRootAncestorIds = await getAncestorIds(ownerId, workspace.viewRootContentId);
+  }
+
+  let claim: (typeof candidates)[number] | undefined;
+  for (const candidate of candidates) {
+    const isActive =
+      candidate.scope === "recursive" ||
+      workspaceStateHasContent(candidate.workspace, candidate.contentId);
+    if (!isActive) continue;
+
+    // Downstream sharing exception: active view's root is inside the claiming workspace's
+    // recursive scope → allow opening (vertically downstream overlap is permitted)
+    if (
+      candidate.scope === "recursive" &&
+      viewRootAncestorIds !== null &&
+      workspace.viewRootContentId &&
+      (viewRootAncestorIds.includes(candidate.contentId) ||
+        workspace.viewRootContentId === candidate.contentId)
+    ) {
+      continue;
+    }
+
+    claim = candidate;
+    break;
+  }
   if (!claim) return { allowed: true, conflict: null };
 
   const folderScopeCandidate =
@@ -831,6 +922,7 @@ export async function resolveOpenIntent(
   return {
     allowed: false,
     conflict: {
+      conflictType: "overlap",
       workspaceId: claim.workspaceId,
       workspaceName: claim.workspace.name,
       contentId: content.id,

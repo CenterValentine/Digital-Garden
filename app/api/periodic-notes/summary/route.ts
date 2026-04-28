@@ -31,6 +31,29 @@ interface PersonPathNode {
   primaryGroupId: string;
 }
 
+interface SummaryNode {
+  id: string;
+  title: string;
+  contentType: string;
+  customIcon: string | null;
+  iconColor: string | null;
+  parentId: string | null;
+  peopleGroupId: string | null;
+  personId: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+  notePayload: { updatedAt: Date } | null;
+  filePayload: { mimeType: string; updatedAt: Date } | null;
+  htmlPayload: { updatedAt: Date } | null;
+  codePayload: { updatedAt: Date } | null;
+  externalPayload: { updatedAt: Date } | null;
+  chatPayload: { updatedAt: Date } | null;
+  visualizationPayload: { engine: string; updatedAt: Date } | null;
+  dataPayload: { updatedAt: Date } | null;
+  hopePayload: { updatedAt: Date } | null;
+  workflowPayload: { updatedAt: Date } | null;
+}
+
 function buildFolderPathSegments(parentId: string | null, folderMap: Map<string, PathNode>) {
   const labels: string[] = [];
   const seen = new Set<string>();
@@ -137,6 +160,34 @@ function buildLocationPathLabel(
   return [...baseSegments, ...folderSegments].join(" / ");
 }
 
+function getEffectiveContentUpdatedAt(node: SummaryNode) {
+  switch (node.contentType) {
+    case "note":
+      return node.notePayload?.updatedAt ?? node.updatedAt;
+    case "file":
+      return node.filePayload?.updatedAt ?? node.updatedAt;
+    case "html":
+    case "template":
+      return node.htmlPayload?.updatedAt ?? node.updatedAt;
+    case "code":
+      return node.codePayload?.updatedAt ?? node.updatedAt;
+    case "external":
+      return node.externalPayload?.updatedAt ?? node.updatedAt;
+    case "chat":
+      return node.chatPayload?.updatedAt ?? node.updatedAt;
+    case "visualization":
+      return node.visualizationPayload?.updatedAt ?? node.updatedAt;
+    case "data":
+      return node.dataPayload?.updatedAt ?? node.updatedAt;
+    case "hope":
+      return node.hopePayload?.updatedAt ?? node.updatedAt;
+    case "workflow":
+      return node.workflowPayload?.updatedAt ?? node.updatedAt;
+    default:
+      return node.updatedAt;
+  }
+}
+
 export async function GET(request: NextRequest) {
   try {
     const session = await requireAuth();
@@ -184,9 +235,103 @@ export async function GET(request: NextRequest) {
             },
           },
           {
-            updatedAt: {
-              gte: start,
-              lt: end,
+            notePayload: {
+              is: {
+                updatedAt: {
+                  gte: start,
+                  lt: end,
+                },
+              },
+            },
+          },
+          {
+            filePayload: {
+              is: {
+                updatedAt: {
+                  gte: start,
+                  lt: end,
+                },
+              },
+            },
+          },
+          {
+            htmlPayload: {
+              is: {
+                updatedAt: {
+                  gte: start,
+                  lt: end,
+                },
+              },
+            },
+          },
+          {
+            codePayload: {
+              is: {
+                updatedAt: {
+                  gte: start,
+                  lt: end,
+                },
+              },
+            },
+          },
+          {
+            externalPayload: {
+              is: {
+                updatedAt: {
+                  gte: start,
+                  lt: end,
+                },
+              },
+            },
+          },
+          {
+            chatPayload: {
+              is: {
+                updatedAt: {
+                  gte: start,
+                  lt: end,
+                },
+              },
+            },
+          },
+          {
+            visualizationPayload: {
+              is: {
+                updatedAt: {
+                  gte: start,
+                  lt: end,
+                },
+              },
+            },
+          },
+          {
+            dataPayload: {
+              is: {
+                updatedAt: {
+                  gte: start,
+                  lt: end,
+                },
+              },
+            },
+          },
+          {
+            hopePayload: {
+              is: {
+                updatedAt: {
+                  gte: start,
+                  lt: end,
+                },
+              },
+            },
+          },
+          {
+            workflowPayload: {
+              is: {
+                updatedAt: {
+                  gte: start,
+                  lt: end,
+                },
+              },
             },
           },
         ],
@@ -202,14 +347,56 @@ export async function GET(request: NextRequest) {
         personId: true,
         createdAt: true,
         updatedAt: true,
+        notePayload: {
+          select: {
+            updatedAt: true,
+          },
+        },
         filePayload: {
           select: {
             mimeType: true,
+            updatedAt: true,
+          },
+        },
+        htmlPayload: {
+          select: {
+            updatedAt: true,
+          },
+        },
+        codePayload: {
+          select: {
+            updatedAt: true,
+          },
+        },
+        externalPayload: {
+          select: {
+            updatedAt: true,
+          },
+        },
+        chatPayload: {
+          select: {
+            updatedAt: true,
           },
         },
         visualizationPayload: {
           select: {
             engine: true,
+            updatedAt: true,
+          },
+        },
+        dataPayload: {
+          select: {
+            updatedAt: true,
+          },
+        },
+        hopePayload: {
+          select: {
+            updatedAt: true,
+          },
+        },
+        workflowPayload: {
+          select: {
+            updatedAt: true,
           },
         },
       },
@@ -261,7 +448,8 @@ export async function GET(request: NextRequest) {
     const items = nodes
       .map((node) => {
         const createdAt = node.createdAt.getTime();
-        const updatedAt = node.updatedAt.getTime();
+        const effectiveUpdatedAtDate = getEffectiveContentUpdatedAt(node);
+        const updatedAt = effectiveUpdatedAtDate.getTime();
         const createdInPeriod = createdAt >= start.getTime() && createdAt < end.getTime();
         const editedInPeriod = updatedAt >= start.getTime() && updatedAt < end.getTime();
         const locationPath = buildLocationPathLabel(
@@ -280,7 +468,7 @@ export async function GET(request: NextRequest) {
           fileMimeType: node.filePayload?.mimeType ?? null,
           visualizationEngine: node.visualizationPayload?.engine ?? null,
           createdAt: node.createdAt.toISOString(),
-          updatedAt: node.updatedAt.toISOString(),
+          updatedAt: effectiveUpdatedAtDate.toISOString(),
           activity: createdInPeriod ? "created" : "edited",
           path: locationPath,
           sortTime: createdInPeriod ? createdAt : updatedAt,

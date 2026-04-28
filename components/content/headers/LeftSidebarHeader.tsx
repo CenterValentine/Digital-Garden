@@ -170,23 +170,25 @@ export function LeftSidebarHeader({
 
       {/* Right side: Actions + Toggle — must never be clipped */}
       <div className="flex shrink-0 items-center gap-1">
-        <LeftSidebarHeaderActions
-          onCreateFolder={onCreateFolder ? () => onCreateFolder() : undefined}
-          onCreateNote={onCreateNote ? () => onCreateNote() : undefined}
-          onCreateFile={onCreateFile ? () => onCreateFile() : undefined}
-          onCreateDocument={onCreateDocument ? () => onCreateDocument() : undefined}
-          onCreateSpreadsheet={onCreateSpreadsheet ? () => onCreateSpreadsheet() : undefined}
-          onCreateCode={onCreateCode ? () => onCreateCode() : undefined}
-          onCreateHtml={onCreateHtml ? () => onCreateHtml() : undefined}
-          onCreateJson={onCreateJson ? () => onCreateJson() : undefined}
-          onCreateExternal={onCreateExternal ? () => onCreateExternal() : undefined}
-          onCreateVisualizationMermaid={onCreateVisualizationMermaid ? () => onCreateVisualizationMermaid() : undefined}
-          onCreateVisualizationExcalidraw={onCreateVisualizationExcalidraw ? () => onCreateVisualizationExcalidraw() : undefined}
-          onCreateVisualizationDiagramsNet={onCreateVisualizationDiagramsNet ? () => onCreateVisualizationDiagramsNet() : undefined}
-          onCreateChat={onCreateChat ? () => onCreateChat() : undefined}
-          onAddPeopleTarget={onAddPeopleTarget ? () => onAddPeopleTarget() : undefined}
-          disabled={isCreateDisabled}
-        />
+        {activeView === "files" ? (
+          <LeftSidebarHeaderActions
+            onCreateFolder={onCreateFolder ? () => onCreateFolder() : undefined}
+            onCreateNote={onCreateNote ? () => onCreateNote() : undefined}
+            onCreateFile={onCreateFile ? () => onCreateFile() : undefined}
+            onCreateDocument={onCreateDocument ? () => onCreateDocument() : undefined}
+            onCreateSpreadsheet={onCreateSpreadsheet ? () => onCreateSpreadsheet() : undefined}
+            onCreateCode={onCreateCode ? () => onCreateCode() : undefined}
+            onCreateHtml={onCreateHtml ? () => onCreateHtml() : undefined}
+            onCreateJson={onCreateJson ? () => onCreateJson() : undefined}
+            onCreateExternal={onCreateExternal ? () => onCreateExternal() : undefined}
+            onCreateVisualizationMermaid={onCreateVisualizationMermaid ? () => onCreateVisualizationMermaid() : undefined}
+            onCreateVisualizationExcalidraw={onCreateVisualizationExcalidraw ? () => onCreateVisualizationExcalidraw() : undefined}
+            onCreateVisualizationDiagramsNet={onCreateVisualizationDiagramsNet ? () => onCreateVisualizationDiagramsNet() : undefined}
+            onCreateChat={onCreateChat ? () => onCreateChat() : undefined}
+            onAddPeopleTarget={onAddPeopleTarget ? () => onAddPeopleTarget() : undefined}
+            disabled={isCreateDisabled}
+          />
+        ) : null}
 
         {/* Panel collapse toggle */}
         <button

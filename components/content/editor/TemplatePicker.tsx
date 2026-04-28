@@ -17,6 +17,7 @@ import { useTemplateStore } from "@/state/template-store";
 import type { ContentTemplateWithCategory } from "@/lib/domain/templates";
 import { getViewerExtensions } from "@/lib/domain/editor/extensions-client";
 import { sanitizeTipTapJsonWithExtensions } from "@/lib/domain/editor/unsupported-content";
+import { instantiateTemplateContent } from "@/lib/domain/editor/template-instantiation";
 
 let templateInsertExtensions: ReturnType<typeof getViewerExtensions> | null = null;
 
@@ -60,11 +61,17 @@ export function TemplatePicker() {
 
     const tiptapJson = template.tiptapJson as { content?: unknown[] };
     if (tiptapJson?.content) {
-      const sanitized = sanitizeTipTapJsonWithExtensions(
+      const instantiated = instantiateTemplateContent(
         {
           type: "doc",
           content: tiptapJson.content as JSONContent[],
         },
+        {
+          regenerateBlockIds: true,
+        }
+      );
+      const sanitized = sanitizeTipTapJsonWithExtensions(
+        instantiated,
         getTemplateInsertExtensions()
       );
       editor.chain().focus().insertContent(sanitized.json.content ?? []).run();
