@@ -525,6 +525,7 @@ export class HTMLConverter implements DocumentConverter {
         display: inline-flex;
         align-items: center;
         justify-content: center;
+        transform: translateY(-0.26em);
       }
 
       .stopwatch-segment-value {

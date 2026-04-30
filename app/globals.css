@@ -2829,6 +2829,7 @@ mark {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  transform: translateY(var(--stopwatch-separator-offset, -0.28em));
 }
 
 .ProseMirror .stopwatch-segment-value {
@@ -2846,6 +2847,7 @@ mark {
 .ProseMirror .stopwatch-content[data-variant="ios"] .stopwatch-separator {
   font-size: clamp(2.2rem, 4.5vw, 4rem);
   font-weight: 300;
+  --stopwatch-separator-offset: -0.3em;
 }
 
 .ProseMirror .stopwatch-content[data-variant="minimal"] .stopwatch-segment-value {
@@ -2857,6 +2859,7 @@ mark {
 .ProseMirror .stopwatch-content[data-variant="minimal"] .stopwatch-separator {
   font-size: clamp(1.85rem, 3.6vw, 3rem);
   font-weight: 600;
+  --stopwatch-separator-offset: -0.24em;
 }
 
 .ProseMirror .stopwatch-content[data-variant="panel"] .stopwatch-segment-value {
@@ -2868,6 +2871,7 @@ mark {
 .ProseMirror .stopwatch-content[data-variant="panel"] .stopwatch-separator {
   font-size: clamp(1.7rem, 3vw, 2.7rem);
   font-weight: 700;
+  --stopwatch-separator-offset: -0.22em;
 }
 
 .ProseMirror .stopwatch-segment-label {
