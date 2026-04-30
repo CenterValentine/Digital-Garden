@@ -518,11 +518,13 @@ export class HTMLConverter implements DocumentConverter {
       }
 
       .stopwatch-separator {
-        align-self: flex-start;
-        padding-top: 0.18em;
+        align-self: center;
         font-size: 1.9rem;
         font-weight: 600;
         line-height: 1;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
       }
 
       .stopwatch-segment-value {

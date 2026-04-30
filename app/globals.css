@@ -2822,11 +2822,13 @@ mark {
 }
 
 .ProseMirror .stopwatch-separator {
-  align-self: flex-start;
-  padding-top: 0.18em;
+  align-self: center;
   font-variant-numeric: tabular-nums;
   color: #0f172a;
   line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .ProseMirror .stopwatch-segment-value {
