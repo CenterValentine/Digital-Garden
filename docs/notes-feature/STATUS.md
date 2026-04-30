@@ -1,5 +1,5 @@
 ---
-last_updated: 2026-04-26
+last_updated: 2026-04-29
 current_epoch: 13
 current_sprint: 58
 sprint_status: planned
@@ -52,6 +52,20 @@ before planning and executing. There may be additions or modifications.
 **Detailed Plan**: `docs/notes-feature/work-tracking/epochs/epoch-13-people-and-collaboration.md`
 
 ## Recent Completions (Last 30 Days)
+
+**Apr 29, 2026**: Stopwatch block prototype
+- Added a new document-local `stopwatch` TipTap block with persisted wall-clock timing, lap capture, and multiple visual style variants
+- Implemented count-up stopwatch state from saved `startedAt + accumulatedMs`, allowing timers to continue accurately across reloads until explicitly stopped
+- Added a dedicated Stopwatch properties panel for title, style variant, accent color, lap visibility, and display toggles
+- Wired the block into editor schema/versioning, slash commands, HTML export, Markdown export, and plain-text export
+- Build gate passed on branch `codex/habit-tracker-block-prototype`
+
+**Apr 28, 2026**: Habit tracker block prototype
+- Added a new document-local `habitTracker` TipTap block with three presets: monthly grid, weekly grid, and streak cards
+- Introduced inline boolean and count-based check-ins with computed completion rate, hit-day totals, and current streak rollups
+- Added a dedicated Habit Tracker properties panel for tracker settings, habit list management, and mode/target customization
+- Wired the block into editor schema/versioning, slash commands, HTML export, Markdown export, and plain-text export
+- Build gate passed on branch `codex/habit-tracker-block-prototype`
 
 **Apr 26, 2026**: Unsupported TipTap block safety net
 - Added schema-aware TipTap normalization that rewrites unknown/deprecated nodes before editor load, collaboration bootstrap, or server rendering

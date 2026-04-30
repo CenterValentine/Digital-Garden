@@ -284,6 +284,304 @@ export class HTMLConverter implements DocumentConverter {
         background: ${isDark ? "rgba(6, 182, 212, 0.1)" : "rgba(6, 182, 212, 0.1)"};
       }
 
+      /* Habit tracker */
+      .habit-tracker-static {
+        border: 1px solid var(--border-color);
+        border-radius: 16px;
+        padding: 1rem;
+        margin: 1.25rem 0;
+        background: ${isDark ? "rgba(255,255,255,0.03)" : "rgba(15,23,42,0.03)"};
+      }
+
+      .habit-tracker-static[data-show-background="false"] {
+        background: transparent;
+      }
+
+      .habit-tracker-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 1rem;
+        margin-bottom: 1rem;
+      }
+
+      .habit-tracker-title {
+        font-size: 1rem;
+        font-weight: 600;
+      }
+
+      .habit-tracker-subtitle {
+        font-size: 0.875rem;
+        color: var(--text-secondary);
+        margin-top: 0.2rem;
+      }
+
+      .habit-tracker-empty {
+        border: 1px dashed var(--border-color);
+        border-radius: 12px;
+        padding: 1rem;
+        color: var(--text-secondary);
+      }
+
+      .habit-tracker-empty-title {
+        font-weight: 600;
+        color: var(--text-primary);
+      }
+
+      .habit-tracker-grid-scroll {
+        overflow-x: auto;
+      }
+
+      .habit-tracker-grid {
+        width: 100%;
+        min-width: 540px;
+        border-collapse: collapse;
+      }
+
+      .habit-tracker-grid-header {
+        font-size: 0.75rem;
+        color: var(--text-secondary);
+        white-space: nowrap;
+      }
+
+      .habit-tracker-grid-weekday,
+      .habit-tracker-grid-day {
+        display: block;
+      }
+
+      .habit-tracker-habit-cell {
+        min-width: 180px;
+      }
+
+      .habit-tracker-habit-chip {
+        display: flex;
+        align-items: center;
+        gap: 0.65rem;
+      }
+
+      .habit-tracker-habit-icon {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 1.5rem;
+        height: 1.5rem;
+        font-size: 1rem;
+      }
+
+      .habit-tracker-habit-name {
+        font-weight: 500;
+      }
+
+      .habit-tracker-habit-target {
+        font-size: 0.75rem;
+        color: var(--text-secondary);
+      }
+
+      .habit-tracker-grid-cell {
+        text-align: center;
+      }
+
+      .habit-tracker-cell-static {
+        display: inline-flex;
+        min-width: 2rem;
+        min-height: 2rem;
+        align-items: center;
+        justify-content: center;
+        border-radius: 10px;
+        border: 1px solid var(--border-color);
+        background: ${isDark ? "rgba(255,255,255,0.02)" : "rgba(15,23,42,0.03)"};
+      }
+
+      .habit-tracker-cell-static[data-complete="true"] {
+        border-color: rgba(34, 197, 94, 0.45);
+        background: rgba(34, 197, 94, 0.14);
+      }
+
+      .habit-tracker-row-stats {
+        min-width: 160px;
+      }
+
+      .habit-tracker-stat-badges,
+      .habit-tracker-row-stats {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.35rem;
+      }
+
+      .habit-tracker-stat {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0.2rem 0.5rem;
+        border-radius: 9999px;
+        font-size: 0.75rem;
+        border: 1px solid var(--border-color);
+        color: var(--text-secondary);
+      }
+
+      .habit-tracker-cards {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 0.75rem;
+      }
+
+      .habit-tracker-card {
+        border: 1px solid var(--border-color);
+        border-radius: 14px;
+        padding: 0.85rem;
+        background: ${isDark ? "rgba(255,255,255,0.02)" : "rgba(15,23,42,0.02)"};
+      }
+
+      .habit-tracker-card-top {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 0.75rem;
+        margin-bottom: 0.75rem;
+      }
+
+      .habit-tracker-card-identity {
+        display: flex;
+        align-items: center;
+        gap: 0.65rem;
+      }
+
+      .habit-tracker-card-strip {
+        display: grid;
+        grid-template-columns: repeat(7, minmax(0, 1fr));
+        gap: 0.35rem;
+      }
+
+      .habit-tracker-card-day {
+        border: 1px solid var(--border-color);
+        border-radius: 10px;
+        padding: 0.35rem 0.2rem;
+        text-align: center;
+        background: ${isDark ? "rgba(255,255,255,0.02)" : "rgba(15,23,42,0.02)"};
+      }
+
+      .habit-tracker-card-day[data-complete="true"] {
+        border-color: rgba(34, 197, 94, 0.45);
+        background: rgba(34, 197, 94, 0.12);
+      }
+
+      .habit-tracker-card-day-label,
+      .habit-tracker-card-day-value {
+        display: block;
+        font-size: 0.72rem;
+      }
+
+      .block-stopwatch {
+        --stopwatch-accent: #ff6b57;
+        margin: 1rem 0;
+      }
+
+      .stopwatch-static[data-show-background="true"] {
+        border-radius: 18px;
+        padding: 1rem;
+        background: ${isDark ? "rgba(255,255,255,0.03)" : "rgba(15,23,42,0.03)"};
+      }
+
+      .stopwatch-header {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 1rem;
+      }
+
+      .stopwatch-title {
+        font-size: 1rem;
+        font-weight: 600;
+      }
+
+      .stopwatch-status {
+        margin-top: 0.15rem;
+        font-size: 0.72rem;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: var(--text-secondary);
+      }
+
+      .stopwatch-display {
+        display: flex;
+        gap: 0.5rem;
+        margin: 0.85rem 0 0.45rem;
+        overflow-x: auto;
+      }
+
+      .stopwatch-segment {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 0.1rem;
+        flex-shrink: 0;
+      }
+
+      .stopwatch-separator {
+        align-self: flex-start;
+        padding-top: 0.18em;
+        font-size: 1.9rem;
+        font-weight: 600;
+        line-height: 1;
+      }
+
+      .stopwatch-segment-value {
+        font-size: 2rem;
+        font-weight: 600;
+        line-height: 1;
+      }
+
+      .stopwatch-segment-label {
+        font-size: 0.62rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--text-secondary);
+      }
+
+      .stopwatch-meta {
+        font-size: 0.78rem;
+        color: var(--text-secondary);
+      }
+
+      .stopwatch-laps {
+        margin-top: 0.85rem;
+        padding-top: 0.85rem;
+        border-top: 1px solid var(--border-color);
+      }
+
+      .stopwatch-laps-header,
+      .stopwatch-lap-row {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr);
+        gap: 0.75rem;
+        align-items: center;
+      }
+
+      .stopwatch-laps-header {
+        margin-bottom: 0.45rem;
+        font-size: 0.66rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--text-secondary);
+      }
+
+      .stopwatch-lap-row {
+        padding: 0.45rem 0;
+        border-top: 1px solid var(--border-color);
+        font-variant-numeric: tabular-nums;
+      }
+
+      .stopwatch-lap-value,
+      .stopwatch-lap-split {
+        text-align: right;
+      }
+
+      .stopwatch-laps-empty {
+        font-size: 0.78rem;
+        color: var(--text-secondary);
+      }
+
       ${syntaxHighlight ? this.getSyntaxHighlightCSS(isDark) : ""}
     </style>`;
   }

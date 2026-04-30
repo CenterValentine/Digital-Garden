@@ -10,6 +10,10 @@ import type {
   ConversionResult,
 } from "../types";
 import type { JSONContent } from "@tiptap/core";
+import { normalizeHabitTrackerAttrs } from "@/lib/domain/habit-tracker";
+import { getHabitTrackerPlainText } from "@/lib/domain/editor/extensions/blocks/habit-tracker";
+import { normalizeStopwatchAttrs } from "@/lib/domain/stopwatch";
+import { getStopwatchPlainText } from "@/lib/domain/editor/extensions/blocks/stopwatch";
 
 export class PlainTextConverter implements DocumentConverter {
   async convert(
@@ -51,6 +55,18 @@ export class PlainTextConverter implements DocumentConverter {
       text += node.text;
     }
 
+    if (node.type === "habitTracker") {
+      return `${getHabitTrackerPlainText(
+        normalizeHabitTrackerAttrs((node.attrs || {}) as Record<string, unknown>)
+      )}\n`;
+    }
+
+    if (node.type === "stopwatch") {
+      return `${getStopwatchPlainText(
+        normalizeStopwatchAttrs((node.attrs || {}) as Record<string, unknown>)
+      )}\n`;
+    }
+
     // Handle child nodes
     if (node.content && Array.isArray(node.content)) {
       for (const child of node.content) {
@@ -86,6 +102,8 @@ export class PlainTextConverter implements DocumentConverter {
       "horizontalRule",
       "table",
       "callout",
+      "habitTracker",
+      "stopwatch",
     ];
 
     return blockTypes.includes(type || "");

@@ -6,6 +6,44 @@ branch: epoch-12/sprint-55-wire-blocks
 status: complete
 ---
 
+# Current Sprint Addendum
+
+## Apr 29, 2026 — Stopwatch Block Prototype
+
+**Branch**: `codex/habit-tracker-block-prototype`  
+**Status**: Implemented, awaiting manual browser smoke test
+
+### Implemented
+- Added a new document-local `stopwatch` block with persisted count-up timing, lap capture, and style variants
+- Implemented elapsed-time persistence from saved `startedAt`, `accumulatedMs`, and laps so running stopwatches resume accurately across reloads
+- Added a dedicated Stopwatch properties panel for title, variant, accent color, lap visibility, and display toggles
+- Registered the block in both client and server TipTap extension sets and added `/stopwatch` to slash commands
+- Updated schema versioning and export fallbacks so the stopwatch remains readable in HTML, Markdown, and plain text
+
+### Verification
+- `pnpm build` passed
+- Manual browser smoke test still pending
+
+---
+
+## Apr 28, 2026 — Habit Tracker Prototype
+
+**Branch**: `codex/habit-tracker-block-prototype`  
+**Status**: Implemented, awaiting manual browser smoke test
+
+### Implemented
+- Added a new document-local `habitTracker` block with `monthly-grid`, `weekly-grid`, and `streak-cards` presets
+- Added inline boolean and count interactions with period navigation and computed stats
+- Added a dedicated Habit Tracker properties panel for title, preset, week start, display toggles, and habit list editing
+- Registered the block in both client and server TipTap extension sets and added `/habit-tracker` to slash commands
+- Updated schema versioning and export fallbacks so the tracker remains readable in HTML, Markdown, and plain text
+
+### Verification
+- `pnpm build` passed
+- Manual browser smoke test still pending
+
+---
+
 # Sprint 55: Block Wiring + UI Fixes + Auth
 
 ## Sprint Goal
