@@ -313,7 +313,14 @@ export function MainPanelHeader({
         );
       }
       if (!isPageTemplate) {
-        window.dispatchEvent(new CustomEvent("dg:tree-refresh"));
+        window.dispatchEvent(
+          new CustomEvent("content-updated", {
+            detail: {
+              contentId: tab.contentId,
+              updates: { title: newTitle },
+            },
+          }),
+        );
       }
     } catch {
       // Revert on failure

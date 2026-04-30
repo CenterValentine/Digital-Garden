@@ -1,27 +1,19 @@
 {
   "name": "Digital Garden",
-  "short_name": "Digital Garden",
-  "description": "A personal knowledge space for notes, ideas, and connected thinking.",
+  "short_name": "Garden",
   "icons": [
     {
-      "src": "/favicon.ico",
-      "sizes": "any",
-      "type": "image/x-icon"
-    },
-    {
-      "src": "/favicon-32x32.png",
-      "sizes": "32x32",
+      "src": "/android-chrome-192x192.png",
+      "sizes": "192x192",
       "type": "image/png"
     },
     {
-      "src": "/favicon-16x16.png",
-      "sizes": "16x16",
+      "src": "/android-chrome-512x512.png",
+      "sizes": "512x512",
       "type": "image/png"
     }
   ],
-  "theme_color": "#1a1a1a",
-  "background_color": "#1a1a1a",
-  "display": "standalone",
-  "start_url": "/content/",
-  "scope": "/"
+  "theme_color": "#ffffff",
+  "background_color": "#ffffff",
+  "display": "standalone"
 }

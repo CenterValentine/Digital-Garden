@@ -11,7 +11,6 @@ import {
 import * as LucideIcons from "lucide-react";
 import {
   Briefcase,
-  Check,
   ChevronDown,
   Copy,
   Eye,
@@ -1324,7 +1323,9 @@ export function WorkspaceSelector() {
                     ? `border-l-2 pl-1 ${isActive ? "border-gold-primary" : "border-gold-primary/35"}`
                     : "pl-1.5"
                 } ${
-                  isActive ? "bg-gold-primary/10 text-gold-primary" : ""
+                  isActive
+                    ? "bg-gold-primary/16 text-gold-primary shadow-[inset_0_0_0_1px_rgba(212,167,85,0.24)]"
+                    : ""
                 } ${isDragged ? "opacity-40" : ""} ${
                   isDropTarget ? "ring-1 ring-gold-primary/40" : ""
                 }`}
@@ -1362,7 +1363,6 @@ export function WorkspaceSelector() {
                     {workspace.isView ? (
                       <Eye className="h-3 w-3 shrink-0 text-gold-primary/70" />
                     ) : null}
-                    {isActive ? <Check className="h-4 w-4 shrink-0" /> : null}
                     {workspace.isLocked ? (
                       <Lock className="h-3 w-3 shrink-0 text-gray-400/80" />
                     ) : null}

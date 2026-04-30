@@ -1161,7 +1161,14 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
       if (isPageTemplateTab) {
         await refreshPageTemplates();
       } else {
-        window.dispatchEvent(new CustomEvent("dg:tree-refresh"));
+        window.dispatchEvent(
+          new CustomEvent("content-updated", {
+            detail: {
+              contentId: selectedContentId,
+              updates: { title: newTitle },
+            },
+          }),
+        );
       }
     } catch {
       // Revert
