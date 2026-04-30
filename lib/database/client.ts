@@ -7,6 +7,7 @@ import { PrismaPg } from "@prisma/adapter-pg";
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
+  prismaPool: Pool | undefined;
 };
 
 const databaseUrl = process.env.DATABASE_URL || "";
@@ -19,30 +20,38 @@ const logLevels: Prisma.LogLevel[] =
     ? ["query", "error", "warn"]
     : ["error"];
 
-// Prisma client configuration
-// If using Accelerate, use accelerateUrl; otherwise use adapter for direct PostgreSQL connection
-const prismaClient = isAccelerateUrl
-  ? new PrismaClient({
+function createPrismaClient() {
+  if (isAccelerateUrl) {
+    return new PrismaClient({
       log: logLevels,
       accelerateUrl: databaseUrl,
-    })
-  : // For direct PostgreSQL connections, use the pg adapter
-    (() => {
-      const pool = new Pool({ connectionString: databaseUrl });
-      const adapter = new PrismaPg(pool);
-      return new PrismaClient({
-        log: logLevels,
-        adapter,
-      });
-    })();
+    });
+  }
 
-// No new client is created if one already exists
-export const prisma = globalForPrisma.prisma ?? prismaClient;
+  // Reuse one pg pool in development so HMR doesn't leak connections.
+  const pool =
+    globalForPrisma.prismaPool ?? new Pool({ connectionString: databaseUrl });
+
+  if (process.env.NODE_ENV !== "production") {
+    globalForPrisma.prismaPool = pool;
+  }
+
+  const adapter = new PrismaPg(pool);
+  return new PrismaClient({
+    log: logLevels,
+    adapter,
+  });
+}
+
+export const prisma = globalForPrisma.prisma ?? createPrismaClient();
 
 if (process.env.NODE_ENV !== "production") {
   globalForPrisma.prisma = prisma;
   // Debug: Log what's available on prisma client
-  if (typeof prisma.contentNode === 'undefined') {
-    console.error('[PRISMA DEBUG] contentNode is undefined! Available keys:', Object.keys(prisma).slice(0, 15));
+  if (typeof prisma.contentNode === "undefined") {
+    console.error(
+      "[PRISMA DEBUG] contentNode is undefined! Available keys:",
+      Object.keys(prisma).slice(0, 15),
+    );
   }
 }

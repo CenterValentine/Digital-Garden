@@ -16,6 +16,7 @@ interface FileNameInputProps {
   onBlur?: () => void;
   onKeyDown?: (e: React.KeyboardEvent) => void;
   autoFocus?: boolean;
+  focusBehavior?: "select" | "end";
   className?: string;
   placeholder?: string;
 }
@@ -27,26 +28,29 @@ export function FileNameInput({
   onBlur,
   onKeyDown,
   autoFocus = false,
+  focusBehavior = "select",
   className = "",
   placeholder = "",
 }: FileNameInputProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [isFocused, setIsFocused] = useState(false);
 
-  // Auto-focus and select all text on mount
+  // Auto-focus once on mount. Resumed edit sessions keep the caret at the end
+  // instead of re-selecting the entire filename and clobbering the next keypress.
   useEffect(() => {
     if (autoFocus && inputRef.current) {
       inputRef.current.focus();
-      inputRef.current.select();
+      if (focusBehavior === "select") {
+        inputRef.current.select();
+      } else {
+        const { value } = inputRef.current;
+        inputRef.current.setSelectionRange(value.length, value.length);
+      }
     }
-  }, [autoFocus]);
+  }, [autoFocus, focusBehavior]);
 
   const handleFocus = () => {
     setIsFocused(true);
-    // Select all text when input gains focus
-    if (inputRef.current) {
-      inputRef.current.select();
-    }
   };
 
   const handleBlur = () => {
