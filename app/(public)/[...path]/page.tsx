@@ -6,7 +6,7 @@ import { prisma } from "@/lib/database/client";
 const SITE_OWNER_ID = process.env.SITE_OWNER_ID ?? "";
 
 interface Params {
-  path?: string[];
+  path: string[];
 }
 
 export default async function PublicCatchAll({
@@ -14,7 +14,7 @@ export default async function PublicCatchAll({
 }: {
   params: Promise<Params>;
 }) {
-  const { path: segments = [] } = await params;
+  const { path: segments } = await params;
   const fullPath = "/" + segments.join("/");
 
   if (!SITE_OWNER_ID) {
@@ -132,30 +132,7 @@ async function resolvePublicPath(ownerId: string, segments: string[]) {
     parentId = current.id;
   }
 
-  if (!current) {
-    // Root path — return a virtual listing of all root-level items
-    return {
-      id: null as unknown as string,
-      title: "All Content",
-      description: null,
-      slug: "",
-      items: await prisma.publicItem.findMany({
-        where: { ownerId, pathId: { not: undefined as never }, state: "published", deletedAt: null },
-        select: {
-          id: true,
-          slug: true,
-          publicTitle: true,
-          payloadType: true,
-          publicTags: true,
-          firstPublishedAt: true,
-          path: { select: { slug: true, title: true } },
-          blogPostPayload: { select: { excerpt: true, coverImageUrl: true } },
-        },
-        orderBy: { lastPublishedAt: "desc" },
-        take: 50,
-      }),
-    };
-  }
+  if (!current) return null;
 
   const items = await prisma.publicItem.findMany({
     where: { ownerId, pathId: current.id, state: "published", deletedAt: null },
