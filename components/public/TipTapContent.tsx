@@ -4,7 +4,7 @@
  */
 
 import { generateHTML } from "@tiptap/core";
-import { getServerExtensions } from "@/lib/domain/editor";
+import { getServerExtensions } from "@/lib/domain/editor/extensions-server";
 import type { JSONContent } from "@tiptap/core";
 
 interface TipTapContentProps {

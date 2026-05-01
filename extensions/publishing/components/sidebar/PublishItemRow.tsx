@@ -127,12 +127,12 @@ export function PublishItemRow({ item, onRefresh }: PublishItemRowProps) {
         </div>
 
         {/* Actions */}
-        <div className="flex items-center gap-2 mt-1.5">
+        <div className="flex items-center gap-1 mt-1.5">
           {item.state !== "published" && canPublish(item) && (
             <button
               onClick={handlePublish}
               disabled={isActing || blocked}
-              className="text-[10px] text-emerald-600 hover:text-emerald-700 transition-colors disabled:opacity-40"
+              className="rounded px-1.5 py-0.5 text-[10px] font-medium text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700 transition-colors disabled:opacity-40"
             >
               Publish
             </button>
@@ -143,10 +143,10 @@ export function PublishItemRow({ item, onRefresh }: PublishItemRowProps) {
                 onClick={handlePublish}
                 disabled={isActing || blocked}
                 className={cn(
-                  "text-[10px] transition-colors disabled:opacity-40",
+                  "rounded px-1.5 py-0.5 text-[10px] font-medium transition-colors disabled:opacity-40",
                   pendingChanges
-                    ? "text-amber-600 hover:text-amber-700"
-                    : "text-gray-400 hover:text-gray-600"
+                    ? "text-amber-600 hover:bg-amber-50 hover:text-amber-700"
+                    : "text-gray-400 hover:bg-gray-100 hover:text-gray-600"
                 )}
               >
                 {pendingChanges ? "Update" : "Re-publish"}
@@ -154,7 +154,7 @@ export function PublishItemRow({ item, onRefresh }: PublishItemRowProps) {
               <button
                 onClick={handleUnpublish}
                 disabled={isActing}
-                className="text-[10px] text-gray-400 hover:text-gray-600 transition-colors disabled:opacity-40"
+                className="rounded px-1.5 py-0.5 text-[10px] font-medium text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors disabled:opacity-40"
               >
                 Unpublish
               </button>
@@ -162,7 +162,7 @@ export function PublishItemRow({ item, onRefresh }: PublishItemRowProps) {
                 href={viewHref}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-0.5 text-[10px] text-gray-400 hover:text-gray-600 transition-colors"
+                className="flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-medium text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
               >
                 <ExternalLink className="w-2.5 h-2.5" />
                 View
