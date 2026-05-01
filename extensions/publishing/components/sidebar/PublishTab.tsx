@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { usePublishStore } from "../../state/publish-store";
 import { fetchLinkedPublicItems } from "../../lib/client-api";
 import { PublishItemRow } from "./PublishItemRow";
+import { PrePublishDialog } from "../dialogs/PrePublishDialog";
 
 interface PublishTabProps {
   contentId: string | null;
@@ -50,6 +51,7 @@ export function PublishTab({ contentId }: PublishTabProps) {
 
   return (
     <div className="flex flex-col h-full">
+      <PrePublishDialog onRefresh={load} />
       {/* Header */}
       <div className="flex items-center justify-between px-3 py-2 border-b border-white/5 shrink-0">
         <span className="text-xs font-medium text-white/50 uppercase tracking-wider">

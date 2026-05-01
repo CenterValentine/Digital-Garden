@@ -11,7 +11,7 @@ import {
 } from "../icons/state-icon-map";
 import { canPublish, hasPendingChanges, isBlockedByValidation } from "../../lib/predicates";
 import { publishItem, unpublishItem } from "../../lib/client-api";
-import type { PublishItemSummary } from "../../state/publish-store";
+import { usePublishStore, type PublishItemSummary } from "../../state/publish-store";
 
 interface PublishItemRowProps {
   item: PublishItemSummary;
@@ -20,6 +20,7 @@ interface PublishItemRowProps {
 
 export function PublishItemRow({ item, onRefresh }: PublishItemRowProps) {
   const [isActing, setIsActing] = useState(false);
+  const { openPrePublishDialog } = usePublishStore();
 
   const stateIcon = PUBLISH_STATE_ICON[item.state];
   const validationIcon =
@@ -28,9 +29,15 @@ export function PublishItemRow({ item, onRefresh }: PublishItemRowProps) {
       : null;
   const pendingChanges = hasPendingChanges(item);
   const blocked = isBlockedByValidation(item);
+  const hasWarnings = item.validationStatus === "warnings";
 
   async function handlePublish() {
     if (!canPublish(item)) return;
+    // Route through dialog when warnings exist so user can review before publishing
+    if (hasWarnings) {
+      openPrePublishDialog(item.id);
+      return;
+    }
     setIsActing(true);
     try {
       await publishItem(item.id);
