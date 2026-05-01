@@ -22,7 +22,7 @@ export function TipTapContent({ bodyJson, className }: TipTapContentProps) {
 
   return (
     <div
-      className={className ?? "prose prose-invert max-w-none"}
+      className={className ?? "public-prose"}
       // eslint-disable-next-line react/no-danger
       dangerouslySetInnerHTML={{ __html: html }}
     />

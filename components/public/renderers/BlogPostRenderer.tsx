@@ -79,7 +79,7 @@ export function BlogPostRenderer({ item }: { item: BlogPostItem }) {
       {revision && (
         <TipTapContent
           bodyJson={revision.bodyJson as JSONContent}
-          className="prose prose-invert prose-lg max-w-none"
+          className="public-prose public-prose--lg"
         />
       )}
     </article>

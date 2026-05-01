@@ -36,7 +36,7 @@ export function PageRenderer({ item }: { item: PageItem }) {
       {revision && (
         <TipTapContent
           bodyJson={revision.bodyJson as JSONContent}
-          className="prose prose-invert prose-lg max-w-none"
+          className="public-prose public-prose--lg"
         />
       )}
     </article>
