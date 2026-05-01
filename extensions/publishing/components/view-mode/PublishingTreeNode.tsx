@@ -27,8 +27,8 @@ export function PublishingTreeNode({ node, depth }: PublishingTreeNodeProps) {
           "group flex items-center gap-1.5 px-2 py-1 cursor-pointer rounded-sm mx-1 text-sm",
           "transition-colors select-none",
           isSelected
-            ? "bg-white/10 text-white"
-            : "text-white/60 hover:text-white/80 hover:bg-white/5"
+            ? "bg-gray-100 text-gray-800"
+            : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
         )}
         style={{ paddingLeft: `${0.5 + depth * 1}rem` }}
         onClick={() => {

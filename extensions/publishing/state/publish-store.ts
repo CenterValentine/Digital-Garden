@@ -19,6 +19,7 @@ export interface PublishItemSummary {
   workingRevisionId: string | null;
   publishedRevisionId: string | null;
   hasPendingChanges: boolean;
+  path: { id: string; slug: string; title: string } | null;
 }
 
 interface PublishState_ {
