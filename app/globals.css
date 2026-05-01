@@ -896,11 +896,10 @@ mark {
   transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
 }
 
-.ProseMirror .block-node:hover {
+.block-editing-active .block-node:hover {
   border-color: rgba(0, 0, 0, 0.18);
   background: transparent;
   box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.025);
-
 }
 
 .ProseMirror .block-node.block-selected,
@@ -933,9 +932,9 @@ mark {
   pointer-events: none;
 }
 
-.ProseMirror .block-node:hover > .block-chrome,
-.ProseMirror .block-node.block-selected > .block-chrome,
-.ProseMirror .block-node.ProseMirror-selectednode > .block-chrome {
+.block-editing-active .block-node:hover > .block-chrome,
+.block-editing-active .block-node.block-selected > .block-chrome,
+.block-editing-active .block-node.ProseMirror-selectednode > .block-chrome {
   pointer-events: none;
 }
 
@@ -956,7 +955,7 @@ mark {
   user-select: none;
 }
 
-.ProseMirror .block-node:hover .block-type-badge {
+.block-editing-active .block-node:hover .block-type-badge {
   animation: block-badge-peek 2.2s ease-out forwards;
 }
 
@@ -993,7 +992,7 @@ mark {
   pointer-events: auto;
 }
 
-.ProseMirror .block-node:hover .block-menu-btn {
+.block-editing-active .block-node:hover .block-menu-btn {
   opacity: 1;
 }
 
@@ -1021,7 +1020,7 @@ mark {
   pointer-events: auto;
 }
 
-.ProseMirror .block-node:hover .block-delete-btn {
+.block-editing-active .block-node:hover .block-delete-btn {
   opacity: 1;
 }
 
@@ -1066,7 +1065,7 @@ mark {
   bottom: -12px;
 }
 
-.ProseMirror .block-node:hover .block-insert-btn {
+.block-editing-active .block-node:hover .block-insert-btn {
   opacity: 1;
   pointer-events: auto;
 }
@@ -1108,9 +1107,9 @@ mark {
   bottom: -5px;
 }
 
-.ProseMirror .block-node:hover .block-cursor-anchor,
-.ProseMirror .block-node.block-selected .block-cursor-anchor,
-.ProseMirror .block-node.ProseMirror-selectednode .block-cursor-anchor {
+.block-editing-active .block-node:hover .block-cursor-anchor,
+.block-editing-active .block-node.block-selected .block-cursor-anchor,
+.block-editing-active .block-node.ProseMirror-selectednode .block-cursor-anchor {
   opacity: 0.4;
 }
 
