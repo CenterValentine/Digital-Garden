@@ -49,8 +49,9 @@ export function PublishTab({ contentId, contentTitle }: PublishTabProps) {
   if (!contentId) {
     return (
       <div className="flex flex-col items-center gap-2 py-10 px-4 text-center">
-        <Globe className="w-6 h-6 text-white/20" />
-        <p className="text-xs text-white/40">No content selected.</p>
+        <Globe className="w-6 h-6 text-white/30" />
+        <p className="text-xs text-white/50">No content selected.</p>
+        <p className="text-[11px] text-white/30">Open a note to manage publishing.</p>
       </div>
     );
   }
@@ -72,12 +73,12 @@ export function PublishTab({ contentId, contentTitle }: PublishTabProps) {
 
       {/* Header */}
       <div className="flex items-center justify-between px-3 py-2 border-b border-white/5 shrink-0">
-        <span className="text-xs font-medium text-white/50 uppercase tracking-wider">
-          Published as
+        <span className="text-xs font-medium text-white/60 uppercase tracking-wider">
+          {linkedItems.length > 0 ? "Published as" : "Publish"}
         </span>
         <button
           onClick={() => setShowCreateDialog(true)}
-          className="flex items-center gap-1 text-xs text-white/40 hover:text-white/70 transition-colors"
+          className="flex items-center gap-1 text-xs text-white/50 hover:text-white/80 transition-colors"
           title="Add to publishing"
         >
           <Plus className="w-3.5 h-3.5" />
@@ -92,12 +93,17 @@ export function PublishTab({ contentId, contentTitle }: PublishTabProps) {
             <Loader2 className="w-4 h-4 animate-spin" />
           </div>
         ) : linkedItems.length === 0 ? (
-          <div className="flex flex-col items-center gap-2 py-10 px-4 text-center">
-            <Globe className="w-5 h-5 text-white/20" />
-            <p className="text-xs text-white/40">Not yet published.</p>
+          <div className="flex flex-col items-center gap-3 py-10 px-4 text-center">
+            <Globe className="w-6 h-6 text-white/30" />
+            <div>
+              <p className="text-xs text-white/60 font-medium">Not yet published</p>
+              <p className="text-[11px] text-white/40 mt-0.5">
+                Add this note to a publishing path to make it public.
+              </p>
+            </div>
             <button
               onClick={() => setShowCreateDialog(true)}
-              className="mt-1 text-xs text-white/30 hover:text-white/60 underline transition-colors"
+              className="mt-1 px-3 py-1.5 rounded-md text-xs font-medium bg-white/5 text-white/60 hover:bg-white/10 hover:text-white/80 transition-colors border border-white/10"
             >
               Add to publishing
             </button>
