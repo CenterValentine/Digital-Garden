@@ -36,6 +36,15 @@ main:has(.notes-layout-page) {
   padding-top: 0 !important;
 }
 
+/* Suppress default app nav + padding for public route group */
+body:has(.public-route) .notes-route-hides-default-nav {
+  display: none !important;
+}
+body:has(.public-route) .notes-route-no-padding,
+body:has(.public-route) main {
+  padding-top: 0 !important;
+}
+
 /* Position toaster below navbar on notes routes (top-right corner) */
 /* Sonner uses [data-sonner-toaster] as the main container */
 body:has(.notes-layout-page) [data-sonner-toaster][data-y-position="top"] {
