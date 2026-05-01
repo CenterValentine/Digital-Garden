@@ -122,7 +122,7 @@ async function resolvePublicItem(
 
 async function resolvePublicPath(ownerId: string, segments: string[]) {
   let parentId: string | null = null;
-  let current = null;
+  let current: Awaited<ReturnType<typeof prisma.publicPath.findFirst>> = null;
 
   for (const seg of segments) {
     current = await prisma.publicPath.findFirst({
@@ -132,7 +132,48 @@ async function resolvePublicPath(ownerId: string, segments: string[]) {
     parentId = current.id;
   }
 
-  return current;
+  if (!current) {
+    // Root path — return a virtual listing of all root-level items
+    return {
+      id: null as unknown as string,
+      title: "All Content",
+      description: null,
+      slug: "",
+      items: await prisma.publicItem.findMany({
+        where: { ownerId, pathId: { not: undefined as never }, state: "published", deletedAt: null },
+        select: {
+          id: true,
+          slug: true,
+          publicTitle: true,
+          payloadType: true,
+          publicTags: true,
+          firstPublishedAt: true,
+          path: { select: { slug: true, title: true } },
+          blogPostPayload: { select: { excerpt: true, coverImageUrl: true } },
+        },
+        orderBy: { lastPublishedAt: "desc" },
+        take: 50,
+      }),
+    };
+  }
+
+  const items = await prisma.publicItem.findMany({
+    where: { ownerId, pathId: current.id, state: "published", deletedAt: null },
+    select: {
+      id: true,
+      slug: true,
+      publicTitle: true,
+      payloadType: true,
+      publicTags: true,
+      firstPublishedAt: true,
+      path: { select: { slug: true, title: true } },
+      blogPostPayload: { select: { excerpt: true, coverImageUrl: true } },
+    },
+    orderBy: { lastPublishedAt: "desc" },
+    take: 50,
+  });
+
+  return { ...current, items };
 }
 
 function buildPublicItemPath(item: { slug: string; path: { slug: string } }) {
