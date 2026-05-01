@@ -29,6 +29,9 @@ import { ServerDateInput } from "@/lib/domain/editor/extensions/blocks/date-inpu
 import { ServerNumberInput } from "@/lib/domain/editor/extensions/blocks/number-input";
 import { ServerRatingInput } from "@/lib/domain/editor/extensions/blocks/rating-input";
 import { ServerPromptInput } from "@/lib/domain/editor/extensions/blocks/prompt-input";
+import { ServerHabitTracker } from "@/lib/domain/editor/extensions/blocks/habit-tracker";
+import { ServerStopwatch } from "@/lib/domain/editor/extensions/blocks/stopwatch";
+import { ServerPullQuote } from "@/lib/domain/editor/extensions/blocks/pull-quote";
 import { ServerTimestamp } from "@/lib/domain/editor/extensions/blocks/timestamp";
 import {
   ServerDailySummary,
@@ -97,6 +100,9 @@ export function getCollaborationServerExtensions(): Extensions {
     ServerNumberInput,
     ServerRatingInput,
     ServerPromptInput,
+    ServerHabitTracker,
+    ServerStopwatch,
+    ServerPullQuote,
     ServerTimestamp,
     ServerDailySummary,
     ServerWeeklySummary,

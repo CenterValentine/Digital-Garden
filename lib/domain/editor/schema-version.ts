@@ -81,7 +81,7 @@
  * See: docs/notes-feature/TIPTAP-SCHEMA-EVOLUTION-GUIDE.md
  */
 
-export const TIPTAP_SCHEMA_VERSION = "1.3.0";
+export const TIPTAP_SCHEMA_VERSION = "1.4.0";
 
 export interface SchemaVersion {
   version: string;

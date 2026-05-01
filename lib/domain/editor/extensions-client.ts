@@ -61,6 +61,7 @@ import { Timestamp } from "./extensions/blocks/timestamp";
 import { DailySummary, WeeklySummary } from "./extensions/blocks/periodic-summary";
 import { HabitTracker } from "./extensions/blocks/habit-tracker";
 import { Stopwatch } from "./extensions/blocks/stopwatch";
+import { PullQuote } from "./extensions/blocks/pull-quote";
 import {
   UnsupportedBlock,
   UnsupportedInline,
@@ -289,6 +290,7 @@ export function getEditorExtensions(options?: EditorExtensionsOptions): Extensio
     WeeklySummary,
     HabitTracker,
     Stopwatch,
+    PullQuote,
     UnsupportedBlock,
     UnsupportedInline,
     ...getExtensionClientEditorExtensions(),
