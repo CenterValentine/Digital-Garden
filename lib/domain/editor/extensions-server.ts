@@ -17,6 +17,7 @@ import TableRow from "@tiptap/extension-table-row";
 import TableHeader from "@tiptap/extension-table-header";
 import TableCell from "@tiptap/extension-table-cell";
 import CharacterCount from "@tiptap/extension-character-count";
+import Underline from "@tiptap/extension-underline";
 import { common, createLowlight } from "lowlight";
 import { Callout } from "./extensions/callout";
 import { HeadingHardbreakSplit } from "./extensions/heading-hardbreak-split";
@@ -126,6 +127,7 @@ export function getServerExtensions(): Extensions {
     TableCell,
 
     CharacterCount,
+    Underline,
 
     // M7: Callouts (server-side markdown parsing)
     Callout,

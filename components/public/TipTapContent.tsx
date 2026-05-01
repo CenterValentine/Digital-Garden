@@ -13,10 +13,20 @@ interface TipTapContentProps {
 }
 
 export function TipTapContent({ bodyJson, className }: TipTapContentProps) {
+  // Ensure every block node has a content array — generateHTML chokes on missing content keys
+  function normalizeDoc(doc: JSONContent): JSONContent {
+    if (!doc || typeof doc !== "object") return doc;
+    return {
+      ...doc,
+      content: (doc.content ?? []).map(normalizeDoc),
+    };
+  }
+
   let html = "";
   try {
-    html = generateHTML(bodyJson, getServerExtensions());
-  } catch {
+    html = generateHTML(normalizeDoc(bodyJson), getServerExtensions());
+  } catch (err) {
+    console.error("[TipTapContent] generateHTML failed:", err);
     html = "<p><em>Content could not be rendered.</em></p>";
   }
 
