@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useCallback } from "react";
+import { useEffect, useCallback, useState } from "react";
 import { Globe, FolderPlus, RefreshCw, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { usePublishTreeStore } from "../../state/publish-tree-store";
 import { PublishingTree } from "./PublishingTree";
+import { CreatePublicPathDialog } from "../dialogs/CreatePublicPathDialog";
 
 async function fetchPublicPaths() {
   const res = await fetch("/api/publishing/paths");
@@ -14,6 +15,7 @@ async function fetchPublicPaths() {
 
 export function PublishingViewMode() {
   const { paths, setPaths, isLoading, setIsLoading } = usePublishTreeStore();
+  const [showCreatePath, setShowCreatePath] = useState(false);
 
   const load = useCallback(async () => {
     setIsLoading(true);
@@ -34,6 +36,12 @@ export function PublishingViewMode() {
 
   return (
     <div className="flex flex-col h-full">
+      {showCreatePath && (
+        <CreatePublicPathDialog
+          onClose={() => setShowCreatePath(false)}
+          onCreated={() => { setShowCreatePath(false); void load(); }}
+        />
+      )}
       {/* Header */}
       <div className="flex items-center justify-between px-3 py-2 border-b border-white/5 shrink-0">
         <div className="flex items-center gap-1.5 text-xs font-medium text-white/60 uppercase tracking-wider">
@@ -49,7 +57,7 @@ export function PublishingViewMode() {
             <RefreshCw className="w-3.5 h-3.5" />
           </button>
           <button
-            onClick={() => toast.info("Create path — coming soon")}
+            onClick={() => setShowCreatePath(true)}
             className="p-1 rounded text-white/40 hover:text-white/70 hover:bg-white/5 transition-colors"
             title="New path"
           >
