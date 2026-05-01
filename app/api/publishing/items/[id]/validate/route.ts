@@ -25,7 +25,10 @@ export async function POST(
 
   const item = await prisma.publicItem.findFirst({
     where: { id, ownerId: session.user.id, deletedAt: null },
-    include: { workingRevision: true },
+    include: {
+      workingRevision: true,
+      contentNode: { include: { notePayload: true } },
+    },
   });
 
   if (!item) return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -41,8 +44,9 @@ export async function POST(
     });
   }
 
-  // Rule: must have body content
-  const bodyJson = item.workingRevision?.bodyJson as { content?: unknown[] } | null;
+  // Rule: must have body content (check working revision first, then live note payload)
+  const bodyJson = (item.workingRevision?.bodyJson ??
+    item.contentNode.notePayload?.tiptapJson) as { content?: unknown[] } | null;
   const hasContent =
     bodyJson?.content && Array.isArray(bodyJson.content) && bodyJson.content.length > 0;
   if (!hasContent) {
