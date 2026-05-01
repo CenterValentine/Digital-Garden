@@ -29,7 +29,10 @@ export async function POST(
 
   const item = await prisma.publicItem.findFirst({
     where: { id, ownerId: session.user.id, deletedAt: null },
-    include: { workingRevision: true },
+    include: {
+      workingRevision: true,
+      contentNode: { include: { notePayload: true } },
+    },
   });
 
   if (!item) {
@@ -48,8 +51,11 @@ export async function POST(
     );
   }
 
-  // Use working revision body or empty doc
-  const bodyJson = item.workingRevision?.bodyJson ?? { type: "doc", content: [] };
+  // Prefer working revision body; fall back to live ContentNode note payload; then empty doc
+  const bodyJson =
+    item.workingRevision?.bodyJson ??
+    item.contentNode.notePayload?.tiptapJson ??
+    { type: "doc", content: [] };
   const metadataSnapshot = { publicTitle: item.publicTitle, publicTags: item.publicTags };
   const now = new Date();
 
