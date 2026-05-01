@@ -136,15 +136,19 @@ export function PublishItemRow({ item, onRefresh }: PublishItemRowProps) {
           )}
           {item.state === "published" && (
             <>
-              {pendingChanges && (
-                <button
-                  onClick={handlePublish}
-                  disabled={isActing || blocked}
-                  className="text-[10px] text-amber-400/80 hover:text-amber-300 transition-colors disabled:opacity-40"
-                >
-                  Update
-                </button>
-              )}
+              {/* Always show Update for published items so users can re-publish after edits */}
+              <button
+                onClick={handlePublish}
+                disabled={isActing || blocked}
+                className={cn(
+                  "text-[10px] transition-colors disabled:opacity-40",
+                  pendingChanges
+                    ? "text-amber-400/80 hover:text-amber-300"
+                    : "text-white/30 hover:text-white/60"
+                )}
+              >
+                {pendingChanges ? "Update" : "Re-publish"}
+              </button>
               <button
                 onClick={handleUnpublish}
                 disabled={isActing}
