@@ -97,5 +97,32 @@ export async function POST(req: NextRequest) {
     },
   });
 
+  // Create the type-specific payload record (all fields have defaults or are optional)
+  try {
+    switch (payloadType) {
+      case "blog_post":
+        await prisma.blogPostPayload.create({ data: { publicItemId: item.id } });
+        break;
+      case "page":
+        await prisma.pagePayload.create({ data: { publicItemId: item.id } });
+        break;
+      case "project":
+        await prisma.projectPayload.create({ data: { publicItemId: item.id } });
+        break;
+      case "profile_section":
+        await prisma.profileSectionPayload.create({ data: { publicItemId: item.id } });
+        break;
+      case "case_study":
+        await prisma.caseStudyPayload.create({ data: { publicItemId: item.id } });
+        break;
+      case "media_item":
+        await prisma.mediaItemPayload.create({ data: { publicItemId: item.id } });
+        break;
+      // bookmark requires a URL; caller must PATCH to add it
+    }
+  } catch {
+    // Non-fatal: payload creation failure doesn't block the item from being created
+  }
+
   return NextResponse.json(item, { status: 201 });
 }
