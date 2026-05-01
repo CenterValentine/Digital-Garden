@@ -62,3 +62,50 @@ export async function validateItem(
   if (!res.ok) throw new Error(`Validation failed: ${res.status}`);
   return res.json();
 }
+
+export interface PublicPathSummary {
+  id: string;
+  slug: string;
+  title: string;
+  description: string | null;
+  parentId: string | null;
+  children?: PublicPathSummary[];
+}
+
+function flattenPaths(nodes: PublicPathSummary[], prefix = ""): PublicPathSummary[] {
+  const result: PublicPathSummary[] = [];
+  for (const node of nodes) {
+    const displayTitle = prefix ? `${prefix} / ${node.title}` : node.title;
+    result.push({ ...node, title: displayTitle, children: undefined });
+    if (node.children?.length) {
+      result.push(...flattenPaths(node.children, displayTitle));
+    }
+  }
+  return result;
+}
+
+export async function fetchPublicPaths(): Promise<PublicPathSummary[]> {
+  const res = await fetch("/api/publishing/paths");
+  if (!res.ok) throw new Error(`Failed to load paths: ${res.status}`);
+  const roots: PublicPathSummary[] = await res.json();
+  return flattenPaths(roots);
+}
+
+export async function createPublicItem(body: {
+  contentNodeId: string;
+  pathId: string;
+  payloadType: string;
+  slug: string;
+  publicTitle?: string;
+}): Promise<PublishItemSummary> {
+  const res = await fetch("/api/publishing/items", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error((err as { error?: string }).error ?? `Create failed: ${res.status}`);
+  }
+  return res.json();
+}

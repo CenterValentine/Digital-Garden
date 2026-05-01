@@ -1,24 +1,30 @@
 "use client";
 
-import { useEffect, useCallback } from "react";
+import { useEffect, useCallback, useState } from "react";
 import { Globe, Loader2, Plus, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 import { usePublishStore } from "../../state/publish-store";
+import { useLeftPanelViewStore } from "@/state/left-panel-view-store";
 import { fetchLinkedPublicItems } from "../../lib/client-api";
+import { PUBLISHING_VIEW_ID } from "../../manifest";
 import { PublishItemRow } from "./PublishItemRow";
 import { PrePublishDialog } from "../dialogs/PrePublishDialog";
+import { CreatePublicItemDialog } from "../dialogs/CreatePublicItemDialog";
 
 interface PublishTabProps {
   contentId: string | null;
+  contentTitle?: string | null;
 }
 
-export function PublishTab({ contentId }: PublishTabProps) {
+export function PublishTab({ contentId, contentTitle }: PublishTabProps) {
   const {
     linkedItems,
     setLinkedItems,
     isLoadingLinkedItems,
     setIsLoadingLinkedItems,
   } = usePublishStore();
+  const setActiveView = useLeftPanelViewStore((s) => s.setActiveView);
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
 
   const load = useCallback(async () => {
     if (!contentId) {
@@ -52,13 +58,25 @@ export function PublishTab({ contentId }: PublishTabProps) {
   return (
     <div className="flex flex-col h-full">
       <PrePublishDialog onRefresh={load} />
+      {showCreateDialog && (
+        <CreatePublicItemDialog
+          contentNodeId={contentId}
+          contentTitle={contentTitle ?? null}
+          onClose={() => setShowCreateDialog(false)}
+          onCreated={() => {
+            setShowCreateDialog(false);
+            void load();
+          }}
+        />
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between px-3 py-2 border-b border-white/5 shrink-0">
         <span className="text-xs font-medium text-white/50 uppercase tracking-wider">
           Published as
         </span>
         <button
-          onClick={() => toast.info("Add to publishing — coming soon")}
+          onClick={() => setShowCreateDialog(true)}
           className="flex items-center gap-1 text-xs text-white/40 hover:text-white/70 transition-colors"
           title="Add to publishing"
         >
@@ -78,7 +96,7 @@ export function PublishTab({ contentId }: PublishTabProps) {
             <Globe className="w-5 h-5 text-white/20" />
             <p className="text-xs text-white/40">Not yet published.</p>
             <button
-              onClick={() => toast.info("Add to publishing — coming soon")}
+              onClick={() => setShowCreateDialog(true)}
               className="mt-1 text-xs text-white/30 hover:text-white/60 underline transition-colors"
             >
               Add to publishing
@@ -101,7 +119,7 @@ export function PublishTab({ contentId }: PublishTabProps) {
       {linkedItems.length > 0 && (
         <div className="shrink-0 border-t border-white/5 px-3 py-2">
           <button
-            onClick={() => toast.info("Open publishing view — coming soon")}
+            onClick={() => setActiveView(PUBLISHING_VIEW_ID)}
             className="flex items-center gap-1.5 text-xs text-white/30 hover:text-white/60 transition-colors"
           >
             <ExternalLink className="w-3 h-3" />

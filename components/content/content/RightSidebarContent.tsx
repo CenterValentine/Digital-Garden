@@ -31,6 +31,9 @@ interface RightSidebarContentProps {
 
 export function RightSidebarContent({ activeTab }: RightSidebarContentProps) {
   const selectedContentId = useContentStore((s) => s.selectedContentId);
+  const selectedContentTitle = useContentStore((s) =>
+    s.selectedContentId ? (s.tabs[`tab:${s.selectedContentId}`]?.title ?? null) : null
+  );
   const outline = useOutlineStore((state) =>
     state.getViewState(selectedContentId).outline
   );
@@ -90,7 +93,9 @@ export function RightSidebarContent({ activeTab }: RightSidebarContentProps) {
       {activeTab === "tags" && <TagsPanel contentId={selectedContentId} />}
       {activeTab === "chat" && <ChatPanel contentId={selectedContentId} />}
       {activeTab === "properties" && <PropertiesPanel />}
-      {activeTab === "publish" && <PublishTab contentId={selectedContentId} />}
+      {activeTab === "publish" && (
+        <PublishTab contentId={selectedContentId} contentTitle={selectedContentTitle} />
+      )}
     </div>
   );
 }
