@@ -12,6 +12,12 @@ import type {
   MarkdownExportSettings,
 } from "../types";
 import type { JSONContent } from "@tiptap/core";
+import {
+  normalizeHabitTrackerAttrs,
+} from "@/lib/domain/habit-tracker";
+import { normalizeStopwatchAttrs } from "@/lib/domain/stopwatch";
+import { getHabitTrackerMarkdownLines } from "@/lib/domain/editor/extensions/blocks/habit-tracker";
+import { getStopwatchMarkdownLines } from "@/lib/domain/editor/extensions/blocks/stopwatch";
 
 export class MarkdownConverter implements DocumentConverter {
   async convert(
@@ -290,6 +296,20 @@ export class MarkdownConverter implements DocumentConverter {
           .join("\n");
 
         return `${header}\n${quotedContent}`;
+      }
+
+      case "habitTracker": {
+        const attrs = normalizeHabitTrackerAttrs(
+          (node.attrs || {}) as Record<string, unknown>
+        );
+        return getHabitTrackerMarkdownLines(attrs).join("\n");
+      }
+
+      case "stopwatch": {
+        const attrs = normalizeStopwatchAttrs(
+          (node.attrs || {}) as Record<string, unknown>
+        );
+        return getStopwatchMarkdownLines(attrs).join("\n");
       }
 
       case "table": {

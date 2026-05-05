@@ -92,6 +92,27 @@ function findTreeNode(nodes: TreeNode[], id: string): TreeNode | null {
   return null;
 }
 
+function patchTreeNodeTitle(
+  nodes: TreeNode[],
+  contentId: string,
+  newTitle: string,
+): TreeNode[] {
+  return nodes.map((node) => {
+    if (node.id === contentId) {
+      return { ...node, title: newTitle };
+    }
+
+    if (!node.children?.length) {
+      return node;
+    }
+
+    return {
+      ...node,
+      children: patchTreeNodeTitle(node.children, contentId, newTitle),
+    };
+  });
+}
+
 function getCreateTarget(parentId: string | null, treeData: TreeNode[]): CreateTarget {
   const virtualAssignment = parsePeopleVirtualParentId(parentId);
   if (virtualAssignment.peopleGroupId || virtualAssignment.personId) {
@@ -345,6 +366,34 @@ export function LeftSidebarContent({
       setSelectedIds([selectedContentId]);
     }
   }, [selectedContentId, setSelectedIds]);
+
+  useEffect(() => {
+    const handleContentUpdate = (
+      event: CustomEvent<{
+        contentId: string;
+        updates: { title?: string };
+      }>,
+    ) => {
+      const { contentId, updates } = event.detail;
+      if (!updates.title) return;
+
+      setTreeData((current) =>
+        current ? patchTreeNodeTitle(current, contentId, updates.title!) : current,
+      );
+    };
+
+    window.addEventListener(
+      "content-updated" as any,
+      handleContentUpdate as EventListener,
+    );
+
+    return () => {
+      window.removeEventListener(
+        "content-updated" as any,
+        handleContentUpdate as EventListener,
+      );
+    };
+  }, []);
 
   // Listen for edit-external-link events from context menu
   useEffect(() => {

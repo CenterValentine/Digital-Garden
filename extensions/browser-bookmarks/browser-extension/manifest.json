@@ -1,0 +1,36 @@
+{
+  "manifest_version": 3,
+  "name": "Digital Garden Browser Bookmarks",
+  "version": "0.1.0",
+  "description": "Sync your Chromium browser's activity as external links to your content folders.",
+  "permissions": [
+    "bookmarks",
+    "storage",
+    "tabs",
+    "activeTab",
+    "contextMenus",
+    "alarms"
+  ],
+  "host_permissions": ["http://*/*", "https://*/*"],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "action": {
+    "default_title": "Digital Garden Bookmarks",
+    "default_popup": "popup.html"
+  },
+  "options_page": "options.html",
+  "content_scripts": [
+    {
+      "matches": ["http://localhost/*", "http://127.0.0.1/*", "https://*/*"],
+      "js": ["page-bridge.js"],
+      "run_at": "document_start"
+    },
+    {
+      "matches": ["http://localhost/*", "http://127.0.0.1/*", "https://*/*"],
+      "js": ["overlay.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}

@@ -21,6 +21,8 @@ import type { PropertiesField, BlockDefinition } from "@/lib/domain/blocks/types
 import { Settings2 } from "lucide-react";
 import { PropertyField } from "./PropertyFieldRenderer";
 import { useExtensionActivationStore } from "@/state/extension-activation-store";
+import { HabitTrackerPropertiesPanel } from "./HabitTrackerPropertiesPanel";
+import { StopwatchPropertiesPanel } from "./StopwatchPropertiesPanel";
 
 export function PropertiesPanel() {
   const selectedBlockId = useBlockStore((s) => s.selectedBlockId);
@@ -117,6 +119,14 @@ export function PropertiesPanel() {
     },
     [selectedBlockId, attrs, definition, filterVisibleFields]
   );
+
+  if (selectedBlockType === "habitTracker") {
+    return <HabitTrackerPropertiesPanel />;
+  }
+
+  if (selectedBlockType === "stopwatch") {
+    return <StopwatchPropertiesPanel />;
+  }
 
   if (!selectedBlockId || !definition) {
     return (

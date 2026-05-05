@@ -59,6 +59,8 @@ import { RatingInput } from "./extensions/blocks/rating-input";
 import { PromptInput } from "./extensions/blocks/prompt-input";
 import { Timestamp } from "./extensions/blocks/timestamp";
 import { DailySummary, WeeklySummary } from "./extensions/blocks/periodic-summary";
+import { HabitTracker } from "./extensions/blocks/habit-tracker";
+import { Stopwatch } from "./extensions/blocks/stopwatch";
 import {
   UnsupportedBlock,
   UnsupportedInline,
@@ -285,6 +287,8 @@ export function getEditorExtensions(options?: EditorExtensionsOptions): Extensio
     Timestamp,
     DailySummary,
     WeeklySummary,
+    HabitTracker,
+    Stopwatch,
     UnsupportedBlock,
     UnsupportedInline,
     ...getExtensionClientEditorExtensions(),

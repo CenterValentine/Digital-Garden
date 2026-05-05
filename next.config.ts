@@ -54,6 +54,22 @@ const nextConfig: NextConfig = {
           },
         ],
       },
+      {
+        source: "/extension-overlay/:path*",
+        headers: [
+          {
+            key: "Content-Security-Policy",
+            value: [
+              "default-src 'self'",
+              "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+              "style-src 'self' 'unsafe-inline'",
+              "img-src 'self' data: https: blob:",
+              "connect-src 'self' http: https:",
+              "frame-ancestors *",
+            ].join("; "),
+          },
+        ],
+      },
     ];
   },
   // Pin local dev to the active worktree. Without this, nested worktrees can

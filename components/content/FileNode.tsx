@@ -14,7 +14,7 @@
 
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { type NodeRendererProps } from "react-arborist";
 import * as LucideIcons from "lucide-react";
 import {
@@ -71,9 +71,12 @@ interface FileNodeProps extends NodeRendererProps<TreeNode> {
   onCreateVisualizationExcalidraw?: (parentId: string | null) => Promise<void>;
   onCreateVisualizationDiagramsNet?: (parentId: string | null) => Promise<void>;
   onAddPeopleTarget?: (parentId: string | null) => Promise<void>;
+  editingValue?: string;
+  onEditingValueChange?: (id: string, value: string) => void;
+  onEditingValueClear?: (id: string) => void;
 }
 
-export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete, onDuplicate, onDownload, onChangeIcon, onSetFolderView, onToggleReferencedContent, onCreateVisualizationMermaid, onCreateVisualizationExcalidraw, onCreateVisualizationDiagramsNet, onAddPeopleTarget }: FileNodeProps) {
+export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete, onDuplicate, onDownload, onChangeIcon, onSetFolderView, onToggleReferencedContent, onCreateVisualizationMermaid, onCreateVisualizationExcalidraw, onCreateVisualizationDiagramsNet, onAddPeopleTarget, editingValue, onEditingValueChange, onEditingValueClear }: FileNodeProps) {
   const { data } = node;
   const isFolder = data.contentType === "folder";
   const isPeopleNode = data.treeNodeKind === "peopleGroup" || data.treeNodeKind === "person";
@@ -97,15 +100,37 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
   const displayExtension = getDisplayExtension(data);
   const { basename, extension } = splitFilenameForDisplay(data.title, displayExtension);
 
-  // Local state for editing value (controlled input)
-  const [editingValue, setEditingValue] = useState(basename);
+  // Seed edit drafts from the current basename, but keep them outside the row
+  // component so react-arborist row recycling doesn't wipe in-progress typing.
+  useEffect(() => {
+    if (node.isEditing && editingValue === undefined) {
+      onEditingValueChange?.(data.id, basename);
+    }
+  }, [basename, data.id, editingValue, node.isEditing, onEditingValueChange]);
 
-  // Reset editing value when entering edit mode
+  const committedRef = useRef(false);
+
   useEffect(() => {
     if (node.isEditing) {
-      setEditingValue(basename);
+      committedRef.current = false;
     }
-  }, [node.isEditing, basename]);
+  }, [node.isEditing]);
+
+  const activeEditingValue = editingValue ?? basename;
+
+  const commitEdit = () => {
+    if (committedRef.current) return;
+    committedRef.current = true;
+    node.submit(activeEditingValue);
+    onEditingValueClear?.(data.id);
+  };
+
+  const cancelEdit = () => {
+    if (committedRef.current) return;
+    committedRef.current = true;
+    node.reset();
+    onEditingValueClear?.(data.id);
+  };
 
   // Get icon based on content type or custom icon
   const getIcon = () => {
@@ -332,6 +357,8 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
 
   // Handle context menu (right-click)
   const handleContextMenu = (e: React.MouseEvent) => {
+    // Modifier key = pass through to browser's native context menu
+    if (e.altKey || e.ctrlKey || e.shiftKey || e.metaKey) return;
     e.preventDefault();
     e.stopPropagation();
 
@@ -523,22 +550,21 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
       >
         {node.isEditing ? (
           <FileNameInput
-            value={editingValue}
+            value={activeEditingValue}
             extension={extension}
-            onChange={(value) => {
-              setEditingValue(value);
-            }}
-            onBlur={() => {
-              node.submit(editingValue);
-            }}
+            onChange={(value) => onEditingValueChange?.(data.id, value)}
+            onBlur={commitEdit}
             onKeyDown={(e) => {
               if (e.key === "Enter") {
-                node.submit(editingValue);
+                e.preventDefault();
+                commitEdit();
               } else if (e.key === "Escape") {
-                node.reset();
+                e.preventDefault();
+                cancelEdit();
               }
             }}
             autoFocus
+            focusBehavior={editingValue === undefined ? "select" : "end"}
             className="w-full bg-transparent border-b border-primary focus:outline-none"
           />
         ) : (

@@ -75,6 +75,13 @@ const externalSettingsSchema = z
     allowAllDomains: z.boolean().optional(), // Allow all domains (bypass allowlist)
     allowlistedHosts: z.array(z.string()).optional(), // Hostnames allowed for preview fetching
     allowHttp: z.boolean().optional(), // Allow HTTP URLs (default: HTTPS-only)
+    bookmarkMetadata: z
+      .object({
+        resourceTypes: z.array(z.string().min(1).max(120)).optional(),
+        resourceRelationships: z.array(z.string().min(1).max(120)).optional(),
+        userIntents: z.array(z.string().min(1).max(120)).optional(),
+      })
+      .optional(),
   })
   .optional();
 
@@ -324,6 +331,61 @@ export const DEFAULT_SETTINGS: UserSettings = {
       "onedrive.live.com",
     ],
     allowHttp: false, // HTTPS-only by default
+    bookmarkMetadata: {
+      resourceTypes: [
+        "article",
+        "video",
+        "song",
+        "course",
+        "lesson",
+        "documentation",
+        "repository",
+        "package",
+        "issue",
+        "discussion",
+        "social_post",
+        "product",
+        "service",
+        "tool",
+        "dataset",
+        "paper",
+        "book",
+        "map_location",
+        "profile",
+        "organization",
+        "unknown",
+      ],
+      resourceRelationships: [
+        "cites",
+        "supports",
+        "contradicts",
+        "explains",
+        "teaches",
+        "demonstrates",
+        "implements",
+        "depends_on",
+        "uses",
+        "compares",
+        "evaluates",
+        "archives",
+        "inspired_by",
+        "mentions",
+        "related_to",
+      ],
+      userIntents: [
+        "learn",
+        "research",
+        "build",
+        "cite",
+        "decide",
+        "compare",
+        "buy",
+        "monitor",
+        "archive",
+        "share",
+        "teach",
+      ],
+    },
   },
   search: {
     caseSensitive: false,

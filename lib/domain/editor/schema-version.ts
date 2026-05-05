@@ -81,7 +81,7 @@
  * See: docs/notes-feature/TIPTAP-SCHEMA-EVOLUTION-GUIDE.md
  */
 
-export const TIPTAP_SCHEMA_VERSION = "1.1.0";
+export const TIPTAP_SCHEMA_VERSION = "1.3.0";
 
 export interface SchemaVersion {
   version: string;
@@ -109,6 +109,38 @@ export interface SchemaChange {
  * 4. Run tests: pnpm test lib/domain/export
  */
 export const SCHEMA_HISTORY: SchemaVersion[] = [
+  {
+    version: "1.3.0",
+    date: "2026-04-29",
+    changes: [
+      {
+        type: "add",
+        target: "node",
+        name: "stopwatch",
+        description:
+          "Document-local stopwatch block with persisted elapsed time, laps, and style variants",
+        breaking: false,
+        migrationsAvailable: [],
+      },
+    ],
+    migrationsRequired: false,
+  },
+  {
+    version: "1.2.0",
+    date: "2026-04-28",
+    changes: [
+      {
+        type: "add",
+        target: "node",
+        name: "habitTracker",
+        description:
+          "Document-local habit tracking block with preset-driven monthly, weekly, and streak layouts",
+        breaking: false,
+        migrationsAvailable: [],
+      },
+    ],
+    migrationsRequired: false,
+  },
   {
     version: "1.1.0",
     date: "2026-04-26",
@@ -342,6 +374,8 @@ export function getCurrentSchemaSnapshot() {
       "timestamp",
       "dailySummary",
       "weeklySummary",
+      "habitTracker",
+      "stopwatch",
       "unsupportedBlock",
       "unsupportedInline",
     ],
@@ -385,8 +419,10 @@ export function getCurrentSchemaSnapshot() {
       "RatingInput",
       "PromptInput",
       "Timestamp",
+      "Stopwatch",
       "DailySummary",
       "WeeklySummary",
+      "HabitTracker",
       "UnsupportedBlock",
       "UnsupportedInline",
     ],

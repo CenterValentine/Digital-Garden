@@ -1161,7 +1161,14 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
       if (isPageTemplateTab) {
         await refreshPageTemplates();
       } else {
-        window.dispatchEvent(new CustomEvent("dg:tree-refresh"));
+        window.dispatchEvent(
+          new CustomEvent("content-updated", {
+            detail: {
+              contentId: selectedContentId,
+              updates: { title: newTitle },
+            },
+          }),
+        );
       }
     } catch {
       // Revert
@@ -1508,6 +1515,17 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
         title={noteTitle}
         url={contentData.url}
         subtype={contentData.subtype}
+        readingStatus={contentData.readingStatus}
+        description={contentData.description}
+        resourceType={contentData.resourceType}
+        resourceRelationship={contentData.resourceRelationship}
+        userIntent={contentData.userIntent}
+        sourceDomain={contentData.sourceDomain}
+        sourceHostname={contentData.sourceHostname}
+        faviconUrl={contentData.faviconUrl}
+        preserveHtml={contentData.preserveHtml}
+        preservedHtmlCapturedAt={contentData.preservedHtmlCapturedAt}
+        captureMetadata={contentData.captureMetadata}
         preview={contentData.preview}
       />
     );

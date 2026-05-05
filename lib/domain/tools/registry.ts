@@ -153,10 +153,10 @@ const TOOL_REGISTRY: ToolDefinition[] = [
   // ─── SIDEBAR TABS (matches current RightSidebar) ───
   {
     id: "backlinks-tab",
-    label: "Backlinks",
+    label: "Links",
     iconName: "Link",
     surfaces: ["sidebar-tab"],
-    contentTypes: ["note"],
+    contentTypes: ["note", "external"],
     order: 10,
     tabKey: "backlinks",
   },

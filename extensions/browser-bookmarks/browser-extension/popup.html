@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Digital Garden Bookmarks</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="shell stack" style="width: 360px">
+      <div class="title">Digital Garden Bookmarks</div>
+
+      <section class="card stack">
+        <div class="muted">Quick Save</div>
+        <select id="quick-connection"></select>
+        <textarea id="quick-description" placeholder="Bookmark description"></textarea>
+        <fieldset class="metadata-fieldset stack">
+          <legend>Bookmark metadata</legend>
+          <div class="metadata-controls">
+            <div id="quick-resource-type-control"></div>
+            <div id="quick-resource-relationship-control"></div>
+            <div id="quick-user-intent-control"></div>
+          </div>
+        </fieldset>
+        <div id="quick-save-status" class="hint"></div>
+        <div class="row">
+          <button id="quick-save">Save Current Tab</button>
+          <button class="secondary" id="quick-remove">Remove Current Tab</button>
+        </div>
+        <div class="row">
+          <button class="secondary" id="open-capture">Open Capture</button>
+        </div>
+      </section>
+
+      <section class="card stack">
+        <div class="muted">Extension Settings</div>
+        <button class="secondary" id="open-options">Open Settings</button>
+      </section>
+    </div>
+    <script type="module" src="popup.js"></script>
+  </body>
+</html>

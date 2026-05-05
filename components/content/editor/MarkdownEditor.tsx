@@ -966,6 +966,8 @@ export function MarkdownEditor({
           }
         }}
         onContextMenu={(e) => {
+          // Modifier key = let browser show its native context menu (spell-check, inspect, etc.)
+          if (e.altKey || e.ctrlKey || e.shiftKey || e.metaKey) return;
           // Allow the browser's native context menu when the dev "Inspect Element" action re-fires it
           if ((window as any).__passNativeContextMenu) {
             (window as any).__passNativeContextMenu = false;
