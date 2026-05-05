@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Digital Garden Browser Bookmarks Settings</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="shell stack" style="max-width: 820px; margin: 0 auto">
+      <div class="title">Browser Bookmark Sync Settings</div>
+
+      <section class="card stack">
+        <div class="section-heading">
+          <div class="muted">Trusted Connection</div>
+          <button
+            class="icon-help"
+            type="button"
+            title="Trust this browser from Digital Garden settings first. The extension stores its sync token automatically after trust is granted, so you do not need to paste a token here."
+          >
+            ?
+          </button>
+        </div>
+        <div class="status-grid">
+          <div class="status-card">
+            <div class="status-label">Trust status</div>
+            <div id="trust-status-line" class="status-value">Checking extension trust…</div>
+            <div id="trust-status-hint" class="hint">
+              Trust this browser from Digital Garden settings to establish the hidden sync token.
+            </div>
+          </div>
+          <div class="status-card">
+            <div class="status-label">Connected app</div>
+            <div id="connected-app-line" class="status-value">Not connected yet</div>
+            <div id="connected-install-line" class="hint">No trusted browser install is linked yet.</div>
+          </div>
+        </div>
+        <select id="native-save-behavior">
+          <option value="silent-defaults">Silent defaults + follow-up later</option>
+          <option value="auto-open-follow-up">Auto-open follow-up capture page</option>
+        </select>
+        <div class="hint">
+          Default connection: choose which synced bookmark root native browser saves should use. If the
+          selector is blank, create a sync connection first in Digital Garden settings after trusting this
+          browser install.
+        </div>
+        <select id="default-connection"></select>
+        <button id="save-config">Save Configuration</button>
+      </section>
+
+      <section class="card stack">
+        <div class="muted">Defaults</div>
+        <div class="row">
+          <select id="default-dedupe-enabled">
+            <option value="false">Dedupe Off</option>
+            <option value="true">Dedupe On</option>
+          </select>
+          <select id="default-preserve-html">
+            <option value="false">Preserve HTML Off</option>
+            <option value="true">Preserve HTML On</option>
+          </select>
+        </div>
+      </section>
+
+      <section class="card stack">
+        <div class="section-heading">
+          <div class="muted">Routing / Domain Rules</div>
+          <button
+            class="icon-help"
+            type="button"
+            title='Rules are JSON. Example: [{"hostnameSuffix":"docs.example.com","actions":{"resourceType":"documentation","userIntent":"learn","dedupeEnabled":true}}]. Use them to route matching domains, apply defaults, and control domain intelligence.'
+          >
+            ?
+          </button>
+        </div>
+        <div class="hint">
+          Rules are JSON. Use them to route matching domains into a connection or folder path, apply
+          resource classification defaults, toggle dedupe, and control domain-intelligence behavior.
+        </div>
+        <textarea id="rules-json" placeholder='[{"hostnameSuffix":"docs.example.com","actions":{"resourceType":"documentation","userIntent":"learn","dedupeEnabled":true}}]'></textarea>
+        <div class="row">
+          <button id="save-rules">Save Rules</button>
+          <button class="secondary" id="export-rules">Export Rules</button>
+          <button class="secondary" id="import-rules">Import Rules</button>
+        </div>
+        <input id="rules-file" type="file" accept="application/json" style="display:none" />
+      </section>
+
+      <section class="card stack">
+        <div class="section-heading">
+          <div class="muted">Connection Bootstrap</div>
+          <button
+            class="icon-help"
+            type="button"
+            title="Bootstrap seeds the browser bookmark tree from the selected default Digital Garden connection. Use it after creating a new connection or importing config."
+          >
+            ?
+          </button>
+        </div>
+        <div class="hint">
+          Use bootstrap after creating a new connection or after importing config into a fresh browser. It
+          creates any missing browser-side bookmark folders or bookmarks for the selected default connection.
+        </div>
+        <button class="secondary" id="bootstrap-default">Bootstrap Default Connection</button>
+      </section>
+
+      <section class="card stack">
+        <div class="section-heading">
+          <div class="muted">Bookmark Tree Inspector</div>
+          <button
+            class="icon-help"
+            type="button"
+            title="Browse the live browser bookmark tree here. Folder IDs shown in this inspector are the values to use as Browser Root IDs in Digital Garden sync connections."
+          >
+            ?
+          </button>
+        </div>
+        <div class="hint">
+          Browse the live browser bookmark tree, inspect bookmark and folder IDs, and copy a folder ID for a
+          Digital Garden sync connection.
+        </div>
+        <div class="row">
+          <button class="secondary" id="refresh-bookmark-tree">Refresh Bookmark Tree</button>
+        </div>
+        <div id="bookmark-tree-status" class="hint"></div>
+        <div id="bookmark-tree" class="bookmark-tree"></div>
+      </section>
+    </div>
+    <script type="module" src="options.js"></script>
+  </body>
+</html>

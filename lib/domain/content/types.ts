@@ -86,6 +86,9 @@ export interface TreeNode {
   external?: {
     url: string;
     subtype: string;
+    readingStatus?: string;
+    faviconUrl?: string | null;
+    preserveHtml?: boolean;
   };
   visualization?: {
     engine: string;

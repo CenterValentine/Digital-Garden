@@ -357,6 +357,8 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
 
   // Handle context menu (right-click)
   const handleContextMenu = (e: React.MouseEvent) => {
+    // Modifier key = pass through to browser's native context menu
+    if (e.altKey || e.ctrlKey || e.shiftKey || e.metaKey) return;
     e.preventDefault();
     e.stopPropagation();
 

@@ -24,6 +24,7 @@ export function CollapsibleRightPanel() {
 
   // Check if we're in fullscreen mode (hide panel completely)
   const isFullscreenMode = pathname?.includes("/fullscreen");
+  const isFocusMode = pathname?.includes("/content/focus/");
 
   // Default to collapsed on visualization pages only
   useEffect(() => {
@@ -36,6 +37,47 @@ export function CollapsibleRightPanel() {
   // Don't render anything in fullscreen mode
   if (isFullscreenMode) {
     return null;
+  }
+
+  if (isFocusMode) {
+    return (
+      <>
+        <div
+          className={`
+            fixed right-0 top-0 bottom-0 z-40 w-[360px]
+            flex flex-col overflow-hidden border-l border-white/10
+            transition-transform duration-300 ease-in-out
+            ${isCollapsed ? "translate-x-full" : "translate-x-0"}
+          `}
+          style={{
+            background: glass0.background,
+            backdropFilter: glass0.backdropFilter,
+          }}
+        >
+          <RightSidebar />
+        </div>
+
+        {isCollapsed && (
+          <div
+            className="
+              fixed right-0 top-4 z-50
+              flex items-center justify-center
+              h-12 w-8
+              bg-gray-900/90 backdrop-blur-sm
+              border-l border-t border-b border-white/10
+              rounded-l-lg
+              cursor-pointer
+              transition-colors duration-200
+              hover:bg-gray-800/90 hover:border-gold-primary/50
+            "
+            onClick={toggleCollapsed}
+            title="Expand sidebar (Cmd+.)"
+          >
+            <PanelRight className="h-4 w-4 text-gray-400 hover:text-gold-primary" />
+          </div>
+        )}
+      </>
+    );
   }
 
   return (

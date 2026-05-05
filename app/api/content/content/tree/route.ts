@@ -56,6 +56,9 @@ type ContentTreeNode = {
   external?: {
     url: string;
     subtype: string | null;
+    readingStatus: string;
+    faviconUrl: string | null;
+    preserveHtml: boolean;
   };
   visualization?: {
     engine: string;
@@ -176,6 +179,9 @@ export async function GET(request: NextRequest) {
           select: {
             url: true,
             subtype: true,
+            readingStatus: true,
+            faviconUrl: true,
+            preserveHtml: true,
           },
         },
         visualizationPayload: {
@@ -329,6 +335,9 @@ export async function GET(request: NextRequest) {
         node.external = {
           url: item.externalPayload.url,
           subtype: item.externalPayload.subtype,
+          readingStatus: item.externalPayload.readingStatus,
+          faviconUrl: item.externalPayload.faviconUrl,
+          preserveHtml: item.externalPayload.preserveHtml,
         };
       }
       // Visualization payload

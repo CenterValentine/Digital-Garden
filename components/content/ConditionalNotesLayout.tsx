@@ -33,6 +33,7 @@ export function ConditionalNotesLayout({
 }: ConditionalNotesLayoutProps) {
   const pathname = usePathname();
   const isFullscreen = pathname?.includes("/fullscreen");
+  const isFocusMode = pathname?.includes("/content/focus/");
 
   // Fullscreen mode: just render children directly
   if (isFullscreen) {
@@ -42,6 +43,26 @@ export function ConditionalNotesLayout({
           <AuthSessionSync />
         </Suspense>
         {children}
+      </>
+    );
+  }
+
+  if (isFocusMode) {
+    return (
+      <>
+        <div
+          data-notes-layout
+          className="fixed inset-0 flex overflow-hidden"
+        >
+          <DndWrapper>
+            <div className="flex h-full w-full overflow-hidden">
+              <div className="relative z-0 flex h-full min-h-0 flex-1 flex-col overflow-hidden">
+                {children}
+              </div>
+              <CollapsibleRightPanel />
+            </div>
+          </DndWrapper>
+        </div>
       </>
     );
   }

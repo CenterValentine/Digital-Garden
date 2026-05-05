@@ -1,5 +1,5 @@
 ---
-last_updated: 2026-04-29
+last_updated: 2026-05-04
 current_epoch: 13
 current_sprint: 58
 sprint_status: planned
@@ -52,6 +52,21 @@ before planning and executing. There may be additions or modifications.
 **Detailed Plan**: `docs/notes-feature/work-tracking/epochs/epoch-13-people-and-collaboration.md`
 
 ## Recent Completions (Last 30 Days)
+
+**May 4, 2026**: Browser overlay, associated content, and web notes foundation
+- Added canonical-first webpage identity with new `WebResource`, `WebResourceContentLink`, and `WebResourceViewState` models plus `ExternalPayload.webResourceId`
+- Added a new `/api/integrations/browser-extension/*` API surface for resource context, webpage associations, content-picker tree, note/external overlay editing, and per-install overlay view-state persistence
+- Broadened the right-sidebar `Backlinks` affordance into a generalized `Links` panel for notes and external links while preserving the existing sidebar slot and tab compatibility
+- Added app-hosted overlay editing routes under `/extension-overlay/note/[id]` and `/extension-overlay/external/[id]` for trusted extension sessions
+- Added an in-page extension overlay shell that can resolve webpage context, open associated notes/external links, quick-add current pages into trusted bookmark-sync connections, and reopen saved overlay state on revisit
+- `npx prisma generate`, `pnpm typecheck`, and `pnpm build` passed; additive SQL for the new web-resource tables and `ExternalPayload.webResourceId` was applied safely without table drops
+
+**Apr 30, 2026**: Browser bookmarks sync foundation
+- Added a new browser-bookmarks integration surface with bearer-token auth, connection management, bootstrap, push/pull sync, and reading-queue API routes
+- Expanded external references with normalized/canonical URL metadata, reading status, favicon/domain metadata, capture metadata, dedupe metadata, and preserve-HTML support
+- Added persistent bookmark sync models for extension tokens, browser/app root connections, and per-node sync mappings
+- Added an in-repo `extensions/browser-bookmarks/` package with a Digital Garden settings page plus a Chromium MV3 extension scaffold for popup, options, capture, bookmark observers, session capture, and rules import/export
+- Build gate and typecheck passed; browser-level Chrome/Vivaldi smoke testing remains manual
 
 **Apr 29, 2026**: Stopwatch block prototype
 - Added a new document-local `stopwatch` TipTap block with persisted wall-clock timing, lap capture, and multiple visual style variants

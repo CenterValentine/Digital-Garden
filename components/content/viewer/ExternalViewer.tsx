@@ -14,6 +14,17 @@ interface ExternalViewerProps {
   title: string;
   url: string;
   subtype?: string;
+  readingStatus?: "inbox" | "queue" | "reading" | "read" | "archived";
+  description?: string | null;
+  resourceType?: string | null;
+  resourceRelationship?: string | null;
+  userIntent?: string | null;
+  sourceDomain?: string | null;
+  sourceHostname?: string | null;
+  faviconUrl?: string | null;
+  preserveHtml?: boolean;
+  preservedHtmlCapturedAt?: Date | string | null;
+  captureMetadata?: Record<string, unknown>;
   preview?: {
     mode?: "none" | "open_graph";
     cached?: {
@@ -31,6 +42,17 @@ export function ExternalViewer({
   title,
   url,
   subtype = "website",
+  readingStatus,
+  description,
+  resourceType,
+  resourceRelationship,
+  userIntent,
+  sourceDomain,
+  sourceHostname,
+  faviconUrl,
+  preserveHtml,
+  preservedHtmlCapturedAt,
+  captureMetadata,
   preview,
 }: ExternalViewerProps) {
   // Type-safe preview casting
@@ -54,6 +76,21 @@ export function ExternalViewer({
           contentId={contentId}
           url={url}
           subtype={subtype}
+          readingStatus={readingStatus}
+          description={description}
+          resourceType={resourceType}
+          resourceRelationship={resourceRelationship}
+          userIntent={userIntent}
+          sourceDomain={sourceDomain}
+          sourceHostname={sourceHostname}
+          faviconUrl={faviconUrl}
+          preserveHtml={preserveHtml}
+          preservedHtmlCapturedAt={
+            typeof preservedHtmlCapturedAt === "string"
+              ? preservedHtmlCapturedAt
+              : preservedHtmlCapturedAt?.toISOString()
+          }
+          captureMetadata={captureMetadata}
           preview={typedPreview}
         />
       </div>

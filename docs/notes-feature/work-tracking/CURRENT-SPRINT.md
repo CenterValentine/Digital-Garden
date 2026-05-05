@@ -8,6 +8,47 @@ status: complete
 
 # Current Sprint Addendum
 
+## May 4, 2026 — Browser Overlay + Associated Content Foundation
+
+**Branch**: `codex/habit-tracker-block-prototype`  
+**Status**: Implemented, awaiting manual overlay/browser smoke test
+
+### Implemented
+- Added canonical-first webpage identity and association persistence with `WebResource`, `WebResourceContentLink`, and `WebResourceViewState`
+- Added new trusted-install browser-extension APIs for resource context, associations, content tree picking, note/external overlay editing, and overlay view-state persistence
+- Broadened the app-side backlinks affordance into a generalized Links panel for notes and external content
+- Added app-hosted extension overlay routes for note TipTap editing and external-link metadata editing
+- Added an in-page browser overlay content script with a floating Digital Garden launcher, associated-content surface, quick-add connection surface, content-tree association picker, and saved floating/docked/embedded view restoration
+
+### Verification
+- `npx prisma generate` passed
+- `pnpm typecheck` passed
+- `pnpm build` passed
+- Additive SQL for the new web-resource schema was applied without destructive table drops
+- Manual overlay behavior, iframe loading on live sites, and Chrome/Vivaldi smoke testing still pending
+
+---
+
+## Apr 30, 2026 — Browser Bookmarks Sync Foundation
+
+**Branch**: `codex/epoch-13-people-collab`  
+**Status**: Implemented, awaiting manual Chrome/Vivaldi smoke test
+
+### Implemented
+- Added bookmark integration persistence in Prisma for browser extension tokens, bookmark sync connections, and per-node sync links
+- Added a versioned browser-bookmarks API surface for capability discovery, token lifecycle, connection CRUD, bootstrap, browser push sync, app pull sync, and reading queue queries
+- Expanded external reference payloads so bookmarks can carry normalized/canonical URL data, reading status, domain/favicon metadata, capture and match metadata, and preserve-HTML support
+- Added a built-in Digital Garden settings page for browser bookmarks under `/settings/browser-bookmarks`
+- Added an in-repo MV3 extension scaffold under `extensions/browser-bookmarks/browser-extension/` with popup, options, capture flow, bookmark observers, sync alarm, session capture, and rules import/export
+
+### Verification
+- `npx prisma generate` passed
+- `pnpm typecheck` passed
+- `pnpm build` passed
+- Manual Chrome and Vivaldi smoke testing still pending
+
+---
+
 ## Apr 29, 2026 — Stopwatch Block Prototype
 
 **Branch**: `codex/habit-tracker-block-prototype`  
