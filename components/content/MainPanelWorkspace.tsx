@@ -48,6 +48,8 @@ function WorkspacePane({
   const layoutMode = useContentStore((state) => state.layoutMode);
   const activePaneId = useContentStore((state) => state.activePaneId);
   const focusPane = useContentStore((state) => state.focusPane);
+  const pathname = usePathname();
+  const isEmbedMode = pathname?.startsWith("/embed/") ?? false;
   const isDropTarget = Boolean(draggedTabId) && layoutMode !== "single";
 
   return (
@@ -73,19 +75,21 @@ function WorkspacePane({
         });
       }}
     >
-      <MainPanelHeader
-        paneId={paneId}
-        draggedTabId={draggedTabId}
-        onTabDragStart={onTabDragStart}
-        onTabDragEnd={onTabDragEnd}
-        onTabDrop={(targetPaneId, beforeTabId) =>
-          onTabDrop({
-            paneId: targetPaneId,
-            beforeTabId,
-            placementMode: "layout-aware",
-          })
-        }
-      />
+      {!isEmbedMode && (
+        <MainPanelHeader
+          paneId={paneId}
+          draggedTabId={draggedTabId}
+          onTabDragStart={onTabDragStart}
+          onTabDragEnd={onTabDragEnd}
+          onTabDrop={(targetPaneId, beforeTabId) =>
+            onTabDrop({
+              paneId: targetPaneId,
+              beforeTabId,
+              placementMode: "layout-aware",
+            })
+          }
+        />
+      )}
       {isDropTarget && (
         <div className="pointer-events-none absolute inset-0 z-10 shadow-[inset_0_0_0_1px_rgba(201,168,108,0.18)]" />
       )}
@@ -413,6 +417,7 @@ export function MainPanelWorkspace() {
   const setSelectedContentId = useContentStore((state) => state.setSelectedContentId);
   const shellControllers = useExtensionShellControllers();
   const isFocusMode = pathname?.includes("/content/focus/");
+  const isEmbedMode = pathname?.startsWith("/embed/") ?? false;
   const [draggedTabId, setDraggedTabId] = useState<string | null>(null);
   const [draggedFromPaneId, setDraggedFromPaneId] = useState<WorkspacePaneId | null>(null);
   const [hoveredSinglePaneTargetId, setHoveredSinglePaneTargetId] = useState<string | null>(null);
@@ -653,7 +658,7 @@ export function MainPanelWorkspace() {
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden">
-      {!isFocusMode ? <MainPanelNavigation paneId={activePaneId} /> : null}
+      {!isFocusMode && !isEmbedMode ? <MainPanelNavigation paneId={activePaneId} /> : null}
       <div key={layoutMode} className="relative flex-1 min-h-0">
         {paneLayout}
         {layoutMode !== "quad" && (

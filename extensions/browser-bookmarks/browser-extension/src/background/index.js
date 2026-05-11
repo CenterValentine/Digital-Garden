@@ -114,6 +114,12 @@ async function saveTrustedInstall(payload) {
     token: payload.token,
   };
   await saveConfig(next);
+  // New bearer token → clear stale session cache so next exchange uses new token.
+  // Fire-and-forget: do NOT await — the exchange is a network call and waiting for
+  // it would push the background response past the settings page's 3s bridge timeout.
+  chrome.storage.session.remove(EMBED_SESSION_CACHE_KEY).then(() => {
+    exchangeEmbedSession().catch(() => {});
+  });
   return getExtensionContext();
 }
 
@@ -231,8 +237,11 @@ async function saveExtensionExternalContent(contentId, payload) {
   });
 }
 
-async function fetchContentPickerTree() {
-  return apiFetch("/api/integrations/browser-extension/content-picker-tree");
+async function fetchContentPickerTree(workspaceId) {
+  const path = workspaceId
+    ? `/api/integrations/browser-extension/content-picker-tree?workspaceId=${encodeURIComponent(workspaceId)}`
+    : "/api/integrations/browser-extension/content-picker-tree";
+  return apiFetch(path);
 }
 
 async function createContentPickerItem(payload) {
@@ -254,6 +263,12 @@ async function deleteResourceAssociation(payload) {
     method: "DELETE",
     body: JSON.stringify(payload),
   });
+}
+
+async function fetchDomainAssociations(url, excludeResourceId) {
+  const params = new URLSearchParams({ url });
+  if (excludeResourceId) params.set("excludeResourceId", excludeResourceId);
+  return apiFetch(`/api/integrations/browser-extension/domain-associations?${params}`);
 }
 
 async function saveOverlayViewState(payload) {
@@ -336,6 +351,76 @@ function shouldIgnoreBookmarkEvent(id) {
 
 async function fetchConnections() {
   return apiFetch("/api/integrations/browser-bookmarks/connections");
+}
+
+async function fetchWorkspaces() {
+  return apiFetch("/api/integrations/browser-extension/workspaces");
+}
+
+// ── URL association cache ─────────────────────────────────────────────────────
+
+const URL_ASSOC_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+const URL_ASSOC_CACHE_KEY_PREFIX = "dgUrlAssoc:";
+
+function normalizeUrlForCache(url) {
+  try {
+    const u = new URL(url);
+    return `${u.hostname}${u.pathname}`.replace(/\/$/, "");
+  } catch {
+    return null;
+  }
+}
+
+async function getCachedUrlAssociation(url) {
+  const key = normalizeUrlForCache(url);
+  if (!key) return null;
+  const result = await chrome.storage.local.get(`${URL_ASSOC_CACHE_KEY_PREFIX}${key}`);
+  const entry = result[`${URL_ASSOC_CACHE_KEY_PREFIX}${key}`];
+  if (!entry || Date.now() - entry.timestamp > URL_ASSOC_CACHE_TTL_MS) return null;
+  return entry;
+}
+
+async function setCachedUrlAssociation(url, data) {
+  const key = normalizeUrlForCache(url);
+  if (!key) return;
+  await chrome.storage.local.set({
+    [`${URL_ASSOC_CACHE_KEY_PREFIX}${key}`]: { ...data, timestamp: Date.now() },
+  });
+}
+
+async function clearCachedUrlAssociation(url) {
+  const key = normalizeUrlForCache(url);
+  if (!key) return;
+  await chrome.storage.local.remove(`${URL_ASSOC_CACHE_KEY_PREFIX}${key}`);
+}
+
+async function fetchAndCacheUrlAssociation(url) {
+  try {
+    const data = await apiFetch(
+      `/api/integrations/browser-extension/url-association?url=${encodeURIComponent(url)}`
+    );
+    await setCachedUrlAssociation(url, data);
+    return data;
+  } catch {
+    return null;
+  }
+}
+
+async function updateTabBadge(tabId, url) {
+  try {
+    let assoc = await getCachedUrlAssociation(url);
+    if (!assoc) {
+      assoc = await fetchAndCacheUrlAssociation(url);
+    }
+    if (assoc?.hasNote || assoc?.hasExternal) {
+      await chrome.action.setBadgeText({ text: "●", tabId });
+      await chrome.action.setBadgeBackgroundColor({ color: "#c9a86c", tabId });
+    } else {
+      await chrome.action.setBadgeText({ text: "", tabId });
+    }
+  } catch {
+    // Best-effort — don't break tab navigation on badge failure
+  }
 }
 
 async function resolveActiveConnection(config) {
@@ -507,6 +592,23 @@ async function getCurrentTabSyncState() {
     })),
     connections,
   };
+}
+
+async function showTreePanelInActiveTab() {
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (!tab?.id) {
+    throw new Error("No active tab is available");
+  }
+  try {
+    await chrome.tabs.sendMessage(tab.id, { type: "dg-show-tree-panel" });
+    return { openedInOverlay: true, tabId: tab.id };
+  } catch (error) {
+    throw new Error(
+      error instanceof Error
+        ? `This page overlay is not available: ${error.message}`
+        : "This page overlay is not available on the current tab"
+    );
+  }
 }
 
 async function openContentInActiveTab(contentId, contentKind = "external") {
@@ -1078,15 +1180,80 @@ async function captureCurrentSession(payload = {}) {
   return { count: mutations.length };
 }
 
+const EMBED_SESSION_CACHE_KEY = "dgEmbedSession";
+// Two-minute buffer: refresh before the session actually expires
+const EMBED_SESSION_REFRESH_BUFFER_MS = 2 * 60 * 1000;
+
+async function plantEmbedCookie(appBaseUrl, { token, expiresAt, cookieName }) {
+  const url = appBaseUrl.replace(/\/$/, "");
+  const isSecure = url.startsWith("https://");
+  const base = {
+    url,
+    name: cookieName,
+    value: token,
+    httpOnly: true,
+    secure: isSecure,
+    expirationDate: new Date(expiresAt).getTime() / 1000,
+    path: "/",
+  };
+
+  // Attempt 1: SameSite=None (required for cross-site iframe delivery).
+  // Chrome allows this without Secure on localhost; some Vivaldi builds reject it
+  // with a thrown DOMException (not just a null return). Catch both cases.
+  try {
+    const result = await chrome.cookies.set({ ...base, sameSite: "no_restriction" });
+    if (result) {
+      console.log("[DG Bookmarks] Cookie planted (SameSite=None)", {
+        name: result.name,
+        sameSite: result.sameSite,
+        secure: result.secure,
+      });
+      return;
+    }
+    console.warn("[DG Bookmarks] SameSite=None cookie returned null, trying Lax fallback");
+  } catch (e) {
+    console.warn("[DG Bookmarks] SameSite=None cookie threw, trying Lax fallback:", e?.message);
+  }
+
+  // Attempt 2: SameSite=Lax fallback. The pre-planted cookie won't be sent in
+  // cross-site iframes, but the /embed/auth route passes the token via URL instead,
+  // so this cookie is only needed as a same-origin cache after the first auth.
+  try {
+    const result = await chrome.cookies.set({ ...base, sameSite: "lax" });
+    if (result) {
+      console.log("[DG Bookmarks] Cookie planted (SameSite=Lax fallback)");
+    } else {
+      console.warn("[DG Bookmarks] Lax cookie also returned null");
+    }
+  } catch (e) {
+    console.warn("[DG Bookmarks] Lax cookie also threw:", e?.message);
+  }
+  // Never throw — callers should still get the session token for the auth-URL approach.
+}
+
 /**
- * Exchange the bearer token for a short-lived session and plant it as a cookie
- * on the app domain so the embed iframe can authenticate without any token in the URL.
+ * Exchange the bearer token for a short-lived session and plant it as a cookie.
+ * Uses chrome.storage.session to cache the session across service worker restarts
+ * (MV3 workers wake frequently — this avoids a DB round-trip on each wake).
  */
 async function exchangeEmbedSession() {
   const config = await getConfig();
   if (!config.appBaseUrl || !config.token) return null;
 
   try {
+    // Check session cache first
+    const cached = await chrome.storage.session.get(EMBED_SESSION_CACHE_KEY);
+    const cachedSession = cached[EMBED_SESSION_CACHE_KEY];
+    if (cachedSession?.token && cachedSession?.expiresAt) {
+      const msRemaining = new Date(cachedSession.expiresAt).getTime() - Date.now();
+      if (msRemaining > EMBED_SESSION_REFRESH_BUFFER_MS) {
+        // Still valid — just re-plant the cookie (cheap: no DB, no API call)
+        await plantEmbedCookie(config.appBaseUrl, cachedSession);
+        return cachedSession;
+      }
+    }
+
+    // Cache miss or near-expiry — exchange for a fresh session
     const res = await fetch(
       `${config.appBaseUrl}/api/integrations/browser-extension/embed-session`,
       {
@@ -1098,22 +1265,10 @@ async function exchangeEmbedSession() {
     const body = await res.json();
     if (!body.success) return null;
 
-    const { token, expiresAt, cookieName } = body.data;
-    const url = config.appBaseUrl.replace(/\/$/, "");
-    const isSecure = url.startsWith("https://");
-
-    await chrome.cookies.set({
-      url,
-      name: cookieName,
-      value: token,
-      httpOnly: true,
-      secure: isSecure,
-      sameSite: "lax",
-      expirationDate: new Date(expiresAt).getTime() / 1000,
-      path: "/",
-    });
-
-    return { token, expiresAt };
+    const session = body.data;
+    await chrome.storage.session.set({ [EMBED_SESSION_CACHE_KEY]: session });
+    await plantEmbedCookie(config.appBaseUrl, session);
+    return session;
   } catch (error) {
     console.error("[DG Bookmarks] Embed session exchange failed", error);
     return null;
@@ -1187,6 +1342,19 @@ chrome.bookmarks.onRemoved.addListener((id, removeInfo) => {
   });
 });
 
+chrome.tabs.onActivated.addListener(({ tabId }) => {
+  chrome.tabs.get(tabId, (tab) => {
+    if (chrome.runtime.lastError || !tab?.url) return;
+    void updateTabBadge(tabId, tab.url);
+  });
+});
+
+chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+  if (changeInfo.status === "complete" && tab?.url) {
+    void updateTabBadge(tabId, tab.url);
+  }
+});
+
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   (async () => {
     if (message.type === "get-config") {
@@ -1199,7 +1367,8 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     }
     if (message.type === "save-config") {
       sendResponse({ ok: true, data: await saveConfig(message.payload) });
-      // Re-exchange embed session whenever config changes (new token or URL)
+      // Invalidate session cache so the new token/URL is used immediately
+      chrome.storage.session.remove(EMBED_SESSION_CACHE_KEY);
       exchangeEmbedSession().catch(() => {});
       return;
     }
@@ -1219,6 +1388,10 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       sendResponse({ ok: true, data: await fetchConnections() });
       return;
     }
+    if (message.type === "fetch-workspaces") {
+      sendResponse({ ok: true, data: await fetchWorkspaces() });
+      return;
+    }
     if (message.type === "fetch-bookmark-preferences") {
       sendResponse({ ok: true, data: await fetchBookmarkPreferences() });
       return;
@@ -1236,6 +1409,10 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     }
     if (message.type === "get-current-tab-sync-state") {
       sendResponse({ ok: true, data: await getCurrentTabSyncState() });
+      return;
+    }
+    if (message.type === "show-tree-panel") {
+      sendResponse({ ok: true, data: await showTreePanelInActiveTab() });
       return;
     }
     if (message.type === "open-content-in-active-tab") {
@@ -1271,11 +1448,23 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       return;
     }
     if (message.type === "quick-save") {
-      sendResponse({ ok: true, data: await quickSaveCurrentTab(message.payload || {}) });
+      const result = await quickSaveCurrentTab(message.payload || {});
+      const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (activeTab?.url) {
+        await clearCachedUrlAssociation(activeTab.url);
+        void updateTabBadge(activeTab.id, activeTab.url);
+      }
+      sendResponse({ ok: true, data: result });
       return;
     }
     if (message.type === "remove-current-tab") {
-      sendResponse({ ok: true, data: await removeCurrentTabBookmark() });
+      const result = await removeCurrentTabBookmark();
+      const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (activeTab?.url) {
+        await clearCachedUrlAssociation(activeTab.url);
+        void updateTabBadge(activeTab.id, activeTab.url);
+      }
+      sendResponse({ ok: true, data: result });
       return;
     }
     if (message.type === "capture-session") {
@@ -1295,7 +1484,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       return;
     }
     if (message.type === "fetch-content-picker-tree") {
-      sendResponse({ ok: true, data: await fetchContentPickerTree() });
+      sendResponse({ ok: true, data: await fetchContentPickerTree(message.payload?.workspaceId || null) });
       return;
     }
     if (message.type === "create-content-picker-item") {
@@ -1308,6 +1497,10 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     }
     if (message.type === "delete-resource-association") {
       sendResponse({ ok: true, data: await deleteResourceAssociation(message.payload || {}) });
+      return;
+    }
+    if (message.type === "fetch-domain-associations") {
+      sendResponse({ ok: true, data: await fetchDomainAssociations(message.url, message.excludeResourceId || null) });
       return;
     }
     if (message.type === "save-overlay-view-state") {

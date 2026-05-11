@@ -1,10 +1,11 @@
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { v4 as uuidv4 } from "uuid";
 import type { SessionData, User } from "./types";
 
 import { prisma } from "@/lib/database/client";
 
 const SESSION_COOKIE_NAME = "session_token";
+const EMBED_SESSION_HEADER = "x-embed-session";
 const SESSION_DURATION_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
 /**
@@ -59,8 +60,21 @@ export async function createSession(userId: string): Promise<SessionData> {
 export async function validateSession(
   token?: string
 ): Promise<SessionData | null> {
-  const cookieStore = await cookies();
-  const sessionToken = token || cookieStore.get(SESSION_COOKIE_NAME)?.value;
+  let sessionToken = token;
+
+  if (!sessionToken) {
+    const cookieStore = await cookies();
+    sessionToken = cookieStore.get(SESSION_COOKIE_NAME)?.value;
+  }
+
+  // Fallback: X-Embed-Session header. Used by the browser-extension iframe
+  // when it runs in a cross-site context where the session_token cookie is
+  // blocked by the browser (e.g. Vivaldi strict tracking protection).
+  // The embed layout's inline script wraps window.fetch to inject this header.
+  if (!sessionToken) {
+    const headerStore = await headers();
+    sessionToken = headerStore.get(EMBED_SESSION_HEADER) ?? undefined;
+  }
 
   if (!sessionToken) {
     return null;

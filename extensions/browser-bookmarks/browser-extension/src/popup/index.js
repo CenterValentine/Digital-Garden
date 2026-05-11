@@ -29,52 +29,81 @@ let currentPageState = null;
 let autosaveTimer = null;
 let syncInFlight = null;
 
+// ── DOM helpers ───────────────────────────────────────────────────────────────
+
 function loadingCard() {
   return document.getElementById("quick-loading");
 }
-
 function editorShell() {
   return document.getElementById("quick-editor-shell");
 }
-
 function titleInput() {
   return document.getElementById("quick-title");
 }
-
 function descriptionInput() {
   return document.getElementById("quick-description");
 }
-
 function connectionSelect() {
   return document.getElementById("quick-connection");
 }
-
 function launchButton() {
   return document.getElementById("launch-note");
 }
-
 function removeButton() {
   return document.getElementById("quick-remove");
 }
-
+function openTreeButton() {
+  return document.getElementById("open-tree");
+}
 function getStatusNode() {
   return document.getElementById("quick-save-status");
 }
+function getStatusDot() {
+  return document.getElementById("status-dot");
+}
 
-function setPopupLoading(isLoading, message = "Loading current page sync state…") {
-  if (loadingCard()) {
-    loadingCard().hidden = false;
-    loadingCard().style.display = isLoading ? "flex" : "none";
-    const hint = loadingCard().querySelector(".hint");
-    if (hint) {
-      hint.textContent = message;
+// ── Page context ──────────────────────────────────────────────────────────────
+
+async function populatePageContext() {
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!tab) return;
+
+    const faviconEl = document.getElementById("page-favicon");
+    const domainEl = document.getElementById("page-domain");
+    const titleDisplayEl = document.getElementById("page-title-display");
+
+    if (tab.favIconUrl) {
+      faviconEl.src = tab.favIconUrl;
     }
+
+    try {
+      const hostname = new URL(tab.url || "").hostname.replace(/^www\./, "");
+      domainEl.textContent = hostname;
+    } catch {
+      domainEl.textContent = "";
+    }
+
+    if (tab.title) {
+      titleDisplayEl.textContent = tab.title;
+    }
+  } catch {
+    // Best-effort; non-blocking
+  }
+}
+
+// ── Loading state ─────────────────────────────────────────────────────────────
+
+function setPopupLoading(isLoading) {
+  if (loadingCard()) {
+    loadingCard().style.display = isLoading ? "flex" : "none";
   }
   if (editorShell()) {
-    editorShell().hidden = false;
     editorShell().style.display = isLoading ? "none" : "flex";
   }
 }
+
+// ── Preference controls ───────────────────────────────────────────────────────
 
 async function savePreferenceList(key, values) {
   const updated = normalizeBookmarkPreferences({
@@ -89,7 +118,7 @@ async function savePreferenceList(key, values) {
   resourceTypeControl?.setValues(bookmarkPreferences.resourceTypes);
   resourceRelationshipControl?.setValues(bookmarkPreferences.resourceRelationships);
   userIntentControl?.setValues(bookmarkPreferences.userIntents);
-  setQuickSaveStatus("Bookmark metadata options updated.", "success");
+  setQuickSaveStatus("Metadata options updated.", "success");
   scheduleAutosave("metadata changed");
   return bookmarkPreferences[key] || [];
 }
@@ -103,7 +132,7 @@ function mountPreferenceControls() {
     container: document.getElementById("quick-resource-type-control"),
     label: "Resource Type",
     values: bookmarkPreferences.resourceTypes,
-    placeholder: "Choose resource type",
+    placeholder: "Resource type",
     selectedValue:
       currentPageState?.draft?.resourceType ||
       currentPageState?.existingExternal?.external?.resourceType ||
@@ -118,7 +147,7 @@ function mountPreferenceControls() {
     container: document.getElementById("quick-resource-relationship-control"),
     label: "Resource Relationship",
     values: bookmarkPreferences.resourceRelationships,
-    placeholder: "Choose resource relationship",
+    placeholder: "Resource relationship",
     selectedValue:
       currentPageState?.draft?.resourceRelationship ||
       currentPageState?.existingExternal?.external?.resourceRelationship ||
@@ -133,7 +162,7 @@ function mountPreferenceControls() {
     container: document.getElementById("quick-user-intent-control"),
     label: "User Intent",
     values: bookmarkPreferences.userIntents,
-    placeholder: "Choose user intent",
+    placeholder: "User intent",
     selectedValue:
       currentPageState?.draft?.userIntent ||
       currentPageState?.existingExternal?.external?.userIntent ||
@@ -145,6 +174,8 @@ function mountPreferenceControls() {
     },
   });
 }
+
+// ── Data loading ──────────────────────────────────────────────────────────────
 
 async function loadConfigAndConnections() {
   const [config, connections, preferences, pageState] = await Promise.all([
@@ -163,26 +194,22 @@ async function loadConfigAndConnections() {
   const currentValue = pageState?.defaultConnectionId || config.defaultConnectionId || "";
 
   if (connections.length === 0) {
-    select.innerHTML = '<option value="">No synced connections yet</option>';
+    select.innerHTML = '<option value="">No connections yet</option>';
     select.disabled = true;
   } else {
     select.disabled = false;
     select.innerHTML = connections
       .map(
-        (connection) =>
-          `<option value="${connection.id}">${connection.name} (${connection.chromeRootTitle})</option>`
+        (c) => `<option value="${c.id}">${c.name} (${c.chromeRootTitle})</option>`
       )
       .join("");
-    if (currentValue && connections.some((connection) => connection.id === currentValue)) {
+    if (currentValue && connections.some((c) => c.id === currentValue)) {
       select.value = currentValue;
     } else {
       select.value = connections[0].id;
       await sendMessage({
         type: "save-config",
-        payload: {
-          ...config,
-          defaultConnectionId: connections[0].id,
-        },
+        payload: { ...config, defaultConnectionId: connections[0].id },
       });
     }
   }
@@ -197,15 +224,13 @@ async function loadConfigAndConnections() {
   };
 }
 
+// ── Status ────────────────────────────────────────────────────────────────────
+
 function setQuickSaveStatus(message, kind = "idle") {
-  const node = getStatusNode();
-  node.textContent = message;
-  node.style.color =
-    kind === "error"
-      ? "#ff8a8a"
-      : kind === "success"
-        ? "#8fe0b3"
-        : "rgba(244, 246, 248, 0.64)";
+  const textNode = getStatusNode();
+  const dotNode = getStatusDot();
+  if (textNode) textNode.textContent = message;
+  if (dotNode) dotNode.setAttribute("data-kind", kind);
 }
 
 function formatSyncConnectionStatus(pageState) {
@@ -213,38 +238,33 @@ function formatSyncConnectionStatus(pageState) {
   const uniqueNames = Array.from(
     new Set(
       bookmarks
-        .map((bookmark) => bookmark.connectionName)
-        .filter((value) => typeof value === "string" && value.trim().length > 0)
+        .map((b) => b.connectionName)
+        .filter((v) => typeof v === "string" && v.trim().length > 0)
     )
   );
 
   if (uniqueNames.length === 0) {
-    return "This page is not synced yet. Title, description, and metadata autosave once the bookmark is created, and Launch Note opens the webpage note in the page overlay.";
+    return "Not yet synced. Autosaves after the first save, and Launch Note opens the note in the page overlay.";
   }
-
   if (uniqueNames.length === 1) {
-    return `This page is already synced to ${uniqueNames[0]}. Changes autosave, and Launch Note opens the webpage note in the page overlay.`;
+    return `Synced to ${uniqueNames[0]}. Changes autosave.`;
   }
-
-  return `This page is already synced to ${uniqueNames.join(", ")}. Changes autosave across the current bookmarked connections, and Launch Note opens the webpage note in the page overlay.`;
+  return `Synced to ${uniqueNames.join(", ")}. Changes autosave.`;
 }
+
+// ── Draft / sync ──────────────────────────────────────────────────────────────
 
 async function setDefaultConnection(connectionId) {
   const current = await sendMessage({ type: "get-config" });
   await sendMessage({
     type: "save-config",
-    payload: {
-      ...current,
-      defaultConnectionId: connectionId,
-    },
+    payload: { ...current, defaultConnectionId: connectionId },
   });
 }
 
 function getSelectedConnectionRecord() {
   const selectedId = connectionSelect().value;
-  return (currentPageState?.connections || []).find(
-    (connection) => connection.id === selectedId
-  );
+  return (currentPageState?.connections || []).find((c) => c.id === selectedId);
 }
 
 function getDraftPayloadFromForm() {
@@ -297,7 +317,7 @@ function hydrateDraftFields() {
 function scheduleAutosave(reason = "changes pending") {
   if (connectionSelect().disabled) return;
   window.clearTimeout(autosaveTimer);
-  setQuickSaveStatus(`Changes pending. Autosaving in a moment…`, "idle");
+  setQuickSaveStatus("Saving…", "saving");
   autosaveTimer = window.setTimeout(() => {
     void syncCurrentTab({ source: reason });
   }, AUTOSAVE_DEBOUNCE_MS);
@@ -312,22 +332,22 @@ async function refreshCurrentPageState() {
   return currentPageState;
 }
 
+// ── Note creation ─────────────────────────────────────────────────────────────
+
 async function ensureLinkedNoteForCurrentPage() {
   const existingNote = (currentPageState?.resourceContext?.associations || []).find(
     (entry) => entry?.content?.contentType === "note"
   )?.content?.id;
-  if (existingNote) {
-    return existingNote;
-  }
+  if (existingNote) return existingNote;
 
   const resourceId = currentPageState?.resourceContext?.resource?.id || null;
   if (!resourceId) {
-    throw new Error("No webpage context is available for linked notes");
+    throw new Error("No webpage context available for linked notes");
   }
 
   const connection = getSelectedConnectionRecord();
   if (!connection?.appRootId) {
-    throw new Error("No valid synced connection is selected for linked note creation");
+    throw new Error("No valid synced connection selected for linked note creation");
   }
 
   const created = await sendMessage({
@@ -345,15 +365,14 @@ async function ensureLinkedNoteForCurrentPage() {
 
   await sendMessage({
     type: "create-resource-association",
-    payload: {
-      webResourceId: resourceId,
-      contentId: created.id,
-    },
+    payload: { webResourceId: resourceId, contentId: created.id },
   });
 
   await refreshCurrentPageState();
   return created.id;
 }
+
+// ── Sync ──────────────────────────────────────────────────────────────────────
 
 async function syncCurrentTab(options = {}) {
   if (syncInFlight) {
@@ -363,7 +382,7 @@ async function syncCurrentTab(options = {}) {
   const run = (async () => {
     const selectValue = connectionSelect().value;
     if (!selectValue) {
-      throw new Error("No synced browser-bookmark connection is available");
+      throw new Error("No synced browser-bookmark connection available");
     }
 
     window.clearTimeout(autosaveTimer);
@@ -372,24 +391,18 @@ async function syncCurrentTab(options = {}) {
 
     const payload = getSyncPayloadFromForm();
     setQuickSaveStatus(
-      options.source === "launch"
-        ? "Saving and preparing note launch…"
-        : "Autosaving bookmark info…"
+      options.source === "launch" ? "Saving and preparing note…" : "Saving…",
+      "saving"
     );
 
-    const bookmark = await sendMessage({
-      type: "quick-save",
-      payload,
-    });
+    const bookmark = await sendMessage({ type: "quick-save", payload });
 
     if (!options.skipRefresh) {
       await refreshCurrentPageState();
     }
 
     setQuickSaveStatus(
-      bookmark.action === "updated-existing"
-        ? "Bookmark info autosaved."
-        : "Bookmark created and autosaved.",
+      bookmark.action === "updated-existing" ? "Bookmark autosaved." : "Bookmark created.",
       "success"
     );
 
@@ -404,6 +417,8 @@ async function syncCurrentTab(options = {}) {
   }
 }
 
+// ── Handlers ──────────────────────────────────────────────────────────────────
+
 async function handleLaunchNote() {
   const button = launchButton();
   try {
@@ -411,21 +426,18 @@ async function handleLaunchNote() {
     button.textContent = "Launching…";
     await syncCurrentTab({ source: "launch", skipRefresh: true });
     await refreshCurrentPageState();
-    setQuickSaveStatus("Preparing webpage note…");
+    setQuickSaveStatus("Preparing note…", "saving");
     const contentId = await ensureLinkedNoteForCurrentPage();
 
     await sendMessage({
       type: "open-content-in-active-tab",
-      payload: {
-        contentId,
-        contentKind: "note",
-      },
+      payload: { contentId, contentKind: "note" },
     });
 
-    setQuickSaveStatus("Opened the webpage note in the overlay.", "success");
+    setQuickSaveStatus("Opened in overlay.", "success");
     window.close();
   } catch (error) {
-    console.error("[DG Bookmarks Popup] Launch note failed", error);
+    console.error("[DG Popup] Launch note failed", error);
     setQuickSaveStatus(
       error instanceof Error ? error.message : "Failed to launch note.",
       "error"
@@ -436,44 +448,57 @@ async function handleLaunchNote() {
   }
 }
 
+async function handleOpenInTree() {
+  const button = openTreeButton();
+  try {
+    button.disabled = true;
+    button.textContent = "Opening…";
+    await sendMessage({ type: "show-tree-panel" });
+    window.close();
+  } catch (error) {
+    console.error("[DG Popup] Open in tree failed", error);
+    setQuickSaveStatus(
+      error instanceof Error ? error.message : "Failed to open tree.",
+      "error"
+    );
+    button.disabled = false;
+    button.textContent = "Open in Tree";
+  }
+}
+
 async function handleRemoveCurrentTab() {
   const button = removeButton();
-
   try {
     button.disabled = true;
     button.textContent = "Removing…";
-    setQuickSaveStatus(
-      "Removing the current page from the selected bookmark connection and Digital Garden…"
-    );
+    setQuickSaveStatus("Removing bookmark…", "saving");
 
     const result = await sendMessage({ type: "remove-current-tab" });
     await refreshCurrentPageState();
 
     setQuickSaveStatus(
       result.removedCount > 1
-        ? `Removed ${result.removedCount} synced bookmarks for this page from ${result.connectionName}.`
-        : `Removed this page from ${result.connectionName}.`,
+        ? `Removed ${result.removedCount} bookmarks from ${result.connectionName}.`
+        : `Removed from ${result.connectionName}.`,
       "success"
     );
   } catch (error) {
-    console.error("[DG Bookmarks Popup] Remove current tab failed", error);
+    console.error("[DG Popup] Remove failed", error);
     setQuickSaveStatus(
-      error instanceof Error ? error.message : "Failed to remove the current tab.",
+      error instanceof Error ? error.message : "Failed to remove.",
       "error"
     );
   } finally {
     button.disabled = false;
-    button.textContent = "Remove Current Tab";
+    button.textContent = "Remove";
   }
 }
 
-launchButton().addEventListener("click", () => {
-  void handleLaunchNote();
-});
+// ── Event wiring ──────────────────────────────────────────────────────────────
 
-removeButton().addEventListener("click", () => {
-  void handleRemoveCurrentTab();
-});
+launchButton().addEventListener("click", () => void handleLaunchNote());
+openTreeButton().addEventListener("click", () => void handleOpenInTree());
+removeButton().addEventListener("click", () => void handleRemoveCurrentTab());
 
 document.getElementById("open-options").addEventListener("click", () => {
   chrome.runtime.openOptionsPage();
@@ -501,21 +526,24 @@ descriptionInput().addEventListener("input", () => {
   scheduleAutosave("description changed");
 });
 
+// ── Init ──────────────────────────────────────────────────────────────────────
+
 (async () => {
   setPopupLoading(true);
+  void populatePageContext();
   try {
     const { connections, pageState } = await loadConfigAndConnections();
     setPopupLoading(false);
     setQuickSaveStatus(
       connections.length > 0
         ? formatSyncConnectionStatus(pageState)
-        : "Create and trust a bookmark sync connection in Digital Garden first."
+        : "Create a bookmark sync connection in Digital Garden first."
     );
   } catch (error) {
-    console.error("[DG Bookmarks Popup] Initial load failed", error);
-    setPopupLoading(false, "Failed to load current page sync state.");
+    console.error("[DG Popup] Init failed", error);
+    setPopupLoading(false);
     setQuickSaveStatus(
-      error instanceof Error ? error.message : "Failed to load bookmark popup.",
+      error instanceof Error ? error.message : "Failed to load popup.",
       "error"
     );
   }

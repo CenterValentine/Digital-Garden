@@ -197,704 +197,667 @@ function openAppContent(appBaseUrl, contentId) {
   window.open(url.toString(), "_blank", "noopener,noreferrer");
 }
 
+// ── Domain memory ─────────────────────────────────────────────────────────────
+
+const KNOWN_2PART_TLDS = new Set([
+  "co.uk","com.au","co.jp","com.br","co.in","co.nz","co.za","com.cn","org.uk","net.au",
+  "gov.uk","ac.uk","me.uk","org.au","net.nz","org.nz","gov.au","edu.au",
+]);
+
+function getEtld1(hostname) {
+  const parts = hostname.split(".");
+  if (parts.length <= 2) return hostname;
+  const last2 = parts.slice(-2).join(".");
+  if (KNOWN_2PART_TLDS.has(last2)) return parts.slice(-3).join(".");
+  return parts.slice(-2).join(".");
+}
+
+async function loadDomainMemory(hostname) {
+  try {
+    const etld1 = getEtld1(hostname);
+    const keys = [`dgHostname:${hostname}`, `dgEtld1:${etld1}`, "dgSnapDefault"];
+    const result = await chrome.storage.local.get(keys);
+    if (result[`dgHostname:${hostname}`]) return result[`dgHostname:${hostname}`];
+    if (result[`dgEtld1:${etld1}`]) return result[`dgEtld1:${etld1}`];
+    return result["dgSnapDefault"] || { snap: "right" };
+  } catch {
+    return { snap: "right" };
+  }
+}
+
+async function saveDomainMemory(hostname, data, scope) {
+  try {
+    const etld1 = getEtld1(hostname);
+    // Accept both old string form (snap) and new object form { snap, edgeTabOffset }
+    const value = typeof data === "string" ? { snap: data } : data;
+    if (scope === "hostname") {
+      await chrome.storage.local.set({ [`dgHostname:${hostname}`]: value });
+    } else if (scope === "etld1") {
+      await chrome.storage.local.set({ [`dgEtld1:${etld1}`]: value });
+    } else {
+      await chrome.storage.local.set({ dgSnapDefault: value });
+    }
+  } catch { /* best-effort */ }
+}
+
+// ── Snap panel ────────────────────────────────────────────────────────────────
+
+function applyEdgeTabPosition(state) {
+  const tab = state.edgeTab;
+  if (!tab || !state.snap || state.snap === "floating") return;
+  const offset = state.edgeTabOffset ?? 0.5;
+  // Clear any previous inline overrides
+  tab.style.top = "";
+  tab.style.left = "";
+  tab.style.transform = "none"; // suppress CSS translate centering
+  if (state.snap === "right" || state.snap === "left") {
+    const tabH = 48;
+    tab.style.top = `${Math.round(offset * (window.innerHeight - tabH))}px`;
+  } else {
+    const tabW = 48;
+    tab.style.left = `${Math.round(offset * (window.innerWidth - tabW))}px`;
+  }
+}
+
+function setSnap(state, mode) {
+  state.snap = mode;
+  state.root.setAttribute("data-snap", mode);
+  state.shadow.querySelectorAll("[data-snap-to]").forEach((btn) => {
+    btn.setAttribute("data-active", btn.getAttribute("data-snap-to") === mode ? "true" : "false");
+  });
+  if (mode === "floating") {
+    // Clear JS-applied edge positioning before switching to floating
+    if (state.edgeTab) {
+      state.edgeTab.style.top = "";
+      state.edgeTab.style.left = "";
+      state.edgeTab.style.transform = "";
+    }
+    applyLauncherPosition(state);
+    applyFloatingPanelPosition(state);
+  } else {
+    applyEdgeTabPosition(state);
+  }
+}
+
+function applyFloatingPanelPosition(state) {
+  if (!state.snapPanel || state.snap !== "floating") return;
+  const x = state.launcherPosition?.x ?? window.innerWidth - DG_LAUNCHER_SIZE - 22;
+  const y = state.launcherPosition?.y ?? window.innerHeight - DG_LAUNCHER_SIZE - 22;
+  const panelW = 320;
+  const panelH = Math.min(560, window.innerHeight - 32);
+  // Decide side: if launcher is on right half, panel goes left; else right
+  const goLeft = x > window.innerWidth / 2;
+  const left = goLeft ? Math.max(8, x - panelW - 12) : Math.min(x + DG_LAUNCHER_SIZE + 12, window.innerWidth - panelW - 8);
+  // Decide vertical: try to keep panel within viewport
+  let top = y - 48;
+  if (top + panelH > window.innerHeight - 8) top = window.innerHeight - panelH - 8;
+  if (top < 8) top = 8;
+  state.snapPanel.style.left = `${left}px`;
+  state.snapPanel.style.top = `${top}px`;
+  state.snapPanel.style.width = `${panelW}px`;
+  state.snapPanel.style.height = `${panelH}px`;
+}
+
+async function openSnapPanel(state) {
+  state.panelOpen = true;
+  state.root.setAttribute("data-panel-open", "true");
+  if (state.snap === "floating") applyFloatingPanelPosition(state);
+  markActivity(state);
+  const renderAssoc = async () => {
+    if (!state.resourceContext) {
+      renderStatus(state.popoverBodies.associations, "Loading page context…");
+      try {
+        await loadResourceContext(state);
+        renderAssociationsPopover(state);
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : "Failed to load";
+        const isAuth = /token|trusted|unauthorized|auth/i.test(msg);
+        renderStatus(state.popoverBodies.associations, isAuth ? "Re-trust required — open Digital Garden settings to reconnect." : msg, "error");
+      }
+    } else {
+      renderAssociationsPopover(state);
+    }
+  };
+  const renderTree = async () => {
+    const workspaceId = state.selectedWorkspaceId || null;
+    if (!state.contentTree || state.loadedForWorkspaceId !== workspaceId) {
+      renderStatus(state.popoverBodies.tree, "Loading content tree…");
+      try {
+        await loadContentTree(state, { workspaceId });
+        renderTreePopover(state);
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : "Failed to load tree";
+        const isAuth = /token|trusted|unauthorized|auth/i.test(msg);
+        renderStatus(state.popoverBodies.tree, isAuth ? "Re-trust required — open Digital Garden settings to reconnect." : msg, "error");
+      }
+    } else {
+      renderTreePopover(state);
+    }
+  };
+  await Promise.all([renderAssoc(), renderTree()]);
+}
+
+function closeSnapPanel(state) {
+  state.panelOpen = false;
+  state.root.setAttribute("data-panel-open", "false");
+  markActivity(state);
+}
+
+// ── Embed iframe management ───────────────────────────────────────────────────
+
+function openEmbedForPanel(state, panel) {
+  const iframe = state.embedIframe;
+  if (!iframe || !state.config?.appBaseUrl) return;
+
+  const targetUrl = `${state.config.appBaseUrl.replace(/\/$/, "")}/embed/content/${panel.contentId}`;
+
+  // If another panel owns the iframe, detach it cleanly first
+  if (state.iframePanel && state.iframePanel !== panel) {
+    closeEmbedForPanel(state, state.iframePanel, { keepIframe: true });
+  }
+
+  setPanelEditorStatus(panel, "Loading editor…");
+
+  // Move iframe into this panel's body
+  panel.body.appendChild(iframe);
+  state.iframePanel = panel;
+
+  if (state.iframeContentId === panel.contentId && iframe.getAttribute("src")) {
+    // Already loaded — send a navigate message instead of reloading
+    iframe.contentWindow?.postMessage({ type: "open", contentId: panel.contentId }, "*");
+    iframe.setAttribute("data-active", "true");
+    setPanelEditorStatus(panel, "");
+  } else {
+    // First load — request a fresh embed session from the background BEFORE setting
+    // src so the session_token is available when the iframe loads.
+    iframe.setAttribute("data-active", "false");
+    state.iframeContentId = panel.contentId;
+
+    chrome.runtime.sendMessage({ type: "refresh-embed-session" }, (response) => {
+      // Panel may have been closed while waiting — bail out if so
+      if (state.iframePanel !== panel) return;
+
+      const sessionOk = response?.ok && response?.data != null;
+      if (!sessionOk) {
+        setPanelEditorStatus(
+          panel,
+          "Auth failed — click Refresh Token in Settings then try again",
+          "error"
+        );
+        closeEmbedForPanel(state, panel);
+        return;
+      }
+
+      // Load the embed page directly with the session token in the URL (?_t=).
+      // The server validates the token without needing a cookie — this bypasses
+      // Vivaldi's (and other browsers') third-party cookie blocking in iframes.
+      const baseUrl = state.config.appBaseUrl.replace(/\/$/, "");
+      const targetPath = `/embed/content/${panel.contentId}`;
+      const sessionToken = response.data?.token;
+      const iframeSrc = sessionToken
+        ? `${baseUrl}${targetPath}?_t=${encodeURIComponent(sessionToken)}`
+        : targetUrl;
+
+      iframe.setAttribute("src", iframeSrc);
+    });
+
+    // Belt-and-suspenders: if ready never arrives within 12s show actionable error
+    const authCheckTimer = window.setTimeout(() => {
+      if (state.iframePanel === panel &&
+          iframe.getAttribute("data-active") !== "true") {
+        setPanelEditorStatus(
+          panel,
+          "Could not load editor — if your browser blocks cross-site iframes (e.g. Vivaldi strict tracking protection), whitelist your Digital Garden URL. Otherwise click Refresh Token in Settings.",
+          "error"
+        );
+      }
+    }, 12000);
+    if (panel.authCheckTimer) window.clearTimeout(panel.authCheckTimer);
+    panel.authCheckTimer = authCheckTimer;
+  }
+}
+
+function closeEmbedForPanel(state, panel, { keepIframe = false } = {}) {
+  const iframe = state.embedIframe;
+
+  if (!keepIframe && iframe && iframe.parentElement === panel.body) {
+    panel.body.removeChild(iframe);
+    state.iframePanel = null;
+  }
+
+  if (panel.authCheckTimer) {
+    window.clearTimeout(panel.authCheckTimer);
+    panel.authCheckTimer = null;
+  }
+  setPanelEditorStatus(panel, "");
+
+  if (toggleBtn) {
+    toggleBtn.setAttribute("data-mode", "read");
+    toggleBtn.textContent = "✎ Edit";
+  }
+}
+
+// ── Workspaces ────────────────────────────────────────────────────────────────
+
+async function loadWorkspaces(state) {
+  try {
+    state.workspaces = await runtimeMessage({ type: "fetch-workspaces" });
+  } catch {
+    state.workspaces = [];
+  }
+}
+
+function renderWorkspaceSelector(state) {
+  const select = state.workspaceSelect;
+  if (!select) return;
+  const workspaces = state.workspaces || [];
+  select.innerHTML = `
+    <option value="">All content</option>
+    ${workspaces.map((w) => `<option value="${escapeHtml(w.id)}">${escapeHtml(w.name)}${w.viewRootContentId ? " ⊂" : ""}</option>`).join("")}
+  `;
+  if (state.selectedWorkspaceId) {
+    select.value = state.selectedWorkspaceId;
+  }
+}
+
 function overlayStyles() {
   return `
-    :host {
-      all: initial;
-    }
-    * {
-      box-sizing: border-box;
-      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    }
+    :host { all: initial; }
+    * { box-sizing: border-box; font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    [hidden] { display: none !important; }
+
+    /* ── Overlay root ── */
     .dg-overlay {
       position: fixed;
       inset: 0;
       z-index: 2147483644;
       pointer-events: none;
     }
-    .dg-overlay[data-idle="true"] .dg-main-button:not([data-open="true"]) {
-      opacity: 0.18;
-      transform: translateY(8px);
-    }
-    .dg-launcher {
+
+    /* ── Launcher button (floating mode) ── */
+    .dg-launcher-btn {
+      display: none;
       position: fixed;
-      left: calc(100vw - 80px);
-      top: calc(100vh - 80px);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 10px;
+      width: 54px; height: 54px;
+      border-radius: 999px;
+      border: 1px solid rgba(216, 176, 92, 0.32);
+      background: radial-gradient(circle at 30% 30%, rgba(224,188,112,0.22), transparent 56%), rgba(13,16,20,0.9);
+      box-shadow: 0 14px 44px rgba(0,0,0,0.36), inset 0 1px 0 rgba(255,255,255,0.08);
+      color: #f2e2b6;
+      font-size: 22px;
+      cursor: pointer;
       pointer-events: auto;
       touch-action: none;
-    }
-    .dg-launcher[data-side="left"] .dg-action-ring {
-      left: 72px;
-      right: auto;
-      bottom: 4px;
-      transform: translateX(-14px) scale(0.96);
-    }
-    .dg-launcher[data-side="left"] .dg-action-ring[data-open="true"] {
-      transform: translateX(0) scale(1);
-    }
-    .dg-main-button {
-      position: relative;
-      width: 58px;
-      height: 58px;
-      border: 1px solid rgba(216, 176, 92, 0.34);
-      border-radius: 999px;
-      background:
-        radial-gradient(circle at 30% 30%, rgba(224, 188, 112, 0.24), transparent 56%),
-        rgba(13, 16, 20, 0.88);
-      box-shadow:
-        0 16px 48px rgba(0, 0, 0, 0.34),
-        inset 0 1px 0 rgba(255, 255, 255, 0.08);
-      color: #f2e2b6;
-      cursor: pointer;
-      transition: opacity 180ms ease, transform 180ms ease, box-shadow 180ms ease;
+      transition: opacity 200ms ease, transform 200ms ease;
+      align-items: center; justify-content: center;
       backdrop-filter: blur(16px);
     }
-    .dg-main-button:hover,
-    .dg-main-button[data-open="true"] {
-      opacity: 1;
-      transform: translateY(0);
-      box-shadow:
-        0 20px 56px rgba(0, 0, 0, 0.42),
-        0 0 0 1px rgba(216, 176, 92, 0.14),
-        inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    .dg-overlay[data-snap="floating"] .dg-launcher-btn { display: flex; }
+    .dg-overlay[data-snap="floating"][data-idle="true"] .dg-launcher-btn:not([data-open="true"]) {
+      opacity: 0.2; transform: translateY(6px);
     }
-    .dg-main-button span {
-      font-size: 26px;
-      line-height: 1;
-    }
-    .dg-action-ring {
-      position: absolute;
-      right: 72px;
-      bottom: 4px;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      opacity: 0;
-      transform: translateX(14px) scale(0.96);
-      pointer-events: none;
-      transition: opacity 180ms ease, transform 180ms ease;
-    }
-    .dg-action-ring[data-open="true"] {
-      opacity: 1;
-      transform: translateX(0) scale(1);
-      pointer-events: auto;
-    }
-    .dg-action-button {
-      position: relative;
-      width: 46px;
-      height: 46px;
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      border-radius: 999px;
-      background: rgba(17, 20, 24, 0.94);
-      color: white;
-      cursor: pointer;
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.28);
-    }
-    .dg-action-button[data-active="true"] {
-      border-color: rgba(216, 176, 92, 0.44);
-      color: #f2e2b6;
-    }
-    .dg-action-button::after {
-      content: attr(data-label);
-      position: absolute;
-      right: calc(100% + 10px);
-      top: 50%;
-      transform: translateY(-50%);
-      padding: 7px 10px;
-      border-radius: 999px;
-      background: rgba(9, 11, 14, 0.92);
-      color: rgba(255, 255, 255, 0.84);
-      font-size: 12px;
-      line-height: 1;
-      white-space: nowrap;
-      opacity: 0;
-      pointer-events: none;
-      transition: opacity 160ms ease;
-    }
-    .dg-action-button:hover::after {
-      opacity: 1;
-    }
-    .dg-panel-popover {
+
+    /* Edge tab — shown when panel is closed in docked modes */
+    .dg-edge-tab {
+      display: none;
       position: fixed;
-      right: 92px;
-      bottom: 92px;
-      width: min(420px, calc(100vw - 40px));
-      max-height: min(72vh, 720px);
+      width: 16px; height: 48px;
+      background: rgba(201,168,108,0.18);
+      border: 1px solid rgba(201,168,108,0.28);
+      cursor: pointer;
+      pointer-events: auto;
+      transition: background 0.15s;
+      align-items: center; justify-content: center;
+      color: rgba(201,168,108,0.7);
+      font-size: 10px;
+    }
+    .dg-edge-tab:hover { background: rgba(201,168,108,0.3); }
+    .dg-overlay[data-snap="right"][data-panel-open="false"] .dg-edge-tab {
+      display: flex; right: 0; top: 50%; transform: translateY(-50%);
+      border-right: 0; border-radius: 8px 0 0 8px; cursor: ns-resize;
+    }
+    .dg-overlay[data-snap="left"][data-panel-open="false"] .dg-edge-tab {
+      display: flex; left: 0; top: 50%; transform: translateY(-50%);
+      border-left: 0; border-radius: 0 8px 8px 0; cursor: ns-resize;
+    }
+    .dg-overlay[data-snap="top"][data-panel-open="false"] .dg-edge-tab {
+      display: flex; top: 0; left: 50%; transform: translateX(-50%);
+      width: 48px; height: 14px; border-top: 0; border-radius: 0 0 8px 8px; cursor: ew-resize;
+    }
+    .dg-overlay[data-snap="bottom"][data-panel-open="false"] .dg-edge-tab {
+      display: flex; bottom: 0; left: 50%; transform: translateX(-50%);
+      width: 48px; height: 14px; border-bottom: 0; border-radius: 8px 8px 0 0; cursor: ew-resize;
+    }
+
+    /* ── Snap panel ── */
+    .dg-snap-panel {
       display: none;
       flex-direction: column;
-      overflow: hidden;
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      border-radius: 22px;
-      background: rgba(15, 18, 23, 0.94);
-      box-shadow: 0 22px 60px rgba(0, 0, 0, 0.36);
-      backdrop-filter: blur(24px);
+      position: fixed;
+      background: rgba(11,14,18,0.96);
+      border: 1px solid rgba(255,255,255,0.09);
+      box-shadow: 0 0 0 0 transparent;
+      backdrop-filter: blur(22px);
       pointer-events: auto;
+      overflow: hidden;
     }
-    .dg-panel-popover[data-open="true"] {
-      display: flex;
+    .dg-overlay[data-panel-open="true"] .dg-snap-panel { display: flex; }
+    /* Right */
+    .dg-overlay[data-snap="right"] .dg-snap-panel {
+      top: 0; right: 0; height: 100vh; width: 320px;
+      border-top: 0; border-right: 0; border-bottom: 0;
+      border-left: 1px solid rgba(255,255,255,0.1);
     }
+    /* Left */
+    .dg-overlay[data-snap="left"] .dg-snap-panel {
+      top: 0; left: 0; height: 100vh; width: 320px;
+      border-top: 0; border-left: 0; border-bottom: 0;
+      border-right: 1px solid rgba(255,255,255,0.1);
+    }
+    /* Top */
+    .dg-overlay[data-snap="top"] .dg-snap-panel {
+      top: 0; left: 0; right: 0; width: 100%; height: 260px;
+      border-top: 0; border-left: 0; border-right: 0;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+    }
+    /* Bottom */
+    .dg-overlay[data-snap="bottom"] .dg-snap-panel {
+      bottom: 0; left: 0; right: 0; width: 100%; height: 260px;
+      border-bottom: 0; border-left: 0; border-right: 0;
+      border-top: 1px solid rgba(255,255,255,0.1);
+    }
+    /* Floating — positioned by JS */
+    .dg-overlay[data-snap="floating"] .dg-snap-panel {
+      border-radius: 18px;
+      box-shadow: 0 24px 64px rgba(0,0,0,0.48), inset 0 1px 0 rgba(255,255,255,0.07);
+    }
+
+    /* ── Panel header ── */
     .dg-panel-header {
       display: flex;
       align-items: center;
-      justify-content: space-between;
-      gap: 14px;
-      padding: 16px 18px 12px;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      gap: 6px;
+      padding: 0 8px 0 10px;
+      height: 44px;
+      min-height: 44px;
+      border-bottom: 1px solid rgba(255,255,255,0.07);
+      background: rgba(255,255,255,0.02);
+      flex-shrink: 0;
     }
-    .dg-panel-title {
-      font-size: 14px;
-      font-weight: 700;
-      letter-spacing: 0.02em;
-      color: white;
-    }
-    .dg-panel-subtitle {
-      margin-top: 3px;
+    .dg-workspace-select {
+      flex: 1;
+      min-width: 0;
+      font: inherit;
       font-size: 12px;
-      color: rgba(255, 255, 255, 0.54);
-    }
-    .dg-panel-close {
-      border: 0;
+      font-weight: 500;
+      color: rgba(255,255,255,0.82);
       background: transparent;
-      color: rgba(255, 255, 255, 0.58);
+      border: 0;
+      outline: none;
       cursor: pointer;
-      font-size: 18px;
+      padding: 0 2px;
+      appearance: auto;
     }
-    .dg-panel-body {
-      overflow: auto;
-      padding: 14px 14px 16px;
+    .dg-workspace-select option { background: #141820; }
+    .dg-snap-controls {
+      display: flex;
+      align-items: center;
+      gap: 2px;
+      flex-shrink: 0;
+    }
+    .dg-snap-btn {
+      width: 24px; height: 24px;
+      display: flex; align-items: center; justify-content: center;
+      border: 0;
+      border-radius: 6px;
+      background: transparent;
+      color: rgba(255,255,255,0.36);
+      font-size: 12px;
+      cursor: pointer;
+      transition: color 0.12s, background 0.12s;
+      padding: 0;
+    }
+    .dg-snap-btn:hover { background: rgba(255,255,255,0.07); color: rgba(255,255,255,0.72); }
+    .dg-snap-btn[data-active="true"] { color: #c9a86c; background: rgba(201,168,108,0.12); }
+    .dg-panel-close-btn {
+      width: 26px; height: 26px;
+      display: flex; align-items: center; justify-content: center;
+      border: 0; border-radius: 6px;
+      background: transparent;
+      color: rgba(255,255,255,0.4);
+      font-size: 16px; line-height: 1;
+      cursor: pointer;
+      flex-shrink: 0;
+      transition: color 0.12s, background 0.12s;
+    }
+    .dg-panel-close-btn:hover { background: rgba(255,255,255,0.07); color: rgba(255,255,255,0.8); }
+
+    /* ── Panel scroll body ── */
+    .dg-panel-scroll {
+      flex: 1;
+      overflow-y: auto;
+      overflow-x: hidden;
       display: flex;
       flex-direction: column;
-      gap: 10px;
     }
-    #dg-tree-body {
-      gap: 0;
-      padding: 8px 0 12px;
+    .dg-panel-scroll::-webkit-scrollbar { width: 4px; }
+    .dg-panel-scroll::-webkit-scrollbar-track { background: transparent; }
+    .dg-panel-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 4px; }
+
+    /* ── Sections ── */
+    .dg-panel-section { display: flex; flex-direction: column; }
+    .dg-section-label {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 8px 12px 4px;
+      font-size: 10px; font-weight: 700;
+      letter-spacing: 0.09em; text-transform: uppercase;
+      color: rgba(255,255,255,0.36);
     }
+    .dg-section-actions { display: flex; gap: 4px; }
+    .dg-panel-divider { height: 1px; background: rgba(255,255,255,0.06); margin: 4px 0; flex-shrink: 0; }
+
+    /* ── Status ── */
     .dg-status {
-      padding: 11px 13px;
-      border-radius: 14px;
-      background: rgba(255, 255, 255, 0.06);
-      color: rgba(255, 255, 255, 0.7);
+      padding: 10px 13px;
+      color: rgba(255,255,255,0.62);
       font-size: 12px;
       line-height: 1.45;
     }
-    .dg-status[data-tone="error"] {
-      background: rgba(160, 42, 42, 0.24);
-      color: #ffd6d6;
+    .dg-status[data-tone="error"] { color: #ffd6d6; }
+
+    /* ── Association list ── */
+    .dg-list-item {
+      width: 100%; display: flex;
+      align-items: center; justify-content: space-between;
+      gap: 10px; padding: 8px 12px;
+      border: 0; border-bottom: 1px solid rgba(255,255,255,0.05);
+      background: transparent; color: white; text-align: left; cursor: pointer;
     }
-    .dg-list-item,
-    .dg-connection-item,
-    .dg-tree-row {
-      width: 100%;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 12px;
-      padding: 12px 14px;
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      border-radius: 16px;
-      background: rgba(255, 255, 255, 0.04);
-      color: white;
-      text-align: left;
+    .dg-list-item:last-child { border-bottom: 0; }
+    .dg-list-item:hover { background: rgba(255,255,255,0.04); }
+    .dg-list-meta { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+    .dg-list-title { color: rgba(255,255,255,0.9); font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .dg-list-subtitle { color: rgba(255,255,255,0.46); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .dg-list-chip {
+      flex-shrink: 0; border-radius: 999px; padding: 3px 8px;
+      background: rgba(216,176,92,0.14); color: #f2e2b6;
+      font-size: 10px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase;
     }
-    .dg-list-item:hover,
-    .dg-connection-item:hover,
-    .dg-tree-row:hover {
-      background: rgba(255, 255, 255, 0.07);
-      border-color: rgba(255, 255, 255, 0.14);
-    }
-    .dg-list-meta,
-    .dg-tree-meta {
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-      min-width: 0;
-      flex: 1;
-    }
-    .dg-list-title,
-    .dg-tree-title {
-      color: white;
-      font-size: 14px;
-      font-weight: 600;
-      line-height: 1.3;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-    .dg-list-subtitle,
-    .dg-tree-subtitle {
-      color: rgba(255, 255, 255, 0.55);
-      font-size: 12px;
-      line-height: 1.4;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-    .dg-list-chip,
-    .dg-connection-chip {
-      flex-shrink: 0;
-      border-radius: 999px;
-      padding: 6px 10px;
-      background: rgba(216, 176, 92, 0.18);
-      color: #f2e2b6;
-      font-size: 11px;
-      font-weight: 600;
-      letter-spacing: 0.04em;
-      text-transform: uppercase;
-    }
-    .dg-connection-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(64px, 1fr));
-      gap: 12px;
-    }
-    .dg-connection-button {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      width: 100%;
-      aspect-ratio: 1 / 1;
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      border-radius: 22px;
-      background: rgba(255, 255, 255, 0.04);
-      color: white;
-      cursor: pointer;
-      position: relative;
-      overflow: hidden;
-    }
-    .dg-connection-button:hover {
-      background: rgba(255, 255, 255, 0.08);
-    }
-    .dg-connection-initials {
-      width: 36px;
-      height: 36px;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      border-radius: 999px;
-      background: rgba(216, 176, 92, 0.18);
-      color: #f2e2b6;
-      font-weight: 700;
-      font-size: 14px;
-    }
-    .dg-connection-button::after {
-      content: attr(data-label);
-      position: absolute;
-      left: 50%;
-      bottom: 8px;
-      transform: translateX(-50%);
-      max-width: calc(100% - 12px);
-      color: rgba(255, 255, 255, 0.66);
-      font-size: 11px;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-    .dg-tree-group {
-      display: flex;
-      flex-direction: column;
-      gap: 0;
-    }
-    .dg-tree-row {
-      min-height: 32px;
-      gap: 8px;
-      padding: 4px 8px 4px calc(8px + (var(--depth, 0) * 14px));
-      border: 0;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-      border-radius: 0;
-      background: transparent;
-    }
-    .dg-tree-group:last-child > .dg-tree-row {
-      border-bottom: 0;
-    }
-    .dg-tree-row:hover {
-      background: rgba(255, 255, 255, 0.035);
-      border-color: rgba(255, 255, 255, 0.07);
-    }
-    .dg-tree-row button {
-      border: 0;
-      background: transparent;
-      color: inherit;
-      cursor: pointer;
-    }
-    .dg-tree-expand {
-      width: 18px;
-      text-align: center;
-      flex-shrink: 0;
-      color: rgba(255, 255, 255, 0.6);
-      font-size: 16px;
-      line-height: 1;
-    }
-    .dg-tree-actions {
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      flex-shrink: 0;
-    }
-    .dg-tree-kind {
-      width: 16px;
-      height: 16px;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      flex-shrink: 0;
-      color: rgba(255, 255, 255, 0.68);
-    }
-    .dg-tree-svg {
-      width: 16px;
-      height: 16px;
-      display: block;
-    }
-    .dg-tree-emoji {
-      font-size: 14px;
-      line-height: 1;
-    }
+
+    /* ── Mini action buttons ── */
     .dg-mini-action {
-      min-width: 24px;
-      height: 22px;
-      padding: 0 6px;
-      border-radius: 6px;
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      background: rgba(255, 255, 255, 0.03);
-      color: rgba(255, 255, 255, 0.76);
-      font-size: 11px;
+      min-width: 22px; height: 20px; padding: 0 5px;
+      border-radius: 5px; border: 1px solid rgba(255,255,255,0.08);
+      background: rgba(255,255,255,0.03); color: rgba(255,255,255,0.72);
+      font-size: 10px; cursor: pointer; font: inherit; font-size: 10px;
     }
+    .dg-mini-action:hover { background: rgba(255,255,255,0.07); }
+
+    /* ── Tree rows ── */
+    .dg-tree-group { display: flex; flex-direction: column; }
+    .dg-tree-row {
+      width: 100%; display: flex; align-items: center; gap: 6px;
+      min-height: 30px; padding: 3px 8px 3px calc(8px + (var(--depth, 0) * 14px));
+      border: 0; border-bottom: 1px solid rgba(255,255,255,0.04);
+      background: transparent; color: white; text-align: left; cursor: default;
+    }
+    .dg-tree-group:last-child > .dg-tree-row { border-bottom: 0; }
+    .dg-tree-row:hover { background: rgba(255,255,255,0.035); }
+    .dg-tree-row button { border: 0; background: transparent; color: inherit; cursor: pointer; padding: 0; }
+    .dg-tree-expand { width: 16px; text-align: center; flex-shrink: 0; color: rgba(255,255,255,0.5); font-size: 14px; line-height: 1; }
+    .dg-tree-kind { width: 15px; height: 15px; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; color: rgba(255,255,255,0.62); }
+    .dg-tree-svg { width: 15px; height: 15px; display: block; }
+    .dg-tree-emoji { font-size: 13px; line-height: 1; }
+    .dg-tree-meta { display: flex; flex-direction: column; gap: 1px; min-width: 0; flex: 1; }
+    .dg-tree-title { color: rgba(255,255,255,0.88); font-size: 12px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .dg-tree-subtitle { color: rgba(255,255,255,0.4); font-size: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .dg-tree-actions { display: flex; align-items: center; gap: 3px; flex-shrink: 0; opacity: 0; transition: opacity 0.12s; }
+    .dg-tree-row:hover .dg-tree-actions { opacity: 1; }
+
+    /* ── Floating content panels (unchanged) ── */
     .dg-floating-panel {
-      position: fixed;
-      width: 420px;
-      height: 56vh;
-      min-width: 320px;
-      min-height: 240px;
-      border-radius: 22px;
-      overflow: hidden;
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      background: rgba(13, 16, 20, 0.88);
-      box-shadow:
-        0 26px 70px rgba(0, 0, 0, 0.42),
-        inset 0 1px 0 rgba(255, 255, 255, 0.06);
+      position: fixed; width: 420px; height: 56vh;
+      min-width: 320px; min-height: 240px;
+      border-radius: 22px; overflow: hidden;
+      border: 1px solid rgba(255,255,255,0.1);
+      background: rgba(13,16,20,0.88);
+      box-shadow: 0 26px 70px rgba(0,0,0,0.42), inset 0 1px 0 rgba(255,255,255,0.06);
       backdrop-filter: blur(22px);
-      pointer-events: auto;
-      resize: both;
+      pointer-events: auto; resize: both;
     }
     .dg-floating-panel[data-mode="docked"] {
-      right: 18px !important;
-      top: 18px !important;
-      left: auto !important;
-      bottom: 18px !important;
-      width: min(440px, calc(100vw - 36px));
-      height: calc(100vh - 36px);
-      resize: none;
+      right: 18px !important; top: 18px !important; left: auto !important; bottom: 18px !important;
+      width: min(440px, calc(100vw - 36px)); height: calc(100vh - 36px); resize: none;
     }
-    .dg-floating-panel[data-mode="embedded"] {
-      resize: none;
-    }
+    .dg-floating-panel[data-mode="embedded"] { resize: none; }
     .dg-panel-toolbar {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 12px;
-      padding: 10px 12px;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-      background: rgba(255, 255, 255, 0.02);
-      cursor: move;
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 12px; padding: 10px 12px;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      background: rgba(255,255,255,0.02); cursor: move;
     }
-    .dg-panel-toolbar[data-mode="docked"] {
-      cursor: default;
-    }
-    .dg-panel-toolbar-title {
-      min-width: 0;
-      display: flex;
-      flex-direction: column;
-      gap: 3px;
-    }
-    .dg-panel-toolbar-title strong {
-      color: white;
-      font-size: 13px;
-      line-height: 1.2;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-    .dg-panel-toolbar-title span {
-      color: rgba(255, 255, 255, 0.54);
-      font-size: 11px;
-    }
-    .dg-toolbar-actions {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      flex-shrink: 0;
-    }
+    .dg-panel-toolbar[data-mode="docked"] { cursor: default; }
+    .dg-panel-toolbar-title { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+    .dg-panel-toolbar-title strong { color: white; font-size: 13px; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .dg-panel-toolbar-title span { color: rgba(255,255,255,0.54); font-size: 11px; }
+    .dg-toolbar-actions { display: flex; align-items: center; gap: 4px; flex-shrink: 1; min-width: 0; overflow-x: auto; scrollbar-width: none; }
+    .dg-toolbar-actions::-webkit-scrollbar { display: none; }
     .dg-toolbar-button {
-      min-width: 32px;
-      height: 32px;
-      padding: 0 10px;
-      border-radius: 999px;
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      background: rgba(255, 255, 255, 0.04);
-      color: rgba(255, 255, 255, 0.82);
-      cursor: pointer;
-      font-size: 12px;
-      line-height: 1;
+      min-width: 32px; height: 32px; padding: 0 10px;
+      border-radius: 999px; border: 1px solid rgba(255,255,255,0.08);
+      background: rgba(255,255,255,0.04); color: rgba(255,255,255,0.82);
+      cursor: pointer; font-size: 12px; line-height: 1;
     }
-    .dg-toolbar-button[data-active="true"] {
-      color: #f2e2b6;
-      border-color: rgba(216, 176, 92, 0.28);
-      background: rgba(216, 176, 92, 0.12);
-    }
+    .dg-toolbar-button[data-active="true"] { color: #f2e2b6; border-color: rgba(216,176,92,0.28); background: rgba(216,176,92,0.12); }
     .dg-panel-content {
-      height: calc(100% - 53px);
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-      padding: 14px;
-      overflow: auto;
+      height: calc(100% - 53px); display: flex; flex-direction: column;
+      gap: 12px; padding: 14px; overflow: auto;
     }
-    .dg-panel-content[data-loading="true"] {
-      opacity: 0.62;
-      pointer-events: none;
+    .dg-panel-content[data-loading="true"] { opacity: 0.62; pointer-events: none; }
+    .dg-editor-stack { display: flex; flex-direction: column; gap: 12px; min-height: 0; flex: 1; }
+    .dg-editor-field { display: flex; flex-direction: column; gap: 6px; }
+    .dg-editor-label { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(255,255,255,0.48); font-weight: 700; }
+    .dg-editor-input, .dg-editor-textarea {
+      width: 100%; border: 1px solid rgba(255,255,255,0.1); border-radius: 14px;
+      background: rgba(0,0,0,0.22); color: white; padding: 11px 12px; outline: none; font: inherit;
     }
-    .dg-editor-stack {
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-      min-height: 0;
-      flex: 1;
-    }
-    .dg-editor-field {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
-    .dg-editor-label {
-      font-size: 11px;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: rgba(255, 255, 255, 0.48);
-      font-weight: 700;
-    }
-    .dg-editor-input,
-    .dg-editor-textarea {
-      width: 100%;
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      border-radius: 14px;
-      background: rgba(0, 0, 0, 0.22);
-      color: white;
-      padding: 11px 12px;
-      outline: none;
-      font: inherit;
-    }
-    .dg-editor-input:focus,
-    .dg-editor-textarea:focus {
-      border-color: rgba(216, 176, 92, 0.42);
-      box-shadow: 0 0 0 1px rgba(216, 176, 92, 0.18);
-    }
-    .dg-editor-textarea {
-      min-height: 220px;
-      resize: vertical;
-      line-height: 1.5;
-    }
+    .dg-editor-input:focus, .dg-editor-textarea:focus { border-color: rgba(216,176,92,0.42); box-shadow: 0 0 0 1px rgba(216,176,92,0.18); }
+    .dg-editor-textarea { min-height: 220px; resize: vertical; line-height: 1.5; }
     .dg-note-toolbar {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      flex-wrap: wrap;
-      padding: 8px;
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      border-radius: 14px;
-      background: rgba(255, 255, 255, 0.03);
+      display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+      padding: 8px; border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 14px; background: rgba(255,255,255,0.03);
     }
-    .dg-note-toolbar .dg-toolbar-button {
-      min-width: 34px;
-      height: 30px;
-      padding: 0 10px;
-      border-radius: 10px;
-      font-size: 11px;
-      font-weight: 700;
-    }
-    .dg-note-toolbar-spacer {
-      width: 1px;
-      height: 18px;
-      background: rgba(255, 255, 255, 0.08);
-      margin: 0 2px;
-    }
+    .dg-note-toolbar .dg-toolbar-button { min-width: 34px; height: 30px; padding: 0 10px; border-radius: 10px; font-size: 11px; font-weight: 700; }
+    .dg-note-toolbar-spacer { width: 1px; height: 18px; background: rgba(255,255,255,0.08); margin: 0 2px; }
     .dg-editor-rich {
-      min-height: 280px;
-      padding: 14px 15px;
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      border-radius: 14px;
-      background: rgba(0, 0, 0, 0.22);
-      color: white;
-      outline: none;
-      line-height: 1.62;
-      overflow: auto;
+      min-height: 280px; padding: 14px 15px;
+      border: 1px solid rgba(255,255,255,0.1); border-radius: 14px;
+      background: rgba(0,0,0,0.22); color: white; outline: none; line-height: 1.62; overflow: auto;
     }
-    .dg-editor-rich:focus {
-      border-color: rgba(216, 176, 92, 0.42);
-      box-shadow: 0 0 0 1px rgba(216, 176, 92, 0.18);
+    .dg-editor-rich:focus { border-color: rgba(216,176,92,0.42); box-shadow: 0 0 0 1px rgba(216,176,92,0.18); }
+    .dg-editor-rich[data-empty="true"]::before { content: attr(data-placeholder); color: rgba(255,255,255,0.34); pointer-events: none; }
+    .dg-editor-rich p, .dg-editor-rich h1, .dg-editor-rich h2, .dg-editor-rich h3,
+    .dg-editor-rich blockquote, .dg-editor-rich ul, .dg-editor-rich ol { margin: 0 0 0.72em; }
+    .dg-editor-rich h1 { font-size: 1.55rem; line-height: 1.18; }
+    .dg-editor-rich h2 { font-size: 1.32rem; line-height: 1.22; }
+    .dg-editor-rich h3 { font-size: 1.14rem; line-height: 1.26; }
+    .dg-editor-rich blockquote { padding-left: 12px; border-left: 2px solid rgba(216,176,92,0.55); color: rgba(255,255,255,0.82); }
+    .dg-editor-rich ul, .dg-editor-rich ol { padding-left: 1.35rem; }
+    .dg-editor-rich a { color: #f2e2b6; }
+    .dg-editor-meta-grid { display: grid; grid-template-columns: repeat(1, minmax(0, 1fr)); gap: 12px; }
+    .dg-editor-status { min-height: 20px; font-size: 12px; color: rgba(255,255,255,0.58); }
+    .dg-editor-status[data-tone="error"] { color: #ffd6d6; }
+    .dg-editor-status[data-tone="success"] { color: #a8ebc2; }
+    .dg-editor-divider { height: 1px; background: rgba(255,255,255,0.08); margin: 2px 0; }
+    .dg-assoc-row { display: flex; align-items: center; gap: 6px; }
+
+    /* ── Domain associations sub-section ── */
+    .dg-domain-section { border-top: 1px solid rgba(255,255,255,0.05); }
+    .dg-domain-toggle {
+      width: 100%; display: flex; align-items: center; gap: 6px;
+      padding: 7px 12px; border: 0;
+      background: transparent; color: rgba(255,255,255,0.42);
+      font: inherit; font-size: 11px; cursor: pointer; text-align: left;
     }
-    .dg-editor-rich[data-empty="true"]::before {
-      content: attr(data-placeholder);
-      color: rgba(255, 255, 255, 0.34);
-      pointer-events: none;
+    .dg-domain-toggle:hover { background: rgba(255,255,255,0.03); color: rgba(255,255,255,0.72); }
+    .dg-domain-toggle-icon { font-size: 9px; flex-shrink: 0; }
+    .dg-domain-body { border-top: 1px solid rgba(255,255,255,0.05); max-height: 320px; overflow-y: auto; }
+    .dg-domain-body::-webkit-scrollbar { width: 3px; }
+    .dg-domain-body::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 4px; }
+    .dg-domain-search { padding: 6px 8px 4px; }
+    .dg-domain-search-input {
+      width: 100%; padding: 5px 9px; border-radius: 6px;
+      border: 1px solid rgba(255,255,255,0.1);
+      background: rgba(0,0,0,0.25); color: white; font: inherit; font-size: 11px;
+      outline: none; box-sizing: border-box;
     }
-    .dg-editor-rich p,
-    .dg-editor-rich h1,
-    .dg-editor-rich h2,
-    .dg-editor-rich h3,
-    .dg-editor-rich blockquote,
-    .dg-editor-rich ul,
-    .dg-editor-rich ol {
-      margin: 0 0 0.72em;
-    }
-    .dg-editor-rich h1 {
-      font-size: 1.55rem;
-      line-height: 1.18;
-    }
-    .dg-editor-rich h2 {
-      font-size: 1.32rem;
-      line-height: 1.22;
-    }
-    .dg-editor-rich h3 {
-      font-size: 1.14rem;
-      line-height: 1.26;
-    }
-    .dg-editor-rich blockquote {
-      padding-left: 12px;
-      border-left: 2px solid rgba(216, 176, 92, 0.55);
-      color: rgba(255, 255, 255, 0.82);
-    }
-    .dg-editor-rich ul,
-    .dg-editor-rich ol {
-      padding-left: 1.35rem;
-    }
-    .dg-editor-rich a {
-      color: #f2e2b6;
-    }
-    .dg-editor-meta-grid {
-      display: grid;
-      grid-template-columns: repeat(1, minmax(0, 1fr));
-      gap: 12px;
-    }
-    .dg-editor-status {
-      min-height: 20px;
-      font-size: 12px;
-      color: rgba(255, 255, 255, 0.58);
-    }
-    .dg-editor-status[data-tone="error"] {
-      color: #ffd6d6;
-    }
-    .dg-editor-status[data-tone="success"] {
-      color: #a8ebc2;
-    }
-    .dg-editor-divider {
-      height: 1px;
-      background: rgba(255, 255, 255, 0.08);
-      margin: 2px 0;
-    }
+    .dg-domain-search-input::placeholder { color: rgba(255,255,255,0.28); }
+    .dg-domain-search-input:focus { border-color: rgba(255,255,255,0.2); }
+    .dg-delete-assoc { flex-shrink: 0; color: rgba(255,100,100,0.72); border-color: rgba(255,100,100,0.2); }
+    .dg-delete-assoc:hover { color: #ff9090; background: rgba(255,80,80,0.12); }
     .dg-panel-collapsed {
-      position: fixed;
-      left: 18px;
-      bottom: 18px;
-      display: none;
-      align-items: center;
-      gap: 8px;
-      border-radius: 999px;
-      background: rgba(13, 16, 20, 0.9);
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      padding: 8px 12px;
-      color: white;
-      box-shadow: 0 16px 48px rgba(0, 0, 0, 0.34);
-      cursor: grab;
-      touch-action: none;
+      position: fixed; left: 18px; bottom: 18px; display: none;
+      align-items: center; gap: 8px; border-radius: 999px;
+      background: rgba(13,16,20,0.9); border: 1px solid rgba(255,255,255,0.08);
+      padding: 8px 12px; color: white; box-shadow: 0 16px 48px rgba(0,0,0,0.34);
+      cursor: grab; touch-action: none;
     }
-    .dg-panel-collapsed[data-open="true"] {
-      display: inline-flex;
-      pointer-events: auto;
-    }
-    .dg-panel-banner {
-      padding: 10px 12px;
-      margin: 0 14px;
-      border-radius: 14px;
-      background: rgba(216, 176, 92, 0.12);
-      color: #f2e2b6;
-      font-size: 12px;
-      line-height: 1.45;
-    }
+    .dg-panel-collapsed[data-open="true"] { display: inline-flex; pointer-events: auto; }
+    .dg-panel-banner { padding: 10px 12px; margin: 0 14px; border-radius: 14px; background: rgba(216,176,92,0.12); color: #f2e2b6; font-size: 12px; line-height: 1.45; }
+
+    /* ── Target / embed UI ── */
     .dg-target-banner {
-      position: fixed;
-      left: 50%;
-      top: 16px;
-      transform: translateX(-50%);
-      width: min(560px, calc(100vw - 32px));
-      display: none;
-      align-items: center;
-      justify-content: space-between;
-      gap: 14px;
-      padding: 12px 14px;
-      border-radius: 18px;
-      border: 1px solid rgba(91, 175, 255, 0.28);
-      background: rgba(14, 18, 24, 0.92);
-      box-shadow: 0 20px 56px rgba(0, 0, 0, 0.32);
-      color: white;
-      pointer-events: auto;
+      position: fixed; left: 50%; top: 16px; transform: translateX(-50%);
+      width: min(560px, calc(100vw - 32px)); display: none;
+      align-items: center; justify-content: space-between;
+      gap: 14px; padding: 12px 14px; border-radius: 18px;
+      border: 1px solid rgba(91,175,255,0.28); background: rgba(14,18,24,0.92);
+      box-shadow: 0 20px 56px rgba(0,0,0,0.32); color: white; pointer-events: auto;
     }
-    .dg-target-banner[data-open="true"] {
-      display: flex;
-    }
-    .dg-target-copy {
-      min-width: 0;
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-    }
-    .dg-target-copy strong {
-      font-size: 13px;
-    }
-    .dg-target-copy span {
-      color: rgba(255, 255, 255, 0.62);
-      font-size: 12px;
-      line-height: 1.4;
-    }
-    .dg-target-actions {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      flex-shrink: 0;
-    }
-    .dg-target-button {
-      height: 32px;
-      padding: 0 12px;
-      border-radius: 999px;
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      background: rgba(255, 255, 255, 0.05);
-      color: rgba(255, 255, 255, 0.82);
-      cursor: pointer;
-      font-size: 12px;
-      font-weight: 600;
-    }
-    .dg-target-button[data-variant="primary"] {
-      background: rgba(91, 175, 255, 0.18);
-      border-color: rgba(91, 175, 255, 0.34);
-      color: #d9ebff;
-    }
+    .dg-target-banner[data-open="true"] { display: flex; }
+    .dg-target-copy { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+    .dg-target-copy strong { font-size: 13px; }
+    .dg-target-copy span { color: rgba(255,255,255,0.62); font-size: 12px; line-height: 1.4; }
+    .dg-target-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+    .dg-target-button { height: 32px; padding: 0 12px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.05); color: rgba(255,255,255,0.82); cursor: pointer; font-size: 12px; font-weight: 600; }
+    .dg-target-button[data-variant="primary"] { background: rgba(91,175,255,0.18); border-color: rgba(91,175,255,0.34); color: #d9ebff; }
     .dg-target-highlight {
-      position: fixed;
-      display: none;
-      border: 2px solid rgba(91, 175, 255, 0.94);
-      border-radius: 14px;
-      background: rgba(91, 175, 255, 0.08);
-      box-shadow:
-        0 0 0 1px rgba(255, 255, 255, 0.08),
-        0 12px 32px rgba(0, 0, 0, 0.22);
+      position: fixed; display: none;
+      border: 2px solid rgba(91,175,255,0.94); border-radius: 14px;
+      background: rgba(91,175,255,0.08);
+      box-shadow: 0 0 0 1px rgba(255,255,255,0.08), 0 12px 32px rgba(0,0,0,0.22);
       pointer-events: none;
     }
-    .dg-target-highlight[data-open="true"] {
-      display: block;
+    .dg-target-highlight[data-open="true"] { display: block; }
+
+    /* ── Embed iframe ── */
+    .dg-embed-iframe {
+      width: 100%; height: 100%; border: none;
+      display: none; border-radius: 0; background: transparent;
+      flex: 1; min-height: 0;
     }
+    .dg-embed-iframe[data-active="true"] { display: block; }
   `;
 }
 
@@ -906,47 +869,40 @@ function createOverlayApp(state) {
 
   shadow.innerHTML = `
     <style>${overlayStyles()}</style>
-    <div class="dg-overlay" data-idle="false">
-      <div class="dg-launcher">
-        <div class="dg-action-ring" id="dg-action-ring">
-          <button class="dg-action-button" data-action="associations" data-label="Associated content">⦿</button>
-          <button class="dg-action-button" data-action="connections" data-label="Quick add connections">⊕</button>
-          <button class="dg-action-button" data-action="tree" data-label="Browse content tree">☰</button>
+    <div class="dg-overlay" data-snap="right" data-panel-open="false" data-idle="false">
+      <button class="dg-launcher-btn" id="dg-launcher-btn" type="button" aria-label="Digital Garden">◌</button>
+      <div class="dg-edge-tab" id="dg-edge-tab" role="button" tabindex="0" aria-label="Open Digital Garden panel"></div>
+      <div class="dg-snap-panel" id="dg-snap-panel">
+        <div class="dg-panel-header">
+          <select class="dg-workspace-select" id="dg-workspace-select">
+            <option value="">All content</option>
+          </select>
+          <div class="dg-snap-controls">
+            <button class="dg-snap-btn" type="button" data-snap-to="left" title="Dock left">◧</button>
+            <button class="dg-snap-btn" type="button" data-snap-to="top" title="Dock top">⬒</button>
+            <button class="dg-snap-btn" type="button" data-snap-to="right" title="Dock right">◨</button>
+            <button class="dg-snap-btn" type="button" data-snap-to="bottom" title="Dock bottom">⬓</button>
+            <button class="dg-snap-btn" type="button" data-snap-to="floating" title="Float">⊞</button>
+          </div>
+          <button class="dg-panel-close-btn" id="dg-panel-close-btn" type="button" aria-label="Close panel">×</button>
         </div>
-        <button class="dg-main-button" id="dg-main-button" type="button" aria-label="Digital Garden">
-          <span>◌</span>
-        </button>
+        <div class="dg-panel-scroll">
+          <div class="dg-panel-section">
+            <div class="dg-section-label">
+              Associated content
+              <div class="dg-section-actions">
+                <button class="dg-mini-action" type="button" data-action="refresh-associations" title="Refresh for current URL">↻</button>
+              </div>
+            </div>
+            <div class="dg-section-body" id="dg-associations-body"></div>
+          </div>
+          <div class="dg-panel-divider"></div>
+          <div class="dg-panel-section">
+            <div class="dg-section-label">Content tree</div>
+            <div class="dg-section-body" id="dg-tree-body"></div>
+          </div>
+        </div>
       </div>
-      <section class="dg-panel-popover" id="dg-associations-panel">
-        <div class="dg-panel-header">
-          <div>
-            <div class="dg-panel-title">Associated content</div>
-            <div class="dg-panel-subtitle">Open notes, external links, and existing webpage associations.</div>
-          </div>
-          <button class="dg-panel-close" type="button" data-close-panel="dg-associations-panel">×</button>
-        </div>
-        <div class="dg-panel-body" id="dg-associations-body"></div>
-      </section>
-      <section class="dg-panel-popover" id="dg-connections-panel">
-        <div class="dg-panel-header">
-          <div>
-            <div class="dg-panel-title">Quick add</div>
-            <div class="dg-panel-subtitle">Save this page into one of your trusted sync connections.</div>
-          </div>
-          <button class="dg-panel-close" type="button" data-close-panel="dg-connections-panel">×</button>
-        </div>
-        <div class="dg-panel-body" id="dg-connections-body"></div>
-      </section>
-      <section class="dg-panel-popover" id="dg-tree-panel">
-        <div class="dg-panel-header">
-          <div>
-            <div class="dg-panel-title">Content tree</div>
-            <div class="dg-panel-subtitle">Associate this webpage with existing content.</div>
-          </div>
-          <button class="dg-panel-close" type="button" data-close-panel="dg-tree-panel">×</button>
-        </div>
-        <div class="dg-panel-body" id="dg-tree-body"></div>
-      </section>
       <div class="dg-target-banner" id="dg-target-banner">
         <div class="dg-target-copy">
           <strong>Select an element to embed beside</strong>
@@ -965,23 +921,40 @@ function createOverlayApp(state) {
   state.host = host;
   state.shadow = shadow;
   state.root = shadow.querySelector(".dg-overlay");
-  state.mainButton = shadow.getElementById("dg-main-button");
-  state.launcher = shadow.querySelector(".dg-launcher");
-  state.actionRing = shadow.getElementById("dg-action-ring");
-  state.popovers = {
-    associations: shadow.getElementById("dg-associations-panel"),
-    connections: shadow.getElementById("dg-connections-panel"),
-    tree: shadow.getElementById("dg-tree-panel"),
-  };
+  state.launcherBtn = shadow.getElementById("dg-launcher-btn");
+  state.edgeTab = shadow.getElementById("dg-edge-tab");
+  state.snapPanel = shadow.getElementById("dg-snap-panel");
+  state.workspaceSelect = shadow.getElementById("dg-workspace-select");
+  state.panelCloseBtn = shadow.getElementById("dg-panel-close-btn");
   state.popoverBodies = {
     associations: shadow.getElementById("dg-associations-body"),
-    connections: shadow.getElementById("dg-connections-body"),
     tree: shadow.getElementById("dg-tree-body"),
   };
   state.panelsMount = shadow.getElementById("dg-open-panels");
   state.targetBanner = shadow.getElementById("dg-target-banner");
   state.targetCopy = shadow.getElementById("dg-target-copy");
   state.targetHighlight = shadow.getElementById("dg-target-highlight");
+
+  // Single shared iframe — repositioned between panels instead of recreated.
+  // Moving an iframe in the DOM preserves its browsing context (session stays alive).
+  const embedIframe = document.createElement("iframe");
+  embedIframe.className = "dg-embed-iframe";
+  // No sandbox — we load our own trusted app and need full capabilities
+  // (cookies for auth, web workers for Y.js/collaboration, localStorage for state).
+  embedIframe.setAttribute("allow", "clipboard-read; clipboard-write");
+  embedIframe.setAttribute("data-active", "false");
+  state.embedIframe = embedIframe;
+  state.iframeContentId = null;
+  state.iframePanel = null;
+  state.iframePrewarmed = false;
+
+  // Hidden 1×1 container — the iframe lives here during prewarm so the browser
+  // actually loads the src (detached elements don't trigger network requests).
+  const prewarmContainer = document.createElement("div");
+  prewarmContainer.style.cssText =
+    "position:absolute;width:1px;height:1px;overflow:hidden;opacity:0;pointer-events:none;";
+  shadow.appendChild(prewarmContainer);
+  state.prewarmContainer = prewarmContainer;
 }
 
 function schedulePersist(state, contentId) {
@@ -1037,7 +1010,7 @@ function markActivity(state) {
     clearTimeout(state.idleTimer);
   }
   state.idleTimer = setTimeout(() => {
-    if (!state.menuOpen && state.openPanels.size === 0) {
+    if (!state.panelOpen && state.openPanels.size === 0) {
       setIdle(state, true);
     }
   }, DG_OVERLAY_IDLE_MS);
@@ -1061,7 +1034,7 @@ function setMenuOpen(state, open) {
 }
 
 function applyLauncherPosition(state) {
-  if (!state.launcher) return;
+  if (!state.launcherBtn) return;
   const x = clamp(
     state.launcherPosition?.x ?? window.innerWidth - DG_LAUNCHER_SIZE - 22,
     10,
@@ -1073,12 +1046,8 @@ function applyLauncherPosition(state) {
     window.innerHeight - DG_LAUNCHER_SIZE - 10
   );
   state.launcherPosition = { x, y };
-  state.launcher.style.left = `${x}px`;
-  state.launcher.style.top = `${y}px`;
-  state.launcher.setAttribute(
-    "data-side",
-    x < window.innerWidth / 2 ? "left" : "right"
-  );
+  state.launcherBtn.style.left = `${x}px`;
+  state.launcherBtn.style.top = `${y}px`;
 }
 
 function closePopoverById(state, id) {
@@ -1130,16 +1099,28 @@ function resourcePayload() {
 }
 
 async function loadResourceContext(state) {
+  const prevId = state.resourceContext?.resource?.id;
   state.resourceContext = await runtimeMessage({
     type: "fetch-resource-context",
     payload: resourcePayload(),
   });
+  if (prevId !== state.resourceContext?.resource?.id) {
+    state.domainAssociations = null;
+    state.domainAssociationsExpanded = false;
+    state.domainAssociationsSearch = "";
+  }
   return state.resourceContext;
 }
 
-async function loadContentTree(state) {
-  if (state.contentTree) return state.contentTree;
-  state.contentTree = await runtimeMessage({ type: "fetch-content-picker-tree" });
+async function loadContentTree(state, { workspaceId = null, force = false } = {}) {
+  if (!force && state.contentTree && state.loadedForWorkspaceId === (workspaceId || null)) {
+    return state.contentTree;
+  }
+  state.contentTree = await runtimeMessage({
+    type: "fetch-content-picker-tree",
+    payload: { workspaceId: workspaceId || null },
+  });
+  state.loadedForWorkspaceId = workspaceId || null;
   return state.contentTree;
 }
 
@@ -1183,74 +1164,6 @@ function setPanelEditorStatus(panel, message, tone = "idle") {
   panel.statusNode.setAttribute("data-tone", tone);
 }
 
-function normalizeEditorHtml(html) {
-  const trimmed = String(html || "").trim();
-  return trimmed.length > 0 ? trimmed : "<p></p>";
-}
-
-function syncRichEditorPlaceholder(editor) {
-  if (!editor) return;
-  const text = editor.textContent?.replace(/\u200B/g, "").trim() || "";
-  editor.setAttribute("data-empty", text.length === 0 ? "true" : "false");
-}
-
-function isSelectionInsideEditor(editor) {
-  if (!editor) return false;
-  const selection = window.getSelection();
-  if (!selection || selection.rangeCount === 0) return false;
-  const anchor = selection.anchorNode;
-  return Boolean(anchor && editor.contains(anchor));
-}
-
-function updateNoteToolbarState(panel) {
-  if (!panel?.richEditor || !panel?.noteToolbarButtons?.length) return;
-  if (!isSelectionInsideEditor(panel.richEditor) && document.activeElement !== panel.richEditor) {
-    panel.noteToolbarButtons.forEach((button) => button.setAttribute("data-active", "false"));
-    return;
-  }
-
-  const block = (document.queryCommandValue("formatBlock") || "").toLowerCase();
-  panel.noteToolbarButtons.forEach((button) => {
-    const command = button.getAttribute("data-command");
-    const blockName = button.getAttribute("data-block");
-    let active = false;
-    if (blockName) {
-      active = block.includes(blockName);
-    } else if (command === "blockquote") {
-      active = block.includes("blockquote");
-    } else if (command) {
-      try {
-        active = Boolean(document.queryCommandState(command));
-      } catch {
-        active = false;
-      }
-    }
-    button.setAttribute("data-active", active ? "true" : "false");
-  });
-}
-
-function runNoteEditorCommand(panel, button) {
-  if (!panel?.richEditor || !button) return;
-  panel.richEditor.focus();
-  const command = button.getAttribute("data-command");
-  const blockName = button.getAttribute("data-block");
-
-  if (blockName) {
-    document.execCommand("formatBlock", false, `<${blockName}>`);
-  } else if (command === "blockquote") {
-    document.execCommand("formatBlock", false, "<blockquote>");
-  } else if (command === "createLink") {
-    const current = window.getSelection()?.toString().trim() || "https://";
-    const url = window.prompt("Link URL", current.startsWith("http") ? current : "https://");
-    if (!url) return;
-    document.execCommand("createLink", false, url);
-  } else if (command) {
-    document.execCommand(command, false);
-  }
-
-  syncRichEditorPlaceholder(panel.richEditor);
-  updateNoteToolbarState(panel);
-}
 
 function schedulePanelAutosave(panel, saveFn, message = "Saving…") {
   if (panel.autosaveTimer) {
@@ -1260,6 +1173,44 @@ function schedulePanelAutosave(panel, saveFn, message = "Saving…") {
   panel.autosaveTimer = window.setTimeout(() => {
     void saveFn(message);
   }, 1400);
+}
+
+function renderDomainBody(state) {
+  const data = state.domainAssociations;
+  if (data === "loading") {
+    return `<div class="dg-status">Loading…</div>`;
+  }
+  const items = data?.items || [];
+  if (items.length === 0) {
+    return `<div class="dg-status">No other content on this domain.</div>`;
+  }
+  const search = state.domainAssociationsSearch || "";
+  const showSearch = items.length > 8;
+  const filtered = search
+    ? items.filter((item) => item.contentTitle.toLowerCase().includes(search.toLowerCase()))
+    : items;
+  return `
+    ${showSearch ? `
+      <div class="dg-domain-search">
+        <input class="dg-domain-search-input" type="text" placeholder="Filter…"
+          value="${escapeHtml(search)}" data-domain-search="true" />
+      </div>
+    ` : ""}
+    ${filtered.length === 0
+      ? `<div class="dg-status">No results for "${escapeHtml(search)}"</div>`
+      : filtered.map((item) => `
+        <button class="dg-list-item" type="button"
+          data-open-content="${escapeHtml(item.contentId)}"
+          data-content-kind="${escapeHtml(item.contentType)}">
+          <div class="dg-list-meta">
+            <div class="dg-list-title">${escapeHtml(item.contentTitle)}</div>
+            <div class="dg-list-subtitle">${escapeHtml(item.normalizedUrl || item.contentType)}</div>
+          </div>
+          <div class="dg-list-chip" style="background:rgba(99,131,196,0.14);color:#b8cef2;">domain</div>
+        </button>
+      `).join("")
+    }
+  `;
 }
 
 function renderAssociationsPopover(state) {
@@ -1304,19 +1255,26 @@ function renderAssociationsPopover(state) {
   }
 
   if (associations.length > 0) {
+    const webResourceId = context.resource?.id || "";
     sections.push(
       associations
         .map(
           (entry) => `
-            <button class="dg-list-item" type="button" data-open-content="${escapeHtml(
-              entry.content.id
-            )}" data-content-kind="${escapeHtml(entry.content.contentType)}">
-              <div class="dg-list-meta">
-                <div class="dg-list-title">${escapeHtml(entry.content.title)}</div>
-                <div class="dg-list-subtitle">${escapeHtml(entry.content.contentType)}</div>
-              </div>
-              <div class="dg-list-chip">associated</div>
-            </button>
+            <div class="dg-assoc-row">
+              <button class="dg-list-item" type="button" data-open-content="${escapeHtml(
+                entry.content.id
+              )}" data-content-kind="${escapeHtml(entry.content.contentType)}" style="flex:1;min-width:0;">
+                <div class="dg-list-meta">
+                  <div class="dg-list-title">${escapeHtml(entry.content.title)}</div>
+                  <div class="dg-list-subtitle">${escapeHtml(entry.content.contentType)}</div>
+                </div>
+                <div class="dg-list-chip">associated</div>
+              </button>
+              <button class="dg-mini-action dg-delete-assoc" type="button"
+                data-delete-association="${escapeHtml(entry.content.id)}"
+                data-web-resource-id="${escapeHtml(webResourceId)}"
+                title="Remove association">×</button>
+            </div>
           `
         )
         .join("")
@@ -1324,6 +1282,21 @@ function renderAssociationsPopover(state) {
   }
 
   container.innerHTML = sections.join("");
+
+  const hostname = state.resourceContext?.resource?.sourceHostname;
+  if (hostname) {
+    const domainSection = document.createElement("div");
+    domainSection.className = "dg-domain-section";
+    const isExpanded = state.domainAssociationsExpanded;
+    domainSection.innerHTML = `
+      <button class="dg-domain-toggle" type="button" data-action="toggle-domain-assoc">
+        <span class="dg-domain-toggle-icon">${isExpanded ? "▾" : "▸"}</span>
+        <span>More from ${escapeHtml(hostname)}</span>
+      </button>
+      ${isExpanded ? `<div class="dg-domain-body">${renderDomainBody(state)}</div>` : ""}
+    `;
+    container.appendChild(domainSection);
+  }
 }
 
 function renderConnectionsPopover(state) {
@@ -1415,7 +1388,8 @@ function renderTreeRows(state, nodes, depth = 0) {
 function renderTreePopover(state) {
   const container = state.popoverBodies.tree;
   if (!container) return;
-  if (!state.contentTree || state.contentTree.length === 0) {
+  const visibleTree = state.contentTree;
+  if (!visibleTree || visibleTree.length === 0) {
     renderStatus(container, "No content is available to associate yet.");
     return;
   }
@@ -1430,7 +1404,7 @@ function renderTreePopover(state) {
         </span>
       </div>
     </div>
-    ${renderTreeRows(state, state.contentTree)}
+    ${renderTreeRows(state, visibleTree)}
   `;
 }
 
@@ -1590,103 +1564,13 @@ function wirePanelDirectEditor(state, panel) {
   const body = panel.body;
   if (!body) return;
 
-  if (panel.kind === "note") {
-    body.innerHTML = `
-      <div class="dg-editor-stack">
-        <label class="dg-editor-field">
-          <span class="dg-editor-label">Title</span>
-          <input class="dg-editor-input" type="text" data-note-title />
-        </label>
-        <div class="dg-editor-field" style="flex:1;">
-          <span class="dg-editor-label">Note Content</span>
-          <div class="dg-note-toolbar" data-note-toolbar>
-            <button class="dg-toolbar-button" type="button" data-block="p">P</button>
-            <button class="dg-toolbar-button" type="button" data-block="h1">H1</button>
-            <button class="dg-toolbar-button" type="button" data-block="h2">H2</button>
-            <button class="dg-toolbar-button" type="button" data-block="h3">H3</button>
-            <span class="dg-note-toolbar-spacer"></span>
-            <button class="dg-toolbar-button" type="button" data-command="bold"><strong>B</strong></button>
-            <button class="dg-toolbar-button" type="button" data-command="italic"><em>I</em></button>
-            <button class="dg-toolbar-button" type="button" data-command="strikeThrough"><s>S</s></button>
-            <span class="dg-note-toolbar-spacer"></span>
-            <button class="dg-toolbar-button" type="button" data-command="insertUnorderedList">• List</button>
-            <button class="dg-toolbar-button" type="button" data-command="insertOrderedList">1. List</button>
-            <button class="dg-toolbar-button" type="button" data-command="blockquote">Quote</button>
-            <button class="dg-toolbar-button" type="button" data-command="createLink">Link</button>
-          </div>
-          <div
-            class="dg-editor-rich"
-            data-note-rich
-            data-placeholder="Write note content here…"
-            data-empty="true"
-            contenteditable="true"
-            spellcheck="true"
-          ></div>
-        </div>
-        <div class="dg-editor-status" data-editor-status></div>
-      </div>
-    `;
-
-    panel.titleInput = body.querySelector("[data-note-title]");
-    panel.richEditor = body.querySelector("[data-note-rich]");
-    panel.noteToolbar = body.querySelector("[data-note-toolbar]");
-    panel.noteToolbarButtons = Array.from(
-      body.querySelectorAll("[data-note-toolbar] .dg-toolbar-button")
-    );
+  if (panel.kind === "note" || panel.kind === "embed") {
+    // Edit-only embed: skip the HTML read view entirely. The iframe is the
+    // single source of truth for note rendering — keeps display/edit perfectly
+    // consistent and removes ~470 lines of tiptapJsonToHtml DOM walker.
+    body.innerHTML = `<div class="dg-editor-status" data-editor-status></div>`;
     panel.statusNode = body.querySelector("[data-editor-status]");
-
-    const saveNote = async () => {
-      if (!panel.titleInput || !panel.richEditor) return;
-      try {
-        setPanelEditorStatus(panel, "Saving note…");
-        const saved = await savePanelContent("note", panel.contentId, {
-          title: panel.titleInput.value.trim() || panel.toolbarTitle.textContent || "Note",
-          html: normalizeEditorHtml(panel.richEditor.innerHTML),
-        });
-        panel.currentContent = saved;
-        const nextTitle = saved.title || panel.titleInput.value.trim() || "Note";
-        panel.toolbarTitle.textContent = nextTitle;
-        panel.titleInput.value = nextTitle;
-        panel.collapsedChip.querySelector("span").textContent = nextTitle;
-        panel.richEditor.innerHTML = normalizeEditorHtml(saved.note?.html || panel.richEditor.innerHTML);
-        syncRichEditorPlaceholder(panel.richEditor);
-        setPanelEditorStatus(panel, "Note autosaved.", "success");
-      } catch (error) {
-        setPanelEditorStatus(
-          panel,
-          error instanceof Error ? error.message : "Failed to save note",
-          "error"
-        );
-      }
-    };
-
-    const queueSave = () => schedulePanelAutosave(panel, saveNote);
-    panel.titleInput.addEventListener("input", queueSave);
-    panel.richEditor.addEventListener("input", () => {
-      syncRichEditorPlaceholder(panel.richEditor);
-      updateNoteToolbarState(panel);
-      queueSave();
-    });
-    panel.richEditor.addEventListener("keyup", () => updateNoteToolbarState(panel));
-    panel.richEditor.addEventListener("mouseup", () => updateNoteToolbarState(panel));
-    panel.richEditor.addEventListener("focus", () => updateNoteToolbarState(panel));
-    panel.noteToolbarButtons.forEach((button) => {
-      button.addEventListener("mousedown", (event) => event.preventDefault());
-      button.addEventListener("click", () => {
-        runNoteEditorCommand(panel, button);
-        queueSave();
-      });
-    });
-
-    const handleSelectionChange = () => updateNoteToolbarState(panel);
-    document.addEventListener("selectionchange", handleSelectionChange);
-
-    panel.cleanupHandlers.push(() => {
-      if (panel.autosaveTimer) {
-        window.clearTimeout(panel.autosaveTimer);
-      }
-      document.removeEventListener("selectionchange", handleSelectionChange);
-    });
+    setTimeout(() => openEmbedForPanel(state, panel), 0);
     return;
   }
 
@@ -1718,35 +1602,6 @@ function wirePanelDirectEditor(state, panel) {
           <input class="dg-editor-input" type="text" data-external-user-intent />
         </label>
       </div>
-      <div class="dg-editor-divider"></div>
-      <div class="dg-editor-field" style="flex:1;">
-        <span class="dg-editor-label">Linked Note</span>
-        <div class="dg-note-toolbar" data-external-note-toolbar hidden>
-          <button class="dg-toolbar-button" type="button" data-block="p">P</button>
-          <button class="dg-toolbar-button" type="button" data-block="h1">H1</button>
-          <button class="dg-toolbar-button" type="button" data-block="h2">H2</button>
-          <button class="dg-toolbar-button" type="button" data-block="h3">H3</button>
-          <span class="dg-note-toolbar-spacer"></span>
-          <button class="dg-toolbar-button" type="button" data-command="bold"><strong>B</strong></button>
-          <button class="dg-toolbar-button" type="button" data-command="italic"><em>I</em></button>
-          <button class="dg-toolbar-button" type="button" data-command="strikeThrough"><s>S</s></button>
-          <span class="dg-note-toolbar-spacer"></span>
-          <button class="dg-toolbar-button" type="button" data-command="insertUnorderedList">• List</button>
-          <button class="dg-toolbar-button" type="button" data-command="insertOrderedList">1. List</button>
-          <button class="dg-toolbar-button" type="button" data-command="blockquote">Quote</button>
-          <button class="dg-toolbar-button" type="button" data-command="createLink">Link</button>
-        </div>
-        <div
-          class="dg-editor-rich"
-          data-external-note-rich
-          data-placeholder="Write note content here…"
-          data-empty="true"
-          contenteditable="true"
-          spellcheck="true"
-          hidden
-        ></div>
-        <div class="hint" data-external-note-empty hidden>No linked note is available for this webpage yet.</div>
-      </div>
       <div class="dg-editor-status" data-editor-status></div>
     </div>
   `;
@@ -1759,12 +1614,6 @@ function wirePanelDirectEditor(state, panel) {
     "[data-external-resource-relationship]"
   );
   panel.userIntentInput = body.querySelector("[data-external-user-intent]");
-  panel.linkedNoteToolbar = body.querySelector("[data-external-note-toolbar]");
-  panel.linkedNoteEditor = body.querySelector("[data-external-note-rich]");
-  panel.linkedNoteEmpty = body.querySelector("[data-external-note-empty]");
-  panel.linkedNoteButtons = Array.from(
-    body.querySelectorAll("[data-external-note-toolbar] .dg-toolbar-button")
-  );
   panel.statusNode = body.querySelector("[data-editor-status]");
 
   const saveExternal = async () => {
@@ -1803,102 +1652,28 @@ function wirePanelDirectEditor(state, panel) {
     panel.userIntentInput,
   ].forEach((input) => input?.addEventListener("input", queueSave));
 
-  const saveLinkedNote = async () => {
-    if (!panel.linkedNoteId || !panel.linkedNoteEditor) return;
-    try {
-      setPanelEditorStatus(panel, "Saving linked note…");
-      const savedNote = await savePanelContent("note", panel.linkedNoteId, {
-        title: panel.linkedNoteTitle || panel.titleInput.value.trim() || "Note",
-        html: normalizeEditorHtml(panel.linkedNoteEditor.innerHTML),
-      });
-      panel.linkedNoteTitle = savedNote.title || panel.linkedNoteTitle || "Note";
-      panel.currentContent = {
-        ...(panel.currentContent || {}),
-        linkedNote: savedNote,
-      };
-      panel.linkedNoteEditor.innerHTML = normalizeEditorHtml(
-        savedNote.note?.html || panel.linkedNoteEditor.innerHTML
-      );
-      syncRichEditorPlaceholder(panel.linkedNoteEditor);
-      setPanelEditorStatus(panel, "Linked note autosaved.", "success");
-    } catch (error) {
-      setPanelEditorStatus(
-        panel,
-        error instanceof Error ? error.message : "Failed to save linked note",
-        "error"
-      );
-    }
-  };
-
-  const queueLinkedNoteSave = () => {
-    if (panel.linkedNoteAutosaveTimer) {
-      window.clearTimeout(panel.linkedNoteAutosaveTimer);
-    }
-    setPanelEditorStatus(panel, "Linked note changes pending…");
-    panel.linkedNoteAutosaveTimer = window.setTimeout(() => {
-      void saveLinkedNote();
-    }, 1400);
-  };
-
-  const linkedNoteEditorState = {
-    richEditor: panel.linkedNoteEditor,
-    noteToolbarButtons: panel.linkedNoteButtons,
-  };
-
-  panel.linkedNoteEditor?.addEventListener("input", () => {
-    syncRichEditorPlaceholder(panel.linkedNoteEditor);
-    updateNoteToolbarState(linkedNoteEditorState);
-    queueLinkedNoteSave();
-  });
-  panel.linkedNoteEditor?.addEventListener("keyup", () =>
-    updateNoteToolbarState(linkedNoteEditorState)
-  );
-  panel.linkedNoteEditor?.addEventListener("mouseup", () =>
-    updateNoteToolbarState(linkedNoteEditorState)
-  );
-  panel.linkedNoteEditor?.addEventListener("focus", () =>
-    updateNoteToolbarState(linkedNoteEditorState)
-  );
-  panel.linkedNoteButtons.forEach((button) => {
-    button.addEventListener("mousedown", (event) => event.preventDefault());
-    button.addEventListener("click", () => {
-      runNoteEditorCommand(linkedNoteEditorState, button);
-      queueLinkedNoteSave();
-    });
-  });
-
   panel.cleanupHandlers.push(() => {
     if (panel.autosaveTimer) {
       window.clearTimeout(panel.autosaveTimer);
-    }
-    if (panel.linkedNoteAutosaveTimer) {
-      window.clearTimeout(panel.linkedNoteAutosaveTimer);
     }
   });
 }
 
 async function loadPanelEditorData(panel) {
+  // Note and embed panels use the iframe — no client-side data fetch needed.
+  // The iframe loads the embed page which does its own data fetching.
+  if (panel.kind === "embed" || panel.kind === "note") {
+    panel.body?.setAttribute("data-loading", "false");
+    return;
+  }
   try {
     panel.body?.setAttribute("data-loading", "true");
-    setPanelEditorStatus(panel, panel.kind === "note" ? "Loading note…" : "Loading external link…");
+    setPanelEditorStatus(panel, "Loading external link…");
     const data = await fetchPanelContent(panel.kind, panel.contentId);
     panel.currentContent = data;
     const nextTitle = data.title || panel.toolbarTitle.textContent || "";
     panel.toolbarTitle.textContent = nextTitle;
     panel.collapsedChip.querySelector("span").textContent = nextTitle;
-
-    if (panel.kind === "note") {
-      if (panel.titleInput) panel.titleInput.value = nextTitle;
-      if (panel.richEditor) {
-        panel.richEditor.innerHTML = normalizeEditorHtml(
-          data.note?.html || "<p></p>"
-        );
-        syncRichEditorPlaceholder(panel.richEditor);
-        updateNoteToolbarState(panel);
-      }
-      setPanelEditorStatus(panel, "Rich note editing active.");
-      return;
-    }
 
     if (panel.titleInput) panel.titleInput.value = nextTitle;
     if (panel.urlInput) panel.urlInput.value = data.external?.url || "";
@@ -1908,25 +1683,7 @@ async function loadPanelEditorData(panel) {
       panel.resourceRelationshipInput.value = data.external?.resourceRelationship || "";
     }
     if (panel.userIntentInput) panel.userIntentInput.value = data.external?.userIntent || "";
-    panel.linkedNoteId = data.linkedNote?.id || null;
-    panel.linkedNoteTitle = data.linkedNote?.title || panel.titleInput?.value || "Note";
-    if (panel.linkedNoteEditor && panel.linkedNoteToolbar && panel.linkedNoteEmpty) {
-      const hasLinkedNote = Boolean(data.linkedNote?.id);
-      panel.linkedNoteToolbar.hidden = !hasLinkedNote;
-      panel.linkedNoteEditor.hidden = !hasLinkedNote;
-      panel.linkedNoteEmpty.hidden = hasLinkedNote;
-      if (hasLinkedNote) {
-        panel.linkedNoteEditor.innerHTML = normalizeEditorHtml(
-          data.linkedNote?.note?.html || "<p></p>"
-        );
-        syncRichEditorPlaceholder(panel.linkedNoteEditor);
-        updateNoteToolbarState({
-          richEditor: panel.linkedNoteEditor,
-          noteToolbarButtons: panel.linkedNoteButtons,
-        });
-      }
-    }
-    setPanelEditorStatus(panel, "External link and linked note ready.");
+    setPanelEditorStatus(panel, "External link ready.");
   } catch (error) {
     setPanelEditorStatus(
       panel,
@@ -1944,10 +1701,44 @@ function closePanel(state, contentId, nextState = "closed") {
   panel.state = nextState;
   showCollapsedChip(panel);
   if (nextState === "closed") {
+    // Persist "closed" BEFORE deleting from the map — schedulePersist looks up
+    // the panel by ID and would find nothing after the delete below.
+    const webResourceId = state.resourceContext?.resource?.id;
+    if (webResourceId) {
+      runtimeMessage({
+        type: "save-overlay-view-state",
+        payload: {
+          webResourceId,
+          contentId,
+          state: "closed",
+          layoutMode: panel.layoutMode,
+          dockSide: panel.dockSide || null,
+          positionX: panel.positionX,
+          positionY: panel.positionY,
+          width: panel.width,
+          height: panel.height,
+          opacity: panel.opacity,
+          embeddedSelector: panel.embeddedSelector || null,
+          embeddedPlacement: panel.embeddedPlacement || null,
+          metadata: {
+            ...(panel.metadata || {}),
+            tileX: panel.tileX ?? null,
+            tileY: panel.tileY ?? null,
+          },
+          lastActiveAt: new Date().toISOString(),
+        },
+      }).catch(() => {});
+    }
     state.tileOrder = state.tileOrder.filter((id) => id !== contentId);
     if (panel.embeddedPreviewNode) {
       panel.embeddedPreviewNode.remove();
       panel.embeddedPreviewNode = null;
+    }
+    // Detach the shared iframe before removing the panel container so
+    // the iframe's browsing context survives for the next panel.
+    if (state.iframePanel === panel && state.embedIframe?.parentElement === panel.body) {
+      panel.body.removeChild(state.embedIframe);
+      state.iframePanel = null;
     }
     panel.cleanupHandlers.forEach((cleanup) => {
       try {
@@ -1957,14 +1748,15 @@ function closePanel(state, contentId, nextState = "closed") {
     panel.container.remove();
     panel.collapsedChip.remove();
     state.openPanels.delete(contentId);
+    // schedulePersist intentionally NOT called here — we persisted above
   } else {
     panel.container.style.display = "none";
     if (!state.tileOrder.includes(contentId)) {
       state.tileOrder.push(contentId);
     }
     applyTilePosition(state, panel);
+    schedulePersist(state, contentId);
   }
-  schedulePersist(state, contentId);
 }
 
 function reopenPanel(state, contentId) {
@@ -2022,23 +1814,20 @@ function createContentPanel(state, item, kind, persisted = null) {
 
   const container = document.createElement("section");
   container.className = "dg-floating-panel";
-  const title = item.title || (kind === "note" ? "Note" : "External link");
+  const title = item.title || (kind === "note" ? "Note" : kind === "embed" ? "Content" : "External link");
+  const kindLabel = kind === "note" ? "Web note overlay" : kind === "embed" ? "Content overlay" : "External metadata overlay";
   container.innerHTML = `
     <div class="dg-panel-toolbar">
       <div class="dg-panel-toolbar-title">
         <strong>${escapeHtml(title)}</strong>
-        <span>${escapeHtml(kind === "note" ? "Web note overlay" : "External metadata overlay")}</span>
+        <span>${escapeHtml(kindLabel)}</span>
       </div>
       <div class="dg-toolbar-actions">
         <span class="dg-panel-ready" style="font-size:11px;color:rgba(255,255,255,0.46)"></span>
-        <button class="dg-toolbar-button" type="button" data-panel-mode="floating">Float</button>
-        <button class="dg-toolbar-button" type="button" data-panel-mode="docked">Dock</button>
-        <button class="dg-toolbar-button" type="button" data-panel-mode="embedded">Embed</button>
-        <button class="dg-toolbar-button" type="button" data-panel-action="reanchor">↺</button>
-        <button class="dg-toolbar-button" type="button" data-panel-action="opacity">◐</button>
-        <button class="dg-toolbar-button" type="button" data-panel-action="app">↗</button>
-        <button class="dg-toolbar-button" type="button" data-panel-action="collapse">—</button>
-        <button class="dg-toolbar-button" type="button" data-panel-action="close">×</button>
+        <button class="dg-toolbar-button" type="button" data-panel-action="open-tree" title="Browse file tree">◂ Tree</button>
+        <button class="dg-toolbar-button" type="button" data-panel-action="app" title="Open in app">↗</button>
+        <button class="dg-toolbar-button" type="button" data-panel-action="collapse" title="Collapse">—</button>
+        <button class="dg-toolbar-button" type="button" data-panel-action="close" title="Close">×</button>
       </div>
     </div>
     <div class="dg-panel-content"></div>
@@ -2139,6 +1928,12 @@ function createContentPanel(state, item, kind, persisted = null) {
 
     if (action === "app") {
       openAppContent(state.config.appBaseUrl, panel.contentId);
+      return;
+    }
+
+    if (action === "open-tree") {
+      closePanel(state, panel.contentId, "closed");
+      openSnapPanel(state);
       return;
     }
 
@@ -2311,12 +2106,8 @@ function beginEmbedTargeting(state, panel) {
 }
 
 async function openAssociatedContent(state, contentId, contentKind) {
-  const kind = contentKind === "external" ? "external" : contentKind === "note" ? "note" : null;
-  if (!kind) {
-    setMenuOpen(state, false);
-    openAppContent(state.config.appBaseUrl, contentId);
-    return;
-  }
+  // "embed" = any content type the embed shell can render (file, folder, visualization, etc.)
+  const kind = contentKind === "external" ? "external" : contentKind === "note" ? "note" : "embed";
   const context = state.resourceContext;
   const persisted =
     context?.viewStates?.find((entry) => entry.contentId === contentId) || null;
@@ -2325,7 +2116,7 @@ async function openAssociatedContent(state, contentId, contentKind) {
     (context?.externalContents || []).find((entry) => entry.id === contentId) ||
     { id: contentId, title: contentId };
   createContentPanel(state, source, kind, persisted);
-  setMenuOpen(state, false);
+  closeSnapPanel(state);
 }
 
 async function associateAndOpen(state, contentId, contentKind) {
@@ -2337,7 +2128,6 @@ async function associateAndOpen(state, contentId, contentKind) {
     throw new Error("Web resource context is unavailable");
   }
 
-  const isRenderable = contentKind === "note" || contentKind === "external";
   await runtimeMessage({
     type: "create-resource-association",
     payload: {
@@ -2348,12 +2138,6 @@ async function associateAndOpen(state, contentId, contentKind) {
 
   state.resourceContext = await loadResourceContext(state);
   renderAssociationsPopover(state);
-
-  if (!isRenderable) {
-    setMenuOpen(state, false);
-    openAppContent(state.config.appBaseUrl, contentId);
-    return;
-  }
 
   await openAssociatedContent(state, contentId, contentKind);
 }
@@ -2366,8 +2150,7 @@ async function restorePanelsFromState(state) {
       state.resourceContext.associations.find((entry) => entry.content.id === viewState.contentId)?.content ||
       state.resourceContext.externalContents.find((entry) => entry.id === viewState.contentId);
     if (!association) continue;
-    const kind = association.contentType === "external" ? "external" : association.contentType === "note" ? "note" : null;
-    if (!kind) continue;
+    const kind = association.contentType === "external" ? "external" : association.contentType === "note" ? "note" : "embed";
     createContentPanel(state, association, kind, viewState);
   }
 }
@@ -2383,13 +2166,6 @@ async function refreshOverlayResourceState(state, reason = "sync-update") {
       )
     ) {
       void loadPanelEditorData(panel);
-    }
-  }
-  if (state.menuOpen) {
-    const connectionsPopoverOpen =
-      state.popovers.connections?.getAttribute("data-open") === "true";
-    if (connectionsPopoverOpen) {
-      renderConnectionsPopover(state);
     }
   }
   return reason;
@@ -2408,6 +2184,7 @@ function wireRootEvents(state) {
       }
     });
   });
+
   window.addEventListener("scroll", () => {
     Array.from(state.openPanels.values()).forEach((panel) => {
       if (panel.layoutMode === "embedded" && panel.state === "open") {
@@ -2415,8 +2192,14 @@ function wireRootEvents(state) {
       }
     });
   });
+
   window.addEventListener("resize", () => {
-    applyLauncherPosition(state);
+    if (state.snap === "floating") {
+      applyLauncherPosition(state);
+      applyFloatingPanelPosition(state);
+    } else {
+      applyEdgeTabPosition(state);
+    }
     Array.from(state.openPanels.values()).forEach((panel) => {
       applyPanelGeometry(state, panel);
       if (panel.state === "collapsed") {
@@ -2424,6 +2207,35 @@ function wireRootEvents(state) {
       }
     });
   });
+
+  // ── SPA URL change detection ──────────────────────────────────────────────
+  // Content scripts run in an isolated JS world, so patching history.pushState
+  // only patches the content-script copy — the page's framework calls its own.
+  // window.location.href IS shared across worlds, so polling is the reliable path.
+  let _lastTrackedHref = window.location.href;
+  function _onUrlChange() {
+    const current = window.location.href;
+    if (current === _lastTrackedHref) return;
+    _lastTrackedHref = current;
+    state.resourceContext = null;
+    state.domainAssociations = null;
+    state.domainAssociationsExpanded = false;
+    state.domainAssociationsSearch = "";
+    if (state.panelOpen) {
+      renderStatus(state.popoverBodies.associations, "Loading…");
+      void loadResourceContext(state)
+        .then(() => renderAssociationsPopover(state))
+        .catch(() => {});
+    }
+  }
+  // popstate fires in isolated world for Back/Forward
+  window.addEventListener("popstate", _onUrlChange);
+  window.addEventListener("hashchange", _onUrlChange);
+  // Navigation API (Chrome 102+) fires in isolated world for all SPA navigations
+  try { if (window.navigation) window.navigation.addEventListener("navigate", _onUrlChange); } catch (_) {}
+  // Polling — universal fallback, location.href is readable from isolated world
+  setInterval(_onUrlChange, 1000);
+
   document.addEventListener(
     "click",
     (event) => {
@@ -2436,10 +2248,75 @@ function wireRootEvents(state) {
     },
     true
   );
+
   window.addEventListener("keydown", (event) => {
-    if (event.key === "Escape" && state.targetingPanelId) {
-      stopEmbedTargeting(state);
+    if (event.key === "Escape") {
+      if (state.targetingPanelId) stopEmbedTargeting(state);
+      else if (state.panelOpen) closeSnapPanel(state);
     }
+  });
+
+  // Bridge postMessages from the embed iframe → overlay UI
+  window.addEventListener("message", (event) => {
+    const iframe = state.embedIframe;
+    if (!iframe || !event.data || typeof event.data !== "object") return;
+    // Only accept messages from our iframe
+    if (event.source !== iframe.contentWindow) return;
+
+    const { type, title, contentId } = event.data;
+    const panel = state.iframePanel;
+
+    if (type === "ready") {
+      iframe.setAttribute("data-active", "true");
+      if (panel) {
+        setPanelEditorStatus(panel, "");
+        if (panel.authCheckTimer) {
+          window.clearTimeout(panel.authCheckTimer);
+          panel.authCheckTimer = null;
+        }
+      }
+    }
+    if (type === "dirty" && panel) {
+      setPanelEditorStatus(panel, "Saving…");
+    }
+    if (type === "saved" && panel) {
+      setPanelEditorStatus(panel, "Saved ✓", "success");
+      setTimeout(() => {
+        if (state.iframePanel === panel) setPanelEditorStatus(panel, "");
+      }, 2000);
+    }
+    if (type === "title-changed" && title && panel) {
+      panel.toolbarTitle.textContent = title;
+      const chipSpan = panel.collapsedChip?.querySelector("span");
+      if (chipSpan) chipSpan.textContent = title;
+    }
+    if (type === "navigate" && contentId) {
+      // Session 5: open the linked note as a new panel
+    }
+    if (type === "open-external" && event.data.url) {
+      // Iframe asked us to open an external URL — pop it in a new top-level tab.
+      // We use window.open from the content-script context so it inherits the
+      // host page's window features, then immediately blur to keep focus on the
+      // original page (clipboard / focus-stealing protection).
+      try {
+        const opened = window.open(event.data.url, "_blank", "noopener,noreferrer");
+        if (opened && typeof opened.opener !== "undefined") opened.opener = null;
+      } catch (_) {
+        // Some hosts block window.open from content scripts — fall back to a
+        // synthesised anchor click which is more permissive.
+        try {
+          const a = document.createElement("a");
+          a.href = event.data.url;
+          a.target = "_blank";
+          a.rel = "noopener noreferrer";
+          a.style.display = "none";
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+        } catch (_) {}
+      }
+    }
+    // prewarm-ready is informational only — no action needed
   });
 
   chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
@@ -2448,9 +2325,7 @@ function wireRootEvents(state) {
       const normalizedEventUrl =
         message.payload?.normalizedUrl ||
         (message.payload?.url ? normalizeComparableUrl(message.payload.url) : "");
-      if (!normalizedEventUrl || normalizedEventUrl !== normalizedCurrentUrl) {
-        return;
-      }
+      if (!normalizedEventUrl || normalizedEventUrl !== normalizedCurrentUrl) return;
       void refreshOverlayResourceState(state, message.payload?.reason || "sync-update").catch(
         (error) => {
           console.warn("[DG Overlay] Failed to refresh resource state after sync update", {
@@ -2486,34 +2361,36 @@ function wireRootEvents(state) {
       })();
       return true;
     }
+
+    if (message?.type === "dg-show-tree-panel") {
+      void (async () => {
+        try {
+          await openSnapPanel(state);
+          sendResponse?.({ ok: true });
+        } catch (error) {
+          sendResponse?.({
+            ok: false,
+            error: error instanceof Error ? error.message : "Failed to open tree panel",
+          });
+        }
+      })();
+      return true;
+    }
   });
 
-  state.mainButton.addEventListener("click", async () => {
-    if (Date.now() < state.suppressMainButtonClickUntil) {
-      return;
-    }
-    setMenuOpen(state, !state.menuOpen);
-    if (state.menuOpen) {
-      if (!state.resourceContext) {
-        try {
-          await loadResourceContext(state);
-          renderAssociationsPopover(state);
-          await restorePanelsFromState(state);
-        } catch (error) {
-          renderStatus(
-            state.popoverBodies.associations,
-            error instanceof Error ? error.message : "Failed to load associated content",
-            "error"
-          );
-        }
-      } else {
-        renderAssociationsPopover(state);
-      }
+  // ── Floating launcher button ───────────────────────────────────────────────
+
+  state.launcherBtn.addEventListener("click", () => {
+    if (Date.now() < state.suppressMainButtonClickUntil) return;
+    if (state.panelOpen) {
+      closeSnapPanel(state);
+    } else {
+      void openSnapPanel(state);
     }
   });
 
   let launcherDrag = null;
-  state.mainButton.addEventListener("pointerdown", (event) => {
+  state.launcherBtn.addEventListener("pointerdown", (event) => {
     launcherDrag = {
       startX: state.launcherPosition?.x ?? 0,
       startY: state.launcherPosition?.y ?? 0,
@@ -2530,6 +2407,7 @@ function wireRootEvents(state) {
       }
       state.launcherPosition = { x: nextX, y: nextY };
       applyLauncherPosition(state);
+      if (state.panelOpen) applyFloatingPanelPosition(state);
     };
     const onUp = () => {
       if (!launcherDrag) return;
@@ -2546,58 +2424,120 @@ function wireRootEvents(state) {
     window.addEventListener("pointerup", onUp);
   });
 
-  state.actionRing.addEventListener("click", async (event) => {
-    const button = event.target.closest("[data-action]");
-    if (!button) return;
-    const action = button.getAttribute("data-action");
-    togglePopover(state, action);
-    try {
-      if (action === "associations") {
-        if (!state.resourceContext) {
-          await loadResourceContext(state);
-        }
-        renderAssociationsPopover(state);
+  // ── Edge tab (docked mode) — drag to reposition along edge, click to open ───
+
+  let edgeTabDrag = null;
+  state.edgeTab.addEventListener("pointerdown", (event) => {
+    if (state.snap === "floating") return;
+    event.preventDefault();
+    const snap = state.snap;
+    edgeTabDrag = { moved: false };
+    const onMove = (me) => {
+      if (!edgeTabDrag) return;
+      edgeTabDrag.moved = true;
+      if (snap === "right" || snap === "left") {
+        state.edgeTabOffset = Math.max(0, Math.min(1, me.clientY / (window.innerHeight - 48)));
+      } else {
+        state.edgeTabOffset = Math.max(0, Math.min(1, me.clientX / (window.innerWidth - 48)));
       }
-      if (action === "connections") {
-        await loadConnections(state);
-        renderConnectionsPopover(state);
+      applyEdgeTabPosition(state);
+    };
+    const onUp = () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      const wasMoved = edgeTabDrag?.moved ?? false;
+      edgeTabDrag = null;
+      if (!wasMoved) {
+        void openSnapPanel(state);
+      } else {
+        void saveDomainMemory(window.location.hostname, { snap: state.snap, edgeTabOffset: state.edgeTabOffset }, "etld1");
       }
-      if (action === "tree") {
-        renderStatus(
-          state.popoverBodies.tree,
-          "Loading content tree…"
-        );
-        const tree = await loadContentTree(state);
-        for (const node of tree) {
-          void node;
-        }
-        renderTreePopover(state);
-      }
-    } catch (error) {
-      const target = state.popoverBodies[action];
-      if (target) {
-        renderStatus(target, error instanceof Error ? error.message : "Request failed", "error");
-      }
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+  });
+  state.edgeTab.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      void openSnapPanel(state);
     }
   });
 
+  // ── Snap panel controls ───────────────────────────────────────────────────
+
+  state.panelCloseBtn.addEventListener("click", () => closeSnapPanel(state));
+
+  state.workspaceSelect.addEventListener("change", () => {
+    const workspaceId = state.workspaceSelect.value || null;
+    state.selectedWorkspaceId = workspaceId;
+    renderStatus(state.popoverBodies.tree, "Loading…");
+    void loadContentTree(state, { workspaceId, force: true })
+      .then(() => renderTreePopover(state))
+      .catch((e) => {
+        const msg = e instanceof Error ? e.message : "Failed to load tree";
+        const isAuth = /token|trusted|unauthorized|auth/i.test(msg);
+        renderStatus(state.popoverBodies.tree, isAuth ? "Re-trust required — open Digital Garden settings to reconnect." : msg, "error");
+      });
+  });
+
+  // ── Shadow-delegated click events ─────────────────────────────────────────
+
   state.shadow.addEventListener("click", async (event) => {
-    const closeButton = event.target.closest("[data-close-panel]");
-    if (closeButton) {
-      closePopoverById(state, closeButton.getAttribute("data-close-panel"));
+    const snapBtn = event.target.closest("[data-snap-to]");
+    if (snapBtn) {
+      const mode = snapBtn.getAttribute("data-snap-to");
+      setSnap(state, mode);
+      void saveDomainMemory(window.location.hostname, { snap: mode, edgeTabOffset: state.edgeTabOffset ?? 0.5 }, "etld1");
       return;
     }
 
     const targetAction = event.target.closest("[data-target-action]");
     if (targetAction) {
       const action = targetAction.getAttribute("data-target-action");
-      if (action === "cancel") {
-        stopEmbedTargeting(state);
-      }
-      if (action === "confirm") {
-        confirmEmbedTarget(state);
-      }
+      if (action === "cancel") stopEmbedTargeting(state);
+      if (action === "confirm") confirmEmbedTarget(state);
       return;
+    }
+
+    // ── Associations section: refresh + domain toggle ─────────────────────────
+    const actionBtn = event.target.closest("[data-action]");
+    if (actionBtn) {
+      const action = actionBtn.getAttribute("data-action");
+
+      if (action === "refresh-associations") {
+        state.resourceContext = null;
+        state.domainAssociations = null;
+        state.domainAssociationsExpanded = false;
+        state.domainAssociationsSearch = "";
+        renderStatus(state.popoverBodies.associations, "Refreshing…");
+        try {
+          await loadResourceContext(state);
+          renderAssociationsPopover(state);
+        } catch (e) {
+          renderStatus(state.popoverBodies.associations, "Refresh failed — check connection", "error");
+        }
+        return;
+      }
+
+      if (action === "toggle-domain-assoc") {
+        state.domainAssociationsExpanded = !state.domainAssociationsExpanded;
+        if (state.domainAssociationsExpanded && state.domainAssociations === null) {
+          state.domainAssociations = "loading";
+          renderAssociationsPopover(state);
+          try {
+            const result = await runtimeMessage({
+              type: "fetch-domain-associations",
+              url: window.location.href,
+              excludeResourceId: state.resourceContext?.resource?.id || null,
+            });
+            state.domainAssociations = result;
+          } catch (e) {
+            state.domainAssociations = { items: [] };
+          }
+        }
+        renderAssociationsPopover(state);
+        return;
+      }
     }
 
     const openButton = event.target.closest("[data-open-content]");
@@ -2607,42 +2547,6 @@ function wireRootEvents(state) {
         openButton.getAttribute("data-open-content"),
         openButton.getAttribute("data-content-kind")
       );
-      return;
-    }
-
-    const quickButton = event.target.closest("[data-quick-add]");
-    if (quickButton) {
-      const connectionId = quickButton.getAttribute("data-quick-add");
-      const status = state.popoverBodies.connections.querySelector("#dg-connection-status");
-      if (status) {
-        status.textContent = "Saving current page…";
-      }
-      try {
-        const result = await runtimeMessage({
-          type: "quick-save",
-          payload: {
-            connectionId,
-            bypassRules: false,
-            title: document.title || window.location.href,
-          },
-        });
-        state.resourceContext = await loadResourceContext(state);
-        renderAssociationsPopover(state);
-        if (status) {
-          status.textContent =
-            result.duplicateCount > 0
-              ? "This bookmark was applied to more than one Digital Garden folder."
-              : `Saved to ${result.title || "Digital Garden"}.`;
-        }
-        if (result.contentId) {
-          await openAssociatedContent(state, result.contentId, "external");
-        }
-        setMenuOpen(state, false);
-      } catch (error) {
-        if (status) {
-          status.textContent = error instanceof Error ? error.message : "Save failed";
-        }
-      }
       return;
     }
 
@@ -2676,6 +2580,25 @@ function wireRootEvents(state) {
       return;
     }
 
+    const deleteAssocButton = event.target.closest("[data-delete-association]");
+    if (deleteAssocButton) {
+      const contentId = deleteAssocButton.getAttribute("data-delete-association");
+      const webResourceId = deleteAssocButton.getAttribute("data-web-resource-id");
+      if (!contentId || !webResourceId) return;
+      try {
+        await runtimeMessage({ type: "delete-resource-association", payload: { webResourceId, contentId } });
+        state.resourceContext = await loadResourceContext(state);
+        renderAssociationsPopover(state);
+      } catch (error) {
+        renderStatus(
+          state.popoverBodies.associations,
+          error instanceof Error ? error.message : "Failed to remove association",
+          "error"
+        );
+      }
+      return;
+    }
+
     const createButton = event.target.closest("[data-create-tree-item]");
     if (createButton) {
       const type = createButton.getAttribute("data-create-tree-item");
@@ -2692,9 +2615,7 @@ function wireRootEvents(state) {
         url = window.prompt("External link URL", window.location.href) || "";
       }
 
-      if (!title.trim()) {
-        return;
-      }
+      if (!title.trim()) return;
 
       renderStatus(state.popoverBodies.tree, `Creating ${type}…`);
 
@@ -2706,13 +2627,9 @@ function wireRootEvents(state) {
           url,
         });
         state.contentTree = null;
-        const tree = await loadContentTree(state);
-        if (parentId) {
-          state.expandedTreeIds.add(parentId);
-        }
-        if (created.contentType === "folder") {
-          state.expandedTreeIds.add(created.id);
-        }
+        await loadContentTree(state, { workspaceId: state.selectedWorkspaceId || null });
+        if (parentId) state.expandedTreeIds.add(parentId);
+        if (created.contentType === "folder") state.expandedTreeIds.add(created.id);
         renderTreePopover(state);
         if (created.contentType === "note" || created.contentType === "external") {
           if (created.contentType === "note" && state.resourceContext?.resource?.id) {
@@ -2737,6 +2654,14 @@ function wireRootEvents(state) {
       }
     }
   });
+
+  // ── Domain search input ────────────────────────────────────────────────────
+  state.shadow.addEventListener("input", (event) => {
+    if (!event.target.closest("[data-domain-search]")) return;
+    state.domainAssociationsSearch = event.target.value || "";
+    const domainBody = state.popoverBodies.associations?.querySelector(".dg-domain-body");
+    if (domainBody) domainBody.innerHTML = renderDomainBody(state);
+  });
 }
 
 async function initOverlay() {
@@ -2760,16 +2685,7 @@ async function initOverlay() {
   }
 
   if (missingPrerequisites.length > 0) {
-    console.warn(
-      "[DG Overlay] Skipping initialization because setup is incomplete",
-      {
-        missingPrerequisites,
-        appBaseUrl: config?.appBaseUrl || null,
-        tokenPresent: Boolean(config?.token),
-        trustedInstallId: extensionContext?.trustedInstallId || null,
-        installInstanceId: extensionContext?.installInstanceId || null,
-      }
-    );
+    console.debug("[DG Overlay] Setup incomplete, skipping injection", missingPrerequisites);
     return;
   }
 
@@ -2794,23 +2710,31 @@ async function initOverlay() {
     host: null,
     shadow: null,
     root: null,
-    mainButton: null,
-    actionRing: null,
-    popovers: {},
+    launcherBtn: null,
+    edgeTab: null,
+    snapPanel: null,
+    workspaceSelect: null,
+    panelCloseBtn: null,
     popoverBodies: {},
     panelsMount: null,
-    menuOpen: false,
+    snap: "right",
+    panelOpen: false,
+    workspaces: [],
+    selectedWorkspaceId: null,
     isIdle: false,
     idleTimer: null,
     resourceContext: null,
+    domainAssociations: null,
+    domainAssociationsExpanded: false,
+    domainAssociationsSearch: "",
+    edgeTabOffset: 0.5,
     contentTree: null,
-    connections: null,
+    loadedForWorkspaceId: null,
     expandedTreeIds: new Set(),
     tileOrder: [],
     openPanels: new Map(),
     persistTimers: new Map(),
     lastHoveredSelector: "body",
-    launcher: null,
     launcherPosition: null,
     targetBanner: null,
     targetCopy: null,
@@ -2820,12 +2744,47 @@ async function initOverlay() {
     targetSelector: null,
     targetPreviewNode: null,
     suppressMainButtonClickUntil: 0,
+    embedIframe: null,
+    iframeContentId: null,
+    iframePanel: null,
+    iframePrewarmed: false,
+    prewarmContainer: null,
   };
 
   createOverlayApp(state);
-  applyLauncherPosition(state);
   wireRootEvents(state);
   markActivity(state);
+
+  // Preconnect: tell the browser to open a TCP/TLS connection to the app
+  // origin immediately, so the first iframe load skips connection setup.
+  try {
+    const existingLink = document.querySelector(`link[rel="preconnect"][data-dg-embed]`);
+    if (!existingLink) {
+      const link = document.createElement("link");
+      link.rel = "preconnect";
+      link.href = appOrigin;
+      link.crossOrigin = "use-credentials";
+      link.setAttribute("data-dg-embed", "1");
+      document.head.appendChild(link);
+    }
+  } catch {}
+
+  // Idle prewarm: 3 s after overlay init, load /embed/blank in the hidden
+  // container so Next.js chunks are cached before the user clicks "Edit".
+  setTimeout(() => {
+    if (state.iframePrewarmed || state.iframeContentId || !state.embedIframe) return;
+    state.iframePrewarmed = true;
+    state.prewarmContainer.appendChild(state.embedIframe);
+    state.embedIframe.setAttribute("src", `${appOrigin}/embed/blank`);
+    state.iframeContentId = "__prewarm__";
+  }, 3000);
+
+  const hostname = window.location.hostname;
+  const domainMemory = await loadDomainMemory(hostname).catch(() => ({ snap: "right" }));
+  state.edgeTabOffset = domainMemory.edgeTabOffset ?? 0.5;
+  setSnap(state, domainMemory.snap || "right");
+
+  void loadWorkspaces(state).then(() => renderWorkspaceSelector(state));
 
   try {
     await loadResourceContext(state);

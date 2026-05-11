@@ -44,7 +44,7 @@ function renderUnsupportedBlockContent(
 
   const eyebrow = document.createElement("div");
   eyebrow.className = "block-unsupported-eyebrow";
-  eyebrow.textContent = "Unavailable block preserved";
+  eyebrow.textContent = "Block not available in this version";
   contentDom.appendChild(eyebrow);
 
   const title = document.createElement("div");
@@ -55,7 +55,7 @@ function renderUnsupportedBlockContent(
   const body = document.createElement("p");
   body.className = "block-unsupported-body";
   body.textContent =
-    "This block is preserved for safety, but its implementation is not available in this build. Open a build that supports it to inspect or edit the original block.";
+    "This block was created in a newer version of the app and is preserved safely. Its content will be restored when you open this note in a version that supports it.";
   contentDom.appendChild(body);
 }
 

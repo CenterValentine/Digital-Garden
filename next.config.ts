@@ -70,6 +70,24 @@ const nextConfig: NextConfig = {
           },
         ],
       },
+      {
+        // Embed routes are loaded inside the browser extension iframe
+        source: "/embed/:path*",
+        headers: [
+          {
+            key: "Content-Security-Policy",
+            value: [
+              "default-src 'self'",
+              "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+              "style-src 'self' 'unsafe-inline'",
+              "img-src 'self' data: https: blob:",
+              "connect-src 'self' http: https: wss: ws:",
+              "frame-src https://embed.diagrams.net https://*.diagrams.net",
+              "frame-ancestors *",
+            ].join("; "),
+          },
+        ],
+      },
     ];
   },
   // Pin local dev to the active worktree. Without this, nested worktrees can

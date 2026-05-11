@@ -41,7 +41,9 @@ export async function PATCH(request: NextRequest, { params }: { params: Params }
     const { id } = await params;
     const body = await request.json();
     const data = await updateExtensionNoteContent(token.user.id, id, {
+      title: typeof body.title === "string" ? body.title : undefined,
       tiptapJson: body.tiptapJson,
+      html: typeof body.html === "string" ? body.html : undefined,
       markdown: typeof body.markdown === "string" ? body.markdown : undefined,
     });
     return NextResponse.json({ success: true, data });

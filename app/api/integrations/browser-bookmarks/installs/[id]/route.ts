@@ -15,7 +15,7 @@ function errorResponse(error: unknown, fallback: string) {
       success: false,
       error: {
         code: isAuthError ? "UNAUTHORIZED" : isNotFound ? "NOT_FOUND" : "INTERNAL_ERROR",
-        message: isAuthError ? "Authentication required" : fallback,
+        message: isAuthError ? "Authentication required" : message,
       },
     },
     { status: isAuthError ? 401 : isNotFound ? 404 : 500 }

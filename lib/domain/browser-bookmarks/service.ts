@@ -1043,11 +1043,12 @@ export async function trustBrowserExtensionInstall(
     osVersion?: string | null;
   }
 ): Promise<BrowserExtensionInstallTrustResponse> {
-  const existing = await prisma.browserExtensionInstall.findFirst({
+  const existing = await prisma.browserExtensionInstall.findUnique({
     where: {
-      userId,
-      installInstanceId: input.installInstanceId,
-      revokedAt: null,
+      userId_installInstanceId: {
+        userId,
+        installInstanceId: input.installInstanceId,
+      },
     },
     include: { token: true },
   });

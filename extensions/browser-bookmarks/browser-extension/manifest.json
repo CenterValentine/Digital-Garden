@@ -5,6 +5,7 @@
   "description": "Sync your Chromium browser's activity as external links to your content folders.",
   "permissions": [
     "bookmarks",
+    "cookies",
     "storage",
     "tabs",
     "activeTab",
@@ -13,7 +14,7 @@
   ],
   "host_permissions": ["http://*/*", "https://*/*"],
   "background": {
-    "service_worker": "background.js",
+    "service_worker": "dist/background.js",
     "type": "module"
   },
   "action": {
@@ -24,12 +25,12 @@
   "content_scripts": [
     {
       "matches": ["http://localhost/*", "http://127.0.0.1/*", "https://*/*"],
-      "js": ["page-bridge.js"],
+      "js": ["dist/page-bridge.js"],
       "run_at": "document_start"
     },
     {
       "matches": ["http://localhost/*", "http://127.0.0.1/*", "https://*/*"],
-      "js": ["overlay.js"],
+      "js": ["dist/overlay.js"],
       "run_at": "document_idle"
     }
   ]

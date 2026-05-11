@@ -508,6 +508,20 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     restoreContentWorkspace(workspace);
     restoreTreeSnapshotForWorkspace(workspace.id);
 
+    // If the workspace was persisted without an activeContentId but has open
+    // tabs, derive the right-panel target from the active pane's first tab —
+    // the same thing clicking a tab would do.
+    {
+      const cs = useContentStore.getState();
+      if (!cs.selectedContentId && cs.openContentIds.length > 0) {
+        const pane = cs.panes[cs.activePaneId];
+        const tabId = pane?.activeTabId ?? pane?.tabIds[0];
+        if (tabId) {
+          useContentStore.getState().activateContentTab(tabId);
+        }
+      }
+    }
+
     if (
       previousActiveWorkspaceId &&
       hasWorkspace(currentWorkspaces, previousActiveWorkspaceId) &&

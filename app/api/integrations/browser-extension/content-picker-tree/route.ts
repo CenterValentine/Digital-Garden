@@ -8,7 +8,8 @@ import {
 export async function GET(request: NextRequest) {
   try {
     const token = await requireBrowserExtensionBearerAuth(request);
-    const data = await getExtensionContentPickerTree(token.user.id);
+    const workspaceId = request.nextUrl.searchParams.get("workspaceId") || null;
+    const data = await getExtensionContentPickerTree(token.user.id, { workspaceId });
     return NextResponse.json({ success: true, data });
   } catch (error) {
     console.error("[BrowserExtension ContentPickerTree] GET error:", error);

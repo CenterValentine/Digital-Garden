@@ -2,14 +2,14 @@ import { prisma } from "@/lib/database/client";
 import type { Prisma } from "@/lib/database/generated/prisma";
 import { generateUniqueSlug } from "@/lib/domain/content";
 import { normalizeUrl } from "@/lib/domain/content/external-validation";
-import { markdownToTiptap } from "@/lib/domain/content/markdown";
+import { markdownToTiptap, tiptapToMarkdown } from "@/lib/domain/content/markdown";
 import { extractSearchTextFromTipTap } from "@/lib/domain/content/search-text";
 import { syncContentTags } from "@/lib/domain/content/tag-sync";
 import { syncImageReferences } from "@/lib/domain/content/image-refs";
 import { syncPersonMentions } from "@/lib/domain/content/person-mention-sync";
 import { getServerExtensions } from "@/lib/domain/editor/extensions-server";
 import { sanitizeTipTapJsonWithExtensions } from "@/lib/domain/editor/unsupported-content";
-import type { JSONContent } from "@tiptap/core";
+import { generateJSON, type JSONContent } from "@tiptap/core";
 
 function asIsoString(value: Date | null | undefined) {
   return value ? value.toISOString() : null;
@@ -251,6 +251,17 @@ export async function getWebResourceContext(
         contentType: true,
         customIcon: true,
         iconColor: true,
+        externalPayload: {
+          select: {
+            description: true,
+            resourceType: true,
+            resourceRelationship: true,
+            userIntent: true,
+            url: true,
+            canonicalUrl: true,
+            faviconUrl: true,
+          },
+        },
       },
       orderBy: { updatedAt: "desc" },
     }),
@@ -396,13 +407,38 @@ type TreeNode = {
   title: string;
   slug: string;
   contentType: string;
+  displayOrder: number;
   customIcon: string | null;
   iconColor: string | null;
+  folder: {
+    viewMode: string | null;
+  } | null;
+  file: {
+    mimeType: string | null;
+  } | null;
+  html: {
+    isTemplate: boolean;
+  } | null;
+  visualization: {
+    engine: string | null;
+  } | null;
   selectable: boolean;
   children: TreeNode[];
 };
 
-export async function getExtensionContentPickerTree(userId: string) {
+export async function getExtensionContentPickerTree(
+  userId: string,
+  options?: { workspaceId?: string | null }
+) {
+  let viewRootContentId: string | null = null;
+  if (options?.workspaceId) {
+    const workspace = await prisma.contentWorkspace.findFirst({
+      where: { id: options.workspaceId, ownerId: userId },
+      select: { viewRootContentId: true },
+    });
+    viewRootContentId = workspace?.viewRootContentId ?? null;
+  }
+
   const nodes = await prisma.contentNode.findMany({
     where: {
       ownerId: userId,
@@ -415,8 +451,29 @@ export async function getExtensionContentPickerTree(userId: string) {
       title: true,
       slug: true,
       contentType: true,
+      displayOrder: true,
       customIcon: true,
       iconColor: true,
+      folderPayload: {
+        select: {
+          viewMode: true,
+        },
+      },
+      filePayload: {
+        select: {
+          mimeType: true,
+        },
+      },
+      htmlPayload: {
+        select: {
+          isTemplate: true,
+        },
+      },
+      visualizationPayload: {
+        select: {
+          engine: true,
+        },
+      },
     },
   });
 
@@ -428,18 +485,72 @@ export async function getExtensionContentPickerTree(userId: string) {
   }
 
   const build = (parentId: string | null): TreeNode[] =>
-    (byParent.get(parentId) ?? []).map((node) => ({
-      id: node.id,
-      title: node.title,
-      slug: node.slug,
-      contentType: node.contentType,
-      customIcon: node.customIcon,
-      iconColor: node.iconColor,
-      selectable: node.contentType !== "folder",
-      children: build(node.id),
-    }));
+    (byParent.get(parentId) ?? [])
+      .sort((a, b) => {
+        if (a.displayOrder !== b.displayOrder) {
+          return a.displayOrder - b.displayOrder;
+        }
+        return a.title.localeCompare(b.title);
+      })
+      .map((node) => ({
+        id: node.id,
+        title: node.title,
+        slug: node.slug,
+        contentType: node.contentType,
+        displayOrder: node.displayOrder,
+        customIcon: node.customIcon,
+        iconColor: node.iconColor,
+        folder: node.folderPayload
+          ? {
+              viewMode: node.folderPayload.viewMode,
+            }
+          : null,
+        file: node.filePayload
+          ? {
+              mimeType: node.filePayload.mimeType,
+            }
+          : null,
+        html: node.htmlPayload
+          ? {
+              isTemplate: node.htmlPayload.isTemplate,
+            }
+          : null,
+        visualization: node.visualizationPayload
+          ? {
+              engine: node.visualizationPayload.engine,
+            }
+          : null,
+        selectable: node.contentType !== "folder",
+        children: build(node.id),
+      }));
 
+  if (viewRootContentId) {
+    const rootNode = buildNode(viewRootContentId);
+    return rootNode ? [rootNode] : build(null);
+  }
   return build(null);
+
+  function buildNode(id: string): ReturnType<typeof build>[number] | null {
+    const children = byParent.get(id);
+    if (!children) return null;
+    const item = nodes.find((n) => n.id === id);
+    if (!item) return null;
+    return {
+      id: item.id,
+      title: item.title,
+      slug: item.slug,
+      contentType: item.contentType,
+      displayOrder: item.displayOrder,
+      customIcon: item.customIcon,
+      iconColor: item.iconColor,
+      folder: item.folderPayload ? { viewMode: item.folderPayload.viewMode } : null,
+      file: item.filePayload ? { mimeType: item.filePayload.mimeType } : null,
+      html: item.htmlPayload ? { isTemplate: item.htmlPayload.isTemplate } : null,
+      visualization: item.visualizationPayload ? { engine: item.visualizationPayload.engine } : null,
+      selectable: item.contentType !== "folder",
+      children: build(id),
+    };
+  }
 }
 
 async function nextSiblingDisplayOrder(userId: string, parentId: string | null) {
@@ -852,23 +963,21 @@ export async function getExtensionNoteContent(userId: string, contentId: string)
   if (!content) {
     throw new Error("Note not found");
   }
-  return {
-    id: content.id,
-    title: content.title,
-    contentType: content.contentType,
-    note: {
-      tiptapJson: (content.notePayload?.tiptapJson ?? { type: "doc", content: [{ type: "paragraph" }] }) as JSONContent,
-      searchText: content.notePayload?.searchText ?? "",
-      metadata: (content.notePayload?.metadata ?? {}) as Record<string, unknown>,
-    },
-  };
+  const tiptapJson = (content.notePayload?.tiptapJson ?? {
+    type: "doc",
+    content: [{ type: "paragraph" }],
+  }) as JSONContent;
+  const sanitized = sanitizeTipTapJsonWithExtensions(tiptapJson, getServerExtensions()).json;
+  return formatExtensionNoteContent(content, sanitized);
 }
 
 export async function updateExtensionNoteContent(
   userId: string,
   contentId: string,
   input: {
+    title?: string;
     tiptapJson?: JSONContent;
+    html?: string;
     markdown?: string;
   }
 ) {
@@ -887,9 +996,19 @@ export async function updateExtensionNoteContent(
     throw new Error("Note not found");
   }
 
-  const parsedJson: JSONContent = input.markdown
-    ? markdownToTiptap(input.markdown)
-    : (input.tiptapJson as JSONContent);
+  const title = trimNullable(input.title, 255);
+  if (title) {
+    await prisma.contentNode.update({
+      where: { id: contentId },
+      data: { title },
+    });
+  }
+
+  const parsedJson: JSONContent = input.html
+    ? generateJSON(input.html, getServerExtensions())
+    : input.markdown
+      ? markdownToTiptap(input.markdown)
+      : (input.tiptapJson as JSONContent);
   const json = sanitizeTipTapJsonWithExtensions(parsedJson, getServerExtensions()).json;
   const searchText = extractSearchTextFromTipTap(json);
   const wordCount = searchText.split(/\s+/).filter(Boolean).length;
@@ -924,6 +1043,42 @@ export async function updateExtensionNoteContent(
   return getExtensionNoteContent(userId, contentId);
 }
 
+function formatExtensionNoteContent(
+  content: {
+    id: string;
+    title: string;
+    contentType: string;
+    notePayload?: {
+      tiptapJson: Prisma.JsonValue;
+      searchText: string;
+      metadata: Prisma.JsonValue;
+    } | null;
+  },
+  sanitizedJson?: JSONContent
+) {
+  const json =
+    sanitizedJson ??
+    sanitizeTipTapJsonWithExtensions(
+      (content.notePayload?.tiptapJson ?? {
+        type: "doc",
+        content: [{ type: "paragraph" }],
+      }) as JSONContent,
+      getServerExtensions()
+    ).json;
+
+  return {
+    id: content.id,
+    title: content.title,
+    contentType: content.contentType,
+    note: {
+      tiptapJson: json,
+      markdown: tiptapToMarkdown(json),
+      searchText: content.notePayload?.searchText ?? "",
+      metadata: (content.notePayload?.metadata ?? {}) as Record<string, unknown>,
+    },
+  };
+}
+
 export async function getExtensionExternalContent(userId: string, contentId: string) {
   const content = await prisma.contentNode.findFirst({
     where: {
@@ -951,6 +1106,29 @@ export async function getExtensionExternalContent(userId: string, contentId: str
     },
   });
 
+  const linkedNote =
+    resource?.id
+      ? await prisma.webResourceContentLink.findFirst({
+          where: {
+            userId,
+            webResourceId: resource.id,
+            content: {
+              ownerId: userId,
+              deletedAt: null,
+              contentType: "note",
+            },
+          },
+          include: {
+            content: {
+              include: {
+                notePayload: true,
+              },
+            },
+          },
+          orderBy: { updatedAt: "desc" },
+        })
+      : null;
+
   return {
     id: content.id,
     title: content.title,
@@ -976,6 +1154,9 @@ export async function getExtensionExternalContent(userId: string, contentId: str
       preservedHtmlCapturedAt: asIsoString(content.externalPayload.preservedHtmlCapturedAt),
       webResourceId: resource?.id ?? content.externalPayload.webResourceId ?? null,
     },
+    linkedNote: linkedNote?.content
+      ? formatExtensionNoteContent(linkedNote.content)
+      : null,
   };
 }
 
