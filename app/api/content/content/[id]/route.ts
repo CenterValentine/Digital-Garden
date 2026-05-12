@@ -9,6 +9,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/database/client";
 import { requireAuth } from "@/lib/infrastructure/auth/middleware";
+import { getOptionalBrowserExtensionBearerAuth } from "@/lib/domain/browser-bookmarks/http";
 import {
   generateUniqueSlug,
   extractSearchTextFromTipTap,
@@ -17,10 +18,12 @@ import {
   markdownToTiptap,
   CONTENT_WITH_PAYLOADS,
 } from "@/lib/domain/content";
+import { normalizeUrl } from "@/lib/domain/content/external-validation";
 import { syncContentTags } from "@/lib/domain/content/tag-sync";
 import { syncImageReferences } from "@/lib/domain/content/image-refs";
 import { syncPersonMentions } from "@/lib/domain/content/person-mention-sync";
 import { resolveContentAccess } from "@/lib/domain/collaboration/access";
+import { ensureWebResourceForExternalContent } from "@/lib/domain/browser-extension";
 import type { JSONContent } from "@tiptap/core";
 import { getServerExtensions } from "@/lib/domain/editor/extensions-server";
 import { sanitizeTipTapJsonWithExtensions } from "@/lib/domain/editor/unsupported-content";
@@ -31,6 +34,75 @@ import type {
 
 type Params = Promise<{ id: string }>;
 
+async function getRequestUserId(request: NextRequest) {
+  const extensionAuth = await getOptionalBrowserExtensionBearerAuth(request);
+  if (extensionAuth?.user?.id) {
+    return extensionAuth.user.id;
+  }
+
+  const session = await requireAuth();
+  return session.user.id;
+}
+
+function getExternalDomainParts(url: string) {
+  try {
+    const parsed = new URL(url);
+    const hostname = parsed.hostname.toLowerCase();
+    const parts = hostname.split(".").filter(Boolean);
+    return {
+      hostname,
+      domain:
+        parts.length >= 2
+          ? `${parts[parts.length - 2]}.${parts[parts.length - 1]}`
+          : hostname,
+    };
+  } catch {
+    return { hostname: null, domain: null };
+  }
+}
+
+function formatExternalResponse(payload: {
+  url: string;
+  subtype: string | null;
+  normalizedUrl: string | null;
+  canonicalUrl: string | null;
+  readingStatus: "inbox" | "queue" | "reading" | "read" | "archived";
+  description: string | null;
+  resourceType: string | null;
+  resourceRelationship: string | null;
+  userIntent: string | null;
+  sourceDomain: string | null;
+  sourceHostname: string | null;
+  faviconUrl: string | null;
+  preserveHtml: boolean;
+  preservedHtmlSnapshot: unknown;
+  preservedHtmlCapturedAt: Date | null;
+  captureMetadata: unknown;
+  matchMetadata: unknown;
+  preview: unknown;
+}) {
+  return {
+    url: payload.url,
+    subtype: payload.subtype || "website",
+    normalizedUrl: payload.normalizedUrl,
+    canonicalUrl: payload.canonicalUrl,
+    readingStatus: payload.readingStatus,
+    description: payload.description,
+    resourceType: payload.resourceType,
+    resourceRelationship: payload.resourceRelationship,
+    userIntent: payload.userIntent,
+    sourceDomain: payload.sourceDomain,
+    sourceHostname: payload.sourceHostname,
+    faviconUrl: payload.faviconUrl,
+    preserveHtml: payload.preserveHtml,
+    preservedHtmlSnapshot: payload.preservedHtmlSnapshot as any,
+    preservedHtmlCapturedAt: payload.preservedHtmlCapturedAt,
+    captureMetadata: payload.captureMetadata as any,
+    matchMetadata: payload.matchMetadata as any,
+    preview: payload.preview as any,
+  };
+}
+
 // ============================================================
 // GET /api/content/content/[id] - Get Content
 // ============================================================
@@ -40,7 +112,7 @@ export async function GET(
   { params }: { params: Params }
 ) {
   try {
-    const session = await requireAuth();
+    const userId = await getRequestUserId(request);
     const { id } = await params;
 
     const content = await prisma.contentNode.findUnique({
@@ -70,7 +142,7 @@ export async function GET(
     try {
       await resolveContentAccess(prisma, {
         contentId: id,
-        userId: session.user.id,
+        userId,
         require: "view",
       });
     } catch {
@@ -164,11 +236,7 @@ export async function GET(
     }
     // Phase 2: External payload
     if (content.externalPayload) {
-      response.external = {
-        url: content.externalPayload.url,
-        subtype: content.externalPayload.subtype || "website",
-        preview: content.externalPayload.preview as any,
-      };
+      response.external = formatExternalResponse(content.externalPayload);
     }
     // Visualization payload
     if (content.visualizationPayload) {
@@ -214,7 +282,7 @@ export async function PATCH(
   { params }: { params: Params }
 ) {
   try {
-    const session = await requireAuth();
+    const userId = await getRequestUserId(request);
     const { id } = await params;
     const body = (await request.json()) as UpdateContentRequest;
 
@@ -240,7 +308,7 @@ export async function PATCH(
     try {
       await resolveContentAccess(prisma, {
         contentId: id,
-        userId: session.user.id,
+        userId,
         require: "edit",
       });
     } catch {
@@ -270,6 +338,17 @@ export async function PATCH(
       iconColor,
       displayOrder,
       url, // Phase 2: External link URL
+      canonicalUrl,
+      faviconUrl,
+      readingStatus,
+      description,
+      resourceType,
+      resourceRelationship,
+      userIntent,
+      preserveHtml,
+      preservedHtmlSnapshot,
+      captureMetadata,
+      matchMetadata,
       viewMode, // Phase 2: Folder view mode
       sortMode, // Phase 2: Folder sort mode
       includeReferencedContent, // Phase 2: Folder referenced content
@@ -311,7 +390,7 @@ export async function PATCH(
 
       // Regenerate slug if title changed
       if (title !== existing.title) {
-        updateData.slug = await generateUniqueSlug(title, session.user.id, id);
+        updateData.slug = await generateUniqueSlug(title, userId, id);
       }
     }
 
@@ -322,7 +401,7 @@ export async function PATCH(
       updateData.categoryId = categoryId;
     }
     if (isPublished !== undefined) {
-      if (existing.ownerId !== session.user.id) {
+      if (existing.ownerId !== userId) {
         return NextResponse.json(
           {
             success: false,
@@ -384,12 +463,12 @@ export async function PATCH(
       });
 
       // M6: Extract and sync tags from content
-      await syncContentTags(id, json, session.user.id);
+      await syncContentTags(id, json, userId);
 
       // Sprint 37: Sync image references (ContentLink with linkType "image-ref")
-      await syncImageReferences(id, json, session.user.id);
+      await syncImageReferences(id, json, userId);
 
-      await syncPersonMentions(id, json, session.user.id);
+      await syncPersonMentions(id, json, userId);
     }
 
     if (existing.htmlPayload && html !== undefined) {
@@ -418,13 +497,96 @@ export async function PATCH(
       });
     }
 
-    // Phase 2: Update external link URL
-    if (existing.externalPayload && url !== undefined) {
+    // Phase 2: Update external link metadata
+    if (
+      existing.externalPayload &&
+      (
+        url !== undefined ||
+        canonicalUrl !== undefined ||
+        faviconUrl !== undefined ||
+        readingStatus !== undefined ||
+        description !== undefined ||
+        resourceType !== undefined ||
+        resourceRelationship !== undefined ||
+        userIntent !== undefined ||
+        preserveHtml !== undefined ||
+        preservedHtmlSnapshot !== undefined ||
+        captureMetadata !== undefined ||
+        matchMetadata !== undefined
+      )
+    ) {
+      const resolvedUrl = url ?? existing.externalPayload.url;
+      const normalizedUrl = normalizeUrl(resolvedUrl);
+      const resolvedCanonicalUrl =
+        canonicalUrl !== undefined
+          ? canonicalUrl
+            ? normalizeUrl(canonicalUrl)
+            : null
+          : existing.externalPayload.canonicalUrl ?? normalizedUrl;
+      const domainParts = getExternalDomainParts(
+        resolvedCanonicalUrl || normalizedUrl
+      );
       await prisma.externalPayload.update({
         where: { contentId: id },
         data: {
-          url,
+          url: resolvedUrl,
+          normalizedUrl,
+          canonicalUrl: resolvedCanonicalUrl,
+          readingStatus: readingStatus || existing.externalPayload.readingStatus,
+          description:
+            description !== undefined
+              ? description?.trim() || null
+              : existing.externalPayload.description,
+          resourceType:
+            resourceType !== undefined
+              ? resourceType?.trim() || null
+              : existing.externalPayload.resourceType,
+          resourceRelationship:
+            resourceRelationship !== undefined
+              ? resourceRelationship?.trim() || null
+              : existing.externalPayload.resourceRelationship,
+          userIntent:
+            userIntent !== undefined
+              ? userIntent?.trim() || null
+              : existing.externalPayload.userIntent,
+          sourceDomain: domainParts.domain,
+          sourceHostname: domainParts.hostname,
+          faviconUrl:
+            faviconUrl !== undefined ? faviconUrl : existing.externalPayload.faviconUrl,
+          preserveHtml:
+            preserveHtml !== undefined
+              ? preserveHtml
+              : existing.externalPayload.preserveHtml,
+          preservedHtmlSnapshot:
+            preservedHtmlSnapshot !== undefined
+              ? (preservedHtmlSnapshot as any)
+              : existing.externalPayload.preservedHtmlSnapshot,
+          preservedHtmlCapturedAt:
+            preserveHtml && preservedHtmlSnapshot ? new Date() : undefined,
+          captureMetadata:
+            captureMetadata !== undefined
+              ? (captureMetadata as any)
+              : existing.externalPayload.captureMetadata,
+          matchMetadata:
+            matchMetadata !== undefined
+              ? (matchMetadata as any)
+              : existing.externalPayload.matchMetadata,
+          subtype:
+            preserveHtml !== undefined
+              ? preserveHtml
+                ? "preserved-html"
+                : "website"
+              : undefined,
         },
+      });
+
+      await ensureWebResourceForExternalContent(userId, {
+        contentId: id,
+        url: resolvedUrl,
+        canonicalUrl: resolvedCanonicalUrl,
+        title: (typeof title === "string" ? title.trim() : "") || existing.title,
+        faviconUrl:
+          faviconUrl !== undefined ? faviconUrl : existing.externalPayload.faviconUrl,
       });
     }
 
@@ -601,11 +763,7 @@ export async function PATCH(
       };
     }
     if (updated.externalPayload) {
-      response.external = {
-        url: updated.externalPayload.url,
-        subtype: updated.externalPayload.subtype || "website",
-        preview: updated.externalPayload.preview as any,
-      };
+      response.external = formatExternalResponse(updated.externalPayload);
     }
     if (updated.chatPayload) {
       response.chat = {

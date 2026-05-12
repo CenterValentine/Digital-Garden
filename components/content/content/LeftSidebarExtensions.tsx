@@ -2,6 +2,7 @@
 
 import { CheckCircle2, Loader2, Puzzle } from "lucide-react";
 import { useState } from "react";
+import Link from "next/link";
 import {
   renderExtensionIcon,
 } from "@/lib/extensions";
@@ -187,7 +188,21 @@ export function LeftSidebarExtensions() {
                 {dialogExtensionEnabled
                   ? renderedSettingsDialog ?? (
                     <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-6 text-sm text-gray-400">
-                      Settings are not available for this extension yet.
+                      {dialogExtension.settings?.path ? (
+                        <span>
+                          Open{" "}
+                          <Link
+                            href={dialogExtension.settings.path}
+                            className="text-gold-primary underline decoration-gold-primary/40 underline-offset-4 transition-colors hover:text-gold-primary/80"
+                            onClick={() => closeExtensionDialog()}
+                          >
+                            Settings › {dialogExtension.settings.label}
+                          </Link>{" "}
+                          to manage this extension.
+                        </span>
+                      ) : (
+                        "Settings are not available for this extension yet."
+                      )}
                     </div>
                     )
                   : (

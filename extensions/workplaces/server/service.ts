@@ -52,7 +52,9 @@ function normalizePaneId(value: unknown): WorkspacePaneId {
     : DEFAULT_PANE_ID;
 }
 
-function normalizeWorkspaceState(workspace: ContentWorkspace): WorkspaceStatePayload {
+function normalizeWorkspaceState(
+  workspace: ContentWorkspace,
+): WorkspaceStatePayload {
   const rawPaneState =
     workspace.paneState && typeof workspace.paneState === "object"
       ? (workspace.paneState as Partial<WorkspaceStatePayload>)
@@ -100,9 +102,9 @@ function normalizeWorkspaceStatePayload(value: unknown): WorkspaceStatePayload {
       ? Array.from(
           new Set(
             pane.contentIds.filter(
-              (contentId): contentId is string => typeof contentId === "string"
-            )
-          )
+              (contentId): contentId is string => typeof contentId === "string",
+            ),
+          ),
         )
       : [];
 
@@ -122,26 +124,28 @@ function normalizeWorkspaceStatePayload(value: unknown): WorkspaceStatePayload {
         : DEFAULT_LAYOUT_MODE,
     activePaneId: normalizePaneId(rawState.activePaneId),
     activeContentId:
-      typeof rawState.activeContentId === "string" ? rawState.activeContentId : null,
+      typeof rawState.activeContentId === "string"
+        ? rawState.activeContentId
+        : null,
     paneTabContentIds,
   };
 }
 
 function filterWorkspaceStateToContentIds(
   state: WorkspaceStatePayload,
-  allowedContentIds: Set<string>
+  allowedContentIds: Set<string>,
 ): WorkspaceStatePayload {
   const paneTabContentIds: WorkspacePaneStatePayload = {};
 
   for (const paneId of WORKSPACE_PANE_IDS) {
     const pane = state.paneTabContentIds[paneId];
     const contentIds = (pane?.contentIds ?? []).filter((contentId) =>
-      allowedContentIds.has(contentId)
+      allowedContentIds.has(contentId),
     );
     const activeContentId =
       pane?.activeContentId && allowedContentIds.has(pane.activeContentId)
         ? pane.activeContentId
-        : contentIds[0] ?? null;
+        : (contentIds[0] ?? null);
 
     paneTabContentIds[paneId] = {
       contentIds,
@@ -154,7 +158,7 @@ function filterWorkspaceStateToContentIds(
     activeContentId:
       state.activeContentId && allowedContentIds.has(state.activeContentId)
         ? state.activeContentId
-        : paneTabContentIds[state.activePaneId]?.activeContentId ?? null,
+        : (paneTabContentIds[state.activePaneId]?.activeContentId ?? null),
     paneTabContentIds,
   };
 }
@@ -166,10 +170,15 @@ function normalizeSettings(value: Prisma.JsonValue): Record<string, unknown> {
 }
 
 function workspaceStateHasContent(
-  workspace: Pick<ContentWorkspace, "paneState" | "layoutMode" | "activePaneId">,
-  contentId: string
+  workspace: Pick<
+    ContentWorkspace,
+    "paneState" | "layoutMode" | "activePaneId"
+  >,
+  contentId: string,
 ) {
-  const normalizedState = normalizeWorkspaceState(workspace as ContentWorkspace);
+  const normalizedState = normalizeWorkspaceState(
+    workspace as ContentWorkspace,
+  );
 
   if (normalizedState.activeContentId === contentId) return true;
 
@@ -182,7 +191,9 @@ function workspaceStateHasContent(
   });
 }
 
-export function formatWorkspace(workspace: WorkspaceWithItems): ContentWorkspaceResponse {
+export function formatWorkspace(
+  workspace: WorkspaceWithItems,
+): ContentWorkspaceResponse {
   const normalizedState = normalizeWorkspaceState(workspace);
   return {
     id: workspace.id,
@@ -221,7 +232,11 @@ export function formatWorkspace(workspace: WorkspaceWithItems): ContentWorkspace
   };
 }
 
-async function uniqueWorkspaceSlug(ownerId: string, name: string, excludeId?: string) {
+async function uniqueWorkspaceSlug(
+  ownerId: string,
+  name: string,
+  excludeId?: string,
+) {
   const baseSlug = generateSlug(name) || "workspace";
   let candidateSlug = baseSlug;
   let suffix = 2;
@@ -354,7 +369,12 @@ export async function getWorkspace(ownerId: string, workspaceId: string) {
         },
         include: {
           content: {
-            select: { id: true, title: true, contentType: true, parentId: true },
+            select: {
+              id: true,
+              title: true,
+              contentType: true,
+              parentId: true,
+            },
           },
         },
         orderBy: { updatedAt: "desc" },
@@ -389,7 +409,12 @@ export async function createWorkspace(ownerId: string, name: string) {
         },
         include: {
           content: {
-            select: { id: true, title: true, contentType: true, parentId: true },
+            select: {
+              id: true,
+              title: true,
+              contentType: true,
+              parentId: true,
+            },
           },
         },
       },
@@ -403,7 +428,7 @@ export async function createWorkspace(ownerId: string, name: string) {
 export async function duplicateWorkspace(
   ownerId: string,
   workspaceId: string,
-  name?: string
+  name?: string,
 ) {
   await ensureMainWorkspace(ownerId);
 
@@ -443,7 +468,12 @@ export async function duplicateWorkspace(
           },
           include: {
             content: {
-              select: { id: true, title: true, contentType: true, parentId: true },
+              select: {
+                id: true,
+                title: true,
+                contentType: true,
+                parentId: true,
+              },
             },
           },
         },
@@ -473,7 +503,12 @@ export async function duplicateWorkspace(
           },
           include: {
             content: {
-              select: { id: true, title: true, contentType: true, parentId: true },
+              select: {
+                id: true,
+                title: true,
+                contentType: true,
+                parentId: true,
+              },
             },
           },
           orderBy: { updatedAt: "desc" },
@@ -495,7 +530,7 @@ export async function updateWorkspace(
     expiresAt?: string | null;
     settings?: Record<string, unknown>;
     viewRootContentId?: string | null;
-  }
+  },
 ) {
   const existing = await prisma.contentWorkspace.findFirst({
     where: { id: workspaceId, ownerId },
@@ -547,7 +582,12 @@ export async function updateWorkspace(
         },
         include: {
           content: {
-            select: { id: true, title: true, contentType: true, parentId: true },
+            select: {
+              id: true,
+              title: true,
+              contentType: true,
+              parentId: true,
+            },
           },
         },
       },
@@ -623,7 +663,7 @@ function getStateContentIds(state: WorkspaceStatePayload) {
 export async function saveWorkspaceState(
   ownerId: string,
   workspaceId: string,
-  state: unknown
+  state: unknown,
 ) {
   const workspace = await prisma.contentWorkspace.findFirst({
     where: { id: workspaceId, ownerId, status: "active" },
@@ -633,59 +673,49 @@ export async function saveWorkspaceState(
 
   const normalizedState = normalizeWorkspaceStatePayload(state);
   const requestedContentIds = getStateContentIds(normalizedState);
-  const ownedContent = requestedContentIds.length
+  const ownedContentIds = requestedContentIds.length
     ? await prisma.contentNode.findMany({
         where: { ownerId, id: { in: requestedContentIds }, deletedAt: null },
         select: { id: true },
       })
     : [];
-  const allowedContentIds = new Set(ownedContent.map((content) => content.id));
-  const filteredState = filterWorkspaceStateToContentIds(normalizedState, allowedContentIds);
-  const contentIds = getStateContentIds(filteredState);
+  const allowedContentIds = new Set(
+    ownedContentIds.map((content) => content.id),
+  );
+  const filteredState = filterWorkspaceStateToContentIds(
+    normalizedState,
+    allowedContentIds,
+  );
 
-  await prisma.$transaction(async (tx) => {
-    await tx.contentWorkspace.update({
-      where: { id: workspaceId },
-      data: {
-        layoutMode: filteredState.layoutMode,
-        activePaneId: filteredState.activePaneId,
-        paneState: filteredState as unknown as Prisma.InputJsonValue,
-      },
-    });
-
-    await tx.contentWorkspaceItem.deleteMany({
-      where: {
-        workspaceId,
-        assignmentType: "primary",
-        scope: "item",
-        contentId: contentIds.length > 0 ? { notIn: contentIds } : undefined,
-      },
-    });
-
-    if (contentIds.length === 0) return;
-
-    await Promise.all(
-      ownedContent.map((content) =>
-        tx.contentWorkspaceItem.upsert({
-          where: {
-            workspaceId_contentId: {
-              workspaceId,
-              contentId: content.id,
+  const updatedWorkspace = await prisma.contentWorkspace.update({
+    where: { id: workspaceId },
+    data: {
+      layoutMode: filteredState.layoutMode,
+      activePaneId: filteredState.activePaneId,
+      paneState: filteredState as unknown as Prisma.InputJsonValue,
+    },
+    include: {
+      items: {
+        where: {
+          content: { ownerId, deletedAt: null },
+        },
+        include: {
+          content: {
+            select: {
+              id: true,
+              title: true,
+              contentType: true,
+              parentId: true,
             },
           },
-          update: {},
-          create: {
-            workspaceId,
-            contentId: content.id,
-            assignmentType: "primary",
-            scope: "item",
-          },
-        })
-      )
-    );
+        },
+        orderBy: { updatedAt: "desc" },
+      },
+      viewRoot: { select: { id: true, title: true } },
+    },
   });
 
-  return getWorkspace(ownerId, workspaceId);
+  return formatWorkspace(updatedWorkspace);
 }
 
 async function getAncestorIds(ownerId: string, contentId: string) {
@@ -712,7 +742,7 @@ async function findOverlappingPrimaryRecursiveClaims(
   ownerId: string,
   workspaceId: string,
   contentId: string,
-  excludeWorkspaceIds: string[] = []
+  excludeWorkspaceIds: string[] = [],
 ) {
   const ancestorIds = await getAncestorIds(ownerId, contentId);
   const claims = await prisma.contentWorkspaceItem.findMany({
@@ -746,7 +776,10 @@ async function findOverlappingPrimaryRecursiveClaims(
   const overlaps = [];
 
   for (const claim of claims) {
-    if (claim.contentId === contentId || ancestorIds.includes(claim.contentId)) {
+    if (
+      claim.contentId === contentId ||
+      ancestorIds.includes(claim.contentId)
+    ) {
       overlaps.push(claim);
       continue;
     }
@@ -763,7 +796,7 @@ async function findOverlappingPrimaryRecursiveClaims(
 export async function resolveOpenIntent(
   ownerId: string,
   workspaceId: string,
-  contentId: string
+  contentId: string,
 ): Promise<WorkspaceOpenIntentResponse> {
   await ensureMainWorkspace(ownerId);
 
@@ -874,7 +907,10 @@ export async function resolveOpenIntent(
   // is used to exempt claims where the active view is downstream of the claiming workspace.
   let viewRootAncestorIds: string[] | null = null;
   if (workspace.viewRootContentId) {
-    viewRootAncestorIds = await getAncestorIds(ownerId, workspace.viewRootContentId);
+    viewRootAncestorIds = await getAncestorIds(
+      ownerId,
+      workspace.viewRootContentId,
+    );
   }
 
   let claim: (typeof candidates)[number] | undefined;
@@ -945,7 +981,7 @@ export async function assignContentToWorkspace(
     scope?: ContentWorkspaceItemScope;
     expiresAt?: string | null;
     moveFromWorkspaceId?: string | null;
-  }
+  },
 ) {
   const [workspace, content] = await Promise.all([
     prisma.contentWorkspace.findFirst({
@@ -968,7 +1004,7 @@ export async function assignContentToWorkspace(
       ownerId,
       workspaceId,
       contentId,
-      options.moveFromWorkspaceId ? [options.moveFromWorkspaceId] : []
+      options.moveFromWorkspaceId ? [options.moveFromWorkspaceId] : [],
     );
 
     if (overlaps.length > 0) {
@@ -977,7 +1013,7 @@ export async function assignContentToWorkspace(
         .slice(0, 3)
         .join(", ");
       throw new Error(
-        `This folder overlaps with existing workspace claims: ${labels}. Resolve the overlap before saving.`
+        `This folder overlaps with existing workspace claims: ${labels}. Resolve the overlap before saving.`,
       );
     }
   }
@@ -1009,7 +1045,10 @@ export async function assignContentToWorkspace(
       },
     });
 
-    if (options.moveFromWorkspaceId && options.moveFromWorkspaceId !== workspaceId) {
+    if (
+      options.moveFromWorkspaceId &&
+      options.moveFromWorkspaceId !== workspaceId
+    ) {
       await tx.contentWorkspaceItem.deleteMany({
         where: {
           workspaceId: options.moveFromWorkspaceId,
@@ -1026,7 +1065,7 @@ export async function assignContentToWorkspace(
 export async function unassignContentFromWorkspace(
   ownerId: string,
   workspaceId: string,
-  contentId: string
+  contentId: string,
 ) {
   await prisma.contentWorkspaceItem.deleteMany({
     where: {

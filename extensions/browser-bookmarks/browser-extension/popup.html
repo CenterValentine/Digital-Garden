@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Digital Garden</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="popup-shell">
+
+      <!-- Current page identity -->
+      <div class="page-context" id="page-context">
+        <img class="page-favicon" id="page-favicon" src="" alt="" aria-hidden="true" />
+        <div class="page-meta">
+          <div class="page-domain" id="page-domain">Loading…</div>
+          <div class="page-title-display" id="page-title-display"></div>
+        </div>
+      </div>
+
+      <!-- Loading state -->
+      <div class="loading-card" id="quick-loading" style="display:none;">
+        <div class="loading-spinner" aria-hidden="true"></div>
+        <span class="muted">Checking sync state…</span>
+      </div>
+
+      <!-- Editor -->
+      <div class="save-form" id="quick-editor-shell" style="display:none;">
+        <select id="quick-connection" class="connection-select"></select>
+
+        <input id="quick-title" class="field-input" placeholder="Page title" />
+        <textarea id="quick-description" class="field-textarea" placeholder="Notes about this page…"></textarea>
+
+        <details class="metadata-details">
+          <summary class="metadata-summary">
+            <span class="summary-arrow" aria-hidden="true">›</span>
+            Metadata
+          </summary>
+          <div class="metadata-body">
+            <div id="quick-resource-type-control"></div>
+            <div id="quick-resource-relationship-control"></div>
+            <div id="quick-user-intent-control"></div>
+          </div>
+        </details>
+
+        <div class="status-row">
+          <span class="status-dot" id="status-dot" data-kind="idle"></span>
+          <span class="status-text" id="quick-save-status"></span>
+        </div>
+
+        <div class="action-row">
+          <button id="launch-note" class="btn-primary">Launch Note</button>
+          <button id="open-tree" class="btn-secondary">Open in Tree</button>
+        </div>
+      </div>
+
+      <!-- Footer -->
+      <div class="footer-links">
+        <button id="quick-remove" class="link-btn">Remove</button>
+        <button id="open-capture" class="link-btn">Capture</button>
+        <button id="open-options" class="link-btn">Settings</button>
+      </div>
+
+    </div>
+    <script type="module" src="dist/popup.js"></script>
+  </body>
+</html>

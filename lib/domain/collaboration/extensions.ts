@@ -44,6 +44,8 @@ import { ServerWikiLink } from "@/lib/domain/editor/extensions/wiki-link-server"
 import { ServerExcalidrawBlock } from "@/lib/domain/editor/extensions/blocks/excalidraw-block";
 import { ServerInlineTimestamp } from "@/lib/domain/editor/extensions/inline-timestamp";
 import { ServerMermaidBlock } from "@/lib/domain/editor/extensions/blocks/mermaid-block";
+import { ServerHabitTracker } from "@/lib/domain/editor/extensions/blocks/habit-tracker";
+import { ServerStopwatch } from "@/lib/domain/editor/extensions/blocks/stopwatch";
 import { getExtensionServerEditorExtensions } from "@/lib/extensions/server-registry";
 
 export function getCollaborationServerExtensions(): Extensions {
@@ -109,5 +111,7 @@ export function getCollaborationServerExtensions(): Extensions {
     ServerExcalidrawBlock,
     ServerInlineTimestamp,
     ServerMermaidBlock,
+    ServerHabitTracker,
+    ServerStopwatch,
   ];
 }

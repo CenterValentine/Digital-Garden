@@ -7,14 +7,17 @@
     "dev:collab": "tsx server/hocuspocus/bootstrap.ts",
     "start:collab": "tsx server/hocuspocus/bootstrap.ts",
     "typecheck": "tsc --noEmit",
-    "build": "prisma generate && pnpm build:tokens && tsc --noEmit && next build --webpack",
+    "build": "prisma generate && pnpm build:tokens && tsc --noEmit && pnpm collab:schema:check && next build --webpack",
     "vercel-build": "prisma generate && pnpm build:tokens && next build --webpack",
     "start": "next start",
     "lint": "eslint",
     "build:tokens": "style-dictionary build --config style-dictionary.config.js",
     "collab:schema:check": "tsx scripts/validate-collaboration-schema.ts",
     "db:seed": "tsx prisma/seed.ts",
-    "collab:env:check": "tsx scripts/check-hocuspocus-env.ts"
+    "collab:env:check": "tsx scripts/check-hocuspocus-env.ts",
+    "extension:tokens": "node scripts/sync-extension-tokens.mjs",
+    "extension:build": "node scripts/build-extension.mjs",
+    "extension:dev": "node scripts/build-extension.mjs --dev"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
@@ -164,6 +167,7 @@
     "@types/react-dom": "^19",
     "@types/uuid": "^10.0.0",
     "dotenv": "^16.4.5",
+    "esbuild": "^0.28.0",
     "eslint": "^9",
     "eslint-config-next": "16.0.8",
     "prisma": "^7.2.0",

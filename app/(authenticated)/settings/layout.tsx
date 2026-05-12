@@ -8,7 +8,6 @@
 import { getSurfaceStyles } from "@/lib/design/system";
 import NotesNavBar from "@/components/client/nav/NotesNavBar";
 import { NotesLayoutMarker } from "@/components/content/NotesLayoutMarker";
-import { Toaster } from "@/components/client/ui/sonner";
 import { SettingsSidebar } from "@/components/settings/SettingsSidebar";
 
 export default function SettingsLayout({
@@ -57,8 +56,6 @@ export default function SettingsLayout({
         </div>
       </div>
 
-      {/* Toast notifications */}
-      <Toaster position="top-center" expand={true} richColors visibleToasts={5} />
-    </>
+</>
   );
 }

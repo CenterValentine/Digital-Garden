@@ -2,6 +2,7 @@
 
 import { createElement, useEffect, useState, type ReactNode } from "react";
 import { Allotment } from "allotment";
+import { usePathname } from "next/navigation";
 import {
   BOTTOM_LEFT_PANE_ID,
   BOTTOM_RIGHT_PANE_ID,
@@ -47,6 +48,8 @@ function WorkspacePane({
   const layoutMode = useContentStore((state) => state.layoutMode);
   const activePaneId = useContentStore((state) => state.activePaneId);
   const focusPane = useContentStore((state) => state.focusPane);
+  const pathname = usePathname();
+  const isEmbedMode = pathname?.startsWith("/embed/") ?? false;
   const isDropTarget = Boolean(draggedTabId) && layoutMode !== "single";
 
   return (
@@ -72,19 +75,21 @@ function WorkspacePane({
         });
       }}
     >
-      <MainPanelHeader
-        paneId={paneId}
-        draggedTabId={draggedTabId}
-        onTabDragStart={onTabDragStart}
-        onTabDragEnd={onTabDragEnd}
-        onTabDrop={(targetPaneId, beforeTabId) =>
-          onTabDrop({
-            paneId: targetPaneId,
-            beforeTabId,
-            placementMode: "layout-aware",
-          })
-        }
-      />
+      {!isEmbedMode && (
+        <MainPanelHeader
+          paneId={paneId}
+          draggedTabId={draggedTabId}
+          onTabDragStart={onTabDragStart}
+          onTabDragEnd={onTabDragEnd}
+          onTabDrop={(targetPaneId, beforeTabId) =>
+            onTabDrop({
+              paneId: targetPaneId,
+              beforeTabId,
+              placementMode: "layout-aware",
+            })
+          }
+        />
+      )}
       {isDropTarget && (
         <div className="pointer-events-none absolute inset-0 z-10 shadow-[inset_0_0_0_1px_rgba(201,168,108,0.18)]" />
       )}
@@ -403,6 +408,7 @@ function WorkspaceReshapeTargets({
 }
 
 export function MainPanelWorkspace() {
+  const pathname = usePathname();
   const layoutMode = useContentStore((state) => state.layoutMode);
   const activePaneId = useContentStore((state) => state.activePaneId);
   const openContentIds = useContentStore((state) => state.openContentIds);
@@ -410,6 +416,8 @@ export function MainPanelWorkspace() {
   const restoreWorkspace = useContentStore((state) => state.restoreWorkspace);
   const setSelectedContentId = useContentStore((state) => state.setSelectedContentId);
   const shellControllers = useExtensionShellControllers();
+  const isFocusMode = pathname?.includes("/content/focus/");
+  const isEmbedMode = pathname?.startsWith("/embed/") ?? false;
   const [draggedTabId, setDraggedTabId] = useState<string | null>(null);
   const [draggedFromPaneId, setDraggedFromPaneId] = useState<WorkspacePaneId | null>(null);
   const [hoveredSinglePaneTargetId, setHoveredSinglePaneTargetId] = useState<string | null>(null);
@@ -650,7 +658,7 @@ export function MainPanelWorkspace() {
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden">
-      <MainPanelNavigation paneId={activePaneId} />
+      {!isFocusMode && !isEmbedMode ? <MainPanelNavigation paneId={activePaneId} /> : null}
       <div key={layoutMode} className="relative flex-1 min-h-0">
         {paneLayout}
         {layoutMode !== "quad" && (
@@ -666,11 +674,13 @@ export function MainPanelWorkspace() {
           />
         )}
       </div>
-      {shellControllers.map((Controller) =>
-        createElement(Controller, {
-          key: Controller.displayName ?? Controller.name,
-        })
-      )}
+      {!isFocusMode
+        ? shellControllers.map((Controller) =>
+            createElement(Controller, {
+              key: Controller.displayName ?? Controller.name,
+            })
+          )
+        : null}
     </div>
   );
 }

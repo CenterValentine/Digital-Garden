@@ -43,6 +43,8 @@ import {
   ServerDailySummary,
   ServerWeeklySummary,
 } from "./extensions/blocks/periodic-summary";
+import { ServerHabitTracker } from "./extensions/blocks/habit-tracker";
+import { ServerStopwatch } from "./extensions/blocks/stopwatch";
 import {
   ServerUnsupportedBlock,
   ServerUnsupportedInline,
@@ -161,6 +163,8 @@ export function getServerExtensions(): Extensions {
     ServerTimestamp,
     ServerDailySummary,
     ServerWeeklySummary,
+    ServerHabitTracker,
+    ServerStopwatch,
     ServerUnsupportedBlock,
     ServerUnsupportedInline,
     ...getExtensionServerEditorExtensions(),

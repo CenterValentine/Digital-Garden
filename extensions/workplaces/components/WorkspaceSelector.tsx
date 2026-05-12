@@ -1,10 +1,16 @@
 "use client";
 
-import { createElement, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  createElement,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import * as LucideIcons from "lucide-react";
 import {
   Briefcase,
-  Check,
   ChevronDown,
   Copy,
   Eye,
@@ -133,12 +139,18 @@ const WORKSPACE_DISASSEMBLE_WARNINGS_DISABLED_KEY =
 
 function expirationWarningsDisabled() {
   if (typeof window === "undefined") return false;
-  return window.localStorage.getItem(WORKSPACE_EXPIRATION_WARNINGS_DISABLED_KEY) === "true";
+  return (
+    window.localStorage.getItem(WORKSPACE_EXPIRATION_WARNINGS_DISABLED_KEY) ===
+    "true"
+  );
 }
 
 function setExpirationWarningsDisabled() {
   if (typeof window === "undefined") return;
-  window.localStorage.setItem(WORKSPACE_EXPIRATION_WARNINGS_DISABLED_KEY, "true");
+  window.localStorage.setItem(
+    WORKSPACE_EXPIRATION_WARNINGS_DISABLED_KEY,
+    "true",
+  );
 }
 
 function disassembleWarningsDisabled() {
@@ -151,12 +163,17 @@ function disassembleWarningsDisabled() {
 
 function setDisassembleWarningsDisabled() {
   if (typeof window === "undefined") return;
-  window.localStorage.setItem(WORKSPACE_DISASSEMBLE_WARNINGS_DISABLED_KEY, "true");
+  window.localStorage.setItem(
+    WORKSPACE_DISASSEMBLE_WARNINGS_DISABLED_KEY,
+    "true",
+  );
 }
 
 function getSeenExpirationWarnings() {
   if (typeof window === "undefined") return {} as Record<string, string>;
-  const rawValue = window.localStorage.getItem(WORKSPACE_EXPIRATION_WARNING_SEEN_KEY);
+  const rawValue = window.localStorage.getItem(
+    WORKSPACE_EXPIRATION_WARNING_SEEN_KEY,
+  );
   if (!rawValue) return {};
   try {
     return JSON.parse(rawValue) as Record<string, string>;
@@ -171,7 +188,7 @@ function markExpirationWarningSeen(workspaceId: string, expiresAt: string) {
   seen[workspaceId] = expiresAt;
   window.localStorage.setItem(
     WORKSPACE_EXPIRATION_WARNING_SEEN_KEY,
-    JSON.stringify(seen)
+    JSON.stringify(seen),
   );
 }
 
@@ -237,7 +254,8 @@ function scoreFolderOption(folder: FolderOption, query: string) {
   if (title === normalizedQuery) return 120;
   if (path === normalizedQuery) return 110;
   if (title.startsWith(normalizedQuery)) return 95;
-  if (pathSegments.some((segment) => segment.startsWith(normalizedQuery))) return 85;
+  if (pathSegments.some((segment) => segment.startsWith(normalizedQuery)))
+    return 85;
   if (words.some((word) => word.startsWith(normalizedQuery))) return 75;
   if (title.includes(normalizedQuery)) return 60;
   if (path.includes(normalizedQuery)) return 45;
@@ -274,33 +292,43 @@ function renderWorkspaceIcon(iconValue: string | null, className = "h-4 w-4") {
 
 function workspaceStateHasContent(
   workspace: ContentWorkspaceResponse,
-  contentId: string
+  contentId: string,
 ) {
   if (workspace.paneState.activeContentId === contentId) return true;
 
-  return Object.values(workspace.paneState.paneTabContentIds ?? {}).some((pane) => {
-    if (!pane) return false;
-    return (
-      pane.activeContentId === contentId ||
-      (pane.contentIds ?? []).includes(contentId)
-    );
-  });
+  return Object.values(workspace.paneState.paneTabContentIds ?? {}).some(
+    (pane) => {
+      if (!pane) return false;
+      return (
+        pane.activeContentId === contentId ||
+        (pane.contentIds ?? []).includes(contentId)
+      );
+    },
+  );
 }
 
 export function WorkspaceSelector() {
   const workspaces = useWorkspaceStore((state) => state.workspaces);
-  const activeWorkspaceId = useWorkspaceStore((state) => state.activeWorkspaceId);
-  const activateWorkspace = useWorkspaceStore((state) => state.activateWorkspace);
+  const activeWorkspaceId = useWorkspaceStore(
+    (state) => state.activeWorkspaceId,
+  );
+  const activateWorkspace = useWorkspaceStore(
+    (state) => state.activateWorkspace,
+  );
   const createWorkspace = useWorkspaceStore((state) => state.createWorkspace);
-  const duplicateWorkspace = useWorkspaceStore((state) => state.duplicateWorkspace);
+  const duplicateWorkspace = useWorkspaceStore(
+    (state) => state.duplicateWorkspace,
+  );
   const updateWorkspace = useWorkspaceStore((state) => state.updateWorkspace);
-  const reorderWorkspaces = useWorkspaceStore((state) => state.reorderWorkspaces);
+  const reorderWorkspaces = useWorkspaceStore(
+    (state) => state.reorderWorkspaces,
+  );
   const archiveWorkspace = useWorkspaceStore((state) => state.archiveWorkspace);
   const assignContentToWorkspace = useWorkspaceStore(
-    (state) => state.assignContentToWorkspace
+    (state) => state.assignContentToWorkspace,
   );
   const unassignContentFromWorkspace = useWorkspaceStore(
-    (state) => state.unassignContentFromWorkspace
+    (state) => state.unassignContentFromWorkspace,
   );
 
   const activeWorkspace = useMemo(
@@ -308,20 +336,28 @@ export function WorkspaceSelector() {
       workspaces.find((workspace) => workspace.id === activeWorkspaceId) ??
       workspaces.find((workspace) => workspace.isMain) ??
       null,
-    [activeWorkspaceId, workspaces]
+    [activeWorkspaceId, workspaces],
   );
 
   const [menuOpen, setMenuOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsTab, setSettingsTab] = useState<"general" | "view">("general");
-  const [settingsWorkspaceId, setSettingsWorkspaceId] = useState<string | null>(null);
-  const [editingWorkspaceId, setEditingWorkspaceId] = useState<string | null>(null);
+  const [settingsWorkspaceId, setSettingsWorkspaceId] = useState<string | null>(
+    null,
+  );
+  const [editingWorkspaceId, setEditingWorkspaceId] = useState<string | null>(
+    null,
+  );
   const [editingName, setEditingName] = useState("");
   const [draftName, setDraftName] = useState("");
   const [draftDescription, setDraftDescription] = useState("");
-  const [draftWorkspaceIcon, setDraftWorkspaceIcon] = useState<string | null>(null);
+  const [draftWorkspaceIcon, setDraftWorkspaceIcon] = useState<string | null>(
+    null,
+  );
   const [draftIsView, setDraftIsView] = useState(false);
-  const [draftViewRootContentId, setDraftViewRootContentId] = useState<string | null>(null);
+  const [draftViewRootContentId, setDraftViewRootContentId] = useState<
+    string | null
+  >(null);
   const [viewRootFolderQuery, setViewRootFolderQuery] = useState("");
   const [draftExpiresAt, setDraftExpiresAt] = useState("");
   const [folderOptions, setFolderOptions] = useState<FolderOption[]>([]);
@@ -329,8 +365,12 @@ export function WorkspaceSelector() {
   const [selectedFolderId, setSelectedFolderId] = useState("");
   const [folderQuery, setFolderQuery] = useState("");
   const [foldersLoading, setFoldersLoading] = useState(false);
-  const [draggedWorkspaceId, setDraggedWorkspaceId] = useState<string | null>(null);
-  const [dropTargetWorkspaceId, setDropTargetWorkspaceId] = useState<string | null>(null);
+  const [draggedWorkspaceId, setDraggedWorkspaceId] = useState<string | null>(
+    null,
+  );
+  const [dropTargetWorkspaceId, setDropTargetWorkspaceId] = useState<
+    string | null
+  >(null);
   const [deleteWorkspaceTarget, setDeleteWorkspaceTarget] =
     useState<ContentWorkspaceResponse | null>(null);
   const [duplicateWorkspaceTarget, setDuplicateWorkspaceTarget] =
@@ -344,15 +384,18 @@ export function WorkspaceSelector() {
     folderIds: string[];
     conflicts: ClaimConflictItem[];
   } | null>(null);
-  const [claimBorrowPreset, setClaimBorrowPreset] = useState<BorrowPreset>("3h");
+  const [claimBorrowPreset, setClaimBorrowPreset] =
+    useState<BorrowPreset>("3h");
   const [claimBorrowUntil, setClaimBorrowUntil] = useState(() =>
-    borrowUntilForPreset("3h")
+    borrowUntilForPreset("3h"),
   );
   const [claimResolutionInFlight, setClaimResolutionInFlight] = useState(false);
-  const [rowBorrowConflictId, setRowBorrowConflictId] = useState<string | null>(null);
+  const [rowBorrowConflictId, setRowBorrowConflictId] = useState<string | null>(
+    null,
+  );
   const [rowBorrowPreset, setRowBorrowPreset] = useState<BorrowPreset>("1h");
   const [rowBorrowUntil, setRowBorrowUntil] = useState(() =>
-    borrowUntilForPreset("1h")
+    borrowUntilForPreset("1h"),
   );
   const [workspaceIconSelector, setWorkspaceIconSelector] = useState<{
     open: boolean;
@@ -365,9 +408,11 @@ export function WorkspaceSelector() {
   const [expirationWarningPreset, setExpirationWarningPreset] =
     useState<BorrowPreset>("1h");
   const [expirationWarningValue, setExpirationWarningValue] = useState(() =>
-    borrowUntilForPreset("1h")
+    borrowUntilForPreset("1h"),
   );
-  const [switchingWorkspaceId, setSwitchingWorkspaceId] = useState<string | null>(null);
+  const [switchingWorkspaceId, setSwitchingWorkspaceId] = useState<
+    string | null
+  >(null);
   const [isSavingSettings, setIsSavingSettings] = useState(false);
   const [skipDisassembleWarnings, setSkipDisassembleWarnings] = useState(false);
   const [skipExpirationWarnings, setSkipExpirationWarnings] = useState(false);
@@ -396,18 +441,19 @@ export function WorkspaceSelector() {
         workspaces.find((workspace) => workspace.id === settingsWorkspaceId) ??
         activeWorkspace
       )?.items.filter((item) => item.scope === "recursive") ?? [],
-    [activeWorkspace, settingsWorkspaceId, workspaces]
+    [activeWorkspace, settingsWorkspaceId, workspaces],
   );
   const settingsWorkspace = useMemo(
     () =>
       workspaces.find((workspace) => workspace.id === settingsWorkspaceId) ??
       activeWorkspace,
-    [activeWorkspace, settingsWorkspaceId, workspaces]
+    [activeWorkspace, settingsWorkspaceId, workspaces],
   );
-  const settingsWorkspaceIsActive = settingsWorkspace?.id === activeWorkspace?.id;
+  const settingsWorkspaceIsActive =
+    settingsWorkspace?.id === activeWorkspace?.id;
   const recursiveClaimIds = useMemo(
     () => new Set(recursiveFolderClaims.map((item) => item.contentId)),
-    [recursiveFolderClaims]
+    [recursiveFolderClaims],
   );
 
   const manualClaimsDisabledReason = useMemo(() => {
@@ -421,7 +467,13 @@ export function WorkspaceSelector() {
     if (foldersLoading) return "Folder list is still loading.";
     if (folderOptions.length === 0) return "No folders are available.";
     return null;
-  }, [settingsWorkspace, draftIsView, draftViewRootContentId, folderOptions.length, foldersLoading]);
+  }, [
+    settingsWorkspace,
+    draftIsView,
+    draftViewRootContentId,
+    folderOptions.length,
+    foldersLoading,
+  ]);
 
   const manualClaimsDisabled = Boolean(manualClaimsDisabledReason);
 
@@ -439,8 +491,11 @@ export function WorkspaceSelector() {
   }, [folderOptions, folderQuery, recursiveClaimIds]);
 
   const orderedWorkspaceIds = useMemo(
-    () => workspaces.filter((workspace) => !workspace.isMain).map((workspace) => workspace.id),
-    [workspaces]
+    () =>
+      workspaces
+        .filter((workspace) => !workspace.isMain)
+        .map((workspace) => workspace.id),
+    [workspaces],
   );
 
   useEffect(() => {
@@ -462,14 +517,28 @@ export function WorkspaceSelector() {
   }, [settingsOpen, settingsWorkspace]);
 
   useEffect(() => {
-    if (!activeWorkspace || activeWorkspace.isMain || !activeWorkspace.expiresAt) return;
+    if (settingsOpen) return;
+    setIsSavingSettings(false);
+    settingsInitKeyRef.current = "";
+  }, [settingsOpen]);
+
+  useEffect(() => {
+    if (
+      !activeWorkspace ||
+      activeWorkspace.isMain ||
+      !activeWorkspace.expiresAt
+    )
+      return;
     if (expirationWarningsDisabled()) return;
 
     const expiresAtMs = new Date(activeWorkspace.expiresAt).getTime();
     if (Number.isNaN(expiresAtMs)) return;
 
     const remainingMs = expiresAtMs - Date.now();
-    if (remainingMs <= 0 || remainingMs > WORKSPACE_EXPIRATION_WARNING_WINDOW_MS) {
+    if (
+      remainingMs <= 0 ||
+      remainingMs > WORKSPACE_EXPIRATION_WARNING_WINDOW_MS
+    ) {
       return;
     }
 
@@ -524,7 +593,9 @@ export function WorkspaceSelector() {
       })
       .catch((error) => {
         console.error("[WorkspaceSelector] Failed to load folders:", error);
-        toast.error(error instanceof Error ? error.message : "Failed to load folders");
+        toast.error(
+          error instanceof Error ? error.message : "Failed to load folders",
+        );
       })
       .finally(() => {
         if (!cancelled) setFoldersLoading(false);
@@ -551,7 +622,7 @@ export function WorkspaceSelector() {
 
   const openWorkspaceSettings = (
     workspaceId: string,
-    tab: "general" | "view" = "general"
+    tab: "general" | "view" = "general",
   ) => {
     setMenuOpen(false);
     window.setTimeout(() => {
@@ -568,7 +639,7 @@ export function WorkspaceSelector() {
 
   const renderWorkspaceName = (
     workspace: ContentWorkspaceResponse | null,
-    className: string
+    className: string,
   ) => {
     if (!workspace || isWorkspaceNamePending(workspace)) {
       return (
@@ -578,7 +649,9 @@ export function WorkspaceSelector() {
       );
     }
 
-    return <span className={className}>{getWorkspaceDisplayName(workspace)}</span>;
+    return (
+      <span className={className}>{getWorkspaceDisplayName(workspace)}</span>
+    );
   };
 
   const openWorkspaceIconPicker = (target: HTMLElement) => {
@@ -589,91 +662,110 @@ export function WorkspaceSelector() {
     });
   };
 
-  const isNodeWithinFolder = useCallback((nodeId: string, folderId: string) => {
-    let currentId: string | null = nodeId;
-    while (currentId) {
-      if (currentId === folderId) return true;
-      currentId = nodesById[currentId]?.parentId ?? null;
-    }
-    return false;
-  }, [nodesById]);
+  const isNodeWithinFolder = useCallback(
+    (nodeId: string, folderId: string) => {
+      let currentId: string | null = nodeId;
+      while (currentId) {
+        if (currentId === folderId) return true;
+        currentId = nodesById[currentId]?.parentId ?? null;
+      }
+      return false;
+    },
+    [nodesById],
+  );
 
-  const foldersOverlap = useCallback((
-    existingContentId: string,
-    existingScope: string,
-    candidateFolderId: string
-  ) => {
-    if (isNodeWithinFolder(existingContentId, candidateFolderId)) return true;
-    if (existingScope === "recursive" && isNodeWithinFolder(candidateFolderId, existingContentId)) {
-      return true;
-    }
-    return false;
-  }, [isNodeWithinFolder]);
+  const foldersOverlap = useCallback(
+    (
+      existingContentId: string,
+      existingScope: string,
+      candidateFolderId: string,
+    ) => {
+      if (isNodeWithinFolder(existingContentId, candidateFolderId)) return true;
+      if (
+        existingScope === "recursive" &&
+        isNodeWithinFolder(candidateFolderId, existingContentId)
+      ) {
+        return true;
+      }
+      return false;
+    },
+    [isNodeWithinFolder],
+  );
 
-  const buildClaimConflicts = useCallback((folderIds: string[]) => {
-    if (!settingsWorkspace) return [];
+  const buildClaimConflicts = useCallback(
+    (folderIds: string[]) => {
+      if (!settingsWorkspace) return [];
 
-    const currentWorkspaceItemIds = new Set(
-      settingsWorkspace.items.map((item) => item.contentId)
-    );
-    const conflicts = new Map<string, ClaimConflictItem>();
+      const currentWorkspaceItemIds = new Set(
+        settingsWorkspace.items.map((item) => item.contentId),
+      );
+      const conflicts = new Map<string, ClaimConflictItem>();
 
-    workspaces
-      .filter((workspace) => workspace.id !== settingsWorkspace.id)
-      .forEach((workspace) => {
-        workspace.items.forEach((item) => {
-          const isLivePrimaryItemClaim =
-            item.assignmentType === "primary" &&
-            item.scope === "item" &&
-            workspaceStateHasContent(workspace, item.contentId);
+      workspaces
+        .filter((workspace) => workspace.id !== settingsWorkspace.id)
+        .forEach((workspace) => {
+          workspace.items.forEach((item) => {
+            const isLivePrimaryItemClaim =
+              item.assignmentType === "primary" &&
+              item.scope === "item" &&
+              workspaceStateHasContent(workspace, item.contentId);
 
-          if (
-            item.assignmentType === "primary" &&
-            item.scope === "item" &&
-            !isLivePrimaryItemClaim
-          ) {
-            return;
-          }
+            if (
+              item.assignmentType === "primary" &&
+              item.scope === "item" &&
+              !isLivePrimaryItemClaim
+            ) {
+              return;
+            }
 
-          if (currentWorkspaceItemIds.has(item.contentId)) return;
-          if (
-            !folderIds.some((folderId) =>
-              foldersOverlap(item.contentId, item.scope, folderId)
-            )
-          ) {
-            return;
-          }
+            if (currentWorkspaceItemIds.has(item.contentId)) return;
+            if (
+              !folderIds.some((folderId) =>
+                foldersOverlap(item.contentId, item.scope, folderId),
+              )
+            ) {
+              return;
+            }
 
-          const key = `${workspace.id}:${item.contentId}`;
-          if (!conflicts.has(key)) {
-            conflicts.set(key, {
-              workspaceId: workspace.id,
-              workspaceName: workspace.name,
-              contentId: item.contentId,
-              contentTitle: item.content.title,
-              assignmentType: item.assignmentType,
-              scope: item.scope,
-            });
-          }
+            const key = `${workspace.id}:${item.contentId}`;
+            if (!conflicts.has(key)) {
+              conflicts.set(key, {
+                workspaceId: workspace.id,
+                workspaceName: workspace.name,
+                contentId: item.contentId,
+                contentTitle: item.content.title,
+                assignmentType: item.assignmentType,
+                scope: item.scope,
+              });
+            }
+          });
         });
-      });
 
-    return [...conflicts.values()].sort((a, b) => {
-      const workspaceCompare = a.workspaceName.localeCompare(b.workspaceName);
-      if (workspaceCompare !== 0) return workspaceCompare;
-      return a.contentTitle.localeCompare(b.contentTitle);
-    });
-  }, [foldersOverlap, settingsWorkspace, workspaces]);
+      return [...conflicts.values()].sort((a, b) => {
+        const workspaceCompare = a.workspaceName.localeCompare(b.workspaceName);
+        if (workspaceCompare !== 0) return workspaceCompare;
+        return a.contentTitle.localeCompare(b.contentTitle);
+      });
+    },
+    [foldersOverlap, settingsWorkspace, workspaces],
+  );
 
   useEffect(() => {
-    if (!claimConflictState || !settingsWorkspace || claimResolutionInFlight) return;
+    if (!claimConflictState || !settingsWorkspace || claimResolutionInFlight)
+      return;
 
     const nextConflicts = buildClaimConflicts(claimConflictState.folderIds);
     const currentSignature = claimConflictState.conflicts
-      .map((conflict) => `${conflict.workspaceId}:${conflict.contentId}:${conflict.assignmentType}:${conflict.scope}`)
+      .map(
+        (conflict) =>
+          `${conflict.workspaceId}:${conflict.contentId}:${conflict.assignmentType}:${conflict.scope}`,
+      )
       .join("|");
     const nextSignature = nextConflicts
-      .map((conflict) => `${conflict.workspaceId}:${conflict.contentId}:${conflict.assignmentType}:${conflict.scope}`)
+      .map(
+        (conflict) =>
+          `${conflict.workspaceId}:${conflict.contentId}:${conflict.assignmentType}:${conflict.scope}`,
+      )
       .join("|");
 
     if (currentSignature === nextSignature) return;
@@ -685,7 +777,7 @@ export function WorkspaceSelector() {
               ...current,
               conflicts: [],
             }
-          : current
+          : current,
       );
       toast.success("Conflicts cleared. Apply the claim when you are ready.");
       return;
@@ -697,9 +789,14 @@ export function WorkspaceSelector() {
             ...current,
             conflicts: nextConflicts,
           }
-        : current
+        : current,
     );
-  }, [buildClaimConflicts, claimConflictState, claimResolutionInFlight, settingsWorkspace]);
+  }, [
+    buildClaimConflicts,
+    claimConflictState,
+    claimResolutionInFlight,
+    settingsWorkspace,
+  ]);
 
   const applyFolderClaims = async (folderIds: string[]) => {
     if (!settingsWorkspace || settingsWorkspace.isMain) return;
@@ -739,9 +836,10 @@ export function WorkspaceSelector() {
   };
 
   const resolveClaimConflicts = async (
-    assignmentType: "shared" | "borrowed" | "primary"
+    assignmentType: "shared" | "borrowed" | "primary",
   ) => {
-    if (!settingsWorkspace || !claimConflictState || claimResolutionInFlight) return;
+    if (!settingsWorkspace || !claimConflictState || claimResolutionInFlight)
+      return;
 
     setClaimResolutionInFlight(true);
 
@@ -750,13 +848,17 @@ export function WorkspaceSelector() {
 
     try {
       for (const conflict of claimConflictState.conflicts) {
-        await assignContentToWorkspace(settingsWorkspace.id, conflict.contentId, {
-          assignmentType,
-          scope: conflict.scope === "recursive" ? "recursive" : "item",
-          expiresAt,
-          moveFromWorkspaceId:
-            assignmentType === "primary" ? conflict.workspaceId : undefined,
-        });
+        await assignContentToWorkspace(
+          settingsWorkspace.id,
+          conflict.contentId,
+          {
+            assignmentType,
+            scope: conflict.scope === "recursive" ? "recursive" : "item",
+            expiresAt,
+            moveFromWorkspaceId:
+              assignmentType === "primary" ? conflict.workspaceId : undefined,
+          },
+        );
       }
 
       await applyFolderClaims(claimConflictState.folderIds);
@@ -768,7 +870,7 @@ export function WorkspaceSelector() {
 
   const resolveSingleClaimConflict = async (
     conflict: ClaimConflictItem,
-    resolution: "split" | "reassign"
+    resolution: "split" | "reassign",
   ) => {
     if (!settingsWorkspace || claimResolutionInFlight) return;
 
@@ -784,12 +886,17 @@ export function WorkspaceSelector() {
       toast.success(
         resolution === "split"
           ? `${conflict.contentTitle} is now shared`
-          : `${conflict.contentTitle} was reassigned here`
+          : `${conflict.contentTitle} was reassigned here`,
       );
     } catch (error) {
-      console.error("[WorkspaceSelector] Failed to resolve claim conflict:", error);
+      console.error(
+        "[WorkspaceSelector] Failed to resolve claim conflict:",
+        error,
+      );
       toast.error(
-        error instanceof Error ? error.message : "Failed to resolve claim conflict"
+        error instanceof Error
+          ? error.message
+          : "Failed to resolve claim conflict",
       );
     } finally {
       setClaimResolutionInFlight(false);
@@ -805,8 +912,13 @@ export function WorkspaceSelector() {
       setClaimConflictState(null);
       toast.success("Claim applied");
     } catch (error) {
-      console.error("[WorkspaceSelector] Failed to apply claim after resolution:", error);
-      toast.error(error instanceof Error ? error.message : "Failed to apply claim");
+      console.error(
+        "[WorkspaceSelector] Failed to apply claim after resolution:",
+        error,
+      );
+      toast.error(
+        error instanceof Error ? error.message : "Failed to apply claim",
+      );
     } finally {
       setClaimResolutionInFlight(false);
     }
@@ -832,9 +944,14 @@ export function WorkspaceSelector() {
       setRowBorrowConflictId(null);
       toast.success(`${conflict.contentTitle} was borrowed temporarily`);
     } catch (error) {
-      console.error("[WorkspaceSelector] Failed to borrow claim conflict:", error);
+      console.error(
+        "[WorkspaceSelector] Failed to borrow claim conflict:",
+        error,
+      );
       toast.error(
-        error instanceof Error ? error.message : "Failed to borrow claim conflict"
+        error instanceof Error
+          ? error.message
+          : "Failed to borrow claim conflict",
       );
     } finally {
       setClaimResolutionInFlight(false);
@@ -844,12 +961,16 @@ export function WorkspaceSelector() {
   const startInlineRename = (workspace: ContentWorkspaceResponse) => {
     setMenuOpen(true);
     setEditingWorkspaceId(workspace.id);
-    setEditingName(workspace.name === "Untitled Workspace" ? "" : workspace.name);
+    setEditingName(
+      workspace.name === "Untitled Workspace" ? "" : workspace.name,
+    );
   };
 
   const commitInlineRename = async () => {
     if (!editingWorkspaceId) return;
-    const workspace = workspaces.find((candidate) => candidate.id === editingWorkspaceId);
+    const workspace = workspaces.find(
+      (candidate) => candidate.id === editingWorkspaceId,
+    );
     const nextName = editingName.trim();
     setEditingWorkspaceId(null);
     if (!workspace || !nextName || nextName === workspace.name) return;
@@ -859,7 +980,9 @@ export function WorkspaceSelector() {
       toast.success("Workspace renamed");
     } catch (error) {
       console.error("[WorkspaceSelector] Failed to rename workspace:", error);
-      toast.error(error instanceof Error ? error.message : "Failed to rename workspace");
+      toast.error(
+        error instanceof Error ? error.message : "Failed to rename workspace",
+      );
     }
   };
 
@@ -871,7 +994,9 @@ export function WorkspaceSelector() {
       toast.success("Workspace created");
     } catch (error) {
       console.error("[WorkspaceSelector] Failed to create workspace:", error);
-      toast.error(error instanceof Error ? error.message : "Failed to create workspace");
+      toast.error(
+        error instanceof Error ? error.message : "Failed to create workspace",
+      );
     }
   };
 
@@ -889,9 +1014,14 @@ export function WorkspaceSelector() {
       startInlineRename(workspace);
       toast.success("Workspace duplicated");
     } catch (error) {
-      console.error("[WorkspaceSelector] Failed to duplicate workspace:", error);
+      console.error(
+        "[WorkspaceSelector] Failed to duplicate workspace:",
+        error,
+      );
       toast.error(
-        error instanceof Error ? error.message : "Failed to duplicate workspace"
+        error instanceof Error
+          ? error.message
+          : "Failed to duplicate workspace",
       );
     }
   };
@@ -903,17 +1033,26 @@ export function WorkspaceSelector() {
     }
   };
 
-  const handleUpdateExpirationFromWarning = async (expiresAt: string | null) => {
+  const handleUpdateExpirationFromWarning = async (
+    expiresAt: string | null,
+  ) => {
     if (!activeWorkspace || activeWorkspace.isMain) return;
 
     try {
       await updateWorkspace(activeWorkspace.id, { expiresAt });
       setExpirationWarningOpen(false);
-      toast.success(expiresAt ? "Workspace expiration updated" : "Workspace expiration cleared");
+      toast.success(
+        expiresAt
+          ? "Workspace expiration updated"
+          : "Workspace expiration cleared",
+      );
     } catch (error) {
-      console.error("[WorkspaceSelector] Failed to update workspace expiration:", error);
+      console.error(
+        "[WorkspaceSelector] Failed to update workspace expiration:",
+        error,
+      );
       toast.error(
-        error instanceof Error ? error.message : "Failed to update expiration"
+        error instanceof Error ? error.message : "Failed to update expiration",
       );
     }
   };
@@ -938,13 +1077,15 @@ export function WorkspaceSelector() {
     void reorderWorkspaces(nextOrder).catch((error) => {
       console.error("[WorkspaceSelector] Failed to reorder workspaces:", error);
       toast.error(
-        error instanceof Error ? error.message : "Failed to save workspace order"
+        error instanceof Error
+          ? error.message
+          : "Failed to save workspace order",
       );
     });
   };
 
   const handleSaveSettings = async () => {
-    if (!settingsWorkspace) return;
+    if (!settingsWorkspace || isSavingSettings) return;
     if (draftIsView && !draftViewRootContentId) {
       toast.error("Select a view root folder before saving.");
       return;
@@ -964,9 +1105,14 @@ export function WorkspaceSelector() {
       setSettingsOpen(false);
       toast.success("Workspace settings saved");
     } catch (error) {
-      console.error("[WorkspaceSelector] Failed to save workspace settings:", error);
+      console.error(
+        "[WorkspaceSelector] Failed to save workspace settings:",
+        error,
+      );
       toast.error(
-        error instanceof Error ? error.message : "Failed to save workspace settings"
+        error instanceof Error
+          ? error.message
+          : "Failed to save workspace settings",
       );
     } finally {
       setIsSavingSettings(false);
@@ -980,9 +1126,14 @@ export function WorkspaceSelector() {
       setSettingsOpen(false);
       toast.success("Workspace disassembled");
     } catch (error) {
-      console.error("[WorkspaceSelector] Failed to disassemble workspace:", error);
+      console.error(
+        "[WorkspaceSelector] Failed to disassemble workspace:",
+        error,
+      );
       toast.error(
-        error instanceof Error ? error.message : "Failed to disassemble workspace"
+        error instanceof Error
+          ? error.message
+          : "Failed to disassemble workspace",
       );
     }
   };
@@ -1009,7 +1160,9 @@ export function WorkspaceSelector() {
       }
     } catch (error) {
       console.error("[WorkspaceSelector] Failed to claim folder:", error);
-      toast.error(error instanceof Error ? error.message : "Failed to claim folder");
+      toast.error(
+        error instanceof Error ? error.message : "Failed to claim folder",
+      );
     }
   };
 
@@ -1019,9 +1172,14 @@ export function WorkspaceSelector() {
       await unassignContentFromWorkspace(settingsWorkspace.id, folderId);
       toast.success("Folder claim removed");
     } catch (error) {
-      console.error("[WorkspaceSelector] Failed to remove folder claim:", error);
+      console.error(
+        "[WorkspaceSelector] Failed to remove folder claim:",
+        error,
+      );
       toast.error(
-        error instanceof Error ? error.message : "Failed to remove folder claim"
+        error instanceof Error
+          ? error.message
+          : "Failed to remove folder claim",
       );
     }
   };
@@ -1039,12 +1197,17 @@ export function WorkspaceSelector() {
           <button
             type="button"
             className="inline-flex items-center gap-1.5 rounded-md border border-white/10 px-2.5 py-1 text-xs font-medium text-gray-600 transition-colors hover:bg-black/5 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-white/10 dark:hover:text-white"
-            title={getWorkspaceDescription(activeWorkspace) || "Choose workspace"}
+            title={
+              getWorkspaceDescription(activeWorkspace) || "Choose workspace"
+            }
           >
             {switchingWorkspaceId ? (
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
             ) : (
-              renderWorkspaceIcon(getWorkspaceIconValue(activeWorkspace), "h-3.5 w-3.5")
+              renderWorkspaceIcon(
+                getWorkspaceIconValue(activeWorkspace),
+                "h-3.5 w-3.5",
+              )
             )}
             {renderWorkspaceName(activeWorkspace, "max-w-36 truncate")}
             {activeWorkspace?.isLocked ? <Lock className="h-3 w-3" /> : null}
@@ -1134,16 +1297,19 @@ export function WorkspaceSelector() {
                   setMenuOpen(false);
                   void activateWorkspace(workspace.id)
                     .catch((error) => {
-                      console.error("[WorkspaceSelector] Failed to switch workspace:", error);
+                      console.error(
+                        "[WorkspaceSelector] Failed to switch workspace:",
+                        error,
+                      );
                       toast.error(
                         error instanceof Error
                           ? error.message
-                          : "Failed to switch workspace"
+                          : "Failed to switch workspace",
                       );
                     })
                     .finally(() => {
                       setSwitchingWorkspaceId((current) =>
-                        current === workspace.id ? null : current
+                        current === workspace.id ? null : current,
                       );
                     });
                 }}
@@ -1157,7 +1323,9 @@ export function WorkspaceSelector() {
                     ? `border-l-2 pl-1 ${isActive ? "border-gold-primary" : "border-gold-primary/35"}`
                     : "pl-1.5"
                 } ${
-                  isActive ? "bg-gold-primary/10 text-gold-primary" : ""
+                  isActive
+                    ? "bg-gold-primary/16 text-gold-primary shadow-[inset_0_0_0_1px_rgba(212,167,85,0.24)]"
+                    : ""
                 } ${isDragged ? "opacity-40" : ""} ${
                   isDropTarget ? "ring-1 ring-gold-primary/40" : ""
                 }`}
@@ -1185,14 +1353,16 @@ export function WorkspaceSelector() {
                 ) : (
                   <>
                     <span className="inline-flex h-4 w-4 items-center justify-center">
-                      {renderWorkspaceIcon(getWorkspaceIconValue(workspace), "h-4 w-4")}
+                      {renderWorkspaceIcon(
+                        getWorkspaceIconValue(workspace),
+                        "h-4 w-4",
+                      )}
                     </span>
 
                     {renderWorkspaceName(workspace, "min-w-0 flex-1 truncate")}
                     {workspace.isView ? (
                       <Eye className="h-3 w-3 shrink-0 text-gold-primary/70" />
                     ) : null}
-                    {isActive ? <Check className="h-4 w-4 shrink-0" /> : null}
                     {workspace.isLocked ? (
                       <Lock className="h-3 w-3 shrink-0 text-gray-400/80" />
                     ) : null}
@@ -1308,7 +1478,8 @@ export function WorkspaceSelector() {
           <DialogHeader>
             <DialogTitle>Workspace Settings</DialogTitle>
             <DialogDescription>
-              Rename this workspace, set when it disassembles, and configure view settings.
+              Rename this workspace, set when it disassembles, and configure
+              view settings.
             </DialogDescription>
           </DialogHeader>
 
@@ -1318,7 +1489,9 @@ export function WorkspaceSelector() {
                 <div className="relative shrink-0">
                   <button
                     type="button"
-                    onClick={(event) => openWorkspaceIconPicker(event.currentTarget)}
+                    onClick={(event) =>
+                      openWorkspaceIconPicker(event.currentTarget)
+                    }
                     className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-md border border-black/10 bg-white/70 text-gray-900 transition-colors hover:bg-black/5 dark:border-white/10 dark:bg-white/5 dark:text-white dark:hover:bg-white/10"
                     aria-label="Choose workspace icon"
                   >
@@ -1393,7 +1566,9 @@ export function WorkspaceSelector() {
                     Description
                     <textarea
                       value={draftDescription}
-                      onChange={(event) => setDraftDescription(event.target.value)}
+                      onChange={(event) =>
+                        setDraftDescription(event.target.value)
+                      }
                       rows={3}
                       placeholder="Optional workspace description shown on hover."
                       className="mt-1 w-full rounded-md border border-black/10 bg-white/70 px-3 py-2 text-sm outline-none focus:border-gold-primary dark:border-white/10 dark:bg-white/5"
@@ -1406,13 +1581,17 @@ export function WorkspaceSelector() {
                       type="datetime-local"
                       value={draftExpiresAt}
                       disabled={settingsWorkspace.isMain || isSavingSettings}
-                      onChange={(event) => setDraftExpiresAt(event.target.value)}
+                      onChange={(event) =>
+                        setDraftExpiresAt(event.target.value)
+                      }
                       className="mt-1 w-full rounded-md border border-black/10 bg-white/70 px-3 py-2 text-sm outline-none focus:border-gold-primary disabled:opacity-50 dark:border-white/10 dark:bg-white/5"
                     />
                   </label>
 
                   <div className="rounded-md border border-black/10 bg-black/[0.025] px-3 py-2 text-xs text-gray-600 dark:border-white/10 dark:bg-white/[0.04] dark:text-gray-400">
-                    Expiration closes out a workspace at the time of expiration. Workspace sessions cannot be recovered. You will be warned when a tab or workspace expires.
+                    Expiration closes out a workspace at the time of expiration.
+                    Workspace sessions cannot be recovered. You will be warned
+                    when a tab or workspace expires.
                   </div>
                 </div>
               ) : (
@@ -1423,7 +1602,9 @@ export function WorkspaceSelector() {
                         <div>
                           <div className="font-medium">Enable as View</div>
                           <div className="text-xs text-gray-500">
-                            Restricts the file tree to a specific folder. Opening files outside that tree will require a borrow or share decision.
+                            Restricts the file tree to a specific folder.
+                            Opening files outside that tree will require a
+                            borrow or share decision.
                           </div>
                         </div>
                         <Switch
@@ -1437,169 +1618,208 @@ export function WorkspaceSelector() {
                       </div>
 
                       {draftIsView && (
-                        <div className="space-y-2 border-b border-black/10 p-3 dark:border-white/10">
-                          <div className="text-xs font-medium text-gray-600 dark:text-gray-400">
-                            View root folder
-                          </div>
-                          {draftViewRootContentId ? (
-                            <div className="flex items-center justify-between gap-2 rounded-md border border-gold-primary/30 bg-gold-primary/5 px-3 py-2 text-xs">
-                              <span className="truncate font-medium text-gold-primary">
-                                {folderOptions.find((f) => f.id === draftViewRootContentId)?.path ??
-                                  settingsWorkspace.viewRoot?.title ??
-                                  "Selected folder"}
-                              </span>
-                              <button
-                                type="button"
-                                onClick={() => setDraftViewRootContentId(null)}
-                                className="shrink-0 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
-                              >
-                                ✕
-                              </button>
+                        <>
+                          <div className="space-y-2 border-b border-black/10 p-3 dark:border-white/10">
+                            <div className="text-xs font-medium text-gray-600 dark:text-gray-400">
+                              View root folder
                             </div>
-                          ) : (
-                            <div className="space-y-1">
-                              <input
-                                type="text"
-                                placeholder="Search folders…"
-                                value={viewRootFolderQuery}
-                                onChange={(e) => setViewRootFolderQuery(e.target.value)}
-                                className="w-full rounded-md border border-black/10 bg-white/70 px-3 py-2 text-xs outline-none focus:border-gold-primary dark:border-white/10 dark:bg-white/5"
-                              />
-                              <div className="max-h-40 overflow-y-auto rounded-md border border-black/10 dark:border-white/10">
-                                {folderOptions
-                                  .filter(
+                            {draftViewRootContentId ? (
+                              <div className="flex items-center justify-between gap-2 rounded-md border border-gold-primary/30 bg-gold-primary/5 px-3 py-2 text-xs">
+                                <span className="truncate font-medium text-gold-primary">
+                                  {folderOptions.find(
+                                    (f) => f.id === draftViewRootContentId,
+                                  )?.path ??
+                                    settingsWorkspace.viewRoot?.title ??
+                                    "Selected folder"}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setDraftViewRootContentId(null)
+                                  }
+                                  className="shrink-0 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                                >
+                                  ✕
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="space-y-1">
+                                <input
+                                  type="text"
+                                  placeholder="Search folders…"
+                                  value={viewRootFolderQuery}
+                                  onChange={(e) =>
+                                    setViewRootFolderQuery(e.target.value)
+                                  }
+                                  className="w-full rounded-md border border-black/10 bg-white/70 px-3 py-2 text-xs outline-none focus:border-gold-primary dark:border-white/10 dark:bg-white/5"
+                                />
+                                <div className="max-h-40 overflow-y-auto rounded-md border border-black/10 dark:border-white/10">
+                                  {folderOptions
+                                    .filter(
+                                      (f) =>
+                                        !viewRootFolderQuery ||
+                                        f.path
+                                          .toLowerCase()
+                                          .includes(
+                                            viewRootFolderQuery.toLowerCase(),
+                                          ),
+                                    )
+                                    .slice(0, 20)
+                                    .map((folder) => (
+                                      <button
+                                        key={folder.id}
+                                        type="button"
+                                        onClick={() => {
+                                          setDraftViewRootContentId(folder.id);
+                                          setViewRootFolderQuery("");
+                                        }}
+                                        className="block w-full truncate px-3 py-2 text-left text-xs hover:bg-black/5 dark:hover:bg-white/5"
+                                      >
+                                        {folder.path}
+                                      </button>
+                                    ))}
+                                  {folderOptions.filter(
                                     (f) =>
                                       !viewRootFolderQuery ||
-                                      f.path.toLowerCase().includes(viewRootFolderQuery.toLowerCase())
-                                  )
-                                  .slice(0, 20)
-                                  .map((folder) => (
-                                    <button
-                                      key={folder.id}
-                                      type="button"
-                                      onClick={() => {
-                                        setDraftViewRootContentId(folder.id);
-                                        setViewRootFolderQuery("");
-                                      }}
-                                      className="block w-full truncate px-3 py-2 text-left text-xs hover:bg-black/5 dark:hover:bg-white/5"
-                                    >
-                                      {folder.path}
-                                    </button>
-                                  ))}
-                                {folderOptions.filter(
-                                  (f) =>
-                                    !viewRootFolderQuery ||
-                                    f.path.toLowerCase().includes(viewRootFolderQuery.toLowerCase())
-                                ).length === 0 && (
-                                  <div className="px-3 py-2 text-xs text-gray-400">No folders found</div>
+                                      f.path
+                                        .toLowerCase()
+                                        .includes(
+                                          viewRootFolderQuery.toLowerCase(),
+                                        ),
+                                  ).length === 0 && (
+                                    <div className="px-3 py-2 text-xs text-gray-400">
+                                      No folders found
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="space-y-3 p-3">
+                            <div>
+                              <div className="font-medium">View Exceptions</div>
+                              <div className="text-xs text-gray-500">
+                                Assign specific folders that are excluded from
+                                the view root restriction. Exceptions are
+                                recursive.
+                              </div>
+                            </div>
+
+                            {manualClaimsDisabledReason ? (
+                              <div className="rounded-md border border-gold-primary/20 bg-gold-primary/10 px-3 py-2 text-xs text-gold-primary">
+                                {manualClaimsDisabledReason}
+                              </div>
+                            ) : null}
+
+                            <input
+                              value={folderQuery}
+                              disabled={manualClaimsDisabled}
+                              title={
+                                manualClaimsDisabledReason ?? "Search folders"
+                              }
+                              onChange={(event) =>
+                                setFolderQuery(event.target.value)
+                              }
+                              placeholder="Search folders..."
+                              className="w-full rounded-md border border-black/10 bg-white/70 px-3 py-2 text-xs outline-none focus:border-gold-primary disabled:opacity-50 dark:border-white/10 dark:bg-white/5"
+                            />
+
+                            <div
+                              className={`overflow-hidden rounded-md border border-black/10 bg-white/70 text-xs dark:border-white/10 dark:bg-white/5 ${
+                                manualClaimsDisabled ? "opacity-50" : ""
+                              }`}
+                              title={
+                                manualClaimsDisabledReason ??
+                                "Click a folder to add a claim"
+                              }
+                            >
+                              <div className="max-h-40 overflow-y-auto">
+                                {filteredFolderOptions.length === 0 ? (
+                                  <div className="px-3 py-2 text-gray-500">
+                                    {folderOptions.length === 0
+                                      ? "No folders available"
+                                      : "No folders match your search"}
+                                  </div>
+                                ) : (
+                                  filteredFolderOptions
+                                    .slice(0, 30)
+                                    .map((folder) => {
+                                      const selected =
+                                        folder.id === selectedFolderId;
+                                      return (
+                                        <button
+                                          key={folder.id}
+                                          type="button"
+                                          disabled={manualClaimsDisabled}
+                                          onMouseEnter={() =>
+                                            setSelectedFolderId(folder.id)
+                                          }
+                                          onFocus={() =>
+                                            setSelectedFolderId(folder.id)
+                                          }
+                                          onClick={() => {
+                                            setSelectedFolderId(folder.id);
+                                            void handleAddManualFolderClaim(
+                                              folder.id,
+                                            );
+                                          }}
+                                          className={`group flex w-full items-center gap-2 px-3 py-2 text-left transition-colors ${
+                                            selected
+                                              ? "bg-gold-primary/10 text-gold-primary"
+                                              : "hover:bg-black/5 dark:hover:bg-white/10"
+                                          }`}
+                                        >
+                                          <Folder className="h-3.5 w-3.5 shrink-0" />
+                                          <span className="min-w-0 flex-1 truncate">
+                                            {folder.path}
+                                          </span>
+                                          <Plus className="h-3.5 w-3.5 shrink-0 opacity-0 transition-opacity group-hover:opacity-100 group-focus:opacity-100" />
+                                        </button>
+                                      );
+                                    })
                                 )}
                               </div>
                             </div>
-                          )}
-                        </div>
+
+                            <div className="space-y-2">
+                              {recursiveFolderClaims.length === 0 ? (
+                                <div className="rounded-md border border-dashed border-black/10 px-3 py-2 text-xs text-gray-500 dark:border-white/10">
+                                  No folder claims yet.
+                                </div>
+                              ) : (
+                                recursiveFolderClaims.map((item) => (
+                                  <div
+                                    key={item.id}
+                                    className="flex items-center gap-2 rounded-md border border-black/10 px-3 py-2 text-xs dark:border-white/10"
+                                  >
+                                    <Folder className="h-3.5 w-3.5 text-gold-primary" />
+                                    <span className="min-w-0 flex-1 truncate">
+                                      {nodesById[item.contentId]?.path ??
+                                        item.content.title}
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        void handleRemoveFolderClaim(
+                                          item.contentId,
+                                        )
+                                      }
+                                      className="rounded p-1 text-gray-500 transition-colors hover:bg-black/5 hover:text-red-600 dark:hover:bg-white/10"
+                                      aria-label={`Remove ${item.content.title} claim`}
+                                    >
+                                      <X className="h-3.5 w-3.5" />
+                                    </button>
+                                  </div>
+                                ))
+                              )}
+                            </div>
+                          </div>
+                        </>
                       )}
                     </div>
                   )}
-
-                  <div className="overflow-hidden rounded-md border border-black/10 text-sm dark:border-white/10">
-                    <div className="space-y-3 p-3">
-                    <div>
-                      <div className="font-medium">View Exceptions</div>
-                      <div className="text-xs text-gray-500">
-                        Assign specific folders that are excluded from the view root restriction. Exceptions are recursive.
-                      </div>
-                    </div>
-
-                    {manualClaimsDisabledReason ? (
-                      <div className="rounded-md border border-gold-primary/20 bg-gold-primary/10 px-3 py-2 text-xs text-gold-primary">
-                        {manualClaimsDisabledReason}
-                      </div>
-                    ) : null}
-
-                    <input
-                      value={folderQuery}
-                      disabled={manualClaimsDisabled}
-                      title={manualClaimsDisabledReason ?? "Search folders"}
-                      onChange={(event) => setFolderQuery(event.target.value)}
-                      placeholder="Search folders..."
-                      className="w-full rounded-md border border-black/10 bg-white/70 px-3 py-2 text-xs outline-none focus:border-gold-primary disabled:opacity-50 dark:border-white/10 dark:bg-white/5"
-                    />
-
-                    <div
-                      className={`overflow-hidden rounded-md border border-black/10 bg-white/70 text-xs dark:border-white/10 dark:bg-white/5 ${
-                        manualClaimsDisabled ? "opacity-50" : ""
-                      }`}
-                      title={manualClaimsDisabledReason ?? "Click a folder to add a claim"}
-                    >
-                      <div className="max-h-40 overflow-y-auto">
-                        {filteredFolderOptions.length === 0 ? (
-                          <div className="px-3 py-2 text-gray-500">
-                            {folderOptions.length === 0
-                              ? "No folders available"
-                              : "No folders match your search"}
-                          </div>
-                        ) : (
-                          filteredFolderOptions.slice(0, 30).map((folder) => {
-                            const selected = folder.id === selectedFolderId;
-                            return (
-                              <button
-                                key={folder.id}
-                                type="button"
-                                disabled={manualClaimsDisabled}
-                                onMouseEnter={() => setSelectedFolderId(folder.id)}
-                                onFocus={() => setSelectedFolderId(folder.id)}
-                              onClick={() => {
-                                setSelectedFolderId(folder.id);
-                                void handleAddManualFolderClaim(folder.id);
-                              }}
-                                className={`group flex w-full items-center gap-2 px-3 py-2 text-left transition-colors ${
-                                  selected
-                                    ? "bg-gold-primary/10 text-gold-primary"
-                                    : "hover:bg-black/5 dark:hover:bg-white/10"
-                                }`}
-                              >
-                                <Folder className="h-3.5 w-3.5 shrink-0" />
-                                <span className="min-w-0 flex-1 truncate">
-                                  {folder.path}
-                                </span>
-                                <Plus className="h-3.5 w-3.5 shrink-0 opacity-0 transition-opacity group-hover:opacity-100 group-focus:opacity-100" />
-                              </button>
-                            );
-                          })
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      {recursiveFolderClaims.length === 0 ? (
-                        <div className="rounded-md border border-dashed border-black/10 px-3 py-2 text-xs text-gray-500 dark:border-white/10">
-                          No folder claims yet.
-                        </div>
-                      ) : (
-                        recursiveFolderClaims.map((item) => (
-                          <div
-                            key={item.id}
-                            className="flex items-center gap-2 rounded-md border border-black/10 px-3 py-2 text-xs dark:border-white/10"
-                          >
-                            <Folder className="h-3.5 w-3.5 text-gold-primary" />
-                            <span className="min-w-0 flex-1 truncate">
-                              {nodesById[item.contentId]?.path ?? item.content.title}
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => void handleRemoveFolderClaim(item.contentId)}
-                              className="rounded p-1 text-gray-500 transition-colors hover:bg-black/5 hover:text-red-600 dark:hover:bg-white/10"
-                              aria-label={`Remove ${item.content.title} claim`}
-                            >
-                              <X className="h-3.5 w-3.5" />
-                            </button>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  </div>
                 </div>
-              </div>
               )}
             </div>
           ) : null}
@@ -1628,7 +1848,9 @@ export function WorkspaceSelector() {
               onClick={() => void handleSaveSettings()}
               className="inline-flex items-center gap-2 rounded-md border border-gold-primary/30 bg-gold-primary/10 px-3 py-2 text-sm font-medium text-gold-primary transition-colors hover:bg-gold-primary/15 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {isSavingSettings ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+              {isSavingSettings ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : null}
               {isSavingSettings ? "Saving..." : "Save"}
             </button>
           </DialogFooter>
@@ -1655,14 +1877,17 @@ export function WorkspaceSelector() {
           </DialogHeader>
 
           <div className="rounded-md border border-gold-primary/20 bg-gold-primary/10 px-3 py-2 text-xs text-gold-primary">
-            This closes the workspace session. The workspace state and open tabs will not be recoverable afterwards.
+            This closes the workspace session. The workspace state and open tabs
+            will not be recoverable afterwards.
           </div>
 
           <label className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
             <input
               type="checkbox"
               checked={skipDisassembleWarnings}
-              onChange={(event) => setSkipDisassembleWarnings(event.target.checked)}
+              onChange={(event) =>
+                setSkipDisassembleWarnings(event.target.checked)
+              }
               className="h-4 w-4 rounded border border-black/15 text-gold-primary focus:ring-gold-primary dark:border-white/15"
             />
             <span>Don&apos;t warn again</span>
@@ -1690,9 +1915,14 @@ export function WorkspaceSelector() {
                     setSkipDisassembleWarnings(false);
                   })
                   .catch((error) => {
-                    console.error("[WorkspaceSelector] Failed to delete workspace:", error);
+                    console.error(
+                      "[WorkspaceSelector] Failed to delete workspace:",
+                      error,
+                    );
                     toast.error(
-                      error instanceof Error ? error.message : "Failed to delete workspace"
+                      error instanceof Error
+                        ? error.message
+                        : "Failed to delete workspace",
                     );
                   });
               }}
@@ -1721,7 +1951,8 @@ export function WorkspaceSelector() {
           </DialogHeader>
 
           <div className="rounded-md border border-gold-primary/20 bg-gold-primary/10 px-3 py-2 text-xs text-gold-primary">
-            Duplicating is intentional. Any current claims will be shared in the copied workspace until you change them.
+            Duplicating is intentional. Any current claims will be shared in the
+            copied workspace until you change them.
           </div>
 
           <DialogFooter className="gap-2 sm:gap-2">
@@ -1766,26 +1997,28 @@ export function WorkspaceSelector() {
             <div>
               <div className="mb-2 text-sm font-medium">Extend by</div>
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                {(["1h", "3h", "eod", "custom"] as BorrowPreset[]).map((preset) => (
-                  <button
-                    key={preset}
-                    type="button"
-                    onClick={() => handleExpirationWarningPreset(preset)}
-                    className={`rounded-md border px-3 py-2 text-xs font-medium transition-colors ${
-                      expirationWarningPreset === preset
-                        ? "border-gold-primary/40 bg-gold-primary/10 text-gold-primary"
-                        : "border-black/10 hover:bg-black/5 dark:border-white/10 dark:hover:bg-white/10"
-                    }`}
-                  >
-                    {preset === "1h"
-                      ? "1 hour"
-                      : preset === "3h"
-                        ? "3 hours"
-                        : preset === "eod"
-                          ? "EOD"
-                          : "Custom"}
-                  </button>
-                ))}
+                {(["1h", "3h", "eod", "custom"] as BorrowPreset[]).map(
+                  (preset) => (
+                    <button
+                      key={preset}
+                      type="button"
+                      onClick={() => handleExpirationWarningPreset(preset)}
+                      className={`rounded-md border px-3 py-2 text-xs font-medium transition-colors ${
+                        expirationWarningPreset === preset
+                          ? "border-gold-primary/40 bg-gold-primary/10 text-gold-primary"
+                          : "border-black/10 hover:bg-black/5 dark:border-white/10 dark:hover:bg-white/10"
+                      }`}
+                    >
+                      {preset === "1h"
+                        ? "1 hour"
+                        : preset === "3h"
+                          ? "3 hours"
+                          : preset === "eod"
+                            ? "EOD"
+                            : "Custom"}
+                    </button>
+                  ),
+                )}
               </div>
             </div>
 
@@ -1795,7 +2028,9 @@ export function WorkspaceSelector() {
                 <input
                   type="datetime-local"
                   value={expirationWarningValue}
-                  onChange={(event) => setExpirationWarningValue(event.target.value)}
+                  onChange={(event) =>
+                    setExpirationWarningValue(event.target.value)
+                  }
                   className="mt-1 w-full rounded-md border border-black/10 bg-white/70 px-3 py-2 text-sm outline-none focus:border-gold-primary dark:border-white/10 dark:bg-white/5"
                 />
               </label>
@@ -1806,7 +2041,9 @@ export function WorkspaceSelector() {
             <input
               type="checkbox"
               checked={skipExpirationWarnings}
-              onChange={(event) => setSkipExpirationWarnings(event.target.checked)}
+              onChange={(event) =>
+                setSkipExpirationWarnings(event.target.checked)
+              }
               className="h-4 w-4 rounded border border-black/15 text-gold-primary focus:ring-gold-primary dark:border-white/15"
             />
             <span>Don&apos;t warn again</span>
@@ -1832,7 +2069,7 @@ export function WorkspaceSelector() {
                   setExpirationWarningsDisabled();
                 }
                 void handleUpdateExpirationFromWarning(
-                  fromDatetimeLocalValue(expirationWarningValue)
+                  fromDatetimeLocalValue(expirationWarningValue),
                 );
               }}
               className="rounded-md border border-gold-primary/30 bg-gold-primary px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-gold-primary/90"
@@ -1853,7 +2090,9 @@ export function WorkspaceSelector() {
           <DialogHeader>
             <DialogTitle>Resolve workspace claim conflicts</DialogTitle>
             <DialogDescription>
-              These files or folders are already in use by other workspaces. Resolve them before applying the new claim so content does not disappear without context.
+              These files or folders are already in use by other workspaces.
+              Resolve them before applying the new claim so content does not
+              disappear without context.
             </DialogDescription>
           </DialogHeader>
 
@@ -1873,7 +2112,9 @@ export function WorkspaceSelector() {
                     className="grid grid-cols-[minmax(0,1.15fr)_minmax(0,0.9fr)_auto_auto_auto] gap-2 px-3 py-2 text-sm"
                   >
                     <span className="truncate">{conflict.contentTitle}</span>
-                    <span className="truncate text-gray-500">{conflict.workspaceName}</span>
+                    <span className="truncate text-gray-500">
+                      {conflict.workspaceName}
+                    </span>
                     <span className="rounded-full bg-black/[0.04] px-2 py-0.5 text-xs capitalize dark:bg-white/[0.06]">
                       {conflict.assignmentType}
                     </span>
@@ -1892,16 +2133,20 @@ export function WorkspaceSelector() {
                         Split claim
                       </button>
                       <Popover
-                        open={rowBorrowConflictId === `${conflict.workspaceId}:${conflict.contentId}`}
+                        open={
+                          rowBorrowConflictId ===
+                          `${conflict.workspaceId}:${conflict.contentId}`
+                        }
                         onOpenChange={(open) => {
                           if (open) {
                             setRowBorrowConflictId(
-                              `${conflict.workspaceId}:${conflict.contentId}`
+                              `${conflict.workspaceId}:${conflict.contentId}`,
                             );
                             setRowBorrowPreset("1h");
                             setRowBorrowUntil(borrowUntilForPreset("1h"));
                           } else if (
-                            rowBorrowConflictId === `${conflict.workspaceId}:${conflict.contentId}`
+                            rowBorrowConflictId ===
+                            `${conflict.workspaceId}:${conflict.contentId}`
                           ) {
                             setRowBorrowConflictId(null);
                           }
@@ -1925,40 +2170,44 @@ export function WorkspaceSelector() {
                               Borrow {conflict.contentTitle}
                             </div>
                             <div className="grid grid-cols-2 gap-2">
-                              {(["1h", "3h", "eod", "custom"] as BorrowPreset[]).map(
-                                (preset) => (
-                                  <button
-                                    key={preset}
-                                    type="button"
-                                    onClick={() => handleRowBorrowPreset(preset)}
-                                    className={`rounded-md border px-2 py-2 text-xs font-medium transition-colors ${
-                                      rowBorrowPreset === preset
-                                        ? "border-gold-primary/40 bg-gold-primary/10 text-gold-primary"
-                                        : "border-black/10 hover:bg-black/5 dark:border-white/10 dark:hover:bg-white/10"
-                                    }`}
-                                  >
-                                    {preset === "1h"
-                                      ? "1 hour"
-                                      : preset === "3h"
-                                        ? "3 hours"
-                                        : preset === "eod"
-                                          ? "EOD"
-                                          : "Custom"}
-                                  </button>
-                                )
-                              )}
+                              {(
+                                ["1h", "3h", "eod", "custom"] as BorrowPreset[]
+                              ).map((preset) => (
+                                <button
+                                  key={preset}
+                                  type="button"
+                                  onClick={() => handleRowBorrowPreset(preset)}
+                                  className={`rounded-md border px-2 py-2 text-xs font-medium transition-colors ${
+                                    rowBorrowPreset === preset
+                                      ? "border-gold-primary/40 bg-gold-primary/10 text-gold-primary"
+                                      : "border-black/10 hover:bg-black/5 dark:border-white/10 dark:hover:bg-white/10"
+                                  }`}
+                                >
+                                  {preset === "1h"
+                                    ? "1 hour"
+                                    : preset === "3h"
+                                      ? "3 hours"
+                                      : preset === "eod"
+                                        ? "EOD"
+                                        : "Custom"}
+                                </button>
+                              ))}
                             </div>
                             {rowBorrowPreset === "custom" ? (
                               <input
                                 type="datetime-local"
                                 value={rowBorrowUntil}
-                                onChange={(event) => setRowBorrowUntil(event.target.value)}
+                                onChange={(event) =>
+                                  setRowBorrowUntil(event.target.value)
+                                }
                                 className="w-full rounded-md border border-black/10 bg-white/70 px-3 py-2 text-sm outline-none focus:border-gold-primary dark:border-white/10 dark:bg-white/5"
                               />
                             ) : null}
                             <button
                               type="button"
-                              onClick={() => void borrowSingleClaimConflict(conflict)}
+                              onClick={() =>
+                                void borrowSingleClaimConflict(conflict)
+                              }
                               className="w-full rounded-md border border-gold-primary/30 bg-gold-primary px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-gold-primary/90"
                             >
                               Borrow
@@ -1987,32 +2236,34 @@ export function WorkspaceSelector() {
                 Borrow all claims temporarily
               </div>
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                {(["1h", "3h", "eod", "custom"] as BorrowPreset[]).map((preset) => (
-                  <button
-                    key={preset}
-                    type="button"
-                    disabled={claimResolutionInFlight}
-                    onClick={() => {
-                      setClaimBorrowPreset(preset);
-                      if (preset !== "custom") {
-                        setClaimBorrowUntil(borrowUntilForPreset(preset));
-                      }
-                    }}
-                    className={`rounded-md border px-3 py-2 text-xs font-medium transition-colors ${
-                      claimBorrowPreset === preset
-                        ? "border-gold-primary/40 bg-white/70 text-gold-primary dark:bg-black/20"
-                        : "border-black/10 bg-white/70 hover:bg-white dark:border-white/10 dark:bg-black/10 dark:hover:bg-black/20"
-                    }`}
-                  >
-                    {preset === "1h"
-                      ? "1 hour"
-                      : preset === "3h"
-                        ? "3 hours"
-                        : preset === "eod"
-                          ? "EOD"
-                          : "Custom"}
-                  </button>
-                ))}
+                {(["1h", "3h", "eod", "custom"] as BorrowPreset[]).map(
+                  (preset) => (
+                    <button
+                      key={preset}
+                      type="button"
+                      disabled={claimResolutionInFlight}
+                      onClick={() => {
+                        setClaimBorrowPreset(preset);
+                        if (preset !== "custom") {
+                          setClaimBorrowUntil(borrowUntilForPreset(preset));
+                        }
+                      }}
+                      className={`rounded-md border px-3 py-2 text-xs font-medium transition-colors ${
+                        claimBorrowPreset === preset
+                          ? "border-gold-primary/40 bg-white/70 text-gold-primary dark:bg-black/20"
+                          : "border-black/10 bg-white/70 hover:bg-white dark:border-white/10 dark:bg-black/10 dark:hover:bg-black/20"
+                      }`}
+                    >
+                      {preset === "1h"
+                        ? "1 hour"
+                        : preset === "3h"
+                          ? "3 hours"
+                          : preset === "eod"
+                            ? "EOD"
+                            : "Custom"}
+                    </button>
+                  ),
+                )}
               </div>
               {claimBorrowPreset === "custom" ? (
                 <input
@@ -2041,14 +2292,19 @@ export function WorkspaceSelector() {
               onClick={() => {
                 void resolveClaimConflicts("shared")
                   .then(() => {
-                    toast.success("All conflicts were split into shared claims");
+                    toast.success(
+                      "All conflicts were split into shared claims",
+                    );
                   })
                   .catch((error) => {
-                    console.error("[WorkspaceSelector] Failed to split claim conflicts:", error);
+                    console.error(
+                      "[WorkspaceSelector] Failed to split claim conflicts:",
+                      error,
+                    );
                     toast.error(
                       error instanceof Error
                         ? error.message
-                        : "Failed to split conflicting workspace claims"
+                        : "Failed to split conflicting workspace claims",
                     );
                   });
               }}
@@ -2065,11 +2321,14 @@ export function WorkspaceSelector() {
                     toast.success("All conflicts were reassigned here");
                   })
                   .catch((error) => {
-                    console.error("[WorkspaceSelector] Failed to reassign claim conflicts:", error);
+                    console.error(
+                      "[WorkspaceSelector] Failed to reassign claim conflicts:",
+                      error,
+                    );
                     toast.error(
                       error instanceof Error
                         ? error.message
-                        : "Failed to reassign conflicting workspace claims"
+                        : "Failed to reassign conflicting workspace claims",
                     );
                   });
               }}
@@ -2079,7 +2338,10 @@ export function WorkspaceSelector() {
             </button>
             <button
               type="button"
-              disabled={claimResolutionInFlight || (claimConflictState?.conflicts.length ?? 0) > 0}
+              disabled={
+                claimResolutionInFlight ||
+                (claimConflictState?.conflicts.length ?? 0) > 0
+              }
               onClick={() => {
                 void applyPendingClaimAfterResolution();
               }}
@@ -2096,11 +2358,14 @@ export function WorkspaceSelector() {
                     toast.success("All conflicting claims were borrowed");
                   })
                   .catch((error) => {
-                    console.error("[WorkspaceSelector] Failed to borrow claim conflicts:", error);
+                    console.error(
+                      "[WorkspaceSelector] Failed to borrow claim conflicts:",
+                      error,
+                    );
                     toast.error(
                       error instanceof Error
                         ? error.message
-                        : "Failed to borrow conflicting workspace items"
+                        : "Failed to borrow conflicting workspace items",
                     );
                   });
               }}

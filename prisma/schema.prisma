@@ -78,6 +78,14 @@ enum FlashcardShownSide {
   back
 }
 
+enum ExternalReadingStatus {
+  inbox
+  queue
+  reading
+  read
+  archived
+}
+
 model ContentNode {
   id            String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   ownerId       String      @db.Uuid
@@ -136,10 +144,14 @@ model ContentNode {
   trashBinEntry        TrashBin?
   viewGrants           ViewGrant[]
   calendarEvents       CalendarEvent[]
-  workspaceItems        ContentWorkspaceItem[]
-  viewWorkspaces        ContentWorkspace[]       @relation("WorkspaceViewRoot")
+  workspaceItems       ContentWorkspaceItem[]
+  viewWorkspaces       ContentWorkspace[]       @relation("WorkspaceViewRoot")
   periodicNoteIndexes  PeriodicNoteIndex[]
-  sourceFlashcards      Flashcard[]              @relation("FlashcardSourceContent")
+  sourceFlashcards     Flashcard[]              @relation("FlashcardSourceContent")
+  bookmarkSyncLinks    BookmarkSyncLink[]
+  bookmarkSyncRoots    BookmarkSyncConnection[] @relation("BookmarkSyncRoot")
+  webResourceLinks     WebResourceContentLink[]
+  webResourceViewStates WebResourceViewState[]
 
   @@unique([ownerId, slug])
   @@index([ownerId, deletedAt])
@@ -432,6 +444,12 @@ model User {
   periodicNoteIndexes  PeriodicNoteIndex[]
   flashcards           Flashcard[]
   flashcardReviewAttempts FlashcardReviewAttempt[]
+  browserExtensionTokens BrowserExtensionToken[]
+  browserExtensionInstalls BrowserExtensionInstall[]
+  bookmarkSyncConnections BookmarkSyncConnection[]
+  webResources         WebResource[]
+  webResourceContentLinks WebResourceContentLink[]
+  webResourceViewStates WebResourceViewState[]
 
   @@index([email])
 }
@@ -678,6 +696,184 @@ model Session {
   @@index([expiresAt])
 }
 
+model BrowserExtensionToken {
+  id          String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId      String                   @db.Uuid
+  name        String                   @db.VarChar(120)
+  tokenHash   String                   @unique @db.Char(64)
+  tokenPrefix String                   @db.VarChar(16)
+  scopes      String[]                 @default(["bookmarks:sync"])
+  lastUsedAt  DateTime?                @db.Timestamptz(6)
+  expiresAt   DateTime?                @db.Timestamptz(6)
+  revokedAt   DateTime?                @db.Timestamptz(6)
+  createdAt   DateTime                 @default(now()) @db.Timestamptz(6)
+  updatedAt   DateTime                 @updatedAt @db.Timestamptz(6)
+  user        User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  connections BookmarkSyncConnection[]
+  install     BrowserExtensionInstall?
+
+  @@index([userId, revokedAt])
+  @@index([tokenPrefix])
+}
+
+model BrowserExtensionInstall {
+  id               String                        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId           String                        @db.Uuid
+  tokenId          String                        @unique @db.Uuid
+  installInstanceId String                       @db.VarChar(128)
+  extensionId      String                        @db.VarChar(128)
+  extensionName    String                        @db.VarChar(255)
+  extensionVersion String                        @db.VarChar(64)
+  browserName      String                        @db.VarChar(120)
+  browserVersion   String?                       @db.VarChar(64)
+  osName           String                        @db.VarChar(120)
+  osVersion        String?                       @db.VarChar(64)
+  trustedAt        DateTime                      @default(now()) @db.Timestamptz(6)
+  lastSeenAt       DateTime?                     @db.Timestamptz(6)
+  revokedAt        DateTime?                     @db.Timestamptz(6)
+  createdAt        DateTime                      @default(now()) @db.Timestamptz(6)
+  updatedAt        DateTime                      @updatedAt @db.Timestamptz(6)
+  user             User                          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token            BrowserExtensionToken         @relation(fields: [tokenId], references: [id], onDelete: Cascade)
+  connectionLinks  BookmarkSyncConnectionInstall[]
+  webResourceViewStates WebResourceViewState[]
+
+  @@unique([userId, installInstanceId])
+  @@index([userId, revokedAt])
+}
+
+model BookmarkSyncConnection {
+  id              String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId          String                 @db.Uuid
+  tokenId         String?                @db.Uuid
+  name            String                 @db.VarChar(120)
+  appRootId       String                 @db.Uuid
+  chromeRootId    String                 @db.VarChar(128)
+  chromeRootTitle String                 @db.VarChar(255)
+  lastSyncedAt    DateTime?              @db.Timestamptz(6)
+  lastPulledAt    DateTime?              @db.Timestamptz(6)
+  lastPushedAt    DateTime?              @db.Timestamptz(6)
+  lastSyncError   String?
+  createdAt       DateTime               @default(now()) @db.Timestamptz(6)
+  updatedAt       DateTime               @updatedAt @db.Timestamptz(6)
+  user            User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token           BrowserExtensionToken? @relation(fields: [tokenId], references: [id], onDelete: SetNull)
+  appRoot         ContentNode            @relation("BookmarkSyncRoot", fields: [appRootId], references: [id], onDelete: Cascade)
+  links           BookmarkSyncLink[]
+  installLinks    BookmarkSyncConnectionInstall[]
+
+  @@unique([userId, chromeRootId])
+  @@index([userId, appRootId])
+  @@index([tokenId])
+}
+
+model BookmarkSyncConnectionInstall {
+  id              String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  connectionId    String                 @db.Uuid
+  installId       String                 @db.Uuid
+  chromeRootId    String?                @db.VarChar(128)
+  chromeRootTitle String                 @default("Bookmarks") @db.VarChar(255)
+  createdAt       DateTime               @default(now()) @db.Timestamptz(6)
+  updatedAt       DateTime               @updatedAt @db.Timestamptz(6)
+  connection      BookmarkSyncConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  install         BrowserExtensionInstall @relation(fields: [installId], references: [id], onDelete: Cascade)
+
+  @@unique([connectionId, installId])
+  @@index([installId])
+}
+
+model BookmarkSyncLink {
+  id             String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  connectionId   String                 @db.Uuid
+  contentId      String                 @db.Uuid
+  chromeNodeId   String                 @db.VarChar(128)
+  chromeParentId String?                @db.VarChar(128)
+  nodeType       String                 @db.VarChar(20)
+  normalizedUrl  String?
+  lastKnownTitle String?                @db.VarChar(255)
+  lastSeenAt     DateTime               @default(now()) @db.Timestamptz(6)
+  createdAt      DateTime               @default(now()) @db.Timestamptz(6)
+  updatedAt      DateTime               @updatedAt @db.Timestamptz(6)
+  connection     BookmarkSyncConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  content        ContentNode            @relation(fields: [contentId], references: [id], onDelete: Cascade)
+
+  @@unique([connectionId, contentId])
+  @@unique([connectionId, chromeNodeId])
+  @@index([connectionId, nodeType])
+  @@index([contentId])
+}
+
+model WebResource {
+  id               String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId           String                   @db.Uuid
+  identityUrl      String                   @db.VarChar(2048)
+  normalizedUrl    String                   @db.VarChar(2048)
+  canonicalUrl     String?                  @db.VarChar(2048)
+  title            String?                  @db.VarChar(255)
+  faviconUrl       String?                  @db.VarChar(2048)
+  sourceDomain     String?                  @db.VarChar(255)
+  sourceHostname   String?                  @db.VarChar(255)
+  metadata         Json                     @default("{}")
+  createdAt        DateTime                 @default(now()) @db.Timestamptz(6)
+  updatedAt        DateTime                 @updatedAt @db.Timestamptz(6)
+  user             User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  contentLinks     WebResourceContentLink[]
+  viewStates       WebResourceViewState[]
+  externalPayloads ExternalPayload[]
+
+  @@unique([userId, identityUrl])
+  @@index([userId, canonicalUrl])
+  @@index([userId, normalizedUrl])
+  @@index([userId, sourceDomain])
+}
+
+model WebResourceContentLink {
+  id            String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId        String      @db.Uuid
+  webResourceId String      @db.Uuid
+  contentId     String      @db.Uuid
+  metadata      Json        @default("{}")
+  createdAt     DateTime    @default(now()) @db.Timestamptz(6)
+  updatedAt     DateTime    @updatedAt @db.Timestamptz(6)
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  webResource   WebResource @relation(fields: [webResourceId], references: [id], onDelete: Cascade)
+  content       ContentNode @relation(fields: [contentId], references: [id], onDelete: Cascade)
+
+  @@unique([webResourceId, contentId])
+  @@index([userId, contentId])
+  @@index([userId, webResourceId])
+}
+
+model WebResourceViewState {
+  id                String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId            String                  @db.Uuid
+  installId         String                  @db.Uuid
+  webResourceId     String                  @db.Uuid
+  contentId         String                  @db.Uuid
+  state             String                  @default("open") @db.VarChar(20)
+  layoutMode        String                  @default("floating") @db.VarChar(30)
+  dockSide          String?                 @db.VarChar(20)
+  positionX         Int?
+  positionY         Int?
+  width             Int?
+  height            Int?
+  opacity           Float?
+  embeddedSelector  String?                 @db.VarChar(2048)
+  embeddedPlacement String?                 @db.VarChar(40)
+  metadata          Json                    @default("{}")
+  lastActiveAt      DateTime?               @db.Timestamptz(6)
+  createdAt         DateTime                @default(now()) @db.Timestamptz(6)
+  updatedAt         DateTime                @updatedAt @db.Timestamptz(6)
+  user              User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  install           BrowserExtensionInstall @relation(fields: [installId], references: [id], onDelete: Cascade)
+  webResource       WebResource             @relation(fields: [webResourceId], references: [id], onDelete: Cascade)
+  content           ContentNode             @relation(fields: [contentId], references: [id], onDelete: Cascade)
+
+  @@unique([installId, webResourceId, contentId])
+  @@index([userId, webResourceId])
+  @@index([userId, contentId])
+}
+
 model Account {
   id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   userId            String    @db.Uuid
@@ -755,16 +951,41 @@ model FolderPayload {
 }
 
 model ExternalPayload {
-  contentId String   @id @db.Uuid
-  url       String // External URL (HTTPS-only by default)
-  subtype   String?  @default("website") @db.VarChar(20) // "website" | "application" (cosmetic)
-  preview   Json     @default("{}") // { mode: "none" | "open_graph", cached: {...} }
-  createdAt DateTime @default(now()) @db.Timestamptz(6)
-  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+  contentId               String                @id @db.Uuid
+  webResourceId           String?               @db.Uuid
+  url                     String // External URL (HTTPS-only by default)
+  normalizedUrl           String?               @db.VarChar(2048)
+  canonicalUrl            String?               @db.VarChar(2048)
+  subtype                 String?               @default("website") @db.VarChar(20) // "website" | "application" (cosmetic)
+  readingStatus           ExternalReadingStatus @default(inbox)
+  description             String?
+  resourceType            String?               @db.VarChar(120)
+  resourceRelationship    String?               @db.VarChar(120)
+  userIntent              String?               @db.VarChar(120)
+  sourceDomain            String?               @db.VarChar(255)
+  sourceHostname          String?               @db.VarChar(255)
+  faviconUrl              String?               @db.VarChar(2048)
+  preview                 Json                  @default("{}") // { mode: "none" | "open_graph", cached: {...} }
+  captureMetadata         Json                  @default("{}")
+  matchMetadata           Json                  @default("{}")
+  preserveHtml            Boolean               @default(false)
+  preservedHtmlSnapshot   Json?
+  preservedHtmlCapturedAt DateTime?             @db.Timestamptz(6)
+  createdAt               DateTime              @default(now()) @db.Timestamptz(6)
+  updatedAt               DateTime              @updatedAt @db.Timestamptz(6)
 
-  content ContentNode @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  content     ContentNode  @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  webResource WebResource? @relation(fields: [webResourceId], references: [id], onDelete: SetNull)
 
   @@index([url])
+  @@index([webResourceId])
+  @@index([normalizedUrl])
+  @@index([canonicalUrl])
+  @@index([readingStatus])
+  @@index([resourceType])
+  @@index([resourceRelationship])
+  @@index([userIntent])
+  @@index([sourceDomain])
 }
 
 model ChatPayload {

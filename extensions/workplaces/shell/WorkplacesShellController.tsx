@@ -11,12 +11,14 @@ import { useContentStore } from "@/state/content-store";
 
 export function WorkplacesShellController() {
   const workspaceSnapshotKey = useContentStore((state) =>
-    JSON.stringify(state.getWorkspaceStateSnapshot())
+    JSON.stringify(state.getWorkspaceStateSnapshot()),
   );
-  const activeWorkspaceId = useWorkspaceStore((state) => state.activeWorkspaceId);
+  const activeWorkspaceId = useWorkspaceStore(
+    (state) => state.activeWorkspaceId,
+  );
   const loadWorkspaces = useWorkspaceStore((state) => state.loadWorkspaces);
   const persistActiveWorkspace = useWorkspaceStore(
-    (state) => state.persistActiveWorkspace
+    (state) => state.persistActiveWorkspace,
   );
 
   useEffect(() => installWorkspaceOpenGuard(), []);
@@ -31,7 +33,12 @@ export function WorkplacesShellController() {
     if (!activeWorkspaceId) return;
 
     const timeoutId = window.setTimeout(() => {
-      void persistActiveWorkspace();
+      void persistActiveWorkspace().catch((error) => {
+        console.error(
+          "[WorkplacesShellController] Failed to persist active workspace:",
+          error,
+        );
+      });
     }, 600);
 
     return () => window.clearTimeout(timeoutId);

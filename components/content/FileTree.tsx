@@ -14,7 +14,7 @@
 
 "use client";
 
-import { useRef, useEffect, useMemo } from "react";
+import { useRef, useEffect, useMemo, useState, useCallback } from "react";
 import { Tree, type NodeApi } from "react-arborist";
 import { FileNode } from "./FileNode";
 import { useTreeStateStore } from "@/state/tree-state-store";
@@ -85,6 +85,7 @@ export function FileTree({
   } = useTreeStateStore();
   const hasRestoredRef = useRef(false);
   const isRestoringScrollRef = useRef(false);
+  const [editingDrafts, setEditingDrafts] = useState<Record<string, string>>({});
 
   useEffect(() => {
     const targetOffset = scrollOffset;
@@ -227,8 +228,45 @@ export function FileTree({
   }, [selectedIds]); // React to selectedIds changes
 
   // Create a wrapper component that has access to callbacks
+  const handleEditingValueChange = useCallback((id: string, value: string) => {
+    setEditingDrafts((current) => {
+      if (current[id] === value) return current;
+      return { ...current, [id]: value };
+    });
+  }, []);
+
+  const handleEditingValueClear = useCallback((id: string) => {
+    setEditingDrafts((current) => {
+      if (!(id in current)) return current;
+      const next = { ...current };
+      delete next[id];
+      return next;
+    });
+  }, []);
+
   const NodeWithCallbacks = (props: any) => {
-    return <FileNode {...props} onRename={onRename} onCreate={onCreate} onDelete={onDelete} onDuplicate={onDuplicate} onDownload={onDownload} onChangeIcon={onChangeIcon} onSetFolderView={onSetFolderView} onToggleReferencedContent={onToggleReferencedContent} onCreateVisualizationMermaid={onCreateVisualizationMermaid} onCreateVisualizationExcalidraw={onCreateVisualizationExcalidraw} onCreateVisualizationDiagramsNet={onCreateVisualizationDiagramsNet} onAddPeopleTarget={onAddPeopleTarget} />;
+    const nodeId = String(props.node.id);
+
+    return (
+      <FileNode
+        {...props}
+        onRename={onRename}
+        onCreate={onCreate}
+        onDelete={onDelete}
+        onDuplicate={onDuplicate}
+        onDownload={onDownload}
+        onChangeIcon={onChangeIcon}
+        onSetFolderView={onSetFolderView}
+        onToggleReferencedContent={onToggleReferencedContent}
+        onCreateVisualizationMermaid={onCreateVisualizationMermaid}
+        onCreateVisualizationExcalidraw={onCreateVisualizationExcalidraw}
+        onCreateVisualizationDiagramsNet={onCreateVisualizationDiagramsNet}
+        onAddPeopleTarget={onAddPeopleTarget}
+        editingValue={editingDrafts[nodeId]}
+        onEditingValueChange={handleEditingValueChange}
+        onEditingValueClear={handleEditingValueClear}
+      />
+    );
   };
 
   // Get initial open state from persisted IDs

@@ -26,6 +26,7 @@ interface IconSelectorProps {
   triggerPosition: { x: number; y: number };
   disablePortal?: boolean;
   inlineAnchor?: boolean;
+  iconOnly?: boolean;
 }
 
 // Get all lucide icon names (filter out non-icon exports)
@@ -65,9 +66,10 @@ export function IconSelector({
   triggerPosition,
   disablePortal = false,
   inlineAnchor = false,
+  iconOnly = false,
 }: IconSelectorProps) {
   const [activeTab, setActiveTab] = useState<"icons" | "emoji">(
-    currentIcon?.startsWith("emoji:") ? "emoji" : "icons"
+    !iconOnly && currentIcon?.startsWith("emoji:") ? "emoji" : "icons"
   );
   const [searchQuery, setSearchQuery] = useState("");
   const [menuPosition, setMenuPosition] = useState<{ x: number; y: number } | null>(null);
@@ -110,9 +112,9 @@ export function IconSelector({
   useEffect(() => {
     if (isOpen) {
       setSearchQuery("");
-      setActiveTab(currentIcon?.startsWith("emoji:") ? "emoji" : "icons");
+      setActiveTab(!iconOnly && currentIcon?.startsWith("emoji:") ? "emoji" : "icons");
     }
-  }, [currentIcon, isOpen]);
+  }, [currentIcon, iconOnly, isOpen]);
 
   // Handle ESC key to close
   useEffect(() => {
@@ -199,28 +201,34 @@ export function IconSelector({
       </div>
 
       {/* Tabs */}
-      <div className="flex border-b border-black/10 dark:border-white/10">
-        <button
-          onClick={() => setActiveTab("icons")}
-          className={`flex-1 px-3 py-1.5 text-xs font-medium transition-colors ${
-            activeTab === "icons"
-              ? "border-b-2 border-gold-primary text-gold-primary"
-              : "text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white"
-          }`}
-        >
+      {iconOnly ? (
+        <div className="border-b border-black/10 px-3 py-1.5 text-xs font-medium text-gray-500 dark:border-white/10 dark:text-gray-400">
           Icons ({lucideIconNames.length})
-        </button>
-        <button
-          onClick={() => setActiveTab("emoji")}
-          className={`flex-1 px-3 py-1.5 text-xs font-medium transition-colors ${
-            activeTab === "emoji"
-              ? "border-b-2 border-gold-primary text-gold-primary"
-              : "text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white"
-          }`}
-        >
-          Emoji
-        </button>
-      </div>
+        </div>
+      ) : (
+        <div className="flex border-b border-black/10 dark:border-white/10">
+          <button
+            onClick={() => setActiveTab("icons")}
+            className={`flex-1 px-3 py-1.5 text-xs font-medium transition-colors ${
+              activeTab === "icons"
+                ? "border-b-2 border-gold-primary text-gold-primary"
+                : "text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white"
+            }`}
+          >
+            Icons ({lucideIconNames.length})
+          </button>
+          <button
+            onClick={() => setActiveTab("emoji")}
+            className={`flex-1 px-3 py-1.5 text-xs font-medium transition-colors ${
+              activeTab === "emoji"
+                ? "border-b-2 border-gold-primary text-gold-primary"
+                : "text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white"
+            }`}
+          >
+            Emoji
+          </button>
+        </div>
+      )}
 
       {/* Search (Icons tab only) */}
       {activeTab === "icons" && (

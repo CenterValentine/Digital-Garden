@@ -18,6 +18,8 @@ import { SlashCommandsList, type SlashCommandsListRef } from "./slash-commands-m
 import { getExtensionSlashCommands } from "@/lib/extensions/editor-client-registry";
 import { useTimestampFormatStore } from "@/state/timestamp-format-store";
 import { getDefaultPeriodicSummaryDate } from "@/lib/domain/periodic-summary";
+import { createDefaultStopwatchAttrs } from "@/lib/domain/stopwatch";
+import { createDefaultHabitTrackerAttrs } from "../extensions/blocks/habit-tracker";
 
 // Plugin key for slash commands
 export const slashCommandsPluginKey = new PluginKey("slashCommands");
@@ -533,6 +535,40 @@ export function getSlashCommands(): SlashCommand[] {
         }).run();
       },
       aliases: ["weekly summary", "week summary", "activity", "worklog"],
+    },
+    {
+      title: "Habit Tracker",
+      description: "Track habits in monthly, weekly, or streak layouts",
+      icon: "✓",
+      command: ({ editor, range }) => {
+        editor
+          .chain()
+          .focus()
+          .deleteRange(range)
+          .insertContent({
+            type: "habitTracker",
+            attrs: createDefaultHabitTrackerAttrs(),
+          })
+          .run();
+      },
+      aliases: ["habit", "tracker", "streak", "checkins", "routine"],
+    },
+    {
+      title: "Stopwatch",
+      description: "Persisted stopwatch with laps and style variants",
+      icon: "⏱",
+      command: ({ editor, range }) => {
+        editor
+          .chain()
+          .focus()
+          .deleteRange(range)
+          .insertContent({
+            type: "stopwatch",
+            attrs: createDefaultStopwatchAttrs(),
+          })
+          .run();
+      },
+      aliases: ["stopwatch", "timer", "lap", "elapsed", "clock"],
     },
     // Epoch 11 Sprint 45: Template + Snippet insertion
     {

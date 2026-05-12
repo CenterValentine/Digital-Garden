@@ -253,6 +253,7 @@ export function MainPanelHeader({
 }: MainPanelHeaderProps) {
   const glass1 = getSurfaceStyles("glass-1");
   const layoutMode = useContentStore((state) => state.layoutMode);
+  const activePaneId = useContentStore((state) => state.activePaneId);
   const pane = useContentStore((state) => state.panes[paneId]);
   const tabsById = useContentStore((state) => state.tabs);
   const activateContentTab = useContentStore((state) => state.activateContentTab);
@@ -273,6 +274,7 @@ export function MainPanelHeader({
   const [tabRects, setTabRects] = useState<Record<string, DOMRect | null>>({});
   const renameInputRef = useRef<HTMLInputElement>(null);
   const tabElementsRef = useRef<Map<string, HTMLDivElement>>(new Map());
+  const isActivePane = activePaneId === paneId;
 
   const startRename = useCallback((tabId: string, currentTitle: string) => {
     setEditingTabId(tabId);
@@ -313,7 +315,14 @@ export function MainPanelHeader({
         );
       }
       if (!isPageTemplate) {
-        window.dispatchEvent(new CustomEvent("dg:tree-refresh"));
+        window.dispatchEvent(
+          new CustomEvent("content-updated", {
+            detail: {
+              contentId: tab.contentId,
+              updates: { title: newTitle },
+            },
+          }),
+        );
       }
     } catch {
       // Revert on failure
@@ -421,6 +430,32 @@ export function MainPanelHeader({
       window.removeEventListener("keydown", handleKeyDown);
     };
   }, [tabMenu]);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (!isActivePane) return;
+      if (!(event.metaKey || event.ctrlKey) || event.shiftKey || event.altKey) {
+        return;
+      }
+      if (event.key.toLowerCase() !== "e") return;
+
+      const target = event.target as HTMLElement | null;
+      const isTyping =
+        target?.tagName === "INPUT" ||
+        target?.tagName === "TEXTAREA" ||
+        target?.isContentEditable;
+      if (isTyping) return;
+
+      const activeTabId = pane?.activeTabId;
+      if (!activeTabId) return;
+
+      event.preventDefault();
+      closeContentTab(activeTabId);
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [closeContentTab, isActivePane, pane?.activeTabId]);
 
   useEffect(() => {
     const pendingTabs = tabs.filter((tab) => tab.title === "Loading...");
