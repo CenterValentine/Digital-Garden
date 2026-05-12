@@ -24,6 +24,9 @@ import { createDefaultHabitTrackerAttrs } from "../extensions/blocks/habit-track
 // Plugin key for slash commands
 export const slashCommandsPluginKey = new PluginKey("slashCommands");
 
+/** Slash command category — drives the tab filter in SlashCommandsList. */
+export type SlashCommandKind = "editor" | "published";
+
 // Available slash commands
 export interface SlashCommand {
   title: string;
@@ -31,6 +34,12 @@ export interface SlashCommand {
   icon: string;
   command: ({ editor, range }: { editor: Editor; range: Range }) => void;
   aliases?: string[];
+  /**
+   * Category for tab filtering. Defaults to "editor" when omitted.
+   * Mark publishing-extension blocks (PostCard, ProjectCard, Hero, etc.)
+   * as "published" so the Editor tab stays focused on note-taking blocks.
+   */
+  kind?: SlashCommandKind;
 }
 
 interface SlashAllowProps {
@@ -188,6 +197,7 @@ export function getSlashCommands(): SlashCommand[] {
           .run();
       },
       aliases: ["pullquote", "highlight", "featured", "citation", "pull"],
+      kind: "published",
     },
     {
       title: "Table of Contents",
@@ -202,6 +212,7 @@ export function getSlashCommands(): SlashCommand[] {
           .run();
       },
       aliases: ["toc", "contents", "outline", "navigation", "index", "headings"],
+      kind: "published",
     },
     {
       title: "Gallery",
@@ -212,6 +223,7 @@ export function getSlashCommands(): SlashCommand[] {
           .insertContent({ type: "gallery", attrs: {} }).run();
       },
       aliases: ["gallery", "images", "photos", "grid", "carousel"],
+      kind: "published",
     },
     {
       title: "Hero Image",
@@ -222,6 +234,7 @@ export function getSlashCommands(): SlashCommand[] {
           .insertContent({ type: "heroImage", attrs: {} }).run();
       },
       aliases: ["hero", "banner", "header", "cover", "fullwidth"],
+      kind: "published",
     },
     {
       title: "Post Card",
@@ -232,6 +245,7 @@ export function getSlashCommands(): SlashCommand[] {
           .insertContent({ type: "postCard", attrs: {} }).run();
       },
       aliases: ["postcard", "post", "blog", "article", "preview"],
+      kind: "published",
     },
     {
       title: "Project Card",
@@ -242,6 +256,7 @@ export function getSlashCommands(): SlashCommand[] {
           .insertContent({ type: "projectCard", attrs: {} }).run();
       },
       aliases: ["projectcard", "project", "portfolio", "showcase"],
+      kind: "published",
     },
     {
       title: "Recent Posts",
@@ -252,6 +267,7 @@ export function getSlashCommands(): SlashCommand[] {
           .insertContent({ type: "recentPosts", attrs: {} }).run();
       },
       aliases: ["recentposts", "recent", "feed", "posts", "dynamic"],
+      kind: "published",
     },
     {
       title: "Timeline",
@@ -262,6 +278,7 @@ export function getSlashCommands(): SlashCommand[] {
           .insertContent({ type: "timeline", attrs: {} }).run();
       },
       aliases: ["timeline", "history", "events", "chronology", "milestones"],
+      kind: "published",
     },
     {
       title: "Stat Block",
@@ -272,6 +289,7 @@ export function getSlashCommands(): SlashCommand[] {
           .insertContent({ type: "statBlock", attrs: {} }).run();
       },
       aliases: ["stat", "metric", "number", "kpi", "counter"],
+      kind: "published",
     },
     {
       title: "Metrics Strip",
@@ -282,6 +300,7 @@ export function getSlashCommands(): SlashCommand[] {
           .insertContent({ type: "metricsStrip", attrs: {} }).run();
       },
       aliases: ["metrics", "kpi", "stats", "strip", "numbers"],
+      kind: "published",
     },
     {
       title: "Process Steps",
@@ -292,6 +311,7 @@ export function getSlashCommands(): SlashCommand[] {
           .insertContent({ type: "processSteps", attrs: {} }).run();
       },
       aliases: ["steps", "process", "how-to", "guide", "workflow", "numbered"],
+      kind: "published",
     },
     // ── W5 ──────────────────────────────────────────────────────────────────
     {
@@ -303,6 +323,7 @@ export function getSlashCommands(): SlashCommand[] {
           .insertContent({ type: "testimonialCard", attrs: {} }).run();
       },
       aliases: ["testimonial", "quote", "review", "feedback", "star"],
+      kind: "published",
     },
     {
       title: "CTA Banner",
@@ -313,6 +334,7 @@ export function getSlashCommands(): SlashCommand[] {
           .insertContent({ type: "ctaBanner", attrs: {} }).run();
       },
       aliases: ["cta", "call to action", "banner", "button", "conversion"],
+      kind: "published",
     },
     // ── W6 ──────────────────────────────────────────────────────────────────
     {
@@ -324,6 +346,7 @@ export function getSlashCommands(): SlashCommand[] {
           .insertContent({ type: "videoEmbed", attrs: {} }).run();
       },
       aliases: ["video", "youtube", "vimeo", "embed", "player", "media"],
+      kind: "published",
     },
     // ── W7 ──────────────────────────────────────────────────────────────────
     {
@@ -335,6 +358,7 @@ export function getSlashCommands(): SlashCommand[] {
           .insertContent({ type: "faqAccordion", attrs: {} }).run();
       },
       aliases: ["faq", "questions", "accordion", "help", "support"],
+      kind: "published",
     },
     {
       title: "Feature List",
@@ -345,6 +369,7 @@ export function getSlashCommands(): SlashCommand[] {
           .insertContent({ type: "featureList", attrs: {} }).run();
       },
       aliases: ["features", "benefits", "grid", "icons", "services"],
+      kind: "published",
     },
     // ── W8 ──────────────────────────────────────────────────────────────────
     {
@@ -356,6 +381,7 @@ export function getSlashCommands(): SlashCommand[] {
           .insertContent({ type: "personCard", attrs: {} }).run();
       },
       aliases: ["person", "profile", "team", "author", "bio", "about"],
+      kind: "published",
     },
     {
       title: "Newsletter Signup",
@@ -366,6 +392,7 @@ export function getSlashCommands(): SlashCommand[] {
           .insertContent({ type: "newsletterSignup", attrs: {} }).run();
       },
       aliases: ["newsletter", "email", "subscribe", "signup", "form"],
+      kind: "published",
     },
     // ── W9 ──────────────────────────────────────────────────────────────────
     {
@@ -377,6 +404,7 @@ export function getSlashCommands(): SlashCommand[] {
           .insertContent({ type: "logoStrip", attrs: {} }).run();
       },
       aliases: ["logos", "brand", "partner", "client", "sponsor"],
+      kind: "published",
     },
     {
       title: "Social Links",
@@ -387,6 +415,7 @@ export function getSlashCommands(): SlashCommand[] {
           .insertContent({ type: "socialLinks", attrs: {} }).run();
       },
       aliases: ["social", "links", "twitter", "github", "linkedin", "follow"],
+      kind: "published",
     },
     {
       title: "Pricing Card",
@@ -397,6 +426,7 @@ export function getSlashCommands(): SlashCommand[] {
           .insertContent({ type: "pricingCard", attrs: {} }).run();
       },
       aliases: ["pricing", "plan", "tier", "price", "subscription"],
+      kind: "published",
     },
     // ── W10 ─────────────────────────────────────────────────────────────────
     {
@@ -408,6 +438,7 @@ export function getSlashCommands(): SlashCommand[] {
           .insertContent({ type: "spacer", attrs: {} }).run();
       },
       aliases: ["spacer", "space", "gap", "padding", "blank"],
+      kind: "published",
     },
     {
       title: "Skill Badges",
@@ -418,6 +449,7 @@ export function getSlashCommands(): SlashCommand[] {
           .insertContent({ type: "skillBadges", attrs: {} }).run();
       },
       aliases: ["skills", "tech", "stack", "badges", "technologies", "expertise"],
+      kind: "published",
     },
     {
       title: "Bookmark Card",
@@ -428,6 +460,7 @@ export function getSlashCommands(): SlashCommand[] {
           .insertContent({ type: "bookmarkCard", attrs: {} }).run();
       },
       aliases: ["bookmark", "link", "card", "preview", "resource", "reading"],
+      kind: "published",
     },
     {
       title: "Tag Cloud",
@@ -438,6 +471,7 @@ export function getSlashCommands(): SlashCommand[] {
           .insertContent({ type: "tagCloud", attrs: {} }).run();
       },
       aliases: ["tags", "cloud", "topics", "categories", "browse"],
+      kind: "published",
     },
     {
       title: "Code Block",
