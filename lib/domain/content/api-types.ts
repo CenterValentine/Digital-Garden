@@ -72,6 +72,10 @@ export interface ContentListItem {
   external?: {
     url: string;
     subtype: string;
+    description?: string | null;
+    resourceType?: string | null;
+    resourceRelationship?: string | null;
+    userIntent?: string | null;
   };
   chat?: {
     messageCount: number;
@@ -167,6 +171,21 @@ export interface ContentDetailResponse {
   external?: {
     url: string;
     subtype: string;
+    normalizedUrl?: string | null;
+    canonicalUrl?: string | null;
+    readingStatus?: "inbox" | "queue" | "reading" | "read" | "archived";
+    description?: string | null;
+    resourceType?: string | null;
+    resourceRelationship?: string | null;
+    userIntent?: string | null;
+    sourceDomain?: string | null;
+    sourceHostname?: string | null;
+    faviconUrl?: string | null;
+    preserveHtml?: boolean;
+    preservedHtmlSnapshot?: Record<string, unknown> | null;
+    preservedHtmlCapturedAt?: Date | null;
+    captureMetadata?: Record<string, unknown>;
+    matchMetadata?: Record<string, unknown>;
     preview: Record<string, unknown>;
   };
   // Visualization payload
@@ -207,6 +226,17 @@ export interface CreateContentRequest {
   language?: string;
   url?: string; // Phase 2: External link URL
   subtype?: string; // Phase 2: "website" | "application"
+  canonicalUrl?: string;
+  faviconUrl?: string | null;
+  readingStatus?: "inbox" | "queue" | "reading" | "read" | "archived";
+  description?: string | null;
+  resourceType?: string | null;
+  resourceRelationship?: string | null;
+  userIntent?: string | null;
+  preserveHtml?: boolean;
+  preservedHtmlSnapshot?: Record<string, unknown> | null;
+  captureMetadata?: Record<string, unknown>;
+  matchMetadata?: Record<string, unknown>;
 
   // Visualization fields
   engine?: string; // "diagrams-net" | "excalidraw" | "mermaid"
@@ -241,6 +271,17 @@ export interface UpdateContentRequest {
   code?: string;
   language?: string;
   url?: string; // Phase 2: External link URL update
+  canonicalUrl?: string | null;
+  faviconUrl?: string | null;
+  readingStatus?: "inbox" | "queue" | "reading" | "read" | "archived";
+  description?: string | null;
+  resourceType?: string | null;
+  resourceRelationship?: string | null;
+  userIntent?: string | null;
+  preserveHtml?: boolean;
+  preservedHtmlSnapshot?: Record<string, unknown> | null;
+  captureMetadata?: Record<string, unknown>;
+  matchMetadata?: Record<string, unknown>;
 
   // Phase 2: Folder payload updates
   viewMode?: "list" | "gallery" | "kanban" | "dashboard" | "canvas";

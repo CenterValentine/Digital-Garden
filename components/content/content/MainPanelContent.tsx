@@ -9,6 +9,7 @@
 "use client";
 
 import { createElement, useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { usePathname } from "next/navigation";
 import { AlertTriangle } from "lucide-react";
 import { ToolSurfaceProvider } from "@/lib/domain/tools";
 import { ContentToolbar } from "../toolbar";
@@ -190,6 +191,8 @@ interface PageTemplateResponse {
 }
 
 export function MainPanelContent({ paneId }: MainPanelContentProps) {
+  const pathname = usePathname();
+  const isEmbedMode = pathname?.startsWith("/embed/") ?? false;
   const { activeView, setActiveView } = useLeftPanelViewStore();
   const { position: notesPanelPosition } = useNotesPanelStore();
   const activePaneId = useContentStore((state) => state.activePaneId);
@@ -1515,6 +1518,17 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
         title={noteTitle}
         url={contentData.url}
         subtype={contentData.subtype}
+        readingStatus={contentData.readingStatus}
+        description={contentData.description}
+        resourceType={contentData.resourceType}
+        resourceRelationship={contentData.resourceRelationship}
+        userIntent={contentData.userIntent}
+        sourceDomain={contentData.sourceDomain}
+        sourceHostname={contentData.sourceHostname}
+        faviconUrl={contentData.faviconUrl}
+        preserveHtml={contentData.preserveHtml}
+        preservedHtmlCapturedAt={contentData.preservedHtmlCapturedAt}
+        captureMetadata={contentData.captureMetadata}
         preview={contentData.preview}
       />
     );
@@ -1729,7 +1743,8 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
       >
         {selectedContentId &&
           !selectedContentId.startsWith("person:") &&
-          contentType !== "page-template" && <ContentToolbar />}
+          contentType !== "page-template" &&
+          !isEmbedMode && <ContentToolbar />}
         {isNonNoteContent ? (
           <div className="flex flex-1 min-h-0 flex-col overflow-hidden">
             {notesPanelPosition === "above" && (

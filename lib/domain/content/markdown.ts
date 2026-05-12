@@ -104,10 +104,11 @@ function serializeToMarkdown(
   json: JSONContent,
   extensions: Extensions
 ): string {
-  // This is a placeholder - actual implementation requires
-  // prosemirror-markdown serializer configured with extensions
-
-  // For now, return HTML conversion (M5 will implement full markdown serializer)
+  // generateHTML internally uses browser DOM APIs (document.createElement etc.).
+  // Guard so server-side callers (API routes) don't crash with "window is not defined".
+  if (typeof window === "undefined") {
+    return extractPlainText(json);
+  }
   const html = generateHTML(json, extensions);
   return htmlToMarkdown(html);
 }

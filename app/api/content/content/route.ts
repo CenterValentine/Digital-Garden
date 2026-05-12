@@ -16,11 +16,13 @@ import {
   markdownToTiptap,
   CONTENT_WITH_PAYLOADS,
 } from "@/lib/domain/content";
+import { normalizeUrl } from "@/lib/domain/content/external-validation";
 import type { JSONContent } from "@tiptap/core";
 import { getServerExtensions } from "@/lib/domain/editor/extensions-server";
 import { instantiateTemplateContent } from "@/lib/domain/editor/template-instantiation";
 import { sanitizeTipTapJsonWithExtensions } from "@/lib/domain/editor/unsupported-content";
 import type { ContentType } from "@/lib/database/generated/prisma";
+import { ensureWebResourceForExternalContent } from "@/lib/domain/browser-extension";
 import type {
   ContentWhereInput,
   ContentListItem,
@@ -28,6 +30,65 @@ import type {
   CreateContentRequest,
   ContentDetailResponse,
 } from "@/lib/domain/content/api-types";
+
+function getExternalDomainParts(url: string) {
+  try {
+    const parsed = new URL(url);
+    const hostname = parsed.hostname.toLowerCase();
+    const parts = hostname.split(".").filter(Boolean);
+    return {
+      hostname,
+      domain:
+        parts.length >= 2
+          ? `${parts[parts.length - 2]}.${parts[parts.length - 1]}`
+          : hostname,
+    };
+  } catch {
+    return { hostname: null, domain: null };
+  }
+}
+
+function formatExternalResponse(payload: {
+  url: string;
+  subtype: string | null;
+  normalizedUrl: string | null;
+  canonicalUrl: string | null;
+  readingStatus: "inbox" | "queue" | "reading" | "read" | "archived";
+  description: string | null;
+  resourceType: string | null;
+  resourceRelationship: string | null;
+  userIntent: string | null;
+  sourceDomain: string | null;
+  sourceHostname: string | null;
+  faviconUrl: string | null;
+  preserveHtml: boolean;
+  preservedHtmlSnapshot: unknown;
+  preservedHtmlCapturedAt: Date | null;
+  captureMetadata: unknown;
+  matchMetadata: unknown;
+  preview: unknown;
+}) {
+  return {
+    url: payload.url,
+    subtype: payload.subtype || "website",
+    normalizedUrl: payload.normalizedUrl,
+    canonicalUrl: payload.canonicalUrl,
+    readingStatus: payload.readingStatus,
+    description: payload.description,
+    resourceType: payload.resourceType,
+    resourceRelationship: payload.resourceRelationship,
+    userIntent: payload.userIntent,
+    sourceDomain: payload.sourceDomain,
+    sourceHostname: payload.sourceHostname,
+    faviconUrl: payload.faviconUrl,
+    preserveHtml: payload.preserveHtml,
+    preservedHtmlSnapshot: payload.preservedHtmlSnapshot as any,
+    preservedHtmlCapturedAt: payload.preservedHtmlCapturedAt,
+    captureMetadata: payload.captureMetadata as any,
+    matchMetadata: payload.matchMetadata as any,
+    preview: payload.preview as any,
+  };
+}
 
 // ============================================================
 // GET /api/content/content - List Content
@@ -300,6 +361,17 @@ export async function POST(request: NextRequest) {
       language,
       url,
       subtype,
+      canonicalUrl,
+      faviconUrl,
+      readingStatus,
+      description,
+      resourceType,
+      resourceRelationship,
+      userIntent,
+      preserveHtml,
+      preservedHtmlSnapshot,
+      captureMetadata,
+      matchMetadata,
       engine,
       chartConfig,
       chartData,
@@ -592,13 +664,34 @@ export async function POST(request: NextRequest) {
     } else if (url !== undefined) {
       // External payload (Phase 2)
       contentType = "external";
+      const normalizedUrl = normalizeUrl(url);
+      const resolvedCanonicalUrl = canonicalUrl
+        ? normalizeUrl(canonicalUrl)
+        : normalizedUrl;
+      const domainParts = getExternalDomainParts(resolvedCanonicalUrl);
 
       payloadData = {
         externalPayload: {
           create: {
             url,
-            subtype: subtype || "website",
+            normalizedUrl,
+            canonicalUrl: resolvedCanonicalUrl,
+            subtype: preserveHtml ? "preserved-html" : subtype || "website",
+            readingStatus: readingStatus || "inbox",
+            description: description?.trim() || null,
+            resourceType: resourceType?.trim() || null,
+            resourceRelationship: resourceRelationship?.trim() || null,
+            userIntent: userIntent?.trim() || null,
+            sourceDomain: domainParts.domain,
+            sourceHostname: domainParts.hostname,
+            faviconUrl: faviconUrl || null,
             preview: {}, // Will be populated by preview fetch
+            captureMetadata: (captureMetadata || {}) as any,
+            matchMetadata: (matchMetadata || {}) as any,
+            preserveHtml: preserveHtml || false,
+            preservedHtmlSnapshot: (preservedHtmlSnapshot || null) as any,
+            preservedHtmlCapturedAt:
+              preserveHtml && preservedHtmlSnapshot ? new Date() : null,
           },
         },
       };
@@ -708,6 +801,23 @@ export async function POST(request: NextRequest) {
       throw new Error("Could not resolve unique slug after retries");
     }
 
+    if (content.externalPayload) {
+      await ensureWebResourceForExternalContent(session.user.id, {
+        contentId: content.id,
+        url: content.externalPayload.url,
+        canonicalUrl: content.externalPayload.canonicalUrl,
+        title: content.title,
+        faviconUrl: content.externalPayload.faviconUrl,
+      });
+      content = await prisma.contentNode.findUnique({
+        where: { id: content.id },
+        include: CONTENT_WITH_PAYLOADS,
+      });
+      if (!content) {
+        throw new Error("Created external content could not be reloaded");
+      }
+    }
+
     // Format response
     const response: ContentDetailResponse = {
       id: content.id,
@@ -762,11 +872,7 @@ export async function POST(request: NextRequest) {
       };
     }
     if (content.externalPayload) {
-      response.external = {
-        url: content.externalPayload.url,
-        subtype: content.externalPayload.subtype || "website",
-        preview: content.externalPayload.preview as any,
-      };
+      response.external = formatExternalResponse(content.externalPayload);
     }
     if (content.chatPayload) {
       response.chat = {

@@ -45,6 +45,26 @@ body:has(.public-route) main {
   padding-top: 0 !important;
 }
 
+/* ────────────────────────────────────────────────────────────────────────
+ * Embed iframe — hide root chrome and let .embed-layout-page own the viewport.
+ * Used when the browser-extension iframe loads /embed/* pages. The embed
+ * layout fixed-positions itself over the whole viewport, but we also kill the
+ * navbar / padding so they can't bleed through or steal layout space.
+ * ──────────────────────────────────────────────────────────────────────── */
+body:has(.embed-layout-page) .notes-route-hides-default-nav,
+body:has(.embed-layout-page) > header,
+body:has(.embed-layout-page) > nav {
+  display: none !important;
+}
+
+body:has(.embed-layout-page) main {
+  padding: 0 !important;
+}
+
+body:has(.embed-layout-page) {
+  overflow: hidden !important;
+}
+
 /* Position toaster below navbar on notes routes (top-right corner) */
 /* Sonner uses [data-sonner-toaster] as the main container */
 body:has(.notes-layout-page) [data-sonner-toaster][data-y-position="top"] {

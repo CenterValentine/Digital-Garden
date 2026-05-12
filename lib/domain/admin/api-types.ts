@@ -168,6 +168,10 @@ export const AUDIT_ACTIONS = {
   VIEW_SYSTEM_STATS: "VIEW_SYSTEM_STATS",
   VIEW_AUDIT_LOGS: "VIEW_AUDIT_LOGS",
   EXPORT_AUDIT_LOGS: "EXPORT_AUDIT_LOGS",
+
+  // Collaboration maintenance
+  FLUSH_COLLAB_DOC: "FLUSH_COLLAB_DOC",
+  VIEW_COLLAB_DOCS: "VIEW_COLLAB_DOCS",
 } as const;
 
 export type AuditAction = typeof AUDIT_ACTIONS[keyof typeof AUDIT_ACTIONS];

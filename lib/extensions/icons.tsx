@@ -1,4 +1,5 @@
 import {
+  Bookmark,
   Briefcase,
   CalendarCheck,
   CalendarDays,
@@ -11,6 +12,7 @@ import {
 import type { ReactElement } from "react";
 
 const EXTENSION_ICONS: Record<string, LucideIcon> = {
+  Bookmark,
   Briefcase,
   CalendarCheck,
   CalendarDays,

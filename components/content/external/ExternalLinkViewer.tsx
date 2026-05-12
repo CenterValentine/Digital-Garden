@@ -16,6 +16,17 @@ interface ExternalLinkViewerProps {
   contentId: string;
   url: string;
   subtype: string;
+  readingStatus?: "inbox" | "queue" | "reading" | "read" | "archived";
+  description?: string | null;
+  resourceType?: string | null;
+  resourceRelationship?: string | null;
+  userIntent?: string | null;
+  sourceDomain?: string | null;
+  sourceHostname?: string | null;
+  faviconUrl?: string | null;
+  preserveHtml?: boolean;
+  preservedHtmlCapturedAt?: string | null;
+  captureMetadata?: Record<string, unknown>;
   preview?: {
     mode?: "none" | "open_graph";
     cached?: {
@@ -32,12 +43,36 @@ export function ExternalLinkViewer({
   contentId,
   url,
   subtype,
+  readingStatus,
+  description,
+  resourceType,
+  resourceRelationship,
+  userIntent,
+  sourceDomain,
+  sourceHostname,
+  faviconUrl,
+  preserveHtml,
+  preservedHtmlCapturedAt,
+  captureMetadata,
   preview = {},
 }: ExternalLinkViewerProps) {
   const glass0 = getSurfaceStyles("glass-0");
   const [previewData, setPreviewData] = useState(preview.cached || null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
+  const screenshotDataUrl =
+    typeof captureMetadata?.screenshotDataUrl === "string"
+      ? captureMetadata.screenshotDataUrl
+      : null;
+  const displayImageUrl = previewData?.imageUrl || screenshotDataUrl || null;
+  const savedFromSource =
+    typeof captureMetadata?.source === "string" ? captureMetadata.source : null;
+  const savedAt =
+    typeof captureMetadata?.dateAdded === "number"
+      ? new Date(captureMetadata.dateAdded).toISOString()
+      : typeof captureMetadata?.capturedAt === "string"
+        ? captureMetadata.capturedAt
+        : null;
 
   // Reset preview when URL changes (e.g., after editing)
   useEffect(() => {
@@ -102,11 +137,13 @@ export function ExternalLinkViewer({
   };
 
   // Check if we have any metadata at all
-  const hasAnyMetadata = previewData && (
-    previewData.title ||
-    previewData.description ||
-    previewData.siteName ||
-    previewData.imageUrl
+  const hasAnyMetadata = Boolean(
+    screenshotDataUrl ||
+      (previewData &&
+        (previewData.title ||
+          previewData.description ||
+          previewData.siteName ||
+          previewData.imageUrl))
   );
 
   // Check which fields are missing
@@ -127,10 +164,10 @@ export function ExternalLinkViewer({
             backdropFilter: glass0.backdropFilter,
           }}
         >
-          {previewData?.imageUrl ? (
+          {displayImageUrl ? (
             <div className="aspect-video w-full overflow-hidden bg-black/20">
               <img
-                src={previewData.imageUrl}
+                src={displayImageUrl}
                 alt={previewData.title || "Preview"}
                 className="h-full w-full object-cover"
               />
@@ -198,21 +235,92 @@ export function ExternalLinkViewer({
           background: glass0.background,
           backdropFilter: glass0.backdropFilter,
         }}
-      >
-        <div className="flex items-start gap-3">
-          <ExternalLink className="h-5 w-5 text-gray-600 mt-0.5 flex-shrink-0" />
+        >
+          <div className="flex items-start gap-3">
+          {faviconUrl ? (
+            <img
+              src={faviconUrl}
+              alt=""
+              className="h-5 w-5 rounded-sm mt-0.5 flex-shrink-0"
+            />
+          ) : (
+            <ExternalLink className="h-5 w-5 text-gray-600 mt-0.5 flex-shrink-0" />
+          )}
           <div className="flex-1 min-w-0">
             <div className="text-sm font-medium text-gray-900 mb-1">
               External Link
             </div>
             <div className="text-xs text-gray-700 break-all">{url}</div>
-            {subtype && subtype !== "website" && (
-              <div className="mt-2">
-                <span className="inline-block px-2 py-0.5 bg-blue-500/20 text-blue-400 text-xs rounded">
+            <div className="mt-3 flex flex-wrap gap-2">
+              {readingStatus && (
+                <span className="inline-block px-2 py-0.5 bg-amber-500/15 text-amber-600 text-xs rounded-full">
+                  {readingStatus}
+                </span>
+              )}
+              {resourceType && (
+                <span className="inline-block px-2 py-0.5 bg-sky-500/15 text-sky-600 text-xs rounded-full">
+                  {resourceType}
+                </span>
+              )}
+              {resourceRelationship && (
+                <span className="inline-block px-2 py-0.5 bg-rose-500/15 text-rose-600 text-xs rounded-full">
+                  {resourceRelationship}
+                </span>
+              )}
+              {userIntent && (
+                <span className="inline-block px-2 py-0.5 bg-emerald-500/15 text-emerald-600 text-xs rounded-full">
+                  {userIntent}
+                </span>
+              )}
+              {subtype && subtype !== "website" && (
+                <span className="inline-block px-2 py-0.5 bg-blue-500/20 text-blue-400 text-xs rounded-full">
                   {subtype}
                 </span>
-              </div>
+              )}
+              {preserveHtml && (
+                <span className="inline-block px-2 py-0.5 bg-violet-500/15 text-violet-600 text-xs rounded-full">
+                  preserve HTML
+                </span>
+              )}
+              {savedFromSource && (
+                <span className="inline-block px-2 py-0.5 bg-emerald-500/15 text-emerald-600 text-xs rounded-full">
+                  {savedFromSource}
+                </span>
+              )}
+            </div>
+            <div className="mt-3 space-y-1 text-xs text-gray-600">
+              {sourceDomain && <div>Domain: {sourceDomain}</div>}
+              {!sourceDomain && sourceHostname && <div>Host: {sourceHostname}</div>}
+              {savedAt && (
+                <div>
+                  Saved: {new Date(savedAt).toLocaleString()}
+                </div>
+              )}
+              {preservedHtmlCapturedAt && (
+                <div>
+                  HTML captured: {new Date(preservedHtmlCapturedAt).toLocaleString()}
+                </div>
+              )}
+              {screenshotDataUrl && (
+                <div>Visual snapshot captured when saved.</div>
+              )}
+              {previewData?.fetchedAt && (
+                <div>
+                  Preview fetched: {new Date(previewData.fetchedAt).toLocaleString()}
+                </div>
+              )}
+            </div>
+            {description && (
+              <p className="mt-3 text-sm text-gray-700 whitespace-pre-wrap">
+                {description}
+              </p>
             )}
+            {previewData?.description &&
+              previewData.description !== description && (
+              <p className="mt-3 text-xs text-gray-700 line-clamp-3">
+                {previewData.description}
+              </p>
+              )}
           </div>
         </div>
       </div>

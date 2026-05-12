@@ -318,7 +318,7 @@ export const toolRegistry: ToolDefinition[] = [
 
   {
     id: "backlinks",
-    label: "Backlinks",
+    label: "Links",
     icon: <Link2 size={16} />,
     order: 10,
     surfaces: ["panel"],

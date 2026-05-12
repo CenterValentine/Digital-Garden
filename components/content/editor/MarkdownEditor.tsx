@@ -13,6 +13,7 @@
 
 import { useEditor, EditorContent } from "@tiptap/react";
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { usePathname } from "next/navigation";
 import { getEditorExtensions, getViewerExtensions } from "@/lib/domain/editor/extensions-client";
 import type { JSONContent } from "@tiptap/core";
 import { LinkDialog } from "./LinkDialog";
@@ -180,6 +181,8 @@ export function MarkdownEditor({
   className = "",
 }: MarkdownEditorProps) {
   const openMenu = useContextMenuStore((s) => s.openMenu);
+  const pathname = usePathname();
+  const isEmbedMode = pathname?.startsWith("/embed/") ?? false;
 
   // Pre-load template/snippet data so right-click context menu has categories ready
   useEffect(() => {
@@ -969,6 +972,11 @@ export function MarkdownEditor({
           }
         }}
         onContextMenu={(e) => {
+          // In the browser-extension iframe, the custom context-menu portal
+          // isn't mounted — bail out so the browser's native menu shows.
+          if (isEmbedMode) return;
+          // Modifier key = let browser show its native context menu (spell-check, inspect, etc.)
+          if (e.altKey || e.ctrlKey || e.shiftKey || e.metaKey) return;
           // Allow the browser's native context menu when the dev "Inspect Element" action re-fires it
           if ((window as any).__passNativeContextMenu) {
             (window as any).__passNativeContextMenu = false;

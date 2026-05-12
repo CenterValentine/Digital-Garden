@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Bookmark Capture</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="shell stack" style="max-width: 700px; margin: 0 auto">
+      <div class="title">Bookmark Capture</div>
+      <section class="card stack">
+        <div class="muted">Simple text placeholder now, future rich editor later.</div>
+        <input id="capture-title" placeholder="Bookmark title" />
+        <textarea id="capture-description" placeholder="Bookmark description"></textarea>
+        <fieldset class="metadata-fieldset stack">
+          <legend>Bookmark metadata</legend>
+          <div class="metadata-controls">
+            <div id="capture-resource-type-control"></div>
+            <div id="capture-resource-relationship-control"></div>
+            <div id="capture-user-intent-control"></div>
+          </div>
+        </fieldset>
+        <div class="row">
+          <select id="capture-dedupe">
+            <option value="false">Dedupe Off</option>
+            <option value="true">Dedupe On</option>
+          </select>
+          <select id="capture-preserve-html">
+            <option value="false">Preserve HTML Off</option>
+            <option value="true">Preserve HTML On</option>
+          </select>
+        </div>
+        <div class="row">
+          <button id="capture-save">Save Current Tab</button>
+          <button class="secondary" id="capture-session">Capture Session</button>
+        </div>
+      </section>
+    </div>
+    <script type="module" src="capture.js"></script>
+  </body>
+</html>

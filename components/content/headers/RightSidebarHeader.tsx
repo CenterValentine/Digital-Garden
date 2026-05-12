@@ -37,7 +37,7 @@ const TAB_SVG_PATHS: Record<string, string> = {
 
 /** Tab titles keyed by tabKey */
 const TAB_TITLES: Record<string, string> = {
-  backlinks: "Backlinks",
+  backlinks: "Links",
   outline: "Outline",
   tags: "Tags",
   chat: "AI Chat",
