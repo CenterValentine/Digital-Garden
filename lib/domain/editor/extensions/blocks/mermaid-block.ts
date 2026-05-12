@@ -24,6 +24,7 @@ import type * as Y from "yjs";
 import { createBlockSchema } from "@/lib/domain/blocks/schema";
 import { registerBlock } from "@/lib/domain/blocks/registry";
 import { createBlockNodeView } from "@/lib/domain/blocks/node-view-factory";
+import { makeWrapAttrs } from "@/lib/domain/blocks/wrap-size";
 
 /**
  * Sub-Y.Text naming convention — kept in one place so server (documents.ts)
@@ -153,6 +154,7 @@ export const MermaidBlock = Node.create({
         renderHTML: (attrs) =>
           attrs.showContainer ? { "data-show-container": "true" } : {},
       },
+      ...makeWrapAttrs(),
     };
   },
 
@@ -243,6 +245,7 @@ export const ServerMermaidBlock = Node.create({
         renderHTML: (attrs) =>
           attrs.showContainer ? { "data-show-container": "true" } : {},
       },
+      ...makeWrapAttrs(),
     };
   },
 

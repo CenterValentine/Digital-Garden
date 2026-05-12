@@ -22,6 +22,7 @@ import type * as Y from "yjs";
 import { createBlockSchema } from "@/lib/domain/blocks/schema";
 import { registerBlock } from "@/lib/domain/blocks/registry";
 import { createBlockNodeView } from "@/lib/domain/blocks/node-view-factory";
+import { makeWrapAttrs } from "@/lib/domain/blocks/wrap-size";
 
 /**
  * Sub-map naming convention — kept in one place so server (documents.ts) and
@@ -151,6 +152,7 @@ export const ExcalidrawBlock = Node.create({
         renderHTML: (attrs) =>
           attrs.showContainer ? { "data-show-container": "true" } : {},
       },
+      ...makeWrapAttrs(),
     };
   },
 
@@ -241,6 +243,7 @@ export const ServerExcalidrawBlock = Node.create({
         renderHTML: (attrs) =>
           attrs.showContainer ? { "data-show-container": "true" } : {},
       },
+      ...makeWrapAttrs(),
     };
   },
 

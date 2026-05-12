@@ -63,3 +63,6 @@ archive/
 
 # Office lock/temp files
 ~$*
+
+# memsearch index (local-only Claude Code artifact)
+.memsearch/

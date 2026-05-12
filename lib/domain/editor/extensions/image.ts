@@ -11,6 +11,7 @@
  */
 
 import Image from "@tiptap/extension-image";
+import { makeWrapAttrs, applyWrapAttrs } from "@/lib/domain/blocks/wrap-size";
 
 export const EditorImage = Image.extend({
   // atom: true enables NodeSelection on click (blue outline, delete via backspace)
@@ -53,6 +54,7 @@ export const EditorImage = Image.extend({
           return { style: `width: ${attributes.width}` };
         },
       },
+      ...makeWrapAttrs(),
     };
   },
 
@@ -62,12 +64,23 @@ export const EditorImage = Image.extend({
       // Container
       const wrapper = document.createElement("div");
       wrapper.classList.add("image-resize-wrapper");
-      wrapper.style.display = "inline-block";
       wrapper.style.position = "relative";
       wrapper.style.maxWidth = "100%";
-      if (node.attrs.width) {
-        wrapper.style.width = node.attrs.width;
+
+      // Apply size as preset width (overrides drag-resize width when set)
+      function syncWrapSize(n: typeof node) {
+        applyWrapAttrs(wrapper, n.attrs.wrap as string, n.attrs.size as string);
+        if (n.attrs.size) {
+          // Size preset: let CSS handle width via data-size; clear inline style
+          wrapper.style.width = "";
+          wrapper.style.display = "";
+        } else {
+          // No size preset: use inline width from drag-resize, inline-block layout
+          wrapper.style.display = "inline-block";
+          wrapper.style.width = (n.attrs.width as string) || "";
+        }
       }
+      syncWrapSize(node);
 
       // Image element
       const img = document.createElement("img");
@@ -167,11 +180,8 @@ export const EditorImage = Image.extend({
           } else {
             img.removeAttribute("data-source");
           }
-          if (updatedNode.attrs.width) {
-            wrapper.style.width = updatedNode.attrs.width;
-          } else {
-            wrapper.style.width = "";
-          }
+          // Sync wrap/size CSS
+          syncWrapSize(updatedNode);
 
           // Keep node reference up to date for the resize handler
           node = updatedNode;
@@ -220,6 +230,7 @@ export const ServerImage = Image.extend({
           return { style: `width: ${attributes.width}` };
         },
       },
+      ...makeWrapAttrs(),
     };
   },
 });
