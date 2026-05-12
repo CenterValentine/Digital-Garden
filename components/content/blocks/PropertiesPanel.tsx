@@ -27,6 +27,7 @@ import { StopwatchPropertiesPanel } from "./StopwatchPropertiesPanel";
 export function PropertiesPanel() {
   const selectedBlockId = useBlockStore((s) => s.selectedBlockId);
   const selectedBlockType = useBlockStore((s) => s.selectedBlockType);
+  const selectedBlockAttrs = useBlockStore((s) => s.selectedBlockAttrs);
   const workplacesEnabled = useExtensionActivationStore((state) =>
     state.isExtensionEnabled("workplaces")
   );
@@ -74,12 +75,13 @@ export function PropertiesPanel() {
 
     setDefinition(def);
 
-    // Use default attrs as starting point; editor pushes real values via block-attrs-update.
-    const currentAttrs = def.defaultAttrs;
+    // Prefer real attrs from the store (set immediately on block selection);
+    // fall back to defaults only if we don't have them yet.
+    const currentAttrs = selectedBlockAttrs ?? def.defaultAttrs;
     setAttrs(currentAttrs);
     const allFields = schemaToFields(def.attrsSchema, currentAttrs);
     setFields(filterVisibleFields(def, allFields));
-  }, [selectedBlockId, selectedBlockType, filterVisibleFields]);
+  }, [selectedBlockId, selectedBlockType, selectedBlockAttrs, filterVisibleFields]);
 
   // Listen for block attrs updates from the editor
   useEffect(() => {
@@ -145,8 +147,8 @@ export function PropertiesPanel() {
         <p className="text-xs opacity-50 mt-0.5">{definition.description}</p>
       </div>
 
-      {/* Properties form */}
-      <div className="px-4 py-3 space-y-4">
+      {/* Properties form — keyed on selectedBlockId so all fields remount fresh on block change */}
+      <div key={selectedBlockId ?? "none"} className="px-4 py-3 space-y-4">
         {fields.map((field) => (
           <PropertyField
             key={field.key}

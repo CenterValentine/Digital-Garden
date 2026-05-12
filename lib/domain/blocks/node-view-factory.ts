@@ -22,6 +22,7 @@ import { useBlockStore } from "@/state/block-store";
 import { useRightPanelCollapseStore } from "@/state/right-panel-collapse-store";
 import { getAllSlashBlocks, getBlockDefinition } from "./registry";
 import { calculateMenuPosition } from "@/lib/core/menu-positioning";
+import { applyWrapAttrs } from "./wrap-size";
 
 function focusEditorView(view: EditorView) {
   const element = view.dom as HTMLElement;
@@ -74,6 +75,11 @@ export interface BlockNodeViewOptions {
    * is applied to the outer dom element. When false → hidden; when true → visible.
    */
   containerAttr?: string;
+  /**
+   * When true, adds wrap/size chrome controls and applies float CSS.
+   * The block must include makeWrapAttrs() in addAttributes().
+   */
+  supportWrap?: boolean;
 }
 
 function isEmptyParagraph(node: ProseMirrorNode | null | undefined) {
@@ -431,6 +437,10 @@ export function createBlockNodeView(options: BlockNodeViewOptions) {
     if (options.containerAttr) {
       dom.classList.toggle("block-container-hidden", !node.attrs[options.containerAttr]);
     }
+    // Apply initial wrap/size CSS data-attrs
+    if (options.supportWrap) {
+      applyWrapAttrs(dom, node.attrs.wrap as string, node.attrs.size as string);
+    }
 
     const getNodePos = typeof getPos === "function" ? getPos : undefined;
 
@@ -467,8 +477,28 @@ export function createBlockNodeView(options: BlockNodeViewOptions) {
     const dragHandle = document.createElement("div");
     dragHandle.classList.add("block-drag-handle");
     dragHandle.contentEditable = "false";
+    dragHandle.draggable = true;
     dragHandle.innerHTML = "⠿";
     dragHandle.title = "Drag to reorder";
+    // Mousedown: create a NodeSelection so ProseMirror knows which node is dragging
+    dragHandle.addEventListener("mousedown", (e) => {
+      e.preventDefault();
+      if (typeof getPos !== "function") return;
+      const pos = getPos();
+      if (pos === undefined) return;
+      try {
+        const sel = NodeSelection.create(editor.state.doc, pos);
+        editor.view.dispatch(editor.state.tr.setSelection(sel));
+        editor.view.focus();
+      } catch {}
+    });
+    // Dragstart: set the drag image to the block's outer dom so it looks clean
+    dragHandle.addEventListener("dragstart", (e) => {
+      if (e.dataTransfer) {
+        e.dataTransfer.effectAllowed = "move";
+        e.dataTransfer.setDragImage(dom, 20, 12);
+      }
+    });
     dom.appendChild(dragHandle);
 
     // --- Block chrome header (type badge + menu) ---
@@ -481,6 +511,79 @@ export function createBlockNodeView(options: BlockNodeViewOptions) {
     badge.textContent = options.label;
     chrome.appendChild(badge);
 
+    // --- Wrap / Size controls (opt-in via supportWrap) ---
+    let wrapGroup: HTMLElement | null = null;
+    if (options.supportWrap) {
+      wrapGroup = document.createElement("div");
+      wrapGroup.classList.add("block-wrap-controls");
+      wrapGroup.contentEditable = "false";
+
+      const currentWrap = (node.attrs.wrap as string) || "inline";
+      const currentSize = (node.attrs.size as string) || "";
+      wrapGroup.setAttribute("data-active-wrap", currentWrap);
+      wrapGroup.setAttribute("data-active-size", currentSize);
+
+      function dispatchWrapSize(wrap: string, size: string | null) {
+        if (typeof getPos !== "function") return;
+        const pos = getPos();
+        if (pos === undefined) return;
+        editor.view.dispatch(
+          editor.state.tr.setNodeMarkup(pos, undefined, {
+            ...node.attrs,
+            wrap,
+            size,
+          })
+        );
+      }
+
+      for (const { mode, label, title } of [
+        { mode: "inline", label: "⊟", title: "No wrap (inline)" },
+        { mode: "left", label: "↤", title: "Float left" },
+        { mode: "right", label: "↦", title: "Float right" },
+      ]) {
+        const btn = document.createElement("button");
+        btn.classList.add("block-wrap-btn");
+        btn.setAttribute("data-mode", mode);
+        btn.textContent = label;
+        btn.title = title;
+        btn.addEventListener("mousedown", (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const curSize = (node.attrs.size as string) || null;
+          // L size always overrides to inline; warn by not floated
+          dispatchWrapSize(mode, curSize === "l" ? "l" : curSize);
+        });
+        wrapGroup.appendChild(btn);
+      }
+
+      const sep = document.createElement("span");
+      sep.classList.add("block-wrap-sep");
+      sep.textContent = "|";
+      wrapGroup.appendChild(sep);
+
+      for (const { sz, title } of [
+        { sz: "s", title: "Small — 33%" },
+        { sz: "m", title: "Medium — 50%" },
+        { sz: "l", title: "Large — 100%, no float" },
+      ]) {
+        const btn = document.createElement("button");
+        btn.classList.add("block-size-btn");
+        btn.setAttribute("data-size", sz);
+        btn.textContent = sz.toUpperCase();
+        btn.title = title;
+        btn.addEventListener("mousedown", (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          // L forces inline wrap
+          const newWrap = sz === "l" ? "inline" : ((node.attrs.wrap as string) || "inline");
+          dispatchWrapSize(newWrap, sz);
+        });
+        wrapGroup.appendChild(btn);
+      }
+
+      chrome.appendChild(wrapGroup);
+    }
+
     const menuBtn = document.createElement("button");
     menuBtn.classList.add("block-menu-btn");
     menuBtn.textContent = "⋯";
@@ -489,10 +592,11 @@ export function createBlockNodeView(options: BlockNodeViewOptions) {
       e.preventDefault();
       e.stopPropagation();
       const blockId = resolvedBlockId;
-      useBlockStore.getState().setSelectedBlock(blockId, options.blockType);
+      const currentAttrs = { ...node.attrs, blockId };
+      useBlockStore.getState().setSelectedBlock(blockId, options.blockType, currentAttrs);
       useBlockStore.getState().openProperties();
       useRightPanelCollapseStore.getState().setCollapsed(false);
-      syncAttrsToPanel(blockId, { ...node.attrs, blockId });
+      syncAttrsToPanel(blockId, currentAttrs);
     });
     chrome.appendChild(menuBtn);
 
@@ -563,8 +667,9 @@ export function createBlockNodeView(options: BlockNodeViewOptions) {
     // --- Selection handling (chrome only, not content area) ---
     const syncBlockSelection = () => {
       const blockId = resolvedBlockId;
-      useBlockStore.getState().setSelectedBlock(blockId, options.blockType);
-      syncAttrsToPanel(blockId, { ...node.attrs, blockId });
+      const currentAttrs = { ...node.attrs, blockId };
+      useBlockStore.getState().setSelectedBlock(blockId, options.blockType, currentAttrs);
+      syncAttrsToPanel(blockId, currentAttrs);
     };
 
     // Clicking anywhere inside a block should update the selected block in the
@@ -576,7 +681,9 @@ export function createBlockNodeView(options: BlockNodeViewOptions) {
         const interactive =
           target.closest(".block-menu-btn") ||
           target.closest(".block-delete-btn") ||
-          target.closest(".block-insert-btn");
+          target.closest(".block-insert-btn") ||
+          target.closest(".block-wrap-btn") ||
+          target.closest(".block-size-btn");
         if (interactive) return;
         syncBlockSelection();
       },
@@ -592,11 +699,15 @@ export function createBlockNodeView(options: BlockNodeViewOptions) {
 
       selectNode() {
         dom.classList.add("block-selected", "ProseMirror-selectednode");
+        // Make the outer dom draggable when selected so ProseMirror can
+        // include it in drag/clipboard operations
+        dom.draggable = true;
         syncBlockSelection();
       },
 
       deselectNode() {
         dom.classList.remove("block-selected", "ProseMirror-selectednode");
+        dom.draggable = false;
       },
 
       // Prevent ProseMirror from stealing events inside interactive atom blocks.
@@ -613,6 +724,8 @@ export function createBlockNodeView(options: BlockNodeViewOptions) {
         ) {
           return true;
         }
+        // Inline-editable text fields (contenteditable="true") inside atom blocks
+        if (target.closest('[contenteditable="true"]')) return true;
         const isFormElement =
           target instanceof HTMLInputElement ||
           target instanceof HTMLTextAreaElement ||
@@ -636,6 +749,15 @@ export function createBlockNodeView(options: BlockNodeViewOptions) {
           dom.classList.toggle("block-container-hidden", !updatedNode.attrs[options.containerAttr]);
         }
 
+        // Sync wrap/size CSS and chrome active states
+        if (options.supportWrap) {
+          applyWrapAttrs(dom, updatedNode.attrs.wrap as string, updatedNode.attrs.size as string);
+          if (wrapGroup) {
+            wrapGroup.setAttribute("data-active-wrap", (updatedNode.attrs.wrap as string) || "inline");
+            wrapGroup.setAttribute("data-active-size", (updatedNode.attrs.size as string) || "");
+          }
+        }
+
         // Let the block handle its own content update
         if (options.updateContent) {
           const handled = options.updateContent(
@@ -657,10 +779,11 @@ export function createBlockNodeView(options: BlockNodeViewOptions) {
 
       destroy() {
         // Run any block-specific cleanup (React unmount, runtime handle release, etc.)
-        const cleanup = (contentDom as any).__cleanup;
+        const dom = contentDom as HTMLElement & { __cleanup?: () => void };
+        const cleanup = dom.__cleanup;
         if (cleanup) {
           try { cleanup(); } catch {}
-          delete (contentDom as any).__cleanup;
+          delete dom.__cleanup;
         }
         // Clean up if this block was selected
         const store = useBlockStore.getState();

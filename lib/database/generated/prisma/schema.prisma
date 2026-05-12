@@ -97,6 +97,7 @@ model ContentNode {
   displayOrder  Int         @default(0)
   categoryId    String?     @db.Uuid
   isPublished   Boolean     @default(false)
+  bodyHash      String?     @db.VarChar(64)
   createdAt     DateTime    @default(now()) @db.Timestamptz(6)
   updatedAt     DateTime    @updatedAt @db.Timestamptz(6)
   deletedAt     DateTime?   @db.Timestamptz(6)
@@ -148,6 +149,7 @@ model ContentNode {
   viewWorkspaces               ContentWorkspace[]       @relation("WorkspaceViewRoot")
   periodicNoteIndexes          PeriodicNoteIndex[]
   sourceFlashcards             Flashcard[]              @relation("FlashcardSourceContent")
+  publicItems                  PublicItem[]
   bookmarkSyncLinks            BookmarkSyncLink[]
   bookmarkSyncRoots            BookmarkSyncConnection[] @relation("BookmarkSyncRoot")
   webResourceLinks             WebResourceContentLink[]
@@ -255,6 +257,7 @@ model FilePayload {
   thumbnailUrl     String?
   width            Int?
   height           Int?
+  blurDataUrl      String?         @db.VarChar(2048)
   duration         Int?
   lastAccessedAt   DateTime?       @db.Timestamptz(6)
   createdAt        DateTime        @default(now()) @db.Timestamptz(6)
@@ -444,6 +447,12 @@ model User {
   periodicNoteIndexes      PeriodicNoteIndex[]
   flashcards               Flashcard[]
   flashcardReviewAttempts  FlashcardReviewAttempt[]
+  publicPaths              PublicPath[]
+  publicItems              PublicItem[]
+  publicItemRevisions      PublicItemRevision[]
+  previewTokens            PreviewToken[]
+  publicPathRedirects      PublicPathRedirect[]
+  series                   Series[]
   browserExtensionTokens   BrowserExtensionToken[]
   browserExtensionInstalls BrowserExtensionInstall[]
   bookmarkSyncConnections  BookmarkSyncConnection[]
@@ -1267,4 +1276,306 @@ model CalendarEventAttendee {
 
   @@index([eventId])
   @@index([email])
+}
+
+// ============================================================
+// Publishing System
+// ============================================================
+
+enum PublicItemType {
+  blog_post
+  project
+  profile_section
+  case_study
+  bookmark
+  page
+  media_item
+}
+
+enum PublishState {
+  draft
+  published
+  scheduled
+  unpublished
+  archived
+}
+
+enum ValidationStatus {
+  unchecked
+  ok
+  warnings
+  blocked
+}
+
+enum CoverPosition {
+  top
+  center
+  bottom
+  left
+  right
+}
+
+enum RelatedStrategy {
+  same_path
+  same_tags
+  same_type
+  manual
+  none
+}
+
+enum ProjectStatus {
+  active
+  completed
+  archived
+  wip
+}
+
+enum ProfileLayout {
+  single_column
+  two_column
+  split_hero
+  timeline
+}
+
+enum MediaDisplayVariant {
+  gallery
+  slideshow
+  single
+  mosaic
+}
+
+model PublicPath {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ownerId      String   @db.Uuid
+  parentId     String?  @db.Uuid
+  slug         String   @db.VarChar(120)
+  title        String   @db.VarChar(255)
+  description  String?
+  displayOrder Int      @default(0)
+  icon         String?  @db.VarChar(100)
+  createdAt    DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt    DateTime @updatedAt @db.Timestamptz(6)
+
+  owner       User                 @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  parent      PublicPath?          @relation("PublicPathHierarchy", fields: [parentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  children    PublicPath[]         @relation("PublicPathHierarchy")
+  items       PublicItem[]
+  redirectsTo PublicPathRedirect[] @relation("TargetPath")
+
+  @@unique([parentId, slug])
+  @@index([ownerId, parentId, displayOrder])
+  @@index([ownerId])
+}
+
+model Series {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ownerId      String   @db.Uuid
+  title        String   @db.VarChar(255)
+  slug         String   @db.VarChar(120)
+  description  String?
+  heroImageUrl String?  @db.VarChar(2048)
+  displayOrder Int      @default(0)
+  createdAt    DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt    DateTime @updatedAt @db.Timestamptz(6)
+
+  owner User         @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  items PublicItem[]
+
+  @@unique([ownerId, slug])
+  @@index([ownerId, displayOrder])
+}
+
+model PublicItem {
+  id                  String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ownerId             String           @db.Uuid
+  contentNodeId       String           @db.Uuid
+  pathId              String           @db.Uuid
+  slug                String           @db.VarChar(120)
+  payloadType         PublicItemType
+  publicTitle         String?          @db.VarChar(255)
+  publicTags          String[]
+  state               PublishState     @default(draft)
+  scheduledFor        DateTime?        @db.Timestamptz(6)
+  workingRevisionId   String?          @unique @db.Uuid
+  publishedRevisionId String?          @unique @db.Uuid
+  seriesId            String?          @db.Uuid
+  seriesOrder         Int?
+  deletedAt           DateTime?        @db.Timestamptz(6)
+  firstPublishedAt    DateTime?        @db.Timestamptz(6)
+  lastPublishedAt     DateTime?        @db.Timestamptz(6)
+  validationStatus    ValidationStatus @default(unchecked)
+  validationCheckedAt DateTime?        @db.Timestamptz(6)
+  validationIssues    Json             @default("[]")
+  createdAt           DateTime         @default(now()) @db.Timestamptz(6)
+  updatedAt           DateTime         @updatedAt @db.Timestamptz(6)
+
+  owner             User                 @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  contentNode       ContentNode          @relation(fields: [contentNodeId], references: [id], onDelete: Cascade)
+  path              PublicPath           @relation(fields: [pathId], references: [id], onDelete: Restrict)
+  series            Series?              @relation(fields: [seriesId], references: [id], onDelete: SetNull)
+  workingRevision   PublicItemRevision?  @relation("WorkingRevision", fields: [workingRevisionId], references: [id], onDelete: SetNull)
+  publishedRevision PublicItemRevision?  @relation("PublishedRevision", fields: [publishedRevisionId], references: [id], onDelete: SetNull)
+  revisions         PublicItemRevision[] @relation("AllRevisions")
+  previewTokens     PreviewToken[]
+  redirects         PublicPathRedirect[]
+
+  blogPostPayload       BlogPostPayload?
+  projectPayload        ProjectPayload?
+  profileSectionPayload ProfileSectionPayload?
+  caseStudyPayload      CaseStudyPayload?
+  bookmarkPayload       BookmarkPayload?
+  pagePayload           PagePayload?
+  mediaItemPayload      MediaItemPayload?
+
+  @@unique([pathId, slug])
+  @@index([ownerId, state])
+  @@index([ownerId, payloadType])
+  @@index([contentNodeId])
+  @@index([seriesId, seriesOrder])
+  @@index([scheduledFor])
+  @@index([deletedAt])
+  @@index([ownerId, lastPublishedAt(sort: Desc)])
+}
+
+model PublicItemRevision {
+  id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  publicItemId       String    @db.Uuid
+  bodyJson           Json
+  metadataSnapshot   Json      @default("{}")
+  ogTitle            String?   @db.VarChar(255)
+  ogDescription      String?
+  ogImageUrl         String?   @db.VarChar(2048)
+  readingTimeMinutes Int?
+  wordCount          Int?
+  note               String?   @db.VarChar(500)
+  bodyHash           String    @db.VarChar(64)
+  metadataHash       String    @db.VarChar(64)
+  createdAt          DateTime  @default(now()) @db.Timestamptz(6)
+  publishedAt        DateTime? @db.Timestamptz(6)
+  authorId           String    @db.Uuid
+
+  publicItem   PublicItem  @relation("AllRevisions", fields: [publicItemId], references: [id], onDelete: Cascade)
+  author       User        @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  workingFor   PublicItem? @relation("WorkingRevision")
+  publishedFor PublicItem? @relation("PublishedRevision")
+
+  @@index([publicItemId, createdAt(sort: Desc)])
+  @@index([authorId])
+  @@index([publishedAt])
+}
+
+model PublicPathRedirect {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ownerId        String    @db.Uuid
+  fromPath       String    @unique @db.VarChar(2048)
+  toPathId       String?   @db.Uuid
+  toPublicItemId String?   @db.Uuid
+  isActive       Boolean   @default(true)
+  expiresAt      DateTime? @db.Timestamptz(6)
+  createdAt      DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt      DateTime  @updatedAt @db.Timestamptz(6)
+
+  owner        User        @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  toPath       PublicPath? @relation("TargetPath", fields: [toPathId], references: [id], onDelete: SetNull)
+  toPublicItem PublicItem? @relation(fields: [toPublicItemId], references: [id], onDelete: SetNull)
+
+  @@index([ownerId, isActive])
+  @@index([expiresAt])
+}
+
+model PreviewToken {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  token        String   @unique @db.VarChar(255)
+  publicItemId String   @db.Uuid
+  revisionId   String?  @db.Uuid
+  expiresAt    DateTime @db.Timestamptz(6)
+  createdAt    DateTime @default(now()) @db.Timestamptz(6)
+  createdBy    String   @db.Uuid
+  revoked      Boolean  @default(false)
+  accessCount  Int      @default(0)
+
+  publicItem PublicItem @relation(fields: [publicItemId], references: [id], onDelete: Cascade)
+  creator    User       @relation(fields: [createdBy], references: [id], onDelete: Cascade)
+
+  @@index([publicItemId])
+  @@index([expiresAt])
+}
+
+model BlogPostPayload {
+  publicItemId    String          @id @db.Uuid
+  coverImageUrl   String?         @db.VarChar(2048)
+  coverPosition   CoverPosition   @default(center)
+  excerpt         String?
+  canonicalUrl    String?         @db.VarChar(2048)
+  relatedStrategy RelatedStrategy @default(same_tags)
+  relatedItemIds  String[]        @db.Uuid
+
+  publicItem PublicItem @relation(fields: [publicItemId], references: [id], onDelete: Cascade)
+}
+
+model ProjectPayload {
+  publicItemId  String        @id @db.Uuid
+  status        ProjectStatus @default(active)
+  coverImageUrl String?       @db.VarChar(2048)
+  coverPosition CoverPosition @default(center)
+  repoUrl       String?       @db.VarChar(2048)
+  liveUrl       String?       @db.VarChar(2048)
+  technologies  String[]
+
+  publicItem PublicItem @relation(fields: [publicItemId], references: [id], onDelete: Cascade)
+}
+
+model ProfileSectionPayload {
+  publicItemId String        @id @db.Uuid
+  layout       ProfileLayout @default(single_column)
+  avatarUrl    String?       @db.VarChar(2048)
+  headline     String?       @db.VarChar(255)
+  metadata     Json          @default("{}")
+
+  publicItem PublicItem @relation(fields: [publicItemId], references: [id], onDelete: Cascade)
+}
+
+model CaseStudyPayload {
+  publicItemId  String        @id @db.Uuid
+  coverImageUrl String?       @db.VarChar(2048)
+  coverPosition CoverPosition @default(center)
+  clientName    String?       @db.VarChar(255)
+  outcome       String?       @db.VarChar(500)
+  technologies  String[]
+  startedAt     DateTime?     @db.Timestamptz(6)
+  completedAt   DateTime?     @db.Timestamptz(6)
+
+  publicItem PublicItem @relation(fields: [publicItemId], references: [id], onDelete: Cascade)
+}
+
+model BookmarkPayload {
+  publicItemId  String  @id @db.Uuid
+  url           String  @db.VarChar(2048)
+  ogTitle       String? @db.VarChar(255)
+  ogDescription String?
+  ogImageUrl    String? @db.VarChar(2048)
+  siteName      String? @db.VarChar(255)
+
+  publicItem PublicItem @relation(fields: [publicItemId], references: [id], onDelete: Cascade)
+}
+
+model PagePayload {
+  publicItemId  String        @id @db.Uuid
+  coverImageUrl String?       @db.VarChar(2048)
+  coverPosition CoverPosition @default(center)
+  isRoot        Boolean       @default(false)
+  metadata      Json          @default("{}")
+
+  publicItem PublicItem @relation(fields: [publicItemId], references: [id], onDelete: Cascade)
+}
+
+model MediaItemPayload {
+  publicItemId    String              @id @db.Uuid
+  displayVariant  MediaDisplayVariant @default(single)
+  caption         String?
+  altText         String?             @db.VarChar(500)
+  credit          String?             @db.VarChar(255)
+  mediaContentIds String[]            @db.Uuid
+
+  publicItem PublicItem @relation(fields: [publicItemId], references: [id], onDelete: Cascade)
 }

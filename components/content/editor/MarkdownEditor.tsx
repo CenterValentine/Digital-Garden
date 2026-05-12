@@ -378,9 +378,12 @@ export function MarkdownEditor({
     immediatelyRender: false, // Prevent SSR hydration mismatch
     editorProps: {
       attributes: {
-        class: compact
-          ? "prose prose-sm max-w-none focus:outline-none min-h-[120px] px-4 pt-2 pb-2"
-          : "prose prose-sm sm:prose lg:prose-lg xl:prose-xl max-w-none focus:outline-none min-h-[500px] px-6 pt-3 pb-4",
+        class: [
+          compact
+            ? "prose prose-sm max-w-none focus:outline-none min-h-[120px] px-4 pt-2 pb-2"
+            : "prose prose-sm sm:prose lg:prose-lg xl:prose-xl max-w-none focus:outline-none min-h-[500px] px-6 pt-3 pb-4",
+          effectiveEditable ? "block-editing-active" : "",
+        ].join(" ").trim(),
       },
       // Sprint 37: Allow external file drops (Finder, desktop, etc.)
       // Both dragenter AND dragover must call preventDefault for the browser

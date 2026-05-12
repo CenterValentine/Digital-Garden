@@ -7,8 +7,13 @@
  * Epoch 11 Sprint 43
  */
 
-import { z } from "zod";
+import { z, globalRegistry } from "zod";
 import type { PropertiesField } from "./types";
+
+/** Read the metadata stored via .meta({ ... }) on a Zod type */
+function getZodMeta(def: z.ZodTypeAny): Record<string, unknown> {
+  return (globalRegistry.get(def) as Record<string, unknown>) ?? {};
+}
 
 type ZodCheckDef = {
   _zod?: {
@@ -52,12 +57,9 @@ export function schemaToFields(
 
     const rawType = rawDef as z.ZodTypeAny;
     const def = unwrapZodType(rawType);
-    const field = zodToField(
-      key,
-      def,
-      values[key],
-      getZodDescription(rawType) || getZodDescription(def)
-    );
+    const description = getZodDescription(rawType) || getZodDescription(def);
+    const meta = getZodMeta(rawType);
+    const field = zodToField(key, def, values[key], description, meta);
     if (field) {
       fields.push(field);
     }
@@ -98,23 +100,56 @@ function zodToField(
   key: string,
   def: z.ZodTypeAny,
   value: unknown,
-  description?: string
+  description?: string,
+  meta: Record<string, unknown> = {}
 ): PropertiesField | null {
   const label = humanize(key);
+
+  // Prefer .meta({ tooltip }) over the legacy hardcoded key list
+  const legacyTooltipKeys = new Set([
+    "openBehavior", "workdayCutoffHour", "autoBorrowDurationMinutes",
+    "pathOrder", "templateDateMode", "summaryDate", "weekStartDate",
+  ]);
   const tooltip =
-    key === "openBehavior" ||
-    key === "workdayCutoffHour" ||
-    key === "autoBorrowDurationMinutes" ||
-    key === "pathOrder" ||
-    key === "templateDateMode" ||
-    key === "summaryDate" ||
-    key === "weekStartDate"
+    typeof meta.tooltip === "string"
+      ? meta.tooltip
+      : legacyTooltipKeys.has(key)
       ? description
       : undefined;
+
   const typeName = getZodTypeName(def);
 
-  // String — detect icon fields by key name
+  // String — check meta for explicit fieldType override, then upload type, then key-name heuristics
   if (typeName === "string") {
+    if (meta.fieldType === "gallery-items") {
+      return { key, label, fieldType: "gallery-items", value: value ?? "[]", description, tooltip };
+    }
+    if (meta.fieldType === "json-array") {
+      return {
+        key, label, fieldType: "json-array",
+        value: value ?? "[]",
+        jsonArraySchema: meta.jsonArraySchema as PropertiesField["jsonArraySchema"],
+        addLabel: typeof meta.addLabel === "string" ? meta.addLabel : undefined,
+        emptyMessage: typeof meta.emptyMessage === "string" ? meta.emptyMessage : undefined,
+        description, tooltip,
+      };
+    }
+    if (meta.fieldType === "string-array") {
+      return {
+        key, label, fieldType: "string-array",
+        value: value ?? "[]",
+        placeholder: typeof meta.placeholder === "string" ? meta.placeholder : undefined,
+        addLabel: typeof meta.addLabel === "string" ? meta.addLabel : undefined,
+        emptyMessage: typeof meta.emptyMessage === "string" ? meta.emptyMessage : undefined,
+        description, tooltip,
+      };
+    }
+    if (meta.uploadType === "image") {
+      return { key, label, fieldType: "image-upload", value: value ?? "", description, tooltip };
+    }
+    if (meta.fieldType === "color" || key === "bgColor" || key.endsWith("Color")) {
+      return { key, label, fieldType: "color", value: value ?? "", description, tooltip };
+    }
     if (key === "icon" || key.endsWith("Icon") || key === "customIcon") {
       return { key, label, fieldType: "icon", value: value ?? "", description, tooltip };
     }
