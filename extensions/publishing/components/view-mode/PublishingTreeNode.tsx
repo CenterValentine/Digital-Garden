@@ -1,16 +1,19 @@
 "use client";
 
+import { useState, useCallback } from "react";
 import { ChevronRight, Folder, Globe } from "lucide-react";
 import { cn } from "@/lib/core/utils";
 import { usePublishTreeStore, type PublicPathNode } from "../../state/publish-tree-store";
 import { PublishingTreeNodeBadge } from "./PublishingTreeNodeBadge";
+import { PublishingPathContextMenu } from "./PublishingPathContextMenu";
 
 interface PublishingTreeNodeProps {
   node: PublicPathNode;
   depth: number;
+  onRefresh: () => void;
 }
 
-export function PublishingTreeNode({ node, depth }: PublishingTreeNodeProps) {
+export function PublishingTreeNode({ node, depth, onRefresh }: PublishingTreeNodeProps) {
   const { expandedPathIds, togglePathExpanded, selectedPathId, setSelectedPathId } =
     usePublishTreeStore();
 
@@ -18,7 +21,15 @@ export function PublishingTreeNode({ node, depth }: PublishingTreeNodeProps) {
   const isSelected = selectedPathId === node.id;
   const hasChildren = node.children.length > 0;
 
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
+
   const Icon = depth === 0 ? Globe : Folder;
+
+  const handleContextMenu = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setContextMenu({ x: e.clientX, y: e.clientY });
+  }, []);
 
   return (
     <div>
@@ -35,6 +46,7 @@ export function PublishingTreeNode({ node, depth }: PublishingTreeNodeProps) {
           setSelectedPathId(isSelected ? null : node.id);
           if (hasChildren) togglePathExpanded(node.id);
         }}
+        onContextMenu={handleContextMenu}
       >
         {/* Expand chevron */}
         <span className="shrink-0 w-3.5 h-3.5 flex items-center justify-center">
@@ -64,9 +76,19 @@ export function PublishingTreeNode({ node, depth }: PublishingTreeNodeProps) {
       {isExpanded && hasChildren && (
         <div>
           {node.children.map((child) => (
-            <PublishingTreeNode key={child.id} node={child} depth={depth + 1} />
+            <PublishingTreeNode key={child.id} node={child} depth={depth + 1} onRefresh={onRefresh} />
           ))}
         </div>
+      )}
+
+      {/* Context menu */}
+      {contextMenu && (
+        <PublishingPathContextMenu
+          node={node}
+          position={contextMenu}
+          onClose={() => setContextMenu(null)}
+          onRefresh={onRefresh}
+        />
       )}
     </div>
   );

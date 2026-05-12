@@ -91,6 +91,29 @@ export async function fetchPublicPaths(): Promise<PublicPathSummary[]> {
   return flattenPaths(roots);
 }
 
+export async function updatePublicPath(
+  id: string,
+  body: { title?: string; slug?: string; description?: string | null; icon?: string | null }
+): Promise<void> {
+  const res = await fetch(`/api/publishing/paths/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error((err as { error?: string }).error ?? `Update failed: ${res.status}`);
+  }
+}
+
+export async function deletePublicPath(id: string): Promise<void> {
+  const res = await fetch(`/api/publishing/paths/${id}`, { method: "DELETE" });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error((err as { error?: string }).error ?? `Delete failed: ${res.status}`);
+  }
+}
+
 export async function createPublicItem(body: {
   contentNodeId: string;
   pathId: string;

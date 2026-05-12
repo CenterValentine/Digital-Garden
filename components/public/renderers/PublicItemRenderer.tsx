@@ -3,11 +3,17 @@
  */
 
 import type { Prisma } from "@/lib/database/generated/prisma";
+import type { JSONContent } from "@tiptap/core";
 import { BlogPostRenderer } from "./BlogPostRenderer";
 import { PageRenderer } from "./PageRenderer";
 import { BookmarkRenderer } from "./BookmarkRenderer";
+import { ProjectRenderer } from "./ProjectRenderer";
+import { CaseStudyRenderer } from "./CaseStudyRenderer";
+import { ProfileSectionRenderer } from "./ProfileSectionRenderer";
+import { MediaItemRenderer } from "./MediaItemRenderer";
+import { TipTapContent } from "../TipTapContent";
 
-type PublicItemWithPayloads = Prisma.PublicItemGetPayload<{
+export type PublicItemWithPayloads = Prisma.PublicItemGetPayload<{
   include: {
     path: true;
     publishedRevision: true;
@@ -33,6 +39,14 @@ export function PublicItemRenderer({ item }: Props) {
       return <PageRenderer item={item} />;
     case "bookmark":
       return <BookmarkRenderer item={item} />;
+    case "project":
+      return <ProjectRenderer item={item} />;
+    case "case_study":
+      return <CaseStudyRenderer item={item} />;
+    case "profile_section":
+      return <ProfileSectionRenderer item={item} />;
+    case "media_item":
+      return <MediaItemRenderer item={item} />;
     default:
       return <FallbackRenderer item={item} />;
   }
@@ -40,14 +54,18 @@ export function PublicItemRenderer({ item }: Props) {
 
 function FallbackRenderer({ item }: Props) {
   const title = item.publicTitle ?? item.slug;
+  const revision = item.publishedRevision;
+  const typeLabel = item.payloadType.replace(/_/g, " ");
+
   return (
     <main className="max-w-2xl mx-auto px-6 py-20">
       <p className="text-xs text-white/30 uppercase tracking-widest mb-3">
-        {item.payloadType.replace(/_/g, " ")}
+        {typeLabel}
       </p>
-      <h1 className="text-3xl font-bold text-white mb-4">{title}</h1>
+      <h1 className="text-3xl font-bold text-white mb-6">{title}</h1>
+
       {item.publicTags.length > 0 && (
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2 mb-8">
           {item.publicTags.map((tag) => (
             <span
               key={tag}
@@ -57,6 +75,13 @@ function FallbackRenderer({ item }: Props) {
             </span>
           ))}
         </div>
+      )}
+
+      {revision?.bodyJson && (
+        <TipTapContent
+          bodyJson={revision.bodyJson as JSONContent}
+          className="public-prose"
+        />
       )}
     </main>
   );

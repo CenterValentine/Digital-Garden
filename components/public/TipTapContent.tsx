@@ -6,7 +6,7 @@
  * directly, passing a jsdom document so it works in Node.js server components.
  */
 
-import { DOMSerializer, Node } from "@tiptap/pm/model";
+import { DOMSerializer, Node, Fragment } from "@tiptap/pm/model";
 import { getSchema } from "@tiptap/core";
 import { JSDOM } from "jsdom";
 import { getServerExtensions } from "@/lib/domain/editor/extensions-server";
@@ -27,6 +27,65 @@ function normalizeDoc(node: JSONContent): JSONContent {
   };
 }
 
+function slugifyAnchor(text: string): string {
+  return text
+    .toLowerCase()
+    .trim()
+    .replace(/[^\w\s-]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
+}
+
+/**
+ * Two-pass DOM post-processor:
+ * 1. Assign unique `id` attributes to every heading so anchor links resolve.
+ * 2. Fill each `.block-toc-list-placeholder` with the actual <ol> list,
+ *    respecting the TOC block's `data-max-depth` attribute.
+ */
+function postProcessDom(container: HTMLElement, jsdomDocument: Document): void {
+  // Pass 1 — heading IDs
+  const seen = new Map<string, number>();
+  const headingData: Array<{ level: number; text: string; id: string }> = [];
+  container.querySelectorAll<HTMLElement>("h1,h2,h3,h4,h5,h6").forEach((el) => {
+    const base = slugifyAnchor(el.textContent ?? "") || "heading";
+    const count = seen.get(base) ?? 0;
+    seen.set(base, count + 1);
+    const id = count === 0 ? base : `${base}-${count + 1}`;
+    el.id = id;
+    headingData.push({ level: parseInt(el.tagName[1]!, 10), text: el.textContent ?? "", id });
+  });
+
+  // Pass 2 — TOC placeholders
+  container.querySelectorAll<HTMLElement>(".block-toc-list-placeholder").forEach((placeholder) => {
+    const nav = placeholder.closest<HTMLElement>('nav[data-block-type="tableOfContents"]');
+    const maxDepth = parseInt(nav?.getAttribute("data-max-depth") ?? "3", 10);
+    const entries = headingData.filter((h) => h.level <= maxDepth);
+    if (entries.length === 0) {
+      const empty = jsdomDocument.createElement("p");
+      empty.className = "block-toc-empty";
+      empty.textContent = "No headings found";
+      placeholder.appendChild(empty);
+      return;
+    }
+    const minLevel = Math.min(...entries.map((e) => e.level));
+    const ol = jsdomDocument.createElement("ol");
+    ol.className = "block-toc-list";
+    entries.forEach((entry) => {
+      const li = jsdomDocument.createElement("li");
+      li.className = `block-toc-item block-toc-item--h${entry.level}`;
+      if (entry.level > minLevel) li.style.paddingLeft = `${entry.level - minLevel}rem`;
+      const a = jsdomDocument.createElement("a");
+      a.href = `#${entry.id}`;
+      a.className = "block-toc-link";
+      a.textContent = entry.text;
+      li.appendChild(a);
+      ol.appendChild(li);
+    });
+    placeholder.appendChild(ol);
+  });
+}
+
 function generateHTMLServer(doc: JSONContent): string {
   const extensions = getServerExtensions();
   const schema = getSchema(extensions);
@@ -34,13 +93,34 @@ function generateHTMLServer(doc: JSONContent): string {
 
   const { document: jsdomDocument } = new JSDOM("").window;
   const serializer = DOMSerializer.fromSchema(schema);
-  const fragment = serializer.serializeFragment(contentNode.content, {
-    document: jsdomDocument,
-  });
 
-  const container = jsdomDocument.createElement("div");
-  container.appendChild(fragment);
-  return container.innerHTML;
+  // Try full serialization first (fast path).
+  try {
+    const fragment = serializer.serializeFragment(contentNode.content, {
+      document: jsdomDocument,
+    });
+    const container = jsdomDocument.createElement("div");
+    container.appendChild(fragment);
+    postProcessDom(container, jsdomDocument);
+    return container.innerHTML;
+  } catch (fullErr) {
+    // Full pass failed — fall back to per-node serialization so one broken
+    // block doesn't blank the entire page. Logs the failing node type.
+    console.error("[TipTapContent] Full serialization failed, trying per-node fallback:", fullErr);
+    const container = jsdomDocument.createElement("div");
+    contentNode.content.forEach((node) => {
+      try {
+        const nodeFrag = serializer.serializeFragment(Fragment.from(node), {
+          document: jsdomDocument,
+        });
+        container.appendChild(nodeFrag);
+      } catch (nodeErr) {
+        console.error(`[TipTapContent] Block "${node.type.name}" failed to render — skipping:`, nodeErr);
+      }
+    });
+    postProcessDom(container, jsdomDocument);
+    return container.innerHTML;
+  }
 }
 
 export function TipTapContent({ bodyJson, className }: TipTapContentProps) {
@@ -55,6 +135,9 @@ export function TipTapContent({ bodyJson, className }: TipTapContentProps) {
   return (
     <div
       className={className ?? "public-prose"}
+      // Browser extensions (e.g. crypto wallets) sometimes mutate innerHTML
+      // before React hydrates, causing a benign mismatch warning.
+      suppressHydrationWarning
       // eslint-disable-next-line react/no-danger
       dangerouslySetInnerHTML={{ __html: html }}
     />

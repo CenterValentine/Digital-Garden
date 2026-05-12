@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { X, Loader2 } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { X, Loader2, ChevronDown, Plus, Check, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/core/utils";
 import {
@@ -10,14 +10,7 @@ import {
   type PublicPathSummary,
 } from "../../lib/client-api";
 import { slugify, isValidSlug } from "../../lib/slug";
-
-const PAYLOAD_TYPES = [
-  { value: "blog_post", label: "Blog Post" },
-  { value: "page", label: "Page" },
-  { value: "bookmark", label: "Bookmark" },
-  { value: "project", label: "Project" },
-  { value: "profile_section", label: "Profile Section" },
-] as const;
+import { usePublishStore, type ContentTypeEntry } from "../../state/publish-store";
 
 interface CreatePublicItemDialogProps {
   contentNodeId: string;
@@ -36,7 +29,8 @@ export function CreatePublicItemDialog({
   const [isLoadingPaths, setIsLoadingPaths] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const [payloadType, setPayloadType] = useState<string>("blog_post");
+  const { contentTypes, addContentType, removeContentType } = usePublishStore();
+  const [payloadType, setPayloadType] = useState<string>(contentTypes[0]?.value ?? "blog_post");
   const [pathId, setPathId] = useState<string>("");
   const [slug, setSlug] = useState(() => slugify(contentTitle ?? ""));
   const [publicTitle, setPublicTitle] = useState(contentTitle ?? "");
@@ -86,6 +80,8 @@ export function CreatePublicItemDialog({
     }
   }
 
+  const selectedType = contentTypes.find((t) => t.value === payloadType);
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       {/* Backdrop */}
@@ -124,21 +120,17 @@ export function CreatePublicItemDialog({
             />
           </label>
 
-          {/* Payload type */}
-          <label className="block">
+          {/* Content type — custom picker */}
+          <div>
             <span className="text-xs text-white/40 mb-1 block">Content type</span>
-            <select
+            <ContentTypePicker
+              types={contentTypes}
               value={payloadType}
-              onChange={(e) => setPayloadType(e.target.value)}
-              className="w-full rounded-md border border-white/10 bg-zinc-800 px-3 py-2 text-sm text-white focus:border-white/20 focus:outline-none"
-            >
-              {PAYLOAD_TYPES.map((t) => (
-                <option key={t.value} value={t.value}>
-                  {t.label}
-                </option>
-              ))}
-            </select>
-          </label>
+              onChange={setPayloadType}
+              onAdd={addContentType}
+              onRemove={removeContentType}
+            />
+          </div>
 
           {/* Path */}
           <label className="block">
@@ -209,6 +201,142 @@ export function CreatePublicItemDialog({
           </button>
         </div>
       </form>
+    </div>
+  );
+}
+
+// ─── ContentTypePicker ────────────────────────────────────────────────────────
+
+interface ContentTypePickerProps {
+  types: ContentTypeEntry[];
+  value: string;
+  onChange: (value: string) => void;
+  onAdd: (label: string) => ContentTypeEntry | null;
+  onRemove: (value: string) => void;
+}
+
+function ContentTypePicker({
+  types,
+  value,
+  onChange,
+  onAdd,
+  onRemove,
+}: ContentTypePickerProps) {
+  const [open, setOpen] = useState(false);
+  const [newLabel, setNewLabel] = useState("");
+  const containerRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Close on outside click
+  useEffect(() => {
+    if (!open) return;
+    function handleClick(e: MouseEvent) {
+      if (!containerRef.current?.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [open]);
+
+  function handleAddType() {
+    const trimmed = newLabel.trim();
+    if (!trimmed) return;
+    const entry = onAdd(trimmed);
+    if (entry) {
+      onChange(entry.value);
+      setNewLabel("");
+      inputRef.current?.focus();
+    }
+  }
+
+  const selectedLabel = types.find((t) => t.value === value)?.label ?? value;
+
+  return (
+    <div ref={containerRef} className="relative">
+      {/* Trigger */}
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="w-full flex items-center justify-between rounded-md border border-white/10 bg-zinc-800 px-3 py-2 text-sm text-white hover:border-white/20 focus:outline-none transition-colors"
+      >
+        <span>{selectedLabel}</span>
+        <ChevronDown className={cn("w-4 h-4 text-white/30 transition-transform", open && "rotate-180")} />
+      </button>
+
+      {/* Dropdown */}
+      {open && (
+        <div className="absolute left-0 right-0 top-full mt-1 z-50 rounded-lg border border-white/10 bg-zinc-900 shadow-xl overflow-hidden">
+          {/* Type list */}
+          <div className="max-h-40 overflow-y-auto py-1">
+            {types.map((type) => (
+              <div
+                key={type.value}
+                className="group flex items-center gap-2 px-3 py-1.5 hover:bg-white/5 cursor-pointer"
+                onClick={() => {
+                  onChange(type.value);
+                  setOpen(false);
+                }}
+              >
+                <Check
+                  className={cn(
+                    "w-3.5 h-3.5 shrink-0 transition-opacity",
+                    type.value === value ? "text-emerald-400 opacity-100" : "opacity-0"
+                  )}
+                />
+                <span className="flex-1 text-sm text-white/80">{type.label}</span>
+                {type.removable && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onRemove(type.value);
+                      // If removed type was selected, fall back to first
+                      if (type.value === value && types.length > 1) {
+                        const fallback = types.find((t) => t.value !== type.value);
+                        if (fallback) onChange(fallback.value);
+                      }
+                    }}
+                    className="opacity-0 group-hover:opacity-100 p-0.5 rounded text-white/30 hover:text-red-400 transition-all"
+                  >
+                    <Trash2 className="w-3 h-3" />
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {/* Add new type */}
+          <div className="border-t border-white/5 px-3 py-2 flex items-center gap-2">
+            <input
+              ref={inputRef}
+              type="text"
+              value={newLabel}
+              onChange={(e) => setNewLabel(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  handleAddType();
+                }
+              }}
+              placeholder="Add type…"
+              className="flex-1 bg-transparent text-xs text-white placeholder:text-white/25 focus:outline-none"
+              onClick={(e) => e.stopPropagation()}
+            />
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleAddType();
+              }}
+              disabled={!newLabel.trim()}
+              className="p-1 rounded text-white/30 hover:text-white/70 disabled:opacity-30 transition-colors"
+            >
+              <Plus className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

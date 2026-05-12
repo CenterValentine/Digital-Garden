@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ExternalLink, MoreHorizontal, Loader2 } from "lucide-react";
+import { ExternalLink, MoreHorizontal, Loader2, CalendarClock, X } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/core/utils";
 import {
@@ -10,7 +10,7 @@ import {
   VALIDATION_ICON,
 } from "../icons/state-icon-map";
 import { canPublish, hasPendingChanges, isBlockedByValidation } from "../../lib/predicates";
-import { publishItem, unpublishItem } from "../../lib/client-api";
+import { publishItem, unpublishItem, scheduleItem } from "../../lib/client-api";
 import { usePublishStore, type PublishItemSummary } from "../../state/publish-store";
 
 interface PublishItemRowProps {
@@ -20,6 +20,8 @@ interface PublishItemRowProps {
 
 export function PublishItemRow({ item, onRefresh }: PublishItemRowProps) {
   const [isActing, setIsActing] = useState(false);
+  const [showScheduler, setShowScheduler] = useState(false);
+  const [scheduledValue, setScheduledValue] = useState("");
   const { openPrePublishDialog } = usePublishStore();
 
   const stateIcon = PUBLISH_STATE_ICON[item.state];
@@ -57,6 +59,24 @@ export function PublishItemRow({ item, onRefresh }: PublishItemRowProps) {
       onRefresh();
     } catch {
       toast.error("Could not unpublish. Try again.");
+    } finally {
+      setIsActing(false);
+    }
+  }
+
+  async function handleSchedule() {
+    if (!scheduledValue) return;
+    const scheduledFor = new Date(scheduledValue).toISOString();
+    const isFuture = new Date(scheduledFor) > new Date();
+    setIsActing(true);
+    try {
+      await scheduleItem(item.id, scheduledFor);
+      toast.success(isFuture ? "Scheduled for publish." : "Publish date set.");
+      setShowScheduler(false);
+      setScheduledValue("");
+      onRefresh();
+    } catch {
+      toast.error("Could not set schedule. Try again.");
     } finally {
       setIsActing(false);
     }
@@ -127,14 +147,24 @@ export function PublishItemRow({ item, onRefresh }: PublishItemRowProps) {
         </div>
 
         {/* Actions */}
-        <div className="flex items-center gap-1 mt-1.5">
+        <div className="flex items-center gap-1 mt-1.5 flex-wrap">
           {item.state !== "published" && canPublish(item) && (
             <button
               onClick={handlePublish}
               disabled={isActing || blocked}
               className="rounded px-1.5 py-0.5 text-[10px] font-medium text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700 transition-colors disabled:opacity-40"
             >
-              Publish
+              Publish now
+            </button>
+          )}
+          {item.state !== "published" && (
+            <button
+              onClick={() => { setShowScheduler((v) => !v); setScheduledValue(""); }}
+              disabled={isActing}
+              className="flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-medium text-sky-500 hover:bg-sky-50 hover:text-sky-600 transition-colors disabled:opacity-40"
+            >
+              <CalendarClock className="w-2.5 h-2.5" />
+              Schedule
             </button>
           )}
           {item.state === "published" && (
@@ -170,6 +200,31 @@ export function PublishItemRow({ item, onRefresh }: PublishItemRowProps) {
             </>
           )}
         </div>
+
+        {/* Inline scheduler */}
+        {showScheduler && (
+          <div className="mt-2 flex items-center gap-1.5">
+            <input
+              type="datetime-local"
+              value={scheduledValue}
+              onChange={(e) => setScheduledValue(e.target.value)}
+              className="flex-1 rounded border border-gray-200 px-1.5 py-0.5 text-[10px] text-gray-700 bg-white focus:outline-none focus:border-sky-400"
+            />
+            <button
+              onClick={handleSchedule}
+              disabled={!scheduledValue || isActing}
+              className="rounded px-1.5 py-0.5 text-[10px] font-medium text-sky-600 bg-sky-50 hover:bg-sky-100 transition-colors disabled:opacity-40"
+            >
+              Set
+            </button>
+            <button
+              onClick={() => { setShowScheduler(false); setScheduledValue(""); }}
+              className="rounded p-0.5 text-gray-300 hover:text-gray-500 transition-colors"
+            >
+              <X className="w-3 h-3" />
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

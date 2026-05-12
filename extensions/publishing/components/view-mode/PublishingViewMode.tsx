@@ -81,7 +81,7 @@ export function PublishingViewMode() {
             </p>
           </div>
         ) : (
-          <PublishingTree paths={paths} />
+          <PublishingTree paths={paths} onRefresh={load} />
         )}
       </div>
     </div>
