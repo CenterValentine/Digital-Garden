@@ -81,7 +81,7 @@
  * See: docs/notes-feature/TIPTAP-SCHEMA-EVOLUTION-GUIDE.md
  */
 
-export const TIPTAP_SCHEMA_VERSION = "1.4.0";
+export const TIPTAP_SCHEMA_VERSION = "1.7.0";
 
 export interface SchemaVersion {
   version: string;
@@ -109,6 +109,125 @@ export interface SchemaChange {
  * 4. Run tests: pnpm test lib/domain/export
  */
 export const SCHEMA_HISTORY: SchemaVersion[] = [
+  {
+    version: "1.7.0",
+    date: "2026-05-03",
+    changes: [
+      {
+        type: "modify",
+        target: "node",
+        name: "image",
+        description: "Added optional wrap ('inline'|'left'|'right') and size ('s'|'m'|'l') attrs for float-based text wrapping",
+        breaking: false,
+        migrationsAvailable: [],
+      },
+      {
+        type: "modify",
+        target: "node",
+        name: "cardPanel",
+        description: "Added optional wrap and size attrs for float-based text wrapping",
+        breaking: false,
+        migrationsAvailable: [],
+      },
+      {
+        type: "modify",
+        target: "node",
+        name: "excalidrawBlock",
+        description: "Added optional wrap and size attrs for float-based text wrapping",
+        breaking: false,
+        migrationsAvailable: [],
+      },
+      {
+        type: "modify",
+        target: "node",
+        name: "mermaidBlock",
+        description: "Added optional wrap and size attrs for float-based text wrapping",
+        breaking: false,
+        migrationsAvailable: [],
+      },
+      {
+        type: "modify",
+        target: "node",
+        name: "personCard",
+        description: "Added optional wrap and size attrs for float-based text wrapping",
+        breaking: false,
+        migrationsAvailable: [],
+      },
+      {
+        type: "modify",
+        target: "node",
+        name: "postCard",
+        description: "Added optional wrap and size attrs for float-based text wrapping",
+        breaking: false,
+        migrationsAvailable: [],
+      },
+      {
+        type: "modify",
+        target: "node",
+        name: "statBlock",
+        description: "Added optional wrap and size attrs for float-based text wrapping",
+        breaking: false,
+        migrationsAvailable: [],
+      },
+    ],
+    migrationsRequired: false,
+  },
+  {
+    version: "1.6.0",
+    date: "2026-05-01",
+    changes: [
+      { type: "add", target: "node", name: "gallery", description: "Image gallery block — grid/masonry/carousel layouts (W2)", breaking: false, migrationsAvailable: [] },
+      { type: "add", target: "node", name: "heroImage", description: "Full-width banner with headline, subheadline, and CTA (W2)", breaking: false, migrationsAvailable: [] },
+      { type: "add", target: "node", name: "postCard", description: "Single blog post preview card (W3)", breaking: false, migrationsAvailable: [] },
+      { type: "add", target: "node", name: "projectCard", description: "Project showcase card with tech stack and links (W3)", breaking: false, migrationsAvailable: [] },
+      { type: "add", target: "node", name: "recentPosts", description: "Dynamic list of recent posts from a publishing path (W3)", breaking: false, migrationsAvailable: [] },
+      { type: "add", target: "node", name: "timeline", description: "Chronology of events — 10 visual variants (W4)", breaking: false, migrationsAvailable: [] },
+      { type: "add", target: "node", name: "statBlock", description: "Single metric display with optional animation (W4)", breaking: false, migrationsAvailable: [] },
+      { type: "add", target: "node", name: "metricsStrip", description: "Horizontal row of multiple KPIs (W4)", breaking: false, migrationsAvailable: [] },
+      { type: "add", target: "node", name: "processSteps", description: "Step-by-step process list — 6 variants (W4)", breaking: false, migrationsAvailable: [] },
+    ],
+    migrationsRequired: false,
+  },
+  {
+    version: "1.5.0",
+    date: "2026-05-01",
+    changes: [
+      {
+        type: "add",
+        target: "node",
+        name: "tableOfContents",
+        description:
+          "Atom block that auto-generates a navigable TOC from document headings; live-updating in the editor via ProseMirror plugin",
+        breaking: false,
+        migrationsAvailable: [],
+      },
+      {
+        type: "add",
+        target: "node",
+        name: "pullQuote",
+        description:
+          "Styled quote block with 7 visual variants (bordered, card, featured, pullquote, minimal, attribution, default)",
+        breaking: false,
+        migrationsAvailable: [],
+      },
+    ],
+    migrationsRequired: false,
+  },
+  {
+    version: "1.4.0",
+    date: "2026-04-30",
+    changes: [
+      {
+        type: "add",
+        target: "node",
+        name: "pullQuote",
+        description: "Placeholder entry — superseded by 1.5.0",
+        breaking: false,
+        migrationsAvailable: [],
+      },
+    ],
+    migrationsRequired: false,
+  },
   {
     version: "1.3.0",
     date: "2026-04-29",
@@ -376,6 +495,18 @@ export function getCurrentSchemaSnapshot() {
       "weeklySummary",
       "habitTracker",
       "stopwatch",
+      "pullQuote",
+      "tableOfContents",
+      // Publishing blocks (W2–W4)
+      "gallery",
+      "heroImage",
+      "postCard",
+      "projectCard",
+      "recentPosts",
+      "timeline",
+      "statBlock",
+      "metricsStrip",
+      "processSteps",
       "unsupportedBlock",
       "unsupportedInline",
     ],

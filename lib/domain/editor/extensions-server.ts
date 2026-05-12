@@ -47,6 +47,7 @@ import {
 import { ServerHabitTracker } from "./extensions/blocks/habit-tracker";
 import { ServerStopwatch } from "./extensions/blocks/stopwatch";
 import { ServerPullQuote } from "./extensions/blocks/pull-quote";
+import { ServerTableOfContents } from "./extensions/blocks/table-of-contents";
 import {
   ServerUnsupportedBlock,
   ServerUnsupportedInline,
@@ -169,6 +170,7 @@ export function getServerExtensions(): Extensions {
     ServerHabitTracker,
     ServerStopwatch,
     ServerPullQuote,
+    ServerTableOfContents,
     ServerUnsupportedBlock,
     ServerUnsupportedInline,
     ...getExtensionServerEditorExtensions(),

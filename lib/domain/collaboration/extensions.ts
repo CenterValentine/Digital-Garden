@@ -32,6 +32,7 @@ import { ServerPromptInput } from "@/lib/domain/editor/extensions/blocks/prompt-
 import { ServerHabitTracker } from "@/lib/domain/editor/extensions/blocks/habit-tracker";
 import { ServerStopwatch } from "@/lib/domain/editor/extensions/blocks/stopwatch";
 import { ServerPullQuote } from "@/lib/domain/editor/extensions/blocks/pull-quote";
+import { ServerTableOfContents } from "@/lib/domain/editor/extensions/blocks/table-of-contents";
 import { ServerTimestamp } from "@/lib/domain/editor/extensions/blocks/timestamp";
 import {
   ServerDailySummary,
@@ -103,6 +104,7 @@ export function getCollaborationServerExtensions(): Extensions {
     ServerHabitTracker,
     ServerStopwatch,
     ServerPullQuote,
+    ServerTableOfContents,
     ServerTimestamp,
     ServerDailySummary,
     ServerWeeklySummary,
