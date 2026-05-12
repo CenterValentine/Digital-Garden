@@ -80,8 +80,6 @@ export function CreatePublicItemDialog({
     }
   }
 
-  const selectedType = contentTypes.find((t) => t.value === payloadType);
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       {/* Backdrop */}

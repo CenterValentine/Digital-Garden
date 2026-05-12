@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { Prisma } from "@/lib/database/generated/prisma";
 import type { JSONContent } from "@tiptap/core";
 import { TipTapContent } from "../TipTapContent";
@@ -19,11 +20,11 @@ export function BlogPostRenderer({ item }: { item: BlogPostItem }) {
     <article className="max-w-2xl mx-auto px-6 py-20">
       {/* Breadcrumb */}
       <nav className="mb-8 text-xs text-white/30">
-        <a href="/" className="hover:text-white/60 transition-colors">Home</a>
+        <Link href="/" className="hover:text-white/60 transition-colors">Home</Link>
         <span className="mx-1.5">/</span>
-        <a href={`/${item.path.slug}`} className="hover:text-white/60 transition-colors">
+        <Link href={`/${item.path.slug}`} className="hover:text-white/60 transition-colors">
           {item.path.title}
-        </a>
+        </Link>
       </nav>
 
       {/* Cover image */}

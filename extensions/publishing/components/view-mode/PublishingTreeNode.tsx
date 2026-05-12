@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState } from "react";
 import { ChevronRight, Folder, Globe } from "lucide-react";
 import { cn } from "@/lib/core/utils";
 import { usePublishTreeStore, type PublicPathNode } from "../../state/publish-tree-store";
@@ -25,11 +25,12 @@ export function PublishingTreeNode({ node, depth, onRefresh }: PublishingTreeNod
 
   const Icon = depth === 0 ? Globe : Folder;
 
-  const handleContextMenu = useCallback((e: React.MouseEvent) => {
+  // React Compiler memoizes this automatically; no need for useCallback
+  const handleContextMenu = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     setContextMenu({ x: e.clientX, y: e.clientY });
-  }, []);
+  };
 
   return (
     <div>

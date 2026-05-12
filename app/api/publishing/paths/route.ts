@@ -3,11 +3,11 @@
  * POST /api/publishing/paths  — create a new PublicPath
  */
 
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
 import { requireAuth } from "@/lib/infrastructure/auth/middleware";
 import { prisma } from "@/lib/database/client";
 
-export async function GET(req: NextRequest) {
+export async function GET() {
   const session = await requireAuth();
   
 

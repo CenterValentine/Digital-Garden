@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import { X } from "lucide-react";
 import { toast } from "sonner";
-import { cn } from "@/lib/core/utils";
 import { slugify, isValidSlug } from "../../lib/slug";
 
 interface PathNode {

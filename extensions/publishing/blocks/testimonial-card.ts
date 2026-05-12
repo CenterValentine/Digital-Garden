@@ -228,7 +228,6 @@ export const ServerTestimonialCard = Node.create({
     const bgGradient = (HTMLAttributes["data-bg-gradient"] as string) || "";
     const bgStyle = bgGradient ? `background:${bgGradient}` : bgColor ? `background:${bgColor}` : "";
 
-    const attribution = [name, title, company].filter(Boolean);
     const starStr = stars(rating);
 
     return [

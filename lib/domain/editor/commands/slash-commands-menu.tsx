@@ -13,7 +13,6 @@
 
 import {
   forwardRef,
-  useEffect,
   useImperativeHandle,
   useMemo,
   useState,
@@ -88,8 +87,16 @@ export const SlashCommandsList = forwardRef<SlashCommandsListRef, SlashCommandsL
     setActiveTab(TABS[next]!.id);
   };
 
-  // Reset selection when the underlying items or active tab changes
-  useEffect(() => setSelectedIndex(0), [props.items, activeTab]);
+  // Reset selection when the underlying items or active tab changes.
+  // Render-time reset pattern (React docs / React Compiler approved): track a
+  // fingerprint of the inputs in state alongside the index; when it changes,
+  // reset both in the same render. Avoids the cascading-render of useEffect.
+  const fingerprint = `${activeTab}:${props.items.length}`;
+  const [lastFingerprint, setLastFingerprint] = useState(fingerprint);
+  if (fingerprint !== lastFingerprint) {
+    setLastFingerprint(fingerprint);
+    setSelectedIndex(0);
+  }
 
   useImperativeHandle(ref, () => ({
     onKeyDown: ({ event }: { event: KeyboardEvent }) => {

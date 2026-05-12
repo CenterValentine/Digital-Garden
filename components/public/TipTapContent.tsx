@@ -138,7 +138,6 @@ export function TipTapContent({ bodyJson, className }: TipTapContentProps) {
       // Browser extensions (e.g. crypto wallets) sometimes mutate innerHTML
       // before React hydrates, causing a benign mismatch warning.
       suppressHydrationWarning
-      // eslint-disable-next-line react/no-danger
       dangerouslySetInnerHTML={{ __html: html }}
     />
   );

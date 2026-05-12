@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { Prisma } from "@/lib/database/generated/prisma";
 import { ExternalLink } from "lucide-react";
 
@@ -25,11 +26,11 @@ export function BookmarkRenderer({ item }: { item: BookmarkItem }) {
   return (
     <main className="max-w-2xl mx-auto px-6 py-20">
       <nav className="mb-8 text-xs text-white/30">
-        <a href="/" className="hover:text-white/60 transition-colors">Home</a>
+        <Link href="/" className="hover:text-white/60 transition-colors">Home</Link>
         <span className="mx-1.5">/</span>
-        <a href={`/${item.path.slug}`} className="hover:text-white/60 transition-colors">
+        <Link href={`/${item.path.slug}`} className="hover:text-white/60 transition-colors">
           {item.path.title}
-        </a>
+        </Link>
       </nav>
 
       <a

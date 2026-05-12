@@ -1,3 +1,5 @@
+import Image from "next/image";
+import Link from "next/link";
 import type { Prisma } from "@/lib/database/generated/prisma";
 import type { JSONContent } from "@tiptap/core";
 import { TipTapContent } from "../TipTapContent";
@@ -19,7 +21,7 @@ export function ProfileSectionRenderer({ item }: { item: ProfileSectionItem }) {
   return (
     <main className="max-w-3xl mx-auto px-6 py-20">
       <nav className="mb-10 text-xs text-white/30">
-        <a href="/" className="hover:text-white/60 transition-colors">Home</a>
+        <Link href="/" className="hover:text-white/60 transition-colors">Home</Link>
         <span className="mx-1.5">/</span>
         <span className="text-white/50">{title}</span>
       </nav>
@@ -27,9 +29,11 @@ export function ProfileSectionRenderer({ item }: { item: ProfileSectionItem }) {
       {/* Profile header — avatar + headline */}
       <div className={`flex ${isTwoColumn ? "flex-row gap-10 items-start" : "flex-col items-center text-center"} mb-12`}>
         {payload?.avatarUrl && (
-          <img
+          <Image
             src={payload.avatarUrl}
             alt={title}
+            width={96}
+            height={96}
             className="w-24 h-24 rounded-full object-cover ring-2 ring-white/10 flex-shrink-0"
           />
         )}
