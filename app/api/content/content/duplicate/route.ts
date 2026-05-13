@@ -119,9 +119,9 @@ async function duplicateNode(
   const newTitle = `${original.title} (Copy)`;
 
   // Create the duplicate node
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   const duplicate = await prisma.contentNode.create({
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     data: {
       title: newTitle,
       slug: `${original.slug}-copy-${Date.now()}`,

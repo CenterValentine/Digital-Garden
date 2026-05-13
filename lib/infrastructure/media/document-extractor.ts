@@ -88,7 +88,7 @@ export class DocumentExtractor {
 
     // Strip markdown syntax for cleaner search results
     // Remove headers (#), links ([text](url)), images, code blocks, etc.
-    let cleaned = text
+    const cleaned = text
       .replace(/^#{1,6}\s+/gm, '') // Headers
       .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1') // Links
       .replace(/!\[([^\]]*)\]\([^)]+\)/g, '$1') // Images

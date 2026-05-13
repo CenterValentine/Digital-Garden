@@ -115,7 +115,7 @@ export async function getNavigationTree(
   });
 
   // Transform to navigation format with preset calculations
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   const navCategories: NavigationCategory[] = categories.map(
     (category: any) => {
       const childCount = category.contentNodes?.length || 0;
