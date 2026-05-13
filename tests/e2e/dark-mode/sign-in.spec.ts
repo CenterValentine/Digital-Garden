@@ -18,7 +18,7 @@ test.describe("sign-in page", () => {
     await expect(page).toHaveScreenshot("sign-in.png");
   });
 
-  test("shows error state when validation fails", async ({ page, themedGoto }) => {
+  test("shows error state when validation fails", async ({ themedGoto }) => {
     // Stubbed: real flow needs to mock the /api/auth/sign-in response or
     // submit invalid creds against a test fixture user. Skipped until the
     // auth test fixture lands (see tests/e2e/auth/*).

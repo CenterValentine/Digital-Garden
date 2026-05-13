@@ -37,17 +37,17 @@ test.describe("authenticated dark-mode routes", () => {
     await expect(page).toHaveScreenshot("settings-preferences.png");
   });
 
-  test("note editor with content renders correctly", async ({ page, themedGoto }) => {
+  test("note editor with content renders correctly", async ({ themedGoto }) => {
     test.skip(true, "TODO(sprint-c-followup): wire auth fixture and seed test note");
     await themedGoto("/content");
   });
 
-  test("embedded excalidraw block renders correctly", async ({ page, themedGoto }) => {
+  test("embedded excalidraw block renders correctly", async ({ themedGoto }) => {
     test.skip(true, "TODO(sprint-c-followup): wire auth fixture and seed note with excalidraw block");
     await themedGoto("/content");
   });
 
-  test("embedded mermaid block renders correctly", async ({ page, themedGoto }) => {
+  test("embedded mermaid block renders correctly", async ({ themedGoto }) => {
     test.skip(true, "TODO(sprint-c-followup): wire auth fixture and seed note with mermaid block");
     await themedGoto("/content");
   });

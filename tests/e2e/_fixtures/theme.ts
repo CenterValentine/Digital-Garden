@@ -34,6 +34,8 @@ type ThemeFixtures = {
 export const test = base.extend<ThemeFixtures>({
   resolvedTheme: async ({}, use, testInfo) => {
     const theme = testInfo.project.name === "dark" ? "dark" : "light";
+    // `use` here is Playwright's fixture-injection callback, not a React hook.
+    // eslint-disable-next-line react-hooks/rules-of-hooks
     await use(theme);
   },
 
@@ -58,6 +60,8 @@ export const test = base.extend<ThemeFixtures>({
       // Now navigate to the actual target with the theme cached.
       await page.goto(path);
     };
+    // Playwright fixture-injection callback, not a React hook.
+    // eslint-disable-next-line react-hooks/rules-of-hooks
     await use(navigate);
   },
 });
