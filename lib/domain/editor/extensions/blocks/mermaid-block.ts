@@ -24,6 +24,7 @@ import type * as Y from "yjs";
 import { createBlockSchema } from "@/lib/domain/blocks/schema";
 import { registerBlock } from "@/lib/domain/blocks/registry";
 import { createBlockNodeView } from "@/lib/domain/blocks/node-view-factory";
+import { consumePendingDiagramCreate } from "./pending-diagram-creates";
 
 /**
  * Sub-Y.Text naming convention — kept in one place so server (documents.ts)
@@ -284,6 +285,27 @@ function renderMermaidBlock(
   getPos: (() => number | undefined) | undefined
 ) {
   contentDom.className = "block-mermaid-content";
+
+  // ── Pending-create pickup: if a prior MarkdownEditor listener completed
+  // the POST while we were unmounted (Fast Refresh, navigation, etc.), the
+  // contentId is waiting for us in the shared map. Apply it via our own
+  // fresh getPos and let the next render handle the expanded state.
+  if (!attrs.contentId && attrs.blockId && getPos) {
+    const pending = consumePendingDiagramCreate(attrs.blockId);
+    if (pending) {
+      const pos = getPos();
+      if (pos !== undefined) {
+        editor.view.dispatch(
+          editor.state.tr.setNodeMarkup(pos, undefined, {
+            ...attrs,
+            contentId: pending.contentId,
+            expanded: pending.expanded,
+          })
+        );
+        return; // The setNodeMarkup will trigger a fresh render with the new attrs.
+      }
+    }
+  }
 
   // ── Unlinked state: auto-create immediately, show spinner ─────────────
   if (!attrs.contentId) {

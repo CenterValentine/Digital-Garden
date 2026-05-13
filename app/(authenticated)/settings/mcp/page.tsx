@@ -24,7 +24,7 @@ export default function MCPSettingsPage() {
 
       {/* Coming Soon Notice */}
       <div
-        className="border border-white/10 rounded-lg p-8 text-center"
+        className="border border-black/10 dark:border-white/10 rounded-lg p-8 text-center"
         style={{
           background: glass0.background,
           backdropFilter: glass0.backdropFilter,
@@ -58,7 +58,7 @@ export default function MCPSettingsPage() {
           giving them context from your notes.
         </p>
 
-        <div className="mt-6 space-y-3 text-sm text-gray-400 max-w-lg mx-auto text-left">
+        <div className="mt-6 space-y-3 text-sm text-gray-600 dark:text-gray-400 max-w-lg mx-auto text-left">
           <div className="flex items-start gap-3">
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -132,7 +132,7 @@ export default function MCPSettingsPage() {
 
       {/* Preview UI (Non-functional) */}
       <div
-        className="border border-white/10 rounded-lg p-6 opacity-50 pointer-events-none"
+        className="border border-black/10 dark:border-white/10 rounded-lg p-6 opacity-50 pointer-events-none"
         style={{
           background: glass0.background,
           backdropFilter: glass0.backdropFilter,
@@ -166,14 +166,14 @@ export default function MCPSettingsPage() {
               type="text"
               disabled
               placeholder="http://localhost:3000/mcp"
-              className="w-full px-4 py-2 bg-black/20 border border-white/10 rounded-lg text-gray-500 placeholder-gray-600 cursor-not-allowed"
+              className="w-full px-4 py-2 bg-black/20 border border-black/10 dark:border-white/10 rounded-lg text-gray-500 dark:text-gray-400 placeholder-gray-600 cursor-not-allowed"
             />
           </div>
 
           {/* Connect Button (disabled) */}
           <button
             disabled
-            className="px-4 py-2 text-sm rounded-lg bg-gray-700 text-gray-500 cursor-not-allowed font-medium"
+            className="px-4 py-2 text-sm rounded-lg bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed font-medium"
           >
             Connect to Claude Desktop
           </button>
@@ -207,7 +207,7 @@ export default function MCPSettingsPage() {
             <h4 className="text-sm font-semibold text-blue-400">
               About Model Context Protocol
             </h4>
-            <p className="text-sm text-gray-300 mt-1">
+            <p className="text-sm text-gray-700 dark:text-gray-300 mt-1">
               MCP is an open protocol that enables AI assistants to securely
               connect to your data sources. Learn more at{" "}
               <a

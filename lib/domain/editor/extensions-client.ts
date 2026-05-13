@@ -61,6 +61,8 @@ import { Timestamp } from "./extensions/blocks/timestamp";
 import { DailySummary, WeeklySummary } from "./extensions/blocks/periodic-summary";
 import { HabitTracker } from "./extensions/blocks/habit-tracker";
 import { Stopwatch } from "./extensions/blocks/stopwatch";
+import { ExcalidrawBlock } from "./extensions/blocks/excalidraw-block";
+import { MermaidBlock } from "./extensions/blocks/mermaid-block";
 import {
   UnsupportedBlock,
   UnsupportedInline,
@@ -289,6 +291,8 @@ export function getEditorExtensions(options?: EditorExtensionsOptions): Extensio
     WeeklySummary,
     HabitTracker,
     Stopwatch,
+    ExcalidrawBlock,
+    MermaidBlock,
     UnsupportedBlock,
     UnsupportedInline,
     ...getExtensionClientEditorExtensions(),

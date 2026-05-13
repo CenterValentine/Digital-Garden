@@ -63,3 +63,9 @@ archive/
 
 # Office lock/temp files
 ~$*
+
+# Playwright
+/test-results/
+/playwright-report/
+/playwright/.cache/
+/playwright/.auth/

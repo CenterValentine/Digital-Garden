@@ -298,14 +298,14 @@ export function PeopleProfileDialog({
               <ProfileTextField label="Country" value={form.country} onChange={(value) => updateField("country", value)} placeholder="Optional" disabled={formDisabled} />
             </div>
             <label className="block">
-              <span className="mb-1 block text-xs font-medium text-gray-700">Notes</span>
+              <span className="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300">Notes</span>
               <textarea
                 value={form.notes}
                 onChange={(event) => updateField("notes", event.target.value)}
                 placeholder="Optional"
                 rows={3}
                 disabled={formDisabled}
-                className="w-full resize-y rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition-colors placeholder:text-gray-500 focus:border-gold-primary/60 disabled:cursor-not-allowed disabled:bg-gray-50"
+                className="w-full resize-y rounded-lg border border-gray-200 dark:border-white/15 bg-white dark:bg-black/30 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 outline-none transition-colors placeholder:text-gray-500 dark:placeholder:text-gray-400 focus:border-gold-primary/60 disabled:cursor-not-allowed disabled:bg-gray-50 dark:disabled:bg-black/40"
               />
             </label>
           </div>
@@ -354,7 +354,7 @@ function ProfileTextField({
 }) {
   return (
     <label className="block">
-      <span className="mb-1 block text-xs font-medium text-gray-700">{label}</span>
+      <span className="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300">{label}</span>
       <input
         autoFocus={autoFocus}
         value={value}

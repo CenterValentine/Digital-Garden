@@ -26,6 +26,7 @@ import { Button } from "@/components/ui/glass/button";
 import { ExcalidrawToolbar } from "./ExcalidrawToolbar";
 import { toast } from "sonner";
 import type { CollaborationRuntimeHandle } from "@/lib/domain/collaboration/runtime";
+import { useResolvedTheme } from "@/lib/features/theme";
 
 // Fields to compare when deciding if an element *meaningfully* changed.
 // Excludes `version` / `versionNonce` / `updated` — those get bumped by
@@ -214,6 +215,7 @@ export function ExcalidrawViewer({
 
   // Track if component has mounted to avoid saving initial data
   const [hasMounted, setHasMounted] = useState(false);
+  const resolvedTheme = useResolvedTheme();
   // Track previous elements to detect actual content changes vs viewport changes
   const previousElementsRef = useRef<ExcalidrawElement[]>(data?.elements || []);
   // Ref to track the current elements — used to skip echoing our own Y.js updates
@@ -585,6 +587,7 @@ export function ExcalidrawViewer({
             viewModeEnabled={isReadOnly}
             UIOptions={excalidrawUIOptions}
             renderTopRightUI={isEmbedded ? renderTopRightUI : undefined}
+            theme={resolvedTheme}
           />
         </div>
       </div>

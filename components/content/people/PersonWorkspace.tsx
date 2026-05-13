@@ -550,7 +550,7 @@ export function PersonWorkspace({ personId, paneId }: PersonWorkspaceProps) {
   if (isLoading) {
     return (
       <div className="flex h-full items-center justify-center">
-        <div className="text-sm text-gray-500">Loading contact...</div>
+        <div className="text-sm text-gray-500 dark:text-gray-400">Loading contact...</div>
       </div>
     );
   }
@@ -560,7 +560,7 @@ export function PersonWorkspace({ personId, paneId }: PersonWorkspaceProps) {
       <div className="flex h-full items-center justify-center px-6">
         <div className="max-w-md text-center">
           <div className="text-sm font-medium text-red-500">Failed to load contact</div>
-          <div className="mt-2 text-xs text-gray-500">{error}</div>
+          <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">{error}</div>
         </div>
       </div>
     );
@@ -568,11 +568,11 @@ export function PersonWorkspace({ personId, paneId }: PersonWorkspaceProps) {
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden">
-      <div className="border-b border-white/10 px-6 py-5">
+      <div className="border-b border-black/10 dark:border-white/10 px-6 py-5">
         <div className="flex items-start justify-between gap-4">
           <div>
             <h1 className="text-2xl font-semibold text-foreground">{form.displayName || "Contact"}</h1>
-            <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-gray-500">
+            <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-gray-500 dark:text-gray-400">
               <span className="inline-flex items-center gap-1.5">
                 <Users className="h-3.5 w-3.5" />
                 {primaryGroupName}
@@ -590,7 +590,7 @@ export function PersonWorkspace({ personId, paneId }: PersonWorkspaceProps) {
               type="button"
               onClick={() => void handleSave()}
               disabled={isSaving || !form.displayName.trim()}
-              className="rounded-lg bg-gray-900 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-200"
+              className="rounded-lg bg-gray-900 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white dark:text-gray-900 dark:text-gray-100 dark:hover:bg-gray-200"
             >
               {isSaving ? "Saving..." : "Save"}
             </button>
@@ -598,14 +598,14 @@ export function PersonWorkspace({ personId, paneId }: PersonWorkspaceProps) {
         </div>
 
         <div className="mt-4 flex items-center justify-end">
-          <div className="flex items-center gap-1 rounded-md border border-white/10 bg-white/5 p-1">
+          <div className="flex items-center gap-1 rounded-md border border-black/10 dark:border-white/10 bg-black/[0.03] dark:bg-white/5 p-1">
             <button
               type="button"
               onClick={() => setViewMode("profile")}
               className={`rounded p-1.5 transition-colors ${
                 viewMode === "profile"
                   ? "bg-primary/20 text-primary"
-                  : "text-gray-400 hover:bg-white/10 hover:text-white"
+                  : "text-gray-600 dark:text-gray-400 hover:bg-black/[0.05] dark:hover:bg-white/10 hover:text-gray-900 dark:text-gray-100 dark:hover:text-white"
               }`}
               title="Profile"
             >
@@ -619,7 +619,7 @@ export function PersonWorkspace({ personId, paneId }: PersonWorkspaceProps) {
                 className={`rounded p-1.5 transition-colors ${
                   viewMode === mode
                     ? "bg-primary/20 text-primary"
-                    : "text-gray-400 hover:bg-white/10 hover:text-white"
+                    : "text-gray-600 dark:text-gray-400 hover:bg-black/[0.05] dark:hover:bg-white/10 hover:text-gray-900 dark:text-gray-100 dark:hover:text-white"
                 }`}
                 title={`${mode.charAt(0).toUpperCase() + mode.slice(1)} view`}
               >
@@ -632,7 +632,7 @@ export function PersonWorkspace({ personId, paneId }: PersonWorkspaceProps) {
 
       <div className="flex-1 overflow-y-auto px-6 py-5">
         {viewMode === "profile" ? (
-          <section className="mx-auto max-w-4xl rounded-2xl border border-white/10 bg-white/50 p-4">
+          <section className="mx-auto max-w-4xl rounded-2xl border border-black/10 dark:border-white/10 bg-black/[0.03] dark:bg-white/50 dark:bg-white/[0.04] p-4">
             <div className="space-y-4">
               <div className="grid gap-3 md:grid-cols-2">
                 <ProfileField label="Display name" value={form.displayName} onChange={(value) => updateField("displayName", value)} />
@@ -666,7 +666,7 @@ export function PersonWorkspace({ personId, paneId }: PersonWorkspaceProps) {
               </div>
             </div>
 
-            <div className="mt-6 overflow-hidden rounded-xl border border-white/10 bg-white/70">
+            <div className="mt-6 overflow-hidden rounded-xl border border-black/10 dark:border-white/10 bg-white/70 dark:bg-white/[0.05]">
               <ExpandableEditor
                 contentId={`person:${personId}`}
                 contentType="contact"
@@ -679,11 +679,11 @@ export function PersonWorkspace({ personId, paneId }: PersonWorkspaceProps) {
             </div>
           </section>
         ) : (
-          <section className="overflow-hidden rounded-2xl border border-white/10 bg-white/50">
-            <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
+          <section className="overflow-hidden rounded-2xl border border-black/10 dark:border-white/10 bg-black/[0.03] dark:bg-white/50 dark:bg-white/[0.04]">
+            <div className="flex items-center justify-between border-b border-black/10 dark:border-white/10 px-4 py-3">
               <div>
-                <h2 className="text-sm font-semibold text-gray-900">Assigned Content</h2>
-                <p className="mt-1 text-xs text-gray-500">
+                <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Assigned Content</h2>
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                   Files and folders owned by this contact.
                 </p>
               </div>
@@ -724,12 +724,12 @@ function ProfileField({
 }) {
   return (
     <label className="block">
-      <span className="mb-1 block text-xs font-medium text-gray-700">{label}</span>
+      <span className="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300">{label}</span>
       <input
         type={type}
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition-colors focus:border-gold-primary/60 dark:border-white/10 dark:bg-white/5 dark:text-gray-100"
+        className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 dark:text-gray-100 outline-none transition-colors focus:border-gold-primary/60 dark:border-black/10 dark:border-white/10 dark:bg-black/[0.03] dark:bg-white/5 dark:text-gray-100"
       />
     </label>
   );

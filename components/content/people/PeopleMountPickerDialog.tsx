@@ -244,11 +244,11 @@ export function PeopleMountPickerDialog({
 
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/45 px-4">
-      <div className="w-full max-w-md overflow-hidden rounded-xl border border-white/10 bg-white shadow-2xl">
-        <div className="flex items-start justify-between border-b border-gray-200 px-4 py-3">
+      <div className="w-full max-w-md overflow-hidden rounded-xl border border-black/10 dark:border-white/10 bg-white dark:bg-[#1a2530] shadow-2xl">
+        <div className="flex items-start justify-between border-b border-gray-200 dark:border-white/10 px-4 py-3">
           <div>
-            <h2 className="text-sm font-semibold text-gray-900">Add Person / Group</h2>
-            <p className="mt-1 text-xs text-gray-500">
+            <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Add Person / Group</h2>
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
               Mount one canonical People record under {targetLabel}.
             </p>
           </div>
@@ -256,22 +256,22 @@ export function PeopleMountPickerDialog({
             type="button"
             onClick={onClose}
             disabled={Boolean(isMountingId)}
-            className="rounded p-1 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 disabled:opacity-50"
+            className="rounded p-1 text-gray-500 dark:text-gray-400 transition-colors hover:bg-gray-100 dark:hover:bg-white/10 hover:text-gray-900 dark:hover:text-white disabled:opacity-50"
             aria-label="Close People picker"
           >
             <X className="h-4 w-4" />
           </button>
         </div>
 
-        <div className="border-b border-gray-200 px-4 py-3">
+        <div className="border-b border-gray-200 dark:border-white/10 px-4 py-3">
           <label className="relative block">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500 dark:text-gray-400" />
             <input
               autoFocus
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Search people, groups, or subgroups..."
-              className="w-full rounded-lg border border-gray-200 bg-white py-2 pl-9 pr-3 text-sm text-gray-900 outline-none transition-colors placeholder:text-gray-500 focus:border-gold-primary/60"
+              className="w-full rounded-lg border border-gray-200 dark:border-white/15 bg-white dark:bg-black/30 py-2 pl-9 pr-3 text-sm text-gray-900 dark:text-gray-100 outline-none transition-colors placeholder:text-gray-500 dark:placeholder:text-gray-400 focus:border-gold-primary/60"
             />
           </label>
         </div>
@@ -299,20 +299,20 @@ export function PeopleMountPickerDialog({
                   type="button"
                   onClick={() => void mountTarget(result)}
                   disabled={Boolean(isMountingId)}
-                  className="flex w-full items-center gap-2 rounded px-2 py-2 text-left text-sm transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="flex w-full items-center gap-2 rounded px-2 py-2 text-left text-sm transition-colors hover:bg-gray-50 dark:hover:bg-white/[0.04] dark:hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   <ResultIcon result={result} />
                   <div className="min-w-0 flex-1">
-                    <div className="truncate font-medium text-gray-900">{result.label}</div>
-                    <div className="truncate text-xs text-gray-500">{formatResultDescription(result)}</div>
+                    <div className="truncate font-medium text-gray-900 dark:text-gray-100">{result.label}</div>
+                    <div className="truncate text-xs text-gray-500 dark:text-gray-400">{formatResultDescription(result)}</div>
                   </div>
                   {result.mount ? (
-                    <span className="shrink-0 rounded-full bg-gray-100 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-gray-500">
+                    <span className="shrink-0 rounded-full bg-gray-100 dark:bg-white/10 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-gray-500 dark:text-gray-400">
                       Tree
                     </span>
                   ) : null}
                   {isMountingId === result.id ? (
-                    <span className="shrink-0 text-xs text-gray-500">Adding...</span>
+                    <span className="shrink-0 text-xs text-gray-500 dark:text-gray-400">Adding...</span>
                   ) : null}
                 </button>
               ))}
@@ -437,13 +437,13 @@ function PickerState({
   return (
     <div className="flex min-h-[180px] flex-col items-center justify-center p-6 text-center">
       <div className="mb-3">{icon}</div>
-      <h3 className="mb-1 text-sm font-semibold text-gray-900">{title}</h3>
-      <p className="max-w-xs text-xs leading-5 text-gray-500">{description}</p>
+      <h3 className="mb-1 text-sm font-semibold text-gray-900 dark:text-gray-100">{title}</h3>
+      <p className="max-w-xs text-xs leading-5 text-gray-500 dark:text-gray-400">{description}</p>
       {actionLabel && onAction ? (
         <button
           type="button"
           onClick={onAction}
-          className="mt-4 rounded-lg bg-gray-900 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-gray-800"
+          className="mt-4 rounded-lg bg-gray-900 dark:bg-white px-3 py-1.5 text-xs font-medium text-white dark:text-gray-900 transition-colors hover:bg-gray-800 dark:hover:bg-gray-200"
         >
           {actionLabel}
         </button>
@@ -452,7 +452,7 @@ function PickerState({
         <button
           type="button"
           onClick={onSecondaryAction}
-          className="mt-2 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50"
+          className="mt-2 rounded-lg border border-gray-200 dark:border-white/15 px-3 py-1.5 text-xs font-medium text-gray-700 dark:text-gray-300 transition-colors hover:bg-gray-50 dark:hover:bg-white/[0.04]"
         >
           {secondaryActionLabel}
         </button>
@@ -515,7 +515,7 @@ function ConflictDialog({
                   <button
                     type="button"
                     onClick={() => onFocusConflict(conflict)}
-                    className="mt-3 rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50"
+                    className="mt-3 rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:hover:bg-white/[0.04]"
                   >
                     Go To Current Location
                   </button>
@@ -537,7 +537,7 @@ function ConflictDialog({
               type="button"
               disabled={isSubmitting}
               onClick={onConfirm}
-              className="rounded-lg bg-gray-900 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
+              className="rounded-lg bg-gray-900 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-gray-800 dark:hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {isSubmitting ? "Moving..." : "Move To New Location"}
             </button>

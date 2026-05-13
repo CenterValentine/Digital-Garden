@@ -1,5 +1,5 @@
 ---
-last_updated: 2026-04-09
+last_updated: 2026-05-13
 ---
 
 # Sprint Backlog
@@ -7,6 +7,19 @@ last_updated: 2026-04-09
 **Prioritized work items for upcoming sprints, organized by epoch.**
 
 **Sprint Execution Protocol**: Before commencing any sprint, always ask the user for input before planning and executing — there may be additions or modifications.
+
+---
+
+## Dark Mode Followups (from 2026-05-13 epoch completion)
+
+**Dark Mode** epoch shipped on branch `feature/dark-mode` (see [STATUS.md](../STATUS.md) entry). Followups carved out for future sprints:
+
+- [ ] **Production deploy** unblocks slash-command collab edge case — server schema already supports `ExcalidrawBlock`/`MermaidBlock`; only the client-side registration needs to propagate
+- [ ] **Smarter unsupportedBlock sanitization** — differentiate "client doesn't render this node type" from "truly unknown node type"; the former should be a graceful degradation, not a destructive rewrite. User flagged this during slash-command debugging
+- [ ] **Auth fixture for Playwright** — `tests/e2e/_fixtures/auth.ts` should sign in a seeded test user via `/api/auth/sign-in`, capture session cookie as `storageState`. Unblocks 5 stubbed authenticated dark-mode tests in `tests/e2e/dark-mode/authenticated-routes.spec.ts`
+- [ ] **Fill in Playwright stub coverage** — 10 stub specs across `tests/e2e/{auth,editor,file-tree,content,search,extensions}/` document scope but are `test.skip()`'d. Each has a top-level docstring explaining what to cover
+- [ ] **`ProfileMenu` dark mode polish** — signed-in nav dropdown still has 11 hardcoded light classes; defer until user flags
+- [ ] **Embed iframe parity verification** — original motivator of the epoch (overlay-iframe seam). Verify visually with a real production browser-extension overlay once deployed
 
 ---
 

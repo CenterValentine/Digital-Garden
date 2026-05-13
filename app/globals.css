@@ -108,6 +108,34 @@ body:has(.notes-layout-page) .toaster {
   --intent-danger: #E57373;
   --intent-neutral: #6E869D;
 
+  /* Block & input semantic colors (shared across editor block CSS).
+     Consumed by .ProseMirror .input-block-*, .unsupported-block, .tabs-block,
+     .calendar-view, .periodic-summary, .habit-tracker, .stopwatch, and other
+     block-level styles in this stylesheet. Dark variants live in the .dark
+     block below. */
+  --text-primary: #1f2937;
+  --text-secondary: #475569;
+  --text-tertiary: #6b7280;
+  --border-secondary: rgba(15, 23, 42, 0.14);
+  --surface-input: rgba(255, 255, 255, 0.6);
+  --surface-secondary: rgba(15, 23, 42, 0.025);
+
+  /* Liquid Glass surfaces (light mode defaults).
+     Consumed by lib/design/system/surfaces.ts::getSurfaceStyles().
+     Dark variants live in the .dark block below. */
+  --surface-glass-0-bg: rgba(255, 255, 255, 0.55);
+  --surface-glass-0-blur: 8px;
+  --surface-glass-0-border: 1px solid rgba(15, 23, 42, 0.08);
+  --surface-glass-0-shadow: 0 1px 2px 0 rgba(15, 23, 42, 0.04);
+  --surface-glass-1-bg: rgba(255, 255, 255, 0.7);
+  --surface-glass-1-blur: 12px;
+  --surface-glass-1-border: 1px solid rgba(15, 23, 42, 0.1);
+  --surface-glass-1-shadow: 0 4px 6px -1px rgba(15, 23, 42, 0.06);
+  --surface-glass-2-bg: rgba(255, 255, 255, 0.82);
+  --surface-glass-2-blur: 16px;
+  --surface-glass-2-border: 1px solid rgba(15, 23, 42, 0.12);
+  --surface-glass-2-shadow: 0 10px 15px -3px rgba(15, 23, 42, 0.08);
+
   /* ProseMirror Table Settings — keep low so colgroup doesn't fight width:100% */
   --default-cell-min-width: 25px;
 
@@ -157,6 +185,25 @@ body:has(.notes-layout-page) .toaster {
   --border: rgba(229, 212, 176, 0.2);
   --input: transparent;
   --ring: #81C784;
+
+  /* Block & input semantic colors (dark mode — beige family on slate). */
+  --text-primary: rgba(229, 212, 176, 0.95);
+  --text-secondary: rgba(229, 212, 176, 0.85);
+  --text-tertiary: rgba(229, 212, 176, 0.6);
+  --border-secondary: rgba(229, 212, 176, 0.18);
+  --surface-input: rgba(0, 0, 0, 0.28);
+  --surface-secondary: rgba(255, 255, 255, 0.04);
+
+  /* Liquid Glass surfaces (dark mode). */
+  --surface-glass-0-bg: rgba(0, 0, 0, 0.3);
+  --surface-glass-0-border: 1px solid rgba(255, 255, 255, 0.06);
+  --surface-glass-0-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.4);
+  --surface-glass-1-bg: rgba(0, 0, 0, 0.4);
+  --surface-glass-1-border: 1px solid rgba(255, 255, 255, 0.08);
+  --surface-glass-1-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5);
+  --surface-glass-2-bg: rgba(0, 0, 0, 0.5);
+  --surface-glass-2-border: 1px solid rgba(255, 255, 255, 0.12);
+  --surface-glass-2-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.6);
 }
 
 @theme inline {
@@ -302,6 +349,10 @@ nav[class*="fixed"] {
   padding-bottom: 4rem;
 }
 
+.dark .ProseMirror {
+  color: #E5D4B0;
+}
+
 /* Placeholder text ONLY for completely empty document (first and only paragraph) */
 .ProseMirror p.is-editor-empty:first-child:last-child::before {
   color: rgba(0, 0, 0, 0.3);
@@ -309,6 +360,10 @@ nav[class*="fixed"] {
   float: left;
   height: 0;
   pointer-events: none;
+}
+
+.dark .ProseMirror p.is-editor-empty:first-child:last-child::before {
+  color: rgba(229, 212, 176, 0.4);
 }
 
 /* Placeholder: ONLY show on the very first paragraph of an entirely empty document.
@@ -340,13 +395,14 @@ nav[class*="fixed"] {
   content: none !important;
 }
 
-/* Headings */
+/* Headings — neon gold reads beautifully on dark, but is jarring on white.
+   Use the muted gold token (--gold-primary) in light mode and brighten in dark. */
 .ProseMirror h1 {
   font-size: 2em;
   font-weight: bold;
   margin: 1em 0 0.5em 0;
   line-height: 1.2;
-  color: #FFD700;
+  color: var(--gold-primary);
 }
 
 .ProseMirror h2 {
@@ -354,7 +410,7 @@ nav[class*="fixed"] {
   font-weight: bold;
   margin: 0.83em 0 0.5em 0;
   line-height: 1.3;
-  color: #FFD700;
+  color: var(--gold-primary);
 }
 
 .ProseMirror h3 {
@@ -362,13 +418,22 @@ nav[class*="fixed"] {
   font-weight: bold;
   margin: 0.75em 0 0.5em 0;
   line-height: 1.4;
-  color: #FFD700;
+  color: var(--gold-primary);
 }
 
 .ProseMirror h4, .ProseMirror h5, .ProseMirror h6 {
   font-size: 1.1em;
   font-weight: bold;
   margin: 0.67em 0 0.5em 0;
+  color: var(--gold-primary);
+}
+
+.dark .ProseMirror h1,
+.dark .ProseMirror h2,
+.dark .ProseMirror h3,
+.dark .ProseMirror h4,
+.dark .ProseMirror h5,
+.dark .ProseMirror h6 {
   color: #FFD700;
 }
 
@@ -395,13 +460,17 @@ nav[class*="fixed"] {
   margin: 0;
 }
 
-/* Blockquotes */
+/* Blockquotes — dark slate text in light mode, warm beige in dark. */
 .ProseMirror blockquote {
   border-left: 4px solid #49A657;
   padding-left: 1rem;
   margin: 1rem 0;
-  color: rgba(229, 212, 176, 0.8);
+  color: rgba(30, 30, 30, 0.75);
   font-style: italic;
+}
+
+.dark .ProseMirror blockquote {
+  color: rgba(229, 212, 176, 0.8);
 }
 
 /* Horizontal Rule */
@@ -528,9 +597,9 @@ nav[class*="fixed"] {
   color: #82AAFF;
 }
 
-/* M6: Wiki Links [[Note Title]] */
+/* M6: Wiki Links [[Note Title]] — muted gold for light mode, neon for dark. */
 .ProseMirror .wiki-link {
-  color: #FFD700;
+  color: var(--gold-primary);
   text-decoration: none;
   font-weight: 500;
   transition: opacity 0.2s;
@@ -539,6 +608,10 @@ nav[class*="fixed"] {
 .ProseMirror .wiki-link:hover {
   opacity: 0.8;
   text-decoration: underline;
+}
+
+.dark .ProseMirror .wiki-link {
+  color: #FFD700;
 }
 
 /* M6: Slash Commands Menu */
@@ -620,7 +693,7 @@ nav[class*="fixed"] {
 .ProseMirror td,
 .ProseMirror th {
   min-width: 1em;
-  border: 1px solid #555;
+  border: 1px solid rgba(70, 94, 115, 0.22);
   padding: 0.5rem 0.75rem;
   vertical-align: top;
   box-sizing: border-box;
@@ -630,11 +703,27 @@ nav[class*="fixed"] {
 .ProseMirror th {
   font-weight: 600;
   text-align: left;
-  background-color: rgba(100, 100, 100, 0.3);
+  background-color: rgba(201, 168, 108, 0.1);
+  color: var(--shale-dark);
 }
 
 .ProseMirror tr:nth-child(even) td {
-  background-color: rgba(100, 100, 100, 0.1);
+  background-color: rgba(70, 94, 115, 0.035);
+}
+
+/* Tables — dark mode (beige borders, deeper gold-tinted header on slate). */
+.dark .ProseMirror td,
+.dark .ProseMirror th {
+  border-color: rgba(229, 212, 176, 0.18);
+}
+
+.dark .ProseMirror th {
+  background-color: rgba(201, 168, 108, 0.16);
+  color: var(--gold-light);
+}
+
+.dark .ProseMirror tr:nth-child(even) td {
+  background-color: rgba(229, 212, 176, 0.045);
 }
 
 .ProseMirror td > p,
@@ -652,7 +741,7 @@ nav[class*="fixed"] {
   top: 0;
   bottom: -2px;
   width: 4px;
-  background-color: #888;
+  background-color: rgba(201, 168, 108, 0.5);
   pointer-events: none;
 }
 
@@ -814,7 +903,7 @@ mark {
 }
 
 .ProseMirror .callout-note .callout-title {
-  color: #60a5fa;
+  color: #1d4ed8;
   background: rgba(59, 130, 246, 0.12);
 }
 
@@ -825,6 +914,11 @@ mark {
   text-align: center;
   width: 20px;
   height: 20px;
+  color: #1d4ed8;
+}
+
+.dark .ProseMirror .callout-note .callout-title,
+.dark .ProseMirror .callout-note .callout-title::before {
   color: #60a5fa;
 }
 
@@ -835,7 +929,7 @@ mark {
 }
 
 .ProseMirror .callout-tip .callout-title {
-  color: #34d399;
+  color: #047857;
   background: rgba(16, 185, 129, 0.12);
 }
 
@@ -846,6 +940,10 @@ mark {
   text-align: center;
 }
 
+.dark .ProseMirror .callout-tip .callout-title {
+  color: #34d399;
+}
+
 /* Callout Type: Warning (Yellow/Orange) */
 .ProseMirror .callout-warning {
   border-color: #f59e0b;
@@ -853,7 +951,7 @@ mark {
 }
 
 .ProseMirror .callout-warning .callout-title {
-  color: #fbbf24;
+  color: #b45309;
   background: rgba(245, 158, 11, 0.12);
 }
 
@@ -864,6 +962,11 @@ mark {
   text-align: center;
   width: 20px;
   height: 20px;
+  color: #b45309;
+}
+
+.dark .ProseMirror .callout-warning .callout-title,
+.dark .ProseMirror .callout-warning .callout-title::before {
   color: #fbbf24;
 }
 
@@ -874,7 +977,7 @@ mark {
 }
 
 .ProseMirror .callout-danger .callout-title {
-  color: #f87171;
+  color: #b91c1c;
   background: rgba(239, 68, 68, 0.12);
 }
 
@@ -885,6 +988,10 @@ mark {
   text-align: center;
 }
 
+.dark .ProseMirror .callout-danger .callout-title {
+  color: #f87171;
+}
+
 /* Callout Type: Info (Purple) */
 .ProseMirror .callout-info {
   border-color: #8b5cf6;
@@ -892,7 +999,7 @@ mark {
 }
 
 .ProseMirror .callout-info .callout-title {
-  color: #a78bfa;
+  color: #6d28d9;
   background: rgba(139, 92, 246, 0.12);
 }
 
@@ -901,6 +1008,10 @@ mark {
   font-size: 16px;
   line-height: 20px;
   text-align: center;
+}
+
+.dark .ProseMirror .callout-info .callout-title {
+  color: #a78bfa;
 }
 
 /* ─── Block System (Sprint 43) ─── */
@@ -1178,6 +1289,63 @@ mark {
   color: rgba(0, 0, 0, 0.9);
 }
 
+/* ─── Block System — dark mode overrides ─── */
+.dark .ProseMirror .block-node {
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.dark .ProseMirror .block-node:hover {
+  border-color: rgba(255, 255, 255, 0.18);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.05);
+}
+
+.dark .ProseMirror .block-type-badge {
+  color: rgba(255, 255, 255, 0.5);
+  background: rgba(0, 0, 0, 0.45);
+}
+
+.dark .ProseMirror .block-menu-btn {
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.dark .ProseMirror .block-menu-btn:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.dark .ProseMirror .block-delete-btn {
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.dark .ProseMirror .block-insert-btn {
+  border-color: rgba(255, 255, 255, 0.18);
+  background: rgba(20, 20, 25, 0.85);
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.dark .ProseMirror .block-node:has(+ .block-node) {
+  border-bottom-color: rgba(255, 255, 255, 0.06);
+}
+
+.dark .block-insert-menu {
+  background: rgba(20, 20, 25, 0.95);
+  border-color: rgba(255, 255, 255, 0.12);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+}
+
+.dark .block-insert-menu-group {
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.dark .block-insert-menu-item {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.dark .block-insert-menu-item:hover {
+  background: rgba(59, 130, 246, 0.18);
+  color: rgba(255, 255, 255, 0.95);
+}
+
 /* ─── Shared visual container for consecutive blocks ─── */
 /* Adjacent blocks merge into a single card — connected borders, shared background */
 
@@ -1206,7 +1374,7 @@ mark {
 
 .ProseMirror .block-section-header-content {
   font-weight: 600;
-  color: rgba(0, 0, 0, 0.85);
+  color: var(--text-primary);
   padding-bottom: 0.5rem;
   min-height: 1.5em;
   cursor: text;
@@ -1233,7 +1401,7 @@ mark {
 }
 
 .ProseMirror .block-section-header-content[data-show-divider="true"] {
-  border-bottom: 1px solid rgba(0, 0, 0, 0.12);
+  border-bottom: 1px solid var(--border-secondary);
 }
 
 .ProseMirror .block-section-header-content[data-show-divider="true"][data-divider-style="dashed"] {
@@ -1249,7 +1417,7 @@ mark {
 .ProseMirror .block-card-panel-content {
   padding: 0.75rem;
   border-radius: 6px;
-  background: rgba(0, 0, 0, 0.02);
+  background: var(--surface-secondary);
 }
 
 /* Card border styles */
@@ -1257,18 +1425,18 @@ mark {
   border: 1px solid transparent;
 }
 .ProseMirror .block-card-panel-content[data-card-border="subtle"] {
-  border: 1px solid rgba(0, 0, 0, 0.1);
+  border: 1px solid var(--border-secondary);
 }
 .ProseMirror .block-card-panel-content[data-card-border="solid"] {
-  border: 1px solid rgba(0, 0, 0, 0.25);
+  border: 1px solid color-mix(in srgb, var(--border-secondary) 180%, transparent);
 }
 .ProseMirror .block-card-panel-content[data-card-border="dashed"] {
-  border: 1px dashed rgba(0, 0, 0, 0.2);
+  border: 1px dashed color-mix(in srgb, var(--border-secondary) 150%, transparent);
 }
 
 /* Hover guide when border is "none" */
 .ProseMirror .block-card-panel-content[data-card-border="none"]:hover {
-  border-color: rgba(0, 0, 0, 0.06);
+  border-color: color-mix(in srgb, var(--border-secondary) 60%, transparent);
 }
 
 /* Card background hidden */
@@ -1279,9 +1447,9 @@ mark {
 .ProseMirror .block-card-header {
   font-size: 0.85rem;
   font-weight: 600;
-  color: rgba(0, 0, 0, 0.8);
+  color: var(--text-primary);
   padding: 0.5rem 0.75rem;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+  border-bottom: 1px solid var(--border-secondary);
   margin-bottom: 0.25rem;
 }
 
@@ -1309,7 +1477,7 @@ mark {
 .ProseMirror .block-divider-line {
   flex: 1;
   border: none;
-  border-top: 1px solid rgba(0, 0, 0, 0.15);
+  border-top: 1px solid var(--border-secondary);
   margin: 0;
 }
 
@@ -1324,15 +1492,15 @@ mark {
 .ProseMirror .block-divider-gradient {
   border: none;
   height: 1px;
-  background: linear-gradient(to right, transparent, rgba(0, 0, 0, 0.15), transparent);
+  background: linear-gradient(to right, transparent, var(--border-secondary), transparent);
 }
 
 .ProseMirror .block-divider-label {
   position: absolute;
   padding: 0 0.75rem;
   font-size: 0.75rem;
-  color: rgba(0, 0, 0, 0.45);
-  background: var(--color-background, #ffffff);
+  color: var(--text-tertiary);
+  background: var(--background);
 }
 
 /* ─── Timestamp Block (Sprint 65) ─── */
@@ -1496,6 +1664,33 @@ mark {
   line-height: 1.35;
 }
 
+/* Periodic summary — dark mode (beige family over slate). */
+.dark .ProseMirror .block-periodic-summary-content {
+  background: rgba(229, 212, 176, 0.04);
+}
+
+.dark .ProseMirror .block-periodic-summary-meta {
+  color: rgba(229, 212, 176, 0.55);
+}
+
+.dark .ProseMirror .block-periodic-summary-row:hover {
+  border-color: rgba(229, 212, 176, 0.12);
+  background: rgba(229, 212, 176, 0.06);
+}
+
+.dark .ProseMirror .block-periodic-summary-type {
+  background: rgba(229, 212, 176, 0.08);
+  color: rgba(229, 212, 176, 0.85);
+}
+
+.dark .ProseMirror .block-periodic-summary-path {
+  color: rgba(229, 212, 176, 0.55);
+}
+
+.dark .ProseMirror .block-periodic-summary-empty {
+  color: rgba(229, 212, 176, 0.55);
+}
+
 /* ─── Unsupported Content Safety Blocks ─── */
 
 .ProseMirror .block-unsupported-content {
@@ -1543,6 +1738,30 @@ mark {
   white-space: nowrap;
 }
 
+/* Unsupported block — dark mode (warm amber on darkened amber tint). */
+.dark .ProseMirror .block-unsupported-content {
+  border-color: rgba(252, 211, 77, 0.28);
+  background: rgba(245, 158, 11, 0.1);
+}
+
+.dark .ProseMirror .block-unsupported-eyebrow {
+  color: rgba(252, 211, 77, 0.95);
+}
+
+.dark .ProseMirror .block-unsupported-title {
+  color: rgba(254, 240, 138, 0.95);
+}
+
+.dark .ProseMirror .block-unsupported-body {
+  color: rgba(252, 211, 77, 0.85);
+}
+
+.dark .ProseMirror .unsupported-inline-node {
+  border-color: rgba(252, 211, 77, 0.3);
+  background: rgba(245, 158, 11, 0.12);
+  color: rgba(252, 211, 77, 0.95);
+}
+
 /* ─── Accordion (Sprint 44) ─── */
 
 .ProseMirror .block-accordion-summary {
@@ -1554,7 +1773,7 @@ mark {
   font-weight: 500;
   color: inherit;
   user-select: none;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+  border-bottom: 1px solid var(--border-secondary);
 }
 
 .ProseMirror .block-accordion-summary.block-accordion-no-divider {
@@ -1585,14 +1804,14 @@ mark {
 
 .ProseMirror .block-accordion-title:empty::before {
   content: attr(data-placeholder);
-  color: rgba(0, 0, 0, 0.25);
+  color: var(--text-tertiary);
   pointer-events: none;
 }
 
 .ProseMirror .block-accordion-chevron {
   font-size: 0.75rem;
   transition: transform 0.2s ease;
-  color: rgba(0, 0, 0, 0.4);
+  color: var(--text-tertiary);
   flex-shrink: 0;
   width: 1.25rem;
   height: 1.25rem;
@@ -1603,8 +1822,8 @@ mark {
 }
 
 .ProseMirror .block-accordion-chevron:hover {
-  background: rgba(0, 0, 0, 0.025);
-  color: rgba(0, 0, 0, 0.6);
+  background: var(--surface-secondary);
+  color: var(--text-secondary);
 }
 
 .ProseMirror .block-accordion-chevron-open {
@@ -1884,6 +2103,52 @@ mark {
 
 .ProseMirror .block-tab-add-btn:hover {
   color: rgba(59, 130, 246, 0.7);
+}
+
+/* Tabs block — dark mode (beige tab text on slate, gold-tinted active). */
+.dark .ProseMirror .block-tabs-bar {
+  border-bottom-color: rgba(229, 212, 176, 0.14);
+}
+
+.dark .ProseMirror .block-tab-btn {
+  color: rgba(229, 212, 176, 0.55);
+}
+
+.dark .ProseMirror .block-tab-btn:hover {
+  color: rgba(229, 212, 176, 0.85);
+}
+
+.dark .ProseMirror .block-tab-active {
+  color: var(--gold-primary);
+}
+
+.dark .ProseMirror .block-tab-label[contenteditable="true"] {
+  background: rgba(229, 212, 176, 0.08);
+}
+
+.dark .ProseMirror .block-tab-delete {
+  color: rgba(229, 212, 176, 0.35);
+}
+
+.dark .ProseMirror .block-tabs[data-tab-style="underline"] .block-tab-active::after {
+  background: var(--gold-primary);
+}
+
+.dark .ProseMirror .block-tabs[data-tab-style="pills"] .block-tab-active {
+  background: rgba(201, 168, 108, 0.18);
+}
+
+.dark .ProseMirror .block-tabs[data-tab-style="boxed"] .block-tab-active {
+  border-color: rgba(229, 212, 176, 0.18);
+  background: rgba(229, 212, 176, 0.06);
+}
+
+.dark .ProseMirror .block-tab-add-btn {
+  color: rgba(229, 212, 176, 0.4);
+}
+
+.dark .ProseMirror .block-tab-add-btn:hover {
+  color: var(--gold-primary);
 }
 
 .ProseMirror .block-tabs-content {
@@ -2299,7 +2564,7 @@ mark {
   margin-top: 0.18rem;
   font-size: 1.05rem;
   font-weight: 800;
-  color: #0f172a;
+  color: var(--text-primary);
 }
 
 .ProseMirror .habit-tracker-header-actions {
@@ -2412,7 +2677,7 @@ mark {
 .ProseMirror .habit-tracker-stats-value {
   font-size: 0.78rem;
   font-weight: 600;
-  color: #334155;
+  color: var(--text-secondary);
   white-space: nowrap;
 }
 
@@ -2504,7 +2769,7 @@ mark {
   width: var(--habit-interval-col-width);
   padding-inline: 0.25rem;
   background: rgba(248, 250, 252, 0.96);
-  color: #64748b;
+  color: var(--text-secondary);
   font-size: 0.68rem;
   font-weight: 700;
   text-align: center;
@@ -2551,7 +2816,7 @@ mark {
   font-size: 0.98rem;
   line-height: 1.3;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--text-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -2795,7 +3060,7 @@ mark {
 .ProseMirror .stopwatch-title {
   font-size: 0.95rem;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--text-primary);
 }
 
 .ProseMirror .stopwatch-status {
@@ -2804,7 +3069,7 @@ mark {
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: #64748b;
+  color: var(--text-secondary);
 }
 
 .ProseMirror .stopwatch-edit-btn {
@@ -2813,7 +3078,7 @@ mark {
   border: 1px solid rgba(148, 163, 184, 0.25);
   border-radius: 9999px;
   background: rgba(255, 255, 255, 0.66);
-  color: #0f172a;
+  color: var(--text-primary);
   font-size: 0.78rem;
   font-weight: 600;
   cursor: pointer;
@@ -2844,7 +3109,7 @@ mark {
 .ProseMirror .stopwatch-separator {
   align-self: center;
   font-variant-numeric: tabular-nums;
-  color: #0f172a;
+  color: var(--text-primary);
   line-height: 1;
   display: inline-flex;
   align-items: center;
@@ -2855,7 +3120,7 @@ mark {
 .ProseMirror .stopwatch-segment-value {
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.04em;
-  color: #0f172a;
+  color: var(--text-primary);
 }
 
 .ProseMirror .stopwatch-content[data-variant="ios"] .stopwatch-segment-value {
@@ -2899,12 +3164,12 @@ mark {
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: #64748b;
+  color: var(--text-secondary);
 }
 
 .ProseMirror .stopwatch-meta {
   font-size: 0.76rem;
-  color: #64748b;
+  color: var(--text-secondary);
 }
 
 .ProseMirror .stopwatch-controls {
@@ -2933,7 +3198,7 @@ mark {
 .ProseMirror .stopwatch-control-secondary,
 .ProseMirror .stopwatch-control-ghost {
   background: rgba(15, 23, 42, 0.06);
-  color: #334155;
+  color: var(--text-secondary);
 }
 
 .ProseMirror .stopwatch-control-start {
@@ -2972,7 +3237,7 @@ mark {
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: #64748b;
+  color: var(--text-secondary);
 }
 
 .ProseMirror .stopwatch-laps-list {
@@ -2990,20 +3255,20 @@ mark {
 .ProseMirror .stopwatch-lap-index {
   font-size: 0.8rem;
   font-weight: 600;
-  color: #0f172a;
+  color: var(--text-primary);
 }
 
 .ProseMirror .stopwatch-lap-value,
 .ProseMirror .stopwatch-lap-split {
   font-size: 0.8rem;
   font-weight: 600;
-  color: #334155;
+  color: var(--text-secondary);
   text-align: right;
 }
 
 .ProseMirror .stopwatch-laps-empty {
   font-size: 0.78rem;
-  color: #64748b;
+  color: var(--text-secondary);
 }
 
 .ProseMirror .stopwatch-content[data-variant="minimal"] .stopwatch-laps,
@@ -3054,6 +3319,65 @@ mark {
   .ProseMirror .stopwatch-control {
     width: 100%;
   }
+}
+
+/* ─── Habit Tracker + Stopwatch — dark mode (slate parchment surfaces) ─── */
+
+/* Outer card background — replace white-on-slate gradient with subtle beige sheen on darker slate. */
+.dark .ProseMirror .habit-tracker-content[data-background="visible"],
+.dark .ProseMirror .stopwatch-content[data-background="visible"] {
+  background:
+    linear-gradient(180deg, rgba(229, 212, 176, 0.05), rgba(229, 212, 176, 0.02)),
+    rgba(15, 25, 35, 0.4);
+}
+
+/* Pill buttons (nav, settings, empty-action, edit) — beige-tinted dark pill. */
+.dark .ProseMirror .habit-tracker-nav-btn,
+.dark .ProseMirror .habit-tracker-settings-btn,
+.dark .ProseMirror .habit-tracker-empty-btn,
+.dark .ProseMirror .stopwatch-edit-btn {
+  background: rgba(229, 212, 176, 0.06);
+  border-color: rgba(229, 212, 176, 0.18);
+}
+
+.dark .ProseMirror .habit-tracker-nav-btn:hover,
+.dark .ProseMirror .habit-tracker-settings-btn:hover,
+.dark .ProseMirror .habit-tracker-empty-btn:hover {
+  background: rgba(229, 212, 176, 0.1);
+  border-color: rgba(201, 168, 108, 0.45);
+}
+
+/* Empty-state dashed card. */
+.dark .ProseMirror .habit-tracker-empty {
+  background: rgba(15, 25, 35, 0.3);
+}
+
+/* Habit icon avatars — beige-tinted background. */
+.dark .ProseMirror .habit-tracker-habit-icon {
+  background: rgba(229, 212, 176, 0.1);
+}
+
+/* Day cells (interval grid). */
+.dark .ProseMirror .habit-tracker-day-cell {
+  background: rgba(15, 25, 35, 0.45);
+  border-color: rgba(229, 212, 176, 0.16);
+}
+
+/* Period toggle pill in header. */
+.dark .ProseMirror .habit-tracker-period-toggle {
+  background: rgba(229, 212, 176, 0.06);
+  border-color: rgba(229, 212, 176, 0.18);
+}
+
+/* Habit cards (monthly-grid preset). */
+.dark .ProseMirror .habit-tracker-card {
+  background: rgba(15, 25, 35, 0.5);
+  border-color: rgba(229, 212, 176, 0.14);
+}
+
+.dark .ProseMirror .habit-tracker-card-day {
+  background: rgba(15, 25, 35, 0.4);
+  border-color: rgba(229, 212, 176, 0.16);
 }
 
 /* ─── Block Columns (Sprint 47) ─── */
@@ -3209,6 +3533,13 @@ mark {
   --calendar-block-text: #465e73;
   --calendar-block-muted: rgba(70, 94, 115, 0.62);
   --calendar-block-blue: #2f63dc;
+  --calendar-block-toolbar-bg: rgba(255, 255, 255, 0.82);
+  --calendar-block-toolbar-border: rgba(70, 94, 115, 0.18);
+  --calendar-block-toolbar-divider: rgba(70, 94, 115, 0.18);
+  --calendar-block-tab-inactive: rgba(70, 94, 115, 0.45);
+  --calendar-block-tab-active-bg: rgba(255, 255, 255, 0.94);
+  --calendar-block-tab-active-text: #111827;
+  --calendar-block-tab-active-border: rgba(0, 92, 197, 0.9);
   position: relative;
   display: flex;
   flex-direction: column;
@@ -3262,9 +3593,9 @@ mark {
   flex: 0 0 auto;
   gap: 0;
   overflow: hidden;
-  border: 1px solid rgba(70, 94, 115, 0.18);
+  border: 1px solid var(--calendar-block-toolbar-border);
   border-radius: 0.7rem;
-  background: rgba(255, 255, 255, 0.82);
+  background: var(--calendar-block-toolbar-bg);
 }
 
 .ProseMirror .calendar-view-block-nav-button,
@@ -3293,7 +3624,7 @@ mark {
 }
 
 .ProseMirror .calendar-view-block-nav-button + .calendar-view-block-nav-button {
-  border-left: 1px solid rgba(70, 94, 115, 0.18);
+  border-left: 1px solid var(--calendar-block-toolbar-divider);
 }
 
 .ProseMirror .calendar-view-block-today-button {
@@ -3343,17 +3674,17 @@ mark {
   border: 1px solid transparent;
   border-radius: 0.55rem;
   background: transparent;
-  color: rgba(70, 94, 115, 0.35);
+  color: var(--calendar-block-tab-inactive);
   font-size: clamp(0.72rem, 1.9vw, 0.78rem);
   font-weight: 750;
   padding: 0.3rem 0.42rem;
 }
 
 .ProseMirror .calendar-view-block-tab.active {
-  border-color: rgba(0, 92, 197, 0.9);
-  color: #111827;
-  background: rgba(255, 255, 255, 0.94);
-  box-shadow: inset 0 0 0 1px rgba(0, 92, 197, 0.9);
+  border-color: var(--calendar-block-tab-active-border);
+  color: var(--calendar-block-tab-active-text);
+  background: var(--calendar-block-tab-active-bg);
+  box-shadow: inset 0 0 0 1px var(--calendar-block-tab-active-border);
 }
 
 .ProseMirror .calendar-view-block-body {
@@ -3601,6 +3932,70 @@ mark {
   color: var(--calendar-block-muted);
   font-size: 0.72rem;
   padding: 0.5rem;
+}
+
+/* Calendar block — dark mode (leather notebook over slate).
+   Redefines the scoped vars so every var() reference inside the calendar
+   shell automatically flips. The paper aesthetic becomes a darker parchment;
+   the navy text becomes warm beige. Gold accent (--calendar-block-accent)
+   carries through both modes unchanged. */
+.dark .ProseMirror .calendar-view-block-shell {
+  --calendar-block-border: rgba(229, 212, 176, 0.18);
+  --calendar-block-paper: rgba(20, 32, 45, 0.78);
+  --calendar-block-text: rgba(229, 212, 176, 0.92);
+  --calendar-block-muted: rgba(229, 212, 176, 0.55);
+  --calendar-block-toolbar-bg: rgba(15, 25, 35, 0.65);
+  --calendar-block-toolbar-border: rgba(229, 212, 176, 0.16);
+  --calendar-block-toolbar-divider: rgba(229, 212, 176, 0.14);
+  --calendar-block-tab-inactive: rgba(229, 212, 176, 0.5);
+  --calendar-block-tab-active-bg: rgba(15, 25, 35, 0.85);
+  --calendar-block-tab-active-text: var(--gold-primary);
+  --calendar-block-tab-active-border: rgba(201, 168, 108, 0.65);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+}
+
+.dark .ProseMirror .calendar-view-block-toolbar {
+  border-bottom-color: rgba(229, 212, 176, 0.12);
+}
+
+.dark .ProseMirror .calendar-view-block-nav-button:hover,
+.dark .ProseMirror .calendar-view-block-today-button:hover {
+  background: rgba(201, 168, 108, 0.18);
+}
+
+.dark .ProseMirror .calendar-view-block-loading {
+  background: rgba(229, 212, 176, 0.06);
+}
+
+.dark .ProseMirror .calendar-view-block-empty {
+  border-color: rgba(229, 212, 176, 0.18);
+}
+
+.dark .ProseMirror .calendar-view-block-resize-handle {
+  border-right-color: rgba(229, 212, 176, 0.4);
+  border-bottom-color: rgba(229, 212, 176, 0.4);
+}
+
+/* Calendar grid cells, day buttons, headers — dark parchment surfaces. */
+.dark .ProseMirror .calendar-view-block-month-day {
+  border-right-color: rgba(229, 212, 176, 0.08);
+  border-bottom-color: rgba(229, 212, 176, 0.08);
+  background: rgba(15, 25, 35, 0.4);
+}
+
+.dark .ProseMirror .calendar-view-block-day-header {
+  border-bottom-color: rgba(229, 212, 176, 0.12);
+  background: rgba(15, 25, 35, 0.55);
+}
+
+.dark .ProseMirror .calendar-view-block-hour-label {
+  border-right-color: rgba(229, 212, 176, 0.12);
+  background: rgba(15, 25, 35, 0.45);
+}
+
+.dark .ProseMirror .calendar-view-block-hour-label,
+.dark .ProseMirror .calendar-view-block-hour-lane {
+  border-bottom-color: rgba(229, 212, 176, 0.18);
 }
 
 .ProseMirror .dg-collaboration-caret {

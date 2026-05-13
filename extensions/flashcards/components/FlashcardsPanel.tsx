@@ -62,7 +62,7 @@ const STATUS_LABELS: Record<FlashcardReviewStatus | "all", string> = {
   archived: "Archived",
 };
 const MENU_SELECT_CLASS =
-  "w-full rounded-md border border-white/20 bg-gray-900/95 px-3 py-2 text-base text-gray-100 shadow-sm outline-none transition-colors hover:bg-white/10 focus:border-gold-primary focus:bg-gray-900 md:text-sm";
+  "w-full rounded-md border border-black/15 dark:border-white/20 bg-white dark:bg-gray-900/95 px-3 py-2 text-base text-gray-900 dark:text-gray-100 shadow-sm outline-none transition-colors hover:bg-black/[0.05] dark:hover:bg-black/[0.05] dark:bg-white/10 focus:border-gold-primary focus:bg-gray-50 dark:focus:bg-gray-900 md:text-sm";
 const DECK_SETTINGS_STORAGE_KEY = "flashcards:deck-review-settings";
 
 function getUsableSourceContentId(id: string | null): string | null {
@@ -475,14 +475,14 @@ export function FlashcardsPanel() {
         : "No flashcards yet.";
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-[#111318] text-white">
-      <div className="border-b border-white/10 px-4 py-4">
+    <div className="flex h-full min-h-0 flex-col bg-white text-gray-900 dark:bg-[#1a2530] dark:text-white">
+      <div className="border-b border-black/10 dark:border-white/10 px-4 py-4">
         <div className="flex items-center justify-between gap-3">
           <div>
             <p className="text-xs uppercase tracking-[0.18em] text-gray-500">
               Flashcards
             </p>
-            <h3 className="text-lg font-semibold text-white">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
               {selectedDeck
                 ? formatDeckLabel(selectedDeck)
                 : sourceFilter
@@ -494,7 +494,7 @@ export function FlashcardsPanel() {
             <button
               type="button"
               onClick={() => setSettingsOpen(true)}
-              className="flex h-10 w-10 items-center justify-center rounded-md border border-white/10 text-gray-300 transition-colors hover:bg-white/10 hover:text-gold-primary"
+              className="flex h-10 w-10 items-center justify-center rounded-md border border-black/10 dark:border-white/10 text-gray-700 dark:text-gray-300 transition-colors hover:bg-black/[0.05] dark:hover:bg-black/[0.05] dark:bg-white/10 hover:text-gold-primary"
               title="Flashcard settings"
               aria-label="Flashcard settings"
             >
@@ -513,9 +513,9 @@ export function FlashcardsPanel() {
         </div>
       </div>
 
-      <div className="border-b border-white/10 px-4 py-4">
+      <div className="border-b border-black/10 dark:border-white/10 px-4 py-4">
         <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
+          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
             <Layers className="h-4 w-4" />
             Skills
           </div>
@@ -526,7 +526,7 @@ export function FlashcardsPanel() {
               className={`flex h-8 w-8 items-center justify-center rounded-md transition-colors ${
                 skillFilterOpen || deckSearch
                   ? "bg-gold-primary/10 text-gold-primary"
-                  : "text-gray-400 hover:bg-white/10 hover:text-gold-primary"
+                  : "text-gray-500 dark:text-gray-400 hover:bg-black/[0.05] dark:hover:bg-black/[0.05] dark:bg-white/10 hover:text-gold-primary"
               }`}
               title="Filter skills"
               aria-label="Filter skills"
@@ -551,7 +551,7 @@ export function FlashcardsPanel() {
         </div>
         {skillFilterOpen || deckSearch ? (
           <div className="mt-3 space-y-2">
-            <label className="flex items-center gap-2 rounded-md border border-white/10 bg-white/5 px-3 py-2 text-gray-400">
+            <label className="flex items-center gap-2 rounded-md border border-black/10 dark:border-white/10 bg-black/[0.03] dark:bg-white/5 px-3 py-2 text-gray-500 dark:text-gray-400">
               <Search className="h-4 w-4 shrink-0" />
               <input
                 value={deckSearch}
@@ -561,14 +561,14 @@ export function FlashcardsPanel() {
               />
             </label>
             {deckSearch ? (
-              <div className="flex items-center justify-between rounded-md border border-white/10 bg-white/[0.03] px-2 py-1">
+              <div className="flex items-center justify-between rounded-md border border-black/10 dark:border-white/10 bg-black/[0.025] dark:bg-white/[0.03] px-2 py-1">
                 <span className="text-xs text-gray-500">
                   {filteredDecks.length}
                 </span>
                 <button
                   type="button"
                   onClick={() => setDeckSearch("")}
-                  className="flex h-7 w-7 items-center justify-center rounded-md text-gray-400 hover:bg-white/10 hover:text-gold-primary"
+                  className="flex h-7 w-7 items-center justify-center rounded-md text-gray-500 dark:text-gray-400 hover:bg-black/[0.05] dark:hover:bg-black/[0.05] dark:bg-white/10 hover:text-gold-primary"
                   title="Clear skill filter"
                   aria-label="Clear skill filter"
                 >
@@ -580,7 +580,7 @@ export function FlashcardsPanel() {
         ) : null}
         <div className="mt-3 max-h-48 space-y-1 overflow-y-auto">
           {filteredDecks.length === 0 ? (
-            <p className="rounded-md border border-white/10 px-3 py-2 text-sm text-gray-500">
+            <p className="rounded-md border border-black/10 dark:border-white/10 px-3 py-2 text-sm text-gray-500">
               No skills yet.
             </p>
           ) : (
@@ -598,7 +598,7 @@ export function FlashcardsPanel() {
                   className={`group rounded-md border transition-colors ${
                     active
                       ? "border-gold-primary/40 bg-gold-primary/10"
-                      : "border-white/10 bg-white/[0.03] hover:bg-white/[0.07]"
+                      : "border-black/10 dark:border-white/10 bg-black/[0.025] dark:bg-white/[0.03] hover:bg-black/[0.04] dark:hover:bg-white/[0.07]"
                   }`}
                 >
                   <div className="flex items-center gap-2 px-3 py-2">
@@ -614,10 +614,10 @@ export function FlashcardsPanel() {
                       className="min-w-0 flex-1 text-left"
                     >
                       <div className="flex items-center gap-2">
-                        <span className="truncate text-sm font-medium text-gray-100">
+                        <span className="truncate text-sm font-medium text-gray-900 dark:text-gray-100">
                           {deck.subcategory || "No skill category"}
                         </span>
-                        <span className="rounded bg-white/10 px-1.5 py-0.5 text-[11px] text-gray-300">
+                        <span className="rounded bg-black/[0.05] dark:bg-white/10 px-1.5 py-0.5 text-[11px] text-gray-700 dark:text-gray-300">
                           {deck.count}
                         </span>
                         {deck.viewedCount > 0 ? (
@@ -638,7 +638,7 @@ export function FlashcardsPanel() {
                       <button
                         type="button"
                         onClick={() => void startDeckReview(deck)}
-                        className="flex h-8 w-8 items-center justify-center rounded-md text-gray-300 hover:bg-gold-primary/10 hover:text-gold-primary"
+                        className="flex h-8 w-8 items-center justify-center rounded-md text-gray-700 dark:text-gray-300 hover:bg-gold-primary/10 hover:text-gold-primary"
                         title="Review this deck"
                         aria-label="Review this deck"
                       >
@@ -652,7 +652,7 @@ export function FlashcardsPanel() {
                             current === key ? null : key
                           );
                         }}
-                        className="flex h-8 w-8 items-center justify-center rounded-md text-gray-300 hover:bg-white/10 hover:text-gold-primary"
+                        className="flex h-8 w-8 items-center justify-center rounded-md text-gray-700 dark:text-gray-300 hover:bg-black/[0.05] dark:hover:bg-black/[0.05] dark:bg-white/10 hover:text-gold-primary"
                         title="Deck review settings"
                         aria-label="Deck review settings"
                       >
@@ -661,8 +661,8 @@ export function FlashcardsPanel() {
                     </div>
                   </div>
                   {settingsOpen ? (
-                    <div className="grid gap-2 border-t border-white/10 px-3 py-3">
-                      <label className="space-y-1 text-xs text-gray-400">
+                    <div className="grid gap-2 border-t border-black/10 dark:border-white/10 px-3 py-3">
+                      <label className="space-y-1 text-xs text-gray-500 dark:text-gray-400">
                         Skill Category
                         <div className="flex items-center gap-1">
                           <input
@@ -670,7 +670,7 @@ export function FlashcardsPanel() {
                             onChange={(event) =>
                               setRenameSkillCategory(event.target.value)
                             }
-                            className="min-w-0 flex-1 rounded-md border border-white/20 bg-gray-900/95 px-3 py-2 text-base text-gray-100 shadow-sm outline-none transition-colors hover:bg-white/10 focus:border-gold-primary focus:bg-gray-900 md:text-sm"
+                            className="min-w-0 flex-1 rounded-md border border-black/15 dark:border-white/20 bg-white dark:bg-gray-900/95 px-3 py-2 text-base text-gray-900 dark:text-gray-100 shadow-sm outline-none transition-colors hover:bg-black/[0.05] dark:hover:bg-black/[0.05] dark:bg-white/10 focus:border-gold-primary focus:bg-gray-50 dark:focus:bg-gray-900 md:text-sm"
                             placeholder="No skill category"
                           />
                           <button
@@ -680,7 +680,7 @@ export function FlashcardsPanel() {
                               renamingDeckKey === key ||
                               renameSkillCategory.trim() === deck.subcategory
                             }
-                            className="flex h-10 w-10 items-center justify-center rounded-md border border-white/20 text-gray-300 hover:bg-gold-primary/10 hover:text-gold-primary disabled:cursor-not-allowed disabled:opacity-40"
+                            className="flex h-10 w-10 items-center justify-center rounded-md border border-black/15 dark:border-white/20 text-gray-700 dark:text-gray-300 hover:bg-gold-primary/10 hover:text-gold-primary disabled:cursor-not-allowed disabled:opacity-40"
                             title="Save skill category"
                             aria-label="Save skill category"
                           >
@@ -692,7 +692,7 @@ export function FlashcardsPanel() {
                               setRenameSkillCategory(deck.subcategory)
                             }
                             disabled={renameSkillCategory === deck.subcategory}
-                            className="flex h-10 w-10 items-center justify-center rounded-md border border-white/20 text-gray-300 hover:bg-white/10 hover:text-gold-primary disabled:cursor-not-allowed disabled:opacity-40"
+                            className="flex h-10 w-10 items-center justify-center rounded-md border border-black/15 dark:border-white/20 text-gray-700 dark:text-gray-300 hover:bg-black/[0.05] dark:hover:bg-black/[0.05] dark:bg-white/10 hover:text-gold-primary disabled:cursor-not-allowed disabled:opacity-40"
                             title="Reset skill category"
                             aria-label="Reset skill category"
                           >
@@ -700,7 +700,7 @@ export function FlashcardsPanel() {
                           </button>
                         </div>
                       </label>
-                      <label className="space-y-1 text-xs text-gray-400">
+                      <label className="space-y-1 text-xs text-gray-500 dark:text-gray-400">
                         Review Mode
                         <select
                           value={settings.reviewMode}
@@ -718,7 +718,7 @@ export function FlashcardsPanel() {
                           ))}
                         </select>
                       </label>
-                      <label className="space-y-1 text-xs text-gray-400">
+                      <label className="space-y-1 text-xs text-gray-500 dark:text-gray-400">
                         Status
                         <select
                           value={settings.reviewStatus}
@@ -750,13 +750,13 @@ export function FlashcardsPanel() {
       <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
         <div className="mb-3 space-y-3">
           <div className="flex items-center justify-between">
-            <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
               Cards
             </p>
             <button
               type="button"
               onClick={() => void refresh()}
-              className="rounded-md p-1.5 text-gray-400 hover:bg-white/10 hover:text-gold-primary"
+              className="rounded-md p-1.5 text-gray-500 dark:text-gray-400 hover:bg-black/[0.05] dark:hover:bg-black/[0.05] dark:bg-white/10 hover:text-gold-primary"
               aria-label="Refresh flashcards"
             >
               {loading ? (
@@ -766,7 +766,7 @@ export function FlashcardsPanel() {
               )}
             </button>
           </div>
-          <label className="flex items-center gap-2 rounded-md border border-white/10 bg-white/5 px-3 py-2 text-gray-400">
+          <label className="flex items-center gap-2 rounded-md border border-black/10 dark:border-white/10 bg-black/[0.03] dark:bg-white/5 px-3 py-2 text-gray-500 dark:text-gray-400">
             <Search className="h-4 w-4 shrink-0" />
             <input
               value={cardSearch}
@@ -778,7 +778,7 @@ export function FlashcardsPanel() {
         </div>
 
         {filteredCards.length === 0 ? (
-          <p className="rounded-md border border-white/10 bg-white/[0.03] px-3 py-3 text-sm text-gray-500">
+          <p className="rounded-md border border-black/10 dark:border-white/10 bg-black/[0.025] dark:bg-white/[0.03] px-3 py-3 text-sm text-gray-500">
             {emptyMessage}
           </p>
         ) : (
@@ -786,7 +786,7 @@ export function FlashcardsPanel() {
             {filteredCards.map((card) => (
               <div
                 key={card.id}
-                className="rounded-lg border border-white/10 bg-white/[0.03] p-3 transition-colors hover:border-gold-primary/30 hover:bg-white/[0.06]"
+                className="rounded-lg border border-black/10 dark:border-white/10 bg-black/[0.025] dark:bg-white/[0.03] p-3 transition-colors hover:border-gold-primary/30 hover:bg-white/[0.06]"
               >
                 <div className="flex items-start justify-between gap-3">
                   <button
@@ -798,11 +798,11 @@ export function FlashcardsPanel() {
                     <p className="line-clamp-2 text-sm font-semibold text-white transition-colors group-hover:text-gold-primary">
                       {cardPreview(card)}
                     </p>
-                    <p className="mt-1 line-clamp-2 text-xs text-gray-500 transition-colors group-hover:text-gray-300">
+                    <p className="mt-1 line-clamp-2 text-xs text-gray-500 transition-colors group-hover:text-gray-700 dark:text-gray-300">
                       {card.backPreview || "No back preview"}
                     </p>
                   </button>
-                  <span className="shrink-0 rounded bg-white/10 px-1.5 py-0.5 text-[11px] capitalize text-gray-300">
+                  <span className="shrink-0 rounded bg-black/[0.05] dark:bg-white/10 px-1.5 py-0.5 text-[11px] capitalize text-gray-700 dark:text-gray-300">
                     {card.reviewStatus}
                   </span>
                 </div>
@@ -821,10 +821,10 @@ export function FlashcardsPanel() {
                         )
                       }
                       disabled={mutatingId === card.id}
-                      className={`rounded-md p-2 hover:bg-white/10 disabled:opacity-50 ${
+                      className={`rounded-md p-2 hover:bg-black/[0.05] dark:hover:bg-black/[0.05] dark:bg-white/10 disabled:opacity-50 ${
                         editingCardId === card.id
                           ? "text-gold-primary"
-                          : "text-gray-400 hover:text-gold-primary"
+                          : "text-gray-500 dark:text-gray-400 hover:text-gold-primary"
                       }`}
                       aria-label={
                         editingCardId === card.id
@@ -839,7 +839,7 @@ export function FlashcardsPanel() {
                         type="button"
                         onClick={() => void updateCardStatus(card, "review")}
                         disabled={mutatingId === card.id}
-                        className="rounded-md p-2 text-gray-400 hover:bg-white/10 hover:text-gold-primary disabled:opacity-50"
+                        className="rounded-md p-2 text-gray-500 dark:text-gray-400 hover:bg-black/[0.05] dark:hover:bg-black/[0.05] dark:bg-white/10 hover:text-gold-primary disabled:opacity-50"
                         aria-label="Restore flashcard"
                       >
                         <RotateCcw className="h-4 w-4" />
@@ -849,7 +849,7 @@ export function FlashcardsPanel() {
                         type="button"
                         onClick={() => void updateCardStatus(card, "archived")}
                         disabled={mutatingId === card.id}
-                        className="rounded-md p-2 text-gray-400 hover:bg-white/10 hover:text-gold-primary disabled:opacity-50"
+                        className="rounded-md p-2 text-gray-500 dark:text-gray-400 hover:bg-black/[0.05] dark:hover:bg-black/[0.05] dark:bg-white/10 hover:text-gold-primary disabled:opacity-50"
                         aria-label="Archive flashcard"
                       >
                         <Archive className="h-4 w-4" />
@@ -859,7 +859,7 @@ export function FlashcardsPanel() {
                       type="button"
                       onClick={() => void deleteCard(card)}
                       disabled={mutatingId === card.id}
-                      className="rounded-md p-2 text-gray-400 hover:bg-red-500/10 hover:text-red-300 disabled:opacity-50"
+                      className="rounded-md p-2 text-gray-500 dark:text-gray-400 hover:bg-red-500/10 hover:text-red-300 disabled:opacity-50"
                       aria-label="Delete flashcard"
                     >
                       <Trash2 className="h-4 w-4" />
@@ -867,7 +867,7 @@ export function FlashcardsPanel() {
                   </div>
                 </div>
                 {editingCardId === card.id ? (
-                  <div className="mt-3 border-t border-white/10 pt-3">
+                  <div className="mt-3 border-t border-black/10 dark:border-white/10 pt-3">
                     <FlashcardInlineEditor
                       card={card}
                       onSaved={replaceCard}
@@ -895,7 +895,7 @@ export function FlashcardsPanel() {
         }}
       />
       <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
-        <DialogContent className="max-h-[calc(100vh-4rem)] w-[min(760px,92vw)] overflow-y-auto border-white/10 bg-[#0f1115] p-6 text-white">
+        <DialogContent className="max-h-[calc(100vh-4rem)] w-[min(760px,92vw)] overflow-y-auto border-black/10 dark:border-white/10 bg-white dark:bg-[#1a2530] p-6 text-white">
           <FlashcardsSettingsDialog />
         </DialogContent>
       </Dialog>

@@ -99,7 +99,7 @@ export default function AdminDashboard() {
       {/* Users by Role Breakdown */}
       {stats && (
         <div
-          className="border border-white/10 rounded-lg p-6"
+          className="border border-black/10 dark:border-white/10 rounded-lg p-6"
           style={{
             background: glass0.background,
             backdropFilter: glass0.backdropFilter,
@@ -122,7 +122,7 @@ export default function AdminDashboard() {
       {/* Content by Type */}
       {stats && (
         <div
-          className="border border-white/10 rounded-lg p-6"
+          className="border border-black/10 dark:border-white/10 rounded-lg p-6"
           style={{
             background: glass0.background,
             backdropFilter: glass0.backdropFilter,
@@ -144,7 +144,7 @@ export default function AdminDashboard() {
 
       {/* Recent Activity */}
       <div
-        className="border border-white/10 rounded-lg p-6"
+        className="border border-black/10 dark:border-white/10 rounded-lg p-6"
         style={{
           background: glass0.background,
           backdropFilter: glass0.backdropFilter,
@@ -205,7 +205,7 @@ function StatCard({
 }) {
   return (
     <div
-      className="border border-white/10 rounded-lg p-6"
+      className="border border-black/10 dark:border-white/10 rounded-lg p-6"
       style={{
         background: glass0.background,
         backdropFilter: glass0.backdropFilter,

@@ -791,15 +791,15 @@ export function PeoplePanel() {
       <div className="border-b border-white/10 px-3 py-3">
         <div className="mb-3 flex items-start justify-between gap-3">
           <div>
-            <h3 className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-700">People</h3>
-            <p className="mt-1 text-xs text-gray-500">Groups, subgroups, and contacts</p>
+            <h3 className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-700 dark:text-gray-200">People</h3>
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Groups, subgroups, and contacts</p>
           </div>
           <div className="flex shrink-0 items-center gap-1">
             <button
               type="button"
               onClick={() => selectedPersonId ? openProfile(selectedPersonId) : null}
               disabled={!selectedPersonId}
-              className="rounded p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 disabled:cursor-not-allowed disabled:opacity-40"
+              className="rounded p-1.5 text-gray-500 dark:text-gray-400 transition-colors hover:bg-gray-100 dark:hover:bg-white/10 hover:text-gray-900 dark:hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
               title={selectedPersonId ? "Edit selected contact" : "Select one contact to edit profile"}
             >
               <Pencil className="h-4 w-4" />
@@ -812,25 +812,25 @@ export function PeoplePanel() {
                   event.stopPropagation();
                   setShowAddMenu((current) => !current);
                 }}
-                className="rounded p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900"
+                className="rounded p-1.5 text-gray-500 dark:text-gray-400 transition-colors hover:bg-gray-100 dark:hover:bg-white/10 hover:text-gray-900 dark:hover:text-white"
                 title="Add to People"
               >
                 <Plus className="h-4 w-4" />
               </button>
             </div>
-            <div className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-500">
+            <div className="rounded-full bg-gray-100 dark:bg-white/10 px-2 py-0.5 text-xs text-gray-500 dark:text-gray-300">
               {isLoadingTree ? "Loading" : tree ? `${tree.stats.people} people` : "Loading"}
             </div>
           </div>
         </div>
 
         <label className="relative block">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500 dark:text-gray-400" />
           <input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Search people or groups..."
-            className="w-full rounded-lg border border-gray-200 bg-white py-2 pl-9 pr-3 text-sm text-gray-900 outline-none transition-colors placeholder:text-gray-500 focus:border-gold-primary/60"
+            className="w-full rounded-lg border border-gray-200 dark:border-white/15 bg-white dark:bg-black/30 py-2 pl-9 pr-3 text-sm text-gray-900 dark:text-gray-100 outline-none transition-colors placeholder:text-gray-500 dark:placeholder:text-gray-400 focus:border-gold-primary/60"
           />
         </label>
       </div>
@@ -980,7 +980,7 @@ export function PeoplePanel() {
           />
           <div
             ref={addMenuRef}
-            className="fixed z-[190] min-w-52 overflow-visible rounded-lg border border-gray-200 bg-white py-1 shadow-xl"
+            className="fixed z-[190] min-w-52 overflow-visible rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-gray-900/95 backdrop-blur-md py-1 shadow-xl"
             style={
               addMenuPosition
                 ? {
@@ -1062,7 +1062,7 @@ function SearchResults({
         <div key={result.id} className="group flex items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-white/5">
           <PeopleIcon kind={result.treeNodeKind} />
           <div className="min-w-0 flex-1">
-            <div className="truncate font-medium text-gray-900">{result.label}</div>
+            <div className="truncate font-medium text-gray-900 dark:text-gray-100">{result.label}</div>
             <div className="truncate text-xs text-gray-500">
               {result.treeNodeKind === "person"
                 ? result.email || result.phone || "Person"
@@ -1199,7 +1199,7 @@ function PeopleGroupRow({
             onDropOnGroup(payload, group.groupId);
           }
         }}
-        className={`flex items-center gap-2 rounded px-2 py-1.5 text-sm outline-none transition-colors hover:bg-gray-50 focus:bg-gray-50 ${
+        className={`flex items-center gap-2 rounded px-2 py-1.5 text-sm outline-none transition-colors hover:bg-gray-50 focus:bg-gray-50 dark:hover:bg-white/5 dark:focus:bg-white/5 ${
           isSelected ? "bg-gold-primary/10 ring-1 ring-gold-primary/30" : ""
         } ${
           isDragTarget ? "bg-gold-primary/10 ring-1 ring-gold-primary/30" : ""
@@ -1214,12 +1214,12 @@ function PeopleGroupRow({
         <PeopleIcon kind="peopleGroup" />
         <div className="min-w-0 flex-1 leading-tight">
           <div className="flex min-w-0 items-center gap-1.5">
-            <span className="truncate font-medium text-gray-900">
+            <span className="truncate font-medium text-gray-900 dark:text-gray-100">
               {group.name}
             </span>
-            {group.isDefault ? <span className="shrink-0 text-[11px] font-normal text-gray-500">default</span> : null}
+            {group.isDefault ? <span className="shrink-0 text-[11px] font-normal text-gray-500 dark:text-gray-400">default</span> : null}
           </div>
-          <div className="truncate text-xs text-gray-500">
+          <div className="truncate text-xs text-gray-500 dark:text-gray-400">
             {formatGroupSummary(group)}
           </div>
         </div>
@@ -1361,7 +1361,7 @@ function PeoplePersonRow({
           } satisfies PeopleDragPayload));
           event.dataTransfer.effectAllowed = "move";
         }}
-        className={`flex cursor-grab items-center gap-2 rounded px-2 py-1.5 text-sm outline-none transition-colors hover:bg-gray-50 focus:bg-gray-50 active:cursor-grabbing ${
+        className={`flex cursor-grab items-center gap-2 rounded px-2 py-1.5 text-sm outline-none transition-colors hover:bg-gray-50 focus:bg-gray-50 dark:hover:bg-white/5 dark:focus:bg-white/5 active:cursor-grabbing ${
           isSelected ? "bg-blue-50 ring-1 ring-blue-200" : ""
         }`}
         style={{ paddingLeft: 8 + depth * 14 }}
@@ -1373,7 +1373,7 @@ function PeoplePersonRow({
         />
         <PeopleIcon kind="person" />
         <div className="min-w-0 flex-1 leading-tight">
-          <div className="truncate font-medium text-gray-900">{person.displayName}</div>
+          <div className="truncate font-medium text-gray-900 dark:text-gray-100">{person.displayName}</div>
           <div className="truncate text-xs text-gray-500">{person.email || person.phone || "Person"}</div>
         </div>
         <MountBadge mounted={Boolean(person.mount)} />
@@ -1434,8 +1434,8 @@ function PeopleContentRow({
   return (
     <div>
       <div
-        className={`flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm text-gray-700 transition-colors hover:bg-gray-50 ${
-          isSelected ? "bg-gray-100 ring-1 ring-gray-200" : ""
+        className={`flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm text-gray-700 dark:text-gray-300 transition-colors hover:bg-gray-50 dark:hover:bg-white/5 ${
+          isSelected ? "bg-gray-100 dark:bg-white/10 ring-1 ring-gray-200 dark:ring-white/15" : ""
         }`}
         style={{ paddingLeft: 8 + depth * 14 }}
         onClick={() => {
@@ -1495,7 +1495,7 @@ function TreeDisclosure({
   return (
     <button
       type="button"
-      className="flex h-4 w-4 shrink-0 items-center justify-center rounded text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700"
+      className="flex h-4 w-4 shrink-0 items-center justify-center rounded text-gray-400 dark:text-gray-500 transition-colors hover:bg-gray-100 dark:hover:bg-white/10 hover:text-gray-700 dark:hover:text-gray-200"
       onClick={(event) => {
         event.preventDefault();
         event.stopPropagation();
@@ -1511,7 +1511,7 @@ function TreeDisclosure({
 function PeopleLoadingSkeleton() {
   return (
     <div className="space-y-2 p-2" aria-label="Loading People">
-      <div className="h-7 animate-pulse rounded bg-gray-100" />
+      <div className="h-7 animate-pulse rounded bg-gray-100 dark:bg-white/10" />
       <div className="ml-5 h-7 animate-pulse rounded bg-gray-100/80" />
       <div className="ml-5 h-7 animate-pulse rounded bg-gray-100/70" />
       <div className="mt-4 h-7 animate-pulse rounded bg-gray-100" />
@@ -1827,7 +1827,7 @@ function RenameDialog({
 }) {
   return (
     <div className="fixed inset-0 z-[210] flex items-center justify-center bg-black/45 px-4">
-      <div className="w-full max-w-sm rounded-xl border border-white/10 bg-white shadow-2xl">
+      <div className="w-full max-w-sm rounded-xl border border-black/10 dark:border-white/10 bg-white dark:bg-[#1a2530] shadow-2xl">
         <div className="border-b border-gray-200 px-4 py-3">
           <h2 className="text-sm font-semibold text-gray-900">{title}</h2>
         </div>
@@ -1846,7 +1846,7 @@ function RenameDialog({
                 onCancel();
               }
             }}
-            className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition-colors placeholder:text-gray-500 focus:border-gold-primary/60"
+            className="w-full rounded-lg border border-gray-200 dark:border-white/15 bg-white dark:bg-black/30 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 outline-none transition-colors placeholder:text-gray-500 dark:placeholder:text-gray-400 focus:border-gold-primary/60"
           />
         </div>
         <div className="flex items-center justify-end gap-2 border-t border-gray-200 px-4 py-3">

@@ -7,6 +7,7 @@ import Head from "./layout/head";
 import NavBar from "@/components/client/nav/NavBar";
 import { Toaster } from "@/components/client/ui/sonner";
 import { SettingsInitializer } from "@/components/settings/SettingsInitializer";
+import { ThemeProvider, THEME_SCRIPT } from "@/lib/features/theme";
 
 const geistSans = localFont({
   src: "../public/fonts/liberation-sans-regular.ttf",
@@ -79,27 +80,42 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <Head></Head>
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        {/*
+          Pre-hydration theme application. Runs synchronously during HTML
+          parse so .dark is on <html> before first paint — no FOUC.
+          The script writes data-theme and data-theme-pref attributes that
+          the SSR HTML doesn't have, so suppressHydrationWarning on <html>
+          tells React the diff on this element is expected. Same escape
+          hatch next-themes uses for this exact case.
+          See lib/features/theme/script.ts.
+        */}
+        <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
+        <Head />
+      </head>
       <body className={`min-h-screen w-full relative ${geistSans.variable} ${geistMono.variable}`}>
         {/* Initialize user settings on mount */}
         <SettingsInitializer />
-        {/* Note: /notes route has its own NotesNavBar */}
-        {/* The navbar is hidden via CSS when notes layout renders */}
-        <div className="notes-route-hides-default-nav">
-          <NavBar />
-        </div>
-        <main className="pt-20 notes-route-no-padding">{children}</main>
-        {/* Toast notifications - positioned in top-right corner */}
-        {/* Notes route has navbar at 56px, so toasts appear below it via CSS */}
-        <Toaster
-          position="top-right"
-          expand={false}
-          richColors
-          visibleToasts={3}
-          duration={5000}
-          closeButton
-        />
+        {/* Keep <html class="dark"> in sync as preference or OS scheme changes */}
+        <ThemeProvider>
+          {/* Note: /notes route has its own NotesNavBar */}
+          {/* The navbar is hidden via CSS when notes layout renders */}
+          <div className="notes-route-hides-default-nav">
+            <NavBar />
+          </div>
+          <main className="pt-20 notes-route-no-padding">{children}</main>
+          {/* Toast notifications - positioned in top-right corner */}
+          {/* Notes route has navbar at 56px, so toasts appear below it via CSS */}
+          <Toaster
+            position="top-right"
+            expand={false}
+            richColors
+            visibleToasts={3}
+            duration={5000}
+            closeButton
+          />
+        </ThemeProvider>
       </body>
     </html>
   );

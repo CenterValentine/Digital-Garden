@@ -37,9 +37,9 @@ const EMPTY_OPTIONS: FlashcardOptionsDto = {
 const NEW_SKILL_VALUE = "__new_flashcard_skill__";
 const NEW_SKILL_CATEGORY_VALUE = "__new_flashcard_skill_category__";
 const MENU_SELECT_CLASS =
-  "w-full rounded-md border border-white/20 bg-gray-900/95 px-3 py-2 text-base text-gray-100 shadow-sm outline-none transition-colors hover:bg-white/10 focus:border-gold-primary focus:bg-gray-900 md:text-sm";
+  "w-full rounded-md border border-black/15 dark:border-white/20 bg-white dark:bg-gray-900/95 px-3 py-2 text-base text-gray-900 dark:text-gray-100 shadow-sm outline-none transition-colors hover:bg-black/[0.05] dark:hover:bg-black/[0.05] dark:bg-white/10 focus:border-gold-primary focus:bg-gray-50 dark:focus:bg-gray-900 md:text-sm";
 const MENU_INPUT_CLASS =
-  "w-full rounded-md border border-white/20 bg-white/10 px-3 py-2 text-base text-gray-100 outline-none placeholder:text-gray-500 focus:border-white/40 md:text-sm";
+  "w-full rounded-md border border-black/15 dark:border-white/20 bg-black/[0.05] dark:bg-white/10 px-3 py-2 text-base text-gray-900 dark:text-gray-100 outline-none placeholder:text-gray-500 focus:border-white/40 md:text-sm";
 
 function addUniqueSorted(values: string[], value: string) {
   const normalized = value.trim();
@@ -262,7 +262,7 @@ export function FlashcardQuickAddForm({
         ) : null}
 
         <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
-          <label className="space-y-1 text-xs text-gray-400">
+          <label className="space-y-1 text-xs text-gray-600 dark:text-gray-400">
             Skill
             <select
               value={skillSelection}
@@ -300,7 +300,7 @@ export function FlashcardQuickAddForm({
               />
             ) : null}
           </label>
-          <label className="space-y-1 text-xs text-gray-400">
+          <label className="space-y-1 text-xs text-gray-600 dark:text-gray-400">
             Skill Category
             <select
               value={skillCategorySelection}
@@ -337,14 +337,14 @@ export function FlashcardQuickAddForm({
         </div>
 
         <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-2">
-          <label className="space-y-1 text-xs text-gray-400">
+          <label className="space-y-1 text-xs text-gray-600 dark:text-gray-400">
             Front Label
             <input
               ref={frontLabelRef}
               value={frontLabel}
               onChange={(event) => setFrontLabel(event.target.value)}
               list={frontLabelListId}
-              className="w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-base text-white outline-none focus:border-gold-primary md:text-sm"
+              className="w-full rounded-md border border-black/10 dark:border-white/10 bg-black/[0.03] dark:bg-white/5 px-3 py-2 text-base text-gray-900 dark:text-white outline-none focus:border-gold-primary md:text-sm"
             />
             <datalist id={frontLabelListId}>
               {options.frontLabels.map((option) => (
@@ -352,13 +352,13 @@ export function FlashcardQuickAddForm({
               ))}
             </datalist>
           </label>
-          <label className="space-y-1 text-xs text-gray-400">
+          <label className="space-y-1 text-xs text-gray-600 dark:text-gray-400">
             Back Label
             <input
               value={backLabel}
               onChange={(event) => setBackLabel(event.target.value)}
               list={backLabelListId}
-              className="w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-base text-white outline-none focus:border-gold-primary md:text-sm"
+              className="w-full rounded-md border border-black/10 dark:border-white/10 bg-black/[0.03] dark:bg-white/5 px-3 py-2 text-base text-gray-900 dark:text-white outline-none focus:border-gold-primary md:text-sm"
             />
             <datalist id={backLabelListId}>
               {options.backLabels.map((option) => (
@@ -370,7 +370,7 @@ export function FlashcardQuickAddForm({
 
         <div className="mt-4 space-y-2">
           <div className="flex items-center justify-between gap-3">
-            <span className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+            <span className="text-xs font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-400">
               {frontLabel || "Question"}
             </span>
             <button
@@ -384,7 +384,7 @@ export function FlashcardQuickAddForm({
               className={`flex h-9 w-9 items-center justify-center rounded-md border transition-colors ${
                 isFrontRichText
                   ? "border-gold-primary/40 bg-gold-primary/10 text-gold-primary"
-                  : "border-white/20 text-gray-300 hover:bg-white/10 hover:text-gold-primary"
+                  : "border-black/15 dark:border-white/20 text-gray-700 dark:text-gray-300 hover:bg-black/[0.05] dark:hover:bg-black/[0.05] dark:bg-white/10 hover:text-gold-primary"
               }`}
               title={isFrontRichText ? "Use simple text" : "Enable rich text"}
               aria-label={
@@ -405,7 +405,7 @@ export function FlashcardQuickAddForm({
         </div>
 
         <div className="mt-4 space-y-2">
-          <span className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+          <span className="text-xs font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-400">
             {backLabel || "Answer"}
           </span>
           <AdaptiveFlashcardEditor
@@ -419,7 +419,7 @@ export function FlashcardQuickAddForm({
       </div>
 
       <div
-        className={`flex shrink-0 gap-2 border-t border-white/10 bg-[#111318]/95 p-3 ${
+        className={`flex shrink-0 gap-2 border-t border-black/10 dark:border-white/10 bg-white/95 dark:bg-[#1a2530]/95 p-3 ${
           mobileSheet ? "pb-[calc(0.75rem+env(safe-area-inset-bottom))]" : ""
         }`}
       >
@@ -427,7 +427,7 @@ export function FlashcardQuickAddForm({
           <button
             type="button"
             onClick={onCancel}
-            className="min-h-11 rounded-md border border-white/10 px-3 text-sm text-gray-300 hover:bg-white/10"
+            className="min-h-11 rounded-md border border-black/10 dark:border-white/10 px-3 text-sm text-gray-700 dark:text-gray-300 hover:bg-black/[0.05] dark:hover:bg-black/[0.05] dark:bg-white/10"
           >
             Cancel
           </button>
@@ -436,7 +436,7 @@ export function FlashcardQuickAddForm({
           type="button"
           onClick={() => void save(false)}
           disabled={saving}
-          className="min-h-11 flex-1 rounded-md border border-white/10 px-3 text-sm font-semibold text-gray-100 hover:bg-white/10 disabled:opacity-50"
+          className="min-h-11 flex-1 rounded-md border border-black/10 dark:border-white/10 px-3 text-sm font-semibold text-gray-900 dark:text-gray-100 hover:bg-black/[0.05] dark:hover:bg-black/[0.05] dark:bg-white/10 disabled:opacity-50"
         >
           Save
         </button>

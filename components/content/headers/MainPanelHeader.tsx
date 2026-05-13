@@ -513,7 +513,7 @@ export function MainPanelHeader({
       >
         <div className="flex min-w-0 max-w-full flex-1 items-stretch overflow-x-auto scrollbar-hide pr-1">
           {tabs.length === 0 ? (
-            <div className="flex items-center px-2 py-1.5 text-xs font-medium uppercase tracking-[0.18em] text-gray-500">
+            <div className="flex items-center px-2 py-1.5 text-xs font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">
               {getPaneLabel(layoutMode, paneId)}
             </div>
           ) : tabs.map((tab) => {
@@ -533,8 +533,8 @@ export function MainPanelHeader({
                 }}
                 className={`group relative flex min-w-[6rem] max-w-[22rem] shrink items-center gap-1.5 overflow-hidden border-r border-r-black/[0.08] px-2 py-1.5 text-[13px] transition-colors dark:border-r-white/10 ${
                   isActive
-                    ? "border-b-2 border-gold-primary bg-black/[0.04] text-gold-primary shadow-[0_1px_2px_rgba(15,23,42,0.04)]"
-                    : "text-gray-600 hover:bg-black/[0.035] hover:text-gray-900"
+                    ? "border-b-2 border-gold-primary bg-black/[0.04] text-gold-primary shadow-[0_1px_2px_rgba(15,23,42,0.04)] dark:bg-white/[0.04]"
+                    : "text-gray-600 hover:bg-black/[0.035] hover:text-gray-900 dark:text-gray-300 dark:hover:bg-white/[0.05] dark:hover:text-white"
                 } ${isDragging ? "cursor-grabbing opacity-60" : "cursor-grab"}`}
                 data-pane-id={paneId}
                 draggable

@@ -63,10 +63,8 @@ export function FlashcardReviewOverlay({
   const [sessionCards, setSessionCards] = useState<FlashcardDto[]>(cards);
   const [intent, setIntent] = useState<SlideIntent | null>(null);
   const [editing, setEditing] = useState(false);
-  const [editAffordanceVisible, setEditAffordanceVisible] = useState(false);
   const [startedAt, setStartedAt] = useState(Date.now());
   const wasOpenRef = useRef(false);
-  const editHideTimerRef = useRef<number | null>(null);
   const viewedCardIdsRef = useRef<Set<string>>(new Set());
   const reducedMotion = useReducedMotion();
   const current = sessionCards[index] ?? null;
@@ -85,7 +83,6 @@ export function FlashcardReviewOverlay({
     setShownSide(side);
     setFlipped(side === "back");
     setEditing(false);
-    setEditAffordanceVisible(false);
     setStartedAt(Date.now());
   }, [cards, mode, open]);
 
@@ -265,33 +262,15 @@ export function FlashcardReviewOverlay({
     void recordView();
   }, [current, open, updateCurrentCard]);
 
-  const revealEditAffordance = useCallback(() => {
-    setEditAffordanceVisible(true);
-    if (editHideTimerRef.current) {
-      window.clearTimeout(editHideTimerRef.current);
-    }
-    editHideTimerRef.current = window.setTimeout(() => {
-      setEditAffordanceVisible(false);
-    }, 1400);
-  }, []);
-
-  useEffect(() => {
-    return () => {
-      if (editHideTimerRef.current) {
-        window.clearTimeout(editHideTimerRef.current);
-      }
-    };
-  }, []);
-
   if (!open || typeof document === "undefined" || !current) return null;
 
   return createPortal(
     <div className="fixed inset-0 z-[220] flex items-center justify-center bg-black/60 p-3 backdrop-blur-sm md:p-6">
-      <div className="relative flex h-[100dvh] w-full flex-col overflow-hidden bg-[#111318] text-white md:h-[min(72vh,760px)] md:w-[min(66vw,960px)] md:rounded-lg md:border md:border-white/10">
-        <div className="flex shrink-0 items-center justify-between border-b border-white/10 px-4 py-3">
+      <div className="relative flex h-[100dvh] w-full flex-col overflow-hidden bg-white text-gray-900 dark:bg-[#1a2530] dark:text-white md:h-[min(72vh,760px)] md:w-[min(66vw,960px)] md:rounded-lg md:border md:border-black/10 dark:md:border-black/10 dark:border-white/10">
+        <div className="flex shrink-0 items-center justify-between border-b border-black/10 dark:border-white/10 px-4 py-3">
           <div>
             <h2 className="text-sm font-semibold">Review Flashcards</h2>
-            <p className="text-xs text-gray-400">
+            <p className="text-xs text-gray-600 dark:text-gray-400">
               {index + 1} of {sessionCards.length} ·{" "}
               {current.subcategory
                 ? `${current.subcategory} / ${current.category}`
@@ -301,7 +280,7 @@ export function FlashcardReviewOverlay({
           <button
             type="button"
             onClick={onClose}
-            className="flex h-11 w-11 items-center justify-center rounded-md text-gray-300 hover:bg-white/10"
+            className="flex h-11 w-11 items-center justify-center rounded-md text-gray-700 dark:text-gray-300 hover:bg-black/[0.05] dark:hover:bg-white/10"
             aria-label="Close review"
           >
             <X className="h-5 w-5" />
@@ -313,7 +292,7 @@ export function FlashcardReviewOverlay({
             {passiveLayers.map((layer) => (
               <div
                 key={layer}
-                className="absolute h-[min(70dvh,620px)] w-[calc(100vw-128px)] rounded-lg border border-white/10 bg-white/[0.035] md:h-[min(52vh,520px)] md:w-[min(52vw,760px)]"
+                className="absolute h-[min(70dvh,620px)] w-[calc(100vw-128px)] rounded-lg border border-black/10 dark:border-white/10 bg-black/[0.025] dark:bg-white/[0.035] md:h-[min(52vh,520px)] md:w-[min(52vw,760px)]"
                 style={{
                   transform: `translateY(${layer * 10}px) scale(${1 - layer * 0.035})`,
                   opacity: 1 - layer * 0.2,
@@ -322,10 +301,7 @@ export function FlashcardReviewOverlay({
             ))}
           </div>
 
-          <div
-            className="relative flex items-stretch gap-2"
-            onPointerMove={revealEditAffordance}
-          >
+          <div className="relative flex items-stretch gap-2">
             <SideNavButton
               label="Previous card"
               onClick={() => goToIndex(index - 1, "previous")}
@@ -333,7 +309,7 @@ export function FlashcardReviewOverlay({
             >
               <ChevronLeft className="h-5 w-5" />
             </SideNavButton>
-            <div className="relative" style={{ perspective: 1400 }}>
+            <div className="group relative" style={{ perspective: 1400 }}>
               <button
                 type="button"
                 onClick={(event) => {
@@ -344,19 +320,15 @@ export function FlashcardReviewOverlay({
                     return next;
                   });
                 }}
-                className={`absolute right-3 top-3 z-20 flex h-10 w-10 items-center justify-center rounded-md border transition-colors ${
+                className={`absolute right-2.5 top-2.5 z-20 flex h-7 w-7 items-center justify-center rounded-md transition-all duration-200 ${
                   editing
-                    ? "border-gold-primary bg-gold-primary text-black"
-                    : "border-white/10 bg-[#111318]/85 text-gray-200 hover:bg-white/10 hover:text-gold-primary"
-                } ${
-                  editing || editAffordanceVisible
-                    ? "opacity-100"
-                    : "pointer-events-none opacity-0"
+                    ? "bg-gold-primary text-black opacity-100 shadow-sm"
+                    : "bg-transparent text-gray-500 dark:text-gray-500 opacity-0 group-hover:opacity-100 hover:bg-black/[0.05] dark:hover:bg-white/10 hover:text-gold-primary focus-visible:opacity-100"
                 }`}
                 title={editing ? "Stop editing card" : "Edit card"}
                 aria-label={editing ? "Stop editing card" : "Edit card"}
               >
-                <Pencil className="h-4 w-4" />
+                <Pencil className="h-3.5 w-3.5" />
               </button>
               <AnimatePresence mode="popLayout" custom={intent}>
                 <motion.div
@@ -364,11 +336,15 @@ export function FlashcardReviewOverlay({
                   role={editing ? undefined : "button"}
                   tabIndex={editing ? undefined : 0}
                   aria-label={editing ? "Editing flashcard" : "Flip flashcard"}
-                  className={`relative h-[min(70dvh,620px)] w-[calc(100vw-128px)] rounded-lg border border-gold-primary/30 bg-[#171a20] text-left shadow-2xl outline-none md:h-[min(52vh,520px)] md:w-[min(52vw,760px)] ${
+                  className={`relative h-[min(70dvh,620px)] w-[calc(100vw-128px)] rounded-lg border border-gold-primary/30 bg-gray-50 dark:bg-[#202935] text-left shadow-2xl outline-none md:h-[min(52vh,520px)] md:w-[min(52vw,760px)] ${
                     editing ? "cursor-default" : "cursor-pointer"
                   }`}
                   style={{
                     transformStyle: "preserve-3d",
+                    boxShadow: flipped
+                      ? "0 25px 50px -12px rgba(201, 168, 108, 0.18), 0 0 0 1px rgba(201, 168, 108, 0.12)"
+                      : "0 25px 50px -12px rgba(15, 23, 42, 0.35), 0 0 0 1px rgba(201, 168, 108, 0.08)",
+                    transition: "box-shadow 0.5s ease",
                   }}
                   initial={{
                     opacity: 0,
@@ -378,14 +354,23 @@ export function FlashcardReviewOverlay({
                   }}
                   animate={{
                     opacity: 1,
-                    scale: 1,
+                    scale: editing ? 1 : reducedMotion ? 1 : [1, 0.92, 1],
                     y: 0,
                     rotateY: editing ? 0 : flipped ? 180 : 0,
                   }}
                   exit={getExit(intent, Boolean(reducedMotion))}
                   transition={{
-                    duration: reducedMotion ? 0.12 : 0.34,
-                    ease: "easeInOut",
+                    duration: reducedMotion ? 0.12 : 0.55,
+                    rotateY: {
+                      duration: reducedMotion ? 0.12 : 0.55,
+                      ease: [0.34, 1.2, 0.6, 1],
+                    },
+                    scale: {
+                      duration: reducedMotion ? 0.12 : 0.55,
+                      times: [0, 0.5, 1],
+                      ease: "easeInOut",
+                    },
+                    default: { ease: "easeInOut" },
                   }}
                   drag={reducedMotion || editing ? false : true}
                   dragElastic={0.12}
@@ -446,7 +431,7 @@ export function FlashcardReviewOverlay({
           </div>
         </div>
 
-        <div className="grid shrink-0 grid-cols-4 gap-2 border-t border-white/10 bg-[#111318]/95 p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] md:p-4">
+        <div className="grid shrink-0 grid-cols-4 gap-2 border-t border-black/10 dark:border-white/10 bg-white/95 dark:bg-[#1a2530]/95 p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] md:p-4">
           <ReviewIconButton
             label="Mark for review"
             onClick={() => void submitReview("review")}
@@ -491,7 +476,7 @@ function SideNavButton({
       disabled={disabled}
       title={label}
       aria-label={label}
-      className="flex h-[min(70dvh,620px)] w-10 shrink-0 items-center justify-center rounded-md text-gray-300 transition-colors hover:bg-white/[0.04] hover:text-gold-primary disabled:cursor-not-allowed disabled:opacity-35 md:h-[min(52vh,520px)] md:w-12"
+      className="flex h-[min(70dvh,620px)] w-10 shrink-0 items-center justify-center rounded-md text-gray-700 dark:text-gray-300 transition-colors hover:bg-black/[0.04] dark:hover:bg-white/[0.04] hover:text-gold-primary disabled:cursor-not-allowed disabled:opacity-35 md:h-[min(52vh,520px)] md:w-12"
     >
       {children}
     </button>
@@ -525,7 +510,7 @@ function ReviewIconButton({
           ? "border-gold-primary bg-gold-primary text-black hover:bg-gold-light"
           : emphasized
             ? "border-gold-primary/40 text-gold-primary hover:bg-gold-primary/10"
-            : "border-white/10 text-gray-200 hover:bg-white/10 hover:text-gold-primary"
+            : "border-black/10 dark:border-white/10 text-gray-800 dark:text-gray-200 hover:bg-black/[0.05] dark:hover:bg-white/10 hover:text-gold-primary"
       }`}
     >
       {children}
@@ -555,7 +540,7 @@ function CardFace({
       <div className="shrink-0 text-xs font-semibold uppercase tracking-wide text-gold-primary">
         {label}
       </div>
-      <div className="mt-4 min-h-0 flex-1 overflow-y-auto text-gray-100">
+      <div className="mt-4 min-h-0 flex-1 overflow-y-auto text-gray-900 dark:text-gray-100">
         {plain ? (
           <p className="whitespace-pre-wrap text-xl leading-relaxed md:text-2xl">
             {extractPlainTextFromTiptap(content) || "Empty front"}

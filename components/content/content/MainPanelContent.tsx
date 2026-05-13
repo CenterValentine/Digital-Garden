@@ -1451,7 +1451,7 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
   if (!selectedContentId) {
     return (
       <div className="flex-1 overflow-auto p-8">
-        <div className="prose prose-invert mx-auto max-w-3xl">
+        <div className="prose dark:prose-invert mx-auto max-w-3xl">
           
         </div>
       </div>
@@ -1462,7 +1462,7 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
   if (isLoading) {
     return (
       <div className="flex-1 flex items-center justify-center">
-        <div className="text-sm text-gray-400">Loading...</div>
+        <div className="text-sm text-muted-foreground">Loading...</div>
       </div>
     );
   }
@@ -1483,7 +1483,7 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
       <div className="flex-1 flex items-center justify-center">
         <div className="text-center">
           <div className="text-sm text-red-400 mb-2">Failed to load content</div>
-          <div className="text-xs text-gray-500">{error}</div>
+          <div className="text-xs text-muted-foreground">{error}</div>
         </div>
       </div>
     );

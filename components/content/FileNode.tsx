@@ -135,7 +135,7 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
   // Get icon based on content type or custom icon
   const getIcon = () => {
     const iconSize = "h-4 w-4";
-    const iconColor = data.iconColor || "text-gray-400";
+    const iconColor = data.iconColor || "text-gray-600 dark:text-gray-400";
 
     // Render custom icon if set
     if (data.customIcon) {
@@ -299,9 +299,9 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
         aria-label={isOpen ? "Collapse folder" : "Expand folder"}
       >
         {isOpen ? (
-          <ChevronDown className="h-4 w-4 text-gray-400" />
+          <ChevronDown className="h-4 w-4 text-gray-600 dark:text-gray-400" />
         ) : (
-          <ChevronRight className="h-4 w-4 text-gray-400" />
+          <ChevronRight className="h-4 w-4 text-gray-600 dark:text-gray-400" />
         )}
       </button>
     );
@@ -520,7 +520,7 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
     if (isSelected) {
       return "bg-primary/10 text-primary"; // Selected but not active (medium)
     }
-    return "hover:bg-white/5"; // Default hover
+    return "hover:bg-black/[0.03] dark:hover:bg-black/[0.03] dark:bg-white/5"; // Default hover
   };
 
   return (
@@ -571,7 +571,7 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
           <>
             <span>{basename}</span>
             {extension && (
-              <span className="text-gray-500">{extension}</span>
+              <span className="text-gray-500 dark:text-gray-400">{extension}</span>
             )}
           </>
         )}

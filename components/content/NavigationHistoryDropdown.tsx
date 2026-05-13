@@ -113,18 +113,18 @@ export function NavigationHistoryDropdown({
     if (!contentType) return <div className="h-4 w-4" />;
     const iconName = getContentTypeIcon(contentType as any);
     const LucideIcon = (LucideIcons as any)[iconName];
-    return LucideIcon ? <LucideIcon className="h-4 w-4 text-gray-400" /> : <div className="h-4 w-4" />;
+    return LucideIcon ? <LucideIcon className="h-4 w-4 text-gray-600 dark:text-gray-400" /> : <div className="h-4 w-4" />;
   };
 
   const menuContent = (
     <div
       ref={menuRef}
       style={menuStyle}
-      className="w-80 bg-gray-900 border border-white/10 rounded-lg shadow-lg overflow-hidden"
+      className="w-80 bg-gray-900 border border-black/10 dark:border-white/10 rounded-lg shadow-lg overflow-hidden"
     >
       {/* Header */}
-      <div className="px-3 py-2 border-b border-white/10 bg-white/5">
-        <div className="text-xs font-medium text-gray-400 uppercase tracking-wide">
+      <div className="px-3 py-2 border-b border-black/10 dark:border-white/10 bg-black/[0.03] dark:bg-white/5">
+        <div className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">
           Back History
         </div>
       </div>
@@ -132,7 +132,7 @@ export function NavigationHistoryDropdown({
       {/* Items */}
       <div className="max-h-96 overflow-y-auto">
         {historyItems.length === 0 ? (
-          <div className="px-3 py-4 text-center text-sm text-gray-500">
+          <div className="px-3 py-4 text-center text-sm text-gray-500 dark:text-gray-400">
             No history available
           </div>
         ) : (
@@ -148,7 +148,7 @@ export function NavigationHistoryDropdown({
                     onSelectItem(item.contentId);
                     onClose();
                   }}
-                  className="w-full px-3 py-2 flex items-start gap-2 hover:bg-white/5 transition-colors text-left"
+                  className="w-full px-3 py-2 flex items-start gap-2 hover:bg-black/[0.03] dark:bg-white/5 transition-colors text-left"
                 >
                   <div className="flex-shrink-0 mt-0.5">
                     {getIcon(item.contentType)}
@@ -157,11 +157,11 @@ export function NavigationHistoryDropdown({
                   <div className="flex-1 min-w-0">
                     <div className="text-sm font-medium text-gray-200 truncate">
                       {title ?? (
-                        <span className="text-gray-500 italic">No title</span>
+                        <span className="text-gray-500 dark:text-gray-400 italic">No title</span>
                       )}
                     </div>
                     {snippet && (
-                      <div className="text-xs text-gray-500 truncate mt-0.5">
+                      <div className="text-xs text-gray-500 dark:text-gray-400 truncate mt-0.5">
                         {snippet}
                       </div>
                     )}

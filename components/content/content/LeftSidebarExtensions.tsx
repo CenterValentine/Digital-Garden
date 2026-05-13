@@ -73,9 +73,9 @@ export function LeftSidebarExtensions() {
         <div className="mb-4 shrink-0">
           <div className="flex items-center gap-2">
             <Puzzle className="h-5 w-5 text-gold-primary" />
-            <h3 className="text-lg font-semibold text-white">Extensions</h3>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Extensions</h3>
           </div>
-          <p className="mt-1 text-xs text-gray-400">
+          <p className="mt-1 text-xs text-gray-600 dark:text-gray-400">
             {enabledCount} built-in extension{enabledCount === 1 ? "" : "s"}.
           </p>
         </div>
@@ -93,7 +93,7 @@ export function LeftSidebarExtensions() {
                   className={`flex h-full min-h-[8.5rem] w-full flex-col items-center justify-center gap-2 rounded-xl border p-3 text-center transition-colors ${
                     isSelected
                       ? "border-gold-primary/45 bg-gold-primary/10 text-gold-primary"
-                      : "border-white/10 bg-white/[0.025] text-gray-300 hover:border-white/20 hover:bg-white/[0.04]"
+                      : "border-black/10 dark:border-white/10 bg-black/[0.025] dark:bg-white/[0.025] text-gray-700 dark:text-gray-300 hover:border-black/20 dark:hover:border-white/20 hover:bg-black/[0.05] dark:hover:bg-white/[0.04]"
                   }`}
                 >
                   <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-current/20 bg-current/10">
@@ -102,7 +102,7 @@ export function LeftSidebarExtensions() {
                   <span className="max-w-full truncate text-sm font-semibold">
                     {extension.label}
                   </span>
-                  <span className="text-[11px] text-gray-400">
+                  <span className="text-[11px] text-gray-500 dark:text-gray-400">
                     {isEnabled ? "Enabled" : "Disabled"}
                   </span>
                 </button>
@@ -119,9 +119,9 @@ export function LeftSidebarExtensions() {
             if (!open) closeExtensionDialog();
           }}
         >
-          <DialogContent className="top-[52%] max-h-[calc(100vh-5rem)] w-[min(1100px,92vw)] max-w-[1100px] overflow-hidden border-white/10 bg-[#0f1115] p-0 text-white">
+          <DialogContent className="top-[52%] max-h-[calc(100vh-5rem)] w-[min(1100px,92vw)] max-w-[1100px] overflow-hidden border-black/10 dark:border-white/10 bg-white/95 dark:bg-[#1a2530]/95 backdrop-blur-md p-0 text-gray-900 dark:text-gray-100">
             <div className="flex h-full max-h-[calc(100vh-5rem)] flex-col">
-              <DialogHeader className="border-b border-white/10 px-6 py-5 pr-20 text-left">
+              <DialogHeader className="border-b border-black/10 dark:border-white/10 px-6 py-5 pr-20 text-left">
                 <div className="flex items-center gap-4">
                   <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-gold-primary/25 bg-gold-primary/10 text-gold-primary">
                     {renderExtensionIcon(dialogExtension.iconName, "h-6 w-6")}
@@ -134,29 +134,29 @@ export function LeftSidebarExtensions() {
                       <span
                         className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.12em] ${
                           dialogExtensionEnabled
-                            ? "border border-emerald-400/20 bg-emerald-400/10 text-emerald-200"
-                            : "border border-white/10 bg-white/5 text-gray-300"
+                            ? "border border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:border-emerald-400/20 dark:bg-emerald-400/10 dark:text-emerald-200"
+                            : "border border-black/10 dark:border-white/10 bg-black/[0.04] dark:bg-white/5 text-gray-600 dark:text-gray-300"
                         }`}
                       >
                         <CheckCircle2 className="h-3 w-3" />
                         {dialogExtensionEnabled ? "Enabled" : "Disabled"}
                       </span>
                     </div>
-                    <DialogDescription className="mt-1 text-sm text-gray-400">
+                    <DialogDescription className="mt-1 text-sm text-gray-600 dark:text-gray-400">
                       {dialogExtension.description ??
                         "Built-in extension settings and runtime configuration."}
                     </DialogDescription>
                   </div>
                   <div className="mr-3 flex shrink-0 items-center self-center">
                     {dialogExtension.canDisable ? (
-                      <div className="flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5">
-                        <span className="text-xs font-medium text-gray-300">
+                      <div className="flex items-center gap-2 rounded-full border border-black/10 dark:border-white/10 bg-black/[0.03] dark:bg-white/[0.03] px-3 py-1.5">
+                        <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
                           {pendingToggleExtensionId === dialogExtension.id
                             ? "Updating..."
                             : "Enabled"}
                         </span>
                         {pendingToggleExtensionId === dialogExtension.id ? (
-                          <Loader2 className="h-4 w-4 animate-spin text-gray-300" />
+                          <Loader2 className="h-4 w-4 animate-spin text-gray-700 dark:text-gray-300" />
                         ) : null}
                         <Switch
                           checked={dialogExtensionEnabled}
@@ -187,7 +187,7 @@ export function LeftSidebarExtensions() {
               <div className="min-h-0 flex-1 overflow-y-auto px-6 py-6">
                 {dialogExtensionEnabled
                   ? renderedSettingsDialog ?? (
-                    <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-6 text-sm text-gray-400">
+                    <div className="rounded-2xl border border-black/10 dark:border-white/10 bg-black/[0.025] dark:bg-white/[0.03] p-6 text-sm text-gray-600 dark:text-gray-400">
                       {dialogExtension.settings?.path ? (
                         <span>
                           Open{" "}
@@ -206,7 +206,7 @@ export function LeftSidebarExtensions() {
                     </div>
                     )
                   : (
-                    <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-6 text-sm text-gray-400">
+                    <div className="rounded-2xl border border-black/10 dark:border-white/10 bg-black/[0.025] dark:bg-white/[0.03] p-6 text-sm text-gray-600 dark:text-gray-400">
                       This extension is disabled. Re-enable it to mount its shell
                       controls, dialogs, settings UI, and runtime behavior again.
                     </div>

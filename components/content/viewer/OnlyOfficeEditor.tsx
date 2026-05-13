@@ -19,6 +19,7 @@ import { AlertCircle, Download, Settings } from "lucide-react";
 import { Button } from "@/components/ui/glass/button";
 import { toast } from "sonner";
 import { useUploadSettingsStore } from "@/state/upload-settings-store";
+import { useResolvedTheme } from "@/lib/features/theme";
 
 interface OnlyOfficeEditorProps {
   contentId: string;
@@ -42,6 +43,7 @@ export function OnlyOfficeEditor({
   const { onlyofficeServerUrl, setOfficeViewerMode } = useUploadSettingsStore();
   const [error, setError] = useState<string | null>(null);
   const [isReady, setIsReady] = useState(false);
+  const resolvedTheme = useResolvedTheme();
   const editorRef = useRef<any>(null);
 
   // Determine document type from MIME type
@@ -143,7 +145,7 @@ export function OnlyOfficeEditor({
         hideRightMenu: false,
         plugins: true,
         toolbarNoTabs: false,
-        uiTheme: "theme-dark", // Match our dark theme
+        uiTheme: resolvedTheme === "dark" ? "theme-dark" : "theme-light",
       },
     },
     events: {
