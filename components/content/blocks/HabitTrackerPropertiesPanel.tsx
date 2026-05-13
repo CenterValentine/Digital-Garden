@@ -180,6 +180,7 @@ export function HabitTrackerPropertiesPanel() {
 
   useEffect(() => {
     if (selectedBlockType !== "habitTracker") {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- audited, see BACKLOG.md
       setAttrs(initialAttrs as HabitTrackerAttrs);
     }
   }, [initialAttrs, selectedBlockType]);

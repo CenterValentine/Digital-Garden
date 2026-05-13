@@ -268,7 +268,7 @@ export default function APIKeysSettingsPage() {
                       Save This Key Now
                     </h4>
                     <p className="text-sm text-gray-700 dark:text-gray-300 mt-1">
-                      This is the only time you'll see this key. Copy it now.
+                      This is the only time you&apos;ll see this key. Copy it now.
                     </p>
 
                     <div className="mt-3 p-3 bg-black/30 rounded font-mono text-sm break-all">

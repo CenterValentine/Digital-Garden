@@ -90,6 +90,7 @@ export function MediaLightbox({ items, initialIndex, autoStartSlideshow = false,
       const interval = setInterval(() => {
         goToNext();
       }, 3000); // 3 seconds per slide
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- audited, see BACKLOG.md
       setSlideshowInterval(interval);
       return () => clearInterval(interval);
     } else if (slideshowInterval) {

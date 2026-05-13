@@ -253,7 +253,7 @@ function TreeNode({ node, depth, isLast, parentPrefix, showStyles, showBoxModel 
         <span className="text-gray-600 select-none">{parentPrefix}</span>
         <span className="text-gray-600 select-none">{isLast ? "└─ " : "├─ "}</span>
         <span className="text-blue-400">Text:</span>
-        <span className="text-gray-300 ml-2">"{escaped}"</span>
+        <span className="text-gray-300 ml-2">&quot;{escaped}&quot;</span>
       </div>
     );
   }

@@ -195,7 +195,7 @@ export function ExportSettingsClient({ initialSettings, userId }: Props) {
           When exporting to Markdown with metadata enabled, each note will
           include a <code className="px-1 py-0.5 rounded bg-gray-800">.meta.json</code> file.
           This preserves semantic information like tag colors, wiki-link
-          relationships, and callout types that can't be represented in pure
+          relationships, and callout types that can&apos;t be represented in pure
           Markdown.
         </p>
       </div>

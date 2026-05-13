@@ -178,7 +178,7 @@ export default function AdminDashboard() {
                     <span className="font-medium"> {log.targetUsername}</span>
                   )}
                   {log.targetContentTitle && (
-                    <span className="font-medium"> "{log.targetContentTitle}"</span>
+                    <span className="font-medium"> &quot;{log.targetContentTitle}&quot;</span>
                   )}
                 </div>
               </div>

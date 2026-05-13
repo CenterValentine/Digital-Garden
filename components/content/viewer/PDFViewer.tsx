@@ -170,6 +170,7 @@ export function PDFViewer({ downloadUrl, fileName, title, onDownload }: PDFViewe
     // This is a placeholder - actual implementation would need PDF.js library
     // or message passing with the iframe's PDF.js instance
     // For now, we allow manual input without validation
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- audited, see BACKLOG.md
     setTotalPages(0);
   }, [downloadUrl]);
 

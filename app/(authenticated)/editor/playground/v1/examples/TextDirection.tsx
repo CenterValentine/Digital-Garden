@@ -116,7 +116,7 @@ export default function TextDirection() {
         <h3>About this example</h3>
         <p>
           This example demonstrates text direction support in TipTap. While
-          TipTap doesn't have a dedicated TextDirection extension, you can
+          TipTap doesn&apos;t have a dedicated TextDirection extension, you can
           control text direction using the standard HTML <code>dir</code>{" "}
           attribute.
         </p>
@@ -137,14 +137,14 @@ export default function TextDirection() {
         </ul>
         <p>
           The toolbar buttons above allow you to set the text direction for the
-          current paragraph. You can also manually add <code>dir="rtl"</code>{" "}
-          or <code>dir="ltr"</code> attributes to elements.
+          current paragraph. You can also manually add <code>dir=&quot;rtl&quot;</code>{" "}
+          or <code>dir=&quot;ltr&quot;</code> attributes to elements.
         </p>
         <p>
           <strong>Note:</strong> For production RTL support, you may want to
           create a custom extension that properly handles direction as a mark
           or node attribute, allowing undo/redo and better integration with
-          TipTap's command system.
+          TipTap&apos;s command system.
         </p>
         <a
           href="https://tiptap.dev/docs/examples/basics/text-direction"

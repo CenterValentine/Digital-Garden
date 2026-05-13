@@ -76,7 +76,7 @@ export function OfficeDocumentViewer({
           <AlertCircle className="h-16 w-16 text-yellow-400 mx-auto mb-4" />
           <h3 className="text-xl font-semibold mb-2">ONLYOFFICE Server Not Configured</h3>
           <p className="text-gray-400 mb-4">
-            You've selected ONLYOFFICE as your Office viewer, but the server URL hasn't been
+            You&apos;ve selected ONLYOFFICE as your Office viewer, but the server URL hasn&apos;t been
             configured yet. Please set your ONLYOFFICE Document Server URL in Settings →
             Preferences.
           </p>
@@ -262,7 +262,7 @@ export function OfficeDocumentViewer({
               <AlertCircle className="h-12 w-12 text-yellow-400 mx-auto" />
               <h3 className="text-lg font-semibold">Preview Unavailable</h3>
               <p className="text-sm text-gray-400">
-                Microsoft Office Online Viewer couldn't load this document. This usually happens
+                Microsoft Office Online Viewer couldn&apos;t load this document. This usually happens
                 when the file URL is not publicly accessible.
               </p>
               <div className="flex gap-3 justify-center">

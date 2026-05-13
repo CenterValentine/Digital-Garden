@@ -76,6 +76,7 @@ export function ChatInput({
 
   // Reset selected index when items change
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- audited, see BACKLOG.md
     setSelectedIndex(0);
   }, [mentionResults, filteredCommands]);
 

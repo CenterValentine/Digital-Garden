@@ -395,7 +395,7 @@ export default function PreferencesSettingsPage() {
               ) : (
                 <>
                   <span className="inline-block w-2 h-2 rounded-full bg-green-500 mr-2"></span>
-                  You'll confirm each upload
+                  You&apos;ll confirm each upload
                 </>
               )}
             </div>
@@ -476,7 +476,7 @@ export default function PreferencesSettingsPage() {
                 <div className="flex-1">
                   <div className="font-medium text-sm">Microsoft Office Online (View Only)</div>
                   <div className="text-sm text-gray-400">
-                    Read-only preview using Microsoft's viewer
+                    Read-only preview using Microsoft&apos;s viewer
                   </div>
                 </div>
               </label>

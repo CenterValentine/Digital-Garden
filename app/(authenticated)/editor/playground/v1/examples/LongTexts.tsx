@@ -86,13 +86,13 @@ export default function LongTexts() {
       <div className={styles.info}>
         <h3>About this example</h3>
         <p>
-          This example demonstrates TipTap's performance with large documents.
+          This example demonstrates TipTap&apos;s performance with large documents.
           It contains <strong>100+ paragraphs</strong> of Lorem Ipsum text
           organized into 10 sections.
         </p>
         <p><strong>Performance features:</strong></p>
         <ul>
-          <li>Efficient DOM rendering with ProseMirror's optimized algorithms</li>
+          <li>Efficient DOM rendering with ProseMirror&apos;s optimized algorithms</li>
           <li>Fast scrolling even with thousands of nodes</li>
           <li>Quick cursor movement and text selection</li>
           <li>Responsive editing at any position in the document</li>

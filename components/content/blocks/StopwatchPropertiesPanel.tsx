@@ -52,6 +52,7 @@ export function StopwatchPropertiesPanel() {
 
   useEffect(() => {
     if (selectedBlockType !== "stopwatch") {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- audited, see BACKLOG.md
       setAttrs(initialAttrs);
     }
   }, [initialAttrs, selectedBlockType]);

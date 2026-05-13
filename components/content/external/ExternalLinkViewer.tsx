@@ -187,7 +187,7 @@ export function ExternalLinkViewer({
                     No preview image available
                   </p>
                   <p className="text-xs text-gray-400 mt-1">
-                    This site doesn't provide Open Graph metadata
+                    This site doesn&apos;t provide Open Graph metadata
                   </p>
                 </div>
               </div>

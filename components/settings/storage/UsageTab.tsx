@@ -58,7 +58,7 @@ export function StorageUsageTab() {
       >
         <h3 className="text-lg font-semibold mb-2">Storage Usage</h3>
         <p className="text-sm text-muted-foreground mb-4">
-          You're using {formatBytes(usage.used)} of {formatBytes(usage.quota)}
+          You&apos;re using {formatBytes(usage.used)} of {formatBytes(usage.quota)}
         </p>
 
         {/* Progress Bar */}
@@ -99,7 +99,7 @@ export function StorageUsageTab() {
                   Storage Almost Full
                 </h4>
                 <p className="text-sm text-gray-300 mt-1">
-                  You're using {percentUsed.toFixed(0)}% of your storage quota.
+                  You&apos;re using {percentUsed.toFixed(0)}% of your storage quota.
                   Upgrade to increase your limit.
                 </p>
                 <button
