@@ -185,6 +185,8 @@ export function MediaLightbox({ items, initialIndex, autoStartSlideshow = false,
             onClick={(e) => e.stopPropagation()} // Keep video controls working
           />
         ) : (
+          // User upload via presigned URL — see other folder-views for rationale.
+          // eslint-disable-next-line @next/next/no-img-element
           <img
             key={currentItem.id}
             src={currentItem.url}

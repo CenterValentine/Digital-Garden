@@ -6,6 +6,7 @@
  */
 
 import fs from 'fs/promises';
+import { statSync } from 'fs';
 import path from 'path';
 import os from 'os';
 import type { StorageProvider } from '@/lib/infrastructure/storage';
@@ -149,7 +150,7 @@ export class VideoProcessor {
           return;
         }
 
-        const stats = require('fs').statSync(videoPath);
+        const stats = statSync(videoPath);
 
         resolve({
           width: videoStream.width || 0,

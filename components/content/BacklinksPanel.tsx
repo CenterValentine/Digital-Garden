@@ -235,6 +235,9 @@ export function BacklinksPanel({ contentId }: BacklinksPanelProps) {
               >
                 <div className="mb-2 flex items-center gap-2">
                   {resource.faviconUrl ? (
+                    // Favicons come from arbitrary external domains — next/image would
+                    // require remotePatterns for every site. 16×16 makes optimization moot.
+                    // eslint-disable-next-line @next/next/no-img-element
                     <img src={resource.faviconUrl} alt="" className="h-4 w-4 rounded-sm" />
                   ) : (
                     <ExternalLink className="h-4 w-4 shrink-0 text-gray-600 dark:text-gray-400" />

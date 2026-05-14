@@ -66,8 +66,8 @@ function cloneElement(el: ExcalidrawElement): ExcalidrawElement {
 // Dynamically import Excalidraw to avoid SSR issues (component uses window)
 const Excalidraw = dynamic(
   async () => {
-    const module = await import("@excalidraw/excalidraw");
-    return module.Excalidraw;
+    const mod = await import("@excalidraw/excalidraw");
+    return mod.Excalidraw;
   },
   {
     ssr: false,

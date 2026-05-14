@@ -11,7 +11,7 @@
 
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Download, AlertCircle, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/glass/button";
 import { toast } from "sonner";
@@ -45,6 +45,51 @@ export function OfficeDocumentViewer({
   const [isLoadingClient, setIsLoadingClient] = useState(false);
   const [iframeError, setIframeError] = useState(false);
 
+  // These flags are derived from props — compute up-front so the effects below
+  // (which must run on every render to satisfy rules-of-hooks) can depend on them.
+  const isDocx =
+    mimeType.includes("wordprocessingml") ||
+    mimeType.includes("word") ||
+    fileName.toLowerCase().endsWith(".docx");
+
+  const isOfficeOnlineSupported =
+    mimeType.includes("word") ||
+    mimeType.includes("sheet") ||
+    mimeType.includes("excel") ||
+    mimeType.includes("presentation") ||
+    mimeType.includes("powerpoint") ||
+    mimeType.includes("officedocument");
+
+  // Stable ref so the auto-fallback effect's dep array doesn't churn.
+  const loadDocxClientSide = useCallback(async () => {
+    setIsLoadingClient(true);
+    setViewerMode("client-side");
+
+    try {
+      const response = await fetch(downloadUrl);
+      if (!response.ok) {
+        throw new Error("Failed to fetch document");
+      }
+
+      const arrayBuffer = await response.arrayBuffer();
+      const result = await mammoth.convertToHtml({ arrayBuffer });
+
+      setClientHtml(result.value);
+
+      if (result.messages.length > 0) {
+        console.warn("[mammoth] Conversion warnings:", result.messages);
+      }
+    } catch (error) {
+      console.error("[OfficeDocumentViewer] Client-side rendering failed:", error);
+      toast.error("Failed to render document", {
+        description: "Please download the file to view it.",
+      });
+      setViewerMode("download-only");
+    } finally {
+      setIsLoadingClient(false);
+    }
+  }, [downloadUrl]);
+
   // Debug: Log current settings
   useEffect(() => {
     console.log("[OfficeDocumentViewer] Current settings:", {
@@ -53,6 +98,23 @@ export function OfficeDocumentViewer({
       hasServerUrl: !!onlyofficeServerUrl,
     });
   }, [officeViewerMode, onlyofficeServerUrl]);
+
+  // Reset state when file changes (was below the early returns — moved here to
+  // satisfy react-hooks/rules-of-hooks: every render must call the same hooks
+  // in the same order, so all hooks must precede conditional returns).
+  useEffect(() => {
+    setIframeError(false);
+    setClientHtml(null);
+    setViewerMode("office-online");
+  }, [downloadUrl]);
+
+  // Auto-fallback to client-side rendering for .docx if Office Online fails.
+  useEffect(() => {
+    if (iframeError && isDocx && viewerMode === "office-online") {
+      console.log("[OfficeDocumentViewer] Office Online failed, trying client-side rendering");
+      loadDocxClientSide();
+    }
+  }, [iframeError, isDocx, viewerMode, loadDocxClientSide]);
 
   // 1. If Google Docs is selected, show Google Drive editor (will check auth internally)
   if (officeViewerMode === "google-docs") {
@@ -106,69 +168,6 @@ export function OfficeDocumentViewer({
   }
 
   // 4. Fallback viewers for remaining cases
-
-  // Determine if this is a .docx file that can be rendered client-side
-  const isDocx =
-    mimeType.includes("wordprocessingml") ||
-    mimeType.includes("word") ||
-    fileName.toLowerCase().endsWith(".docx");
-
-  // Determine if Office Online Viewer is supported
-  const isOfficeOnlineSupported =
-    mimeType.includes("word") ||
-    mimeType.includes("sheet") ||
-    mimeType.includes("excel") ||
-    mimeType.includes("presentation") ||
-    mimeType.includes("powerpoint") ||
-    mimeType.includes("officedocument");
-
-  useEffect(() => {
-    // Reset state when file changes
-    setIframeError(false);
-    setClientHtml(null);
-    setViewerMode("office-online");
-  }, [downloadUrl]);
-
-  // Auto-fallback to client-side rendering for .docx if Office Online fails
-  useEffect(() => {
-    if (iframeError && isDocx && viewerMode === "office-online") {
-      console.log("[OfficeDocumentViewer] Office Online failed, trying client-side rendering");
-      loadDocxClientSide();
-    }
-  }, [iframeError, isDocx, viewerMode]);
-
-  const loadDocxClientSide = async () => {
-    setIsLoadingClient(true);
-    setViewerMode("client-side");
-
-    try {
-      // Fetch the .docx file as an ArrayBuffer
-      const response = await fetch(downloadUrl);
-      if (!response.ok) {
-        throw new Error("Failed to fetch document");
-      }
-
-      const arrayBuffer = await response.arrayBuffer();
-
-      // Convert .docx to HTML using mammoth
-      const result = await mammoth.convertToHtml({ arrayBuffer });
-
-      setClientHtml(result.value);
-
-      // Log any conversion warnings
-      if (result.messages.length > 0) {
-        console.warn("[mammoth] Conversion warnings:", result.messages);
-      }
-    } catch (error) {
-      console.error("[OfficeDocumentViewer] Client-side rendering failed:", error);
-      toast.error("Failed to render document", {
-        description: "Please download the file to view it.",
-      });
-      setViewerMode("download-only");
-    } finally {
-      setIsLoadingClient(false);
-    }
-  };
 
   const handleManualClientSideSwitch = () => {
     if (isDocx) {

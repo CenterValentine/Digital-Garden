@@ -241,6 +241,10 @@ export function ImageViewer({ downloadUrl, fileName, title, onDownload }: ImageV
         onMouseLeave={handleMouseUp}
         style={{ cursor: isDragging ? "grabbing" : scale > 1 || fitMode === "actual" ? "grab" : "default" }}
       >
+        {/* User upload via presigned URL (R2/S3/Vercel Blob); next/image's
+            remote-pattern + optimizer aren't compatible with short-lived
+            signed tokens. Manual zoom/pan also bypasses the wrapper. */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           ref={imageRef}
           src={downloadUrl}

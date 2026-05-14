@@ -27,7 +27,7 @@ import {
   ExternalLink,
   ChevronRight,
   ChevronDown,
-  Image,
+  Image as ImageIcon,
   Columns3,
   LayoutDashboard,
   Network,
@@ -170,7 +170,7 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
 
       switch (viewMode) {
         case "gallery":
-          return <Image className={`${iconSize} ${iconColor}`} />;
+          return <ImageIcon className={`${iconSize} ${iconColor}`} />;
         case "kanban":
           return <Columns3 className={`${iconSize} ${iconColor}`} />;
         case "dashboard":

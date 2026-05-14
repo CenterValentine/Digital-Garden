@@ -225,6 +225,9 @@ export function GalleryView({
               <div className={`${getAspectClass()} bg-black/5 relative`}>
                 {thumbnailUrl ? (
                   <>
+                    {/* User uploads via presigned URLs (signed tokens, short TTL) — */}
+                    {/* not compatible with next/image's remotePatterns + optimizer cache. */}
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={thumbnailUrl}
                       alt={item.title}
