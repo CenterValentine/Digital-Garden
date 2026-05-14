@@ -10,7 +10,7 @@
 
 import { ReactRenderer } from "@tiptap/react";
 import { SuggestionOptions } from "@tiptap/suggestion";
-import tippy, { Instance as TippyInstance } from "tippy.js";
+import tippy, { Instance as TippyInstance, GetReferenceClientRect } from "tippy.js";
 import { forwardRef, useEffect, useImperativeHandle, useState } from "react";
 
 interface WikiLinkSuggestionItem {
@@ -134,7 +134,7 @@ export function createWikiLinkSuggestion(
           }
 
           popup = tippy("body", {
-            getReferenceClientRect: props.clientRect as any,
+            getReferenceClientRect: props.clientRect as GetReferenceClientRect,
             appendTo: () => document.body,
             content: component.element,
             showOnCreate: true,
@@ -152,7 +152,7 @@ export function createWikiLinkSuggestion(
           }
 
           popup[0].setProps({
-            getReferenceClientRect: props.clientRect as any,
+            getReferenceClientRect: props.clientRect as GetReferenceClientRect,
           });
         },
 

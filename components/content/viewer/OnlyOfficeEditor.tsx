@@ -44,6 +44,7 @@ export function OnlyOfficeEditor({
   const [error, setError] = useState<string | null>(null);
   const [isReady, setIsReady] = useState(false);
   const resolvedTheme = useResolvedTheme();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- TODO(any-epic-phase-4): @onlyoffice/document-editor-react does not export the editor instance type; narrow once upstream type is available
   const editorRef = useRef<any>(null);
 
   // Determine document type from MIME type
@@ -229,7 +230,7 @@ export function OnlyOfficeEditor({
           id={`onlyoffice-${contentId}`}
           documentServerUrl={onlyofficeServerUrl}
           config={config}
-          onLoadComponentError={(error: any) => {
+          onLoadComponentError={(error: unknown) => {
             console.error("[OnlyOffice] Component load error:", error);
             setError("Failed to load ONLYOFFICE editor component");
           }}

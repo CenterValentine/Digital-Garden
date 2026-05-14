@@ -15,7 +15,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { type NodeRendererProps } from "react-arborist";
+import { type NodeRendererProps, type NodeApi } from "react-arborist";
 import * as LucideIcons from "lucide-react";
 import {
   Folder,
@@ -145,7 +145,7 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
       } else if (data.customIcon.startsWith("lucide:")) {
         const iconName = data.customIcon.replace("lucide:", "");
         // Dynamically import the Lucide icon
-        const LucideIcon = (LucideIcons as any)[iconName];
+        const LucideIcon = (LucideIcons as unknown as Record<string, React.ComponentType<{ className?: string }> | undefined>)[iconName];
         if (LucideIcon) {
           return <LucideIcon className={`${iconSize} ${iconColor}`} />;
         }
@@ -369,7 +369,7 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
 
     // Get currently selected node IDs from the tree
     const tree = node.tree;
-    const selectedIds = tree.selectedNodes?.map((n: any) => n.id) || [data.id];
+    const selectedIds = tree.selectedNodes?.map((n: NodeApi<TreeNode>) => n.id) || [data.id];
 
     openMenu(
       "file-tree",

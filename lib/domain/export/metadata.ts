@@ -49,7 +49,7 @@ export function generateMetadataSidecar(content: {
   slug: string;
   createdAt: Date;
   updatedAt: Date;
-  notePayload: { tiptapJson: any; metadata: any };
+  notePayload: { tiptapJson: JSONContent | null; metadata: Record<string, unknown> };
   contentTags: Array<{
     tag: { id: string; name: string; slug: string; color: string | null };
   }>;

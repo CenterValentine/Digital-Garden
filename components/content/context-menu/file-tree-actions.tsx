@@ -124,7 +124,7 @@ export interface FileTreeContext {
  * - Clipboard state
  */
 export const fileTreeActionProvider: ContextMenuActionProvider = (ctx) => {
-  const context = ctx as FileTreeContext;
+  const context = ctx as unknown as FileTreeContext;
   const {
     selectedIds = [],
     clickedId,

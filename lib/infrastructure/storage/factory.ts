@@ -17,9 +17,14 @@ import type { StorageProvider, StorageConfig } from './types';
  * @param config - Storage configuration from database (with encrypted credentials)
  * @returns Initialized storage provider
  */
+type DbStorageConfig = {
+  provider: string;
+  config: Record<string, string | undefined>;
+};
+
 export function createStorageProvider(config: StorageConfig): StorageProvider {
-  // Decrypt credentials
-  const credentials = decrypt(config.credentials as any) as Record<string, string>;
+  // Decrypt credentials (stored as JSON string of an encrypted blob)
+  const credentials = decrypt(config.credentials as unknown as string) as Record<string, string>;
 
   switch (config.provider) {
     case 'r2':
@@ -112,7 +117,7 @@ export async function getUserStorageProvider(
     });
 
     if (specificConfig) {
-      return createProviderFromDbConfig(specificConfig);
+      return createProviderFromDbConfig(specificConfig as unknown as DbStorageConfig);
     }
 
     // No user config for this provider, use env default
@@ -134,15 +139,15 @@ export async function getUserStorageProvider(
   }
 
   // Use user's default config
-  return createProviderFromDbConfig(config);
+  return createProviderFromDbConfig(config as unknown as DbStorageConfig);
 }
 
 /**
  * Create storage provider from database config
  * Helper for getUserStorageProvider - works with actual DB schema (no separate credentials field)
  */
-function createProviderFromDbConfig(dbConfig: any): StorageProvider {
-  const configData = dbConfig.config as any;
+function createProviderFromDbConfig(dbConfig: DbStorageConfig): StorageProvider {
+  const configData = dbConfig.config;
 
   switch (dbConfig.provider) {
     case 'r2':

@@ -10,9 +10,9 @@
 "use client";
 
 import { ReactRenderer } from "@tiptap/react";
-import { SuggestionOptions } from "@tiptap/suggestion";
+import { SuggestionOptions, SuggestionKeyDownProps } from "@tiptap/suggestion";
 import { PluginKey } from "@tiptap/pm/state";
-import tippy, { Instance as TippyInstance } from "tippy.js";
+import tippy, { Instance as TippyInstance, GetReferenceClientRect } from "tippy.js";
 import { forwardRef, useEffect, useImperativeHandle, useState } from "react";
 
 // Unique plugin key to avoid conflicts with other suggestion plugins
@@ -221,7 +221,7 @@ export function createTagSuggestion(
           }
 
           popup = tippy("body", {
-            getReferenceClientRect: props.clientRect as any,
+            getReferenceClientRect: props.clientRect as GetReferenceClientRect,
             appendTo: () => document.body,
             content: component.element,
             showOnCreate: false, // Don't show immediately — wait for 2s delay
@@ -270,7 +270,7 @@ export function createTagSuggestion(
           }
 
           popup[0].setProps({
-            getReferenceClientRect: props.clientRect as any,
+            getReferenceClientRect: props.clientRect as GetReferenceClientRect,
           });
         },
 
@@ -294,7 +294,7 @@ export function createTagSuggestion(
 
           // Guard: component may not be initialized
           if (!component?.ref) return false;
-          return (component.ref as any).onKeyDown(props) ?? false;
+          return (component.ref as { onKeyDown: (p: SuggestionKeyDownProps) => boolean } | null)?.onKeyDown(props) ?? false;
         },
 
         onExit() {

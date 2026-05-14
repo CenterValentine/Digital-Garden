@@ -12,11 +12,11 @@ import type { ContextMenuState, ContextMenuPanel, ContextMenuPosition } from "@/
 
 interface ContextMenuStore extends ContextMenuState {
   /** Open context menu */
-  openMenu: (panel: ContextMenuPanel, position: ContextMenuPosition, context?: Record<string, any>) => void;
+  openMenu: (panel: ContextMenuPanel, position: ContextMenuPosition, context?: Record<string, unknown>) => void;
   /** Close context menu */
   closeMenu: () => void;
   /** Update context without repositioning */
-  updateContext: (context: Record<string, any>) => void;
+  updateContext: (context: Record<string, unknown>) => void;
 }
 
 export const useContextMenuStore = create<ContextMenuStore>((set) => ({

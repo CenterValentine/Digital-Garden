@@ -19,8 +19,11 @@ import { Pencil, Loader2, Check, ExternalLink, Maximize2, Minimize2, BookOpen } 
 import type * as Y from "yjs";
 
 // Type aliases for Excalidraw (types not exported in current version)
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- TODO(any-epic-phase-4): @excalidraw/excalidraw 0.x doesn't expose Element/AppState/BinaryFiles types directly; revisit on v1 upgrade
 type ExcalidrawElement = any;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- TODO(any-epic-phase-4): see ExcalidrawElement above
 type AppState = any;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- TODO(any-epic-phase-4): see ExcalidrawElement above
 type BinaryFiles = any;
 import { Button } from "@/components/ui/glass/button";
 import { ExcalidrawToolbar } from "./ExcalidrawToolbar";

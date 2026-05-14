@@ -23,9 +23,9 @@ export interface WikiLinkSuggestionItem {
 }
 
 export interface WikiLinkOptions {
-  HTMLAttributes: Record<string, any>;
+  HTMLAttributes: Record<string, unknown>;
   onClickLink?: (targetTitle: string) => void;
-  suggestion?: Omit<any, "editor">;
+  suggestion?: Partial<import("@tiptap/suggestion").SuggestionOptions>;
 }
 
 export const WikiLink = Node.create<WikiLinkOptions>({

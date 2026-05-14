@@ -44,8 +44,8 @@ export function ProviderConfigForm({ provider, onSuccess, onCancel }: ProviderCo
     setLoading(true);
 
     try {
-      let config: any = {};
-      let credentials: any = {};
+      let config: Record<string, string> = {};
+      let credentials: Record<string, string> = {};
 
       if (provider === "r2") {
         config = {

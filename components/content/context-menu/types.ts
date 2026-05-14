@@ -84,12 +84,12 @@ export interface ContextMenuState {
   /** Which panel triggered the menu */
   panel: ContextMenuPanel | null;
   /** Context data (e.g., selected node IDs, cursor position) */
-  context: Record<string, any> | null;
+  context: Record<string, unknown> | null;
 }
 
 /**
  * Action provider - each panel provides its own actions based on context
  */
 export type ContextMenuActionProvider = (
-  context: Record<string, any>
+  context: Record<string, unknown>
 ) => ContextMenuSection[];

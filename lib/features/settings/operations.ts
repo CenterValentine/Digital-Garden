@@ -5,6 +5,7 @@
  */
 
 import { prisma } from "@/lib/database/client";
+import type { Prisma } from "@/lib/database/generated/prisma";
 import {
   userSettingsSchema,
   DEFAULT_SETTINGS,
@@ -66,7 +67,7 @@ export async function updateUserSettings(
     await prisma.user.update({
       where: { id: userId },
       data: {
-        settings: validated as any, // Prisma Json type
+        settings: validated as unknown as Prisma.InputJsonValue,
         updatedAt: new Date(),
       },
     });
@@ -90,7 +91,7 @@ export async function resetUserSettings(
     await prisma.user.update({
       where: { id: userId },
       data: {
-        settings: DEFAULT_SETTINGS as any,
+        settings: DEFAULT_SETTINGS as unknown as Prisma.InputJsonValue,
         settingsVersion: 1,
         updatedAt: new Date(),
       },

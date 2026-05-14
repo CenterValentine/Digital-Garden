@@ -51,7 +51,7 @@ export interface ExcalidrawElement {
   strokeWidth?: number;
   roughness?: number;
   opacity?: number;
-  [key: string]: any; // Allow other Excalidraw-specific properties
+  [key: string]: unknown; // Allow other Excalidraw-specific properties
 }
 
 export interface ExcalidrawAppState {
@@ -59,13 +59,13 @@ export interface ExcalidrawAppState {
   zoom?: { value: number };
   scrollX?: number;
   scrollY?: number;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export interface ExcalidrawData {
   elements: ExcalidrawElement[];
   appState: ExcalidrawAppState;
-  files: Record<string, any>; // Embedded images
+  files: Record<string, unknown>; // Embedded images
 }
 
 // ============================================================================

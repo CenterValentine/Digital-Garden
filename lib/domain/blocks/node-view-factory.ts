@@ -657,10 +657,11 @@ export function createBlockNodeView(options: BlockNodeViewOptions) {
 
       destroy() {
         // Run any block-specific cleanup (React unmount, runtime handle release, etc.)
-        const cleanup = (contentDom as any).__cleanup;
+        type DomWithCleanup = HTMLElement & { __cleanup?: () => void };
+        const cleanup = (contentDom as DomWithCleanup).__cleanup;
         if (cleanup) {
           try { cleanup(); } catch {}
-          delete (contentDom as any).__cleanup;
+          delete (contentDom as DomWithCleanup).__cleanup;
         }
         // Clean up if this block was selected
         const store = useBlockStore.getState();

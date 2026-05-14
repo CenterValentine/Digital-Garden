@@ -9,11 +9,12 @@
 
 "use client";
 
+import type React from "react";
 import { useEffect, useState, useRef } from "react";
 import { createPortal } from "react-dom";
 import type { NavigationHistoryItem } from "@/state/navigation-history-store";
 import { calculateMenuPosition } from "@/lib/core/menu-positioning";
-import { getContentTypeIcon } from "@/lib/domain/content/types";
+import { getContentTypeIcon, type ContentType } from "@/lib/domain/content/types";
 import * as LucideIcons from "lucide-react";
 
 interface PreviewSnippet {
@@ -111,8 +112,8 @@ export function NavigationHistoryDropdown({
 
   const getIcon = (contentType?: string) => {
     if (!contentType) return <div className="h-4 w-4" />;
-    const iconName = getContentTypeIcon(contentType as any);
-    const LucideIcon = (LucideIcons as any)[iconName];
+    const iconName = getContentTypeIcon(contentType as ContentType);
+    const LucideIcon = (LucideIcons as unknown as Record<string, React.ComponentType<{ className?: string }> | undefined>)[iconName];
     return LucideIcon ? <LucideIcon className="h-4 w-4 text-gray-600 dark:text-gray-400" /> : <div className="h-4 w-4" />;
   };
 

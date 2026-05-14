@@ -84,6 +84,7 @@ export class PDFProcessor {
   /**
    * Generate thumbnail from first page of PDF
    */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- TODO(any-epic-phase-4): pdfjs-dist types are not bundled — narrow `pdf` to PDFDocumentProxy once @types/pdfjs-dist is added
   private async generatePDFThumbnail(pdf: any): Promise<Buffer> {
     // Get first page
     const page = await pdf.getPage(1);
