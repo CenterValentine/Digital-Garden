@@ -268,10 +268,11 @@ export async function GET(request: NextRequest) {
         };
       }
       if (item.notePayload) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- TODO(any-epic-phase-3b): widen `ContentListItem.note` in api-types.ts to include `searchText` + arbitrary metadata fields, or restrict the response to declared keys
         formatted.note = {
           ...(item.notePayload.metadata as Record<string, unknown>),
           searchText: item.notePayload.searchText,
+          // TODO(any-epic-phase-3b): widen `ContentListItem.note` in api-types.ts to include `searchText` + arbitrary metadata fields, or restrict the response to declared keys
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } as any;
       }
       if (item.filePayload) {
@@ -287,17 +288,19 @@ export async function GET(request: NextRequest) {
         };
       }
       if (item.htmlPayload) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- TODO(any-epic-phase-3b): widen `ContentListItem.html` in api-types.ts to include `searchText`, or drop searchText from this response
         formatted.html = {
           isTemplate: item.htmlPayload.isTemplate,
           searchText: item.htmlPayload.searchText,
+          // TODO(any-epic-phase-3b): widen `ContentListItem.html` in api-types.ts to include `searchText`, or drop searchText from this response
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } as any;
       }
       if (item.codePayload) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- TODO(any-epic-phase-3b): widen `ContentListItem.code` in api-types.ts to include `searchText`, or drop searchText from this response
         formatted.code = {
           language: item.codePayload.language,
           searchText: item.codePayload.searchText,
+          // TODO(any-epic-phase-3b): widen `ContentListItem.code` in api-types.ts to include `searchText`, or drop searchText from this response
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } as any;
       }
       if (item.chatPayload) {

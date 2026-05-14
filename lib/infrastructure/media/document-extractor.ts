@@ -134,13 +134,20 @@ export class DocumentExtractor {
     return new Promise((resolve, reject) => {
       const pdfParser = new PDFParser();
 
+      // pdf2json's shape (subset we use)
+      type PdfTextRun = { T?: string };
+      type PdfTextItem = { R?: PdfTextRun[] };
+      type PdfPage = { Texts?: PdfTextItem[] };
+      type PdfData = { Pages?: PdfPage[] };
+      type PdfParserError = Error | { parserError: Error };
+
       // Handle parsing completion
-      pdfParser.on('pdfParser_dataReady', (pdfData: any) => {
+      pdfParser.on('pdfParser_dataReady', (pdfData: PdfData) => {
         try {
           // Extract text from all pages
-          const text = pdfData.Pages?.map((page: any) =>
-            page.Texts?.map((text: any) =>
-              decodeURIComponent(text.R?.[0]?.T || '')
+          const text = pdfData.Pages?.map((page) =>
+            page.Texts?.map((textItem) =>
+              decodeURIComponent(textItem.R?.[0]?.T || '')
             ).join(' ')
           ).join('\n') || '';
 
@@ -151,8 +158,11 @@ export class DocumentExtractor {
       });
 
       // Handle parsing errors
-      pdfParser.on('pdfParser_dataError', (error: any) => {
-        reject(new Error(error.parserError || 'PDF parsing failed'));
+      pdfParser.on('pdfParser_dataError', (error: PdfParserError) => {
+        const msg = error instanceof Error
+          ? error.message
+          : error.parserError.message;
+        reject(new Error(msg || 'PDF parsing failed'));
       });
 
       // Parse the buffer
@@ -215,7 +225,7 @@ export class DocumentExtractor {
   /**
    * Recursively extract all string values from JSON object
    */
-  private extractJSONValues(obj: any, depth = 0): string[] {
+  private extractJSONValues(obj: unknown, depth = 0): string[] {
     // Prevent infinite recursion
     if (depth > 10) return [];
 
@@ -229,7 +239,7 @@ export class DocumentExtractor {
       }
     } else if (obj && typeof obj === 'object') {
       for (const key of Object.keys(obj)) {
-        values.push(...this.extractJSONValues(obj[key], depth + 1));
+        values.push(...this.extractJSONValues((obj as Record<string, unknown>)[key], depth + 1));
       }
     }
 

@@ -8,12 +8,13 @@
 "use client";
 
 import { ExcalidrawViewer } from "./ExcalidrawViewer";
+import type { ExcalidrawData } from "@/lib/domain/visualization/types";
 
 interface FullscreenExcalidrawViewerProps {
   contentId: string;
   title: string;
-  config: any;
-  data: any;
+  config?: Record<string, unknown>;
+  data?: ExcalidrawData;
   isReadOnly?: boolean;
   ownerNoteInfo?: {
     noteId: string;
@@ -31,7 +32,7 @@ export function FullscreenExcalidrawViewer({
   ownerNoteInfo = null,
 }: FullscreenExcalidrawViewerProps) {
   // Client-side save handler (disabled in read-only mode).
-  const handleSave = async (updatedData: any) => {
+  const handleSave = async (updatedData: Record<string, unknown>) => {
     if (isReadOnly) return;
     try {
       console.log("[FullscreenExcalidrawViewer] Saving data:", updatedData);

@@ -34,7 +34,7 @@ import { useResolvedTheme } from "@/lib/features/theme";
 const LOCAL_ORIGIN = "diagramsnet-local";
 
 // Debounce utility
-function debounce<T extends (...args: any[]) => any>(
+function debounce<T extends (...args: unknown[]) => unknown>(
   func: T,
   wait: number
 ): (...args: Parameters<T>) => void {
@@ -161,7 +161,7 @@ export function DiagramsNetViewer({
     if (!ydoc) return;
 
     const ydocDiagram = ydoc.getMap<string>("diagram");
-    const dbg = () => (window as any).__dg_debug;
+    const dbg = () => (window as Window & { __dg_debug?: boolean }).__dg_debug;
 
     // Seed from Y.js if the shared doc already has content, otherwise seed
     // Y.js from the database snapshot so latecomers see the latest state.
@@ -201,7 +201,7 @@ export function DiagramsNetViewer({
   // Stable identity so DiagramsNetEditor's [onChange]-dep useEffect doesn't
   // re-register its message listener on every render.
   const handleChange = useCallback((newXml: string) => {
-    const dbg = () => (window as any).__dg_debug;
+    const dbg = () => (window as Window & { __dg_debug?: boolean }).__dg_debug;
     if (dbg()) console.log("[dg/diagrams-net] local change, len=", newXml.length);
     xmlRef.current = newXml;
     setXml(newXml);
