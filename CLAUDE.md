@@ -69,26 +69,35 @@ Review the regenerated PNGs in `tests/e2e/__snapshots__/` before committing — 
 
 ```
 tests/e2e/
-├── _fixtures/theme.ts         # themedGoto: seeds notes:settings localStorage before nav
-├── dark-mode/                 # OPERATIONAL — runs every CI invocation
-│   ├── home.spec.ts
-│   ├── sign-in.spec.ts
-│   ├── sign-up.spec.ts
-│   ├── embed-blank.spec.ts
-│   └── authenticated-routes.spec.ts  # currently test.skip — needs auth fixture
-├── auth/ editor/ file-tree/ content/ search/ extensions/
+├── setup/
+│   ├── auth.setup.ts          # signs in as seeded admin, writes storageState
+│   └── paths.ts               # ADMIN_STORAGE_STATE + AUTH_REQUIRED_SPECS globs
+├── _fixtures/
+│   ├── theme.ts               # themedGoto: seeds notes:settings localStorage before nav
+│   └── auth.ts                # re-exports theme; marker for "this spec needs auth"
+├── dark-mode/                 # OPERATIONAL
+│   ├── home.spec.ts                       # signed-out
+│   ├── sign-in.spec.ts                    # signed-out
+│   ├── sign-up.spec.ts                    # signed-out
+│   ├── embed-blank.spec.ts                # signed-out
+│   └── authenticated-routes.spec.ts       # auth — 2 active, 3 stubbed
+├── auth/
+│   ├── sign-in-flow.spec.ts               # signed-out — 2 active, 2 stubbed
+│   └── session-persistence.spec.ts        # auth — 2 active, 1 stubbed
+├── editor/ file-tree/ content/ search/ extensions/
 │   └── *.spec.ts              # STUBS — test.skip() with docstring describing scope
 └── __snapshots__/             # committed baseline screenshots, per-spec per-project
 ```
 
-Two Playwright projects run every spec: `light` and `dark`. Snapshots auto-suffix with the project name (e.g., `home-light.png`, `home-dark.png`).
+Four Playwright projects: `light` / `dark` (signed-out) and `auth-light` / `auth-dark` (authenticated). The `setup` project runs first as a dependency of the auth projects. Snapshots auto-suffix with the project name (e.g., `content-home-auth-dark.png`).
 
 ### Theme propagation in tests
 
-Tests **MUST** import from `_fixtures/theme.ts` (not `@playwright/test` directly) so theme preference is set before navigation:
+Tests **MUST** import from `_fixtures/theme.ts` (signed-out) or `_fixtures/auth.ts` (authenticated) — not `@playwright/test` directly — so theme preference is set before navigation:
 
 ```ts
-import { test, expect } from "../_fixtures/theme";
+import { test, expect } from "../_fixtures/theme";   // signed-out specs
+import { test, expect } from "../_fixtures/auth";    // authenticated specs
 
 test("my surface renders correctly in both themes", async ({ page, themedGoto }) => {
   await themedGoto("/my/route");
@@ -96,7 +105,25 @@ test("my surface renders correctly in both themes", async ({ page, themedGoto })
 });
 ```
 
-`themedGoto` writes `notes:settings.state.ui.theme` to localStorage before navigation, so the pre-hydration FOUC script in [lib/features/theme/script.ts](lib/features/theme/script.ts) applies the correct `.dark` class on first paint.
+`themedGoto` writes `notes:settings.state.ui.theme` to localStorage before navigation, so the pre-hydration FOUC script in [lib/features/theme/script.ts](lib/features/theme/script.ts) applies the correct `.dark` class on first paint. It also uses `waitUntil: "domcontentloaded"` to handle SPA pages with persistent connections (HMR / collab WebSocket) where the default `load` event never fires.
+
+### Auth fixture and project chaining
+
+Authentication is wired at the **project level** in [playwright.config.ts](playwright.config.ts):
+
+```
+setup project   → POSTs /api/auth/sign-in as admin@example.com (prisma/seed.ts)
+                  Writes playwright/.auth/admin.json
+                        ↓
+auth-light  ←─── loads storageState via `use` config (colorScheme: light)
+auth-dark   ←─── same storageState (colorScheme: dark)
+```
+
+The auth projects declare `dependencies: ["setup"]` so Playwright guarantees the sign-in happens once before any auth test starts.
+
+Which project runs which spec is controlled by `AUTH_REQUIRED_SPECS` in [tests/e2e/setup/paths.ts](tests/e2e/setup/paths.ts) — that list is both the `testMatch` for auth projects and (combined with `**/setup/**`) the `testIgnore` for signed-out projects. **To activate a new authenticated spec, add its glob to that list.**
+
+Credentials override via `PLAYWRIGHT_ADMIN_EMAIL` / `PLAYWRIGHT_ADMIN_PASSWORD` env vars.
 
 ### Stub convention (non-operational specs)
 
@@ -115,17 +142,21 @@ To activate a stub:
 
 ### Adding a new operational test
 
-1. Decide if the surface needs auth. **Without auth** → put it in `tests/e2e/dark-mode/`. **With auth** → it stays stubbed in `dark-mode/authenticated-routes.spec.ts` until the auth fixture lands.
+1. Decide if the surface needs auth.
+   - **Signed-out** → put it under `dark-mode/` (or another category) and import from `_fixtures/theme`.
+   - **Authenticated** → put it under the relevant category, import from `_fixtures/auth`, **and add its glob to `AUTH_REQUIRED_SPECS` in `tests/e2e/setup/paths.ts`**.
 2. Use the `themedGoto` fixture (not raw `page.goto`).
 3. Wait for a stable element before snapshotting (avoids flake from font/hydration timing): `await expect(page.getByRole("...")).toBeVisible();`
-4. Run `pnpm test:e2e:update` to capture baselines, then `pnpm test:e2e` to verify.
-5. Commit both the spec and the generated PNG(s).
+4. For SPA routes (`/content`, etc.) where you need raw `page.goto`, always pass `{ waitUntil: "domcontentloaded" }` — the default `load` event never fires under persistent HMR / collab connections.
+5. Run `pnpm test:e2e:update` to capture baselines, then `pnpm test:e2e` to verify.
+6. Commit both the spec and the generated PNG(s).
 
 ### Known gaps (followups in BACKLOG.md)
 
-- **Auth fixture** for `tests/e2e/_fixtures/auth.ts` — should sign in a seeded test user and persist `storageState`. Unblocks 5 stubbed authenticated dark-mode tests.
 - **Hocuspocus fixture** for collaboration tests (`tests/e2e/editor/collaboration.spec.ts`) — needs a local Hocuspocus server or mock provider.
-- **Seeded fixture content** for tests that depend on specific note state.
+- **Content-seeding fixture** — would unlock the 3 still-stubbed authenticated dark-mode tests (note with content, embedded Excalidraw, embedded Mermaid).
+- **DB-access fixture** — would unlock the `expired session redirects` test and other negative-path session tests that need to forge expired `Session.expiresAt` rows.
+- **OAuth mock** — would unlock the Google OAuth handoff test in `auth/sign-in-flow.spec.ts`.
 
 ### CI integration
 

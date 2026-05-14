@@ -6,8 +6,10 @@ End-to-end regression coverage for the Digital Garden app. Authored during the d
 
 | Layer | State | What runs |
 |---|---|---|
-| **`dark-mode/`** | ✅ Operational | Screenshot diffs across light + dark themes for signed-out routes (home, sign-in, sign-up, embed/blank) |
-| **`auth/`** `editor/` `file-tree/` `content/` `search/` `extensions/` | ⚠️ Stubs (`test.skip`) | Placeholders documenting what should be covered; not executed |
+| **`setup/`** | ✅ Operational | Signs in as the seeded admin user, persists storageState. Runs once before authenticated projects |
+| **`dark-mode/`** | ✅ Operational | Signed-out routes (home, sign-in, sign-up, embed/blank) + authenticated routes (content workspace, settings preferences) across light + dark themes |
+| **`auth/`** | ✅ Partial | Sign-in form (valid / invalid creds) + session persistence (reload, sign-out cookie clear) |
+| `editor/` `file-tree/` `content/` `search/` `extensions/` | ⚠️ Stubs (`test.skip`) | Placeholders documenting what should be covered; not executed |
 
 The Playwright runner reports both passed and skipped tests on every run — `n passed, m skipped` is the signal of "how much we have left to fill in."
 
@@ -79,13 +81,68 @@ To activate a stub:
 
 ## Authentication
 
-Currently the operational tests cover only **signed-out** routes (no auth required). To enable authenticated route tests:
+Wired at the **project level**, not per-test, so authenticated specs start already signed in with zero per-test cost.
 
-1. Create `tests/e2e/_fixtures/auth.ts` that signs in a seeded test user via `/api/auth/sign-in`, captures the session cookie, and exposes it as a Playwright `storageState`.
-2. Add `storageState: "playwright/.auth/user.json"` to the dark-mode project's `use` block in `playwright.config.ts`.
-3. Update `tests/e2e/dark-mode/authenticated-routes.spec.ts` to remove the `test.skip(...)` lines.
+### How it works
 
-The authenticated-routes spec already documents which screens should be covered.
+```
+[setup project]  → tests/e2e/setup/auth.setup.ts
+                     POSTs /api/auth/sign-in as admin@example.com
+                     Writes playwright/.auth/admin.json (storageState)
+                          ↓
+[auth-light]  ←─────────  loads storageState in `use` config
+[auth-dark]   ←─────────  same storageState, different colorScheme
+```
+
+The `setup` project is declared as a `dependency` of `auth-light` and `auth-dark` in `playwright.config.ts`, so Playwright guarantees it runs first.
+
+### Spec routing
+
+Which project a spec runs under is controlled by `tests/e2e/setup/paths.ts`:
+
+- **`AUTH_REQUIRED_SPECS`** — list of glob patterns that need auth. Used as `testMatch` on the auth projects and (combined with `**/setup/**`) as `testIgnore` on signed-out projects.
+- Specs not in the list run under `light` / `dark` (signed-out, no cookie).
+
+**To add a new authenticated spec:** create the file, then add its glob to `AUTH_REQUIRED_SPECS`.
+
+### Importing in specs
+
+```ts
+// Authenticated specs:
+import { test, expect } from "../_fixtures/auth";
+
+// Signed-out specs:
+import { test, expect } from "../_fixtures/theme";
+```
+
+Both fixtures expose the same `themedGoto` helper today; the `auth.ts` import is the **conventional marker** that signals "this spec assumes auth," and the seam for future auth-only helpers (e.g., `signOut()`, `withSeededNote()`).
+
+### Overriding credentials
+
+```bash
+PLAYWRIGHT_ADMIN_EMAIL=test@... PLAYWRIGHT_ADMIN_PASSWORD=... pnpm test:e2e
+```
+
+Defaults to the seed in `prisma/seed.ts` (`admin@example.com` / `changeme123`).
+
+### Known gaps
+
+- **DB-access fixture** — would unlock `expired session redirects to /sign-in` and several other negative-path session tests that need to forge expired `Session.expiresAt` rows.
+- **Content-seeding fixture** — would unlock the 3 still-stubbed authenticated dark-mode tests (note with content, embedded Excalidraw, embedded Mermaid).
+- **OAuth mock** — would unlock the Google OAuth handoff test in `auth/sign-in-flow.spec.ts`.
+
+## SPA navigation gotcha
+
+`/content` (and all authenticated routes) hold persistent network connections — HMR in dev, collab WebSocket in prod. Playwright's default `waitUntil: "load"` waits for ALL resources to settle, which **never happens** for these pages, so navigation will time out at 30s.
+
+**Always use `domcontentloaded` and a DOM anchor:**
+
+```ts
+await page.goto("/content", { waitUntil: "domcontentloaded" });
+await expect(page.getByRole("button", { name: "Files" })).toBeVisible();
+```
+
+The `themedGoto` fixture already does this — only use raw `page.goto` if you need to skip the theme/localStorage setup.
 
 ## CI integration
 

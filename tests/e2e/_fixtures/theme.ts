@@ -44,7 +44,9 @@ export const test = base.extend<ThemeFixtures>({
       // First navigate to a placeholder so localStorage is writable on the
       // app's origin; Playwright pages start at about:blank where storage
       // is per-origin and won't apply.
-      await page.goto(baseURL ? `${baseURL}/` : path);
+      await page.goto(baseURL ? `${baseURL}/` : path, {
+        waitUntil: "domcontentloaded",
+      });
       await page.evaluate((theme) => {
         try {
           const existing = window.localStorage.getItem("notes:settings");
@@ -58,7 +60,11 @@ export const test = base.extend<ThemeFixtures>({
         }
       }, resolvedTheme);
       // Now navigate to the actual target with the theme cached.
-      await page.goto(path);
+      // Authenticated routes (/content) hold persistent network connections
+      // (HMR in dev, collab WebSocket in prod) so the default `load` event
+      // can hang indefinitely. `domcontentloaded` is sufficient — tests
+      // should anchor on explicit DOM elements after this returns.
+      await page.goto(path, { waitUntil: "domcontentloaded" });
     };
     // Playwright fixture-injection callback, not a React hook.
     // eslint-disable-next-line react-hooks/rules-of-hooks
