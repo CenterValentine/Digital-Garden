@@ -199,10 +199,10 @@ export function ExcalidrawViewer({
             await onSave({ elements, appState, files });
             setLastSaved(new Date());
             setIsModified(false);
-          } catch (error: any) {
+          } catch (error: unknown) {
             console.error("[ExcalidrawViewer] Save failed:", error);
             toast.error("Failed to save drawing", {
-              description: error.message || "Could not save changes",
+              description: (error instanceof Error ? error.message : null) || "Could not save changes",
             });
           } finally {
             setIsSaving(false);
@@ -422,10 +422,10 @@ export function ExcalidrawViewer({
       // Delay cleanup to ensure download starts
       setTimeout(() => URL.revokeObjectURL(url), 100);
       toast.success(`Exported as ${format.toUpperCase()}`);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("[ExcalidrawViewer] Export failed:", error);
       toast.error("Export failed", {
-        description: error.message || `Could not export as ${format.toUpperCase()}`,
+        description: (error instanceof Error ? error.message : null) || `Could not export as ${format.toUpperCase()}`,
       });
     }
   };

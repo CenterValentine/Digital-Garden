@@ -61,10 +61,10 @@ export async function POST(request: NextRequest): Promise<NextResponse<Validatio
           warnings: ["Expected mxGraphModel structure from diagrams.net"],
         });
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       return NextResponse.json({
         valid: false,
-        error: `XML parsing error: ${error.message}`,
+        error: `XML parsing error: ${error instanceof Error ? error.message : String(error)}`,
       });
     }
 
@@ -108,7 +108,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<Validatio
       valid: true,
       warnings: warnings.length > 0 ? warnings : undefined,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("[Diagrams.net Validation] Error:", error);
     return NextResponse.json({
       valid: false,

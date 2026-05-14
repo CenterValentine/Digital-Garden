@@ -105,10 +105,10 @@ export function DiagramsNetViewer({
         await onSave?.(newXml);
         setLastSaved(new Date());
         setIsModified(false);
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.error("Diagrams.net save failed:", error);
         toast.error("Failed to save diagram", {
-          description: error.message || "Could not save changes to database",
+          description: (error instanceof Error ? error.message : null) || "Could not save changes to database",
         });
       } finally {
         setIsSaving(false);
@@ -274,10 +274,10 @@ export function DiagramsNetViewer({
       document.body.removeChild(link);
       setTimeout(() => URL.revokeObjectURL(url), 100);
       toast.success(`Exported as ${format.toUpperCase()}`);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Export failed:", error);
       toast.error("Export failed", {
-        description: error.message || `Could not export as ${format.toUpperCase()}`,
+        description: (error instanceof Error ? error.message : null) || `Could not export as ${format.toUpperCase()}`,
       });
     }
   };

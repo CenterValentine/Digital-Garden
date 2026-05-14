@@ -315,9 +315,12 @@ export async function POST(request: NextRequest) {
 
         // Success! Break out of retry loop
         break;
-      } catch (error: any) {
+      } catch (error: unknown) {
+        // Narrow to Prisma's PrismaClientKnownRequestError shape (see same
+        // pattern in app/api/content/content/create-document/route.ts).
+        const prismaError = error as { code?: string; meta?: { target?: string[] } };
         // Check if it's a unique constraint error on slug
-        if (error.code === "P2002" && error.meta?.target?.includes("slug")) {
+        if (prismaError.code === "P2002" && prismaError.meta?.target?.includes("slug")) {
           if (attempts < maxAttempts) {
             // Regenerate slug with timestamp + random suffix to ensure uniqueness
             const timestamp = Date.now();

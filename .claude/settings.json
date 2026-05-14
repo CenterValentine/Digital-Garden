@@ -1,7 +1,28 @@
 {
   "permissions": {
     "allow": [
-      "Bash(npm run build:*)"
+      "Bash(*)",
+      "Read(*)",
+      "Write(*)",
+      "Edit(*)",
+      "MultiEdit(*)",
+      "WebFetch(*)"
+    ],
+    "deny": [
+      "Bash(prisma *)",
+      "Bash(npx prisma *)",
+      "Bash(yarn prisma *)",
+      "Bash(pnpm prisma *)",
+      "Bash(psql *)",
+      "Bash(mysql *)",
+      "Bash(sqlite3 *)",
+      "Bash(mongosh *)",
+      "Bash(mongodump *)",
+      "Bash(mongorestore *)",
+      "Edit(**/prisma/schema.prisma)",
+      "Edit(**/migrations/**)",
+      "Write(**/prisma/schema.prisma)",
+      "Write(**/migrations/**)"
     ]
   }
 }

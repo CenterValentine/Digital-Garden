@@ -119,10 +119,10 @@ export function MermaidViewer({
             setLastSaved(new Date());
             setIsModified(false);
             console.log("[MermaidViewer] Auto-saved successfully");
-          } catch (error: any) {
+          } catch (error: unknown) {
             console.error("[MermaidViewer] Save failed:", error);
             toast.error("Failed to save diagram", {
-              description: error.message || "Could not save changes",
+              description: (error instanceof Error ? error.message : null) || "Could not save changes",
             });
           } finally {
             setIsSaving(false);
@@ -230,9 +230,9 @@ export function MermaidViewer({
         const { svg } = await mermaidRef.current.render(id, source);
         previewRef.current!.innerHTML = svg;
         setRenderError(null);
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.error("[MermaidViewer] Render error:", error);
-        const errorMessage = error.message || "Syntax error";
+        const errorMessage = (error instanceof Error ? error.message : null) || "Syntax error";
         setRenderError(errorMessage);
 
         // Show toast with detailed error
@@ -301,10 +301,10 @@ export function MermaidViewer({
         // Delay cleanup to ensure download starts
         setTimeout(() => URL.revokeObjectURL(url), 100);
         toast.success("Exported as SVG");
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.error("[MermaidViewer] SVG export failed:", error);
         toast.error("SVG export failed", {
-          description: error.message || "Could not export as SVG",
+          description: (error instanceof Error ? error.message : null) || "Could not export as SVG",
         });
       }
       return;
@@ -353,10 +353,10 @@ export function MermaidViewer({
               });
             }
           });
-        } catch (error: any) {
+        } catch (error: unknown) {
           console.error("[MermaidViewer] PNG export canvas error:", error);
           toast.error("PNG export failed", {
-            description: error.message || "Could not convert to PNG",
+            description: (error instanceof Error ? error.message : null) || "Could not convert to PNG",
           });
         }
       };
@@ -369,10 +369,10 @@ export function MermaidViewer({
       };
 
       img.src = "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(svgData)));
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("[MermaidViewer] PNG export failed:", error);
       toast.error("PNG export failed", {
-        description: error.message || "Could not export as PNG",
+        description: (error instanceof Error ? error.message : null) || "Could not export as PNG",
       });
     }
   };

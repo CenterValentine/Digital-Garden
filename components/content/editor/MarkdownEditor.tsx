@@ -800,10 +800,10 @@ export function MarkdownEditor({
             expanded: true,
           })
         );
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error("[MarkdownEditor] embed-diagram-create failed:", err);
         toast.error("Failed to create diagram", {
-          description: err.message || "Could not create visualization",
+          description: (err instanceof Error ? err.message : null) || "Could not create visualization",
         });
       }
     };
@@ -874,11 +874,11 @@ export function MarkdownEditor({
           },
         }).run();
         toast.dismiss(toastId);
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error("[MarkdownEditor] create-diagram-block failed:", err);
         toast.dismiss(toastId);
         toast.error("Failed to create diagram", {
-          description: err.message || "Could not create visualization",
+          description: (err instanceof Error ? err.message : null) || "Could not create visualization",
         });
       }
     };
@@ -963,7 +963,7 @@ export function MarkdownEditor({
             }
           });
           URL.revokeObjectURL(blobUrl);
-          toast.error(`Image upload failed: ${err.message}`);
+          toast.error(`Image upload failed: ${err instanceof Error ? err.message : String(err)}`);
         });
     },
     [editor, parentId]

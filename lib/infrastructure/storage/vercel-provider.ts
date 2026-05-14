@@ -88,8 +88,10 @@ export class VercelBlobProvider implements StorageProvider {
         mimeType: blob.contentType,
         // Vercel Blob doesn't provide ETags in the same way
       };
-    } catch (error: any) {
-      if (error.message?.includes('not found') || error.status === 404) {
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "";
+      const status = (error as { status?: number }).status;
+      if (message.includes('not found') || status === 404) {
         return { exists: false };
       }
       throw error;
