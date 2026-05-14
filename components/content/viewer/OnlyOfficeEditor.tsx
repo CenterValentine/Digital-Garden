@@ -13,7 +13,7 @@
 
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { DocumentEditor } from "@onlyoffice/document-editor-react";
 import { AlertCircle, Download, Settings } from "lucide-react";
 import { Button } from "@/components/ui/glass/button";
@@ -46,6 +46,19 @@ export function OnlyOfficeEditor({
   const resolvedTheme = useResolvedTheme();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- TODO(any-epic-phase-4): @onlyoffice/document-editor-react does not export the editor instance type; narrow once upstream type is available
   const editorRef = useRef<any>(null);
+
+  // ONLYOFFICE uses `document.key` to decide whether to fetch fresh content or
+  // reuse its cached doc. The original `${contentId}-${Date.now()}` ran on
+  // every render, forcing iframe reloads, and `Date.now()` is impure-during-
+  // render (React Compiler error).
+  //
+  // useId() gives us a stable-per-mount unique suffix, which preserves the
+  // original intent ("each mount is a new document version") without the
+  // purity violation. The id stays the same across re-renders of this mount,
+  // and contentId in the prefix means switching to a different document
+  // still yields a distinct key.
+  const instanceId = useId();
+  const documentKey = `${contentId}-${instanceId}`;
 
   // Determine document type from MIME type
   const getDocumentType = (): DocumentType => {
@@ -110,7 +123,7 @@ export function OnlyOfficeEditor({
   const config = {
     document: {
       fileType: getFileType(),
-      key: `${contentId}-${Date.now()}`, // Unique key for versioning
+      key: documentKey, // Stable per contentId — see useMemo above
       title: title,
       url: downloadUrl, // ONLYOFFICE will fetch the document from this URL
       permissions: {
