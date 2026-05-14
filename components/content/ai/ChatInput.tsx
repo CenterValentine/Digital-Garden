@@ -122,7 +122,7 @@ export function ChatInput({
         }
       });
     },
-    [value, onChange, closeSuggestions, suggestionMode]
+    [value, onChange, closeSuggestions, suggestionMode, onMentionInserted]
   );
 
   const handleSubmit = useCallback(
