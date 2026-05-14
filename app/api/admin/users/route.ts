@@ -48,7 +48,7 @@ export async function GET(request: NextRequest) {
     }
 
     if (role && ["owner", "admin", "member", "guest"].includes(role)) {
-      where.role = role as any;
+      where.role = role as Prisma.UserWhereInput["role"];
     }
 
     // 4. Build orderBy clause

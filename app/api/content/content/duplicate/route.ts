@@ -109,12 +109,18 @@ export async function POST(request: NextRequest) {
 
 /**
  * Recursively duplicate a content node and its children
+ *
+ * TODO(any-epic-phase-4): `original` is a deeply-nested ContentNode with all
+ * payload includes; define a Prisma.ContentNodeGetPayload<...> type for this
+ * query and use it here + as return type.
  */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 async function duplicateNode(
   original: any,
   userId: string,
   parentId: string | null = null
 ): Promise<any> {
+/* eslint-enable @typescript-eslint/no-explicit-any */
   // Generate new title with " (Copy)" suffix
   const newTitle = `${original.title} (Copy)`;
 

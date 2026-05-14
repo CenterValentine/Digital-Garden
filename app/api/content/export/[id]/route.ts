@@ -9,7 +9,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/infrastructure/auth/middleware";
 import { getUserSettings } from "@/lib/features/settings";
 import { exportSingleDocument } from "@/lib/domain/export";
-import type { ExportFormat } from "@/lib/domain/export/types";
+import type { ExportFormat, ExportBackupSettings } from "@/lib/domain/export/types";
 
 type Params = Promise<{ id: string }>;
 
@@ -44,7 +44,7 @@ export async function POST(
     // Export document
     const result = await exportSingleDocument(id, session.user.id, {
       format,
-      settings: settings.exportBackup as any,
+      settings: settings.exportBackup as ExportBackupSettings,
     });
 
     if (!result.success) {

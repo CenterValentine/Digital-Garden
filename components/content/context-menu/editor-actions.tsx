@@ -846,7 +846,7 @@ export const editorActionProvider: ContextMenuActionProvider = (ctx) => {
         const y = (ctx.contextY as number) ?? 0;
         if (target) {
           // Set pass-through flag so the MarkdownEditor handler yields to browser
-          (window as any).__passNativeContextMenu = true;
+          (window as Window & { __passNativeContextMenu?: boolean }).__passNativeContextMenu = true;
           const nativeEvent = new MouseEvent("contextmenu", {
             bubbles: true,
             clientX: x,

@@ -105,8 +105,8 @@ export async function POST(request: NextRequest) {
       });
 
       if (filePayload && filePayload.storageMetadata) {
-        const metadata = filePayload.storageMetadata as any;
-        if (metadata.googleDrive) {
+        const metadata = filePayload.storageMetadata as { googleDrive?: { lastSynced?: string } } | null;
+        if (metadata?.googleDrive) {
           metadata.googleDrive.lastSynced = new Date().toISOString();
 
           await prisma.filePayload.update({

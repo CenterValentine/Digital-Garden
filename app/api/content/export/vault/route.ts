@@ -9,7 +9,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/infrastructure/auth/middleware";
 import { getUserSettings } from "@/lib/features/settings";
 import { exportVault } from "@/lib/domain/export";
-import type { ExportFormat, BulkExportFilters } from "@/lib/domain/export/types";
+import type { ExportFormat, BulkExportFilters, ExportBackupSettings } from "@/lib/domain/export/types";
 
 export async function POST(request: NextRequest) {
   try {
@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
       userId: session.user.id,
       format,
       filters,
-      settings: settings.exportBackup as any,
+      settings: settings.exportBackup as ExportBackupSettings,
     });
 
     console.log(`[Export] Vault export complete, size: ${zipBuffer.length} bytes`);

@@ -55,7 +55,7 @@ export function FileTreeDropZone({ onFileDrop, children }: FileTreeDropZoneProps
   const isDragActive = isOver && canDrop;
 
   return (
-    <div ref={dropRef as any} className="relative w-full h-full">
+    <div ref={dropRef as unknown as React.Ref<HTMLDivElement>} className="relative w-full h-full">
       {/* Drag-and-drop overlay */}
       {isDragActive && (
         <div

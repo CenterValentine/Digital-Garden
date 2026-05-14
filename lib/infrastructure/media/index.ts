@@ -16,7 +16,8 @@ import type { ProcessingOptions, ProcessingResult } from './types';
  */
 export class MediaProcessor {
   private imageProcessor: ImageProcessor;
-  private videoProcessor: any = null;
+  // Lazy-loaded — avoids bundling FFmpeg at module init.
+  private videoProcessor: import('./video-processor').VideoProcessor | null = null;
   private pdfProcessor: PDFProcessor;
 
   constructor(private storageProvider: StorageProvider) {

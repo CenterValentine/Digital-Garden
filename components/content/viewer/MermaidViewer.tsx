@@ -92,6 +92,7 @@ export function MermaidViewer({
   const [mermaidReady, setMermaidReady] = useState(false);
 
   const previewRef = useRef<HTMLDivElement>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- TODO(any-epic-phase-4): mermaid is lazy-imported and its default export isn't easily typed; narrow once initializeMermaid returns a typed handle
   const mermaidRef = useRef<any>(null);
   const resolvedTheme = useResolvedTheme();
 

@@ -213,7 +213,7 @@ export function JSONViewer({
     try {
       const parsed = JSON.parse(editorContent);
       let count = 0;
-      const countObjects = (obj: any) => {
+      const countObjects = (obj: unknown) => {
         if (typeof obj === "object" && obj !== null) {
           count++;
           if (Array.isArray(obj)) {

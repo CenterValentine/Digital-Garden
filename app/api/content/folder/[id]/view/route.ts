@@ -195,7 +195,7 @@ export async function PATCH(
     }
 
     // Build update data (only include fields that were provided)
-    const updateData: any = {};
+    const updateData: Record<string, unknown> = {};
     if (viewMode !== undefined) updateData.viewMode = viewMode;
     if (sortMode !== undefined) updateData.sortMode = sortMode;
     if (viewPrefs !== undefined) updateData.viewPrefs = viewPrefs;

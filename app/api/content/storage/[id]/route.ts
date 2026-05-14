@@ -10,6 +10,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/database/client";
 import { requireAuth } from "@/lib/infrastructure/auth/middleware";
 import type { UpdateStorageConfigRequest } from "@/lib/domain/content/api-types";
+import type { Prisma } from "@/lib/database/generated/prisma";
 
 type Params = Promise<{ id: string }>;
 
@@ -158,7 +159,7 @@ export async function PATCH(
       where: { id },
       data: {
         displayName: displayName ?? existing.displayName,
-        config: (config ?? existing.config) as any,
+        config: (config ?? existing.config) as Prisma.InputJsonValue,
         isDefault: isDefault ?? existing.isDefault,
         isActive: isActive ?? existing.isActive,
       },

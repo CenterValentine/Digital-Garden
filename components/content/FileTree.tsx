@@ -558,7 +558,8 @@ export function FileTree({
         }}
         disableDrag={!onMove}
         disableDrop={!onMove}
-        {...({ canDrop } as any)} // Type assertion: canDrop exists in runtime but not in v3.4.0 types
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        {...({ canDrop } as any) /* canDrop exists at runtime in react-arborist 3.4 but not in the public type */}
         {...(dndManager && { dndManager })} // Pass dndManager if provided
       >
         {NodeWithCallbacks}

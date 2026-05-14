@@ -45,7 +45,15 @@ export async function POST(request: NextRequest) {
       select: { settings: true },
     });
 
-    const settings = (user?.settings as any) || {};
+    type SettingsShape = {
+      external?: {
+        previewsEnabled?: boolean;
+        allowAllDomains?: boolean;
+        allowlistedHosts?: string[];
+        allowHttp?: boolean;
+      };
+    };
+    const settings = (user?.settings as SettingsShape | null) || {};
     const externalSettings = settings.external || {};
 
     console.log("[External Preview API] User settings loaded:", {

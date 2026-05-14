@@ -7,6 +7,7 @@
 import { requireAuth } from "@/lib/infrastructure/auth/middleware";
 import { getUserSettings } from "@/lib/features/settings";
 import { DEFAULT_EXPORT_BACKUP_SETTINGS } from "@/lib/domain/export";
+import type { ExportBackupSettings } from "@/lib/domain/export/types";
 import { ExportSettingsClient } from "./ExportSettingsClient";
 
 export default async function ExportSettingsPage() {
@@ -23,7 +24,7 @@ export default async function ExportSettingsPage() {
       </div>
 
       <ExportSettingsClient
-        initialSettings={(settings.exportBackup || DEFAULT_EXPORT_BACKUP_SETTINGS) as any}
+        initialSettings={(settings.exportBackup || DEFAULT_EXPORT_BACKUP_SETTINGS) as ExportBackupSettings}
         userId={session.user.id}
       />
     </div>

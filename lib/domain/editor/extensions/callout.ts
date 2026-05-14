@@ -29,7 +29,7 @@ import { Decoration, DecorationSet } from "@tiptap/pm/view";
 
 export interface CalloutOptions {
   types: string[];
-  HTMLAttributes: Record<string, any>;
+  HTMLAttributes: Record<string, unknown>;
 }
 
 declare module "@tiptap/core" {

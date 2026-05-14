@@ -15,6 +15,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { X, Save, Trash2 } from "lucide-react";
 import { useEditor, EditorContent } from "@tiptap/react";
+import type { JSONContent } from "@tiptap/core";
 import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
 import Link from "@tiptap/extension-link";
@@ -91,9 +92,9 @@ export function TemplateEditorDialog() {
   // Set editor content when editor becomes available after template is loaded
   useEffect(() => {
     if (editor && template?.tiptapJson && isOpen) {
-      const json = template.tiptapJson as { type?: string; content?: unknown[] };
+      const json = template.tiptapJson as JSONContent;
       if (json?.content) {
-        editor.commands.setContent(json as any);
+        editor.commands.setContent(json);
       }
     }
   }, [editor, template, isOpen]);

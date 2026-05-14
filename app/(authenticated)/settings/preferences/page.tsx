@@ -611,7 +611,7 @@ export default function PreferencesSettingsPage() {
                       name="defaultFolderViewMode"
                       value={mode.value}
                       checked={defaultFolderViewMode === mode.value}
-                      onChange={(e) => setDefaultFolderViewMode(e.target.value as any)}
+                      onChange={(e) => setDefaultFolderViewMode(e.target.value as typeof defaultFolderViewMode)}
                       className="mt-0.5"
                     />
                     <div className="flex-1">
@@ -643,7 +643,7 @@ export default function PreferencesSettingsPage() {
                       name="defaultFolderSortMode"
                       value={mode.value}
                       checked={defaultFolderSortMode === mode.value}
-                      onChange={(e) => setDefaultFolderSortMode(e.target.value as any)}
+                      onChange={(e) => setDefaultFolderSortMode(e.target.value as typeof defaultFolderSortMode)}
                       className="mt-0.5"
                     />
                     <div className="flex-1">

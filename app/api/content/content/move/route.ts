@@ -362,7 +362,7 @@ async function moveContentToPosition(
 
   // Update all siblings with new displayOrder and parentId for the moved item
   const updates = siblings.map((sibling, index) => {
-    const updateData: any = { displayOrder: index };
+    const updateData: { displayOrder: number; parentId?: string | null } = { displayOrder: index };
 
     // Only update parentId for the moved item
     if (sibling.id === contentId) {

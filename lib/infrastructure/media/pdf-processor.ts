@@ -61,14 +61,14 @@ export class PDFProcessor {
         thumbnailKeys.push(thumbnailKey);
       }
 
-      const info = metadata.info as Record<string, any> | undefined;
+      const info = metadata.info as Record<string, unknown> | undefined;
       const pdfMetadata: PDFMetadata = {
         pageCount,
         size: buffer.length,
         thumbnail: thumbnailUrl,
-        author: info?.Author || undefined,
-        title: info?.Title || undefined,
-        createdDate: info?.CreationDate || undefined,
+        author: (info?.Author as string | undefined) || undefined,
+        title: (info?.Title as string | undefined) || undefined,
+        createdDate: (info?.CreationDate as string | undefined) || undefined,
       };
 
       return {

@@ -137,7 +137,7 @@ export function BacklinksPanel({ contentId }: BacklinksPanelProps) {
   const handleContentClick = (item: AssociatedContentItem["content"] | BacklinkItem, contentType?: string) => {
     setSelectedContentId(item.id, {
       title: item.title,
-      contentType: (contentType || ("contentType" in item ? item.contentType : "note")) as any,
+      contentType: contentType || ("contentType" in item ? item.contentType : "note"),
     });
   };
 
