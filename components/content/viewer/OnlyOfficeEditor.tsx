@@ -153,18 +153,20 @@ export function OnlyOfficeEditor({
         console.log("[OnlyOffice] Document ready");
         setIsReady(true);
       },
-      onDocumentStateChange: (event: any) => {
+      // OnlyOffice's React wrapper doesn't export its event types. Use narrow
+      // inline shapes that match the documented DocumentEditor event payloads.
+      onDocumentStateChange: (event: { data?: unknown }) => {
         console.log("[OnlyOffice] Document state changed:", event);
         // Auto-save is handled by callbackUrl
       },
-      onError: (event: any) => {
+      onError: (event: { data?: string }) => {
         console.error("[OnlyOffice] Error:", event);
         setError(`Editor error: ${event.data || "Unknown error"}`);
         toast.error("Editor error", {
           description: event.data || "Failed to load document editor",
         });
       },
-      onWarning: (event: any) => {
+      onWarning: (event: { data?: unknown }) => {
         console.warn("[OnlyOffice] Warning:", event);
       },
     },
