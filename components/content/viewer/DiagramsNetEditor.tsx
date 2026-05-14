@@ -52,8 +52,14 @@ export const DiagramsNetEditor = forwardRef<DiagramsNetEditorHandle, DiagramsNet
     const isReadyRef = useRef(false);
     const pendingXmlRef = useRef<string | null>(null);
 
-    // Keep ref in sync with prop (no effect needed — synchronous before render)
-    xmlRef.current = xml;
+    // Keep ref in sync with prop. We do this in an effect (not synchronously
+    // during render) because writing to refs during render is impure and
+    // breaks under StrictMode double-rendering. The diagrams.net iframe only
+    // calls back asynchronously (via postMessage), so the post-commit timing
+    // is safe — the handler will always see the latest committed xml.
+    useEffect(() => {
+      xmlRef.current = xml;
+    }, [xml]);
 
     // Reset ready state when the embed URL changes (theme change reloads iframe src).
     const embedUrl = useMemo(() => {
