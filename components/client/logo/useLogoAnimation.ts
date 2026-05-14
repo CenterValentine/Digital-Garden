@@ -66,7 +66,7 @@ function extractOrderInfo(id: string) {
 }
 
 function isDrawable(el: Element): el is SVGGeometryElement {
-  return typeof (el as any)?.getTotalLength === "function";
+  return typeof (el as Partial<SVGGeometryElement>).getTotalLength === "function";
 }
 
 async function animateDraw(
@@ -81,7 +81,7 @@ async function animateDraw(
     length = 0;
   }
 
-  const style = (el as any).style as CSSStyleDeclaration;
+  const { style } = el;
   style.opacity = "1";
 
   if (!length || !Number.isFinite(length)) return;
@@ -91,7 +91,7 @@ async function animateDraw(
   const from = direction === "reverse" ? -length : length;
   style.strokeDashoffset = `${from}`;
 
-  const anim = (el as any).animate(
+  const anim = el.animate(
     [{ strokeDashoffset: `${from}` }, { strokeDashoffset: "0" }],
     { duration: durationMs, easing: "ease-out", fill: "forwards" }
   );
@@ -102,19 +102,19 @@ async function animateDraw(
   });
 }
 
-async function animateNode(el: Element, durationMs: number) {
-  const style = (el as any).style as CSSStyleDeclaration;
+async function animateNode(el: SVGElement, durationMs: number) {
+  const { style } = el;
 
   // Ensure transforms are computed relative to the element’s own box,
   // so scaling doesn't look like it "moves".
   // (transformBox isn't in TS lib typings for CSSStyleDeclaration in some setups)
-  (style as any).transformBox = "fill-box";
+  (style as CSSStyleDeclaration & { transformBox?: string }).transformBox = "fill-box";
   style.transformOrigin = "center";
 
   style.opacity = "1";
 
   // "Sprout / pop" in place: scale from 0 -> overshoot -> settle.
-  const anim = (el as any).animate(
+  const anim = el.animate(
     [
       { transform: "scale(0)", opacity: 0 },
       { transform: "scale(1.12)", opacity: 1, offset: 0.65 },
@@ -147,14 +147,14 @@ function resetForAnimation(svg: SVGSVGElement) {
   for (const el of els) {
     const id = el.getAttribute("id") ?? "";
     const { kind } = extractOrderInfo(id);
-    const style = (el as any).style as CSSStyleDeclaration;
+    const { style } = el;
 
     style.opacity = "0";
     style.strokeDasharray = "";
     style.strokeDashoffset = "";
 
     if (kind === "node") {
-      (style as any).transformBox = "fill-box";
+      (style as CSSStyleDeclaration & { transformBox?: string }).transformBox = "fill-box";
       style.transformOrigin = "center";
       style.transform = "scale(0)";
     } else {
@@ -178,8 +178,8 @@ function groupByNumber<T extends { num: number }>(items: T[]) {
 }
 
 function setDebugActive(el: Element, active: boolean) {
-  if (!(el as any)?.classList) return;
-  (el as any).classList.toggle("logo-debug-active", active);
+  if (!el?.classList) return;
+  el.classList.toggle("logo-debug-active", active);
 }
 
 /**
@@ -204,10 +204,10 @@ export function useLogoAnimation(
     if (prefersReducedMotion()) {
       const els = resetForAnimation(svg);
       for (const el of els) {
-        (el as any).style.opacity = "1";
-        (el as any).style.transform = "";
-        (el as any).style.strokeDasharray = "";
-        (el as any).style.strokeDashoffset = "";
+        el.style.opacity = "1";
+        el.style.transform = "";
+        el.style.strokeDasharray = "";
+        el.style.strokeDashoffset = "";
       }
       svg.dataset.logoAnimated = "true";
       return;
@@ -311,7 +311,7 @@ export function useLogoAnimation(
                 o.reverse ? "reverse" : "forward"
               );
             } else {
-              (o.el as any).style.opacity = "1";
+              o.el.style.opacity = "1";
             }
           });
 

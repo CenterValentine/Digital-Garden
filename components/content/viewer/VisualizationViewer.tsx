@@ -14,10 +14,7 @@ import { BarChart3, AlertCircle, Loader2 } from "lucide-react";
 import type {
   DiagramsNetConfig,
   DiagramsNetData,
-  ExcalidrawConfig,
   ExcalidrawData,
-  MermaidConfig,
-  MermaidData,
 } from "@/lib/domain/visualization/types";
 import type { CollaborationRuntimeHandle } from "@/lib/domain/collaboration/runtime";
 
@@ -65,7 +62,7 @@ export function VisualizationViewer({
   ownerNoteInfo = null,
 }: VisualizationViewerProps) {
   // Save handler for auto-save
-  const handleSave = async (updatedData: any) => {
+  const handleSave = async (updatedData: Record<string, unknown>) => {
     try {
       const response = await fetch(`/api/content/content/${contentId}`, {
         method: "PATCH",
@@ -98,8 +95,8 @@ export function VisualizationViewer({
         <DiagramsNetViewer
           contentId={contentId}
           title={title}
-          config={config as any}
-          data={data as any}
+          config={config as Partial<DiagramsNetConfig>}
+          data={data as unknown as DiagramsNetData}
           onSave={async (xml: string) => {
             await handleSave({ ...data, xml });
           }}
@@ -112,9 +109,9 @@ export function VisualizationViewer({
         <ExcalidrawViewer
           contentId={contentId}
           title={title}
-          config={config as any}
-          data={data as any}
-          onSave={async (updatedData: any) => {
+          config={config}
+          data={data as unknown as ExcalidrawData}
+          onSave={async (updatedData: Record<string, unknown>) => {
             if (isReadOnly) return;
             await handleSave(updatedData);
           }}
@@ -129,8 +126,8 @@ export function VisualizationViewer({
         <MermaidViewer
           contentId={contentId}
           title={title}
-          config={config as any}
-          data={data as any}
+          config={config}
+          data={data as { source?: string }}
           onSave={async (source: string) => {
             await handleSave({ source });
           }}

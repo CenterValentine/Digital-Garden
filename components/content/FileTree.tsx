@@ -15,7 +15,7 @@
 "use client";
 
 import { useRef, useEffect, useMemo, useState, useCallback } from "react";
-import { Tree, type NodeApi } from "react-arborist";
+import { Tree, type NodeApi, type TreeApi, type NodeRendererProps } from "react-arborist";
 import { FileNode } from "./FileNode";
 import { useTreeStateStore } from "@/state/tree-state-store";
 import type { TreeNode } from "@/lib/domain/content/types";
@@ -47,7 +47,7 @@ interface FileTreeProps {
   editingNodeId?: string; // If set, automatically triggers edit mode on this node
   expandNodeId?: string | null; // If set, imperatively expands this node
   onExpandComplete?: () => void; // Called after expansion completes
-  dndManager?: any; // Optional: DndManager from parent DndProvider
+  dndManager?: unknown; // Optional: DndManager from parent DndProvider; opaque pass-through
 }
 
 export function FileTree({
@@ -72,7 +72,7 @@ export function FileTree({
   onExpandComplete,
   dndManager,
 }: FileTreeProps) {
-  const treeRef = useRef<any>(null);
+  const treeRef = useRef<TreeApi<TreeNode> | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const {
     expandedIds,
@@ -151,7 +151,7 @@ export function FileTree({
       const tree = treeRef.current;
       if (!tree || !tree.visibleNodes) return;
 
-      const nodesToSelect = tree.visibleNodes.filter((node: any) =>
+      const nodesToSelect = tree.visibleNodes.filter((node: NodeApi<TreeNode>) =>
         validIds.includes(node.id)
       );
 
@@ -159,7 +159,7 @@ export function FileTree({
         console.log(`[FileTree] Restoring selection for ${nodesToSelect.length} node(s)`, validIds);
 
         // Select each node using the node's select method
-        nodesToSelect.forEach((node: any, index: number) => {
+        nodesToSelect.forEach((node: NodeApi<TreeNode>, index: number) => {
           if (node && node.select) {
             // First node: regular select, rest: selectMulti to add to selection
             if (index === 0) {
@@ -172,7 +172,7 @@ export function FileTree({
 
         // Also trigger the onSelect callback to update parent state
         if (onSelect) {
-          const selectedNodes = nodesToSelect.map((n: any) => n.data);
+          const selectedNodes = nodesToSelect.map((n: NodeApi<TreeNode>) => n.data);
           onSelect(selectedNodes);
         }
       }
@@ -190,7 +190,7 @@ export function FileTree({
     if (!tree || !tree.visibleNodes) return;
 
     // Get currently selected node IDs from the tree
-    const currentlySelected = tree.selectedNodes?.map((n: any) => n.id) || [];
+    const currentlySelected = tree.selectedNodes?.map((n: NodeApi<TreeNode>) => n.id) || [];
 
     // Check if selection actually changed (avoid loops)
     const selectedIdsSet = new Set(selectedIds);
@@ -203,13 +203,13 @@ export function FileTree({
     console.log('[FileTree] External selection change detected:', selectedIds);
 
     // Find nodes to select
-    const nodesToSelect = tree.visibleNodes.filter((node: any) =>
+    const nodesToSelect = tree.visibleNodes.filter((node: NodeApi<TreeNode>) =>
       selectedIdsSet.has(node.id)
     );
 
     if (nodesToSelect.length > 0) {
       // Select nodes programmatically
-      nodesToSelect.forEach((node: any, index: number) => {
+      nodesToSelect.forEach((node: NodeApi<TreeNode>, index: number) => {
         if (node && node.select) {
           if (index === 0) {
             node.select();
@@ -221,7 +221,7 @@ export function FileTree({
 
       // Trigger onSelect callback
       if (onSelect) {
-        const selectedNodes = nodesToSelect.map((n: any) => n.data);
+        const selectedNodes = nodesToSelect.map((n: NodeApi<TreeNode>) => n.data);
         onSelect(selectedNodes);
       }
     }
@@ -244,7 +244,7 @@ export function FileTree({
     });
   }, []);
 
-  const NodeWithCallbacks = (props: any) => {
+  const NodeWithCallbacks = (props: NodeRendererProps<TreeNode>) => {
     const nodeId = String(props.node.id);
 
     return (
@@ -374,7 +374,7 @@ export function FileTree({
 
       // Also check if any node in the tree is being edited
       const tree = treeRef.current;
-      const isAnyNodeEditing = tree?.visibleNodes?.some((node: any) => node.isEditing);
+      const isAnyNodeEditing = tree?.visibleNodes?.some((node: NodeApi<TreeNode>) => node.isEditing);
 
       if (isAnyNodeEditing) {
         // A node is being renamed - don't intercept keystrokes
@@ -416,7 +416,7 @@ export function FileTree({
         const tree = treeRef.current;
         if (tree?.selectedNodes?.length > 0) {
           // Pass all selected node IDs for batch delete
-          const selectedIds = tree.selectedNodes.map((node: any) => node.id);
+          const selectedIds = tree.selectedNodes.map((node: NodeApi<TreeNode>) => node.id);
           onDelete(selectedIds);
         }
         return;
@@ -431,8 +431,10 @@ export function FileTree({
         const selectedNode = tree?.selectedNodes?.[0];
 
         if (selectedNode) {
-          // Trigger right-click on selected node to show create menu
-          const nodeElement = selectedNode.element;
+          // Trigger right-click on selected node to show create menu.
+          // `element` is a runtime-only field on NodeApi (set by the rendered
+          // node), not part of the public 3.4 type — narrow rather than `any`.
+          const nodeElement = (selectedNode as NodeApi<TreeNode> & { element?: HTMLElement | null }).element;
           if (nodeElement) {
             const rect = nodeElement.getBoundingClientRect();
             // Simulate right-click event at node position
@@ -483,7 +485,7 @@ export function FileTree({
     if (!tree) return;
 
     // Find the node by ID and open it imperatively
-    const node = tree.visibleNodes?.find((n: any) => n.id === expandNodeId);
+    const node = tree.visibleNodes?.find((n: NodeApi<TreeNode>) => n.id === expandNodeId);
 
     if (node && !node.isOpen) {
       // Open the node imperatively via react-arborist API
@@ -509,7 +511,7 @@ export function FileTree({
     // Small delay to ensure the node is rendered in the DOM
     const timeoutId = setTimeout(() => {
       // Find the node by ID
-      const node = tree.visibleNodes?.find((n: any) => n.id === editingNodeId);
+      const node = tree.visibleNodes?.find((n: NodeApi<TreeNode>) => n.id === editingNodeId);
 
       if (node && !node.isEditing) {
         // Trigger edit mode

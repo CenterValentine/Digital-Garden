@@ -40,7 +40,7 @@ interface NodeStyleInfo {
 /**
  * Get CSS/style information for a node type
  */
-function getNodeStyleInfo(nodeType: string, attrs: any, depth: number): NodeStyleInfo {
+function getNodeStyleInfo(nodeType: string, attrs: Record<string, unknown>, depth: number): NodeStyleInfo {
   const info: NodeStyleInfo = {
     classes: [],
     computedStyles: {},
@@ -66,7 +66,7 @@ function getNodeStyleInfo(nodeType: string, attrs: any, depth: number): NodeStyl
       break;
 
     case "heading":
-      const level = attrs?.level || 1;
+      const level = (typeof attrs?.level === "number" ? attrs.level : 1) as number;
       info.classes = [".ProseMirror-heading", `.h${level}`];
       const headingSizes: Record<number, string> = {
         1: "32px",
@@ -195,7 +195,7 @@ function getNodeStyleInfo(nodeType: string, attrs: any, depth: number): NodeStyl
       break;
 
     case "callout":
-      const calloutType = attrs?.type || "note";
+      const calloutType = (typeof attrs?.type === "string" ? attrs.type : "note") as string;
       info.classes = [".callout", `.callout-${calloutType}`];
       const calloutColors: Record<string, string> = {
         note: "rgb(59, 130, 246)",
@@ -258,11 +258,12 @@ function TreeNode({ node, depth, isLast, parentPrefix, showStyles, showBoxModel 
     );
   }
 
-  // Handle object nodes
-  const nodeType = (node as any).type || "unknown";
-  const hasChildren = (node as any).content && Array.isArray((node as any).content) && (node as any).content.length > 0;
-  const attrs = (node as any).attrs || {};
-  const marks = (node as any).marks || [];
+  // After the `typeof node === "string"` guard above, node is JSONContent.
+  const nodeType = node.type || "unknown";
+  const childContent = Array.isArray(node.content) ? node.content : [];
+  const hasChildren = childContent.length > 0;
+  const attrs = (node.attrs ?? {}) as Record<string, unknown>;
+  const marks = node.marks ?? [];
 
   // Get style information
   const styleInfo = getNodeStyleInfo(nodeType, attrs, depth);
@@ -278,12 +279,17 @@ function TreeNode({ node, depth, isLast, parentPrefix, showStyles, showBoxModel 
 
   // Format marks for display
   const marksString = marks.length > 0
-    ? ` [${marks.map((m: any) => m.type).join(", ")}]`
+    ? ` [${marks.map((m) => m.type).join(", ")}]`
     : "";
 
   // Special handling for table cells - check if empty
   const isTableCell = nodeType === "tableCell" || nodeType === "tableHeader";
-  const isEmpty = isTableCell && (!hasChildren || (hasChildren && (node as any).content.length === 1 && (node as any).content[0].type === "paragraph" && !(node as any).content[0].content));
+  const isEmpty =
+    isTableCell &&
+    (!hasChildren ||
+      (childContent.length === 1 &&
+        childContent[0]?.type === "paragraph" &&
+        !childContent[0]?.content));
 
   return (
     <div>
@@ -361,12 +367,12 @@ function TreeNode({ node, depth, isLast, parentPrefix, showStyles, showBoxModel 
 
       {hasChildren && isExpanded && (
         <div className="ml-0">
-          {(node as any).content.map((child: any, index: number) => (
+          {childContent.map((child, index) => (
             <TreeNode
               key={index}
               node={child}
               depth={depth + 1}
-              isLast={index === (node as any).content.length - 1}
+              isLast={index === childContent.length - 1}
               parentPrefix={currentPrefix}
               showStyles={showStyles}
               showBoxModel={showBoxModel}

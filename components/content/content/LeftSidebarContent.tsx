@@ -383,13 +383,13 @@ export function LeftSidebarContent({
     };
 
     window.addEventListener(
-      "content-updated" as any,
+      "content-updated",
       handleContentUpdate as EventListener,
     );
 
     return () => {
       window.removeEventListener(
-        "content-updated" as any,
+        "content-updated",
         handleContentUpdate as EventListener,
       );
     };
@@ -430,9 +430,9 @@ export function LeftSidebarContent({
       }
     };
 
-    window.addEventListener('edit-external-link' as any, handleEditExternal);
+    window.addEventListener('edit-external-link', handleEditExternal as EventListener);
     return () => {
-      window.removeEventListener('edit-external-link' as any, handleEditExternal);
+      window.removeEventListener('edit-external-link', handleEditExternal as EventListener);
     };
   }, []);
 
@@ -515,13 +515,13 @@ export function LeftSidebarContent({
     };
 
     window.addEventListener(
-      "dg:create-from-template" as any,
-      handleCreateFromTemplate
+      "dg:create-from-template",
+      handleCreateFromTemplate as EventListener,
     );
     return () => {
       window.removeEventListener(
-        "dg:create-from-template" as any,
-        handleCreateFromTemplate
+        "dg:create-from-template",
+        handleCreateFromTemplate as EventListener,
       );
     };
   }, [treeData]);
@@ -952,7 +952,7 @@ export function LeftSidebarContent({
 
     try {
       // Prepare payload based on content type
-      const defaults: Record<string, { title: string; payload?: any; fileType?: "docx" | "xlsx" | "json" }> = {
+      const defaults: Record<string, { title: string; payload?: Record<string, unknown>; fileType?: "docx" | "xlsx" | "json" }> = {
         folder: { title: title.trim() },
         note: {
           title: title.trim(),
@@ -1037,8 +1037,8 @@ export function LeftSidebarContent({
         throw new Error(`Unknown content type: ${type}`);
       }
 
-      // Build request body
-      const requestBody: any = {
+      // Build request body — keys vary per content type (payload spread later)
+      const requestBody: Record<string, unknown> = {
         title: config.title,
         parentId: createTarget.requestParentId,
       };
