@@ -10,18 +10,19 @@
 import { Node, mergeAttributes } from "@tiptap/core";
 import { ReactNodeViewRenderer } from "@tiptap/react";
 import { InputRule } from "@tiptap/core";
-import Suggestion from "@tiptap/suggestion";
-import { Plugin, PluginKey } from "@tiptap/pm/state";
-import { createTagSuggestion } from "./tag-suggestion";
+import Suggestion, { type SuggestionOptions } from "@tiptap/suggestion";
+import { Plugin, PluginKey, Selection } from "@tiptap/pm/state";
+import type { Node as ProseMirrorNode } from "@tiptap/pm/model";
+import { createTagSuggestion, type TagSuggestionItem } from "./tag-suggestion";
 
 export interface TagOptions {
-  HTMLAttributes: Record<string, any>;
-  renderLabel: (props: { node: any }) => string;
-  fetchTags: (query: string) => Promise<any[]>;
-  createTag?: (tagName: string) => Promise<any>;
+  HTMLAttributes: Record<string, unknown>;
+  renderLabel: (props: { node: ProseMirrorNode }) => string;
+  fetchTags: (query: string) => Promise<TagSuggestionItem[]>;
+  createTag?: (tagName: string) => Promise<TagSuggestionItem>;
   onTagClick?: (tagId: string, tagName: string) => void;
-  onTagSelect?: (tag: any) => void;
-  suggestion: any;
+  onTagSelect?: (tag: TagSuggestionItem) => void;
+  suggestion: Partial<SuggestionOptions>;
 }
 
 declare module "@tiptap/core" {
@@ -197,9 +198,7 @@ export const Tag = Node.create<TagOptions>({
                 .insertText(tagText, pos)
                 // Position cursor at the end of the text
                 .setSelection(
-                  (state.selection.constructor as any).near(
-                    tr.doc.resolve(pos + tagText.length)
-                  )
+                  Selection.near(tr.doc.resolve(pos + tagText.length))
                 );
 
               return false;
@@ -233,7 +232,7 @@ export const Tag = Node.create<TagOptions>({
             const { doc, tr } = view.state;
 
             // Find tag node at click position
-            let tagNode = null;
+            let tagNode: ProseMirrorNode | null = null;
             let tagPos = -1;
 
             doc.nodesBetween(pos - 1, pos + 1, (node, nodePos) => {
@@ -245,11 +244,12 @@ export const Tag = Node.create<TagOptions>({
             });
 
             if (!tagNode) return false;
+            const tagNodeNonNull: ProseMirrorNode = tagNode;
 
             // Replace tag node with plain text for editing
-            const tagText = `#${(tagNode as any).attrs.tagName}`;
+            const tagText = `#${tagNodeNonNull.attrs.tagName}`;
             const from = tagPos;
-            const to = tagPos + (tagNode as any).nodeSize;
+            const to = tagPos + tagNodeNonNull.nodeSize;
 
             // Delete the tag node and insert editable text
             view.dispatch(
@@ -258,9 +258,7 @@ export const Tag = Node.create<TagOptions>({
                 .insertText(tagText, from)
                 // Set selection to the end of the inserted text (after the tag name)
                 .setSelection(
-                  (view.state.selection.constructor as any).near(
-                    tr.doc.resolve(from + tagText.length)
-                  )
+                  Selection.near(tr.doc.resolve(from + tagText.length))
                 )
             );
 

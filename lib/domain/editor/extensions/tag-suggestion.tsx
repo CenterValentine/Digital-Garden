@@ -18,7 +18,7 @@ import { forwardRef, useEffect, useImperativeHandle, useState } from "react";
 // Unique plugin key to avoid conflicts with other suggestion plugins
 export const tagSuggestionPluginKey = new PluginKey("tagSuggestion");
 
-interface TagSuggestionItem {
+export interface TagSuggestionItem {
   id: string;
   name: string;
   slug: string;
