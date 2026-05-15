@@ -4,9 +4,54 @@ epoch: 12 (Main Panel Tabs + Split Workspace)
 duration: multi-session
 branch: epoch-12/sprint-55-wire-blocks
 status: complete
+last_updated: 2026-05-13
 ---
 
 # Current Sprint Addendum
+
+## May 13, 2026 — Dark Mode Epoch Complete
+
+**Branch**: `feature/dark-mode`
+**Status**: Functionally complete; awaiting deploy to address production-version-skew collab edge case (see Followups below)
+
+### Implemented
+
+- **Sprint A — Foundation + Editor Surface**: theme provider + `useResolvedTheme()` hook + FOUC-prevention inline script (`lib/features/theme/`); settings UI in `/settings/preferences`; editor surface retrofit; ProseMirror prose CSS pass (body, headings, blockquote, callouts, wiki-link, block system); Liquid Glass surfaces refactored to CSS variables (auto-swap across all 42 callsites)
+- **Sprint B — Long-Tail + Third-Party Viewers**: tables (brand-aligned shale/gold), calendar settings buttons, flashcards (panel + review overlay + flip animation polish + minimized edit affordance), settings pages, AI surfaces, people dialogs, common surfaces, admin pages, viewer chrome (Mermaid/Excalidraw/DiagramsNet toolbars); third-party viewer theme propagation (Mermaid, Excalidraw, DiagramsNet override-beats-global, OnlyOffice); hydration mismatch fix via `suppressHydrationWarning` on `<html>`
+- **Sprint C — Cleanup + Test Harness**: signed-out / auth pages retrofitted; Playwright harness scaffolded with operational dark-mode coverage (4 signed-out routes, 8 baseline snapshots) + 10 non-operational stubs (auth, editor, file-tree, content, search, extensions); `tests/e2e/README.md` documents conventions; `DevThemeToggle` removed
+- **Side quest**: slash command bug for `ExcalidrawBlock`/`MermaidBlock` — root cause was missing client-side registration; restructured to create-then-insert pattern to avoid collab sync race; verified solo dev workflow
+
+### Decisions Locked During Epoch
+
+- Default theme: `system` (follows OS)
+- DiagramsNet per-diagram theme override: persists; reset-to-global preserved as future UX
+- `/embed/*` honors user theme (overlay seam in light mode is a separate concern)
+- Brand canvas stays at `#465E73` (shale-dark) — text colors tuned for it
+- Bubble menus + small floating popovers stay always-dark; full-page dialogs follow theme
+- Visual regression: minimal Playwright harness operational + stubs scaffolded for other categories
+
+### Verification
+
+- `pnpm typecheck` passes
+- `pnpm collab:schema:check` passes
+- `pnpm test:e2e` runs 8 passing + 90 skipped (baselines captured)
+- Manual visual review across multiple iterations covered editor, dialogs, sidebars, blocks, flashcards, viewers, calendar settings, auth pages
+
+### Known Followups
+
+- **Production deploy of `feature/dark-mode`** unblocks the slash command bug for collaborating clients (server already had `ExcalidrawBlock`/`MermaidBlock`; production client schema needs to catch up)
+- **Sanitization nuance**: user flagged that `unsupportedBlock` rewriting is too aggressive for nodes the server schema knows about — consider differentiating "client doesn't render" from "truly unknown" types post-deploy
+- **Authenticated dark-mode tests**: 5 `dark-mode/authenticated-routes.spec.ts` tests are stubbed pending an auth fixture (`tests/e2e/_fixtures/auth.ts`) — should sign in a test user and persist `storageState`
+- **Sprint C Playwright stubs**: 10 non-operational stub specs across `auth/`, `editor/`, `file-tree/`, `content/`, `search/`, `extensions/` are placeholders awaiting future sprints
+- **`ProfileMenu`** (signed-in nav profile dropdown) still has some hardcoded light styles — not in user's testing flow, defer
+
+### Files Touched (Summary)
+
+- New: `lib/features/theme/{provider.tsx,useResolvedTheme.ts,script.ts,index.ts}`, `lib/domain/editor/extensions/blocks/pending-diagram-creates.ts`, `playwright.config.ts`, `tests/e2e/**` (12 specs + 1 README + 1 fixture)
+- Major edits: `app/globals.css` (Liquid Glass CSS vars + phantom semantic vars + dark mode rules for headings/blockquote/callouts/tabs/calendar/etc.), `app/layout.tsx`, `app/page.tsx`, `app/(auth)/sign-{in,up}/page.tsx`, `lib/design/system/surfaces.ts`, `lib/domain/editor/extensions-client.ts` (block registration), `lib/domain/editor/commands/slash-commands.tsx`, `components/content/editor/MarkdownEditor.tsx`, all four third-party viewers + their toolbars, ~30 component-level retrofits across panels/dialogs/headers
+- Removed: `components/dev/DevThemeToggle.tsx` and its mount
+
+---
 
 ## May 4, 2026 — Browser Overlay + Associated Content Foundation
 

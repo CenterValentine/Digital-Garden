@@ -146,6 +146,9 @@ export function DashboardView({
           return (
             <div className="h-full flex flex-col">
               <div className="flex-1 bg-black/5 rounded overflow-hidden">
+                {/* User uploads come via presigned URLs from R2/S3/Vercel Blob — next/image */}
+                {/* would need remotePatterns + the URLs are short-lived signed tokens. */}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={imageUrl}
                   alt={item.title}

@@ -290,6 +290,7 @@ export function LeftSidebarHeaderActions({
 
   // Set mounted state for portal rendering
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- audited, see BACKLOG.md
     setMounted(true);
   }, []);
 
@@ -320,6 +321,7 @@ export function LeftSidebarHeaderActions({
   // Reset position and submenu when menu closes
   useEffect(() => {
     if (!showMenu) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- audited, see BACKLOG.md
       setMenuPosition(null);
       setOpenSubmenu(null);
       // Clear any pending submenu close timeout

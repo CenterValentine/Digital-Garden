@@ -203,7 +203,9 @@ export function extractExcerpt(
  *
  * Converts API content items to SearchResult format
  */
+// TODO(any-epic-phase-4): search-result items have a polymorphic payload shape; introduce a SearchResultItem union once payload contract stabilizes
 export function parseSearchResults(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   items: any[],
   query: string,
   caseSensitive: boolean = false,

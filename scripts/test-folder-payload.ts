@@ -31,7 +31,7 @@ async function main() {
   console.log("🧪 Testing FolderPayload Implementation\n");
 
   // Find or create a test user
-  let testUser = await prisma.user.findFirst({
+  const testUser = await prisma.user.findFirst({
     where: { role: "owner" },
   });
 

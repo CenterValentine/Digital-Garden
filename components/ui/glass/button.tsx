@@ -37,6 +37,7 @@ export const Button = React.forwardRef<
   return (
     <BaseButton
       ref={ref}
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- TODO(any-epic-phase-4): "glass" is not a BaseButton variant; widen BaseButton's variant union or strip "glass" before forwarding
       variant={variant as any}
       className={cn(
         "relative overflow-hidden",

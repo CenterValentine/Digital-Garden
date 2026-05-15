@@ -113,8 +113,10 @@ export class S3StorageProvider implements StorageProvider {
         etag: response.ETag?.replace(/"/g, ''),
         mimeType: response.ContentType,
       };
-    } catch (error: any) {
-      if (error.name === 'NotFound' || error.$metadata?.httpStatusCode === 404) {
+    } catch (error: unknown) {
+      // Narrow to AWS SDK error shape (HeadObjectCommand's NotFound).
+      const awsError = error as { name?: string; $metadata?: { httpStatusCode?: number } };
+      if (awsError.name === 'NotFound' || awsError.$metadata?.httpStatusCode === 404) {
         return { exists: false };
       }
       throw error;

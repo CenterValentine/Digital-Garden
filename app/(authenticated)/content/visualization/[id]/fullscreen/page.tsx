@@ -19,6 +19,11 @@ import { FullscreenVisualizationWrapper } from "@/components/content/viewer/Full
 import { FullscreenDiagramsNetViewer } from "@/components/content/viewer/FullscreenDiagramsNetViewer";
 import { FullscreenExcalidrawViewer } from "@/components/content/viewer/FullscreenExcalidrawViewer";
 import { FullscreenMermaidViewer } from "@/components/content/viewer/FullscreenMermaidViewer";
+import type {
+  DiagramsNetConfig,
+  DiagramsNetData,
+  ExcalidrawData,
+} from "@/lib/domain/visualization/types";
 
 interface VisualizationFullscreenPageProps {
   params: Promise<{
@@ -60,8 +65,8 @@ export default async function VisualizationFullscreenPage({
         <FullscreenDiagramsNetViewer
           contentId={viz.id}
           title={viz.title}
-          config={payload.config as any}
-          data={payload.data as any}
+          config={payload.config as Partial<DiagramsNetConfig>}
+          data={payload.data as unknown as DiagramsNetData}
         />
       )}
 
@@ -69,8 +74,8 @@ export default async function VisualizationFullscreenPage({
         <FullscreenExcalidrawViewer
           contentId={viz.id}
           title={viz.title}
-          config={payload.config as any}
-          data={payload.data as any}
+          config={payload.config as Record<string, unknown>}
+          data={payload.data as unknown as ExcalidrawData}
           isReadOnly={isReadOnly}
           ownerNoteInfo={ownerNoteInfo}
         />
@@ -80,8 +85,8 @@ export default async function VisualizationFullscreenPage({
         <FullscreenMermaidViewer
           contentId={viz.id}
           title={viz.title}
-          config={payload.config as any}
-          data={payload.data as any}
+          config={payload.config as Record<string, unknown>}
+          data={payload.data as { source?: string }}
         />
       )}
     </FullscreenVisualizationWrapper>

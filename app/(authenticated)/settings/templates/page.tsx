@@ -121,30 +121,30 @@ function CategoryManager({ scope, title, description }: {
 
   return (
     <div
-      className="border border-white/10 rounded-lg p-6"
+      className="border border-black/10 dark:border-white/10 rounded-lg p-6"
       style={{
         background: glass0.background,
         backdropFilter: glass0.backdropFilter,
       }}
     >
       <h3 className="text-lg font-semibold mb-1">{title}</h3>
-      <p className="text-sm text-gray-400 mb-4">{description}</p>
+      <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">{description}</p>
 
       {isLoading ? (
-        <div className="text-sm text-gray-500">Loading...</div>
+        <div className="text-sm text-gray-500 dark:text-gray-400">Loading...</div>
       ) : (
         <>
           {/* Category list */}
           <div className="space-y-1.5 mb-4">
             {categories.length === 0 && (
-              <p className="text-sm text-gray-500 italic py-2">
+              <p className="text-sm text-gray-500 dark:text-gray-400 italic py-2">
                 No categories yet. Create one below.
               </p>
             )}
             {categories.map((cat) => (
               <div
                 key={cat.id}
-                className="flex items-center gap-2 p-2 rounded-lg border border-white/10 bg-white/[0.03] group"
+                className="flex items-center gap-2 p-2 rounded-lg border border-black/10 dark:border-white/10 bg-black/[0.025] dark:bg-white/[0.03] group"
               >
                 <GripVertical className="h-3.5 w-3.5 text-gray-600 shrink-0" />
 
@@ -159,7 +159,7 @@ function CategoryManager({ scope, title, description }: {
                         if (e.key === "Escape") setEditingId(null);
                       }}
                       autoFocus
-                      className="flex-1 px-2 py-1 bg-black/20 border border-white/20 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      className="flex-1 px-2 py-1 bg-black/20 border border-black/15 dark:border-white/20 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
                     />
                     <button
                       onClick={() => handleRename(cat.id)}
@@ -169,7 +169,7 @@ function CategoryManager({ scope, title, description }: {
                     </button>
                     <button
                       onClick={() => setEditingId(null)}
-                      className="p-1 rounded hover:bg-white/10 text-gray-400"
+                      className="p-1 rounded hover:bg-black/[0.05] dark:hover:bg-white/10 text-gray-600 dark:text-gray-400"
                     >
                       <X className="h-3.5 w-3.5" />
                     </button>
@@ -177,7 +177,7 @@ function CategoryManager({ scope, title, description }: {
                 ) : (
                   <>
                     <span className="flex-1 text-sm">{cat.name}</span>
-                    <span className="text-xs text-gray-500">
+                    <span className="text-xs text-gray-500 dark:text-gray-400">
                       {cat.itemCount} item{cat.itemCount !== 1 ? "s" : ""}
                     </span>
                     {!cat.isSystem && (
@@ -187,13 +187,13 @@ function CategoryManager({ scope, title, description }: {
                             setEditingId(cat.id);
                             setEditingName(cat.name);
                           }}
-                          className="p-1 rounded hover:bg-white/10 text-gray-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                          className="p-1 rounded hover:bg-black/[0.05] dark:hover:bg-white/10 text-gray-500 dark:text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity"
                         >
                           <Pencil className="h-3 w-3" />
                         </button>
                         <button
                           onClick={() => handleDelete(cat.id, cat.name)}
-                          className="p-1 rounded hover:bg-red-500/10 text-gray-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                          className="p-1 rounded hover:bg-red-500/10 text-gray-500 dark:text-gray-400 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
                         >
                           <Trash2 className="h-3 w-3" />
                         </button>
@@ -218,7 +218,7 @@ function CategoryManager({ scope, title, description }: {
                   handleCreate();
                 }
               }}
-              className="flex-1 px-3 py-2 bg-black/20 border border-white/10 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="flex-1 px-3 py-2 bg-black/20 border border-black/10 dark:border-white/10 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
             />
             <button
               onClick={handleCreate}
@@ -407,36 +407,36 @@ function PageTemplateManager() {
 
   return (
     <div
-      className="border border-white/10 rounded-lg p-6"
+      className="border border-black/10 dark:border-white/10 rounded-lg p-6"
       style={{
         background: glass0.background,
         backdropFilter: glass0.backdropFilter,
       }}
     >
       <h3 className="text-lg font-semibold mb-1">Page Templates</h3>
-      <p className="text-sm text-gray-400 mb-4">
+      <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
         Full-document blueprints that appear in the &quot;New &gt; Note&quot; menu. Save templates from the editor toolbar.
       </p>
 
       {isLoading ? (
-        <div className="text-sm text-gray-500">Loading...</div>
+        <div className="text-sm text-gray-500 dark:text-gray-400">Loading...</div>
       ) : (
         <>
           {/* Categories + Templates tree */}
           <div className="space-y-2 mb-4">
             {categories.length === 0 && templates.length === 0 && (
-              <p className="text-sm text-gray-500 italic py-2">
+              <p className="text-sm text-gray-500 dark:text-gray-400 italic py-2">
                 No page templates yet. Save one from the editor toolbar.
               </p>
             )}
 
             {templatesByCategory.map(({ category: cat, templates: catTemplates }) => (
-              <div key={cat.id} className="border border-white/10 rounded-lg overflow-hidden">
+              <div key={cat.id} className="border border-black/10 dark:border-white/10 rounded-lg overflow-hidden">
                 {/* Category header */}
-                <div className="flex items-center gap-2 p-2 bg-white/[0.03] group">
+                <div className="flex items-center gap-2 p-2 bg-black/[0.025] dark:bg-white/[0.03] group">
                   <button
                     onClick={() => toggleCategory(cat.id)}
-                    className="p-0.5 rounded hover:bg-white/10 text-gray-400"
+                    className="p-0.5 rounded hover:bg-black/[0.05] dark:hover:bg-white/10 text-gray-600 dark:text-gray-400"
                   >
                     {expandedCategories.has(cat.id) ? (
                       <ChevronDown className="h-3.5 w-3.5" />
@@ -456,7 +456,7 @@ function PageTemplateManager() {
                           if (e.key === "Escape") setEditingCatId(null);
                         }}
                         autoFocus
-                        className="flex-1 px-2 py-0.5 bg-black/20 border border-white/20 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        className="flex-1 px-2 py-0.5 bg-black/20 border border-black/15 dark:border-white/20 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
                       />
                       <button
                         onClick={() => handleRenameCategory(cat.id)}
@@ -466,7 +466,7 @@ function PageTemplateManager() {
                       </button>
                       <button
                         onClick={() => setEditingCatId(null)}
-                        className="p-1 rounded hover:bg-white/10 text-gray-400"
+                        className="p-1 rounded hover:bg-black/[0.05] dark:hover:bg-white/10 text-gray-600 dark:text-gray-400"
                       >
                         <X className="h-3.5 w-3.5" />
                       </button>
@@ -475,9 +475,9 @@ function PageTemplateManager() {
                     <>
                       <span className="flex-1 text-sm font-medium">{cat.name}</span>
                       {cat.isSystem && (
-                        <span className="text-[10px] text-gray-500 bg-white/5 px-1.5 py-0.5 rounded">System</span>
+                        <span className="text-[10px] text-gray-500 dark:text-gray-400 bg-black/[0.03] dark:bg-white/5 px-1.5 py-0.5 rounded">System</span>
                       )}
-                      <span className="text-xs text-gray-500">
+                      <span className="text-xs text-gray-500 dark:text-gray-400">
                         {catTemplates.length} template{catTemplates.length !== 1 ? "s" : ""}
                       </span>
                       {!cat.isSystem && (
@@ -487,13 +487,13 @@ function PageTemplateManager() {
                               setEditingCatId(cat.id);
                               setEditingCatName(cat.name);
                             }}
-                            className="p-1 rounded hover:bg-white/10 text-gray-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                            className="p-1 rounded hover:bg-black/[0.05] dark:hover:bg-white/10 text-gray-500 dark:text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity"
                           >
                             <Pencil className="h-3 w-3" />
                           </button>
                           <button
                             onClick={() => handleDeleteCategory(cat.id, cat.name)}
-                            className="p-1 rounded hover:bg-red-500/10 text-gray-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                            className="p-1 rounded hover:bg-red-500/10 text-gray-500 dark:text-gray-400 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
                           >
                             <Trash2 className="h-3 w-3" />
                           </button>
@@ -505,18 +505,18 @@ function PageTemplateManager() {
 
                 {/* Template list */}
                 {expandedCategories.has(cat.id) && (
-                  <div className="border-t border-white/5">
+                  <div className="border-t border-black/[0.04] dark:border-white/5">
                     {catTemplates.length === 0 ? (
-                      <p className="text-xs text-gray-500 italic py-2 px-4">
+                      <p className="text-xs text-gray-500 dark:text-gray-400 italic py-2 px-4">
                         No templates in this category
                       </p>
                     ) : (
                       catTemplates.map((tpl) => (
                         <div
                           key={tpl.id}
-                          className="flex items-center gap-2 px-4 py-1.5 border-t border-white/5 first:border-t-0 group/tpl"
+                          className="flex items-center gap-2 px-4 py-1.5 border-t border-black/[0.04] dark:border-white/5 first:border-t-0 group/tpl"
                         >
-                          <FileText className="h-3.5 w-3.5 text-gray-500 shrink-0" />
+                          <FileText className="h-3.5 w-3.5 text-gray-500 dark:text-gray-400 shrink-0" />
 
                           <>
                             <button
@@ -533,10 +533,10 @@ function PageTemplateManager() {
                               {tpl.title}
                             </button>
                             {tpl.isSystem && (
-                              <span className="text-[10px] text-gray-500 bg-white/5 px-1.5 py-0.5 rounded">System</span>
+                              <span className="text-[10px] text-gray-500 dark:text-gray-400 bg-black/[0.03] dark:bg-white/5 px-1.5 py-0.5 rounded">System</span>
                             )}
                             {tpl.usageCount > 0 && (
-                              <span className="text-[10px] text-gray-500">
+                              <span className="text-[10px] text-gray-500 dark:text-gray-400">
                                 used {tpl.usageCount}x
                               </span>
                             )}
@@ -544,14 +544,14 @@ function PageTemplateManager() {
                               <>
                                 <button
                                   onClick={() => setEditorTemplateId(tpl.id)}
-                                  className="p-1 rounded hover:bg-white/10 text-gray-500 opacity-0 group-hover/tpl:opacity-100 transition-opacity"
+                                  className="p-1 rounded hover:bg-black/[0.05] dark:hover:bg-white/10 text-gray-500 dark:text-gray-400 opacity-0 group-hover/tpl:opacity-100 transition-opacity"
                                   title="Edit page template"
                                 >
                                   <Pencil className="h-3 w-3" />
                                 </button>
                                 <button
                                   onClick={() => handleDeleteTemplate(tpl.id, tpl.title)}
-                                  className="p-1 rounded hover:bg-red-500/10 text-gray-500 hover:text-red-400 opacity-0 group-hover/tpl:opacity-100 transition-opacity"
+                                  className="p-1 rounded hover:bg-red-500/10 text-gray-500 dark:text-gray-400 hover:text-red-400 opacity-0 group-hover/tpl:opacity-100 transition-opacity"
                                 >
                                   <Trash2 className="h-3 w-3" />
                                 </button>
@@ -568,20 +568,20 @@ function PageTemplateManager() {
 
             {/* Orphaned templates (no matching category) */}
             {orphanedTemplates.length > 0 && (
-              <div className="border border-white/10 rounded-lg overflow-hidden">
-                <div className="flex items-center gap-2 p-2 bg-white/[0.03]">
+              <div className="border border-black/10 dark:border-white/10 rounded-lg overflow-hidden">
+                <div className="flex items-center gap-2 p-2 bg-black/[0.025] dark:bg-white/[0.03]">
                   <span className="flex-1 text-sm font-medium text-yellow-400/80">Uncategorized</span>
-                  <span className="text-xs text-gray-500">
+                  <span className="text-xs text-gray-500 dark:text-gray-400">
                     {orphanedTemplates.length} template{orphanedTemplates.length !== 1 ? "s" : ""}
                   </span>
                 </div>
-                <div className="border-t border-white/5">
+                <div className="border-t border-black/[0.04] dark:border-white/5">
                   {orphanedTemplates.map((tpl) => (
                     <div
                       key={tpl.id}
-                      className="flex items-center gap-2 px-4 py-1.5 border-t border-white/5 first:border-t-0 group/tpl"
+                      className="flex items-center gap-2 px-4 py-1.5 border-t border-black/[0.04] dark:border-white/5 first:border-t-0 group/tpl"
                     >
-                      <FileText className="h-3.5 w-3.5 text-gray-500 shrink-0" />
+                      <FileText className="h-3.5 w-3.5 text-gray-500 dark:text-gray-400 shrink-0" />
                       <button
                         type="button"
                         onClick={() => {
@@ -599,14 +599,14 @@ function PageTemplateManager() {
                         <>
                           <button
                             onClick={() => setEditorTemplateId(tpl.id)}
-                            className="p-1 rounded hover:bg-white/10 text-gray-500 opacity-0 group-hover/tpl:opacity-100 transition-opacity"
+                            className="p-1 rounded hover:bg-black/[0.05] dark:hover:bg-white/10 text-gray-500 dark:text-gray-400 opacity-0 group-hover/tpl:opacity-100 transition-opacity"
                             title="Edit page template"
                           >
                             <Pencil className="h-3 w-3" />
                           </button>
                           <button
                             onClick={() => handleDeleteTemplate(tpl.id, tpl.title)}
-                            className="p-1 rounded hover:bg-red-500/10 text-gray-500 hover:text-red-400 opacity-0 group-hover/tpl:opacity-100 transition-opacity"
+                            className="p-1 rounded hover:bg-red-500/10 text-gray-500 dark:text-gray-400 hover:text-red-400 opacity-0 group-hover/tpl:opacity-100 transition-opacity"
                           >
                             <Trash2 className="h-3 w-3" />
                           </button>
@@ -632,7 +632,7 @@ function PageTemplateManager() {
                   handleCreateCategory();
                 }
               }}
-              className="flex-1 px-3 py-2 bg-black/20 border border-white/10 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="flex-1 px-3 py-2 bg-black/20 border border-black/10 dark:border-white/10 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
             />
             <button
               onClick={handleCreateCategory}

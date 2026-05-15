@@ -103,7 +103,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     let username = extractUsername(input.email);
 
     // Check if username is taken and generate unique one if needed
-    let existingUsername = await prisma.user.findUnique({
+    const existingUsername = await prisma.user.findUnique({
       where: { username },
     });
 

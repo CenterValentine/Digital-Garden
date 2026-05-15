@@ -46,6 +46,7 @@ export const SlashCommandsList = forwardRef<SlashCommandsListRef, SlashCommandsL
     selectItem(selectedIndex);
   };
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- audited, see BACKLOG.md
   useEffect(() => setSelectedIndex(0), [props.items]);
 
   useImperativeHandle(ref, () => ({

@@ -174,7 +174,7 @@ export async function POST(request: NextRequest) {
     // Generate presigned URL for direct upload
     const presignedUrl = await generatePresignedUploadUrl(
       storageConfig.provider,
-      storageConfig.config,
+      storageConfig.config as Record<string, unknown>,
       storageKey,
       mimeType
     );
@@ -216,7 +216,7 @@ export async function POST(request: NextRequest) {
  */
 async function generatePresignedUploadUrl(
   provider: string,
-  config: any,
+  config: Record<string, unknown>,
   storageKey: string,
   mimeType: string
 ): Promise<string> {

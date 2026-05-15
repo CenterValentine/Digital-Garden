@@ -373,7 +373,7 @@ export function ChatPanel({ contentId }: ChatPanelProps) {
   if (!contentId) {
     return (
       <div className="flex h-full items-center justify-center p-4 text-center">
-        <div className="text-sm text-gray-400">
+        <div className="text-sm text-gray-600 dark:text-gray-400">
           Select content to start an AI chat
         </div>
       </div>
@@ -383,7 +383,7 @@ export function ChatPanel({ contentId }: ChatPanelProps) {
   return (
     <div className="flex h-full flex-col">
       {/* Header */}
-      <div className="flex shrink-0 items-center justify-between border-b border-white/10 px-3 py-2">
+      <div className="flex shrink-0 items-center justify-between border-b border-black/10 dark:border-white/10 px-3 py-2">
         <div className="flex items-center gap-2 text-sm text-gray-300">
           <Bot className="h-4 w-4 text-green-400" />
           <span className="font-medium">AI Chat</span>
@@ -394,14 +394,14 @@ export function ChatPanel({ contentId }: ChatPanelProps) {
               <button
                 onClick={handleSaveConversation}
                 title="Save conversation"
-                className="rounded p-1.5 text-gray-400 hover:bg-white/10 hover:text-white transition-colors"
+                className="rounded p-1.5 text-gray-600 dark:text-gray-400 hover:bg-black/[0.05] dark:hover:bg-white/10 hover:text-gray-900 dark:hover:text-white transition-colors"
               >
                 <Save className="h-3.5 w-3.5" />
               </button>
               <button
                 onClick={handleClear}
                 title="Clear chat"
-                className="rounded p-1.5 text-gray-400 hover:bg-white/10 hover:text-red-400 transition-colors"
+                className="rounded p-1.5 text-gray-600 dark:text-gray-400 hover:bg-black/[0.05] dark:hover:bg-white/10 hover:text-red-400 transition-colors"
               >
                 <Trash2 className="h-3.5 w-3.5" />
               </button>
@@ -477,10 +477,10 @@ export function ChatPanel({ contentId }: ChatPanelProps) {
 function EmptyState() {
   return (
     <div className="flex h-full flex-col items-center justify-center p-6 text-center">
-      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white/5 border border-white/10 mb-3">
+      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-black/[0.03] dark:bg-white/5 border border-black/10 dark:border-white/10 mb-3">
         <Bot className="h-6 w-6 text-gray-500" />
       </div>
-      <p className="text-sm font-medium text-gray-400">
+      <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
         How can I help?
       </p>
       <p className="mt-1 text-xs text-gray-600 max-w-48">

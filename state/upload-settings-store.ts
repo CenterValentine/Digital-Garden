@@ -40,21 +40,22 @@ export const useUploadSettingsStore = create<UploadSettingsStore>()(
     {
       name: 'upload-settings',
       version: 3,
-      migrate: (persistedState: any, version: number) => {
+      migrate: (persistedState: unknown, version: number) => {
+        const state = (persistedState as Record<string, unknown>) ?? {};
         if (version === 1) {
           return {
-            ...persistedState,
+            ...state,
             officeViewerMode: 'google-docs',
             onlyofficeServerUrl: null,
           };
         }
         if (version === 2) {
           return {
-            ...persistedState,
+            ...state,
             officeViewerMode: 'google-docs',
           };
         }
-        return persistedState;
+        return state;
       },
     }
   )

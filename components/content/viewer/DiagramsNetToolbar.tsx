@@ -47,7 +47,7 @@ export function DiagramsNetToolbar({
   isSaving,
 }: DiagramsNetToolbarProps) {
   return (
-    <div className="flex items-center justify-between border-t px-4 py-3 bg-gray-50">
+    <div className="flex items-center justify-between border-t border-black/10 dark:border-white/10 px-4 py-3 bg-gray-50 dark:bg-[#1a2530]">
       <div className="flex items-center gap-2">
         {/* Theme Selector */}
         <DropdownMenu>

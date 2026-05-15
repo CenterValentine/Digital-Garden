@@ -98,7 +98,7 @@ export function ConfirmDialog({
 
         {/* Content */}
         <Dialog.Content
-          className="fixed left-[50%] top-[50%] z-50 w-full max-w-md translate-x-[-50%] translate-y-[-50%] rounded-lg border border-white/10 bg-[#1a1a1a] p-6 shadow-lg data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%]"
+          className="fixed left-[50%] top-[50%] z-50 w-full max-w-md translate-x-[-50%] translate-y-[-50%] rounded-lg border border-black/10 dark:border-white/10 bg-[#1a1a1a] p-6 shadow-lg data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%]"
           onOpenAutoFocus={(e) => {
             // Focus the cancel button by default (safer)
             e.preventDefault();
@@ -127,7 +127,7 @@ export function ConfirmDialog({
           </div>
 
           {/* Description */}
-          <Dialog.Description className="text-sm text-gray-400 mb-6 ml-10 whitespace-pre-line">
+          <Dialog.Description className="text-sm text-gray-600 dark:text-gray-400 mb-6 ml-10 whitespace-pre-line">
             {description}
           </Dialog.Description>
 
@@ -141,7 +141,7 @@ export function ConfirmDialog({
                   onChange={(e) => checkbox.onChange(e.target.checked)}
                   className="h-4 w-4 rounded border border-white/20 bg-white/5 text-primary focus:ring-2 focus:ring-primary/50 cursor-pointer"
                 />
-                <span className="text-sm text-gray-300 group-hover:text-gray-200 transition-colors">
+                <span className="text-sm text-gray-700 dark:text-gray-300 group-hover:text-gray-200 transition-colors">
                   {checkbox.label}
                 </span>
               </label>
@@ -154,7 +154,7 @@ export function ConfirmDialog({
               <button
                 id="confirm-dialog-cancel"
                 onClick={handleCancel}
-                className="px-4 py-2 text-sm font-medium text-gray-300 hover:bg-white/5 rounded border border-white/10 transition-colors focus:outline-none focus:ring-2 focus:ring-white/20"
+                className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-white/5 rounded border border-black/10 dark:border-white/10 transition-colors focus:outline-none focus:ring-2 focus:ring-white/20"
               >
                 {cancelLabel}
               </button>

@@ -8,7 +8,7 @@
  */
 
 import { Extension } from "@tiptap/core";
-import { Plugin, PluginKey } from "@tiptap/pm/state";
+import { Plugin, PluginKey, Selection } from "@tiptap/pm/state";
 
 export const TaskListInputRule = Extension.create({
   name: "taskListInputRule",
@@ -50,7 +50,7 @@ export const TaskListInputRule = Extension.create({
 
                 tr.replaceWith(deleteFrom, deleteFrom, taskListNode);
                 tr.setSelection(
-                  (state.selection.constructor as any).near(tr.doc.resolve(deleteFrom + 2))
+                  Selection.near(tr.doc.resolve(deleteFrom + 2))
                 );
 
                 if (dispatch) {
@@ -132,21 +132,21 @@ export const TaskListInputRule = Extension.create({
 
                     // Set cursor position inside the new task item's paragraph
                     const newPos = tr.doc.resolve(updatedBulletListPos + 4); // taskList + taskItem + paragraph
-                    tr.setSelection((state.selection.constructor as any).near(newPos));
+                    tr.setSelection(Selection.near(newPos));
                   } else {
                     // Fallback: just position cursor in the taskItem
                     const newPos = tr.doc.resolve(listItemPosAfterDelete + 2);
-                    tr.setSelection((state.selection.constructor as any).near(newPos));
+                    tr.setSelection(Selection.near(newPos));
                   }
                 } else {
                   // Fallback: just position cursor in the taskItem
                   const newPos = tr.doc.resolve(listItemPosAfterDelete + 2);
-                  tr.setSelection((state.selection.constructor as any).near(newPos));
+                  tr.setSelection(Selection.near(newPos));
                 }
               } else {
                 // No bulletList conversion needed, just position cursor
                 const newPos = tr.doc.resolve(listItemPosAfterDelete + 2);
-                tr.setSelection((state.selection.constructor as any).near(newPos));
+                tr.setSelection(Selection.near(newPos));
               }
 
               if (dispatch) {

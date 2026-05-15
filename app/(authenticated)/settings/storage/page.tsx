@@ -26,7 +26,7 @@ export default function StorageSettingsPage() {
       </div>
 
       {/* Tab Navigation */}
-      <div className="border-b border-white/10">
+      <div className="border-b border-black/10 dark:border-white/10">
         <div className="flex gap-6">
           <button
             onClick={() => setActiveTab("providers")}
@@ -35,7 +35,7 @@ export default function StorageSettingsPage() {
               ${
                 activeTab === "providers"
                   ? "border-primary text-primary"
-                  : "border-transparent text-gray-400 hover:text-gray-300"
+                  : "border-transparent text-gray-600 dark:text-gray-400 hover:text-gray-300"
               }
             `}
           >
@@ -48,7 +48,7 @@ export default function StorageSettingsPage() {
               ${
                 activeTab === "backups"
                   ? "border-primary text-primary"
-                  : "border-transparent text-gray-400 hover:text-gray-300"
+                  : "border-transparent text-gray-600 dark:text-gray-400 hover:text-gray-300"
               }
             `}
           >
@@ -61,7 +61,7 @@ export default function StorageSettingsPage() {
               ${
                 activeTab === "usage"
                   ? "border-primary text-primary"
-                  : "border-transparent text-gray-400 hover:text-gray-300"
+                  : "border-transparent text-gray-600 dark:text-gray-400 hover:text-gray-300"
               }
             `}
           >

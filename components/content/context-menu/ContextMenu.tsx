@@ -72,6 +72,7 @@ function MenuAction({
     if (isInputMode && action.inlineInput) {
       // Pre-fill with placeholder value so user can accept as-is
       if (!inputValue && action.inlineInput.placeholder) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- audited, see BACKLOG.md
         setInputValue(action.inlineInput.placeholder);
       }
       setTimeout(() => {
@@ -300,6 +301,7 @@ function SubMenu({
   const nestedSubmenuCloseTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- audited, see BACKLOG.md
     setMounted(true);
   }, []);
 
@@ -476,6 +478,7 @@ export function ContextMenu({ actionProviders }: ContextMenuProps) {
   // Reset submenu state when menu closes
   useEffect(() => {
     if (!isOpen) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- audited, see BACKLOG.md
       setOpenSubmenu(null);
       setMenuPosition(null);
       // Clear any pending submenu close timeout
@@ -514,6 +517,7 @@ export function ContextMenu({ actionProviders }: ContextMenuProps) {
 
   // Set mounted state for portal rendering
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- audited, see BACKLOG.md
     setMounted(true);
   }, []);
 

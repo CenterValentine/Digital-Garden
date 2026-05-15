@@ -14,12 +14,16 @@ import {
   useCollaborationRuntime,
   getContentCollaborationCapability,
 } from "@/lib/domain/collaboration/runtime";
+import type {
+  DiagramsNetConfig,
+  DiagramsNetData,
+} from "@/lib/domain/visualization/types";
 
 interface FullscreenDiagramsNetViewerProps {
   contentId: string;
   title: string;
-  config: any;
-  data: any;
+  config?: Partial<DiagramsNetConfig>;
+  data?: DiagramsNetData;
 }
 
 export function FullscreenDiagramsNetViewer({

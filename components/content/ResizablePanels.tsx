@@ -65,6 +65,7 @@ export function ResizablePanels({ children }: ResizablePanelsProps) {
   useEffect(() => {
     if (prevPanelMode.current !== panelMode) {
       prevPanelMode.current = panelMode;
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- audited, see BACKLOG.md
       setIsPanelTransitioning(true);
       const timer = setTimeout(() => setIsPanelTransitioning(false), 280);
       return () => clearTimeout(timer);

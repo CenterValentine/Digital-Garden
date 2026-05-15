@@ -18,6 +18,7 @@
  * // result = { a: 1, b: { c: 4, d: 3 }, e: 5 }
  * ```
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- TODO(any-epic-phase-4): `Record<string, any>` allows callers with typed object shapes (e.g. UserSettings) to satisfy the generic constraint — narrowing to `unknown` breaks recursive calls inside this function and at call sites
 export function deepMerge<T extends Record<string, any>>(
   target: T,
   source: Partial<T>

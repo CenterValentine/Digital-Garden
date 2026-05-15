@@ -79,7 +79,7 @@ export function ModelPicker({
           {PROVIDER_CATALOG.map((provider) => (
             <div key={provider.id}>
               {/* Provider label */}
-              <div className="px-3 py-1.5 text-[10px] uppercase tracking-wider text-gray-500 font-medium border-b border-white/5">
+              <div className="px-3 py-1.5 text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 font-medium border-b border-white/5">
                 {provider.name}
               </div>
               {/* Model options */}
@@ -94,7 +94,7 @@ export function ModelPicker({
                       "flex w-full items-center justify-between px-3 py-2 text-left text-xs transition-colors",
                       isSelected
                         ? "bg-white/10 text-white"
-                        : "text-gray-400 hover:bg-white/5 hover:text-gray-200"
+                        : "text-gray-600 dark:text-gray-400 hover:bg-black/[0.04] hover:text-gray-800 dark:hover:bg-white/5 dark:hover:text-gray-200"
                     )}
                   >
                     <span className="truncate">{model.name}</span>
@@ -119,7 +119,7 @@ export function ModelPicker({
         disabled={disabled}
         className={cn(
           "flex w-full items-center gap-1.5 px-3 py-1.5 text-[11px]",
-          "text-gray-500 hover:text-gray-400 transition-colors",
+          "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-600 dark:text-gray-400 transition-colors",
           "disabled:opacity-50 disabled:cursor-not-allowed"
         )}
       >

@@ -6,19 +6,51 @@
  */
 
 import fs from 'fs/promises';
+import { statSync } from 'fs';
 import path from 'path';
 import os from 'os';
 import type { StorageProvider } from '@/lib/infrastructure/storage';
 import type { VideoMetadata, ProcessingOptions, ProcessingResult } from './types';
 
-// Lazy load FFmpeg to avoid bundling issues with Next.js
-let ffmpeg: any = null;
-let ffmpegInstaller: any = null;
+// Minimal subset of fluent-ffmpeg's API we use — keeps lazy-loaded module
+// references typed without pulling its full @types in.
+type FfprobeStream = {
+  codec_type?: string;
+  codec_name?: string;
+  width?: number;
+  height?: number;
+};
+type FfprobeMetadata = {
+  streams: FfprobeStream[];
+  format: { duration?: number; format_name?: string };
+};
+type FfmpegCommand = {
+  screenshots: (opts: {
+    timestamps: string[];
+    filename: string;
+    folder: string;
+    size: string;
+  }) => FfmpegCommand;
+  on: (event: string, cb: (arg?: Error) => void) => FfmpegCommand;
+};
+type FfmpegLib = {
+  (input: string): FfmpegCommand;
+  setFfmpegPath: (path: string) => void;
+  ffprobe: (
+    path: string,
+    cb: (err: Error | null, metadata: FfprobeMetadata) => void
+  ) => void;
+};
+type FfmpegInstaller = { path: string };
 
-async function ensureFFmpeg() {
+// Lazy load FFmpeg to avoid bundling issues with Next.js
+let ffmpeg: FfmpegLib | null = null;
+let ffmpegInstaller: FfmpegInstaller | null = null;
+
+async function ensureFFmpeg(): Promise<FfmpegLib> {
   if (!ffmpeg) {
-    ffmpeg = (await import('fluent-ffmpeg')).default;
-    ffmpegInstaller = (await import('@ffmpeg-installer/ffmpeg')).default;
+    ffmpeg = (await import('fluent-ffmpeg')).default as unknown as FfmpegLib;
+    ffmpegInstaller = (await import('@ffmpeg-installer/ffmpeg')).default as unknown as FfmpegInstaller;
     ffmpeg.setFfmpegPath(ffmpegInstaller.path);
   }
   return ffmpeg;
@@ -106,19 +138,19 @@ export class VideoProcessor {
     const ffmpegInstance = await ensureFFmpeg();
 
     return new Promise((resolve, reject) => {
-      ffmpegInstance.ffprobe(videoPath, (err: any, metadata: any) => {
+      ffmpegInstance.ffprobe(videoPath, (err: Error | null, metadata: FfprobeMetadata) => {
         if (err) {
           reject(new Error(`FFprobe failed: ${err.message}`));
           return;
         }
 
-        const videoStream = metadata.streams.find((s: any) => s.codec_type === 'video');
+        const videoStream = metadata.streams.find((s: FfprobeStream) => s.codec_type === 'video');
         if (!videoStream) {
           reject(new Error('No video stream found'));
           return;
         }
 
-        const stats = require('fs').statSync(videoPath);
+        const stats = statSync(videoPath);
 
         resolve({
           width: videoStream.width || 0,
@@ -150,7 +182,7 @@ export class VideoProcessor {
           size: '300x?', // Width 300, height auto
         })
         .on('end', () => resolve())
-        .on('error', (err: any) => reject(new Error(`Thumbnail generation failed: ${err.message}`)));
+        .on('error', (err?: Error) => reject(new Error(`Thumbnail generation failed: ${err?.message ?? "unknown"}`)));
     });
   }
 

@@ -25,6 +25,7 @@ export function FocusContentWorkspace({ contentId }: FocusContentWorkspaceProps)
       },
     });
     setCollapsed(true);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- audited, see BACKLOG.md
     setReady(true);
   }, [contentId, restoreWorkspace, setCollapsed]);
 

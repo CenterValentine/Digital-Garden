@@ -477,7 +477,7 @@ export async function PATCH(
         displayName: updated.displayName,
         slug: updated.slug,
         primaryGroupId: updated.primaryGroupId,
-        primaryGroupName: (updated as any).primaryGroup?.name ?? null,
+        primaryGroupName: (updated as { primaryGroup?: { name?: string } | null }).primaryGroup?.name ?? null,
         metadata: {
           contentView: readContentViewMetadata(asObject(updated.metadata)),
         },

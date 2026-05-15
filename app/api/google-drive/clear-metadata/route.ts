@@ -8,6 +8,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/infrastructure/auth/session";
 import { prisma } from "@/lib/database/client";
+import type { Prisma } from "@/lib/database/generated/prisma";
 
 interface ClearMetadataRequest {
   contentId: string;
@@ -48,14 +49,14 @@ export async function POST(request: NextRequest) {
     }
 
     // Remove Google Drive metadata
-    const metadata = filePayload.storageMetadata as any;
+    const metadata = filePayload.storageMetadata as { externalProviders?: { googleDrive?: unknown } } | null;
     if (metadata?.externalProviders?.googleDrive) {
       delete metadata.externalProviders.googleDrive;
 
       // Update database
       await prisma.filePayload.update({
         where: { contentId },
-        data: { storageMetadata: metadata },
+        data: { storageMetadata: metadata as unknown as Prisma.InputJsonValue },
       });
 
       console.log("[Clear Metadata] Removed Google Drive metadata for:", contentId);

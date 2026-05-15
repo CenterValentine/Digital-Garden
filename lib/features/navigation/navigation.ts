@@ -85,10 +85,10 @@ export async function getNavigationTree(
 
   // Get all categories for this user, ordered by displayOrder (with id as tiebreaker)
   // Handle anonymous users (guests) by not filtering by ownerId
-  const categoryWhere: any = {
+  const categoryWhere: { isPublished?: boolean; ownerId?: string } = {
     ...publishedFilter,
   };
-  
+
   // Only filter by ownerId if user is authenticated (not anonymous)
   if (userId !== "anonymous") {
     categoryWhere.ownerId = userId;
@@ -115,36 +115,34 @@ export async function getNavigationTree(
   });
 
   // Transform to navigation format with preset calculations
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const navCategories: NavigationCategory[] = categories.map(
-    (category: any) => {
-      const childCount = category.contentNodes?.length || 0;
-      const presetData = calculatePresetFromChildCount(
-        childCount,
-        null // branchPreset field no longer exists
-      );
+   
+  const navCategories: NavigationCategory[] = categories.map((category) => {
+    const childCount = category.contentNodes?.length || 0;
+    const presetData = calculatePresetFromChildCount(
+      childCount,
+      null // branchPreset field no longer exists
+    );
 
-      return {
-        id: category.id,
-        name: category.name,
-        slug: category.slug,
-        description: category.description,
-        displayOrder: category.displayOrder,
-        branchPreset: null,
-        isPublished: category.isPublished,
-        // Map ContentNodes to documents for backwards compatibility
-        documents: (category.contentNodes || []).map((node: any) => ({
-          id: node.id,
-          title: node.title,
-          slug: node.slug || `node-${node.id}`,
-          docType: node.contentType || 'note',
-          displayOrder: node.displayOrder,
-          children: [], // ContentNodes use hierarchical structure via parentId
-        })),
-        ...presetData,
-      };
-    }
-  );
+    return {
+      id: category.id,
+      name: category.name,
+      slug: category.slug,
+      description: category.description,
+      displayOrder: category.displayOrder,
+      branchPreset: null,
+      isPublished: category.isPublished,
+      // Map ContentNodes to documents for backwards compatibility
+      documents: (category.contentNodes || []).map((node) => ({
+        id: node.id,
+        title: node.title,
+        slug: node.slug || `node-${node.id}`,
+        docType: node.contentType || 'note',
+        displayOrder: node.displayOrder,
+        children: [], // ContentNodes use hierarchical structure via parentId
+      })),
+      ...presetData,
+    };
+  });
 
   return {
     categories: navCategories,

@@ -59,6 +59,7 @@ export function PropertiesPanel() {
   // Look up block definition when selection changes
   useEffect(() => {
     if (!selectedBlockType) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- audited, see BACKLOG.md
       setDefinition(null);
       setFields([]);
       setAttrs({});

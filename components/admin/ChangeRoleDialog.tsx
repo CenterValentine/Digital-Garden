@@ -82,7 +82,7 @@ export function ChangeRoleDialog({
           {/* New Role Select */}
           <div>
             <Label htmlFor="new-role">New Role</Label>
-            <Select value={newRole} onValueChange={(value) => setNewRole(value as any)}>
+            <Select value={newRole} onValueChange={(value) => setNewRole(value as typeof newRole)}>
               <SelectTrigger id="new-role" className="mt-1">
                 <SelectValue />
               </SelectTrigger>

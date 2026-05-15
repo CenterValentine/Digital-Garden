@@ -12,7 +12,7 @@ const REVIEW_MODES: Array<{ value: FlashcardReviewMode; label: string }> = [
   { value: "random", label: "Random" },
 ];
 const MENU_SELECT_CLASS =
-  "w-full rounded-md border border-white/20 bg-gray-900/95 px-3 py-2 text-gray-100 shadow-sm outline-none transition-colors hover:bg-white/10 focus:border-gold-primary focus:bg-gray-900";
+  "w-full rounded-md border border-black/15 dark:border-white/20 bg-white dark:bg-gray-900/95 px-3 py-2 text-gray-900 dark:text-gray-100 shadow-sm outline-none transition-colors hover:bg-black/[0.05] dark:hover:bg-white/10 focus:border-gold-primary focus:bg-gray-50 dark:focus:bg-gray-900";
 
 export default function FlashcardsSettingsDialog() {
   const flashcards = useSettingsStore((state) => state.flashcards);
@@ -62,51 +62,51 @@ export default function FlashcardsSettingsDialog() {
             Built-in extension
           </span>
         </div>
-        <h2 className="mt-3 text-4xl font-semibold tracking-tight text-white">
+        <h2 className="mt-3 text-4xl font-semibold tracking-tight text-gray-900 dark:text-white">
           Flashcards
         </h2>
-        <p className="mt-3 max-w-3xl text-base text-gray-400">
+        <p className="mt-3 max-w-3xl text-base text-gray-600 dark:text-gray-400">
           Set defaults for quick card creation and review flow.
         </p>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
-        <label className="space-y-2 text-sm text-gray-300">
+        <label className="space-y-2 text-sm text-gray-700 dark:text-gray-300">
           Default Front Label
           <input
             value={defaultFrontLabel}
             onChange={(event) => setDefaultFrontLabel(event.target.value)}
-            className="w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-white outline-none focus:border-gold-primary"
+            className="w-full rounded-md border border-black/10 dark:border-white/10 bg-black/[0.03] dark:bg-white/5 px-3 py-2 text-gray-900 dark:text-white outline-none focus:border-gold-primary"
           />
         </label>
-        <label className="space-y-2 text-sm text-gray-300">
+        <label className="space-y-2 text-sm text-gray-700 dark:text-gray-300">
           Default Back Label
           <input
             value={defaultBackLabel}
             onChange={(event) => setDefaultBackLabel(event.target.value)}
-            className="w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-white outline-none focus:border-gold-primary"
+            className="w-full rounded-md border border-black/10 dark:border-white/10 bg-black/[0.03] dark:bg-white/5 px-3 py-2 text-gray-900 dark:text-white outline-none focus:border-gold-primary"
           />
         </label>
-        <label className="space-y-2 text-sm text-gray-300">
+        <label className="space-y-2 text-sm text-gray-700 dark:text-gray-300">
           Last Used Skill
           <input
             value={lastUsedCategory}
             onChange={(event) => setLastUsedCategory(event.target.value)}
-            className="w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-white outline-none focus:border-gold-primary"
+            className="w-full rounded-md border border-black/10 dark:border-white/10 bg-black/[0.03] dark:bg-white/5 px-3 py-2 text-gray-900 dark:text-white outline-none focus:border-gold-primary"
           />
         </label>
-        <label className="space-y-2 text-sm text-gray-300">
+        <label className="space-y-2 text-sm text-gray-700 dark:text-gray-300">
           Last Used Skill Category
           <input
             value={lastUsedSubcategory}
             onChange={(event) => setLastUsedSubcategory(event.target.value)}
             placeholder="Optional"
-            className="w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-white outline-none focus:border-gold-primary"
+            className="w-full rounded-md border border-black/10 dark:border-white/10 bg-black/[0.03] dark:bg-white/5 px-3 py-2 text-gray-900 dark:text-white outline-none focus:border-gold-primary"
           />
         </label>
       </div>
 
-      <label className="block max-w-sm space-y-2 text-sm text-gray-300">
+      <label className="block max-w-sm space-y-2 text-sm text-gray-700 dark:text-gray-300">
         Default Review Mode
         <select
           value={defaultReviewMode}

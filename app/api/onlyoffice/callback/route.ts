@@ -32,9 +32,9 @@ interface OnlyOfficeCallback {
   filetype?: string;
   forcesavetype?: number;
   users?: string[];
-  actions?: any[];
+  actions?: unknown[];
   changesurl?: string;
-  history?: any;
+  history?: unknown;
 }
 
 export async function POST(request: NextRequest) {

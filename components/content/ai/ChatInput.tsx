@@ -76,6 +76,7 @@ export function ChatInput({
 
   // Reset selected index when items change
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- audited, see BACKLOG.md
     setSelectedIndex(0);
   }, [mentionResults, filteredCommands]);
 
@@ -121,7 +122,7 @@ export function ChatInput({
         }
       });
     },
-    [value, onChange, closeSuggestions, suggestionMode]
+    [value, onChange, closeSuggestions, suggestionMode, onMentionInserted]
   );
 
   const handleSubmit = useCallback(
@@ -264,7 +265,7 @@ export function ChatInput({
   return (
     <form
       onSubmit={handleSubmit}
-      className="flex items-end gap-2 border-t border-white/10 bg-black/20 p-3"
+      className="flex items-end gap-2 border-t border-black/10 dark:border-white/10 bg-black/20 p-3"
     >
       {/* Text input with suggestion menu */}
       <div className="relative flex-1">
@@ -286,7 +287,7 @@ export function ChatInput({
           disabled={disabled || isActive}
           rows={1}
           className={cn(
-            "w-full resize-none rounded-xl border border-white/10 bg-white/[0.08] px-3.5 py-2.5",
+            "w-full resize-none rounded-xl border border-black/10 dark:border-white/10 bg-white/[0.08] px-3.5 py-2.5",
             "text-sm text-white placeholder-gray-500",
             "focus:border-white/20 focus:outline-none focus:ring-1 focus:ring-white/10",
             "disabled:opacity-50 disabled:cursor-not-allowed",

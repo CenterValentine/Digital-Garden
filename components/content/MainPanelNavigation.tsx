@@ -73,7 +73,7 @@ const NavigationButtons = memo(function NavigationButtons({
         onMouseUp={onBackMouseUp}
         onMouseLeave={onBackMouseLeave}
         disabled={!canGoBack}
-        className="rounded p-1 hover:bg-white/10 active:bg-white/5 focus:outline-none disabled:cursor-not-allowed disabled:opacity-30"
+        className="rounded p-1 hover:bg-black/10 active:bg-black/5 focus:outline-none disabled:cursor-not-allowed disabled:opacity-30 dark:hover:bg-white/10 dark:active:bg-white/5"
         title="Go back • Hold for history"
       >
         <ChevronLeft className="h-4 w-4" />
@@ -81,7 +81,7 @@ const NavigationButtons = memo(function NavigationButtons({
       <button
         onClick={onForwardClick}
         disabled={!canGoForward}
-        className="rounded p-1 hover:bg-white/10 active:bg-white/5 focus:outline-none disabled:cursor-not-allowed disabled:opacity-30"
+        className="rounded p-1 hover:bg-black/10 active:bg-black/5 focus:outline-none disabled:cursor-not-allowed disabled:opacity-30 dark:hover:bg-white/10 dark:active:bg-white/5"
         title="Go forward"
       >
         <ChevronRight className="h-4 w-4" />

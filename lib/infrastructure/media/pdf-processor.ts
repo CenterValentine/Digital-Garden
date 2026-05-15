@@ -61,14 +61,14 @@ export class PDFProcessor {
         thumbnailKeys.push(thumbnailKey);
       }
 
-      const info = metadata.info as Record<string, any> | undefined;
+      const info = metadata.info as Record<string, unknown> | undefined;
       const pdfMetadata: PDFMetadata = {
         pageCount,
         size: buffer.length,
         thumbnail: thumbnailUrl,
-        author: info?.Author || undefined,
-        title: info?.Title || undefined,
-        createdDate: info?.CreationDate || undefined,
+        author: (info?.Author as string | undefined) || undefined,
+        title: (info?.Title as string | undefined) || undefined,
+        createdDate: (info?.CreationDate as string | undefined) || undefined,
       };
 
       return {
@@ -84,6 +84,7 @@ export class PDFProcessor {
   /**
    * Generate thumbnail from first page of PDF
    */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- TODO(any-epic-phase-4): pdfjs-dist types are not bundled — narrow `pdf` to PDFDocumentProxy once @types/pdfjs-dist is added
   private async generatePDFThumbnail(pdf: any): Promise<Buffer> {
     // Get first page
     const page = await pdf.getPage(1);

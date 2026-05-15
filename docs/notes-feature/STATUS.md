@@ -1,5 +1,5 @@
 ---
-last_updated: 2026-05-04
+last_updated: 2026-05-13
 current_epoch: 13
 current_sprint: 58
 sprint_status: planned
@@ -52,6 +52,23 @@ before planning and executing. There may be additions or modifications.
 **Detailed Plan**: `docs/notes-feature/work-tracking/epochs/epoch-13-people-and-collaboration.md`
 
 ## Recent Completions (Last 30 Days)
+
+**May 13, 2026**: Dark Mode epoch — COMPLETE
+- Foundation: theme provider, `useResolvedTheme()` hook, FOUC-prevention inline script reading `notes:settings` from localStorage, `suppressHydrationWarning` on `<html>` to handle pre-hydration class application
+- Settings UI: light/dark/system radio in `/settings/preferences` with live "currently dark/light" indicator
+- Editor surface retrofit: `MainPanelWorkspace`, `MainPanelContent`, `MainPanelHeader`, `MainPanelNavigation`, file tree, content toolbar, root node header
+- ProseMirror prose CSS: body text, placeholder, headings (muted gold light → neon gold dark), blockquote, all 5 callout types, wiki-links, block system, tables (brand-aligned shale/gold instead of grayscale)
+- Block dark mode: section header, card panel, divider, accordion, tabs (gold-primary active tab), list container, periodic summary, unsupported content, habit tracker, stopwatch, calendar block (slate parchment notebook aesthetic)
+- Liquid Glass surfaces refactored to CSS variables — `getSurfaceStyles()` now returns `var(--surface-glass-N-bg)` etc., auto-swapping via cascade across all 42 callsites without per-callsite changes
+- Defined the previously-undefined `--text-primary`/`--text-secondary`/`--text-tertiary`/`--border-secondary`/`--surface-input` semantic vars in both `:root` and `.dark` — force-multiplier fix covering ~20 block CSS callsites
+- Third-party viewer theme propagation: Mermaid, Excalidraw, DiagramsNet (override-beats-global preserved), OnlyOffice all wired to `useResolvedTheme()`
+- Long-tail retrofit: dialogs (page template, category move, people profile/create/workspace/mount-picker), sidebar headers, settings pages (preferences, calendar, templates, api, mcp, storage, export), admin pages (users, content, audit-logs, collab-doc), AI surfaces (chat panel, messages, input, snippet/suggestion menus, model picker), flashcards (panel, review overlay, quick add form, settings dialog), common surfaces (confirm dialog, navigation history, left sidebar collapsed, file node, backlinks panel)
+- Flashcard polish: flip animation now has easeOutBack rotateY curve with mid-flip scale dip and shadow color shift; edit affordance minimized to a transparent icon-only button revealed via group-hover
+- Auth pages: home, sign-in, sign-up retrofitted for both themes
+- Playwright e2e harness scaffolded: operational dark-mode coverage (4 signed-out routes, 8 baseline snapshots) + 10 non-operational stubs across 6 regression categories (auth, editor, file-tree, content, search, extensions). `pnpm test:e2e`, `:e2e:update`, `:e2e:report` scripts wired. `tests/e2e/README.md` documents conventions.
+- Sprint A.0 dev toggle and Sprint C.6 cleanup: removed `components/dev/DevThemeToggle.tsx` after production toggle confirmed working
+- Slash command bug discovered + fixed during dark mode visual QA: missing client registration of `ExcalidrawBlock` and `MermaidBlock` in `extensions-client.ts`, plus restructured to create-then-insert pattern to avoid collab sync race
+- Branch: `feature/dark-mode`. `pnpm build`, `pnpm collab:schema:check`, `pnpm typecheck` all pass
 
 **May 4, 2026**: Browser overlay, associated content, and web notes foundation
 - Added canonical-first webpage identity with new `WebResource`, `WebResourceContentLink`, and `WebResourceViewState` models plus `ExternalPayload.webResourceId`

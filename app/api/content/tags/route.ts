@@ -13,6 +13,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/database/client";
 import { requireAuth } from "@/lib/infrastructure/auth/middleware";
+import type { Prisma } from "@/lib/database/generated/prisma";
 
 export async function GET(request: NextRequest) {
   try {
@@ -21,7 +22,7 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get("search") || "";
 
     // Build where clause with optional search
-    const where: any = {
+    const where: Prisma.TagWhereInput = {
       userId: session.user.id,
     };
 

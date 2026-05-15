@@ -16,12 +16,19 @@
  *   unlinked   — contentId is null; shows a "Create drawing" prompt
  */
 
-import { Node, mergeAttributes } from "@tiptap/core";
+import { Node, mergeAttributes, type Editor } from "@tiptap/core";
 import { z } from "zod";
 import type * as Y from "yjs";
+import type { Root as ReactRoot } from "react-dom/client";
 import { createBlockSchema } from "@/lib/domain/blocks/schema";
 import { registerBlock } from "@/lib/domain/blocks/registry";
 import { createBlockNodeView } from "@/lib/domain/blocks/node-view-factory";
+import { consumePendingDiagramCreate } from "./pending-diagram-creates";
+
+type BlockContentDom = HTMLElement & {
+  __cleanup?: () => void;
+  __reactRoot?: ReactRoot;
+};
 
 /**
  * Sub-map naming convention — kept in one place so server (documents.ts) and
@@ -45,15 +52,13 @@ const pendingCreateBlockIds = new Set<string>();
  * is reliable *at NodeView mount time*, which a useEffect-populated
  * editor.storage.noteYdoc is not (useEffect runs after the first render).
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function resolveNoteYdoc(editor: any): Y.Doc | null {
+function resolveNoteYdoc(editor: Editor): Y.Doc | null {
   try {
     const ext = editor?.extensionManager?.extensions?.find(
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (e: any) => e.name === "collaboration"
+      (e: { name: string }) => e.name === "collaboration"
     );
-    const doc = ext?.options?.document ?? null;
-    return doc as Y.Doc | null;
+    const doc = (ext?.options as { document?: Y.Doc } | undefined)?.document ?? null;
+    return doc ?? null;
   } catch {
     return null;
   }
@@ -182,16 +187,16 @@ export const ExcalidrawBlock = Node.create({
 
       updateContent(node, contentDom, editor, getPos) {
         // Run cleanup (unmount + runtime release) before clearing DOM
-        const cleanup = (contentDom as any).__cleanup;
+        const cleanup = (contentDom as BlockContentDom).__cleanup;
         if (cleanup) {
           try { cleanup(); } catch {}
-          delete (contentDom as any).__cleanup;
+          delete (contentDom as BlockContentDom).__cleanup;
         }
         // Also unmount any root not yet cleaned up
-        const existingRoot = (contentDom as any).__reactRoot;
+        const existingRoot = (contentDom as BlockContentDom).__reactRoot;
         if (existingRoot) {
           try { existingRoot.unmount(); } catch {}
-          delete (contentDom as any).__reactRoot;
+          delete (contentDom as BlockContentDom).__reactRoot;
         }
         contentDom.innerHTML = "";
         renderExcalidrawBlock(node.attrs as ExcalidrawBlockAttrs, contentDom, editor, getPos);
@@ -278,14 +283,34 @@ interface ExcalidrawBlockAttrs {
 function renderExcalidrawBlock(
   attrs: ExcalidrawBlockAttrs,
   contentDom: HTMLElement,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  editor: any,
+  editor: Editor,
   getPos: (() => number | undefined) | undefined
 ) {
   contentDom.className = "block-excalidraw-content";
   // Prevent right-clicks inside the Excalidraw canvas from bubbling up to
   // TipTap's onContextMenu handler and showing the app's editor context menu.
   contentDom.addEventListener("contextmenu", (e) => e.stopPropagation());
+
+  // ── Pending-create pickup: if a prior MarkdownEditor listener completed
+  // the POST while we were unmounted (Fast Refresh, navigation, etc.), the
+  // contentId is waiting for us in the shared map. Apply it via our own
+  // fresh getPos and let the next render handle the expanded state.
+  if (!attrs.contentId && attrs.blockId && getPos) {
+    const pending = consumePendingDiagramCreate(attrs.blockId);
+    if (pending) {
+      const pos = getPos();
+      if (pos !== undefined) {
+        editor.view.dispatch(
+          editor.state.tr.setNodeMarkup(pos, undefined, {
+            ...attrs,
+            contentId: pending.contentId,
+            expanded: pending.expanded,
+          })
+        );
+        return; // The setNodeMarkup will trigger a fresh render with the new attrs.
+      }
+    }
+  }
 
   // ── Unlinked state: auto-create immediately, show spinner ─────────────
   if (!attrs.contentId) {
@@ -412,7 +437,7 @@ function renderExcalidrawBlock(
       import("@/components/content/viewer/ExcalidrawViewer"),
     ]).then(([React, ReactDOM, { ExcalidrawViewer }]) => {
       const root = ReactDOM.createRoot(mountEl);
-      (contentDom as any).__reactRoot = root;
+      (contentDom as BlockContentDom).__reactRoot = root;
 
       const el = React.createElement(ExcalidrawViewer, {
         contentId: attrs.contentId!,
@@ -426,7 +451,7 @@ function renderExcalidrawBlock(
 
       // Defer unmount — synchronous unmount during a React render cycle throws
       // "Attempted to synchronously unmount a root while React was already rendering".
-      (contentDom as any).__cleanup = () => {
+      (contentDom as BlockContentDom).__cleanup = () => {
         queueMicrotask(() => { try { root.unmount(); } catch {} });
       };
     }).catch(console.error);

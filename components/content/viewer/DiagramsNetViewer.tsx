@@ -28,12 +28,13 @@ import { DiagramsNetEditor, type DiagramsNetEditorHandle } from "./DiagramsNetEd
 import { DiagramsNetToolbar } from "./DiagramsNetToolbar";
 import type { DiagramsNetConfig, DiagramsNetData, DiagramsNetTheme } from "@/lib/domain/visualization/types";
 import type { CollaborationRuntimeHandle } from "@/lib/domain/collaboration/runtime";
+import { useResolvedTheme } from "@/lib/features/theme";
 
 // Transaction origin tag for local edits — lets the Y.js observer skip its own writes.
 const LOCAL_ORIGIN = "diagramsnet-local";
 
 // Debounce utility
-function debounce<T extends (...args: any[]) => any>(
+function debounce<T extends (...args: unknown[]) => unknown>(
   func: T,
   wait: number
 ): (...args: Parameters<T>) => void {
@@ -68,9 +69,25 @@ export function DiagramsNetViewer({
   const [isModified, setIsModified] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
+  const resolvedTheme = useResolvedTheme();
+  // Per-diagram theme override beats the global app theme. If config.theme
+  // is set, the user has explicitly pinned this diagram to a theme; otherwise
+  // default to the global app theme ("dark" → DiagramsNet "dark", "light" →
+  // "kennedy" which is the canonical light theme).
   const [theme, setTheme] = useState<DiagramsNetTheme>(
-    (config.theme as DiagramsNetTheme) || "kennedy"
+    (config.theme as DiagramsNetTheme) || (resolvedTheme === "dark" ? "dark" : "kennedy")
   );
+  // Session-scoped manual override flag. Set true when the user picks a theme
+  // from the toolbar — that pin wins over future global theme flips. Cleared
+  // on unmount. To reset, user picks "match app" from the toolbar (future UX).
+  const userOverrideRef = useRef(false);
+
+  // Track global theme when no persistent or session override is set.
+  useEffect(() => {
+    if (userOverrideRef.current) return;
+    if (config.theme) return;
+    setTheme(resolvedTheme === "dark" ? "dark" : "kennedy");
+  }, [resolvedTheme, config.theme]);
 
   // Ref to the editor's imperative handle so we can push remote updates into
   // the live iframe without re-triggering React state (which can't send
@@ -88,10 +105,10 @@ export function DiagramsNetViewer({
         await onSave?.(newXml);
         setLastSaved(new Date());
         setIsModified(false);
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.error("Diagrams.net save failed:", error);
         toast.error("Failed to save diagram", {
-          description: error.message || "Could not save changes to database",
+          description: (error instanceof Error ? error.message : null) || "Could not save changes to database",
         });
       } finally {
         setIsSaving(false);
@@ -144,7 +161,7 @@ export function DiagramsNetViewer({
     if (!ydoc) return;
 
     const ydocDiagram = ydoc.getMap<string>("diagram");
-    const dbg = () => (window as any).__dg_debug;
+    const dbg = () => (window as Window & { __dg_debug?: boolean }).__dg_debug;
 
     // Seed from Y.js if the shared doc already has content, otherwise seed
     // Y.js from the database snapshot so latecomers see the latest state.
@@ -184,7 +201,7 @@ export function DiagramsNetViewer({
   // Stable identity so DiagramsNetEditor's [onChange]-dep useEffect doesn't
   // re-register its message listener on every render.
   const handleChange = useCallback((newXml: string) => {
-    const dbg = () => (window as any).__dg_debug;
+    const dbg = () => (window as Window & { __dg_debug?: boolean }).__dg_debug;
     if (dbg()) console.log("[dg/diagrams-net] local change, len=", newXml.length);
     xmlRef.current = newXml;
     setXml(newXml);
@@ -210,8 +227,10 @@ export function DiagramsNetViewer({
     }
   };
 
-  // Theme change → Update local state and re-render iframe
+  // Theme change → Update local state and re-render iframe. Mark as a
+  // session override so subsequent app-theme flips don't overwrite it.
   const handleThemeChange = (newTheme: DiagramsNetTheme) => {
+    userOverrideRef.current = true;
     setTheme(newTheme);
     toast.success(`Theme changed to ${newTheme}`);
   };
@@ -255,10 +274,10 @@ export function DiagramsNetViewer({
       document.body.removeChild(link);
       setTimeout(() => URL.revokeObjectURL(url), 100);
       toast.success(`Exported as ${format.toUpperCase()}`);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Export failed:", error);
       toast.error("Export failed", {
-        description: error.message || `Could not export as ${format.toUpperCase()}`,
+        description: (error instanceof Error ? error.message : null) || `Could not export as ${format.toUpperCase()}`,
       });
     }
   };

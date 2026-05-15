@@ -62,10 +62,10 @@ export async function POST(request: NextRequest) {
     //     'Content-Disposition': `attachment; filename="diagram.${format}"`,
     //   },
     // });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("[Diagrams.net Export] Error:", error);
     return NextResponse.json(
-      { error: "Export failed", details: error.message },
+      { error: "Export failed", details: error instanceof Error ? error.message : String(error) },
       { status: 500 }
     );
   }

@@ -7,6 +7,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import type { Prisma } from "@/lib/database/generated/prisma";
 import { prisma } from "@/lib/database/client";
 import { requireAuth } from "@/lib/infrastructure/auth/middleware";
 import { getOptionalBrowserExtensionBearerAuth } from "@/lib/domain/browser-bookmarks/http";
@@ -31,6 +32,7 @@ import type {
   ContentDetailResponse,
   UpdateContentRequest,
 } from "@/lib/domain/content/api-types";
+import type { StoredChatMessage } from "@/lib/domain/ai/types";
 
 type Params = Promise<{ id: string }>;
 
@@ -95,11 +97,11 @@ function formatExternalResponse(payload: {
     sourceHostname: payload.sourceHostname,
     faviconUrl: payload.faviconUrl,
     preserveHtml: payload.preserveHtml,
-    preservedHtmlSnapshot: payload.preservedHtmlSnapshot as any,
+    preservedHtmlSnapshot: payload.preservedHtmlSnapshot as Record<string, unknown> | null,
     preservedHtmlCapturedAt: payload.preservedHtmlCapturedAt,
-    captureMetadata: payload.captureMetadata as any,
-    matchMetadata: payload.matchMetadata as any,
-    preview: payload.preview as any,
+    captureMetadata: payload.captureMetadata as Record<string, unknown>,
+    matchMetadata: payload.matchMetadata as Record<string, unknown>,
+    preview: payload.preview as Record<string, unknown>,
   };
 }
 
@@ -183,9 +185,9 @@ export async function GET(
     // Include full payload data
     if (content.notePayload) {
       response.note = {
-        tiptapJson: content.notePayload.tiptapJson as any,
+        tiptapJson: content.notePayload.tiptapJson as Record<string, unknown>,
         searchText: content.notePayload.searchText,
-        metadata: content.notePayload.metadata as any,
+        metadata: content.notePayload.metadata as Record<string, unknown>,
       };
     }
     if (content.filePayload) {
@@ -198,7 +200,7 @@ export async function GET(
         storageProvider: content.filePayload.storageProvider,
         storageKey: content.filePayload.storageKey,
         storageUrl: content.filePayload.storageUrl,
-        storageMetadata: content.filePayload.storageMetadata as any,
+        storageMetadata: content.filePayload.storageMetadata as Record<string, unknown>,
         uploadStatus: content.filePayload.uploadStatus,
         uploadedAt: content.filePayload.uploadedAt,
         uploadError: content.filePayload.uploadError,
@@ -212,8 +214,8 @@ export async function GET(
       response.html = {
         html: content.htmlPayload.html,
         isTemplate: content.htmlPayload.isTemplate,
-        templateSchema: content.htmlPayload.templateSchema as any,
-        templateMetadata: content.htmlPayload.templateMetadata as any,
+        templateSchema: content.htmlPayload.templateSchema as Record<string, unknown>,
+        templateMetadata: content.htmlPayload.templateMetadata as Record<string, unknown>,
         renderMode: content.htmlPayload.renderMode,
         templateEngine: content.htmlPayload.templateEngine,
       };
@@ -222,7 +224,7 @@ export async function GET(
       response.code = {
         code: content.codePayload.code,
         language: content.codePayload.language,
-        metadata: content.codePayload.metadata as any,
+        metadata: content.codePayload.metadata as Record<string, unknown>,
       };
     }
     // Phase 2: Folder payload
@@ -230,7 +232,7 @@ export async function GET(
       response.folder = {
         viewMode: content.folderPayload.viewMode,
         sortMode: content.folderPayload.sortMode,
-        viewPrefs: content.folderPayload.viewPrefs as any,
+        viewPrefs: content.folderPayload.viewPrefs as Record<string, unknown>,
         includeReferencedContent: content.folderPayload.includeReferencedContent,
       };
     }
@@ -242,15 +244,15 @@ export async function GET(
     if (content.visualizationPayload) {
       response.visualization = {
         engine: content.visualizationPayload.engine,
-        config: content.visualizationPayload.config as any,
-        data: content.visualizationPayload.data as any,
+        config: content.visualizationPayload.config as Record<string, unknown>,
+        data: content.visualizationPayload.data as Record<string, unknown>,
       };
     }
     // Chat payload
     if (content.chatPayload) {
       response.chat = {
-        messages: (content.chatPayload.messages ?? []) as any,
-        metadata: (content.chatPayload.metadata ?? {}) as any,
+        messages: (content.chatPayload.messages ?? []) as unknown as StoredChatMessage[],
+        metadata: (content.chatPayload.metadata ?? {}) as Record<string, unknown>,
       };
     }
 
@@ -559,17 +561,17 @@ export async function PATCH(
               : existing.externalPayload.preserveHtml,
           preservedHtmlSnapshot:
             preservedHtmlSnapshot !== undefined
-              ? (preservedHtmlSnapshot as any)
+              ? (preservedHtmlSnapshot as Prisma.InputJsonValue)
               : existing.externalPayload.preservedHtmlSnapshot,
           preservedHtmlCapturedAt:
             preserveHtml && preservedHtmlSnapshot ? new Date() : undefined,
           captureMetadata:
             captureMetadata !== undefined
-              ? (captureMetadata as any)
+              ? (captureMetadata as Prisma.InputJsonValue)
               : existing.externalPayload.captureMetadata,
           matchMetadata:
             matchMetadata !== undefined
-              ? (matchMetadata as any)
+              ? (matchMetadata as Prisma.InputJsonValue)
               : existing.externalPayload.matchMetadata,
           subtype:
             preserveHtml !== undefined
@@ -620,7 +622,7 @@ export async function PATCH(
       await prisma.visualizationPayload.update({
         where: { contentId: id },
         data: {
-          data: visualizationData as any, // Cast to any for JSON type compatibility
+          data: visualizationData as Prisma.InputJsonValue, // Cast to any for JSON type compatibility
           updatedAt: new Date(),
         },
       });
@@ -631,13 +633,13 @@ export async function PATCH(
       await prisma.chatPayload.upsert({
         where: { contentId: id },
         update: {
-          ...(chatMessages !== undefined && { messages: chatMessages as any }),
-          ...(chatMetadata !== undefined && { metadata: chatMetadata as any }),
+          ...(chatMessages !== undefined && { messages: chatMessages as unknown as Prisma.InputJsonValue }),
+          ...(chatMetadata !== undefined && { metadata: chatMetadata as Prisma.InputJsonValue }),
         },
         create: {
           contentId: id,
-          messages: (chatMessages ?? []) as any,
-          metadata: (chatMetadata ?? {}) as any,
+          messages: (chatMessages ?? []) as unknown as Prisma.InputJsonValue,
+          metadata: (chatMetadata ?? {}) as Prisma.InputJsonValue,
         },
       });
     }
@@ -672,7 +674,11 @@ export async function PATCH(
 
     // If this is a file with Google Drive integration, rename the Google Drive file
     if (title && title !== existing.title && existing.filePayload) {
-      const metadata = existing.filePayload.storageMetadata as any;
+      // Narrow shape for Google Drive integration metadata stored under
+      // storageMetadata.externalProviders.googleDrive.
+      const metadata = existing.filePayload.storageMetadata as {
+        externalProviders?: { googleDrive?: { fileId?: string } };
+      } | null;
       const googleDriveFileId = metadata?.externalProviders?.googleDrive?.fileId;
 
       if (googleDriveFileId) {
@@ -734,23 +740,23 @@ export async function PATCH(
       response.folder = {
         viewMode: updated.folderPayload.viewMode,
         sortMode: updated.folderPayload.sortMode,
-        viewPrefs: updated.folderPayload.viewPrefs as any,
+        viewPrefs: updated.folderPayload.viewPrefs as Record<string, unknown>,
         includeReferencedContent: updated.folderPayload.includeReferencedContent,
       };
     }
     if (updated.notePayload) {
       response.note = {
-        tiptapJson: updated.notePayload.tiptapJson as any,
+        tiptapJson: updated.notePayload.tiptapJson as Record<string, unknown>,
         searchText: updated.notePayload.searchText,
-        metadata: updated.notePayload.metadata as any,
+        metadata: updated.notePayload.metadata as Record<string, unknown>,
       };
     }
     if (updated.htmlPayload) {
       response.html = {
         html: updated.htmlPayload.html,
         isTemplate: updated.htmlPayload.isTemplate,
-        templateSchema: updated.htmlPayload.templateSchema as any,
-        templateMetadata: updated.htmlPayload.templateMetadata as any,
+        templateSchema: updated.htmlPayload.templateSchema as Record<string, unknown>,
+        templateMetadata: updated.htmlPayload.templateMetadata as Record<string, unknown>,
         renderMode: updated.htmlPayload.renderMode,
         templateEngine: updated.htmlPayload.templateEngine,
       };
@@ -759,7 +765,7 @@ export async function PATCH(
       response.code = {
         code: updated.codePayload.code,
         language: updated.codePayload.language,
-        metadata: updated.codePayload.metadata as any,
+        metadata: updated.codePayload.metadata as Record<string, unknown>,
       };
     }
     if (updated.externalPayload) {
@@ -767,8 +773,8 @@ export async function PATCH(
     }
     if (updated.chatPayload) {
       response.chat = {
-        messages: (updated.chatPayload.messages ?? []) as any,
-        metadata: (updated.chatPayload.metadata ?? {}) as any,
+        messages: (updated.chatPayload.messages ?? []) as unknown as StoredChatMessage[],
+        metadata: (updated.chatPayload.metadata ?? {}) as Record<string, unknown>,
       };
     }
 

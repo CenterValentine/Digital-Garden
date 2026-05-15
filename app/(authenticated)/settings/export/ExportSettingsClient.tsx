@@ -92,7 +92,7 @@ export function ExportSettingsClient({ initialSettings, userId }: Props) {
                 ${
                   exportFormat === format
                     ? "border-primary bg-primary/10 text-primary"
-                    : "border-gray-700 bg-gray-800/50 text-gray-300 hover:border-gray-600"
+                    : "border-gray-700 bg-gray-800/50 text-gray-700 dark:text-gray-300 hover:border-gray-600"
                 }
               `}
             >
@@ -142,12 +142,12 @@ export function ExportSettingsClient({ initialSettings, userId }: Props) {
           <div className="flex items-start justify-between gap-4">
             <div>
               <h3 className="font-semibold">Export Entire Vault</h3>
-              <p className="text-sm text-gray-400 mt-1">
+              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
                 Download all your notes as a ZIP archive in{" "}
                 {exportFormat.toUpperCase()} format
               </p>
               {initialSettings.bulkExport?.includeStructure && (
-                <p className="text-xs text-gray-500 mt-2">
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
                   ✓ Folder hierarchy will be preserved
                 </p>
               )}
@@ -159,7 +159,7 @@ export function ExportSettingsClient({ initialSettings, userId }: Props) {
                 px-6 py-2 rounded-lg font-semibold transition-all
                 ${
                   isExporting
-                    ? "bg-gray-700 text-gray-400 cursor-not-allowed"
+                    ? "bg-gray-700 text-gray-600 dark:text-gray-400 cursor-not-allowed"
                     : "bg-primary hover:bg-primary/90 text-white"
                 }
               `}
@@ -179,7 +179,7 @@ export function ExportSettingsClient({ initialSettings, userId }: Props) {
           </span>
         </h2>
         <div className="p-6 rounded-lg bg-gray-800/30 border border-gray-700 opacity-60">
-          <p className="text-sm text-gray-400">
+          <p className="text-sm text-gray-600 dark:text-gray-400">
             Automatic scheduled backups to cloud storage will be available in a
             future update.
           </p>
@@ -191,11 +191,11 @@ export function ExportSettingsClient({ initialSettings, userId }: Props) {
         <h3 className="font-semibold text-blue-400 mb-2">
           About Metadata Sidecars
         </h3>
-        <p className="text-sm text-gray-300">
+        <p className="text-sm text-gray-700 dark:text-gray-300">
           When exporting to Markdown with metadata enabled, each note will
           include a <code className="px-1 py-0.5 rounded bg-gray-800">.meta.json</code> file.
           This preserves semantic information like tag colors, wiki-link
-          relationships, and callout types that can't be represented in pure
+          relationships, and callout types that can&apos;t be represented in pure
           Markdown.
         </p>
       </div>

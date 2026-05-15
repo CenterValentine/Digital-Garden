@@ -113,8 +113,10 @@ export class R2StorageProvider implements StorageProvider {
         etag: response.ETag?.replace(/"/g, ''), // Remove quotes from ETag
         mimeType: response.ContentType,
       };
-    } catch (error: any) {
-      if (error.name === 'NotFound' || error.$metadata?.httpStatusCode === 404) {
+    } catch (error: unknown) {
+      // Narrow to AWS SDK error shape (R2 is S3-compatible, uses same shape).
+      const awsError = error as { name?: string; $metadata?: { httpStatusCode?: number } };
+      if (awsError.name === 'NotFound' || awsError.$metadata?.httpStatusCode === 404) {
         return { exists: false };
       }
       throw error;

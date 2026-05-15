@@ -9,6 +9,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/infrastructure/auth/middleware";
 import { prisma } from "@/lib/database/client";
 import type { ContentType } from "@/lib/domain/content/types";
+import type { JSONContent } from "@tiptap/core";
 
 interface PreviewItem {
   id: string;
@@ -20,15 +21,15 @@ interface PreviewItem {
 /**
  * Extract first heading from TipTap JSON content
  */
-function extractFirstHeading(tiptapJson: any): string | null {
+function extractFirstHeading(tiptapJson: unknown): string | null {
   if (!tiptapJson || typeof tiptapJson !== "object") return null;
 
   // DFS to find first heading node
-  const findHeading = (node: any): string | null => {
+  const findHeading = (node: JSONContent): string | null => {
     if (node.type === "heading" && node.content) {
       // Extract text from heading content
       const text = node.content
-        .map((n: any) => n.text || "")
+        .map((n) => n.text || "")
         .join("")
         .trim();
       return text || null;
@@ -45,19 +46,19 @@ function extractFirstHeading(tiptapJson: any): string | null {
     return null;
   };
 
-  return findHeading(tiptapJson);
+  return findHeading(tiptapJson as JSONContent);
 }
 
 /**
  * Extract first text snippet from TipTap JSON content (fallback for non-heading content)
  */
-function extractFirstText(tiptapJson: any, maxWords: number = 10): string | null {
+function extractFirstText(tiptapJson: unknown, maxWords: number = 10): string | null {
   if (!tiptapJson || typeof tiptapJson !== "object") return null;
 
   const texts: string[] = [];
 
   // DFS to collect all text nodes
-  const collectText = (node: any) => {
+  const collectText = (node: JSONContent) => {
     if (node.text) {
       texts.push(node.text);
     }
@@ -69,7 +70,7 @@ function extractFirstText(tiptapJson: any, maxWords: number = 10): string | null
     }
   };
 
-  collectText(tiptapJson);
+  collectText(tiptapJson as JSONContent);
 
   // Join and limit to maxWords
   const fullText = texts.join(" ").trim();

@@ -33,6 +33,7 @@ export function LeftSidebar() {
     if (mode === "hidden") {
       collapseTimerRef.current = setTimeout(() => setDisplayMode("hidden"), 200);
     } else {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- audited, see BACKLOG.md
       setDisplayMode("full");
     }
     return () => {

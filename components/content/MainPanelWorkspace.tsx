@@ -223,7 +223,7 @@ function WorkspaceReshapeTargets({
   const dragIndicator = dragIndicatorPosition ? (
     layoutMode === "single" ? (
       <div
-        className="pointer-events-none fixed z-40 rounded-full border border-gold-primary/18 bg-white/88 px-3 py-1 text-[11px] font-medium uppercase tracking-[0.2em] text-gold-primary/75 shadow-[0_10px_30px_rgba(15,23,42,0.08)] backdrop-blur-sm"
+        className="pointer-events-none fixed z-40 rounded-full border border-gold-primary/18 bg-white/88 dark:bg-black/60 px-3 py-1 text-[11px] font-medium uppercase tracking-[0.2em] text-gold-primary/75 shadow-[0_10px_30px_rgba(15,23,42,0.08)] backdrop-blur-sm"
         style={{
           left: dragIndicatorPosition.x,
           top: dragIndicatorPosition.y,
@@ -290,7 +290,7 @@ function WorkspaceReshapeTargets({
                 });
               }}
             >
-              <div className="absolute left-2.5 top-2.5 rounded-full border border-gold-primary/14 bg-white/55 px-2 py-1 text-[10px] font-medium uppercase tracking-[0.18em] text-gold-primary/70 backdrop-blur-sm">
+              <div className="absolute left-2.5 top-2.5 rounded-full border border-gold-primary/14 bg-white/55 dark:bg-black/40 px-2 py-1 text-[10px] font-medium uppercase tracking-[0.18em] text-gold-primary/70 backdrop-blur-sm">
                 {target.label}
               </div>
             </div>
@@ -325,7 +325,7 @@ function WorkspaceReshapeTargets({
                   });
                 }}
               >
-                <div className="rounded-full border border-gold-primary/16 bg-white/55 px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.18em] text-gold-primary/70 backdrop-blur-sm">
+                <div className="rounded-full border border-gold-primary/16 bg-white/55 dark:bg-black/40 px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.18em] text-gold-primary/70 backdrop-blur-sm">
                   {target.label}
                 </div>
               </div>
@@ -334,9 +334,9 @@ function WorkspaceReshapeTargets({
         </div>
       ) : compactOverlayClass ? (
         <div
-          className={`pointer-events-none absolute rounded-[24px] border border-white/30 bg-white/72 p-3 shadow-[0_12px_34px_rgba(15,23,42,0.12)] backdrop-blur-md ${compactOverlayClass}`}
+          className={`pointer-events-none absolute rounded-[24px] border border-white/30 dark:border-white/15 bg-white/72 dark:bg-black/55 p-3 shadow-[0_12px_34px_rgba(15,23,42,0.12)] backdrop-blur-md ${compactOverlayClass}`}
         >
-          <div className="mb-2 rounded-full border border-gold-primary/14 bg-white/55 px-2.5 py-1 text-center text-[10px] font-medium uppercase tracking-[0.18em] text-gold-primary/75">
+          <div className="mb-2 rounded-full border border-gold-primary/14 bg-white/55 dark:bg-black/40 px-2.5 py-1 text-center text-[10px] font-medium uppercase tracking-[0.18em] text-gold-primary/75">
             Drag To Reshape Workspace
           </div>
           <div className="grid grid-cols-2 gap-2">

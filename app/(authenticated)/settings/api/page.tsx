@@ -73,7 +73,7 @@ export default function APIKeysSettingsPage() {
 
       {/* API Keys List */}
       <div
-        className="border border-white/10 rounded-lg p-6"
+        className="border border-black/10 dark:border-white/10 rounded-lg p-6"
         style={{
           background: glass0.background,
           backdropFilter: glass0.backdropFilter,
@@ -85,7 +85,7 @@ export default function APIKeysSettingsPage() {
           {apiKeys.map((key) => (
             <div
               key={key.id}
-              className="flex items-center justify-between p-4 border border-white/10 rounded-lg"
+              className="flex items-center justify-between p-4 border border-black/10 dark:border-white/10 rounded-lg"
             >
               <div className="flex-1">
                 <div className="font-medium">{key.name}</div>
@@ -93,14 +93,14 @@ export default function APIKeysSettingsPage() {
                   Created {key.createdAt.toLocaleDateString()} • Last used{" "}
                   {key.lastUsedAt.toLocaleDateString()}
                 </div>
-                <div className="text-xs text-gray-500 mt-1 font-mono">
+                <div className="text-xs text-gray-500 dark:text-gray-400 mt-1 font-mono">
                   {key.maskedKey}
                 </div>
               </div>
               <div className="flex gap-2">
                 <button
                   onClick={() => handleCopyKey(key.id)}
-                  className="p-2 hover:bg-white/5 rounded transition-colors"
+                  className="p-2 hover:bg-black/[0.03] dark:bg-white/5 rounded transition-colors"
                   title="Copy key"
                 >
                   <svg
@@ -177,7 +177,7 @@ export default function APIKeysSettingsPage() {
           </svg>
           <div>
             <h4 className="text-sm font-semibold text-blue-400">API Documentation</h4>
-            <p className="text-sm text-gray-300 mt-1">
+            <p className="text-sm text-gray-700 dark:text-gray-300 mt-1">
               Learn how to use the API in our{" "}
               <a
                 href="/docs/api"
@@ -199,7 +199,7 @@ export default function APIKeysSettingsPage() {
       {showGenerateDialog && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
           <div
-            className="w-full max-w-md p-6 border border-white/10 rounded-lg"
+            className="w-full max-w-md p-6 border border-black/10 dark:border-white/10 rounded-lg"
             style={{
               background: glass1.background,
               backdropFilter: glass1.backdropFilter,
@@ -217,7 +217,7 @@ export default function APIKeysSettingsPage() {
                   placeholder="Key name (e.g., 'My Automation Script')"
                   value={keyName}
                   onChange={(e) => setKeyName(e.target.value)}
-                  className="w-full px-4 py-2 bg-black/20 border border-white/10 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-primary"
+                  className="w-full px-4 py-2 bg-black/20 border border-black/10 dark:border-white/10 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-primary"
                 />
 
                 <div className="flex gap-2 mt-4">
@@ -233,7 +233,7 @@ export default function APIKeysSettingsPage() {
                       setShowGenerateDialog(false);
                       setKeyName("");
                     }}
-                    className="px-4 py-2 text-sm rounded-lg border border-white/10 hover:bg-white/5 transition-colors"
+                    className="px-4 py-2 text-sm rounded-lg border border-black/10 dark:border-white/10 hover:bg-black/[0.03] dark:bg-white/5 transition-colors"
                   >
                     Cancel
                   </button>
@@ -267,8 +267,8 @@ export default function APIKeysSettingsPage() {
                     <h4 className="text-sm font-semibold text-yellow-400">
                       Save This Key Now
                     </h4>
-                    <p className="text-sm text-gray-300 mt-1">
-                      This is the only time you'll see this key. Copy it now.
+                    <p className="text-sm text-gray-700 dark:text-gray-300 mt-1">
+                      This is the only time you&apos;ll see this key. Copy it now.
                     </p>
 
                     <div className="mt-3 p-3 bg-black/30 rounded font-mono text-sm break-all">
@@ -302,7 +302,7 @@ export default function APIKeysSettingsPage() {
                         setKeyName("");
                         setGeneratedKey("");
                       }}
-                      className="mt-2 w-full px-4 py-2 text-sm text-gray-400 hover:text-white transition-colors"
+                      className="mt-2 w-full px-4 py-2 text-sm text-gray-600 dark:text-gray-400 hover:text-white transition-colors"
                     >
                       Done
                     </button>

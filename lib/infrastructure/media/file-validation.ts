@@ -75,7 +75,7 @@ export function getSupportedFileTypes(): {
  * Check if a file type is supported
  */
 export function isFileTypeSupported(mimeType: string): boolean {
-  return SUPPORTED_MIME_TYPES.includes(mimeType as any);
+  return (SUPPORTED_MIME_TYPES as readonly string[]).includes(mimeType);
 }
 
 /**

@@ -11,6 +11,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/database/client";
 import { requireAuth } from "@/lib/infrastructure/auth/middleware";
 import type { ContentType } from "@/lib/domain/content/types";
+import type { Prisma } from "@/lib/database/generated/prisma";
 
 export async function GET(request: NextRequest) {
   try {
@@ -70,7 +71,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Build where clause for content search
-    const where: any = {
+    const where: Prisma.ContentNodeWhereInput = {
       ownerId: session.user.id,
       deletedAt: null,
     };

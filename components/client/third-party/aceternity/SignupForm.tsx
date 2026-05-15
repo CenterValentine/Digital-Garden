@@ -11,7 +11,7 @@ import { cn } from "@/lib/core/utils";
 export interface SignupFormProps {
   className?: string;
   color?: DigitalGardenColor;
-  onSubmit?: (data: any) => void;
+  onSubmit?: (data: FormData) => void;
 }
 
 export function SignupForm({

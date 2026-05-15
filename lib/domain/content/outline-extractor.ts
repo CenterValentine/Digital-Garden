@@ -80,7 +80,7 @@ function extractTextContent(node: JSONContent): string {
 export function extractOutline(tiptapJson: JSONContent): OutlineHeading[] {
   const headings: OutlineHeading[] = [];
   const existingIds = new Set<string>();
-  let position = 0;
+  const position = 0;
 
   /**
    * Recursively walk the document tree to find headings

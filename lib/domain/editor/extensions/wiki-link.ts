@@ -12,6 +12,7 @@
 
 import { Node, mergeAttributes } from "@tiptap/core";
 import { Plugin, PluginKey } from "@tiptap/pm/state";
+import type { Node as ProseMirrorNode } from "@tiptap/pm/model";
 import { InputRule } from "@tiptap/core";
 import Suggestion from "@tiptap/suggestion";
 
@@ -22,9 +23,9 @@ export interface WikiLinkSuggestionItem {
 }
 
 export interface WikiLinkOptions {
-  HTMLAttributes: Record<string, any>;
+  HTMLAttributes: Record<string, unknown>;
   onClickLink?: (targetTitle: string) => void;
-  suggestion?: Omit<any, "editor">;
+  suggestion?: Partial<import("@tiptap/suggestion").SuggestionOptions>;
 }
 
 export const WikiLink = Node.create<WikiLinkOptions>({
@@ -116,7 +117,7 @@ export const WikiLink = Node.create<WikiLinkOptions>({
       // Triggers when user types the closing ]]
       new InputRule({
         find: /\[\[([^\|\]]+)(?:\|([^\]]+))?\]\]$/,
-        handler: ({ state, range, match }: any) => {
+        handler: ({ state, range, match }) => {
           const targetTitle = match[1]?.trim();
           const displayText = match[2]?.trim() || null;
 
@@ -238,7 +239,7 @@ export const WikiLink = Node.create<WikiLinkOptions>({
             const from = Math.max(0, clickPos.pos - 1);
             const to = Math.min(doc.content.size, clickPos.pos + 1);
 
-            let wikiLinkNode = null;
+            let wikiLinkNode: ProseMirrorNode | null = null;
 
             try {
               doc.nodesBetween(from, to, (node) => {
@@ -255,7 +256,7 @@ export const WikiLink = Node.create<WikiLinkOptions>({
             // Single-click to navigate
             if (wikiLinkNode && options.onClickLink) {
               event.preventDefault();
-              options.onClickLink((wikiLinkNode as any).attrs.targetTitle);
+              options.onClickLink((wikiLinkNode as ProseMirrorNode).attrs.targetTitle);
               return true;
             }
 

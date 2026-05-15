@@ -95,7 +95,7 @@ interface ContentResponse {
     ownedByNoteId?: string | null;
     ownedByNote?: { id: string; title: string } | null;
     note?: {
-      tiptapJson: any; // Prisma Json type
+      tiptapJson: JSONContent | null; // Persisted from Prisma Json field
       searchText: string;
       metadata: Record<string, unknown>;
     };
@@ -224,7 +224,8 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
   const [contentType, setContentType] = useState<string | null>(null);
   const [contentParentId, setContentParentId] = useState<string | null>(null);
   const [contentIsPublished, setContentIsPublished] = useState(false);
-  const [contentData, setContentData] = useState<any>(null); // Phase 2: Store payload data
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- TODO(any-epic-phase-3d): payload is a discriminated union (folder/note/external/chat/viz/data/hope/workflow) — model as `ContentPayload` union in api-types.ts and switch each viewer branch to a narrowed value
+  const [contentData, setContentData] = useState<any>(null);
   // Path A: when this ContentNode is a visualization owned by a note, the
   // standalone viewer is read-only. Non-null means "this is an embedded
   // drawing; edits happen in the owning note."
@@ -584,8 +585,9 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
 
   // Listen for content updates (e.g., when renamed in file tree)
   useEffect(() => {
-    const handleContentUpdate = (event: CustomEvent) => {
-      const { contentId, updates } = event.detail;
+    type ContentUpdateDetail = { contentId: string; updates: Record<string, unknown> & { title?: string } };
+    const handleContentUpdate = (event: Event) => {
+      const { contentId, updates } = (event as CustomEvent<ContentUpdateDetail>).detail;
 
       // If the updated content is the currently selected one, refresh it
         if (contentId === selectedContentId) {
@@ -602,9 +604,9 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
       }
     };
 
-    window.addEventListener('content-updated' as any, handleContentUpdate as any);
+    window.addEventListener('content-updated', handleContentUpdate);
     return () => {
-      window.removeEventListener('content-updated' as any, handleContentUpdate as any);
+      window.removeEventListener('content-updated', handleContentUpdate);
     };
   }, [selectedContentId, updateContentTab]);
 
@@ -771,8 +773,8 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
         }
 
         // Find exact title match (case-insensitive)
-        const matchedContent = result.data?.items?.find(
-          (item: any) => item.title.toLowerCase() === targetTitle.toLowerCase()
+        const matchedContent = (result.data?.items as Array<{ id: string; title: string; contentType: string }> | undefined)?.find(
+          (item) => item.title.toLowerCase() === targetTitle.toLowerCase()
         );
 
         if (matchedContent) {
@@ -810,10 +812,11 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
           return [];
         }
 
+        type NoteItem = { id: string; title: string; slug: string; contentType: string };
         // Return notes in the format expected by autocomplete
-        return (result.data?.items || [])
-          .filter((item: any) => item.contentType === 'note') // Only show notes, not folders
-          .map((item: any) => ({
+        return ((result.data?.items as NoteItem[] | undefined) || [])
+          .filter((item) => item.contentType === 'note') // Only show notes, not folders
+          .map((item) => ({
             id: item.id,
             title: item.title,
             slug: item.slug,
@@ -843,8 +846,15 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
 
         const tags = await response.json();
 
+        type TagItem = {
+          id: string;
+          name: string;
+          slug: string;
+          color: string | null;
+          _count?: { contentTags?: number };
+        };
         // Return tags in the format expected by autocomplete
-        return tags.map((tag: any) => ({
+        return (tags as TagItem[]).map((tag) => ({
           id: tag.id,
           name: tag.name,
           slug: tag.slug,
@@ -874,9 +884,19 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
           return [];
         }
 
-        return (result.data?.results || [])
-          .filter((item: any) => item.treeNodeKind === "person")
-          .map((item: any) => ({
+        type PersonResult = {
+          id: string;
+          personId: string;
+          label: string;
+          slug: string;
+          treeNodeKind: string;
+          email?: string | null;
+          phone?: string | null;
+          avatarUrl?: string | null;
+        };
+        return ((result.data?.results as PersonResult[] | undefined) || [])
+          .filter((item) => item.treeNodeKind === "person")
+          .map((item) => ({
             id: item.id,
             personId: item.personId,
             label: item.label,
@@ -1451,7 +1471,7 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
   if (!selectedContentId) {
     return (
       <div className="flex-1 overflow-auto p-8">
-        <div className="prose prose-invert mx-auto max-w-3xl">
+        <div className="prose dark:prose-invert mx-auto max-w-3xl">
           
         </div>
       </div>
@@ -1462,7 +1482,7 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
   if (isLoading) {
     return (
       <div className="flex-1 flex items-center justify-center">
-        <div className="text-sm text-gray-400">Loading...</div>
+        <div className="text-sm text-muted-foreground">Loading...</div>
       </div>
     );
   }
@@ -1483,7 +1503,7 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
       <div className="flex-1 flex items-center justify-center">
         <div className="text-center">
           <div className="text-sm text-red-400 mb-2">Failed to load content</div>
-          <div className="text-xs text-gray-500">{error}</div>
+          <div className="text-xs text-muted-foreground">{error}</div>
         </div>
       </div>
     );

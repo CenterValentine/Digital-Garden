@@ -86,7 +86,7 @@ export default function Tasks() {
           <li>Accessible keyboard navigation</li>
         </ul>
         <p>
-          Tasks are stored as <code>data-type="taskItem"</code> with{" "}
+          Tasks are stored as <code>data-type=&quot;taskItem&quot;</code> with{" "}
           <code>data-checked</code> attributes in the HTML, making them perfect
           for todo lists, project management, or checklists.
         </p>

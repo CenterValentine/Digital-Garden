@@ -612,10 +612,18 @@ export function getSlashCommands(): SlashCommand[] {
       description: "Embed a hand-drawn whiteboard canvas",
       icon: "✏️",
       command: ({ editor, range }) => {
-        editor.chain().focus().deleteRange(range).insertContent({
-          type: "excalidrawBlock",
-          attrs: { title: "Untitled Drawing", expanded: false },
-        }).run();
+        // Create-then-insert pattern: dispatch an event to MarkdownEditor,
+        // which has the note context (parentId, contentId) needed for the
+        // POST. The listener creates the visualization first and only then
+        // inserts a fully-formed block (with contentId already set). This
+        // avoids the collaboration sync race where an unbound block can be
+        // dropped by Y.js reconciliation before its contentId lands.
+        editor.chain().focus().deleteRange(range).run();
+        window.dispatchEvent(
+          new CustomEvent("create-diagram-block", {
+            detail: { engine: "excalidraw", defaultTitle: "Untitled Drawing" },
+          })
+        );
       },
       aliases: ["excalidraw", "drawing", "canvas", "whiteboard", "sketch", "freehand"],
     },
@@ -624,10 +632,12 @@ export function getSlashCommands(): SlashCommand[] {
       description: "Embed a text-based flowchart or diagram",
       icon: "📊",
       command: ({ editor, range }) => {
-        editor.chain().focus().deleteRange(range).insertContent({
-          type: "mermaidBlock",
-          attrs: { title: "Untitled Diagram", expanded: false },
-        }).run();
+        editor.chain().focus().deleteRange(range).run();
+        window.dispatchEvent(
+          new CustomEvent("create-diagram-block", {
+            detail: { engine: "mermaid", defaultTitle: "Untitled Diagram" },
+          })
+        );
       },
       aliases: ["mermaid", "diagram", "flowchart", "graph", "chart", "sequence"],
     },

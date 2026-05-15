@@ -13,12 +13,13 @@
 
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { DocumentEditor } from "@onlyoffice/document-editor-react";
 import { AlertCircle, Download, Settings } from "lucide-react";
 import { Button } from "@/components/ui/glass/button";
 import { toast } from "sonner";
 import { useUploadSettingsStore } from "@/state/upload-settings-store";
+import { useResolvedTheme } from "@/lib/features/theme";
 
 interface OnlyOfficeEditorProps {
   contentId: string;
@@ -42,7 +43,22 @@ export function OnlyOfficeEditor({
   const { onlyofficeServerUrl, setOfficeViewerMode } = useUploadSettingsStore();
   const [error, setError] = useState<string | null>(null);
   const [isReady, setIsReady] = useState(false);
+  const resolvedTheme = useResolvedTheme();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- TODO(any-epic-phase-4): @onlyoffice/document-editor-react does not export the editor instance type; narrow once upstream type is available
   const editorRef = useRef<any>(null);
+
+  // ONLYOFFICE uses `document.key` to decide whether to fetch fresh content or
+  // reuse its cached doc. The original `${contentId}-${Date.now()}` ran on
+  // every render, forcing iframe reloads, and `Date.now()` is impure-during-
+  // render (React Compiler error).
+  //
+  // useId() gives us a stable-per-mount unique suffix, which preserves the
+  // original intent ("each mount is a new document version") without the
+  // purity violation. The id stays the same across re-renders of this mount,
+  // and contentId in the prefix means switching to a different document
+  // still yields a distinct key.
+  const instanceId = useId();
+  const documentKey = `${contentId}-${instanceId}`;
 
   // Determine document type from MIME type
   const getDocumentType = (): DocumentType => {
@@ -107,7 +123,7 @@ export function OnlyOfficeEditor({
   const config = {
     document: {
       fileType: getFileType(),
-      key: `${contentId}-${Date.now()}`, // Unique key for versioning
+      key: documentKey, // Stable per contentId — see useMemo above
       title: title,
       url: downloadUrl, // ONLYOFFICE will fetch the document from this URL
       permissions: {
@@ -143,7 +159,7 @@ export function OnlyOfficeEditor({
         hideRightMenu: false,
         plugins: true,
         toolbarNoTabs: false,
-        uiTheme: "theme-dark", // Match our dark theme
+        uiTheme: resolvedTheme === "dark" ? "theme-dark" : "theme-light",
       },
     },
     events: {
@@ -151,18 +167,20 @@ export function OnlyOfficeEditor({
         console.log("[OnlyOffice] Document ready");
         setIsReady(true);
       },
-      onDocumentStateChange: (event: any) => {
+      // OnlyOffice's React wrapper doesn't export its event types. Use narrow
+      // inline shapes that match the documented DocumentEditor event payloads.
+      onDocumentStateChange: (event: { data?: unknown }) => {
         console.log("[OnlyOffice] Document state changed:", event);
         // Auto-save is handled by callbackUrl
       },
-      onError: (event: any) => {
+      onError: (event: { data?: string }) => {
         console.error("[OnlyOffice] Error:", event);
         setError(`Editor error: ${event.data || "Unknown error"}`);
         toast.error("Editor error", {
           description: event.data || "Failed to load document editor",
         });
       },
-      onWarning: (event: any) => {
+      onWarning: (event: { data?: unknown }) => {
         console.warn("[OnlyOffice] Warning:", event);
       },
     },
@@ -225,7 +243,7 @@ export function OnlyOfficeEditor({
           id={`onlyoffice-${contentId}`}
           documentServerUrl={onlyofficeServerUrl}
           config={config}
-          onLoadComponentError={(error: any) => {
+          onLoadComponentError={(error: unknown) => {
             console.error("[OnlyOffice] Component load error:", error);
             setError("Failed to load ONLYOFFICE editor component");
           }}

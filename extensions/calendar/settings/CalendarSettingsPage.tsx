@@ -51,11 +51,11 @@ export default function CalendarSettingsPage() {
   const [newLocalCalendar, setNewLocalCalendar] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const primaryButtonClass =
-    "border border-gold-primary/25 bg-gold-primary/12 text-gold-primary hover:bg-gold-primary/18";
+    "border border-gold-primary/40 bg-gold-primary/15 text-gold-dark hover:bg-gold-primary/25 dark:border-gold-primary/25 dark:bg-gold-primary/12 dark:text-gold-primary dark:hover:bg-gold-primary/18";
   const secondaryButtonClass =
-    "border border-white/12 bg-white/8 text-white hover:bg-white/12";
+    "border border-shale-dark/20 bg-shale-dark/[0.06] text-shale-dark hover:bg-shale-dark/[0.1] dark:border-white/12 dark:bg-white/8 dark:text-white dark:hover:bg-white/12";
   const dangerButtonClass =
-    "border border-red-400/20 bg-red-400/10 text-red-100 hover:bg-red-400/16";
+    "border border-red-500/30 bg-red-500/[0.08] text-red-700 hover:bg-red-500/[0.14] dark:border-red-400/20 dark:bg-red-400/10 dark:text-red-100 dark:hover:bg-red-400/16";
 
   const localSources = useMemo(
     () => sources.filter((source) => source.provider === "local"),
@@ -314,7 +314,7 @@ export default function CalendarSettingsPage() {
           <div className="flex items-center justify-between rounded-xl border border-white/10 px-4 py-3">
             <div>
               <p className="text-sm font-medium">Show Weekends</p>
-              <p className="text-sm text-gray-400">
+              <p className="text-sm text-gray-600 dark:text-gray-400">
                 Keep Saturday and Sunday visible in FullCalendar.
               </p>
             </div>
@@ -329,7 +329,7 @@ export default function CalendarSettingsPage() {
           <div className="flex items-center justify-between rounded-xl border border-white/10 px-4 py-3">
             <div>
               <p className="text-sm font-medium">Show Declined Events</p>
-              <p className="text-sm text-gray-400">
+              <p className="text-sm text-gray-600 dark:text-gray-400">
                 Hide declined Google events if you want a cleaner calendar.
               </p>
             </div>
@@ -353,7 +353,7 @@ export default function CalendarSettingsPage() {
         <div className="flex items-start justify-between gap-4">
           <div>
             <h2 className="text-lg font-semibold">Connections</h2>
-            <p className="mt-1 text-sm text-gray-400">
+            <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
               Manage remote calendars and refresh their sync state.
             </p>
           </div>
@@ -363,10 +363,10 @@ export default function CalendarSettingsPage() {
         </div>
 
         <div className="mt-6 space-y-3">
-          {isLoading && <p className="text-sm text-gray-400">Loading connections...</p>}
+          {isLoading && <p className="text-sm text-gray-600 dark:text-gray-400">Loading connections...</p>}
 
           {!isLoading && remoteConnections.length === 0 && (
-            <p className="text-sm text-gray-400">No calendar connections yet.</p>
+            <p className="text-sm text-gray-600 dark:text-gray-400">No calendar connections yet.</p>
           )}
 
           {remoteConnections.map((connection) => (
@@ -376,7 +376,7 @@ export default function CalendarSettingsPage() {
             >
               <div>
                 <p className="font-medium">{connection.displayName}</p>
-                <p className="text-sm text-gray-400">
+                <p className="text-sm text-gray-600 dark:text-gray-400">
                   {connection.provider.toUpperCase()} · {connection.status} · Sync{" "}
                   {connection.syncStatus}
                 </p>
@@ -430,7 +430,7 @@ export default function CalendarSettingsPage() {
         }}
       >
         <h2 className="text-lg font-semibold">Local Calendars</h2>
-        <p className="mt-1 text-sm text-gray-400">
+        <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
           Create app-native calendars for planning that does not need an
           external provider.
         </p>
@@ -458,14 +458,14 @@ export default function CalendarSettingsPage() {
             >
               <div>
                 <p className="font-medium">{source.title}</p>
-                <p className="text-sm text-gray-400">
+                <p className="text-sm text-gray-600 dark:text-gray-400">
                   {source.visible ? "Visible" : "Hidden"} ·{" "}
                   {source.isPrimary ? "Primary" : "Secondary"}
                 </p>
               </div>
               <div className="flex items-center gap-3">
                 <div className="flex items-center gap-2">
-                  <span className="text-sm text-gray-400">Visible</span>
+                  <span className="text-sm text-gray-600 dark:text-gray-400">Visible</span>
                   <Switch
                     checked={source.visible}
                     onCheckedChange={(checked) =>

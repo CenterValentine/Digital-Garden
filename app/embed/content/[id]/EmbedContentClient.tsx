@@ -46,6 +46,7 @@ export function EmbedContentClient({
   useLayoutEffect(() => {
     openContent(initialContentId);
     setCollapsed(true);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- audited, see BACKLOG.md
     setReady(true);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 

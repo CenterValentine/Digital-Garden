@@ -5,6 +5,7 @@
  */
 
 import { prisma } from "@/lib/database/client";
+import type { Prisma } from "@/lib/database/generated/prisma";
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import type { AuditAction } from "./api-types";
@@ -38,7 +39,7 @@ export async function logAuditAction(
         action,
         targetUserId: (details.targetUserId as string) || null,
         targetContentId: (details.targetContentId as string) || null,
-        details: details as any,
+        details: details as Prisma.InputJsonValue,
         ipAddress,
         userAgent,
       },

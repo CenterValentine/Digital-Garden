@@ -40,7 +40,7 @@ function getItemIcon(item: SuggestionItem, mode: "mention" | "command") {
     case "chat":
       return <MessageCircle className={cn(cls, "text-green-400")} />;
     default:
-      return <File className={cn(cls, "text-gray-400")} />;
+      return <File className={cn(cls, "text-gray-600 dark:text-gray-400")} />;
   }
 }
 
@@ -70,7 +70,7 @@ export function ChatSuggestionMenu({
       className={cn(
         "absolute bottom-full left-0 right-0 mb-1 z-50",
         "max-h-48 overflow-y-auto rounded-lg",
-        "border border-white/10 bg-[#1a1a1a] shadow-xl",
+        "border border-black/10 dark:border-white/10 bg-[#1a1a1a] shadow-xl",
         "backdrop-blur-sm"
       )}
     >
@@ -89,7 +89,7 @@ export function ChatSuggestionMenu({
             "flex w-full items-center gap-2 px-3 py-2 text-left text-xs transition-colors",
             i === selectedIndex
               ? "bg-white/10 text-white"
-              : "text-gray-400 hover:bg-white/5 hover:text-gray-200"
+              : "text-gray-600 dark:text-gray-400 hover:bg-black/[0.04] hover:text-gray-800 dark:hover:bg-white/5 dark:hover:text-gray-200"
           )}
         >
           {getItemIcon(item, mode)}

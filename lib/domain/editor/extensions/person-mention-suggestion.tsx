@@ -39,6 +39,7 @@ export const PersonMentionList = forwardRef<PersonMentionListRef, PersonMentionL
       }
     };
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- audited, see BACKLOG.md
     useEffect(() => setSelectedIndex(0), [props.items]);
 
     useImperativeHandle(ref, () => ({

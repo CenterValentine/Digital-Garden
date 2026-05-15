@@ -140,7 +140,7 @@ export function PeopleCreateDialog({
 
         <div className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain px-4 py-4">
           <label className="block">
-            <span className="mb-1 block text-xs font-medium text-gray-700">
+            <span className="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300">
               {isPerson ? "Display name" : "Group name"}
             </span>
             <input
@@ -159,7 +159,7 @@ export function PeopleCreateDialog({
                 <TextField label="Family name" value={familyName} onChange={setFamilyName} placeholder="Optional" />
               </div>
               <label className="block">
-                <span className="mb-1 block text-xs font-medium text-gray-700">Email</span>
+                <span className="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300">Email</span>
                 <input
                   value={email}
                   onChange={(event) => setEmail(event.target.value)}
@@ -169,7 +169,7 @@ export function PeopleCreateDialog({
                 />
               </label>
               <label className="block">
-                <span className="mb-1 block text-xs font-medium text-gray-700">Phone</span>
+                <span className="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300">Phone</span>
                 <input
                   value={phone}
                   onChange={(event) => setPhone(event.target.value)}
@@ -197,13 +197,13 @@ export function PeopleCreateDialog({
                 <TextField label="Country" value={country} onChange={setCountry} placeholder="Optional" />
               </div>
               <label className="block">
-                <span className="mb-1 block text-xs font-medium text-gray-700">Notes</span>
+                <span className="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300">Notes</span>
                 <textarea
                   value={notes}
                   onChange={(event) => setNotes(event.target.value)}
                   placeholder="Optional"
                   rows={3}
-                  className="w-full resize-y rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition-colors placeholder:text-gray-500 focus:border-gold-primary/60"
+                  className="w-full resize-y rounded-lg border border-gray-200 dark:border-white/15 bg-white dark:bg-black/30 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 outline-none transition-colors placeholder:text-gray-500 dark:placeholder:text-gray-400 focus:border-gold-primary/60"
                 />
               </label>
             </>

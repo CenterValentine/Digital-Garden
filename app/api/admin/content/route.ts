@@ -58,7 +58,7 @@ export async function GET(request: NextRequest) {
 
     // Filter by content type
     if (type) {
-      where.contentType = type as any;
+      where.contentType = type as Prisma.ContentNodeWhereInput["contentType"];
     }
 
     // Query content

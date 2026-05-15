@@ -31,6 +31,7 @@ import { useContextMenuStore } from "@/state/context-menu-store";
 import { useTemplateStore } from "@/state/template-store";
 import { useSnippetStore } from "@/state/snippet-store";
 import { toast } from "sonner";
+import { setPendingDiagramCreate } from "@/lib/domain/editor/extensions/blocks/pending-diagram-creates";
 import type { HocuspocusProvider } from "@hocuspocus/provider";
 import * as Y from "yjs";
 import type {
@@ -190,7 +191,7 @@ export function MarkdownEditor({
     useTemplateStore.getState().fetchTemplates();
     useSnippetStore.getState().fetchCategories();
     useSnippetStore.getState().fetchSnippets();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);  
   const [, setIsSaving] = useState(false);
   const [, setHasUnsavedChanges] = useState(false);
   const [isLinkDialogOpen, setIsLinkDialogOpen] = useState(false);
@@ -758,16 +759,26 @@ export function MarkdownEditor({
         const { data: newContent } = await response.json();
         const newContentId: string = newContent.id;
 
-        // Write the new contentId back into the block node attrs and auto-expand.
-        // TipTap's chain does not expose setNodeMarkup — use ProseMirror tr directly.
-        // After an async API call, getPos() may be stale if the document shifted;
-        // fall back to a blockId search so the write always lands.
-        const targetEditor = blockEditor ?? editor;
+        // Defensive: if the editor was destroyed during the await (Fast
+        // Refresh in dev, navigation, parent remount), the direct
+        // setNodeMarkup below will silently no-op — but the next render of
+        // the block in the new editor picks this entry up via
+        // consumePendingDiagramCreate().
+        setPendingDiagramCreate(blockId, { contentId: newContentId, expanded: true });
+
+        // Prefer the live editor from the global store; falls back to
+        // closure-captured references.
+        const freshEditor = contentId
+          ? useEditorInstanceStore.getState().getEditor(contentId)
+          : null;
+        const targetEditor = freshEditor ?? blockEditor ?? editor;
         if (!targetEditor) return;
 
-        let targetPos: number | undefined = getPos ? getPos() : undefined;
+        // Only trust getPos() if we're talking to the same editor that
+        // created the closure; otherwise the captured nodeview is dead.
+        let targetPos: number | undefined =
+          targetEditor === blockEditor && getPos ? getPos() : undefined;
 
-        // Fallback: scan by blockId if position is stale
         if (targetPos === undefined && blockId) {
           targetEditor.state.doc.descendants((n, p) => {
             if (n.attrs.blockId === blockId) {
@@ -789,10 +800,10 @@ export function MarkdownEditor({
             expanded: true,
           })
         );
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error("[MarkdownEditor] embed-diagram-create failed:", err);
         toast.error("Failed to create diagram", {
-          description: err.message || "Could not create visualization",
+          description: (err instanceof Error ? err.message : null) || "Could not create visualization",
         });
       }
     };
@@ -800,6 +811,81 @@ export function MarkdownEditor({
     window.addEventListener("embed-diagram-create", handleEmbedDiagramCreate);
     return () => window.removeEventListener("embed-diagram-create", handleEmbedDiagramCreate);
   }, [editor, parentId]);
+
+  // NEW: create-then-insert flow. The slash command dispatches this event
+  // INSTEAD of inserting the block first. We POST to create the visualization,
+  // wait for the contentId, and only then insert a fully-formed block. This
+  // sidesteps the collaboration sync race where an unbound block could be
+  // dropped/sanitized before its contentId lands.
+  useEffect(() => {
+    const handleCreateDiagramBlock = async (e: Event) => {
+      const { engine, defaultTitle } = (e as CustomEvent).detail;
+
+      const toastId = toast.loading(
+        engine === "excalidraw" ? "Creating drawing…" : "Creating diagram…"
+      );
+
+      try {
+        const response = await fetch("/api/content/content", {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            engine,
+            title: defaultTitle || "Untitled",
+            parentId: parentId ?? null,
+            ownedByNoteId: contentId ?? null,
+            role: contentId ? "referenced" : undefined,
+          }),
+        });
+
+        if (!response.ok) {
+          const errBody = await response.json().catch(() => ({}));
+          throw new Error(errBody?.error?.message || `Failed to create visualization: ${response.status}`);
+        }
+
+        const { data: newContent } = await response.json();
+        const newContentId: string = newContent.id;
+
+        // Look up the LIVE editor from the global store. This survives Fast
+        // Refresh / parent remount — unlike the closure-captured `editor`.
+        const liveEditor = contentId
+          ? useEditorInstanceStore.getState().getEditor(contentId)
+          : editor;
+
+        if (!liveEditor) {
+          toast.dismiss(toastId);
+          toast.error("Editor unavailable", {
+            description: "Couldn't insert the diagram block. Created visualization is in your file tree.",
+          });
+          return;
+        }
+
+        // Insert a fully-formed block. Since contentId is already set,
+        // there's no follow-up upgrade step and no race window.
+        const blockType = engine === "excalidraw" ? "excalidrawBlock" : "mermaidBlock";
+        liveEditor.chain().focus().insertContent({
+          type: blockType,
+          attrs: {
+            blockId: crypto.randomUUID(),
+            contentId: newContentId,
+            title: defaultTitle || "Untitled",
+            expanded: true,
+          },
+        }).run();
+        toast.dismiss(toastId);
+      } catch (err: unknown) {
+        console.error("[MarkdownEditor] create-diagram-block failed:", err);
+        toast.dismiss(toastId);
+        toast.error("Failed to create diagram", {
+          description: (err instanceof Error ? err.message : null) || "Could not create visualization",
+        });
+      }
+    };
+
+    window.addEventListener("create-diagram-block", handleCreateDiagramBlock);
+    return () => window.removeEventListener("create-diagram-block", handleCreateDiagramBlock);
+  }, [editor, parentId, contentId]);
 
   // Sprint 42: Listen for AI-generated image insertion at cursor position
   useEffect(() => {
@@ -877,7 +963,7 @@ export function MarkdownEditor({
             }
           });
           URL.revokeObjectURL(blobUrl);
-          toast.error(`Image upload failed: ${err.message}`);
+          toast.error(`Image upload failed: ${err instanceof Error ? err.message : String(err)}`);
         });
     },
     [editor, parentId]
@@ -925,12 +1011,12 @@ export function MarkdownEditor({
         </div>
       ) : null}
       {isCollaborationBooting ? (
-        <div className="border-b border-amber-500/20 bg-amber-500/10 px-4 py-2 text-sm text-amber-700">
+        <div className="border-b border-amber-500/20 bg-amber-500/10 px-4 py-2 text-sm text-amber-700 dark:text-amber-300">
           {collaborationBootMessage}
         </div>
       ) : null}
       {isCollaborationConnecting ? (
-        <div className="border-b border-amber-500/20 bg-amber-500/10 px-4 py-2 text-sm text-amber-700">
+        <div className="border-b border-amber-500/20 bg-amber-500/10 px-4 py-2 text-sm text-amber-700 dark:text-amber-300">
           Connecting collaborative editor...
         </div>
       ) : null}
@@ -975,8 +1061,9 @@ export function MarkdownEditor({
           // Modifier key = let browser show its native context menu (spell-check, inspect, etc.)
           if (e.altKey || e.ctrlKey || e.shiftKey || e.metaKey) return;
           // Allow the browser's native context menu when the dev "Inspect Element" action re-fires it
-          if ((window as any).__passNativeContextMenu) {
-            (window as any).__passNativeContextMenu = false;
+          const w = window as Window & { __passNativeContextMenu?: boolean };
+          if (w.__passNativeContextMenu) {
+            w.__passNativeContextMenu = false;
             return;
           }
           e.preventDefault();

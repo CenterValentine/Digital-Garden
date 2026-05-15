@@ -88,7 +88,7 @@ export async function exportVault(
           }
 
           // Generate metadata sidecar
-          const metadata = generateMetadataSidecar(note as any);
+          const metadata = generateMetadataSidecar(note as unknown as Parameters<typeof generateMetadataSidecar>[0]);
 
           // Convert document
           const result = await convertDocument(tiptapJson, {
@@ -211,7 +211,7 @@ export async function exportSingleDocument(
   }
 
   // Generate metadata
-  const metadata = generateMetadataSidecar(content as any);
+  const metadata = generateMetadataSidecar(content as unknown as Parameters<typeof generateMetadataSidecar>[0]);
 
   // Convert document
   const result = await convertDocument(tiptapJson, {

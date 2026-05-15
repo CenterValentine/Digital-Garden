@@ -21,7 +21,7 @@ import type { JSONContent } from "@tiptap/core";
 import { getServerExtensions } from "@/lib/domain/editor/extensions-server";
 import { instantiateTemplateContent } from "@/lib/domain/editor/template-instantiation";
 import { sanitizeTipTapJsonWithExtensions } from "@/lib/domain/editor/unsupported-content";
-import type { ContentType } from "@/lib/database/generated/prisma";
+import type { ContentType, Prisma } from "@/lib/database/generated/prisma";
 import { ensureWebResourceForExternalContent } from "@/lib/domain/browser-extension";
 import type {
   ContentWhereInput,
@@ -30,6 +30,7 @@ import type {
   CreateContentRequest,
   ContentDetailResponse,
 } from "@/lib/domain/content/api-types";
+import type { StoredChatMessage } from "@/lib/domain/ai/types";
 
 function getExternalDomainParts(url: string) {
   try {
@@ -82,11 +83,11 @@ function formatExternalResponse(payload: {
     sourceHostname: payload.sourceHostname,
     faviconUrl: payload.faviconUrl,
     preserveHtml: payload.preserveHtml,
-    preservedHtmlSnapshot: payload.preservedHtmlSnapshot as any,
+    preservedHtmlSnapshot: payload.preservedHtmlSnapshot as Record<string, unknown> | null,
     preservedHtmlCapturedAt: payload.preservedHtmlCapturedAt,
-    captureMetadata: payload.captureMetadata as any,
-    matchMetadata: payload.matchMetadata as any,
-    preview: payload.preview as any,
+    captureMetadata: payload.captureMetadata as Record<string, unknown>,
+    matchMetadata: payload.matchMetadata as Record<string, unknown>,
+    preview: payload.preview as Record<string, unknown>,
   };
 }
 
@@ -268,9 +269,11 @@ export async function GET(request: NextRequest) {
       }
       if (item.notePayload) {
         formatted.note = {
-          ...(item.notePayload.metadata as any),
+          ...(item.notePayload.metadata as Record<string, unknown>),
           searchText: item.notePayload.searchText,
-        };
+          // TODO(any-epic-phase-3b): widen `ContentListItem.note` in api-types.ts to include `searchText` + arbitrary metadata fields, or restrict the response to declared keys
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        } as any;
       }
       if (item.filePayload) {
         formatted.file = {
@@ -288,17 +291,21 @@ export async function GET(request: NextRequest) {
         formatted.html = {
           isTemplate: item.htmlPayload.isTemplate,
           searchText: item.htmlPayload.searchText,
+          // TODO(any-epic-phase-3b): widen `ContentListItem.html` in api-types.ts to include `searchText`, or drop searchText from this response
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } as any;
       }
       if (item.codePayload) {
         formatted.code = {
           language: item.codePayload.language,
           searchText: item.codePayload.searchText,
+          // TODO(any-epic-phase-3b): widen `ContentListItem.code` in api-types.ts to include `searchText`, or drop searchText from this response
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } as any;
       }
       if (item.chatPayload) {
         const msgs = Array.isArray(item.chatPayload.messages)
-          ? (item.chatPayload.messages as any[])
+          ? (item.chatPayload.messages as unknown as StoredChatMessage[])
           : [];
         formatted.chat = {
           messageCount: msgs.length,
@@ -639,8 +646,8 @@ export async function POST(request: NextRequest) {
             html,
             searchText,
             isTemplate: isTemplate || false,
-            templateSchema: (templateSchema || null) as any,
-            templateMetadata: (templateMetadata || {}) as any,
+            templateSchema: (templateSchema || null) as Prisma.InputJsonValue,
+            templateMetadata: (templateMetadata || {}) as Prisma.InputJsonValue,
             renderMode: isTemplate ? "template" : "static",
             templateEngine: isTemplate ? "nunjucks" : null,
           },
@@ -686,10 +693,10 @@ export async function POST(request: NextRequest) {
             sourceHostname: domainParts.hostname,
             faviconUrl: faviconUrl || null,
             preview: {}, // Will be populated by preview fetch
-            captureMetadata: (captureMetadata || {}) as any,
-            matchMetadata: (matchMetadata || {}) as any,
+            captureMetadata: (captureMetadata || {}) as Prisma.InputJsonValue,
+            matchMetadata: (matchMetadata || {}) as Prisma.InputJsonValue,
             preserveHtml: preserveHtml || false,
-            preservedHtmlSnapshot: (preservedHtmlSnapshot || null) as any,
+            preservedHtmlSnapshot: (preservedHtmlSnapshot || null) as Prisma.InputJsonValue,
             preservedHtmlCapturedAt:
               preserveHtml && preservedHtmlSnapshot ? new Date() : null,
           },
@@ -740,8 +747,8 @@ export async function POST(request: NextRequest) {
       payloadData = {
         chatPayload: {
           create: {
-            messages: (chatMessages ?? []) as any,
-            metadata: (chatMetadata ?? {}) as any,
+            messages: (chatMessages ?? []) as unknown as Prisma.InputJsonValue,
+            metadata: (chatMetadata ?? {}) as unknown as Prisma.InputJsonValue,
           },
         },
       };
@@ -843,23 +850,23 @@ export async function POST(request: NextRequest) {
       response.folder = {
         viewMode: content.folderPayload.viewMode,
         sortMode: content.folderPayload.sortMode,
-        viewPrefs: content.folderPayload.viewPrefs as any,
+        viewPrefs: content.folderPayload.viewPrefs as Record<string, unknown>,
         includeReferencedContent: content.folderPayload.includeReferencedContent,
       };
     }
     if (content.notePayload) {
       response.note = {
-        tiptapJson: content.notePayload.tiptapJson as any,
+        tiptapJson: content.notePayload.tiptapJson as unknown as JSONContent,
         searchText: content.notePayload.searchText,
-        metadata: content.notePayload.metadata as any,
+        metadata: content.notePayload.metadata as Record<string, unknown>,
       };
     }
     if (content.htmlPayload) {
       response.html = {
         html: content.htmlPayload.html,
         isTemplate: content.htmlPayload.isTemplate,
-        templateSchema: content.htmlPayload.templateSchema as any,
-        templateMetadata: content.htmlPayload.templateMetadata as any,
+        templateSchema: content.htmlPayload.templateSchema as Record<string, unknown>,
+        templateMetadata: content.htmlPayload.templateMetadata as Record<string, unknown>,
         renderMode: content.htmlPayload.renderMode,
         templateEngine: content.htmlPayload.templateEngine,
       };
@@ -868,7 +875,7 @@ export async function POST(request: NextRequest) {
       response.code = {
         code: content.codePayload.code,
         language: content.codePayload.language,
-        metadata: content.codePayload.metadata as any,
+        metadata: content.codePayload.metadata as Record<string, unknown>,
       };
     }
     if (content.externalPayload) {
@@ -876,8 +883,8 @@ export async function POST(request: NextRequest) {
     }
     if (content.chatPayload) {
       response.chat = {
-        messages: (content.chatPayload.messages ?? []) as any,
-        metadata: (content.chatPayload.metadata ?? {}) as any,
+        messages: (content.chatPayload.messages ?? []) as unknown as StoredChatMessage[],
+        metadata: (content.chatPayload.metadata ?? {}) as Record<string, unknown>,
       };
     }
 

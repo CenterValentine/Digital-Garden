@@ -35,7 +35,7 @@ export async function PATCH(
     const body: ChangeRoleRequest = await request.json();
 
     // Validate role
-    if (!VALID_ROLES.includes(body.role as any)) {
+    if (!(VALID_ROLES as readonly string[]).includes(body.role)) {
       return NextResponse.json(
         {
           success: false,

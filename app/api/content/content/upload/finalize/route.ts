@@ -11,6 +11,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/database/client";
 import { requireAuth } from "@/lib/infrastructure/auth/middleware";
 import type { FinalizeUploadRequest } from "@/lib/domain/content/api-types";
+import type { Prisma } from "@/lib/database/generated/prisma";
+import type { ProcessingResult } from "@/lib/infrastructure/media/types";
 
 // ============================================================
 // POST /api/content/content/upload/finalize
@@ -144,8 +146,16 @@ export async function POST(request: NextRequest) {
       content.filePayload.mimeType
     );
 
-    // Prepare metadata for database update
-    const metadata: any = processingResult?.metadata || {};
+    // Prepare metadata for database update. MediaMetadata is a union — narrow
+    // to a structural shape exposing the optional fields we read here.
+    type MetadataView = {
+      width?: number;
+      height?: number;
+      duration?: number;
+      thumbnail?: string;
+      thumbnails?: { small?: string };
+    };
+    const metadata: MetadataView = (processingResult?.metadata as MetadataView | undefined) || {};
     const thumbnailUrl = processingResult
       ? (metadata.thumbnails?.small || metadata.thumbnail || null)
       : null;
@@ -164,7 +174,7 @@ export async function POST(request: NextRequest) {
         duration: metadata.duration || null,
         isProcessed: processingResult !== null,
         processingStatus: processingResult ? "complete" : "none",
-        storageMetadata: processingResult ? (metadata as any) : {},
+        storageMetadata: processingResult ? (metadata as unknown as Prisma.InputJsonValue) : {},
       },
     });
 
@@ -238,10 +248,7 @@ async function verifyFileInStorage(
 async function processUploadedMedia(
   storageKey: string,
   mimeType: string
-): Promise<{
-  metadata: any;
-  thumbnailKeys: string[];
-} | null> {
+): Promise<ProcessingResult | null> {
   try {
     const { createMediaProcessor } = await import('@/lib/infrastructure/media');
     const mediaProcessor = await createMediaProcessor();

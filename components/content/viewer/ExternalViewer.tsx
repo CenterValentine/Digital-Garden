@@ -56,7 +56,7 @@ export function ExternalViewer({
   preview,
 }: ExternalViewerProps) {
   // Type-safe preview casting
-  const typedPreview: { mode?: "none" | "open_graph"; cached?: any } | undefined = preview
+  const typedPreview: { mode?: "none" | "open_graph"; cached?: Record<string, unknown> } | undefined = preview
     ? {
         mode: (preview.mode === "open_graph" ? "open_graph" : "none") as "none" | "open_graph",
         cached: preview.cached,

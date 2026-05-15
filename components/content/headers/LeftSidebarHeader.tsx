@@ -71,8 +71,8 @@ export function LeftSidebarHeader({
           }}
           className={`rounded p-1.5 transition-colors ${
             activeView === "files"
-              ? "text-gold-primary hover:bg-white/10"
-              : "text-gray-400 hover:bg-white/10 hover:text-gold-primary"
+              ? "text-gold-primary hover:bg-black/[0.04] dark:hover:bg-white/10"
+              : "text-gray-500 dark:text-gray-400 hover:bg-black/[0.04] dark:hover:bg-white/10 hover:text-gold-primary"
           }`}
           title="Files"
           type="button"
@@ -95,8 +95,8 @@ export function LeftSidebarHeader({
           }}
           className={`rounded p-1.5 transition-colors ${
             activeView === "search"
-              ? "text-gold-primary hover:bg-white/10"
-              : "text-gray-400 hover:bg-white/10 hover:text-gold-primary"
+              ? "text-gold-primary hover:bg-black/[0.04] dark:hover:bg-white/10"
+              : "text-gray-500 dark:text-gray-400 hover:bg-black/[0.04] dark:hover:bg-white/10 hover:text-gold-primary"
           }`}
           title="Search (Cmd+/)"
           type="button"
@@ -119,8 +119,8 @@ export function LeftSidebarHeader({
           }}
           className={`rounded p-1.5 transition-colors ${
             activeView === "extensions"
-              ? "text-gold-primary hover:bg-white/10"
-              : "text-gray-400 hover:bg-white/10 hover:text-gold-primary"
+              ? "text-gold-primary hover:bg-black/[0.04] dark:hover:bg-white/10"
+              : "text-gray-500 dark:text-gray-400 hover:bg-black/[0.04] dark:hover:bg-white/10 hover:text-gold-primary"
           }`}
           title="Extensions"
           type="button"
@@ -141,7 +141,7 @@ export function LeftSidebarHeader({
               <ActionComponent
                 key={item.id}
                 item={item}
-                className="rounded p-1.5 text-gray-400 transition-colors hover:bg-white/10 hover:text-gold-primary"
+                className="rounded p-1.5 text-gray-500 dark:text-gray-400 transition-colors hover:bg-black/[0.04] dark:hover:bg-white/10 hover:text-gold-primary"
                 iconClassName="h-5 w-5"
               />
             ) : null;
@@ -156,8 +156,8 @@ export function LeftSidebarHeader({
               }}
               className={`rounded p-1.5 transition-colors ${
                 activeView === item.view
-                  ? "text-gold-primary hover:bg-white/10"
-                  : "text-gray-400 hover:bg-white/10 hover:text-gold-primary"
+                  ? "text-gold-primary hover:bg-black/[0.04] dark:hover:bg-white/10"
+                  : "text-gray-500 dark:text-gray-400 hover:bg-black/[0.04] dark:hover:bg-white/10 hover:text-gold-primary"
               }`}
               title={item.title ?? item.label}
               type="button"
@@ -193,7 +193,7 @@ export function LeftSidebarHeader({
         {/* Panel collapse toggle */}
         <button
           onClick={toggleMode}
-          className="rounded p-1 transition-colors hover:bg-white/10 text-gray-400 hover:text-gold-primary"
+          className="rounded p-1 transition-colors hover:bg-black/[0.04] dark:hover:bg-white/10 text-gray-500 dark:text-gray-400 hover:text-gold-primary"
           title={mode === "full" ? "Collapse sidebar (Cmd+B)" : "Expand sidebar (Cmd+B)"}
           type="button"
         >

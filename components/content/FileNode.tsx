@@ -15,7 +15,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { type NodeRendererProps } from "react-arborist";
+import { type NodeRendererProps, type NodeApi } from "react-arborist";
 import * as LucideIcons from "lucide-react";
 import {
   Folder,
@@ -27,7 +27,7 @@ import {
   ExternalLink,
   ChevronRight,
   ChevronDown,
-  Image,
+  Image as ImageIcon,
   Columns3,
   LayoutDashboard,
   Network,
@@ -135,7 +135,7 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
   // Get icon based on content type or custom icon
   const getIcon = () => {
     const iconSize = "h-4 w-4";
-    const iconColor = data.iconColor || "text-gray-400";
+    const iconColor = data.iconColor || "text-gray-600 dark:text-gray-400";
 
     // Render custom icon if set
     if (data.customIcon) {
@@ -145,7 +145,7 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
       } else if (data.customIcon.startsWith("lucide:")) {
         const iconName = data.customIcon.replace("lucide:", "");
         // Dynamically import the Lucide icon
-        const LucideIcon = (LucideIcons as any)[iconName];
+        const LucideIcon = (LucideIcons as unknown as Record<string, React.ComponentType<{ className?: string }> | undefined>)[iconName];
         if (LucideIcon) {
           return <LucideIcon className={`${iconSize} ${iconColor}`} />;
         }
@@ -170,7 +170,7 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
 
       switch (viewMode) {
         case "gallery":
-          return <Image className={`${iconSize} ${iconColor}`} />;
+          return <ImageIcon className={`${iconSize} ${iconColor}`} />;
         case "kanban":
           return <Columns3 className={`${iconSize} ${iconColor}`} />;
         case "dashboard":
@@ -299,9 +299,9 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
         aria-label={isOpen ? "Collapse folder" : "Expand folder"}
       >
         {isOpen ? (
-          <ChevronDown className="h-4 w-4 text-gray-400" />
+          <ChevronDown className="h-4 w-4 text-gray-600 dark:text-gray-400" />
         ) : (
-          <ChevronRight className="h-4 w-4 text-gray-400" />
+          <ChevronRight className="h-4 w-4 text-gray-600 dark:text-gray-400" />
         )}
       </button>
     );
@@ -369,7 +369,7 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
 
     // Get currently selected node IDs from the tree
     const tree = node.tree;
-    const selectedIds = tree.selectedNodes?.map((n: any) => n.id) || [data.id];
+    const selectedIds = tree.selectedNodes?.map((n: NodeApi<TreeNode>) => n.id) || [data.id];
 
     openMenu(
       "file-tree",
@@ -520,7 +520,7 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
     if (isSelected) {
       return "bg-primary/10 text-primary"; // Selected but not active (medium)
     }
-    return "hover:bg-white/5"; // Default hover
+    return "hover:bg-black/[0.03] dark:hover:bg-black/[0.03] dark:bg-white/5"; // Default hover
   };
 
   return (
@@ -571,7 +571,7 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
           <>
             <span>{basename}</span>
             {extension && (
-              <span className="text-gray-500">{extension}</span>
+              <span className="text-gray-500 dark:text-gray-400">{extension}</span>
             )}
           </>
         )}

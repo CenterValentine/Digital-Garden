@@ -7,9 +7,37 @@
 import { useState, useEffect, useRef } from "react";
 import { getSurfaceStyles } from "@/lib/design/system";
 import { useUploadSettingsStore } from "@/state/upload-settings-store";
+import { useSettingsStore } from "@/state/settings-store";
+import {
+  useThemePreference,
+  useResolvedTheme,
+  type ThemePreference,
+} from "@/lib/features/theme";
 import { Button } from "@/components/ui/glass/button";
 import { AlertCircle, Check } from "lucide-react";
 import { toast } from "sonner";
+
+const THEME_OPTIONS: Array<{
+  value: ThemePreference;
+  label: string;
+  description: string;
+}> = [
+  {
+    value: "system",
+    label: "System",
+    description: "Match your operating system's color scheme automatically.",
+  },
+  {
+    value: "light",
+    label: "Light",
+    description: "Always use the light theme regardless of OS preference.",
+  },
+  {
+    value: "dark",
+    label: "Dark",
+    description: "Always use the dark theme regardless of OS preference.",
+  },
+];
 
 export default function PreferencesSettingsPage() {
   const glass0 = getSurfaceStyles("glass-0");
@@ -21,6 +49,28 @@ export default function PreferencesSettingsPage() {
     onlyofficeServerUrl,
     setOnlyofficeServerUrl,
   } = useUploadSettingsStore();
+
+  // Theme
+  const themePreference = useThemePreference();
+  const resolvedTheme = useResolvedTheme();
+  const setUISettings = useSettingsStore((s) => s.setUISettings);
+
+  const handleThemeChange = async (next: ThemePreference) => {
+    if (next === themePreference) return;
+    try {
+      await setUISettings({ theme: next });
+      toast.success(
+        next === "system"
+          ? `Theme set to System (currently ${resolvedTheme})`
+          : `Theme set to ${next.charAt(0).toUpperCase() + next.slice(1)}`,
+        { icon: <Check className="h-4 w-4" /> }
+      );
+    } catch (err) {
+      toast.error("Failed to save theme", {
+        description: err instanceof Error ? err.message : "Please try again",
+      });
+    }
+  };
 
   const [serverUrlInput, setServerUrlInput] = useState(onlyofficeServerUrl || "");
   const [isSaving, setIsSaving] = useState(false);
@@ -235,6 +285,58 @@ export default function PreferencesSettingsPage() {
         <p className="text-muted-foreground mt-2">Editor settings and workflow customization</p>
       </div>
 
+      {/* Theme */}
+      <div
+        className="border border-white/10 rounded-lg p-6"
+        style={{
+          background: glass0.background,
+          backdropFilter: glass0.backdropFilter,
+        }}
+      >
+        <h3 className="text-lg font-semibold mb-4">Theme</h3>
+        <div className="space-y-3">
+          <label className="block text-sm font-medium text-gray-300">Appearance</label>
+          <p className="text-xs text-gray-500">
+            Choose your preferred color scheme. &ldquo;System&rdquo; tracks your operating system and updates live when it changes.
+          </p>
+          <div className="space-y-2">
+            {THEME_OPTIONS.map((option) => (
+              <label
+                key={option.value}
+                className="flex items-start gap-3 p-2.5 rounded-lg border border-white/10 hover:bg-white/5 cursor-pointer transition-colors"
+              >
+                <input
+                  type="radio"
+                  name="themePreference"
+                  value={option.value}
+                  checked={themePreference === option.value}
+                  onChange={() => handleThemeChange(option.value)}
+                  className="mt-0.5"
+                />
+                <div className="flex-1">
+                  <div className="font-medium text-sm">{option.label}</div>
+                  <div className="text-sm text-gray-400">{option.description}</div>
+                </div>
+              </label>
+            ))}
+          </div>
+
+          {/* Current Setting Indicator */}
+          <div className="pt-2 border-t border-white/10">
+            <div className="text-xs text-gray-400">
+              <span
+                className={`inline-block w-2 h-2 rounded-full mr-2 ${
+                  resolvedTheme === "dark" ? "bg-indigo-400" : "bg-amber-400"
+                }`}
+              />
+              {themePreference === "system"
+                ? `Following system — currently ${resolvedTheme}`
+                : `Always ${resolvedTheme}`}
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* File Upload Settings */}
       <div
         className="border border-white/10 rounded-lg p-6"
@@ -293,7 +395,7 @@ export default function PreferencesSettingsPage() {
               ) : (
                 <>
                   <span className="inline-block w-2 h-2 rounded-full bg-green-500 mr-2"></span>
-                  You'll confirm each upload
+                  You&apos;ll confirm each upload
                 </>
               )}
             </div>
@@ -374,7 +476,7 @@ export default function PreferencesSettingsPage() {
                 <div className="flex-1">
                   <div className="font-medium text-sm">Microsoft Office Online (View Only)</div>
                   <div className="text-sm text-gray-400">
-                    Read-only preview using Microsoft's viewer
+                    Read-only preview using Microsoft&apos;s viewer
                   </div>
                 </div>
               </label>
@@ -509,7 +611,7 @@ export default function PreferencesSettingsPage() {
                       name="defaultFolderViewMode"
                       value={mode.value}
                       checked={defaultFolderViewMode === mode.value}
-                      onChange={(e) => setDefaultFolderViewMode(e.target.value as any)}
+                      onChange={(e) => setDefaultFolderViewMode(e.target.value as typeof defaultFolderViewMode)}
                       className="mt-0.5"
                     />
                     <div className="flex-1">
@@ -541,7 +643,7 @@ export default function PreferencesSettingsPage() {
                       name="defaultFolderSortMode"
                       value={mode.value}
                       checked={defaultFolderSortMode === mode.value}
-                      onChange={(e) => setDefaultFolderSortMode(e.target.value as any)}
+                      onChange={(e) => setDefaultFolderSortMode(e.target.value as typeof defaultFolderSortMode)}
                       className="mt-0.5"
                     />
                     <div className="flex-1">

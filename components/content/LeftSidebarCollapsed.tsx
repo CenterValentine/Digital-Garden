@@ -48,14 +48,14 @@ export function LeftSidebarCollapsed() {
   };
 
   return (
-    <div className="flex h-full w-12 flex-col items-center border-r border-white/10 bg-black/20 py-2 gap-1">
+    <div className="flex h-full w-12 flex-col items-center border-r border-black/10 dark:border-white/10 bg-black/20 py-2 gap-1">
       {/* Files icon */}
       <button
         onClick={handleFilesClick}
         className={`rounded p-2 transition-colors ${
           activeView === "files"
             ? "text-gold-primary bg-white/10"
-            : "text-gray-400 hover:bg-white/10 hover:text-gold-primary"
+            : "text-gray-600 dark:text-gray-400 hover:bg-black/[0.05] dark:hover:bg-white/10 hover:text-gold-primary"
         }`}
         title="Files"
         type="button"
@@ -69,7 +69,7 @@ export function LeftSidebarCollapsed() {
         className={`rounded p-2 transition-colors ${
           activeView === "search"
             ? "text-gold-primary bg-white/10"
-            : "text-gray-400 hover:bg-white/10 hover:text-gold-primary"
+            : "text-gray-600 dark:text-gray-400 hover:bg-black/[0.05] dark:hover:bg-white/10 hover:text-gold-primary"
         }`}
         title="Search (Cmd+/)"
         type="button"
@@ -83,7 +83,7 @@ export function LeftSidebarCollapsed() {
         className={`rounded p-2 transition-colors ${
           activeView === "extensions"
             ? "text-gold-primary bg-white/10"
-            : "text-gray-400 hover:bg-white/10 hover:text-gold-primary"
+            : "text-gray-600 dark:text-gray-400 hover:bg-black/[0.05] dark:hover:bg-white/10 hover:text-gold-primary"
         }`}
         title="Extensions"
         type="button"
@@ -98,7 +98,7 @@ export function LeftSidebarCollapsed() {
               key={item.id}
               item={item}
               collapsed
-              className="rounded p-2 text-gray-400 transition-colors hover:bg-white/10 hover:text-gold-primary"
+              className="rounded p-2 text-gray-600 dark:text-gray-400 transition-colors hover:bg-black/[0.05] dark:hover:bg-white/10 hover:text-gold-primary"
               iconClassName="h-5 w-5"
             />
           ) : null;
@@ -115,7 +115,7 @@ export function LeftSidebarCollapsed() {
             className={`rounded p-2 transition-colors ${
               activeView === item.view
                 ? "text-gold-primary bg-white/10"
-                : "text-gray-400 hover:bg-white/10 hover:text-gold-primary"
+                : "text-gray-600 dark:text-gray-400 hover:bg-black/[0.05] dark:hover:bg-white/10 hover:text-gold-primary"
             }`}
             title={item.title ?? item.label}
             type="button"

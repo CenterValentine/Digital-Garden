@@ -3,6 +3,17 @@
  *
  * Three-tier glass surface system for depth and hierarchy.
  * Used across ALL routes (not just /notes/**).
+ *
+ * Theme handling: as of the dark-mode epoch, `getSurfaceStyles` returns CSS
+ * variable references (e.g. `var(--surface-glass-0-bg)`) rather than fixed
+ * rgba values. The variables are defined in globals.css under `:root` (light)
+ * and `.dark` (dark). The browser re-evaluates on cascade change, so callers
+ * — including server components — automatically respect theme switches
+ * without any React re-render or hook plumbing.
+ *
+ * The `surfaces` / `surfacesDark` objects below remain exported for any
+ * non-CSS consumer that needs literal values (e.g. canvas painting). They
+ * are NOT used by `getSurfaceStyles` itself.
  */
 
 export const surfaces = {
@@ -31,7 +42,7 @@ export const surfaces = {
 
 export type Surface = keyof typeof surfaces;
 
-// Dark mode adjustments
+// Dark mode adjustments (kept for direct consumers; not consulted by getSurfaceStyles)
 export const surfacesDark = {
   "glass-0": {
     background: "rgba(0, 0, 0, 0.3)",
@@ -48,16 +59,17 @@ export const surfacesDark = {
 } as const;
 
 /**
- * Get surface styles for a given surface level
+ * Get surface styles for a given surface level.
+ *
+ * Returns CSS-variable references; the browser resolves them per theme via
+ * the `.dark` cascade. The legacy `isDark` parameter is accepted for
+ * back-compat but ignored — theming is handled by CSS now.
  */
-export function getSurfaceStyles(surface: Surface, isDark: boolean = false) {
-  const base = surfaces[surface];
-  const dark = isDark ? surfacesDark[surface] : null;
-
+export function getSurfaceStyles(surface: Surface, _isDark: boolean = false) {
   return {
-    background: dark?.background || base.background,
-    backdropFilter: `blur(${base.backdropBlur})`,
-    border: dark?.border || base.border,
-    boxShadow: base.shadow,
+    background: `var(--surface-${surface}-bg)`,
+    backdropFilter: `blur(var(--surface-${surface}-blur))`,
+    border: `var(--surface-${surface}-border)`,
+    boxShadow: `var(--surface-${surface}-shadow)`,
   };
 }

@@ -20,6 +20,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/database/client";
 import { extractTags } from "@/lib/domain/content/tag-extractor";
 import type { JSONContent } from "@tiptap/core";
+import type { Prisma } from "@/lib/database/generated/prisma";
 
 interface ExtractTagsRequest {
   userId: string;
@@ -76,12 +77,12 @@ export async function POST(request: NextRequest) {
           },
         },
         update: {
-          positions: extractedTag.positions as any,
+          positions: extractedTag.positions as unknown as Prisma.InputJsonValue,
         },
         create: {
           contentId,
           tagId: tag.id,
-          positions: extractedTag.positions as any,
+          positions: extractedTag.positions as unknown as Prisma.InputJsonValue,
         },
       });
 

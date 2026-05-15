@@ -15,36 +15,40 @@ import type { JSONContent } from "@tiptap/core";
 /**
  * Get converter for specified format
  *
+ * Uses dynamic `import()` per case to defer loading until the format is
+ * actually requested. This preserves the original `require()`-based
+ * lazy-load behavior (avoid pulling every converter into the bundle on
+ * first call) while staying compatible with ESM/strict TypeScript.
+ *
  * @param format - Target export format
  * @returns Document converter instance
  */
-export function getConverter(format: ExportFormat): DocumentConverter {
+export async function getConverter(format: ExportFormat): Promise<DocumentConverter> {
   switch (format) {
-    case "markdown":
-      // Lazy load to avoid circular dependencies
-      const { MarkdownConverter } = require("./converters/markdown");
+    case "markdown": {
+      const { MarkdownConverter } = await import("./converters/markdown");
       return new MarkdownConverter();
-
-    case "html":
-      const { HTMLConverter } = require("./converters/html");
+    }
+    case "html": {
+      const { HTMLConverter } = await import("./converters/html");
       return new HTMLConverter();
-
-    case "json":
-      const { JSONConverter } = require("./converters/json");
+    }
+    case "json": {
+      const { JSONConverter } = await import("./converters/json");
       return new JSONConverter();
-
-    case "txt":
-      const { PlainTextConverter } = require("./converters/plaintext");
+    }
+    case "txt": {
+      const { PlainTextConverter } = await import("./converters/plaintext");
       return new PlainTextConverter();
-
-    case "pdf":
-      const { PDFConverter } = require("./converters/pdf");
+    }
+    case "pdf": {
+      const { PDFConverter } = await import("./converters/pdf");
       return new PDFConverter();
-
-    case "docx":
-      const { DOCXConverter } = require("./converters/docx");
+    }
+    case "docx": {
+      const { DOCXConverter } = await import("./converters/docx");
       return new DOCXConverter();
-
+    }
     default:
       throw new Error(`Unsupported export format: ${format}`);
   }
@@ -62,7 +66,7 @@ export async function convertDocument(
   options: ConversionOptions
 ): Promise<ConversionResult> {
   try {
-    const converter = getConverter(options.format);
+    const converter = await getConverter(options.format);
     return await converter.convert(tiptapJson, options);
   } catch (error) {
     console.error(`[Export] Conversion failed for format ${options.format}:`, error);

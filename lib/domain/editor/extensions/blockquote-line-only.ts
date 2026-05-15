@@ -17,6 +17,7 @@
 
 import { Extension } from "@tiptap/core";
 import { Plugin, PluginKey } from "@tiptap/pm/state";
+import type { Node as ProseMirrorNode } from "@tiptap/pm/model";
 
 export const BlockquoteLineOnly = Extension.create({
   name: "blockquoteLineOnly",
@@ -48,8 +49,8 @@ export const BlockquoteLineOnly = Extension.create({
             if (!hardBreakFound) return;
 
             // Split the paragraph at the hardBreak
-            const beforeContent: any[] = [];
-            const afterContent: any[] = [];
+            const beforeContent: ProseMirrorNode[] = [];
+            const afterContent: ProseMirrorNode[] = [];
             let pastBreak = false;
 
             firstChild.forEach((child) => {

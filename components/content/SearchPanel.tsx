@@ -553,8 +553,8 @@ export function SearchPanel() {
 
         {/* Empty State - No Query */}
         {!localQuery.trim() && !isLoading && (
-          <div className="flex flex-col items-center justify-center p-8 text-center text-sm text-gray-500">
-            <svg className="mb-3 h-12 w-12 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="flex flex-col items-center justify-center p-8 text-center text-sm text-gray-500 dark:text-gray-400">
+            <svg className="mb-3 h-12 w-12 text-gray-600 dark:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -563,14 +563,14 @@ export function SearchPanel() {
               />
             </svg>
             <p>Type to search your documents</p>
-            <p className="mt-1 text-xs text-gray-600">Press Cmd+/ to close search</p>
+            <p className="mt-1 text-xs text-gray-600 dark:text-gray-400">Press Cmd+/ to close search</p>
           </div>
         )}
 
         {/* Empty State - No Results */}
         {localQuery.trim() && !isLoading && results.length === 0 && !error && (
-          <div className="flex flex-col items-center justify-center p-8 text-center text-sm text-gray-500">
-            <svg className="mb-3 h-12 w-12 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="flex flex-col items-center justify-center p-8 text-center text-sm text-gray-500 dark:text-gray-400">
+            <svg className="mb-3 h-12 w-12 text-gray-600 dark:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"

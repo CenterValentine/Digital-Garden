@@ -38,6 +38,7 @@ export function ExternalLinkDialog({
   // Reset state when dialog opens/closes
   useEffect(() => {
     if (open) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- audited, see BACKLOG.md
       setName(initialName);
       setUrl(initialUrl || "https://");
       setUrlCopied(false);

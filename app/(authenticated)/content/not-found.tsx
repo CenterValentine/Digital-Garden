@@ -9,7 +9,7 @@ export default function NotesNotFound() {
           Note Not Found
         </h2>
         <p className="mt-2 text-muted-foreground">
-          The note you're looking for doesn't exist or has been moved.
+          The note you&apos;re looking for doesn&apos;t exist or has been moved.
         </p>
         <div className="mt-6">
           <Link

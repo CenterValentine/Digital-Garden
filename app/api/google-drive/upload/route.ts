@@ -13,6 +13,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSession, getValidGoogleAccessToken } from "@/lib/infrastructure/auth";
 import { prisma } from "@/lib/database/client";
 import { setGoogleDriveMetadata } from "@/lib/domain/content/metadata-types";
+import type { Prisma } from "@/lib/database/generated/prisma";
 
 interface UploadRequest {
   contentId: string;
@@ -149,7 +150,7 @@ export async function POST(request: NextRequest) {
 
       await prisma.filePayload.update({
         where: { contentId },
-        data: { storageMetadata: updatedMetadata as any },
+        data: { storageMetadata: updatedMetadata as Prisma.InputJsonValue },
       });
 
       console.log("[Google Drive Upload] Saved file ID to database metadata");

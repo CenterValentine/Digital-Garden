@@ -19,13 +19,15 @@ import { MermaidToolbar } from "./MermaidToolbar";
 import { toast } from "sonner";
 import type * as Y from "yjs";
 import type { CollaborationRuntimeHandle } from "@/lib/domain/collaboration/runtime";
+import { useResolvedTheme } from "@/lib/features/theme";
 
-// Dynamically import mermaid to avoid SSR issues
-const initializeMermaid = async () => {
+// Dynamically import mermaid to avoid SSR issues. Theme is re-applied when the
+// resolved app theme changes (see effect below) so diagrams follow the user.
+const initializeMermaid = async (theme: "light" | "dark") => {
   const mermaid = (await import("mermaid")).default;
   mermaid.initialize({
     startOnLoad: false,
-    theme: "dark",
+    theme: theme === "dark" ? "dark" : "default",
     securityLevel: "strict", // Prevent XSS
     fontFamily: "monospace",
   });
@@ -90,15 +92,18 @@ export function MermaidViewer({
   const [mermaidReady, setMermaidReady] = useState(false);
 
   const previewRef = useRef<HTMLDivElement>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- TODO(any-epic-phase-4): mermaid is lazy-imported and its default export isn't easily typed; narrow once initializeMermaid returns a typed handle
   const mermaidRef = useRef<any>(null);
+  const resolvedTheme = useResolvedTheme();
 
-  // Initialize Mermaid
+  // Initialize Mermaid; re-init when theme flips so diagram redraws with
+  // matching node/edge colors.
   useEffect(() => {
-    initializeMermaid().then((mermaid) => {
+    initializeMermaid(resolvedTheme).then((mermaid) => {
       mermaidRef.current = mermaid;
       setMermaidReady(true);
     });
-  }, []);
+  }, [resolvedTheme]);
 
   // Debounced save function
   const debouncedSave = useCallback(
@@ -115,10 +120,10 @@ export function MermaidViewer({
             setLastSaved(new Date());
             setIsModified(false);
             console.log("[MermaidViewer] Auto-saved successfully");
-          } catch (error: any) {
+          } catch (error: unknown) {
             console.error("[MermaidViewer] Save failed:", error);
             toast.error("Failed to save diagram", {
-              description: error.message || "Could not save changes",
+              description: (error instanceof Error ? error.message : null) || "Could not save changes",
             });
           } finally {
             setIsSaving(false);
@@ -226,9 +231,9 @@ export function MermaidViewer({
         const { svg } = await mermaidRef.current.render(id, source);
         previewRef.current!.innerHTML = svg;
         setRenderError(null);
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.error("[MermaidViewer] Render error:", error);
-        const errorMessage = error.message || "Syntax error";
+        const errorMessage = (error instanceof Error ? error.message : null) || "Syntax error";
         setRenderError(errorMessage);
 
         // Show toast with detailed error
@@ -251,7 +256,7 @@ export function MermaidViewer({
     };
 
     renderDiagram();
-  }, [source, mermaidReady, isEditMode]); // Re-render when toggling edit mode
+  }, [source, mermaidReady, isEditMode, resolvedTheme]); // Re-render when toggling edit mode or theme
 
   // Export handler
   const handleExport = async (format: "png" | "svg" | "md") => {
@@ -297,10 +302,10 @@ export function MermaidViewer({
         // Delay cleanup to ensure download starts
         setTimeout(() => URL.revokeObjectURL(url), 100);
         toast.success("Exported as SVG");
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.error("[MermaidViewer] SVG export failed:", error);
         toast.error("SVG export failed", {
-          description: error.message || "Could not export as SVG",
+          description: (error instanceof Error ? error.message : null) || "Could not export as SVG",
         });
       }
       return;
@@ -349,10 +354,10 @@ export function MermaidViewer({
               });
             }
           });
-        } catch (error: any) {
+        } catch (error: unknown) {
           console.error("[MermaidViewer] PNG export canvas error:", error);
           toast.error("PNG export failed", {
-            description: error.message || "Could not convert to PNG",
+            description: (error instanceof Error ? error.message : null) || "Could not convert to PNG",
           });
         }
       };
@@ -365,10 +370,10 @@ export function MermaidViewer({
       };
 
       img.src = "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(svgData)));
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("[MermaidViewer] PNG export failed:", error);
       toast.error("PNG export failed", {
-        description: error.message || "Could not export as PNG",
+        description: (error instanceof Error ? error.message : null) || "Could not export as PNG",
       });
     }
   };
@@ -448,8 +453,8 @@ export function MermaidViewer({
           but without this strip the user has no way to toggle Edit mode or
           jump to fullscreen. Kept minimal so it doesn't eat vertical space. */}
       {isEmbedded && !isFullScreen && (
-        <div className="flex items-center justify-between gap-2 border-b border-white/10 bg-white/5 px-3 py-1.5 text-xs">
-          <div className="flex items-center gap-2 text-gray-300">
+        <div className="flex items-center justify-between gap-2 border-b border-black/10 dark:border-white/10 bg-black/[0.03] dark:bg-white/5 px-3 py-1.5 text-xs">
+          <div className="flex items-center gap-2 text-gray-700 dark:text-gray-300">
             <GitBranch className="h-3.5 w-3.5 text-blue-400" />
             <span className="font-medium">{title}</span>
             {isModified && <span className="text-yellow-400">• Unsaved</span>}

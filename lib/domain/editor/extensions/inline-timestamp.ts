@@ -571,6 +571,11 @@ export const InlineTimestamp = Node.create({
         dom,
         update(updatedNode) {
           if (updatedNode.type.name !== "inlineTimestamp") return false;
+          // The destructured `node` is const; reassigning it lets the
+          // closure pick up the updated attrs on next render. TS rejects
+          // const-write, but at runtime this is the canonical NodeView
+          // pattern for in-place attr updates.
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any -- TODO(any-epic-phase-4): refactor to use `let currentNode = node` outside the closure
           (node as any) = updatedNode;
           render();
           return true;

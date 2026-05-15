@@ -12,6 +12,7 @@
 
 "use client";
 
+import type React from "react";
 import { useState, useEffect, useRef, useMemo } from "react";
 import { createPortal } from "react-dom";
 import * as LucideIcons from "lucide-react";
@@ -92,6 +93,7 @@ export function IconSelector({
   // Two-phase rendering: measure then position
   useEffect(() => {
     if (inlineAnchor) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- audited, see BACKLOG.md
       setMenuPosition({ x: 0, y: 0 });
       return;
     }
@@ -111,6 +113,7 @@ export function IconSelector({
   // Reset state when opening
   useEffect(() => {
     if (isOpen) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- audited, see BACKLOG.md
       setSearchQuery("");
       setActiveTab(!iconOnly && currentIcon?.startsWith("emoji:") ? "emoji" : "icons");
     }
@@ -253,7 +256,7 @@ export function IconSelector({
           <div className="grid grid-cols-6 gap-1">
             {filteredIcons.length > 0 ? (
               filteredIcons.map((iconName) => {
-                const IconComponent = (LucideIcons as any)[iconName];
+                const IconComponent = (LucideIcons as unknown as Record<string, React.ComponentType<{ className?: string }> | undefined>)[iconName];
                 const isSelected = currentIcon === `lucide:${iconName}`;
                 const displayName = formatIconName(iconName);
 
@@ -274,7 +277,7 @@ export function IconSelector({
               })
             ) : (
               <div className="col-span-6 py-6 text-center text-xs text-gray-500">
-                No icons found for "{searchQuery}"
+                No icons found for &quot;{searchQuery}&quot;
               </div>
             )}
           </div>

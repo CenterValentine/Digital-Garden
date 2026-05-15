@@ -7,17 +7,20 @@
     "dev:collab": "tsx server/hocuspocus/bootstrap.ts",
     "start:collab": "tsx server/hocuspocus/bootstrap.ts",
     "typecheck": "tsc --noEmit",
-    "build": "prisma generate && pnpm build:tokens && tsc --noEmit && pnpm collab:schema:check && next build --webpack",
+    "build": "prisma generate && pnpm build:tokens && tsc --noEmit && pnpm collab:schema:check && pnpm lint && next build --webpack",
     "vercel-build": "prisma generate && pnpm build:tokens && next build --webpack",
     "start": "next start",
-    "lint": "eslint",
+    "lint": "eslint --max-warnings 175",
     "build:tokens": "style-dictionary build --config style-dictionary.config.js",
     "collab:schema:check": "tsx scripts/validate-collaboration-schema.ts",
     "db:seed": "tsx prisma/seed.ts",
     "collab:env:check": "tsx scripts/check-hocuspocus-env.ts",
     "extension:tokens": "node scripts/sync-extension-tokens.mjs",
     "extension:build": "node scripts/build-extension.mjs",
-    "extension:dev": "node scripts/build-extension.mjs --dev"
+    "extension:dev": "node scripts/build-extension.mjs --dev",
+    "test:e2e": "playwright test",
+    "test:e2e:update": "playwright test --update-snapshots",
+    "test:e2e:report": "playwright show-report"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
@@ -159,6 +162,7 @@
     "zustand": "^5.0.2"
   },
   "devDependencies": {
+    "@playwright/test": "^1.60.0",
     "@tailwindcss/postcss": "^4",
     "@types/fluent-ffmpeg": "^2.1.28",
     "@types/node": "^20",

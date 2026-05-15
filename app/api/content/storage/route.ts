@@ -8,6 +8,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/database/client";
 import { requireAuth } from "@/lib/infrastructure/auth/middleware";
+import type { Prisma } from "@/lib/database/generated/prisma";
 import type {
   CreateStorageConfigRequest,
   R2Config,
@@ -43,7 +44,10 @@ export async function GET(request: NextRequest) {
 
     // Sanitize configs - remove sensitive credentials, keep display info
     const configs = rawConfigs.map((config) => {
-      const sanitizedConfig = sanitizeConfig(config.provider, config.config as any);
+      const sanitizedConfig = sanitizeConfig(
+        config.provider as "r2" | "s3" | "vercel",
+        config.config as unknown as StorageConfig
+      );
 
       return {
         id: config.id,
@@ -174,7 +178,7 @@ export async function POST(request: NextRequest) {
         userId: session.user.id,
         provider,
         displayName: displayName || `${provider.toUpperCase()} Storage`,
-        config: config as any,
+        config: config as unknown as Prisma.InputJsonValue,
         isDefault: isDefault || false,
         isActive: true,
       },
@@ -220,18 +224,18 @@ export async function POST(request: NextRequest) {
  */
 function sanitizeConfig(
   provider: "r2" | "s3" | "vercel",
-  config: any
-): Record<string, any> {
+  config: StorageConfig
+): Record<string, unknown> {
   if (provider === "r2") {
     return {
-      bucket: config.bucket || null,
-      endpoint: config.endpoint || null,
+      bucket: ("bucket" in config && config.bucket) || null,
+      endpoint: ("endpoint" in config && config.endpoint) || null,
       // Omit: accountId, accessKeyId, secretAccessKey
     };
   } else if (provider === "s3") {
     return {
-      bucket: config.bucket || null,
-      region: config.region || null,
+      bucket: ("bucket" in config && config.bucket) || null,
+      region: ("region" in config && config.region) || null,
       // Omit: accessKeyId, secretAccessKey
     };
   } else if (provider === "vercel") {

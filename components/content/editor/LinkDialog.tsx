@@ -39,6 +39,7 @@ export function LinkDialog({ editor, open, onOpenChange }: LinkDialogProps) {
       const { from, to } = editor.state.selection;
       const selectedText = editor.state.doc.textBetween(from, to, " ");
 
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- audited, see BACKLOG.md
       setUrl(href || "");
       setText(selectedText || "");
 

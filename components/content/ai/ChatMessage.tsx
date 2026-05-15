@@ -136,7 +136,7 @@ export const ChatMessage = memo(function ChatMessage({
           "flex h-7 w-7 shrink-0 items-center justify-center rounded-full",
           isUser
             ? "bg-blue-500/20 text-blue-400"
-            : "bg-white/10 text-gray-400"
+            : "bg-white/10 text-gray-600 dark:text-gray-400"
         )}
       >
         {isUser ? (
@@ -179,7 +179,7 @@ export const ChatMessage = memo(function ChatMessage({
             return (
               <div
                 key={i}
-                className="rounded-xl px-3.5 py-2.5 text-sm leading-relaxed bg-white/5 text-[#E5D4B0] border border-white/10"
+                className="rounded-xl px-3.5 py-2.5 text-sm leading-relaxed bg-black/[0.03] dark:bg-white/5 text-[#E5D4B0] border border-black/10 dark:border-white/10"
               >
                 <MarkdownContent text={part.text} />
               </div>
@@ -324,12 +324,12 @@ const markdownComponents: Components = {
 
   // ── Lists ──
   ul: ({ children }) => (
-    <ul className="mb-2 ml-4 list-disc space-y-0.5 marker:text-gray-500 last:mb-0">
+    <ul className="mb-2 ml-4 list-disc space-y-0.5 marker:text-gray-500 dark:text-gray-400 last:mb-0">
       {children}
     </ul>
   ),
   ol: ({ children }) => (
-    <ol className="mb-2 ml-4 list-decimal space-y-0.5 marker:text-gray-500 last:mb-0">
+    <ol className="mb-2 ml-4 list-decimal space-y-0.5 marker:text-gray-500 dark:text-gray-400 last:mb-0">
       {children}
     </ol>
   ),
@@ -337,7 +337,7 @@ const markdownComponents: Components = {
 
   // ── Blockquotes ──
   blockquote: ({ children }) => (
-    <blockquote className="border-l-2 border-primary/40 pl-3 my-2 text-gray-400 italic">
+    <blockquote className="border-l-2 border-primary/40 pl-3 my-2 text-gray-600 dark:text-gray-400 italic">
       {children}
     </blockquote>
   ),
@@ -348,7 +348,7 @@ const markdownComponents: Components = {
   ),
   em: ({ children }) => <em className="italic">{children}</em>,
   del: ({ children }) => (
-    <del className="text-gray-500 line-through">{children}</del>
+    <del className="text-gray-500 dark:text-gray-400 line-through">{children}</del>
   ),
   code: (props: React.JSX.IntrinsicElements["code"] & ExtraProps) => {
     const { children, className, node, ...rest } = props;
@@ -377,28 +377,28 @@ const markdownComponents: Components = {
 
   // ── Tables ──
   table: ({ children }) => (
-    <div className="my-2 overflow-x-auto rounded-lg border border-white/10">
+    <div className="my-2 overflow-x-auto rounded-lg border border-black/10 dark:border-white/10">
       <table className="w-full text-xs">{children}</table>
     </div>
   ),
   thead: ({ children }) => (
-    <thead className="bg-white/5 border-b border-white/10">{children}</thead>
+    <thead className="bg-black/[0.03] dark:bg-white/5 border-b border-black/10 dark:border-white/10">{children}</thead>
   ),
   tbody: ({ children }) => <tbody>{children}</tbody>,
   tr: ({ children }) => (
     <tr className="border-b border-white/5 last:border-0">{children}</tr>
   ),
   th: ({ children }) => (
-    <th className="px-3 py-1.5 text-left font-medium text-gray-300">
+    <th className="px-3 py-1.5 text-left font-medium text-gray-700 dark:text-gray-300">
       {children}
     </th>
   ),
   td: ({ children }) => (
-    <td className="px-3 py-1.5 text-gray-400">{children}</td>
+    <td className="px-3 py-1.5 text-gray-600 dark:text-gray-400">{children}</td>
   ),
 
   // ── Horizontal Rule ──
-  hr: () => <hr className="my-3 border-white/10" />,
+  hr: () => <hr className="my-3 border-black/10 dark:border-white/10" />,
 
   // ── Task list checkbox (from remark-gfm) ──
   input: (props: React.JSX.IntrinsicElements["input"]) => {
@@ -448,15 +448,15 @@ function CodeBlock({
   }, [language, children]);
 
   return (
-    <div className="group/code relative my-2 rounded-lg bg-black/40 border border-white/10 overflow-hidden">
+    <div className="group/code relative my-2 rounded-lg bg-black/40 border border-black/10 dark:border-white/10 overflow-hidden">
       {/* Header bar */}
-      <div className="flex items-center justify-between px-3 py-1.5 bg-white/5 border-b border-white/5">
-        <span className="text-[10px] uppercase tracking-wider text-gray-500 font-medium">
+      <div className="flex items-center justify-between px-3 py-1.5 bg-black/[0.03] dark:bg-white/5 border-b border-white/5">
+        <span className="text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 font-medium">
           {language}
         </span>
         <button
           onClick={handleCopy}
-          className="flex items-center gap-1 text-[10px] text-gray-500 hover:text-gray-300 transition-colors"
+          className="flex items-center gap-1 text-[10px] text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-700 dark:text-gray-300 transition-colors"
           title="Copy code"
         >
           {copied ? (
@@ -473,7 +473,7 @@ function CodeBlock({
         </button>
       </div>
       {/* Code content */}
-      <pre className="overflow-x-auto p-3 text-xs font-mono leading-relaxed text-gray-300">
+      <pre className="overflow-x-auto p-3 text-xs font-mono leading-relaxed text-gray-700 dark:text-gray-300">
         <code>{highlighted ?? children}</code>
       </pre>
     </div>
@@ -582,8 +582,8 @@ function ToolCallBubble({
   }, [hasResult, result]);
 
   return (
-    <div className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs">
-      <div className="flex items-center gap-2 text-gray-400">
+    <div className="rounded-lg border border-black/10 dark:border-white/10 bg-black/[0.03] dark:bg-white/5 px-3 py-2 text-xs">
+      <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
         {isRunning ? (
           <Loader2 className="h-3 w-3 animate-spin text-amber-400" />
         ) : (
@@ -603,7 +603,7 @@ function ToolCallBubble({
               "ml-auto p-0.5 rounded transition-colors",
               showRaw
                 ? "text-amber-400 bg-amber-400/10"
-                : "text-gray-600 hover:text-gray-400"
+                : "text-gray-600 hover:text-gray-600 dark:hover:text-gray-600 dark:text-gray-400"
             )}
             title="Toggle raw response (dev only)"
           >
@@ -612,14 +612,14 @@ function ToolCallBubble({
         )}
       </div>
       {hasResult && displayResult && !showRaw && (
-        <div className="mt-1.5 border-t border-white/5 pt-1.5 text-gray-500">
+        <div className="mt-1.5 border-t border-white/5 pt-1.5 text-gray-500 dark:text-gray-400">
           {displayResult}
         </div>
       )}
       {/* Dev-only: full raw response */}
       {isDev && showRaw && hasResult && result !== undefined && (
         <div className="mt-1.5 border-t border-white/5 pt-1.5">
-          <pre className="overflow-x-auto text-[10px] font-mono text-gray-500 whitespace-pre-wrap break-all max-h-60 overflow-y-auto">
+          <pre className="overflow-x-auto text-[10px] font-mono text-gray-500 dark:text-gray-400 whitespace-pre-wrap break-all max-h-60 overflow-y-auto">
             {typeof result === "string" ? result : JSON.stringify(result, null, 2)}
           </pre>
         </div>
@@ -680,7 +680,7 @@ function GeneratedImageCard({ payload }: { payload: ImagePayload }) {
   );
 
   return (
-    <div className="rounded-xl border border-white/10 bg-white/5 overflow-hidden max-w-sm">
+    <div className="rounded-xl border border-black/10 dark:border-white/10 bg-black/[0.03] dark:bg-white/5 overflow-hidden max-w-sm">
       {/* Image */}
       <div
         className="relative group cursor-grab active:cursor-grabbing"
@@ -711,13 +711,13 @@ function GeneratedImageCard({ payload }: { payload: ImagePayload }) {
       {/* Info + Actions */}
       <div className="px-3 py-2 space-y-2">
         {/* Prompt summary */}
-        <p className="text-xs text-gray-400 line-clamp-2">
+        <p className="text-xs text-gray-600 dark:text-gray-400 line-clamp-2">
           {payload.revisedPrompt || payload.prompt}
         </p>
 
         {/* Provider badge */}
-        <div className="flex items-center gap-2 text-[10px] text-gray-500">
-          <span className="rounded bg-white/5 px-1.5 py-0.5">
+        <div className="flex items-center gap-2 text-[10px] text-gray-500 dark:text-gray-400">
+          <span className="rounded bg-black/[0.03] dark:bg-white/5 px-1.5 py-0.5">
             {payload.providerId}/{payload.modelId}
           </span>
           {payload.width > 0 && payload.height > 0 && (
@@ -737,7 +737,7 @@ function GeneratedImageCard({ payload }: { payload: ImagePayload }) {
               ? "bg-green-500/20 text-green-300 border border-green-500/20"
               : canInsert
                 ? "bg-blue-500/20 text-blue-300 border border-blue-500/20 hover:bg-blue-500/30"
-                : "bg-white/5 text-gray-500 border border-white/5 cursor-not-allowed"
+                : "bg-black/[0.03] dark:bg-white/5 text-gray-500 dark:text-gray-400 border border-white/5 cursor-not-allowed"
           )}
         >
           {inserted ? (
@@ -760,7 +760,7 @@ function GeneratedImageCard({ payload }: { payload: ImagePayload }) {
 /** Pulsing dots animation for streaming state */
 function StreamingIndicator() {
   return (
-    <div className="inline-flex items-center gap-1.5 rounded-xl bg-white/5 border border-white/10 px-3.5 py-2.5">
+    <div className="inline-flex items-center gap-1.5 rounded-xl bg-black/[0.03] dark:bg-white/5 border border-black/10 dark:border-white/10 px-3.5 py-2.5">
       <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-gray-400" />
       <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-gray-400 [animation-delay:150ms]" />
       <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-gray-400 [animation-delay:300ms]" />

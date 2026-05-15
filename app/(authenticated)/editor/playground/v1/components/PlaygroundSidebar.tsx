@@ -14,6 +14,7 @@ export function PlaygroundSidebar() {
 
   // Mount effect
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- audited, see BACKLOG.md
     setMounted(true);
   }, []);
 

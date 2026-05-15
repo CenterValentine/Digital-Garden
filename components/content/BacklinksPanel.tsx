@@ -137,14 +137,14 @@ export function BacklinksPanel({ contentId }: BacklinksPanelProps) {
   const handleContentClick = (item: AssociatedContentItem["content"] | BacklinkItem, contentType?: string) => {
     setSelectedContentId(item.id, {
       title: item.title,
-      contentType: (contentType || ("contentType" in item ? item.contentType : "note")) as any,
+      contentType: contentType || ("contentType" in item ? item.contentType : "note"),
     });
   };
 
   if (!contentId) {
     return (
       <div className="flex h-full items-center justify-center p-4 text-center">
-        <div className="text-sm text-gray-400">Select content to see links</div>
+        <div className="text-sm text-gray-600 dark:text-gray-400">Select content to see links</div>
       </div>
     );
   }
@@ -152,7 +152,7 @@ export function BacklinksPanel({ contentId }: BacklinksPanelProps) {
   if (isLoading) {
     return (
       <div className="flex h-full items-center justify-center p-4">
-        <div className="text-sm text-gray-400">Loading links...</div>
+        <div className="text-sm text-gray-600 dark:text-gray-400">Loading links...</div>
       </div>
     );
   }
@@ -172,8 +172,8 @@ export function BacklinksPanel({ contentId }: BacklinksPanelProps) {
   if (data && !hasBacklinks && !hasResources && !hasAssociatedContent) {
     return (
       <div className="flex h-full flex-col items-center justify-center p-4 text-center">
-        <div className="mb-2 text-sm font-medium text-gray-300">No links yet</div>
-        <div className="text-xs text-gray-500">
+        <div className="mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">No links yet</div>
+        <div className="text-xs text-gray-500 dark:text-gray-400">
           No note backlinks or associated webpage content were found for “{data.content.title}”
         </div>
       </div>
@@ -182,9 +182,9 @@ export function BacklinksPanel({ contentId }: BacklinksPanelProps) {
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
-      <div className="shrink-0 border-b border-white/10 px-4 py-3">
-        <div className="text-sm font-medium text-gray-300">Links</div>
-        <div className="text-xs text-gray-500">
+      <div className="shrink-0 border-b border-black/10 dark:border-white/10 px-4 py-3">
+        <div className="text-sm font-medium text-gray-700 dark:text-gray-300">Links</div>
+        <div className="text-xs text-gray-500 dark:text-gray-400">
           Backlinks and webpage associations for “{data?.content.title}”
         </div>
       </div>
@@ -192,17 +192,17 @@ export function BacklinksPanel({ contentId }: BacklinksPanelProps) {
       <div className="flex-1 overflow-y-auto p-4 space-y-5">
         {hasBacklinks && (
           <section className="space-y-3">
-            <div className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">
+            <div className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">
               Note backlinks
             </div>
             {data?.backlinks.map((backlink) => (
               <button
                 key={backlink.id}
                 onClick={() => handleContentClick(backlink, "note")}
-                className="w-full rounded-lg border border-white/10 bg-white/5 p-3 text-left transition-all hover:border-white/20 hover:bg-white/10 hover:shadow-sm"
+                className="w-full rounded-lg border border-black/10 dark:border-white/10 bg-black/[0.03] dark:bg-white/5 p-3 text-left transition-all hover:border-black/15 dark:hover:border-white/20 hover:bg-black/[0.05] dark:hover:bg-white/10 hover:shadow-sm"
               >
                 <div className="mb-2 flex items-center gap-2">
-                  <ArrowLeft className="h-3.5 w-3.5 shrink-0 text-gray-400" />
+                  <ArrowLeft className="h-3.5 w-3.5 shrink-0 text-gray-600 dark:text-gray-400" />
                   <div className="truncate text-sm font-medium text-gray-200">
                     {backlink.title}
                   </div>
@@ -212,7 +212,7 @@ export function BacklinksPanel({ contentId }: BacklinksPanelProps) {
                     “{backlink.linkText}”
                   </div>
                 )}
-                <div className="line-clamp-2 text-xs text-gray-400">
+                <div className="line-clamp-2 text-xs text-gray-600 dark:text-gray-400">
                   {backlink.excerpt}
                 </div>
               </button>
@@ -222,7 +222,7 @@ export function BacklinksPanel({ contentId }: BacklinksPanelProps) {
 
         {hasResources && (
           <section className="space-y-3">
-            <div className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">
+            <div className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">
               Associated webpages
             </div>
             {data?.associatedWebResources.map((resource) => (
@@ -231,19 +231,22 @@ export function BacklinksPanel({ contentId }: BacklinksPanelProps) {
                 href={resource.canonicalUrl || resource.normalizedUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="block rounded-lg border border-white/10 bg-white/5 p-3 text-left transition-all hover:border-white/20 hover:bg-white/10 hover:shadow-sm"
+                className="block rounded-lg border border-black/10 dark:border-white/10 bg-black/[0.03] dark:bg-white/5 p-3 text-left transition-all hover:border-black/15 dark:hover:border-white/20 hover:bg-black/[0.05] dark:hover:bg-white/10 hover:shadow-sm"
               >
                 <div className="mb-2 flex items-center gap-2">
                   {resource.faviconUrl ? (
+                    // Favicons come from arbitrary external domains — next/image would
+                    // require remotePatterns for every site. 16×16 makes optimization moot.
+                    // eslint-disable-next-line @next/next/no-img-element
                     <img src={resource.faviconUrl} alt="" className="h-4 w-4 rounded-sm" />
                   ) : (
-                    <ExternalLink className="h-4 w-4 shrink-0 text-gray-400" />
+                    <ExternalLink className="h-4 w-4 shrink-0 text-gray-600 dark:text-gray-400" />
                   )}
                   <div className="truncate text-sm font-medium text-gray-200">
                     {resource.title || resource.sourceHostname || resource.normalizedUrl}
                   </div>
                 </div>
-                <div className="break-all text-xs text-gray-400">{resource.normalizedUrl}</div>
+                <div className="break-all text-xs text-gray-600 dark:text-gray-400">{resource.normalizedUrl}</div>
               </a>
             ))}
           </section>
@@ -251,21 +254,21 @@ export function BacklinksPanel({ contentId }: BacklinksPanelProps) {
 
         {hasAssociatedContent && (
           <section className="space-y-3">
-            <div className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">
+            <div className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">
               Associated content
             </div>
             {data?.associatedContent.map((entry) => (
               <button
                 key={entry.id}
                 onClick={() => handleContentClick(entry.content)}
-                className="flex w-full items-center gap-3 rounded-lg border border-white/10 bg-white/5 p-3 text-left transition-all hover:border-white/20 hover:bg-white/10 hover:shadow-sm"
+                className="flex w-full items-center gap-3 rounded-lg border border-black/10 dark:border-white/10 bg-black/[0.03] dark:bg-white/5 p-3 text-left transition-all hover:border-black/15 dark:hover:border-white/20 hover:bg-black/[0.05] dark:hover:bg-white/10 hover:shadow-sm"
               >
-                <Link2 className="h-4 w-4 shrink-0 text-gray-400" />
+                <Link2 className="h-4 w-4 shrink-0 text-gray-600 dark:text-gray-400" />
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-sm font-medium text-gray-200">
                     {entry.content.title}
                   </div>
-                  <div className="text-xs text-gray-500">
+                  <div className="text-xs text-gray-500 dark:text-gray-400">
                     {entry.content.contentType}
                   </div>
                 </div>

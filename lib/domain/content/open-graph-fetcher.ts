@@ -135,7 +135,7 @@ export async function fetchOpenGraphData(
     if (err instanceof Error && err.name === "AbortError") {
       console.warn(`[OpenGraph] Request timeout for ${url}`);
     } else if (err instanceof Error && 'cause' in err) {
-      const cause = (err as any).cause;
+      const cause = (err as Error & { cause?: { code?: string } }).cause;
       if (cause?.code === 'UNABLE_TO_VERIFY_LEAF_SIGNATURE' || cause?.code === 'CERT_HAS_EXPIRED') {
         console.error(`[OpenGraph] SSL certificate error for ${url}:`, cause.code);
         console.error(`[OpenGraph] To bypass SSL verification in development, set NODE_TLS_REJECT_UNAUTHORIZED=0`);

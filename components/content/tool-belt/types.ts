@@ -78,7 +78,7 @@ export interface ToolBeltProps {
   /** Configuration for the tool belt */
   config: ToolBeltConfig;
   /** Additional context (e.g., file metadata) */
-  context?: Record<string, any>;
+  context?: Record<string, unknown>;
   /** Callback when an action is triggered */
   onActionTriggered?: (actionId: string) => void;
 }
@@ -114,5 +114,5 @@ export interface FileContext {
   /** Is the file currently saving? */
   isSaving?: boolean;
   /** Additional metadata */
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }

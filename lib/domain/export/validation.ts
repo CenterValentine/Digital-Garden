@@ -257,7 +257,7 @@ export function validateMetadata(
  * Ensures conversion produced valid output
  */
 export function validateExportResult(
-  result: { success: boolean; files: Array<{ content: any; name: string }> }
+  result: { success: boolean; files: Array<{ content: string | Buffer | Uint8Array; name: string }> }
 ): ValidationResult {
   const errors: ValidationError[] = [];
   const warnings: ValidationWarning[] = [];

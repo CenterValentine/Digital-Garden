@@ -19,13 +19,17 @@ import { Pencil, Loader2, Check, ExternalLink, Maximize2, Minimize2, BookOpen } 
 import type * as Y from "yjs";
 
 // Type aliases for Excalidraw (types not exported in current version)
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- TODO(any-epic-phase-4): @excalidraw/excalidraw 0.x doesn't expose Element/AppState/BinaryFiles types directly; revisit on v1 upgrade
 type ExcalidrawElement = any;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- TODO(any-epic-phase-4): see ExcalidrawElement above
 type AppState = any;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- TODO(any-epic-phase-4): see ExcalidrawElement above
 type BinaryFiles = any;
 import { Button } from "@/components/ui/glass/button";
 import { ExcalidrawToolbar } from "./ExcalidrawToolbar";
 import { toast } from "sonner";
 import type { CollaborationRuntimeHandle } from "@/lib/domain/collaboration/runtime";
+import { useResolvedTheme } from "@/lib/features/theme";
 
 // Fields to compare when deciding if an element *meaningfully* changed.
 // Excludes `version` / `versionNonce` / `updated` — those get bumped by
@@ -62,8 +66,8 @@ function cloneElement(el: ExcalidrawElement): ExcalidrawElement {
 // Dynamically import Excalidraw to avoid SSR issues (component uses window)
 const Excalidraw = dynamic(
   async () => {
-    const module = await import("@excalidraw/excalidraw");
-    return module.Excalidraw;
+    const mod = await import("@excalidraw/excalidraw");
+    return mod.Excalidraw;
   },
   {
     ssr: false,
@@ -198,10 +202,10 @@ export function ExcalidrawViewer({
             await onSave({ elements, appState, files });
             setLastSaved(new Date());
             setIsModified(false);
-          } catch (error: any) {
+          } catch (error: unknown) {
             console.error("[ExcalidrawViewer] Save failed:", error);
             toast.error("Failed to save drawing", {
-              description: error.message || "Could not save changes",
+              description: (error instanceof Error ? error.message : null) || "Could not save changes",
             });
           } finally {
             setIsSaving(false);
@@ -214,6 +218,7 @@ export function ExcalidrawViewer({
 
   // Track if component has mounted to avoid saving initial data
   const [hasMounted, setHasMounted] = useState(false);
+  const resolvedTheme = useResolvedTheme();
   // Track previous elements to detect actual content changes vs viewport changes
   const previousElementsRef = useRef<ExcalidrawElement[]>(data?.elements || []);
   // Ref to track the current elements — used to skip echoing our own Y.js updates
@@ -420,10 +425,10 @@ export function ExcalidrawViewer({
       // Delay cleanup to ensure download starts
       setTimeout(() => URL.revokeObjectURL(url), 100);
       toast.success(`Exported as ${format.toUpperCase()}`);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("[ExcalidrawViewer] Export failed:", error);
       toast.error("Export failed", {
-        description: error.message || `Could not export as ${format.toUpperCase()}`,
+        description: (error instanceof Error ? error.message : null) || `Could not export as ${format.toUpperCase()}`,
       });
     }
   };
@@ -585,6 +590,7 @@ export function ExcalidrawViewer({
             viewModeEnabled={isReadOnly}
             UIOptions={excalidrawUIOptions}
             renderTopRightUI={isEmbedded ? renderTopRightUI : undefined}
+            theme={resolvedTheme}
           />
         </div>
       </div>

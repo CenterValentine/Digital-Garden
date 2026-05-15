@@ -129,7 +129,7 @@ export function RightSidebarHeader({ activeTab, onTabChange }: RightSidebarHeade
       {/* Panel collapse toggle — must never be clipped */}
       <button
         onClick={toggleCollapsed}
-        className="shrink-0 rounded p-1 transition-colors hover:bg-white/10 text-gray-400 hover:text-gold-primary"
+        className="shrink-0 rounded p-1 transition-colors hover:bg-black/[0.04] dark:hover:bg-white/10 text-gray-500 dark:text-gray-400 hover:text-gold-primary"
         title="Collapse sidebar (Cmd+.)"
         type="button"
       >

@@ -87,38 +87,42 @@ export function AdaptiveFlashcardEditor({
     editor.commands.setContent(next);
   }, [editor, value]);
 
+  const isToolbarVisible = mode === "rich" && editable;
+
   return (
     <div
-      className={`rounded-md border border-white/10 bg-black/20 ${
+      className={`rounded-md border border-black/[0.06] dark:border-white/[0.06] bg-black/[0.04] dark:bg-white/[0.02] ${
         compact ? "min-h-[120px]" : "min-h-[180px]"
       }`}
     >
-      {mode === "rich" && editable ? (
-        <div className="flex min-h-11 items-center gap-1 overflow-x-auto border-b border-white/10 px-2 py-1 text-xs">
+      {isToolbarVisible ? (
+        <div className="flex min-h-11 items-center gap-1 overflow-x-auto border-b border-black/[0.06] dark:border-white/[0.06] px-2 py-1 text-xs">
           <button
             type="button"
             onClick={() => editor?.chain().focus().toggleBold().run()}
-            className="min-h-9 rounded px-2 text-gray-300 hover:bg-white/10"
+            className="min-h-9 rounded px-2 text-gray-700 dark:text-gray-300 hover:bg-black/[0.05] dark:hover:bg-white/10"
           >
             Bold
           </button>
           <button
             type="button"
             onClick={() => editor?.chain().focus().toggleItalic().run()}
-            className="min-h-9 rounded px-2 text-gray-300 hover:bg-white/10"
+            className="min-h-9 rounded px-2 text-gray-700 dark:text-gray-300 hover:bg-black/[0.05] dark:hover:bg-white/10"
           >
             Italic
           </button>
           <button
             type="button"
             onClick={() => editor?.chain().focus().toggleCodeBlock().run()}
-            className="min-h-9 rounded px-2 text-gray-300 hover:bg-white/10"
+            className="min-h-9 rounded px-2 text-gray-700 dark:text-gray-300 hover:bg-black/[0.05] dark:hover:bg-white/10"
           >
             Code
           </button>
         </div>
       ) : null}
-      <EditorContent editor={editor} />
+      <div className="px-4 py-3 md:px-5 md:py-4">
+        <EditorContent editor={editor} />
+      </div>
     </div>
   );
 }

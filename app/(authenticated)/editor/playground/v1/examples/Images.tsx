@@ -101,7 +101,7 @@ export default function Images() {
           <li>Click on an image to select it (shows selection border)</li>
         </ul>
         <p>
-          <strong>Note:</strong> For production use, you'd typically want to add
+          <strong>Note:</strong> For production use, you&apos;d typically want to add
           image upload functionality, resize handles, alt text editing, and
           drag-and-drop support. This example shows the basic image insertion.
         </p>

@@ -12,8 +12,8 @@ import { MermaidViewer } from "./MermaidViewer";
 interface FullscreenMermaidViewerProps {
   contentId: string;
   title: string;
-  config: any;
-  data: any;
+  config?: Record<string, unknown>;
+  data?: { source?: string };
 }
 
 export function FullscreenMermaidViewer({

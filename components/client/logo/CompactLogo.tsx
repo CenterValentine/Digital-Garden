@@ -25,7 +25,7 @@ export default function CompactLogo() {
     if (!el) return;
 
     // Ensure scaling happens in place
-    (el.style as any).transformBox = "fill-box";
+    (el.style as CSSStyleDeclaration & { transformBox?: string }).transformBox = "fill-box";
     el.style.transformOrigin = "center";
 
     // Anchor point (SVG user units) for the root/shoot junction.
@@ -46,7 +46,7 @@ export default function CompactLogo() {
     el.style.transform = `${T} scale(0)`;
 
     const durationMs = 120;
-    const anim = (el as any).animate(
+    const anim = el.animate(
       [
         { transform: `${T} scale(0)`, opacity: 0 },
         {

@@ -105,7 +105,7 @@ export default function CollabDocPage() {
 
       {/* Filters */}
       <div
-        className="border border-white/10 rounded-lg p-4 flex flex-wrap gap-4 items-end"
+        className="border border-black/10 dark:border-white/10 rounded-lg p-4 flex flex-wrap gap-4 items-end"
         style={{ background: glass0.background, backdropFilter: glass0.backdropFilter }}
       >
         <div className="flex-1 min-w-48">
@@ -114,7 +114,7 @@ export default function CollabDocPage() {
           </label>
           <input
             type="text"
-            className="w-full bg-black/30 border border-white/10 rounded px-3 py-2 text-sm text-white placeholder:text-gray-500 focus:outline-none focus:ring-1 focus:ring-white/20"
+            className="w-full bg-black/30 border border-black/10 dark:border-white/10 rounded px-3 py-2 text-sm text-white placeholder:text-gray-500 dark:text-gray-400 focus:outline-none focus:ring-1 focus:ring-white/20"
             placeholder="Note title..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -137,10 +137,10 @@ export default function CollabDocPage() {
 
       {/* Results */}
       <div
-        className="border border-white/10 rounded-lg overflow-hidden"
+        className="border border-black/10 dark:border-white/10 rounded-lg overflow-hidden"
         style={{ background: glass0.background, backdropFilter: glass0.backdropFilter }}
       >
-        <div className="px-6 py-4 border-b border-white/10 flex items-center justify-between">
+        <div className="px-6 py-4 border-b border-black/10 dark:border-white/10 flex items-center justify-between">
           <h3 className="text-sm font-semibold text-gray-300">
             {loading ? "Loading…" : `${items.length} document${items.length !== 1 ? "s" : ""}`}
           </h3>
@@ -165,7 +165,7 @@ export default function CollabDocPage() {
                       </span>
                     )}
                     {!item.hasYdocState && (
-                      <span className="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-gray-500/20 text-gray-400 flex-shrink-0">
+                      <span className="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-gray-500/20 text-gray-600 dark:text-gray-400 flex-shrink-0">
                         no ydoc state
                       </span>
                     )}

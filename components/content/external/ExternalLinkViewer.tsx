@@ -166,6 +166,8 @@ export function ExternalLinkViewer({
         >
           {displayImageUrl ? (
             <div className="aspect-video w-full overflow-hidden bg-black/20">
+              {/* OG preview comes from any URL the user pastes — remote pattern config impractical */}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={displayImageUrl}
                 alt={previewData.title || "Preview"}
@@ -187,7 +189,7 @@ export function ExternalLinkViewer({
                     No preview image available
                   </p>
                   <p className="text-xs text-gray-400 mt-1">
-                    This site doesn't provide Open Graph metadata
+                    This site doesn&apos;t provide Open Graph metadata
                   </p>
                 </div>
               </div>
@@ -238,6 +240,8 @@ export function ExternalLinkViewer({
         >
           <div className="flex items-start gap-3">
           {faviconUrl ? (
+            // Arbitrary external favicon — see comment on first <img> above.
+            // eslint-disable-next-line @next/next/no-img-element
             <img
               src={faviconUrl}
               alt=""

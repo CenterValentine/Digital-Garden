@@ -70,11 +70,16 @@ export function OverlayFrameClient({ kind, contentId }: OverlayFrameClientProps)
     if (!auth) return;
     let active = true;
 
+    type OverlayResponse = {
+      title?: string;
+      note?: { tiptapJson?: JSONContent };
+      external?: Record<string, unknown>;
+    };
     const load = async () => {
       try {
         setLoading(true);
         setError(null);
-        const data = await apiFetch<any>(endpoint, auth.token);
+        const data = await apiFetch<OverlayResponse>(endpoint, auth.token);
         if (!active) return;
         setTitle(data.title || "");
         if (kind === "note") {
@@ -100,7 +105,7 @@ export function OverlayFrameClient({ kind, contentId }: OverlayFrameClientProps)
     if (!auth) return;
     setIsSaving(true);
     try {
-      const data = await apiFetch<any>(endpoint, auth.token, {
+      const data = await apiFetch<{ note?: { tiptapJson?: JSONContent } }>(endpoint, auth.token, {
         method: "PATCH",
         body: JSON.stringify({ tiptapJson: content }),
       });
@@ -114,7 +119,7 @@ export function OverlayFrameClient({ kind, contentId }: OverlayFrameClientProps)
     if (!auth || !external) return;
     setIsSaving(true);
     try {
-      const data = await apiFetch<any>(endpoint, auth.token, {
+      const data = await apiFetch<{ title?: string; external?: Record<string, unknown> }>(endpoint, auth.token, {
         method: "PATCH",
         body: JSON.stringify({
           title,
@@ -229,7 +234,7 @@ export function OverlayFrameClient({ kind, contentId }: OverlayFrameClientProps)
           ].map(([key, label]) => (
             <input
               key={key}
-              value={String((external as any)?.[key] || "")}
+              value={String(external?.[key] ?? "")}
               onChange={(event) =>
                 setExternal((current) => ({
                   ...(current || {}),

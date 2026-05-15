@@ -74,31 +74,31 @@ export default function ContentPage() {
 
       {/* Content Table */}
       <div
-        className="border border-white/10 rounded-lg overflow-hidden"
+        className="border border-black/10 dark:border-white/10 rounded-lg overflow-hidden"
         style={{
           background: glass0.background,
           backdropFilter: glass0.backdropFilter,
         }}
       >
         <table className="w-full">
-          <thead className="border-b border-white/10">
+          <thead className="border-b border-black/10 dark:border-white/10">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wider">
                 Title
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wider">
                 Owner
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wider">
                 Type
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wider">
                 Status
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wider">
                 Updated
               </th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-gray-400 uppercase tracking-wider">
+              <th className="px-6 py-3 text-right text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wider">
                 Actions
               </th>
             </tr>
@@ -126,7 +126,7 @@ export default function ContentPage() {
                       Published
                     </span>
                   ) : (
-                    <span className="inline-flex px-2 py-1 rounded text-xs font-medium bg-gray-500/20 text-gray-300">
+                    <span className="inline-flex px-2 py-1 rounded text-xs font-medium bg-gray-500/20 text-gray-700 dark:text-gray-300">
                       Draft
                     </span>
                   )}
