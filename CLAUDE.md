@@ -12,10 +12,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ```bash
 pnpm dev              # Start dev server (http://localhost:3015)
-pnpm build            # prisma generate → build:tokens → tsc --noEmit → next build --webpack
+pnpm build            # prisma generate → build:tokens → tsc → collab:schema:check → lint → next build
 pnpm typecheck        # tsc --noEmit only (fast type check)
 pnpm start            # Production server
-pnpm lint             # ESLint
+pnpm lint             # ESLint with --max-warnings 175 ratchet (fails if count grows)
 pnpm build:tokens     # Regenerate CSS variables from design tokens
 pnpm db:seed          # Seed database with test ContentNode data
 pnpm collab:schema:check  # CI gate: validate collaboration schema covers all editor extensions
@@ -29,11 +29,13 @@ npx prisma studio     # Database GUI (http://localhost:5555)
 
 **Primary verification is still manual** — `pnpm build` must pass, then smoke-test in browser. The Playwright harness adds visual regression coverage but only for signed-out routes today (auth fixture pending).
 
-**Build pipeline:** `prisma generate` → `pnpm build:tokens` (style-dictionary) → `tsc --noEmit` → `next build --webpack`.
+**Build pipeline:** `prisma generate` → `pnpm build:tokens` (style-dictionary) → `tsc --noEmit` → `pnpm collab:schema:check` → `pnpm lint` → `next build --webpack`.
 
-**Vercel build** skips the `tsc --noEmit` step (`vercel-build` script). Local dev uses Turbopack (no webpack flag). Migrations are run manually via `npx prisma migrate deploy`.
+**Vercel build** skips the `tsc --noEmit` and `lint` steps (`vercel-build` script). Those gates are enforced locally and in CI; Vercel stays minimal for fast deploys. Local dev uses Turbopack (no webpack flag). Migrations are run manually via `npx prisma migrate deploy`.
 
-**CI gate — `pnpm collab:schema:check`:** Scans all TipTap extension source files for `Node.create`/`Mark.create` and asserts every discovered node/mark is covered in `getCollaborationServerExtensions()`. Fails if you add an editor extension without a server-safe variant. Every new TipTap Node/Mark **must** export a `Server*` variant and be registered in `lib/domain/collaboration/extensions.ts`.
+**CI gates** (`.github/workflows/`):
+- **quality.yml** — runs `pnpm lint` (with the `--max-warnings 175` ratchet) and `pnpm typecheck` on every PR. Lint failures or warning count growth block merge.
+- **collaboration-hardening.yml** — runs `pnpm collab:schema:check` on collab-touching PRs. Scans all TipTap extension source files for `Node.create`/`Mark.create` and asserts every discovered node/mark is covered in `getCollaborationServerExtensions()`. Every new TipTap Node/Mark **must** export a `Server*` variant and be registered in `lib/domain/collaboration/extensions.ts`.
 
 ## Visual Regression Testing (Playwright)
 
@@ -446,12 +448,39 @@ const glass0 = getSurfaceStyles("glass-0");
 ## Key Patterns & Conventions
 
 ### Code Standards
-- TypeScript strict mode, no `any` types
+- TypeScript strict mode, **no `any` types**. Use `unknown` and narrow, `Record<string, unknown>` for loose objects, or a proper type. If genuinely unfixable (untyped third-party lib, etc.) flag with `// eslint-disable-next-line @typescript-eslint/no-explicit-any -- TODO(...): <reason>`.
 - Ignore directories with " 2" suffix (e.g., `content 2`, `editor 2`) — filesystem artifacts, not part of the build
 - Inline SVG for server component icons; `lucide-react` OK in client components only
 - Import from barrel exports: `lib/domain/editor`, `lib/infrastructure/auth`, `lib/features/settings`, `lib/domain/tools`
 - Use `lib/design/system/` tokens for styling
 - **Never import Prisma into `"use client"` components** — causes dns/fs/net/tls bundler errors. Client-safe AI tool metadata lives in `lib/domain/ai/tools/metadata.ts`; server-only registry in `lib/domain/ai/tools/registry.ts`
+- For Prisma JSON writes, use `as unknown as Prisma.InputJsonValue` (the cast goes through `unknown` because Prisma's input type is intentionally narrow)
+- For unused parameters/vars that must remain (kept-for-signature, caught errors), prefix with `_` — eslint is configured to ignore `_`-prefixed identifiers via `argsIgnorePattern`/`varsIgnorePattern`/`caughtErrorsIgnorePattern`. **Do NOT** add bare `// eslint-disable` for unused-vars; rename instead.
+
+### Quality Gates — before declaring a task done
+
+The workflow is `typecheck → lint → build`. Each gates the next:
+
+1. **`pnpm typecheck`** — fast. Run continuously while editing. Must be clean before lint.
+2. **`pnpm lint`** — uses `--max-warnings 175` ratchet. **Zero new warnings, zero errors.** If you must introduce a warning, fix an equal-or-greater number elsewhere or update the ratchet number with justification.
+3. **`pnpm build`** — full production build (runs both the above plus `collab:schema:check`). Final gate before declaring complete.
+4. **Browser smoke test** — for any UI change, manually exercise the feature in a browser. Type checks verify correctness; they don't verify behavior.
+
+Rules for specific lint signals:
+- **`react-hooks/exhaustive-deps`** — the missing dep is almost always a real bug. Add it. If you genuinely can't (callback should be stable, dep would cause infinite loop), restructure with `useCallback`/`useRef` or add `// eslint-disable-next-line react-hooks/exhaustive-deps -- <why>`. Don't suppress silently.
+- **`react-hooks/rules-of-hooks`** — never suppress. Hoist all hooks above early-return branches.
+- **`react-hooks/immutability` (React Compiler)** — "cannot modify value": you're mutating something derived from a prop or hook argument. Fix patterns: (a) move the mutation into a `useEffect` and use a ref the component owns, (b) extract to a module-scope helper function (parameter rebinding breaks lineage analysis).
+- **"Compilation Skipped" (React Compiler)** — the compiler found incorrect manual memoization (typically a `useCallback`/`useMemo` dep array that disagrees with what it would generate). Fix the dep array; don't suppress.
+- **"Cannot access refs during render" / "Cannot call impure function during render"** — render must be pure. Move ref writes and `Date.now()`/`Math.random()`/etc. into effects. `useId()` is the pure alternative to `Date.now()` for unique IDs.
+
+### Lessons learned (recorded in the lint-cleanup epic, Apr 2026)
+
+Bugs found by the React Compiler and the type cleanup that we'd otherwise have missed:
+- **OnlyOfficeEditor iframe reload churn** — `key: \`${contentId}-${Date.now()}\`` regenerated every render. Replaced with `useId()` for stable-per-mount keys.
+- **ChatInput stale mention callback** — `handleSelect`'s `useCallback` dep array was missing `onMentionInserted`, leaving the parent's tracking callback frozen at its first identity.
+- **DiagramsNetEditor StrictMode hazard** — `xmlRef.current = xml` ran during render, doubling under StrictMode. Moved into `useEffect(() => { ref.current = x }, [x])`.
+
+These were all caught by enforcing the React Compiler rules during lint. Treat compiler errors as bug reports, not stylistic complaints.
 
 ### Adding a New TipTap Extension
 
