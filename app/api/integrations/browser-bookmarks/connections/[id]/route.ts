@@ -5,6 +5,7 @@ import {
   listBookmarkSyncConnections,
   updateBookmarkSyncConnection,
 } from "@/lib/domain/browser-bookmarks";
+import { logger } from "@/lib/core/logger";
 
 type Params = Promise<{ id: string }>;
 
@@ -45,7 +46,7 @@ export async function GET(
     }
     return NextResponse.json({ success: true, data });
   } catch (error) {
-    console.error("[BrowserBookmarks Connections] GET by id error:", error);
+    logger.error({ layer: "browser_ext", event: "connection_read:caught", summary: "GET caught", error });
     return errorResponse(error, "Failed to load bookmark sync connection");
   }
 }
@@ -70,7 +71,7 @@ export async function PATCH(
     });
     return NextResponse.json({ success: true, data });
   } catch (error) {
-    console.error("[BrowserBookmarks Connections] PATCH error:", error);
+    logger.error({ layer: "browser_ext", event: "connection_update:caught", summary: "PATCH caught", error });
     return errorResponse(error, "Failed to update bookmark sync connection");
   }
 }
@@ -85,7 +86,7 @@ export async function DELETE(
     const data = await deleteBookmarkSyncConnection(session.user.id, id);
     return NextResponse.json({ success: true, data });
   } catch (error) {
-    console.error("[BrowserBookmarks Connections] DELETE error:", error);
+    logger.error({ layer: "browser_ext", event: "connection_delete:caught", summary: "DELETE caught", error });
     return errorResponse(error, "Failed to delete bookmark sync connection");
   }
 }

@@ -18,6 +18,84 @@ const eslintConfig = defineConfig([
           destructuredArrayIgnorePattern: "^_",
         },
       ],
+      // Phase 4: no console.* outside the logger module. Promoted to "error"
+      // after the Phase 4 sweep — zero violations in the main app server.
+      // Phase 5 deferrals (client code, TipTap extensions, "use client" utils)
+      // get the rule turned off via the file-glob override below.
+      "no-console": "error",
+    },
+  },
+  // Logger module is the only allowed `console.*` site — it writes directly
+  // to process.stdout / process.stderr via its encoders. Same for the
+  // instrumentation entry point's startup marker.
+  {
+    files: [
+      "lib/core/logger/**/*.{ts,tsx}",
+      "instrumentation.{ts,js}",
+      // Smoke test for the logger exercises process.stdout/stderr directly.
+      "scripts/smoke-logger.ts",
+    ],
+    rules: {
+      "no-console": "off",
+    },
+  },
+  // Phase 5 deferrals: client-reachable code that needs the client-safe
+  // logger (lib/core/logger/client.ts, ships in Phase 5 per
+  // FRONTEND-LOG-CHARTER.md). Each file here has its own `console.*` calls
+  // that will migrate to the client logger.
+  //
+  // Patterns use broad globs because minimatch doesn't handle Next.js's
+  // parenthesized route groups like `(authenticated)` cleanly. Everything
+  // under app/ except app/api/ is page/component code (client-reachable);
+  // everything under components/, state/, hooks/ is client by convention.
+  {
+    files: [
+      // Pages and layouts (not API routes — those keep the rule on)
+      "app/**/page.tsx",
+      "app/**/page.ts",
+      "app/**/layout.tsx",
+      "app/**/error.tsx",
+      "app/**/not-found.tsx",
+      "app/**/loading.tsx",
+      "app/**/*Client.tsx",
+      "app/**/template.tsx",
+      // Components and client-only modules
+      "components/**/*.tsx",
+      "components/**/*.ts",
+      "state/**/*.ts",
+      "hooks/**/*.ts",
+      "hooks/**/*.tsx",
+      // Utilities transitively reachable from "use client" boundaries
+      "lib/domain/content/tag-sync.ts",
+      "lib/domain/content/image-refs.ts",
+      "lib/domain/content/markdown.ts",
+      "lib/domain/content/person-mention-sync.ts",
+      "lib/domain/content/metadata-validation.ts",
+      // TipTap extensions and visualization hooks
+      "lib/domain/editor/extensions/**/*.ts",
+      "lib/domain/editor/ai/edit-orchestrator.ts",
+      "lib/domain/visualization/**/use-collaboration.ts",
+      "lib/domain/blocks/registry.ts",
+      "lib/design/**/*.ts",
+      "lib/design/**/*.tsx",
+      // Import service's round-trip-verify is a dev-only debug tool
+      "lib/domain/import/round-trip-verify.ts",
+      // Extensions (TipTap + browser extension JS)
+      "extensions/**/*.tsx",
+      "extensions/**/*.ts",
+      "extensions/**/*.js",
+      "extensions/**/*.mjs",
+      // Collaboration runtime is `"use client"`
+      "lib/domain/collaboration/runtime.ts",
+      // Out-of-scope / not part of the app server pipeline
+      "scripts/**/*.ts",
+      "scripts/**/*.mjs",
+      "scripts/**/*.js",
+      "prisma/seed.ts",
+      "server/hocuspocus/**/*.ts",
+    ],
+    rules: {
+      "no-console": "off",
     },
   },
   // Override default ignores of eslint-config-next.

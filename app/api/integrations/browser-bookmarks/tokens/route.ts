@@ -4,6 +4,7 @@ import {
   createBrowserExtensionTokenRecord,
   listBrowserExtensionTokens,
 } from "@/lib/domain/browser-bookmarks";
+import { logger } from "@/lib/core/logger";
 
 function errorResponse(error: unknown, fallback: string) {
   const message = error instanceof Error ? error.message : fallback;
@@ -26,7 +27,7 @@ export async function GET() {
     const data = await listBrowserExtensionTokens(session.user.id);
     return NextResponse.json({ success: true, data });
   } catch (error) {
-    console.error("[BrowserBookmarks Tokens] GET error:", error);
+    logger.error({ layer: "browser_ext", event: "tokens_list:caught", summary: "GET caught", error });
     return errorResponse(error, "Failed to load browser extension tokens");
   }
 }
@@ -47,7 +48,7 @@ export async function POST(request: NextRequest) {
     });
     return NextResponse.json({ success: true, data }, { status: 201 });
   } catch (error) {
-    console.error("[BrowserBookmarks Tokens] POST error:", error);
+    logger.error({ layer: "browser_ext", event: "token_create:caught", summary: "POST caught", error });
     return errorResponse(error, "Failed to create browser extension token");
   }
 }

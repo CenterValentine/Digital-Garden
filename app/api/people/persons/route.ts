@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/database/client";
 import { createPerson } from "@/lib/domain/people";
 import { requireAuth } from "@/lib/infrastructure/auth/middleware";
+import { logger } from "@/lib/core/logger";
 
 interface CreatePersonRequest {
   displayName?: string;
@@ -88,7 +89,7 @@ export async function POST(request: NextRequest) {
       { status: 201 }
     );
   } catch (error) {
-    console.error("POST /api/people/persons error:", error);
+    logger.error({ layer: "content", event: "person_create:caught", summary: "POST caught", error });
     return NextResponse.json(
       {
         success: false,

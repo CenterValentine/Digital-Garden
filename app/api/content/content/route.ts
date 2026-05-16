@@ -31,7 +31,7 @@ import type {
   ContentDetailResponse,
 } from "@/lib/domain/content/api-types";
 import type { StoredChatMessage } from "@/lib/domain/ai/types";
-import { logger, spanPayload, withRouteTrace, withSpan } from "@/lib/core/logger";
+import { logger, withRouteTrace, withSpan } from "@/lib/core/logger";
 
 const ROUTE_PATH = "/api/content/content";
 

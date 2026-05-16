@@ -9,6 +9,7 @@ import {
   parsePeopleMountTarget,
   type PeopleMountRequestBody,
 } from "./request";
+import { logger } from "@/lib/core/logger";
 
 export async function POST(request: NextRequest) {
   try {
@@ -60,7 +61,7 @@ export async function POST(request: NextRequest) {
       { status: 201 }
     );
   } catch (error) {
-    console.error("POST /api/people/mounts error:", error);
+    logger.error({ layer: "content", event: "people_mount_create:caught", summary: "POST caught", error });
     const message =
       error instanceof Error
         ? error.message

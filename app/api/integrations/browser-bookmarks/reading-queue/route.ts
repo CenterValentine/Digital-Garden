@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { ExternalReadingStatus } from "@/lib/database/generated/prisma";
 import { getBrowserReadingQueue } from "@/lib/domain/browser-bookmarks";
 import { requireBrowserExtensionBearerAuth } from "@/lib/domain/browser-bookmarks/http";
+import { logger } from "@/lib/core/logger";
 
 const VALID_STATUSES = new Set<ExternalReadingStatus>([
   "inbox",
@@ -43,7 +44,12 @@ export async function GET(request: NextRequest) {
     });
     return NextResponse.json({ success: true, data });
   } catch (error) {
-    console.error("[BrowserBookmarks Queue] GET error:", error);
+    logger.error({
+      layer: "browser_ext",
+      event: "reading_queue:caught",
+      summary: "fetch failed",
+      error,
+    });
     return errorResponse(error, "Failed to fetch reading queue");
   }
 }

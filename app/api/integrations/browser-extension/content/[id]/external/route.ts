@@ -4,6 +4,7 @@ import {
   getExtensionExternalContent,
   updateExtensionExternalContent,
 } from "@/lib/domain/browser-extension";
+import { logger } from "@/lib/core/logger";
 
 type Params = Promise<{ id: string }>;
 
@@ -30,7 +31,7 @@ export async function GET(request: NextRequest, { params }: { params: Params }) 
     const data = await getExtensionExternalContent(token.user.id, id);
     return NextResponse.json({ success: true, data });
   } catch (error) {
-    console.error("[BrowserExtension ExternalContent] GET error:", error);
+    logger.error({ layer: "browser_ext", event: "external_content_read:caught", summary: "GET caught", error });
     return errorResponse(error, "Failed to load external content");
   }
 }
@@ -83,7 +84,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Params }
     });
     return NextResponse.json({ success: true, data });
   } catch (error) {
-    console.error("[BrowserExtension ExternalContent] PATCH error:", error);
+    logger.error({ layer: "browser_ext", event: "external_content_update:caught", summary: "PATCH caught", error });
     return errorResponse(error, "Failed to save external content");
   }
 }

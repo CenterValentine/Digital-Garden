@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAppSyncDeltas } from "@/lib/domain/browser-bookmarks";
 import { requireBrowserExtensionBearerAuth } from "@/lib/domain/browser-bookmarks/http";
+import { logger } from "@/lib/core/logger";
 
 function errorResponse(error: unknown, fallback: string) {
   const message = error instanceof Error ? error.message : fallback;
@@ -27,13 +28,7 @@ export async function GET(request: NextRequest) {
 
     if (!connectionId) {
       return NextResponse.json(
-        {
-          success: false,
-          error: {
-            code: "INVALID_REQUEST",
-            message: "connectionId is required",
-          },
-        },
+        { success: false, error: { code: "INVALID_REQUEST", message: "connectionId is required" } },
         { status: 400 }
       );
     }
@@ -46,7 +41,12 @@ export async function GET(request: NextRequest) {
     );
     return NextResponse.json({ success: true, data });
   } catch (error) {
-    console.error("[BrowserBookmarks Pull] GET error:", error);
+    logger.error({
+      layer: "browser_ext",
+      event: "sync_pull:caught",
+      summary: "pull failed",
+      error,
+    });
     return errorResponse(error, "Failed to fetch app bookmark deltas");
   }
 }

@@ -10,7 +10,7 @@
     "build": "prisma generate && pnpm build:tokens && tsc --noEmit && pnpm collab:schema:check && pnpm lint && next build --webpack",
     "vercel-build": "prisma generate && pnpm build:tokens && next build --webpack",
     "start": "next start",
-    "lint": "eslint --max-warnings 175",
+    "lint": "eslint --max-warnings 159",
     "build:tokens": "style-dictionary build --config style-dictionary.config.js",
     "collab:schema:check": "tsx scripts/validate-collaboration-schema.ts",
     "db:seed": "tsx prisma/seed.ts",
