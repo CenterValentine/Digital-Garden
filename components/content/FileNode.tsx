@@ -51,6 +51,7 @@ import { toast } from "sonner";
 import type { TreeNode } from "@/lib/domain/content/types";
 import { getDisplayExtension, splitFilenameForDisplay } from "@/lib/domain/content/file-extension-utils";
 import { FileNameInput } from "@/components/common/FileNameInput";
+import { clientLogger } from "@/lib/core/logger/client";
 
 interface FileNodeProps extends NodeRendererProps<TreeNode> {
   onRename?: (id: string, name: string) => Promise<void>;
@@ -404,98 +405,79 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
           onChangeIcon(id);
         } : undefined,
         onCreateNote: onCreate ? async (parentId: string | null) => {
-          console.log("[FileNode] onCreateNote called with parentId:", parentId);
           await onCreate(parentId, "note");
         } : undefined,
         onCreateFolder: onCreate ? async (parentId: string | null) => {
-          console.log("[FileNode] onCreateFolder called with parentId:", parentId);
           await onCreate(parentId, "folder");
         } : undefined,
         onCreateFile: onCreate && !isPeopleNode ? async (parentId: string | null) => {
-          console.log("[FileNode] onCreateFile called with parentId:", parentId);
           await onCreate(parentId, "file");
         } : undefined,
         onCreateCode: onCreate && !isPeopleNode ? async (parentId: string | null) => {
-          console.log("[FileNode] onCreateCode called with parentId:", parentId);
           await onCreate(parentId, "code");
         } : undefined,
         onCreateHtml: onCreate && !isPeopleNode ? async (parentId: string | null) => {
-          console.log("[FileNode] onCreateHtml called with parentId:", parentId);
           await onCreate(parentId, "html");
         } : undefined,
         onCreateDocument: onCreate && !isPeopleNode ? async (parentId: string | null) => {
-          console.log("[FileNode] onCreateDocument called with parentId:", parentId);
           await onCreate(parentId, "docx");
         } : undefined,
         onCreateSpreadsheet: onCreate && !isPeopleNode ? async (parentId: string | null) => {
-          console.log("[FileNode] onCreateSpreadsheet called with parentId:", parentId);
           await onCreate(parentId, "xlsx");
         } : undefined,
-        // Phase 2: New content types
         onCreateExternal: onCreate && !isPeopleNode ? async (parentId: string | null) => {
-          console.log("[FileNode] onCreateExternal called with parentId:", parentId);
           await onCreate(parentId, "external");
         } : undefined,
         onCreateChat: onCreate && !isPeopleNode ? async (parentId: string | null) => {
-          console.log("[FileNode] onCreateChat called with parentId:", parentId);
           await onCreate(parentId, "chat");
         } : undefined,
         onAddPeopleTarget: onAddPeopleTarget && !isPeopleNode ? async (parentId: string | null) => {
-          console.log("[FileNode] onAddPeopleTarget called with parentId:", parentId);
           await onAddPeopleTarget(parentId);
         } : undefined,
-        // Visualization engine-specific callbacks
         onCreateVisualizationMermaid: onCreateVisualizationMermaid && !isPeopleNode ? async (parentId: string | null) => {
-          console.log("[FileNode] onCreateVisualizationMermaid called with parentId:", parentId);
           await onCreateVisualizationMermaid(parentId);
         } : undefined,
         onCreateVisualizationExcalidraw: onCreateVisualizationExcalidraw && !isPeopleNode ? async (parentId: string | null) => {
-          console.log("[FileNode] onCreateVisualizationExcalidraw called with parentId:", parentId);
           await onCreateVisualizationExcalidraw(parentId);
         } : undefined,
         onCreateVisualizationDiagramsNet: onCreateVisualizationDiagramsNet && !isPeopleNode ? async (parentId: string | null) => {
-          console.log("[FileNode] onCreateVisualizationDiagramsNet called with parentId:", parentId);
           await onCreateVisualizationDiagramsNet(parentId);
         } : undefined,
         onCreateData: onCreate && !isPeopleNode ? async (parentId: string | null) => {
-          console.log("[FileNode] onCreateData called with parentId:", parentId);
           await onCreate(parentId, "data");
         } : undefined,
         onCreateHope: onCreate && !isPeopleNode ? async (parentId: string | null) => {
-          console.log("[FileNode] onCreateHope called with parentId:", parentId);
           await onCreate(parentId, "hope");
         } : undefined,
         onCreateWorkflow: onCreate && !isPeopleNode ? async (parentId: string | null) => {
-          console.log("[FileNode] onCreateWorkflow called with parentId:", parentId);
           await onCreate(parentId, "workflow");
         } : undefined,
         onDownload: onDownload ? async (ids: string[]) => {
           await onDownload(ids);
         } : undefined,
-        /** Phase 2: Folder view mode switching */
         onSetFolderView: onSetFolderView ? async (id: string, viewMode: "list" | "gallery" | "kanban" | "dashboard" | "canvas") => {
-          console.log("[FileNode] onSetFolderView called with id:", id, "viewMode:", viewMode);
           await onSetFolderView(id, viewMode);
         } : undefined,
-        /** Phase 2: Toggle referenced content visibility */
         onToggleReferencedContent: onToggleReferencedContent ? async (id: string, currentValue: boolean) => {
-          console.log("[FileNode] onToggleReferencedContent called with id:", id, "currentValue:", currentValue);
           await onToggleReferencedContent(id, currentValue);
         } : undefined,
-        /** Phase 2: Edit external link */
         onEditExternal: async (id: string) => {
-          console.log("[FileNode] onEditExternal called with id:", id);
-          // This will be handled by LeftSidebarContent
-          // Trigger a custom event that LeftSidebarContent can listen for
+          // Dispatched to LeftSidebarContent via window event so the edit
+          // dialog stays owned by the panel that hosts it.
           window.dispatchEvent(new CustomEvent('edit-external-link', { detail: { id } }));
         },
-        /** Phase 2: Copy external URL */
         onCopyExternalUrl: async (_id: string, url: string) => {
           try {
             await navigator.clipboard.writeText(url);
             toast.success("URL copied to clipboard");
           } catch (err) {
-            console.error("[FileNode] Failed to copy URL:", err);
+            clientLogger.error({
+              layer: "ui",
+              event: "clipboard:write_failed",
+              summary: "copy URL failed",
+              attrs: { component: "FileNode" },
+              error: err,
+            });
             toast.error("Failed to copy URL");
           }
         },
