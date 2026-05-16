@@ -4,7 +4,8 @@
 
 export type Level = "debug" | "info" | "warn" | "error" | "fatal";
 
-export type Layer =
+// Server runtime layers. Used by every emit on the Node side.
+export type ServerLayer =
   | "route"
   | "auth"
   | "tree"
@@ -18,6 +19,24 @@ export type Layer =
   | "browser_ext"
   | "periodic"
   | "admin";
+
+// Browser runtime layers. Used by client.ts emits. Per FRONTEND-LOG-CHARTER.md.
+// `route` and `editor` overlap with ServerLayer keys but mean different things
+// in context: on the server it's a request handler / TipTap server-safe
+// extensions; on the client it's an App Router transition / TipTap editor view.
+export type FrontendLayer =
+  | "page"
+  | "route"
+  | "ui"
+  | "editor"
+  | "store"
+  | "fetch"
+  | "error";
+
+// Unified Layer type. Server emits will only ever use ServerLayer values,
+// client emits will only ever use FrontendLayer values. The type stays open
+// enough to deserialize both shapes through the beacon endpoint.
+export type Layer = ServerLayer | FrontendLayer;
 
 export type Marker =
   | "requested"
