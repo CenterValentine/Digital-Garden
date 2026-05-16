@@ -12,54 +12,95 @@ import {
   listProviderKeys,
 } from "@/lib/domain/ai/keys";
 import type { UpdateKeyRequest } from "@/lib/domain/ai/keys";
+import { logger, withRouteTrace, withSpan } from "@/lib/core/logger";
+
+const ROUTE_PATH = "/api/ai/keys/[id]";
 
 interface RouteContext {
   params: Promise<{ id: string }>;
 }
 
 export async function PATCH(request: Request, context: RouteContext) {
-  try {
-    const session = await requireAuth();
-    const { id } = await context.params;
-    const body: UpdateKeyRequest = await request.json();
+  return withRouteTrace(request, { route: ROUTE_PATH }, async () => {
+    try {
+      const session = await withSpan(
+        { layer: "auth", name: "session" },
+        { summary: "session lookup" },
+        async () => requireAuth(),
+      );
+      const { id } = await context.params;
+      const body: UpdateKeyRequest = await request.json();
 
-    await updateProviderKey(id, session.user.id, body);
-    const keys = await listProviderKeys(session.user.id);
-    return Response.json({ success: true, data: keys });
-  } catch (error) {
-    if (error instanceof Error && error.message === "Authentication required") {
+      const keys = await withSpan(
+        { layer: "ai", name: "keys_write" },
+        { attrs: { key_id: id, op: "update" } },
+        async (span) => {
+          await updateProviderKey(id, session.user.id, body);
+          const result = await listProviderKeys(session.user.id);
+          span.attr("count", result.length).summary("key updated");
+          return result;
+        },
+      );
+      return Response.json({ success: true, data: keys });
+    } catch (error) {
+      if (error instanceof Error && error.message === "Authentication required") {
+        return Response.json(
+          { success: false, error: { code: "UNAUTHORIZED", message: "Authentication required" } },
+          { status: 401 }
+        );
+      }
+      logger.error({
+        layer: "ai",
+        event: "keys_write:caught",
+        summary: "PATCH caught — translated to 500",
+        error,
+      });
       return Response.json(
-        { success: false, error: { code: "UNAUTHORIZED", message: "Authentication required" } },
-        { status: 401 }
+        { success: false, error: { code: "SERVER_ERROR", message: "Failed to update key" } },
+        { status: 500 }
       );
     }
-    console.error("PATCH /api/ai/keys/[id] error:", error);
-    return Response.json(
-      { success: false, error: { code: "SERVER_ERROR", message: "Failed to update key" } },
-      { status: 500 }
-    );
-  }
+  });
 }
 
-export async function DELETE(_request: Request, context: RouteContext) {
-  try {
-    const session = await requireAuth();
-    const { id } = await context.params;
+export async function DELETE(request: Request, context: RouteContext) {
+  return withRouteTrace(request, { route: ROUTE_PATH }, async () => {
+    try {
+      const session = await withSpan(
+        { layer: "auth", name: "session" },
+        { summary: "session lookup" },
+        async () => requireAuth(),
+      );
+      const { id } = await context.params;
 
-    await deleteProviderKey(id, session.user.id);
-    const keys = await listProviderKeys(session.user.id);
-    return Response.json({ success: true, data: keys });
-  } catch (error) {
-    if (error instanceof Error && error.message === "Authentication required") {
+      const keys = await withSpan(
+        { layer: "ai", name: "keys_write" },
+        { attrs: { key_id: id, op: "delete" } },
+        async (span) => {
+          await deleteProviderKey(id, session.user.id);
+          const result = await listProviderKeys(session.user.id);
+          span.attr("count", result.length).summary("key deleted");
+          return result;
+        },
+      );
+      return Response.json({ success: true, data: keys });
+    } catch (error) {
+      if (error instanceof Error && error.message === "Authentication required") {
+        return Response.json(
+          { success: false, error: { code: "UNAUTHORIZED", message: "Authentication required" } },
+          { status: 401 }
+        );
+      }
+      logger.error({
+        layer: "ai",
+        event: "keys_write:caught",
+        summary: "DELETE caught — translated to 500",
+        error,
+      });
       return Response.json(
-        { success: false, error: { code: "UNAUTHORIZED", message: "Authentication required" } },
-        { status: 401 }
+        { success: false, error: { code: "SERVER_ERROR", message: "Failed to delete key" } },
+        { status: 500 }
       );
     }
-    console.error("DELETE /api/ai/keys/[id] error:", error);
-    return Response.json(
-      { success: false, error: { code: "SERVER_ERROR", message: "Failed to delete key" } },
-      { status: 500 }
-    );
-  }
+  });
 }
