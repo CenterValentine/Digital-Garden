@@ -25,13 +25,13 @@
 
 ## Findings
 
-### Severity 2 (1 site)
+### Severity 2 (1 site) — ✅ RESOLVED in Phase 3.1 (commit pending)
 
 | File:Line | Pattern | Why this severity |
 |---|---|---|
-| [app/api/content/export/vault/route.ts:39](../../app/api/content/export/vault/route.ts#L39) | `console.log(\`[Export] Starting vault export for user ${session.user.id}, format: ${format}\`)` | UUID is PII-adjacent — joinable to user records in the DB. Severity-2 because (a) it's a *deliberate* log of identity, not an accidental field, and (b) it would be easy for someone editing this code to extend the template to `session.user.email`. |
+| ~~[app/api/content/export/vault/route.ts:39](../../app/api/content/export/vault/route.ts#L39)~~ | ~~`console.log(\`[Export] Starting vault export for user ${session.user.id}, format: ${format}\`)`~~ | ~~UUID is PII-adjacent — joinable to user records in the DB.~~ |
 
-**Phase 3.1 remediation:** replace with `logger.info({ event: "export:vault:started", attrs: { format }, summary: "vault export" })`. The active span's `auth:session:resolved` parent already carries `user_id_hash` — no need to repeat it here.
+**Resolution:** The vault route was fully migrated to `withRouteTrace` + `withSpan({ layer: "export", name: "vault" })` rather than just patched. The `session.user.id` template interpolation is gone; the trace's `auth:session` span carries identity instead. Bonus: the file's two other console calls (line 49 "Vault export complete" and line 65 catch handler) also retired, moving this file off Phase 3.7's queue.
 
 ### Severity 3 (4 sites)
 
