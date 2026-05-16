@@ -1,3 +1,5 @@
+// NOTE: client-reachable via transitive imports — see tag-sync.ts header.
+// Migrates to client-safe logger in Phase 5.
 import type { JSONContent } from "@tiptap/core";
 
 import { prisma } from "@/lib/database/client";

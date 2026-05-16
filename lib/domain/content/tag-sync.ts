@@ -9,6 +9,11 @@
  * - POST /api/content/import (on import)
  */
 
+// NOTE: client-reachable via transitive imports from "use client" components
+// (e.g. via browser-extension/service.ts). Cannot import the server logger
+// here without breaking the client bundle (node:async_hooks). Migrates to the
+// client-safe logger in Phase 5.
+// eslint-disable-next-line no-restricted-imports -- intentional until Phase 5
 import type { JSONContent } from "@tiptap/core";
 import { prisma } from "@/lib/database/client";
 import { extractTags } from "./tag-extractor";
@@ -104,6 +109,8 @@ export async function syncContentTags(
       }
     }
 
+    // Deferred to Phase 5 (client-safe logger) — keeping console.log for now
+    // so this file doesn't pull node:async_hooks into the client bundle.
     console.log(
       `[syncContentTags] Synced ${extractedTags.length} tags for content ${contentId}`
     );

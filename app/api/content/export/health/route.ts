@@ -8,80 +8,82 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/infrastructure/auth/middleware";
 import { errorMonitor, checkExportHealth } from "@/lib/domain/export/error-monitoring";
+import { logger, withRouteTrace, withSpan } from "@/lib/core/logger";
+
+const ROUTE_PATH = "/api/content/export/health";
 
 export async function GET(request: NextRequest) {
-  try {
-    // Only admins can view health metrics (requireRole throws if not admin)
-    const session = await requireRole("admin");
+  return withRouteTrace(request, { route: ROUTE_PATH }, async () => {
+    try {
+      await withSpan(
+        { layer: "auth", name: "session" },
+        { summary: "session lookup (admin)" },
+        async () => requireRole("admin"),
+      );
 
-    // Get health check
-    const health = checkExportHealth();
+      const health = checkExportHealth();
+      const stats = errorMonitor.getStatistics();
 
-    // Get statistics
-    const stats = errorMonitor.getStatistics();
+      const criticalDiscrepancies = errorMonitor.getDiscrepancies({
+        severity: "critical",
+      });
+      const highDiscrepancies = errorMonitor.getDiscrepancies({
+        severity: "high",
+      });
 
-    // Get critical discrepancies
-    const criticalDiscrepancies = errorMonitor.getDiscrepancies({
-      severity: "critical",
-    });
-
-    // Get high-severity discrepancies
-    const highDiscrepancies = errorMonitor.getDiscrepancies({
-      severity: "high",
-    });
-
-    return NextResponse.json({
-      success: true,
-      data: {
-        status: health.healthy ? "healthy" : "unhealthy",
-        issues: health.issues,
-        statistics: {
-          totalErrors: stats.totalErrors,
-          errorsByType: stats.errorsByType,
-          errorsByCode: stats.errorsByCode,
-          recentErrors: stats.recentErrors.slice(-5), // Last 5 errors
+      return NextResponse.json({
+        success: true,
+        data: {
+          status: health.healthy ? "healthy" : "unhealthy",
+          issues: health.issues,
+          statistics: {
+            totalErrors: stats.totalErrors,
+            errorsByType: stats.errorsByType,
+            errorsByCode: stats.errorsByCode,
+            recentErrors: stats.recentErrors.slice(-5),
+          },
+          discrepancies: {
+            critical: criticalDiscrepancies,
+            high: highDiscrepancies,
+            top10: stats.topDiscrepancies,
+          },
+          recommendations: generateRecommendations(health, stats),
         },
-        discrepancies: {
-          critical: criticalDiscrepancies,
-          high: highDiscrepancies,
-          top10: stats.topDiscrepancies,
-        },
-        recommendations: generateRecommendations(health, stats),
-      },
-    });
-  } catch (error) {
-    console.error("[Export Health] Failed to get health metrics:", error);
+      });
+    } catch (error) {
+      logger.error({
+        layer: "export",
+        event: "health:caught",
+        summary: "health check failed — 500",
+        error,
+      });
 
-    return NextResponse.json(
-      {
-        success: false,
-        error: {
-          code: "SERVER_ERROR",
-          message: "Failed to retrieve health metrics",
+      return NextResponse.json(
+        {
+          success: false,
+          error: {
+            code: "SERVER_ERROR",
+            message: "Failed to retrieve health metrics",
+          },
         },
-      },
-      { status: 500 }
-    );
-  }
+        { status: 500 }
+      );
+    }
+  });
 }
 
-/**
- * Generate actionable recommendations based on health metrics
- */
 function generateRecommendations(
   health: ReturnType<typeof checkExportHealth>,
   stats: ReturnType<typeof errorMonitor.getStatistics>
 ): string[] {
   const recommendations: string[] = [];
 
-  // High error count
   if (stats.totalErrors > 100) {
     recommendations.push(
       "High error count detected. Review error logs and consider updating converters."
     );
   }
 
-  // Unknown node errors
   const unknownNodeErrors = stats.errorsByType["unknown_node"] || 0;
   if (unknownNodeErrors > 10) {
     recommendations.push(
@@ -89,7 +91,6 @@ function generateRecommendations(
     );
   }
 
-  // Validation errors
   const validationErrors = stats.errorsByType["validation"] || 0;
   if (validationErrors > 20) {
     recommendations.push(
@@ -97,7 +98,6 @@ function generateRecommendations(
     );
   }
 
-  // Recurring discrepancies
   if (stats.topDiscrepancies.length > 0) {
     const top = stats.topDiscrepancies[0];
     if (top.occurrences > 50) {
@@ -107,7 +107,6 @@ function generateRecommendations(
     }
   }
 
-  // No issues
   if (recommendations.length === 0) {
     recommendations.push("Export system is healthy. No actions needed.");
   }
