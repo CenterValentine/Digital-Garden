@@ -15,6 +15,9 @@ import {
   generateUniqueSlug,
 } from "@/lib/domain/content";
 import { instantiateTemplateContent } from "@/lib/domain/editor/template-instantiation";
+import { logger, withRouteTrace } from "@/lib/core/logger";
+
+const ROUTE_PATH = "/api/periodic-notes/resolve";
 
 interface ResolvePeriodicNoteRequest {
   kind?: PeriodicNoteKind;
@@ -26,6 +29,7 @@ function isPeriodicNoteKind(value: unknown): value is PeriodicNoteKind {
 }
 
 export async function POST(request: NextRequest) {
+  return withRouteTrace(request, { route: ROUTE_PATH }, async () => {
   try {
     const session = await requireAuth();
     const body = (await request.json().catch(() => ({}))) as ResolvePeriodicNoteRequest;
@@ -210,7 +214,14 @@ export async function POST(request: NextRequest) {
         ? 400
         : 500;
 
-    console.error("POST /api/periodic-notes/resolve error:", error);
+    if (status === 500) {
+      logger.error({
+        layer: "periodic",
+        event: "resolve:caught",
+        summary: "resolve failed — 500",
+        error,
+      });
+    }
     return NextResponse.json(
       {
         success: false,
@@ -227,6 +238,7 @@ export async function POST(request: NextRequest) {
       { status }
     );
   }
+  });
 }
 
 async function validatePeriodicNoteFolder(

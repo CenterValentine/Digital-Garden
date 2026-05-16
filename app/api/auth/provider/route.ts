@@ -1,49 +1,64 @@
 /**
  * API Route: Get User's OAuth Provider
- *
- * Returns the OAuth provider (if any) that the user signed in with.
- * Used to conditionally show Google Docs editing option.
  */
 
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { getSession, getValidGoogleAccessToken } from "@/lib/infrastructure/auth";
+import { logger, withRouteTrace, withSpan } from "@/lib/core/logger";
 
-export async function GET() {
-  try {
-    const session = await getSession();
+const ROUTE_PATH = "/api/auth/provider";
 
-    if (!session) {
+export async function GET(request: NextRequest) {
+  return withRouteTrace(request, { route: ROUTE_PATH }, async () => {
+    try {
+      const session = await withSpan(
+        { layer: "auth", name: "session" },
+        { summary: "session lookup" },
+        async () => getSession(),
+      );
+
+      if (!session) {
+        return NextResponse.json(
+          { error: "Unauthorized" },
+          { status: 401 }
+        );
+      }
+
+      const hasValidToken = await withSpan(
+        { layer: "auth", name: "google_token_probe" },
+        undefined,
+        async (span) => {
+          try {
+            await getValidGoogleAccessToken(session.user.id);
+            span.attr("valid", true).summary("token valid");
+            return true;
+          } catch {
+            // Not an error — user simply doesn't have Google auth
+            span.attr("valid", false).summary("no google auth");
+            return false;
+          }
+        },
+      );
+
+      return NextResponse.json({
+        success: true,
+        data: {
+          hasGoogleAuth: hasValidToken,
+          provider: hasValidToken ? "google" : null,
+          hasValidToken,
+        },
+      });
+    } catch (error) {
+      logger.error({
+        layer: "auth",
+        event: "provider_probe:caught",
+        summary: "probe failed — 500",
+        error,
+      });
       return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
+        { error: "Internal server error" },
+        { status: 500 }
       );
     }
-
-    // Proactively refresh Google access token if expired
-    // This ensures the user has a valid token for subsequent API calls
-    let hasValidToken = false;
-    try {
-      await getValidGoogleAccessToken(session.user.id);
-      hasValidToken = true;
-    } catch (error) {
-      // No Google account or refresh failed
-      // This is not an error - just means user doesn't have Google auth
-      hasValidToken = false;
-    }
-
-    return NextResponse.json({
-      success: true,
-      data: {
-        hasGoogleAuth: hasValidToken,
-        provider: hasValidToken ? "google" : null,
-        hasValidToken,
-      },
-    });
-  } catch (error) {
-    console.error("[Auth Provider API] Error:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
-  }
+  });
 }

@@ -8,159 +8,167 @@ import {
   type ApiResponse,
   type SignUpInput,
   type SessionData,
-  type AuthError,
 } from "@/lib/infrastructure/auth/types";
 
 import { prisma } from "@/lib/database/client";
+import { logger, withRouteTrace, withSpan } from "@/lib/core/logger";
 
-export async function POST(request: NextRequest): Promise<NextResponse> {
-  try {
-    const body: unknown = await request.json();
+const ROUTE_PATH = "/api/auth/sign-up";
 
-    // Validate request body
-    if (
-      !body ||
-      typeof body !== "object" ||
-      !("email" in body) ||
-      !("password" in body) ||
-      !("passwordConfirm" in body)
-    ) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: {
-            code: "INVALID_EMAIL",
-            message: "Invalid request body",
-          },
-        } as ApiResponse<never>,
-        { status: 400 }
-      );
-    }
+export async function POST(request: NextRequest) {
+  return withRouteTrace(request, { route: ROUTE_PATH }, async () => {
+    try {
+      const body: unknown = await request.json();
 
-    const input = body as SignUpInput;
-
-    // Validate email
-    if (!isValidEmail(input.email)) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: {
-            code: "INVALID_EMAIL",
-            message: "Invalid email address",
-          },
-        } as ApiResponse<never>,
-        { status: 400 }
-      );
-    }
-
-    // Validate password
-    if (!isValidPassword(input.password)) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: {
-            code: "WEAK_PASSWORD",
-            message: "Password must be at least 8 characters long",
-          },
-        } as ApiResponse<never>,
-        { status: 400 }
-      );
-    }
-
-    // Check password confirmation
-    if (input.password !== input.passwordConfirm) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: {
-            code: "WEAK_PASSWORD",
-            message: "Passwords do not match",
-          },
-        } as ApiResponse<never>,
-        { status: 400 }
-      );
-    }
-
-    // Check if user already exists
-    const existingUser = await prisma.user.findUnique({
-      where: { email: input.email },
-    });
-
-    if (existingUser) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: {
-            code: "USER_EXISTS",
-            message: "User with this email already exists",
-          },
-        } as ApiResponse<never>,
-        { status: 409 }
-      );
-    }
-
-    // Extract username from email
-    let username = extractUsername(input.email);
-
-    // Check if username is taken and generate unique one if needed
-    const existingUsername = await prisma.user.findUnique({
-      where: { username },
-    });
-
-    if (existingUsername) {
-      // Append numbers if username is taken
-      let counter = 1;
-      let uniqueUsername = `${username}${counter}`;
-      while (
-        await prisma.user.findUnique({ where: { username: uniqueUsername } })
+      if (
+        !body ||
+        typeof body !== "object" ||
+        !("email" in body) ||
+        !("password" in body) ||
+        !("passwordConfirm" in body)
       ) {
-        counter++;
-        uniqueUsername = `${username}${counter}`;
+        return NextResponse.json(
+          {
+            success: false,
+            error: {
+              code: "INVALID_EMAIL",
+              message: "Invalid request body",
+            },
+          } as ApiResponse<never>,
+          { status: 400 }
+        );
       }
-      // Ensure length limit
-      username = uniqueUsername.substring(0, 50);
-    }
 
-    // Hash password
-    const passwordHash = await hashPassword(input.password);
+      const input = body as SignUpInput;
 
-    // Create user
-    const user = await prisma.user.create({
-      data: {
-        email: input.email,
-        username,
-        passwordHash,
-        role: "guest",
-      },
-      select: {
-        id: true,
-        username: true,
-        email: true,
-        role: true,
-      },
-    });
+      if (!isValidEmail(input.email)) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: { code: "INVALID_EMAIL", message: "Invalid email address" },
+          } as ApiResponse<never>,
+          { status: 400 }
+        );
+      }
 
-    // Create session
-    const session = await createSession(user.id);
+      if (!isValidPassword(input.password)) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: {
+              code: "WEAK_PASSWORD",
+              message: "Password must be at least 8 characters long",
+            },
+          } as ApiResponse<never>,
+          { status: 400 }
+        );
+      }
 
-    return NextResponse.json(
-      {
-        success: true,
-        data: session,
-      } as ApiResponse<SessionData>,
-      { status: 201 }
-    );
-  } catch (error) {
-    console.error("Sign-up error:", error);
-    return NextResponse.json(
-      {
-        success: false,
-        error: {
-          code: "UNAUTHORIZED",
-          message: error instanceof Error ? error.message : "An error occurred",
+      if (input.password !== input.passwordConfirm) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: {
+              code: "WEAK_PASSWORD",
+              message: "Passwords do not match",
+            },
+          } as ApiResponse<never>,
+          { status: 400 }
+        );
+      }
+
+      // Email and password are NOT logged in attrs.
+      const result = await withSpan(
+        { layer: "auth", name: "sign_up" },
+        { summary: "register + create session" },
+        async (span) => {
+          const existingUser = await prisma.user.findUnique({
+            where: { email: input.email },
+          });
+
+          if (existingUser) {
+            span.attr("exists", true).summary("user already exists");
+            return { exists: true as const };
+          }
+
+          let username = extractUsername(input.email);
+
+          const existingUsername = await prisma.user.findUnique({
+            where: { username },
+          });
+
+          if (existingUsername) {
+            let counter = 1;
+            let uniqueUsername = `${username}${counter}`;
+            while (
+              await prisma.user.findUnique({ where: { username: uniqueUsername } })
+            ) {
+              counter++;
+              uniqueUsername = `${username}${counter}`;
+            }
+            username = uniqueUsername.substring(0, 50);
+          }
+
+          const passwordHash = await hashPassword(input.password);
+
+          const user = await prisma.user.create({
+            data: {
+              email: input.email,
+              username,
+              passwordHash,
+              role: "guest",
+            },
+            select: {
+              id: true,
+              username: true,
+              email: true,
+              role: true,
+            },
+          });
+
+          const session = await createSession(user.id);
+          span.attr("created", true).summary("user + session created");
+          return { exists: false as const, session };
         },
-      } as ApiResponse<never>,
-      { status: 500 }
-    );
-  }
+      );
+
+      if (result.exists) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: {
+              code: "USER_EXISTS",
+              message: "User with this email already exists",
+            },
+          } as ApiResponse<never>,
+          { status: 409 }
+        );
+      }
+
+      return NextResponse.json(
+        {
+          success: true,
+          data: result.session,
+        } as ApiResponse<SessionData>,
+        { status: 201 }
+      );
+    } catch (error) {
+      logger.error({
+        layer: "auth",
+        event: "sign_up:caught",
+        summary: "sign-up failed — 500",
+        error,
+      });
+      return NextResponse.json(
+        {
+          success: false,
+          error: {
+            code: "UNAUTHORIZED",
+            message: error instanceof Error ? error.message : "An error occurred",
+          },
+        } as ApiResponse<never>,
+        { status: 500 }
+      );
+    }
+  });
 }

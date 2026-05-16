@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { prisma } from "@/lib/database/client";
 import { requireAuth } from "@/lib/infrastructure/auth/middleware";
+import { logger, withRouteTrace } from "@/lib/core/logger";
+
+const ROUTE_PATH = "/api/periodic-notes/summary";
 
 const MAX_SUMMARY_WINDOW_MS = 10 * 24 * 60 * 60 * 1000;
 
@@ -189,6 +192,7 @@ function getEffectiveContentUpdatedAt(node: SummaryNode) {
 }
 
 export async function GET(request: NextRequest) {
+  return withRouteTrace(request, { route: ROUTE_PATH }, async () => {
   try {
     const session = await requireAuth();
     const { searchParams } = new URL(request.url);
@@ -512,7 +516,14 @@ export async function GET(request: NextRequest) {
       message === "Authentication required" ||
       message.toLowerCase().includes("auth");
 
-    console.error("GET /api/periodic-notes/summary error:", error);
+    if (!isAuthError) {
+      logger.error({
+        layer: "periodic",
+        event: "summary:caught",
+        summary: "summary failed — 500",
+        error,
+      });
+    }
     return NextResponse.json(
       {
         success: false,
@@ -524,4 +535,5 @@ export async function GET(request: NextRequest) {
       { status: isAuthError ? 401 : 500 }
     );
   }
+  });
 }
