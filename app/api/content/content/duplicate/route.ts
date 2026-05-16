@@ -11,100 +11,116 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/infrastructure/auth/session";
 import { prisma } from "@/lib/database/client";
+import { logger, withRouteTrace, withSpan } from "@/lib/core/logger";
 
-/**
- * POST /api/content/content/duplicate
- *
- * Request body:
- * {
- *   ids: string[];  // IDs of nodes to duplicate
- * }
- *
- * Response:
- * {
- *   success: true,
- *   data: {
- *     duplicated: Array<{ originalId: string; newId: string; title: string }>;
- *   }
- * }
- */
+const ROUTE_PATH = "/api/content/content/duplicate";
+
 export async function POST(request: NextRequest) {
-  try {
-    const session = await getSession();
-    if (!session?.user?.id) {
-      return NextResponse.json(
-        { success: false, error: { code: "UNAUTHORIZED", message: "Not authenticated" } },
-        { status: 401 }
+  return withRouteTrace(request, { route: ROUTE_PATH }, async () => {
+    try {
+      const session = await withSpan(
+        { layer: "auth", name: "session" },
+        { summary: "session lookup" },
+        async () => getSession(),
       );
-    }
-
-    const body = await request.json();
-    const { ids } = body;
-
-    if (!Array.isArray(ids) || ids.length === 0) {
-      return NextResponse.json(
-        { success: false, error: { code: "INVALID_INPUT", message: "ids must be a non-empty array" } },
-        { status: 400 }
-      );
-    }
-
-    const userId = session.user.id;
-    const duplicatedNodes: Array<{ originalId: string; newId: string; title: string }> = [];
-
-    // Process each ID
-    for (const id of ids) {
-      // Fetch the original node
-      const original = await prisma.contentNode.findUnique({
-        where: { id },
-        include: {
-          folderPayload: true,
-          notePayload: true,
-          filePayload: true,
-          htmlPayload: true,
-          codePayload: true,
-          externalPayload: true,
-        },
-      });
-
-      if (!original) {
-        console.warn(`[Duplicate] Node ${id} not found, skipping`);
-        continue;
+      if (!session?.user?.id) {
+        return NextResponse.json(
+          { success: false, error: { code: "UNAUTHORIZED", message: "Not authenticated" } },
+          { status: 401 }
+        );
       }
 
-      // Verify ownership
-      if (original.ownerId !== userId) {
-        console.warn(`[Duplicate] User ${userId} does not own node ${id}, skipping`);
-        continue;
+      const body = await request.json();
+      const { ids } = body;
+
+      if (!Array.isArray(ids) || ids.length === 0) {
+        return NextResponse.json(
+          { success: false, error: { code: "INVALID_INPUT", message: "ids must be a non-empty array" } },
+          { status: 400 }
+        );
       }
 
-      // Create duplicate
-      const duplicate = await duplicateNode(original, userId);
-      duplicatedNodes.push({
-        originalId: id,
-        newId: duplicate.id,
-        title: duplicate.title,
-      });
-    }
+      const userId = session.user.id;
+      const duplicatedNodes: Array<{ originalId: string; newId: string; title: string }> = [];
+      let skippedNotFound = 0;
+      let skippedNotOwned = 0;
 
-    return NextResponse.json({
-      success: true,
-      data: {
-        duplicated: duplicatedNodes,
-      },
-    });
-  } catch (error) {
-    console.error("[Duplicate API] Error:", error);
-    return NextResponse.json(
-      {
-        success: false,
-        error: {
-          code: "INTERNAL_ERROR",
-          message: error instanceof Error ? error.message : "Failed to duplicate content",
+      await withSpan(
+        { layer: "content", name: "duplicate" },
+        { attrs: { requested: ids.length } },
+        async (span) => {
+          for (const id of ids) {
+            const original = await prisma.contentNode.findUnique({
+              where: { id },
+              include: {
+                folderPayload: true,
+                notePayload: true,
+                filePayload: true,
+                htmlPayload: true,
+                codePayload: true,
+                externalPayload: true,
+              },
+            });
+
+            if (!original) {
+              skippedNotFound++;
+              continue;
+            }
+
+            if (original.ownerId !== userId) {
+              skippedNotOwned++;
+              continue;
+            }
+
+            const duplicate = await duplicateNode(original, userId);
+            duplicatedNodes.push({
+              originalId: id,
+              newId: duplicate.id,
+              title: duplicate.title,
+            });
+          }
+          span
+            .attr("duplicated", duplicatedNodes.length)
+            .attr("skipped_not_found", skippedNotFound)
+            .attr("skipped_not_owned", skippedNotOwned)
+            .summary(`${duplicatedNodes.length}/${ids.length} duplicated`);
         },
-      },
-      { status: 500 }
-    );
-  }
+      );
+
+      if (skippedNotFound > 0 || skippedNotOwned > 0) {
+        logger.warn({
+          layer: "content",
+          event: "duplicate:skipped",
+          summary: `${skippedNotFound} not_found, ${skippedNotOwned} not_owned`,
+          attrs: { not_found: skippedNotFound, not_owned: skippedNotOwned },
+        });
+      }
+
+      return NextResponse.json({
+        success: true,
+        data: {
+          duplicated: duplicatedNodes,
+        },
+      });
+    } catch (error) {
+      logger.error({
+        layer: "content",
+        event: "duplicate:caught",
+        summary: "duplicate failed — 500",
+        error,
+      });
+      return NextResponse.json(
+        {
+          success: false,
+          error: {
+            code: "INTERNAL_ERROR",
+            message: error instanceof Error ? error.message : "Failed to duplicate content",
+          },
+        },
+        { status: 500 }
+      );
+    }
+  });
 }
 
 /**
@@ -121,25 +137,20 @@ async function duplicateNode(
   parentId: string | null = null
 ): Promise<any> {
 /* eslint-enable @typescript-eslint/no-explicit-any */
-  // Generate new title with " (Copy)" suffix
   const newTitle = `${original.title} (Copy)`;
 
-  // Create the duplicate node
-   
   const duplicate = await prisma.contentNode.create({
-     
     data: {
       title: newTitle,
       slug: `${original.slug}-copy-${Date.now()}`,
       contentType: original.contentType,
-      parentId: parentId ?? original.parentId, // Use provided parentId or keep original
+      parentId: parentId ?? original.parentId,
       displayOrder: original.displayOrder,
       category: original.category,
       customIcon: original.customIcon,
       iconColor: original.iconColor,
-      isPublished: false, // Duplicates are unpublished by default
+      isPublished: false,
 
-      // Duplicate payload based on type
       ...(original.folderPayload && {
         folderPayload: {
           create: {
@@ -162,8 +173,6 @@ async function duplicateNode(
         },
       }),
 
-      // File payloads cannot be duplicated (would need to copy storage)
-      // Instead, we create a reference to the same file
       ...(original.filePayload && {
         filePayload: {
           create: {
@@ -171,7 +180,7 @@ async function duplicateNode(
             mimeType: original.filePayload.mimeType,
             fileSize: original.filePayload.fileSize,
             storageProvider: original.filePayload.storageProvider,
-            storageKey: original.filePayload.storageKey, // Same file in storage
+            storageKey: original.filePayload.storageKey,
             storageMetadata: original.filePayload.storageMetadata || {},
             uploadStatus: original.filePayload.uploadStatus,
             thumbnailUrl: original.filePayload.thumbnailUrl,
@@ -213,7 +222,6 @@ async function duplicateNode(
     } as never,
   });
 
-  // If original has children (folder), duplicate them recursively
   if (original.contentType === "folder") {
     const children = await prisma.contentNode.findMany({
       where: { parentId: original.id },
