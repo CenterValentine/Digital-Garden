@@ -93,11 +93,16 @@ enum FlashcardRating {
   easy
 }
 
-// Card variant. v1 only ships `basic`; the column exists so cloze/typing/
-// choice can land without a second migration.
+
+// Card variant. `basic` is the historical default. `cloze` is wired in
+// Session 2B alongside noteId + clozeOrdinal + clozeSourceJson on the
+// Flashcard model; sibling cloze cards generated from the same source
+// document share a noteId.
 enum FlashcardCardType {
   basic
+  cloze
 }
+
 
 enum ExternalReadingStatus {
   inbox
@@ -156,6 +161,8 @@ model ContentNode {
   ownedByNote          ContentNode?          @relation("ContentOwnedByNote", fields: [ownedByNoteId], references: [id], onDelete: SetNull)
   ownedEmbeds          ContentNode[]         @relation("ContentOwnedByNote")
   peopleGroup          PeopleGroup?          @relation("PeopleGroupContent", fields: [peopleGroupId], references: [id], onDelete: SetNull)
+  archivedConversation       Conversation?               @relation("ConversationArchive")
+  conversationAssociations   ConversationAssociation[]   @relation("ConversationAssoc")
   person               Person?               @relation("PersonContent", fields: [personId], references: [id], onDelete: SetNull)
   peopleFileTreeMounts PeopleFileTreeMount[] @relation("ContentNodePeopleMounts")
   collaborationDocument CollaborationDocument?
@@ -266,6 +273,15 @@ model Flashcard {
   archivedAt      DateTime?             @db.Timestamptz(6)
   deletedAt       DateTime?             @db.Timestamptz(6)
 
+  // ---- Cloze additions (Anki import / Session 2B). noteId is a loose
+  // ---- pointer (no FK) — promote to a real FK later if shared state grows.
+  noteId          String?               @db.Uuid
+  clozeOrdinal    Int?
+  // Source TipTap document the cloze cards were generated from. Stored
+  // on each sibling for simple re-extraction on edit; if storage cost
+  // becomes a concern this can move to a sidecar table keyed by noteId.
+  clozeSourceJson Json?
+
   owner           User                  @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   deck            FlashcardDeck         @relation(fields: [deckId], references: [id], onDelete: Restrict)
   sourceContent   ContentNode?          @relation("FlashcardSourceContent", fields: [sourceContentId], references: [id], onDelete: SetNull)
@@ -274,9 +290,11 @@ model Flashcard {
   @@index([sourceContentId])
   @@index([ownerId, deckId])
   @@index([ownerId, due])
-  @@index([ownerId, state, due])
+   @@index([ownerId, state, due])
   @@index([ownerId, deletedAt])
+  @@index([ownerId, noteId])
 }
+
 
 model FlashcardReviewAttempt {
   id             String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
@@ -472,21 +490,6 @@ model StorageProviderConfig {
   @@index([userId, isDefault])
 }
 
-model AIProviderKey {
-  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  userId       String    @db.Uuid
-  providerId   String    @db.VarChar(50)
-  encryptedKey String
-  label        String    @default("") @db.VarChar(100)
-  isActive     Boolean   @default(true)
-  lastUsedAt   DateTime? @db.Timestamptz(6)
-  createdAt    DateTime  @default(now()) @db.Timestamptz(6)
-  updatedAt    DateTime  @updatedAt @db.Timestamptz(6)
-  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, providerId])
-  @@index([userId, isActive])
-}
 
 model User {
   id                   String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
@@ -504,12 +507,14 @@ model User {
   fsrsMaxInterval        Int     @default(36500)
   defaultFlashcardDeckId String? @db.Uuid
   accounts             Account[]
-  aiProviderKeys       AIProviderKey[]
+  aiConnections        AIConnection[]
+  aiFeatureRoutes      AIFeatureRoute[]
   auditTargets         AuditLog[]              @relation("AuditTargets")
   adminActions         AuditLog[]              @relation("AdminActions")
   categories           Category[]
   contentHistory       ContentHistory[]
   contentNodes         ContentNode[]
+  conversations           Conversation[]
   sessions             Session[]
   storageConfigs       StorageProviderConfig[]
   tags                 Tag[]
@@ -1098,6 +1103,196 @@ model ChatPayload {
   content ContentNode @relation(fields: [contentId], references: [id], onDelete: Cascade)
 }
 
+// =============================================================================
+// AI conversations — first-class entity, decoupled from ChatPayload.
+// ChatPayload remains as the archive target (set via archivedToContentNodeId).
+// Session 2 of the AI chat revamp plan.
+// =============================================================================
+
+enum ChatMessageRole {
+  user
+  assistant
+  system
+  tool
+}
+
+enum ConversationAssociationSource {
+  snapshot // bound at conversation creation (panels open at the time)
+  manual   // user-pinned via the picker or promoted from auto
+  auto     // bound by @mention or AI tool-call referencing the content
+}
+
+model Conversation {
+  id                       String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ownerId                  String    @db.Uuid
+  title                    String?   @db.VarChar(255)
+  archivedToContentNodeId  String?   @unique @db.Uuid
+  createdAt                DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt                DateTime  @updatedAt @db.Timestamptz(6)
+  deletedAt                DateTime? @db.Timestamptz(6)
+
+  owner                 User                      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  archivedToContentNode ContentNode?              @relation("ConversationArchive", fields: [archivedToContentNodeId], references: [id], onDelete: SetNull)
+  messages              ConversationMessage[]
+  associations          ConversationAssociation[]
+
+  @@index([ownerId, updatedAt])
+  @@index([ownerId, deletedAt])
+}
+
+model ConversationMessage {
+  id             String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  conversationId String  @db.Uuid
+
+  role       ChatMessageRole
+  providerId String?         @db.VarChar(50)  // anthropic | openai | google | ...
+  modelId    String?         @db.VarChar(100) // upstream model id
+
+  // AI SDK v6 parts[] stored verbatim (text, reasoning, tool calls/results,
+  // attachments). Single source of truth for re-render.
+  parts Json
+
+  // Cached plaintext for FTS / quick summary; lossy by design.
+  textCache String?
+
+  // Edit/branch lineage — Session 5 (edit + regenerate) uses this.
+  parentId String? @db.Uuid
+  isHidden Boolean @default(false) // hidden when superseded by an edit
+
+  metadata Json?
+
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+
+  conversation Conversation          @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  parent       ConversationMessage?  @relation("MessageBranch", fields: [parentId], references: [id], onDelete: SetNull)
+  branches     ConversationMessage[] @relation("MessageBranch")
+
+  @@index([conversationId, createdAt])
+  @@index([conversationId, parentId])
+}
+
+model ConversationAssociation {
+  conversationId String                        @db.Uuid
+  contentNodeId  String                        @db.Uuid
+  source         ConversationAssociationSource
+
+  // Updated on every new mention / tool-call referencing this content.
+  // Drives LRU eviction for source: auto (Session 4).
+  lastReferencedAt DateTime @default(now()) @db.Timestamptz(6)
+  referenceCount   Int      @default(1)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  contentNode  ContentNode  @relation("ConversationAssoc", fields: [contentNodeId], references: [id], onDelete: Cascade)
+
+  @@id([conversationId, contentNodeId])
+  @@index([contentNodeId])
+  @@index([conversationId, source, lastReferencedAt])
+}
+
+// =============================================================================
+// AI Connections — universal unit for AI provider configuration.
+// Replaces AIProviderKey conceptually; the old table stays alive during the
+// transition and gets dropped in a cleanup patch once we're confident in the
+// backfill. Sessions 3.5/3.6 of the AI chat revamp plan.
+// =============================================================================
+
+enum ConnectionKind {
+  direct  // Built-in lab providers (Anthropic, OpenAI, Google, xAI, Mistral, Groq)
+  gateway // Multi-model brokers (Vercel AI Gateway, Fireworks, Together, OpenRouter)
+  custom  // User-defined endpoint — any AI-SDK-compatible service
+}
+
+model AIConnection {
+  id            String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ownerId       String         @db.Uuid
+  kind          ConnectionKind
+
+  // For built-ins, the preset id ("anthropic" | "openai" | ... | "vercel-gateway" | ...).
+  // Null for custom connections.
+  presetId      String?        @db.VarChar(50)
+
+  // User-editable display name. Defaults to the preset's name for built-ins.
+  label         String         @db.VarChar(120)
+
+  // Endpoint URL for openai-compat / custom connections. Null for built-in
+  // direct providers that use the lab's own SDK with default URLs.
+  baseURL       String?        @db.VarChar(500)
+
+  // Encrypted API key — uses the existing encryption layer (same as AIProviderKey).
+  encryptedKey  String
+
+  // Which AI SDK adapter handles this connection:
+  //   - "anthropic" | "openai" | "google" | "xai" | "mistral" | "groq"
+  //     → use the matching @ai-sdk/<provider> package
+  //   - "vercel-gateway" → @ai-sdk/gateway
+  //   - "openai-compat"  → createOpenAI({ baseURL, apiKey }) — covers
+  //     Fireworks, Together, OpenRouter, and most customs
+  adapterKind   String         @db.VarChar(50)
+
+  // User-curated model list for this connection.
+  // [{ id: string; name: string; contextWindow?: number; capabilities?: string[] }]
+  // For built-in directs, backfilled from PROVIDER_CATALOG.
+  // For gateways/customs in S3.5, user enters manually; S3.5b auto-fetches.
+  models        Json           @default("[]")
+
+  // Pin-to-picker (S3.5b — schema lands now, UI lands then).
+  isPinned      Boolean        @default(false)
+  pinOrder      Int?
+
+  // Routing preference for direct connections that have a gateway override.
+  // When this is a kind=direct connection AND the user wants their lab calls
+  // to route via a specific gateway, this column holds the target gateway's
+  // connection id. Null = route direct. (UI for this lands in S3.5b.)
+  preferRouteVia String?       @db.Uuid
+
+  createdAt     DateTime       @default(now()) @db.Timestamptz(6)
+  updatedAt     DateTime       @updatedAt @db.Timestamptz(6)
+  deletedAt     DateTime?      @db.Timestamptz(6)
+
+  owner          User             @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  featureRoutes  AIFeatureRoute[] @relation("FeatureRouteConnection")
+
+  @@index([ownerId, kind])
+  @@index([ownerId, isPinned, pinOrder])
+  @@index([ownerId, deletedAt])
+}
+
+// =============================================================================
+// Feature Routing — Session 3.6.
+// Each (user, featureId) gets one or more (connection, model) entries in
+// priority order: position 0 is primary, 1+ are fallbacks. The execute-with-
+// fallback wrapper tries them in order on retriable errors (429/502/503/504/
+// network) and aborts on fatal errors (400/401/402/403).
+// =============================================================================
+
+model AIFeatureRoute {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ownerId       String   @db.Uuid
+
+  // Feature identifier from FEATURE_REGISTRY. e.g. "chat" | "image-generation"
+  // | "follow-ups" | "chat-title-generation" | future "flashcard-mcp" | etc.
+  featureId     String   @db.VarChar(100)
+
+  // 0 = primary; 1, 2, ... = ordered backups.
+  position      Int
+
+  connectionId  String   @db.Uuid
+  modelId       String   @db.VarChar(100)
+
+  createdAt     DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt     DateTime @updatedAt @db.Timestamptz(6)
+
+  owner         User         @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  connection    AIConnection @relation("FeatureRouteConnection", fields: [connectionId], references: [id], onDelete: Cascade)
+
+  @@unique([ownerId, featureId, position])
+  @@index([ownerId, featureId])
+  @@index([connectionId])
+}
+
+
 model VisualizationPayload {
   contentId String   @id @db.Uuid
   engine    String   @db.VarChar(50) // "chartjs" | "d3" | "plotly" | "mermaid"
@@ -1463,10 +1658,12 @@ model Tenant {
 }
 
 model TenantHost {
-  host      String   @id @db.VarChar(253)
-  tenantId  String   @db.Uuid
-  isPrimary Boolean  @default(false)
-  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  host             String    @id @db.VarChar(253)
+  tenantId         String    @db.Uuid
+  isPrimary        Boolean   @default(false)
+  createdAt        DateTime  @default(now()) @db.Timestamptz(6)
+  verifiedAt       DateTime? @db.Timestamptz(6)
+  vercelConfigData Json?
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
