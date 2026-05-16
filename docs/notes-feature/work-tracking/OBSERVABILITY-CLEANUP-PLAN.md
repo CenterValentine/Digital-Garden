@@ -240,23 +240,24 @@ try { /* ... */ span.end("ok"); } catch (e) { span.fail(e); }
 
 **Deliverables:**
 
-1. `instrumentation.ts` at project root.
-   - `register()` from Next.js runtime hook.
-   - Per-request: **read `x-trace-id` header if present** (required by [FRONTEND-LOG-CHARTER.md](./FRONTEND-LOG-CHARTER.md) — the frontend is the trace originator), else generate a short ID server-side.
-   - Wrap each request in `withTrace(id, ...)` so all logger calls inherit it.
+1. `instrumentation.ts` at project root — startup marker for the logger. Runs once per Node runtime. This file is the OTel installation point for future use; per-request trace context is established by `withRouteTrace` (next bullet), not by Next.js's instrumentation hook (which has no per-request callback).
+2. `lib/core/logger/route-trace.ts` — `withRouteTrace(req, options, fn)` wrapper that every route handler invokes.
+   - **Reads `x-trace-id` header if present and well-formed** (per [FRONTEND-LOG-CHARTER.md](./FRONTEND-LOG-CHARTER.md) — frontend is the trace originator), else generates a fresh UUID server-side.
+   - Wraps the handler body in `withTrace(id, ...)` AND opens the root `route:request` span with method/path/status attrs.
    - Note: Fluid Compute (Vercel default now) reuses function instances; ALS is mandatory for correctness here — module-level state would cross-contaminate concurrent requests.
-2. Migrate **[app/api/content/content/[id]/route.ts](app/api/content/content/[id]/route.ts)** end-to-end:
-   - 7 existing console calls → logger calls.
-   - Wrap `GET` handler in `withSpan({ layer: "route", name: "request" }, ...)`.
-   - Inside: `withSpan({ layer: "auth", name: "session" }, ...)`, `withSpan({ layer: "content", name: "payload" }, ...)`, and `withSpan({ layer: "storage", name: "fetch" }, ...)` for file payloads.
-3. Same migration for the PATCH and DELETE handlers in that file (they share the route).
-4. Add a `pnpm dev` smoke recipe: hit the endpoint, copy a trace output into the plan as a snapshot.
+3. Migrate **[app/api/content/content/[id]/route.ts](app/api/content/content/[id]/route.ts)** end-to-end. All three handlers (GET, PATCH, DELETE) wrap their bodies in `withRouteTrace(...)` and use nested `withSpan` calls for sub-work:
+   - **GET:** `auth:session` → `content:payload` → `content:access`
+   - **PATCH:** `auth:session` → `content:payload` → `content:access` → `content:write` (multi-table upsert) → conditional `external:google_drive_rename`
+   - **DELETE:** `auth:session` → `content:payload` → `content:soft_delete`
+   - All 7 existing `console.*` calls retired. Three error catches now use `logger.error({ event: "request:caught", error, ... })`; two Google Drive notice logs use `logger.warn({ event: "rename:failed" / "rename:exception" })`.
+   - Storage span (mentioned in Phase 2 sketch) does **not** appear in this route — the GET only returns file payload *metadata*, not the file contents. Storage spans land in Phase 3.4 when actual fetches happen.
+4. Live smoke: when next running `pnpm dev`, GET `/api/content/content/<some-id>` and confirm a trace block appears in the terminal with the column-aligned shape from Phase 1's smoke. Capture a snapshot in this plan as evidence.
 
 **Verification gate:**
-- `pnpm typecheck && pnpm lint && pnpm build` clean.
-- Manual: `pnpm dev`, `curl http://localhost:3015/api/content/content/<some-id>`, confirm pretty-printed trace appears with correct span nesting and a summary block.
+- `pnpm typecheck && pnpm lint && pnpm build` clean. ✅ (typecheck silent, lint at 175/175, build ✓ Compiled 51s with 131/131 pages)
+- Manual smoke (deferred to next `pnpm dev` session): `curl http://localhost:3015/api/content/content/<some-id>`, confirm pretty-printed trace appears with correct span nesting and a summary block.
 - Confirm `.local/debug-payloads/<trace>.jsonl` is created if any payload reference fires.
-- Confirm ratchet (`--max-warnings 175`) did not grow.
+- Confirm ratchet (`--max-warnings 175`) did not grow. ✅
 
 ---
 
