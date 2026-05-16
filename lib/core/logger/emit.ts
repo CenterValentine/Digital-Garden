@@ -16,6 +16,12 @@ type EmitInput = {
   level: Level;
   layer: Layer;
   event: string;
+  /**
+   * Override trace_id from ALS. Required for spans whose terminal events
+   * (like a streamText onFinish callback) fire after the ALS scope has
+   * exited — the span object holds its own trace_id from creation time.
+   */
+  trace_id?: string;
   span_id?: string;
   parent_span_id?: string;
   duration_ms?: number;
@@ -31,7 +37,7 @@ export function emitEvent(input: EmitInput): void {
   const activeSpan = getActiveSpan();
 
   const ev: LogEvent = {
-    trace_id: ctx?.trace_id ?? "no-trace",
+    trace_id: input.trace_id ?? ctx?.trace_id ?? "no-trace",
     span_id: input.span_id ?? activeSpan?.span_id,
     parent_span_id: input.parent_span_id ?? activeSpan?.parent_span_id,
     ts: new Date().toISOString(),
