@@ -13,369 +13,371 @@ import { requireAuth } from "@/lib/infrastructure/auth/middleware";
 import { generateUniqueSlug } from "@/lib/domain/content";
 import { getUserStorageProvider } from "@/lib/infrastructure/storage";
 import crypto from "crypto";
+import { logger, withRouteTrace, withSpan } from "@/lib/core/logger";
+
+const ROUTE_PATH = "/api/content/content/upload/simple";
 
 export async function POST(request: NextRequest) {
-  try {
-    const session = await requireAuth();
-    const formData = await request.formData();
-
-    const file = formData.get("file") as File;
-    const parentId = formData.get("parentId") as string | null;
-    const peopleGroupId = formData.get("peopleGroupId") as string | null;
-    const personId = formData.get("personId") as string | null;
-    const provider = formData.get("provider") as "r2" | "s3" | "vercel" | null;
-    const enableOCR = formData.get("enableOCR") === "true";
-    const role = formData.get("role") as "primary" | "referenced" | null;
-
-    if (!file) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: {
-            code: "VALIDATION_ERROR",
-            message: "File is required",
-          },
-        },
-        { status: 400 }
+  return withRouteTrace(request, { route: ROUTE_PATH }, async () => {
+    try {
+      const session = await withSpan(
+        { layer: "auth", name: "session" },
+        { summary: "session lookup" },
+        async () => requireAuth(),
       );
-    }
+      const formData = await request.formData();
 
-    if (peopleGroupId && personId) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: {
-            code: "VALIDATION_ERROR",
-            message: "Content can only be assigned to one People target.",
-          },
-        },
-        { status: 400 }
-      );
-    }
+      const file = formData.get("file") as File;
+      const parentId = formData.get("parentId") as string | null;
+      const peopleGroupId = formData.get("peopleGroupId") as string | null;
+      const personId = formData.get("personId") as string | null;
+      const provider = formData.get("provider") as "r2" | "s3" | "vercel" | null;
+      const enableOCR = formData.get("enableOCR") === "true";
+      const role = formData.get("role") as "primary" | "referenced" | null;
 
-    let resolvedPeopleGroupId = peopleGroupId || null;
-    let resolvedPersonId = personId || null;
-
-    if (resolvedPeopleGroupId) {
-      const group = await prisma.peopleGroup.findFirst({
-        where: {
-          id: resolvedPeopleGroupId,
-          ownerId: session.user.id,
-          deletedAt: null,
-        },
-        select: { id: true },
-      });
-
-      if (!group) {
+      if (!file) {
         return NextResponse.json(
           {
             success: false,
-            error: {
-              code: "NOT_FOUND",
-              message: "People group not found",
-            },
+            error: { code: "VALIDATION_ERROR", message: "File is required" },
           },
-          { status: 404 }
-        );
-      }
-    }
-
-    if (resolvedPersonId) {
-      const person = await prisma.person.findFirst({
-        where: {
-          id: resolvedPersonId,
-          ownerId: session.user.id,
-          deletedAt: null,
-        },
-        select: { id: true },
-      });
-
-      if (!person) {
-        return NextResponse.json(
-          {
-            success: false,
-            error: {
-              code: "NOT_FOUND",
-              message: "Person not found",
-            },
-          },
-          { status: 404 }
-        );
-      }
-    }
-
-    if (parentId) {
-      const parent = await prisma.contentNode.findUnique({
-        where: { id: parentId },
-        select: {
-          id: true,
-          ownerId: true,
-          contentType: true,
-          deletedAt: true,
-          peopleGroupId: true,
-          personId: true,
-        },
-      });
-
-      if (!parent || parent.ownerId !== session.user.id) {
-        return NextResponse.json(
-          {
-            success: false,
-            error: {
-              code: "NOT_FOUND",
-              message: "Parent not found",
-            },
-          },
-          { status: 404 }
+          { status: 400 }
         );
       }
 
-      if (parent.deletedAt) {
+      if (peopleGroupId && personId) {
         return NextResponse.json(
           {
             success: false,
             error: {
               code: "VALIDATION_ERROR",
-              message: "Cannot add content to deleted parent",
+              message: "Content can only be assigned to one People target.",
             },
           },
           { status: 400 }
         );
       }
 
-      if (parent.contentType !== "folder") {
-        return NextResponse.json(
-          {
-            success: false,
-            error: {
-              code: "VALIDATION_ERROR",
-              message: "Parent must be a folder",
-            },
+      let resolvedPeopleGroupId = peopleGroupId || null;
+      let resolvedPersonId = personId || null;
+
+      if (resolvedPeopleGroupId) {
+        const group = await prisma.peopleGroup.findFirst({
+          where: {
+            id: resolvedPeopleGroupId,
+            ownerId: session.user.id,
+            deletedAt: null,
           },
-          { status: 400 }
-        );
+          select: { id: true },
+        });
+
+        if (!group) {
+          return NextResponse.json(
+            {
+              success: false,
+              error: { code: "NOT_FOUND", message: "People group not found" },
+            },
+            { status: 404 }
+          );
+        }
       }
 
-      if (parent.peopleGroupId || parent.personId) {
-        if (
-          (resolvedPeopleGroupId && resolvedPeopleGroupId !== parent.peopleGroupId) ||
-          (resolvedPersonId && resolvedPersonId !== parent.personId)
-        ) {
+      if (resolvedPersonId) {
+        const person = await prisma.person.findFirst({
+          where: {
+            id: resolvedPersonId,
+            ownerId: session.user.id,
+            deletedAt: null,
+          },
+          select: { id: true },
+        });
+
+        if (!person) {
+          return NextResponse.json(
+            {
+              success: false,
+              error: { code: "NOT_FOUND", message: "Person not found" },
+            },
+            { status: 404 }
+          );
+        }
+      }
+
+      if (parentId) {
+        const parent = await prisma.contentNode.findUnique({
+          where: { id: parentId },
+          select: {
+            id: true,
+            ownerId: true,
+            contentType: true,
+            deletedAt: true,
+            peopleGroupId: true,
+            personId: true,
+          },
+        });
+
+        if (!parent || parent.ownerId !== session.user.id) {
+          return NextResponse.json(
+            {
+              success: false,
+              error: { code: "NOT_FOUND", message: "Parent not found" },
+            },
+            { status: 404 }
+          );
+        }
+
+        if (parent.deletedAt) {
           return NextResponse.json(
             {
               success: false,
               error: {
                 code: "VALIDATION_ERROR",
-                message: "People assignment must match the parent folder.",
+                message: "Cannot add content to deleted parent",
               },
             },
             { status: 400 }
           );
         }
 
-        resolvedPeopleGroupId = parent.peopleGroupId;
-        resolvedPersonId = parent.personId;
-      }
-    }
-
-    // Convert file to buffer
-    const arrayBuffer = await file.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
-
-    // Calculate checksum
-    const checksum = crypto.createHash("sha256").update(buffer).digest("hex");
-
-    // Generate storage key
-    const fileExtension = file.name.split(".").pop() || "";
-    const timestamp = Date.now();
-    const storageKey = `uploads/${session.user.id}/${timestamp}-${crypto.randomBytes(8).toString("hex")}.${fileExtension}`;
-
-    // Get storage provider (use specified provider or user's default)
-    const storageProvider = await getUserStorageProvider(
-      session.user.id,
-      provider || undefined
-    );
-
-    // Upload to storage
-    await storageProvider.uploadFile(storageKey, buffer, file.type);
-
-    // Determine which provider was actually used
-    const usedProvider = provider || "r2"; // Default to r2 if not specified
-
-    // Extract text for search (if document)
-    // Use the same storage provider we just uploaded to
-    const { DocumentExtractor } = await import("@/lib/infrastructure/media/document-extractor");
-    const documentExtractor = new DocumentExtractor(storageProvider, enableOCR);
-    const searchText = await documentExtractor.extractText(storageKey, file.type);
-
-    console.log(`[Upload] File: ${file.name}, OCR: ${enableOCR}, searchTextLength: ${searchText.length}`);
-
-    // Check for duplicate file (by checksum)
-    const existingFile = await prisma.filePayload.findFirst({
-      where: {
-        checksum,
-        fileSize: BigInt(file.size),
-        content: {
-          ownerId: session.user.id,
-        },
-        uploadStatus: { in: ["uploading", "ready"] },  // Check both statuses
-      },
-      include: {
-        content: true,
-      },
-    });
-
-    // If duplicate exists, auto-rename with (1), (2), etc. like macOS
-    let finalFileName = file.name;
-    let isDuplicateFile = false;
-
-    if (existingFile) {
-      isDuplicateFile = true;
-
-      // Extract filename and extension
-      const extensionMatch = file.name.match(/^(.+)(\.[^.]+)$/);
-      const baseName = extensionMatch ? extensionMatch[1] : file.name;
-      const extension = extensionMatch ? extensionMatch[2] : "";
-
-      // Find next available number (1, 2, 3, etc.)
-      let counter = 1;
-      let candidateName = `${baseName} (${counter})${extension}`;
-
-      while (true) {
-        // Check if this name is already taken (by checksum)
-        const nameExists = await prisma.filePayload.findFirst({
-          where: {
-            checksum,
-            fileSize: BigInt(file.size),
-            content: {
-              ownerId: session.user.id,
-              title: candidateName,
-            },
-            uploadStatus: { in: ["uploading", "ready"] },
-          },
-        });
-
-        if (!nameExists) {
-          finalFileName = candidateName;
-          break;
-        }
-
-        counter++;
-        candidateName = `${baseName} (${counter})${extension}`;
-
-        // Safety limit
-        if (counter > 100) {
-          throw new Error("Too many duplicate files with the same content");
-        }
-      }
-
-      console.log(`[Upload] Duplicate detected. Renamed "${file.name}" → "${finalFileName}"`);
-    }
-
-    // Generate slug and create ContentNode with retry logic for race conditions
-    let slug = await generateUniqueSlug(finalFileName, session.user.id);
-    let content;
-    let attempts = 0;
-    const maxAttempts = 3;
-
-    while (attempts < maxAttempts) {
-      attempts++;
-
-      try {
-        // Try to create ContentNode + FilePayload
-        content = await prisma.contentNode.create({
-          data: {
-            ownerId: session.user.id,
-            title: finalFileName,
-            slug,
-            contentType: "file",
-            parentId: parentId || null,
-            peopleGroupId: resolvedPeopleGroupId,
-            personId: resolvedPersonId,
-            role: role || "primary",
-            displayOrder: 0,
-            filePayload: {
-              create: {
-                fileName: finalFileName,
-                fileExtension,
-                mimeType: file.type || "application/octet-stream",
-                fileSize: BigInt(file.size),
-                checksum,
-                storageProvider: usedProvider,
-                storageKey,
-                searchText,
-                uploadStatus: "ready",
-                uploadedAt: new Date(),
-                isProcessed: false,
-                processingStatus: "none",
+        if (parent.contentType !== "folder") {
+          return NextResponse.json(
+            {
+              success: false,
+              error: {
+                code: "VALIDATION_ERROR",
+                message: "Parent must be a folder",
               },
             },
-          },
-        });
+            { status: 400 }
+          );
+        }
 
-        // Success! Break out of retry loop
-        break;
-      } catch (error: unknown) {
-        // Narrow to Prisma's PrismaClientKnownRequestError shape (see same
-        // pattern in app/api/content/content/create-document/route.ts).
-        const prismaError = error as { code?: string; meta?: { target?: string[] } };
-        // Check if it's a unique constraint error on slug
-        if (prismaError.code === "P2002" && prismaError.meta?.target?.includes("slug")) {
-          if (attempts < maxAttempts) {
-            // Regenerate slug with timestamp + random suffix to ensure uniqueness
-            const timestamp = Date.now();
-            const randomSuffix = crypto.randomBytes(4).toString("hex");
-            slug = `${await generateUniqueSlug(finalFileName, session.user.id)}-${timestamp}-${randomSuffix}`;
-            console.log(`[Upload Retry ${attempts}/${maxAttempts}] Slug collision, retrying with: ${slug}`);
-            continue;
-          } else {
-            // Max attempts reached
-            throw new Error(
-              "Unable to create unique file name. Please rename the file and try again."
+        if (parent.peopleGroupId || parent.personId) {
+          if (
+            (resolvedPeopleGroupId && resolvedPeopleGroupId !== parent.peopleGroupId) ||
+            (resolvedPersonId && resolvedPersonId !== parent.personId)
+          ) {
+            return NextResponse.json(
+              {
+                success: false,
+                error: {
+                  code: "VALIDATION_ERROR",
+                  message: "People assignment must match the parent folder.",
+                },
+              },
+              { status: 400 }
             );
+          }
+
+          resolvedPeopleGroupId = parent.peopleGroupId;
+          resolvedPersonId = parent.personId;
+        }
+      }
+
+      const arrayBuffer = await file.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
+
+      const checksum = crypto.createHash("sha256").update(buffer).digest("hex");
+
+      const fileExtension = file.name.split(".").pop() || "";
+      const timestamp = Date.now();
+      const storageKey = `uploads/${session.user.id}/${timestamp}-${crypto.randomBytes(8).toString("hex")}.${fileExtension}`;
+
+      const usedProvider = provider || "r2";
+
+      const storageProvider = await getUserStorageProvider(
+        session.user.id,
+        provider || undefined
+      );
+
+      await withSpan(
+        { layer: "storage", name: "upload" },
+        {
+          attrs: { provider: usedProvider, bytes: buffer.length, mime: file.type || "octet-stream" },
+          summary: `${buffer.length} bytes`,
+        },
+        async () => storageProvider.uploadFile(storageKey, buffer, file.type),
+      );
+
+      // Extract text for search (if document)
+      const searchText = await withSpan(
+        { layer: "content", name: "extract_text" },
+        { attrs: { mime: file.type || "octet-stream", ocr: enableOCR } },
+        async (span) => {
+          const { DocumentExtractor } = await import("@/lib/infrastructure/media/document-extractor");
+          const documentExtractor = new DocumentExtractor(storageProvider, enableOCR);
+          const text = await documentExtractor.extractText(storageKey, file.type);
+          span.attr("text_chars", text.length).summary(`${text.length} chars extracted`);
+          return text;
+        },
+      );
+
+      // Check for duplicate file (by checksum)
+      const existingFile = await prisma.filePayload.findFirst({
+        where: {
+          checksum,
+          fileSize: BigInt(file.size),
+          content: { ownerId: session.user.id },
+          uploadStatus: { in: ["uploading", "ready"] },
+        },
+        include: { content: true },
+      });
+
+      let finalFileName = file.name;
+      let isDuplicateFile = false;
+
+      if (existingFile) {
+        isDuplicateFile = true;
+
+        const extensionMatch = file.name.match(/^(.+)(\.[^.]+)$/);
+        const baseName = extensionMatch ? extensionMatch[1] : file.name;
+        const extension = extensionMatch ? extensionMatch[2] : "";
+
+        let counter = 1;
+        let candidateName = `${baseName} (${counter})${extension}`;
+
+        while (true) {
+          const nameExists = await prisma.filePayload.findFirst({
+            where: {
+              checksum,
+              fileSize: BigInt(file.size),
+              content: {
+                ownerId: session.user.id,
+                title: candidateName,
+              },
+              uploadStatus: { in: ["uploading", "ready"] },
+            },
+          });
+
+          if (!nameExists) {
+            finalFileName = candidateName;
+            break;
+          }
+
+          counter++;
+          candidateName = `${baseName} (${counter})${extension}`;
+
+          if (counter > 100) {
+            throw new Error("Too many duplicate files with the same content");
           }
         }
 
-        // Not a slug collision error, rethrow
-        throw error;
+        logger.info({
+          layer: "content",
+          event: "upload:duplicate_renamed",
+          summary: `renamed copy (#${counter})`,
+          attrs: { counter },
+        });
       }
-    }
 
-    if (!content) {
-      throw new Error("Failed to create content after retries");
-    }
+      const { content, attempts } = await withSpan(
+        { layer: "content", name: "create" },
+        { attrs: { kind: "file", ext: fileExtension } },
+        async (span) => {
+          let slug = await generateUniqueSlug(finalFileName, session.user.id);
+          let created;
+          let attempt = 0;
+          const maxAttempts = 3;
 
-    // Return a simple response with only primitive types (no Prisma objects)
-    return NextResponse.json(
-      {
-        success: true,
-        data: {
-          contentId: content.id,
-          fileName: finalFileName,
-          fileSize: file.size,
-          searchTextLength: searchText.length,
-          storageProvider: usedProvider,
-          slug,
-          isDuplicate: isDuplicateFile,  // True if we renamed due to duplicate content
-          retriedSlug: attempts > 1,  // Indicate if we had to retry slug collision
+          while (attempt < maxAttempts) {
+            attempt++;
+
+            try {
+              created = await prisma.contentNode.create({
+                data: {
+                  ownerId: session.user.id,
+                  title: finalFileName,
+                  slug,
+                  contentType: "file",
+                  parentId: parentId || null,
+                  peopleGroupId: resolvedPeopleGroupId,
+                  personId: resolvedPersonId,
+                  role: role || "primary",
+                  displayOrder: 0,
+                  filePayload: {
+                    create: {
+                      fileName: finalFileName,
+                      fileExtension,
+                      mimeType: file.type || "application/octet-stream",
+                      fileSize: BigInt(file.size),
+                      checksum,
+                      storageProvider: usedProvider,
+                      storageKey,
+                      searchText,
+                      uploadStatus: "ready",
+                      uploadedAt: new Date(),
+                      isProcessed: false,
+                      processingStatus: "none",
+                    },
+                  },
+                },
+              });
+              span.attr("attempts", attempt).attr("content_id", created.id);
+              return { content: created, attempts: attempt };
+            } catch (error: unknown) {
+              const prismaError = error as { code?: string; meta?: { target?: string[] } };
+              if (prismaError.code === "P2002" && prismaError.meta?.target?.includes("slug")) {
+                if (attempt < maxAttempts) {
+                  const ts = Date.now();
+                  const randomSuffix = crypto.randomBytes(4).toString("hex");
+                  slug = `${await generateUniqueSlug(finalFileName, session.user.id)}-${ts}-${randomSuffix}`;
+                  logger.warn({
+                    layer: "content",
+                    event: "create:slug_retry",
+                    summary: `attempt ${attempt}/${maxAttempts}`,
+                    attrs: { attempt, max: maxAttempts },
+                  });
+                  continue;
+                } else {
+                  throw new Error(
+                    "Unable to create unique file name. Please rename the file and try again."
+                  );
+                }
+              }
+              throw error;
+            }
+          }
+          throw new Error("Failed to create content after retries");
         },
-      },
-      { status: 201 }
-    );
-  } catch (error) {
-    console.error("[SimpleUpload] ERROR:", error);
-    console.error("[SimpleUpload] Stack:", error instanceof Error ? error.stack : "No stack");
+      );
 
-    return NextResponse.json(
-      {
-        success: false,
-        error: {
-          code: "SERVER_ERROR",
-          message: error instanceof Error ? error.message : "Failed to upload file",
-          details: error instanceof Error ? error.stack : String(error),
+      return NextResponse.json(
+        {
+          success: true,
+          data: {
+            contentId: content.id,
+            fileName: finalFileName,
+            fileSize: file.size,
+            searchTextLength: searchText.length,
+            storageProvider: usedProvider,
+            slug: content.slug,
+            isDuplicate: isDuplicateFile,
+            retriedSlug: attempts > 1,
+          },
         },
-      },
-      { status: 500 }
-    );
-  }
+        { status: 201 }
+      );
+    } catch (error) {
+      // Note: previous logs included error.stack — audit sev-3. Logger's
+      // error field omits stack in production by design.
+      logger.error({
+        layer: "storage",
+        event: "upload_simple:caught",
+        summary: "upload failed — 500",
+        error,
+      });
+
+      return NextResponse.json(
+        {
+          success: false,
+          error: {
+            code: "SERVER_ERROR",
+            message: error instanceof Error ? error.message : "Failed to upload file",
+            details: error instanceof Error ? error.message : String(error),
+          },
+        },
+        { status: 500 }
+      );
+    }
+  });
 }
