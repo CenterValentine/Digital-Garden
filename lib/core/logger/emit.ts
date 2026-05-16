@@ -66,6 +66,7 @@ type LeafInput = {
   layer?: Layer;
   event: string;
   summary?: string;
+  duration_ms?: number;
   attrs?: Record<string, AttrValue>;
   payload_ref?: string;
   error?: LogError | Error | unknown;
@@ -98,6 +99,7 @@ function makeLeaf(level: Level) {
       layer,
       event: input.event,
       summary: input.summary,
+      duration_ms: input.duration_ms,
       attrs: input.attrs,
       payload_ref: input.payload_ref,
       error: coerceError(input.error),
