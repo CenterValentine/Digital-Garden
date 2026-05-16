@@ -48,6 +48,9 @@ next-env.d.ts
 # Generic local-only files
 .local.*
 
+# Logger payload sidecars (per-trace debug data, dev-only)
+.local/
+
 # Top-level git worktrees (local-only dev artifact)
 .worktrees/
 

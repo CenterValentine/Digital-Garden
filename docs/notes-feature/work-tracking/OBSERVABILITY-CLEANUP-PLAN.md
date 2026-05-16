@@ -164,16 +164,16 @@ instrumentation.ts                            # NEW at project root — register
 ### Public API (target)
 
 ```ts
-import { logger, withSpan } from "@/lib/core/logger";
+import { logger, withSpan, startSpan } from "@/lib/core/logger";
 
 // 1. Wrapped span (preferred, 95% of sites)
 const node = await withSpan(
   { layer: "content", name: "payload" },
-  { content_id },                                // initial attrs
+  { attrs: { content_id }, summary: `node_${content_id}` },
   async (span) => {
     span.attr("payload_kind", "note");
     const result = await prisma.contentNode.findUnique(/*…*/);
-    span.attr("block_count", result.payload.blocks.length);
+    span.attr("block_count", result.payload.blocks.length).summary("38 blocks");
     return result;
   }
 );
@@ -181,8 +181,11 @@ const node = await withSpan(
 // 2. Leaf log inside an active span (inherits trace_id + parent_span_id from ALS)
 logger.info({ event: "tags:resolved", summary: "12 tags", attrs: { count: 12 } });
 
-// 3. Manual span (escape hatch for streaming / long-lived work)
-const span = logger.startSpan({ layer: "ai", name: "chat_stream" }, { model });
+// 3. Cross-layer leaf (explicit layer overrides the active span's layer)
+logger.info({ layer: "editor", event: "tiptap:initialized", summary: "tab_notes" });
+
+// 4. Manual span (escape hatch for streaming / long-lived work)
+const span = startSpan({ layer: "ai", name: "chat_stream" }, { attrs: { model } });
 try { /* ... */ span.end("ok"); } catch (e) { span.fail(e); }
 ```
 
@@ -224,13 +227,12 @@ try { /* ... */ span.end("ok"); } catch (e) { span.fail(e); }
 7. `lib/core/logger/payload-sidecar.ts` — appends to `.local/debug-payloads/<trace>.jsonl` and returns the path for `payload_ref`.
 8. `lib/core/logger/redaction.ts` — runtime belt-and-suspenders (the type system is the primary firewall).
 9. `.gitignore` entry for `.local/debug-payloads/`.
-10. Unit tests:
-    - JSON encoder round-trips every `LogEvent` shape.
-    - `withSpan` always emits `:completed` or `:failed` even when the callback throws.
-    - `attrs` rejects non-scalar values at compile time (negative type-only test).
-    - ALS context isolates concurrent traces (run two `withTrace` blocks via `Promise.all` and verify no event cross-contaminates).
+10. ~~Unit tests~~ **Deferred** — this repo has no unit test runner (only Playwright e2e per CLAUDE.md). Adding `vitest`/`jest` is out-of-scope for Phase 1. Substituted with:
+    - **`scripts/smoke-logger.ts`** — runnable smoke test covering happy path, fail path, leaf-guard, payload sidecar, and end-of-trace summary. Run with `pnpm tsx scripts/smoke-logger.ts`.
+    - **Type-level firewall is enforced by the TS compiler.** `Attrs = Record<string, string | number | boolean>` makes non-scalar attrs a compile error — `pnpm typecheck` is the test.
+    - Unit-runner adoption tracked as a follow-up in BACKLOG.md if dedicated tests become valuable later.
 
-**Verification gate:** `pnpm typecheck && pnpm lint && pnpm build` clean. Zero call sites migrated yet.
+**Verification gate:** `pnpm typecheck && pnpm lint && pnpm build` clean; `pnpm tsx scripts/smoke-logger.ts` produces a column-aligned trace + summary block. Zero call sites migrated yet.
 
 ---
 
