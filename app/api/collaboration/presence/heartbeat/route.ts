@@ -7,6 +7,8 @@ import {
 } from "@/lib/domain/collaboration/presence-access-cache";
 import { upsertCollaborationPresence } from "@/lib/domain/collaboration/presence-server";
 import { getSession } from "@/lib/infrastructure/auth/session";
+import { logger } from "@/lib/core/logger";
+import { withRouteTrace } from "@/lib/core/logger/route-trace";
 
 export const runtime = "nodejs";
 
@@ -76,6 +78,7 @@ function sanitizeDisplayName(value: unknown) {
 }
 
 export async function POST(request: NextRequest) {
+  return withRouteTrace(request, { route: "/api/collaboration/presence/heartbeat" }, async () => {
   try {
     const session = await getSession();
     const body = (await request.json()) as PresenceHeartbeatInput & {
@@ -140,6 +143,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true, data: { accepted: heartbeatSessions.length } });
   } catch (error) {
+    logger.error({ layer: "collab", event: "presence_heartbeat:caught", summary: "POST caught", error });
     const message =
       error instanceof Error ? error.message : "Failed to update collaboration presence";
     const status = message.includes("Access") || message.includes("required") ? 403 : 500;
@@ -155,4 +159,5 @@ export async function POST(request: NextRequest) {
       { status }
     );
   }
+  });
 }
