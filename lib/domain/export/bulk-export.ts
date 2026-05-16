@@ -13,6 +13,7 @@ import { errorMonitor, logExportError } from "./error-monitoring";
 import { getCurrentSchemaVersion } from "@/lib/domain/editor/schema-version";
 import type { BulkExportOptions } from "./types";
 import type { JSONContent } from "@tiptap/core";
+import { logger } from "@/lib/core/logger";
 
 /**
  * Export entire vault or filtered set of notes
@@ -71,10 +72,12 @@ export async function exportVault(
           const validationResult = validateBeforeExport(tiptapJson);
 
           if (!validationResult.valid) {
-            console.warn(
-              `[Export] Validation issues for note ${note.id}:`,
-              formatValidationResult(validationResult)
-            );
+            logger.warn({
+              layer: "export",
+              event: "validation:issues",
+              summary: `note ${note.id} has validation issues`,
+              attrs: { content_id: note.id },
+            });
 
             // Log validation errors
             errorMonitor.logValidation(
@@ -98,7 +101,12 @@ export async function exportVault(
           });
 
           if (!result.success) {
-            console.error(`Failed to convert note ${note.id}:`, result.metadata?.warnings);
+            logger.error({
+              layer: "export",
+              event: "convert:failed",
+              summary: `note ${note.id} conversion failed`,
+              attrs: { content_id: note.id, warnings: result.metadata?.warnings?.length ?? 0 },
+            });
 
             // Log conversion failure
             logExportError(new Error(`Conversion failed: ${result.metadata?.warnings?.join(", ")}`), {
@@ -130,7 +138,13 @@ export async function exportVault(
             zip.file(fullPath, file.content);
           }
         } catch (error) {
-          console.error(`Error exporting note ${note.id}:`, error);
+          logger.error({
+            layer: "export",
+            event: "convert:caught",
+            summary: `note ${note.id} exception during export`,
+            attrs: { content_id: note.id },
+            error,
+          });
 
           // Log system error
           logExportError(error, {
@@ -196,10 +210,12 @@ export async function exportSingleDocument(
   const validationResult = validateBeforeExport(tiptapJson);
 
   if (!validationResult.valid) {
-    console.warn(
-      `[Export] Validation issues for note ${contentId}:`,
-      formatValidationResult(validationResult)
-    );
+    logger.warn({
+      layer: "export",
+      event: "validation:issues",
+      summary: `note ${contentId} has validation issues`,
+      attrs: { content_id: contentId },
+    });
 
     // Log validation errors
     errorMonitor.logValidation(

@@ -13,7 +13,6 @@
 // (e.g. via browser-extension/service.ts). Cannot import the server logger
 // here without breaking the client bundle (node:async_hooks). Migrates to the
 // client-safe logger in Phase 5.
-// eslint-disable-next-line no-restricted-imports -- intentional until Phase 5
 import type { JSONContent } from "@tiptap/core";
 import { prisma } from "@/lib/database/client";
 import { extractTags } from "./tag-extractor";

@@ -8,6 +8,7 @@
 import sharp from 'sharp';
 import type { StorageProvider } from '@/lib/infrastructure/storage';
 import type { ImageMetadata, ProcessingOptions, ProcessingResult } from './types';
+import { logger } from "@/lib/core/logger";
 
 /**
  * Image Processor
@@ -99,7 +100,12 @@ export class ImageProcessor {
         thumbnailKeys,
       };
     } catch (error) {
-      console.error('Image processing failed:', error);
+      logger.warn({
+        layer: "content",
+        event: "image_process:caught",
+        summary: "image processing failed (continuing)",
+        error,
+      });
       throw new Error(`Failed to process image: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }

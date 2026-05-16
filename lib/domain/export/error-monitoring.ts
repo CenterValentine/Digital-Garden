@@ -5,6 +5,7 @@
  */
 
 import type { ValidationResult, ValidationError, ValidationWarning } from "./validation";
+import { logger } from "@/lib/core/logger";
 
 export interface ExportErrorLog {
   id: string;
@@ -61,11 +62,15 @@ class ErrorMonitor {
       this.errors = this.errors.slice(-this.MAX_ERRORS);
     }
 
-    // Console log for development
-    console.error(`[Export Error] ${log.errorCode}: ${log.errorMessage}`, {
-      contentId: log.contentId,
-      format: log.format,
-      context: log.context,
+    logger.error({
+      layer: "export",
+      event: "monitor:error_logged",
+      summary: `${log.errorCode}: ${log.errorMessage}`,
+      attrs: {
+        error_code: log.errorCode,
+        content_id: log.contentId,
+        format: log.format,
+      },
     });
 
     // Check if this is a recurring issue
@@ -231,9 +236,12 @@ class ErrorMonitor {
       .filter(e => e.errorCode === error.errorCode);
 
     if (recentSimilar.length >= 10) {
-      console.warn(
-        `[Monitor] Recurring issue detected: ${error.errorCode} (${recentSimilar.length} occurrences)`
-      );
+      logger.warn({
+        layer: "export",
+        event: "monitor:recurring",
+        summary: `${error.errorCode} (${recentSimilar.length} occurrences)`,
+        attrs: { error_code: error.errorCode, occurrences: recentSimilar.length },
+      });
 
       // TODO: Send alert to dev team
     }
@@ -243,10 +251,16 @@ class ErrorMonitor {
    * Alert critical issue
    */
   private alertCriticalIssue(report: DiscrepancyReport): void {
-    console.error(
-      `[CRITICAL] Schema discrepancy detected:`,
-      report
-    );
+    logger.fatal({
+      layer: "export",
+      event: "monitor:critical_discrepancy",
+      summary: "schema discrepancy detected",
+      attrs: {
+        type: report.type,
+        severity: report.severity,
+        occurrences: report.occurrences,
+      },
+    });
 
     // TODO: Send to error tracking service (Sentry, etc.)
     // TODO: Send Slack/email notification

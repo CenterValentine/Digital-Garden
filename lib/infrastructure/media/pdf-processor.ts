@@ -9,6 +9,7 @@ import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs';
 import { Canvas, createCanvas } from 'canvas';
 import type { StorageProvider } from '@/lib/infrastructure/storage';
 import type { PDFMetadata, ProcessingOptions, ProcessingResult } from './types';
+import { logger } from "@/lib/core/logger";
 
 // Note: PDF.js requires a worker, but in Node.js we don't need it
 // We're using the legacy build which works in Node
@@ -76,7 +77,12 @@ export class PDFProcessor {
         thumbnailKeys,
       };
     } catch (error) {
-      console.error('PDF processing failed:', error);
+      logger.warn({
+        layer: "content",
+        event: "pdf_process:caught",
+        summary: "PDF processing failed (continuing)",
+        error,
+      });
       throw new Error(`Failed to process PDF: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }

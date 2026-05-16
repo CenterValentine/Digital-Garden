@@ -8,6 +8,7 @@
 import type { JSONContent } from "@tiptap/core";
 import type { MetadataSidecar } from "./metadata";
 import { getCurrentSchemaVersion, getChangesBetween } from "@/lib/domain/editor/schema-version";
+import { logger } from "@/lib/core/logger";
 
 export interface SchemaMigration {
   fromVersion: string;
@@ -93,17 +94,24 @@ export function applyMigrations(
     return { tiptapJson, metadata };
   }
 
-  console.log(`[Migration] Upgrading from ${fromVersion} to ${toVersion}`);
+  logger.info({
+    layer: "export",
+    event: "migration:started",
+    summary: `${fromVersion} → ${toVersion}`,
+    attrs: { from: fromVersion, to: toVersion },
+  });
 
   // Get changes between versions
   const changes = getChangesBetween(fromVersion, toVersion);
   const breakingChanges = changes.filter(c => c.breaking);
 
   if (breakingChanges.length > 0) {
-    console.log(
-      `[Migration] Found ${breakingChanges.length} breaking changes:`,
-      breakingChanges.map(c => c.name)
-    );
+    logger.warn({
+      layer: "export",
+      event: "migration:breaking_changes",
+      summary: `${breakingChanges.length} breaking changes`,
+      attrs: { count: breakingChanges.length },
+    });
   }
 
   // Apply migrations in sequence
@@ -113,7 +121,12 @@ export function applyMigrations(
 
   for (const migration of MIGRATIONS) {
     if (migration.fromVersion === currentVersion) {
-      console.log(`[Migration] Applying: ${migration.description}`);
+      logger.info({
+        layer: "export",
+        event: "migration:applying",
+        summary: migration.description,
+        attrs: { from: migration.fromVersion, to: migration.toVersion },
+      });
 
       migratedJSON = migration.migrateTiptapJSON(migratedJSON);
       migratedMetadata = migration.migrateMetadata(migratedMetadata);
@@ -128,7 +141,12 @@ export function applyMigrations(
     schemaVersion: toVersion,
   };
 
-  console.log(`[Migration] Complete. Schema now at ${toVersion}`);
+  logger.info({
+    layer: "export",
+    event: "migration:completed",
+    summary: `schema at ${toVersion}`,
+    attrs: { schema_version: toVersion },
+  });
 
   return { tiptapJson: migratedJSON, metadata: migratedMetadata };
 }
