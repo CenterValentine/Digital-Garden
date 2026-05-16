@@ -14,7 +14,7 @@ import { getSession, getValidGoogleAccessToken } from "@/lib/infrastructure/auth
 import { prisma } from "@/lib/database/client";
 import { setGoogleDriveMetadata } from "@/lib/domain/content/metadata-types";
 import type { Prisma } from "@/lib/database/generated/prisma";
-import { logger, withRouteTrace, withSpan } from "@/lib/core/logger";
+import { logger, spanPayload, withRouteTrace, withSpan } from "@/lib/core/logger";
 
 const ROUTE_PATH = "/api/google-drive/upload";
 
@@ -155,6 +155,7 @@ export async function POST(request: NextRequest) {
 
           const result = await uploadResponse.json();
           span.attr("file_id", result.id).summary(`file_id ${result.id}`);
+          await spanPayload(span, "google_drive_upload_result", result);
           return result;
         },
       );

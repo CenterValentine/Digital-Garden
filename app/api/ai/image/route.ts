@@ -19,7 +19,7 @@ import { generateUniqueSlug } from "@/lib/domain/content";
 import { prisma } from "@/lib/database/client";
 import crypto from "crypto";
 import type { ImageProviderId, ImageModelId, ImageSize } from "@/lib/domain/ai/image/types";
-import { logger, withRouteTrace, withSpan } from "@/lib/core/logger";
+import { logger, spanPayload, withRouteTrace, withSpan } from "@/lib/core/logger";
 
 const ROUTE_PATH = "/api/ai/image";
 
@@ -72,6 +72,15 @@ export async function POST(request: NextRequest) {
             .attr("width", generated.width ?? 0)
             .attr("height", generated.height ?? 0)
             .summary(`${generated.mimeType} ${generated.width ?? "?"}x${generated.height ?? "?"}`);
+          await spanPayload(span, "image_metadata", {
+            providerId: generated.providerId,
+            modelId: generated.modelId,
+            mimeType: generated.mimeType,
+            width: generated.width,
+            height: generated.height,
+            revisedPrompt: generated.revisedPrompt,
+            // base64/url omitted — too large for sidecar; the file itself is in storage
+          });
           return generated;
         },
       );

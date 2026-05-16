@@ -6,7 +6,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/database/client";
 import { requireAuth } from "@/lib/infrastructure/auth/middleware";
 import { getSnippetDisplayTitle } from "@/lib/domain/snippets";
-import { logger, withRouteTrace, withSpan } from "@/lib/core/logger";
+import { logger, spanPayload, withRouteTrace, withSpan } from "@/lib/core/logger";
 
 const ROUTE_PATH = "/api/content/snippets";
 
@@ -53,6 +53,7 @@ export async function GET(request: NextRequest) {
             orderBy: [{ updatedAt: "desc" }],
           });
           span.attr("count", result.length);
+          await spanPayload(span, "snippets", result);
           return result;
         },
       );

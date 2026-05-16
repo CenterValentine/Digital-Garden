@@ -34,7 +34,7 @@ import { createBaseTools } from "@/lib/domain/ai/tools";
 import { createEditorTools } from "@/lib/domain/ai/tools";
 import { getProviderKey } from "@/lib/domain/ai/keys";
 import { prisma } from "@/lib/database/client";
-import { logger, startSpan, withRouteTrace, withSpan } from "@/lib/core/logger";
+import { logger, spanPayload, startSpan, withRouteTrace, withSpan } from "@/lib/core/logger";
 
 const ROUTE_PATH = "/api/ai/chat";
 
@@ -188,6 +188,16 @@ export async function POST(request: Request) {
         },
       );
 
+      // Capture input messages + mention context to sidecar for replay.
+      await spanPayload(streamSpan, "chat_input", {
+        messages: modelMessages,
+        mentionedContext,
+        providerId,
+        modelId,
+        temperature,
+        maxTokens,
+      });
+
       const result = streamText({
         model: wrappedModel,
         messages: modelMessages,
@@ -212,7 +222,7 @@ IMPORTANT EDITING RULES:
 When you generate an image, the user can insert it into the document at their cursor position.`
             : ""
         }${mentionedContext}`,
-        onFinish: (finishEvent) => {
+        onFinish: async (finishEvent) => {
           // Token usage / finish reason live on the finishEvent shape. The
           // structure varies slightly across AI SDK versions; we read fields
           // defensively to avoid the span ending with bad attrs.
@@ -222,6 +232,8 @@ When you generate an image, the user can insert it into the document at their cu
           if (usage?.outputTokens !== undefined) streamSpan.attr("output_tokens", usage.outputTokens);
           if (usage?.totalTokens !== undefined) streamSpan.attr("total_tokens", usage.totalTokens);
           if (finishReason) streamSpan.attr("finish_reason", finishReason);
+          // Capture the full finish event to sidecar for replay.
+          await spanPayload(streamSpan, "chat_finish", finishEvent);
           streamSpan.end("ok");
         },
         onError: ({ error }) => {

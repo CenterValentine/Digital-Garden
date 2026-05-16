@@ -10,7 +10,7 @@ import { requireAuth } from "@/lib/infrastructure/auth/middleware";
 import { prisma } from "@/lib/database/client";
 import type { ContentType } from "@/lib/domain/content/types";
 import type { JSONContent } from "@tiptap/core";
-import { logger, withRouteTrace, withSpan } from "@/lib/core/logger";
+import { logger, spanPayload, withRouteTrace, withSpan } from "@/lib/core/logger";
 
 const ROUTE_PATH = "/api/content/content/preview";
 
@@ -122,6 +122,7 @@ export async function POST(request: NextRequest) {
             },
           });
           span.attr("found", result.length).summary(`${result.length}/${contentIds.length} found`);
+          await spanPayload(span, "preview_responses", result);
           return result;
         },
       );

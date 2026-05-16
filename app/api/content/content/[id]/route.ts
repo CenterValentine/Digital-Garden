@@ -31,7 +31,7 @@ import { ensureWebResourceForExternalContent } from "@/lib/domain/browser-extens
 import type { JSONContent } from "@tiptap/core";
 import { getServerExtensions } from "@/lib/domain/editor/extensions-server";
 import { sanitizeTipTapJsonWithExtensions } from "@/lib/domain/editor/unsupported-content";
-import { logger, withRouteTrace, withSpan } from "@/lib/core/logger";
+import { logger, spanPayload, withRouteTrace, withSpan } from "@/lib/core/logger";
 import type {
   ContentDetailResponse,
   UpdateContentRequest,
@@ -147,6 +147,7 @@ export async function GET(
             span
               .attr("kind", result.contentType)
               .summary(`${id} ${result.contentType}`);
+            await spanPayload(span, "content_response", result);
           } else {
             span.attr("found", false).summary(`${id} not found`);
           }
@@ -342,6 +343,7 @@ export async function PATCH(
         { layer: "content", name: "payload" },
         { attrs: { content_id: id }, summary: id },
         async (span) => {
+          await spanPayload(span, "incoming_body", body);
           const result = await prisma.contentNode.findUnique({
             where: { id },
             include: CONTENT_WITH_PAYLOADS,
@@ -350,6 +352,7 @@ export async function PATCH(
             span
               .attr("kind", result.contentType)
               .summary(`${id} ${result.contentType}`);
+            await spanPayload(span, "existing_content", result);
           } else {
             span.attr("found", false).summary(`${id} not found`);
           }

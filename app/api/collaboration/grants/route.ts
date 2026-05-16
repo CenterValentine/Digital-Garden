@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { prisma } from "@/lib/database/client";
 import { requireAuth } from "@/lib/infrastructure/auth/middleware";
-import { logger, withRouteTrace, withSpan } from "@/lib/core/logger";
+import { logger, spanPayload, withRouteTrace, withSpan } from "@/lib/core/logger";
 
 export const runtime = "nodejs";
 
@@ -107,6 +107,7 @@ export async function GET(request: NextRequest) {
             },
           });
           span.attr("count", result.length).summary(`${result.length} grants`);
+          await spanPayload(span, "grants", result);
           return result;
         },
       );

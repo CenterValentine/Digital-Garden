@@ -8,7 +8,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/database/client";
 import { requireAuth } from "@/lib/infrastructure/auth/middleware";
 import type { JSONContent } from "@tiptap/core";
-import { logger, withRouteTrace, withSpan } from "@/lib/core/logger";
+import { logger, spanPayload, withRouteTrace, withSpan } from "@/lib/core/logger";
 
 const ROUTE_PATH = "/api/content/backlinks/[id]";
 
@@ -141,6 +141,7 @@ export async function GET(
 
           span.attr("found", results.length).attr("scan_errors", scanErrors);
           span.summary(`${results.length} backlinks${scanErrors > 0 ? ` (${scanErrors} parse errors)` : ""}`);
+          await spanPayload(span, "backlinks", results);
 
           if (scanErrors > 0) {
             logger.warn({

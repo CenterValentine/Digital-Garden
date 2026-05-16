@@ -8,7 +8,7 @@ import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/infrastructure/auth/middleware";
 import { importFile } from "@/lib/domain/import/import-service";
 import type { JSONContent } from "@tiptap/core";
-import { logger, withRouteTrace, withSpan } from "@/lib/core/logger";
+import { logger, spanPayload, withRouteTrace, withSpan } from "@/lib/core/logger";
 
 const ROUTE_PATH = "/api/content/import";
 
@@ -118,6 +118,15 @@ export async function POST(request: Request) {
           },
         },
         async (span) => {
+          await spanPayload(span, "import_input", {
+            fileName,
+            kind: fileName.endsWith(".json") ? "json" : "markdown",
+            markdownContent,
+            jsonContent,
+            sidecarContent,
+            titleOverride,
+            parentId,
+          });
           const r = await importFile({
             markdownContent,
             jsonContent,
@@ -130,6 +139,7 @@ export async function POST(request: Request) {
           span
             .attr("ok", r.success)
             .attr("warnings", r.warnings?.length ?? 0);
+          await spanPayload(span, "import_result", r);
           return r;
         },
       );

@@ -9,7 +9,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/database/client";
 import { requireAuth } from "@/lib/infrastructure/auth/middleware";
-import { logger, withRouteTrace, withSpan } from "@/lib/core/logger";
+import { logger, spanPayload, withRouteTrace, withSpan } from "@/lib/core/logger";
 
 const ROUTE_PATH = "/api/content/content/tree";
 
@@ -181,6 +181,7 @@ export async function GET(request: NextRequest) {
             },
           });
           span.attr("nodes", result.length).summary(`${result.length} nodes`);
+          await spanPayload(span, "tree_nodes", result);
           return result;
         },
       );
@@ -247,6 +248,11 @@ export async function GET(request: NextRequest) {
             .attr("groups", result[1].length)
             .attr("people", result[2].length)
             .summary(`${result[1].length} groups, ${result[2].length} people`);
+          await spanPayload(span, "people_data", {
+            mounts: result[0],
+            groups: result[1],
+            people: result[2],
+          });
           return result;
         },
       );

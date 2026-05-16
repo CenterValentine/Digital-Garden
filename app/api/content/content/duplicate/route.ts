@@ -11,7 +11,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/infrastructure/auth/session";
 import { prisma } from "@/lib/database/client";
-import { logger, withRouteTrace, withSpan } from "@/lib/core/logger";
+import { logger, spanPayload, withRouteTrace, withSpan } from "@/lib/core/logger";
 
 const ROUTE_PATH = "/api/content/content/duplicate";
 
@@ -84,6 +84,12 @@ export async function POST(request: NextRequest) {
             .attr("skipped_not_found", skippedNotFound)
             .attr("skipped_not_owned", skippedNotOwned)
             .summary(`${duplicatedNodes.length}/${ids.length} duplicated`);
+          await spanPayload(span, "duplicate_results", {
+            requested: ids,
+            duplicated: duplicatedNodes,
+            skippedNotFound,
+            skippedNotOwned,
+          });
         },
       );
 

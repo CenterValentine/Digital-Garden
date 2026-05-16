@@ -14,7 +14,7 @@ import { generateUniqueSlug } from "@/lib/domain/content";
 import { getUserStorageProvider } from "@/lib/infrastructure/storage";
 import { createBlankOfficeDocument } from "@/lib/features/office/blank-document-generator";
 import crypto from "crypto";
-import { logger, withRouteTrace, withSpan } from "@/lib/core/logger";
+import { logger, spanPayload, withRouteTrace, withSpan } from "@/lib/core/logger";
 
 const ROUTE_PATH = "/api/content/content/create-document";
 
@@ -310,6 +310,7 @@ export async function POST(request: NextRequest) {
                 },
               });
               span.attr("attempts", attempts).attr("content_id", created.id).summary(`${fileType} created`);
+              await spanPayload(span, "created_document", created);
               return created;
             } catch (error: unknown) {
               const prismaError = error as { code?: string; meta?: { target?: string[] } };

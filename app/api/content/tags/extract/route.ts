@@ -12,7 +12,7 @@ import { prisma } from "@/lib/database/client";
 import { extractTags } from "@/lib/domain/content/tag-extractor";
 import type { JSONContent } from "@tiptap/core";
 import type { Prisma } from "@/lib/database/generated/prisma";
-import { logger, withRouteTrace, withSpan } from "@/lib/core/logger";
+import { logger, spanPayload, withRouteTrace, withSpan } from "@/lib/core/logger";
 
 const ROUTE_PATH = "/api/content/tags/extract";
 
@@ -93,6 +93,7 @@ export async function POST(request: NextRequest) {
           });
 
           span.attr("extracted", out.length).summary(`${out.length} tags`);
+          await spanPayload(span, "extracted_tags", out);
           return out;
         },
       );

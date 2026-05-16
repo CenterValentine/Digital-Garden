@@ -5,7 +5,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/database/client";
 import { requireAuth } from "@/lib/infrastructure/auth/middleware";
-import { logger, withRouteTrace, withSpan } from "@/lib/core/logger";
+import { logger, spanPayload, withRouteTrace, withSpan } from "@/lib/core/logger";
 
 const ROUTE_PATH = "/api/content/saved-blocks";
 
@@ -51,6 +51,7 @@ export async function GET(request: NextRequest) {
             orderBy: [{ usageCount: "desc" }, { updatedAt: "desc" }],
           });
           span.attr("count", result.length);
+          await spanPayload(span, "saved_blocks", result);
           return result;
         },
       );

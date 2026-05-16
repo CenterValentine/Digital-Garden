@@ -11,7 +11,7 @@ import { prisma } from "@/lib/database/client";
 import { requireAuth } from "@/lib/infrastructure/auth/middleware";
 import { updateMaterializedPath } from "@/lib/domain/content";
 import type { MoveContentRequest } from "@/lib/domain/content/api-types";
-import { logger, withRouteTrace, withSpan } from "@/lib/core/logger";
+import { logger, spanPayload, withRouteTrace, withSpan } from "@/lib/core/logger";
 
 const ROUTE_PATH = "/api/content/content/move";
 
@@ -180,6 +180,12 @@ export async function POST(request: NextRequest) {
             throw new Error('Failed to update content position');
           }
           span.attr("new_order", result.displayOrder).summary(`order=${result.displayOrder}`);
+          await spanPayload(span, "move_result", {
+            content_id: contentId,
+            target_parent_id: targetParentId,
+            final_parent_id: finalParentId,
+            new_display_order: result.displayOrder,
+          });
           return result;
         },
       );

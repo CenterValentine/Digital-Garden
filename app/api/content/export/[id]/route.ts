@@ -10,7 +10,7 @@ import { requireAuth } from "@/lib/infrastructure/auth/middleware";
 import { getUserSettings } from "@/lib/features/settings";
 import { exportSingleDocument } from "@/lib/domain/export";
 import type { ExportFormat, ExportBackupSettings } from "@/lib/domain/export/types";
-import { logger, withRouteTrace, withSpan } from "@/lib/core/logger";
+import { logger, spanPayload, withRouteTrace, withSpan } from "@/lib/core/logger";
 
 const ROUTE_PATH = "/api/content/export/[id]";
 
@@ -59,6 +59,12 @@ export async function POST(
             settings: settings.exportBackup as ExportBackupSettings,
           });
           span.attr("files", r.files?.length ?? 0).attr("ok", r.success);
+          // Capture metadata + file names, not file content (often large binary)
+          await spanPayload(span, "export_metadata", {
+            success: r.success,
+            metadata: r.metadata,
+            files: r.files?.map((f) => ({ name: f.name, mimeType: f.mimeType, size: f.size })),
+          });
           return r;
         },
       );

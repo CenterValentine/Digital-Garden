@@ -28,7 +28,12 @@ export function encodePretty(ev: LogEvent, depth: number): string {
     ev.duration_ms != null
       ? padLeft(`${ev.duration_ms}ms`, DURATION_COL_WIDTH)
       : padLeft("", DURATION_COL_WIDTH);
-  const payloadCol = ev.payload_ref ? `  payload: ${ev.payload_ref}` : "";
+  // payload_ref may be set as a top-level field (legacy API) or via attrs
+  // (spanPayload helper). The pretty encoder renders both consistently.
+  const payloadRefFromAttrs =
+    typeof ev.attrs?.payload_ref === "string" ? ev.attrs.payload_ref : undefined;
+  const payloadRef = ev.payload_ref ?? payloadRefFromAttrs;
+  const payloadCol = payloadRef ? `  payload: ${payloadRef}` : "";
   const errorSuffix = ev.error
     ? `  error: ${ev.error.name}: ${ev.error.message}`
     : "";

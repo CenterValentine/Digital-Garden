@@ -14,7 +14,7 @@ import {
   isHostnameAllowed,
 } from "@/lib/domain/content/external-validation";
 import { fetchOpenGraphData } from "@/lib/domain/content/open-graph-fetcher";
-import { logger, withRouteTrace, withSpan } from "@/lib/core/logger";
+import { logger, spanPayload, withRouteTrace, withSpan } from "@/lib/core/logger";
 
 const ROUTE_PATH = "/api/content/external/preview";
 
@@ -136,6 +136,7 @@ export async function POST(request: NextRequest) {
               span.attr("has_title", Boolean(result.title));
               span.attr("has_description", Boolean(result.description));
               span.attr("has_image", Boolean(result.imageUrl));
+              await spanPayload(span, "og_data", result);
             }
             return result;
           },

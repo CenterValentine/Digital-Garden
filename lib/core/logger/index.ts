@@ -14,6 +14,7 @@ export { getActiveSpan, getActiveTrace, withTrace } from "./context";
 export { withRouteTrace } from "./route-trace";
 export type { RouteTraceOptions } from "./route-trace";
 export { writePayload } from "./payload-sidecar";
+export { spanPayload } from "./span-payload";
 export type {
   Attrs,
   AttrValue,

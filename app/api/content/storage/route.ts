@@ -16,7 +16,7 @@ import type {
   VercelConfig,
   StorageConfig,
 } from "@/lib/domain/content/api-types";
-import { logger, withRouteTrace, withSpan } from "@/lib/core/logger";
+import { logger, spanPayload, withRouteTrace, withSpan } from "@/lib/core/logger";
 
 const ROUTE_PATH = "/api/content/storage";
 
@@ -52,6 +52,21 @@ export async function GET(request: NextRequest) {
             orderBy: [{ isDefault: "desc" }, { createdAt: "desc" }],
           });
           span.attr("count", result.length).summary(`${result.length} configs`);
+          // Note: full configs contain credentials. Sidecar uses the
+          // sanitized shape only (provider + display info).
+          await spanPayload(
+            span,
+            "storage_configs",
+            result.map((c) => ({
+              id: c.id,
+              provider: c.provider,
+              displayName: c.displayName,
+              isDefault: c.isDefault,
+              isActive: c.isActive,
+              createdAt: c.createdAt,
+              updatedAt: c.updatedAt,
+            })),
+          );
           return result;
         },
       );

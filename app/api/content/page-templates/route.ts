@@ -5,7 +5,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/database/client";
 import { requireAuth } from "@/lib/infrastructure/auth/middleware";
-import { logger, withRouteTrace, withSpan } from "@/lib/core/logger";
+import { logger, spanPayload, withRouteTrace, withSpan } from "@/lib/core/logger";
 
 const ROUTE_PATH = "/api/content/page-templates";
 
@@ -32,6 +32,7 @@ export async function GET(_request: NextRequest) {
             orderBy: [{ category: { displayOrder: "asc" } }, { title: "asc" }],
           });
           span.attr("count", result.length);
+          await spanPayload(span, "page_templates", result);
           return result;
         },
       );

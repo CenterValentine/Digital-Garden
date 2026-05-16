@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/infrastructure/auth/middleware";
 import { getOptionalBrowserExtensionBearerAuth } from "@/lib/domain/browser-bookmarks/http";
 import { listLinksPanelData } from "@/lib/domain/browser-extension";
-import { logger, withRouteTrace, withSpan } from "@/lib/core/logger";
+import { logger, spanPayload, withRouteTrace, withSpan } from "@/lib/core/logger";
 
 const ROUTE_PATH = "/api/content/links/[id]";
 
@@ -26,7 +26,11 @@ export async function GET(
       const data = await withSpan(
         { layer: "content", name: "links_panel" },
         { attrs: { content_id: id } },
-        async () => listLinksPanelData(userId, id),
+        async (span) => {
+          const result = await listLinksPanelData(userId, id);
+          await spanPayload(span, "links_panel", result);
+          return result;
+        },
       );
       return NextResponse.json({ success: true, data });
     } catch (error) {

@@ -6,7 +6,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/database/client";
 import { requireAuth } from "@/lib/infrastructure/auth/middleware";
 import type { ReusableCategoryScope } from "@/lib/database/generated/prisma";
-import { logger, withRouteTrace, withSpan } from "@/lib/core/logger";
+import { logger, spanPayload, withRouteTrace, withSpan } from "@/lib/core/logger";
 
 const ROUTE_PATH = "/api/content/reusable-categories";
 
@@ -65,6 +65,7 @@ export async function GET(request: NextRequest) {
             orderBy: [{ displayOrder: "asc" }, { name: "asc" }],
           });
           span.attr("count", result.length);
+          await spanPayload(span, "reusable_categories", result);
           return result;
         },
       );

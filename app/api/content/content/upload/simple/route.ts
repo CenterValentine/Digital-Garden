@@ -13,7 +13,7 @@ import { requireAuth } from "@/lib/infrastructure/auth/middleware";
 import { generateUniqueSlug } from "@/lib/domain/content";
 import { getUserStorageProvider } from "@/lib/infrastructure/storage";
 import crypto from "crypto";
-import { logger, withRouteTrace, withSpan } from "@/lib/core/logger";
+import { logger, spanPayload, withRouteTrace, withSpan } from "@/lib/core/logger";
 
 const ROUTE_PATH = "/api/content/content/upload/simple";
 
@@ -313,6 +313,7 @@ export async function POST(request: NextRequest) {
                 },
               });
               span.attr("attempts", attempt).attr("content_id", created.id);
+              await spanPayload(span, "uploaded_content", created);
               return { content: created, attempts: attempt };
             } catch (error: unknown) {
               const prismaError = error as { code?: string; meta?: { target?: string[] } };

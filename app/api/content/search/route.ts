@@ -12,7 +12,7 @@ import { prisma } from "@/lib/database/client";
 import { requireAuth } from "@/lib/infrastructure/auth/middleware";
 import type { ContentType } from "@/lib/domain/content/types";
 import type { Prisma } from "@/lib/database/generated/prisma";
-import { logger, withRouteTrace, withSpan } from "@/lib/core/logger";
+import { logger, spanPayload, withRouteTrace, withSpan } from "@/lib/core/logger";
 
 const ROUTE_PATH = "/api/content/search";
 
@@ -182,6 +182,7 @@ export async function GET(request: NextRequest) {
             take: 100,
           });
           span.attr("hits", result.length).summary(`${result.length} hits`);
+          await spanPayload(span, "search_results", result);
           return result;
         },
       );
