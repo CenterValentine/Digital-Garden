@@ -1,5 +1,5 @@
 ---
-last_updated: 2026-05-13
+last_updated: 2026-05-17
 current_epoch: 13
 current_sprint: 58
 sprint_status: planned
@@ -52,6 +52,17 @@ before planning and executing. There may be additions or modifications.
 **Detailed Plan**: `docs/notes-feature/work-tracking/epochs/epoch-13-people-and-collaboration.md`
 
 ## Recent Completions (Last 30 Days)
+
+**May 17, 2026**: Observability cleanup — COMPLETE (worktree `observability-cleanup`, 27 commits ahead of `origin/main`)
+- Phases 0–5 produced a complete three-layer observability system: structured logs (closed-set `Layer` + `Marker` enums, scalar-only `Attrs`), span traces with end-of-trace summary blocks, and per-trace payload sidecars under `.local/debug-payloads/`
+- Server-side console retirement: ~80+ API routes wrapped with `withRouteTrace`, Prisma `emit: 'event'` bridge silences raw `prisma:query` stdout, every `console.*` outside the logger module is now an ESLint error
+- Client-side console retirement: ~60 files, ~300 call sites across `components/`, `state/`, `hooks/`. Triage pattern: delete debug breadcrumbs covered by the trace, escalate state corrections to `clientLogger.warn`, real failures to `clientLogger.error` with scalar attrs
+- Phase 5 foundation: `lib/core/logger/client.ts` (client-safe, no `node:async_hooks`), `app/api/logs/client/route.ts` beacon endpoint (auth-gated, 100/min rate limit, error/fatal only), `lib/core/logger/client-fetch.ts` `tracedFetch` wrapper, `Layer` split into `ServerLayer | FrontendLayer` closed unions
+- Phase 6 trace viewer: `lib/core/logger/event-recorder.ts` writes every LogEvent to `<trace>.events.jsonl`, `scripts/render-trace.ts` builds a span tree and emits self-contained HTML (`pnpm trace:view [id]`, `pnpm trace:list`)
+- ESLint deferral list shrunk: `no-console=error` now enforced in `components/`, `state/`, `hooks/`. Still deferred (with file globs as tracker): `app/**/page.tsx`, TipTap extensions, design integrations, `extensions/**`, lib utilities transitively reachable from `"use client"`
+- PII firewall by type: `Attrs = Readonly<Record<string, string | number | boolean>>` makes non-scalar attrs a compile error; bulk data flows through `spanPayload()` → sidecar JSONL instead
+- Gates locked at ratchet `--max-warnings 159`. `pnpm typecheck` / `pnpm lint` / `pnpm build` all green on the branch tip
+- Plan docs in `docs/notes-feature/work-tracking/`: `OBSERVABILITY-CLEANUP-PLAN.md`, `FRONTEND-LOG-CHARTER.md`, `PII-AUDIT-2026-05.md`
 
 **May 13, 2026**: Dark Mode epoch — COMPLETE
 - Foundation: theme provider, `useResolvedTheme()` hook, FOUC-prevention inline script reading `notes:settings` from localStorage, `suppressHydrationWarning` on `<html>` to handle pre-hydration class application
