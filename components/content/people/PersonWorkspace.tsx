@@ -25,6 +25,7 @@ import {
 import { useContentStore, type WorkspacePaneId } from "@/state/content-store";
 import { useLeftPanelViewStore } from "@/state/left-panel-view-store";
 import { useTreeStateStore } from "@/state/tree-state-store";
+import { clientLogger } from "@/lib/core/logger/client";
 
 interface PersonWorkspaceProps {
   personId: string;
@@ -232,7 +233,13 @@ export function PersonWorkspace({ personId, paneId }: PersonWorkspaceProps) {
         if (loadError instanceof DOMException && loadError.name === "AbortError") {
           return;
         }
-        console.error("[PersonWorkspace] Failed to load workspace:", loadError);
+        clientLogger.error({
+          layer: "ui",
+          event: "person_workspace_load:caught",
+          summary: "person workspace load failed",
+          attrs: { person_id: personId },
+          error: loadError,
+        });
         setError(loadError instanceof Error ? loadError.message : "Failed to load contact");
       } finally {
         setIsLoading(false);
@@ -352,7 +359,13 @@ export function PersonWorkspace({ personId, paneId }: PersonWorkspaceProps) {
         description: nextDisplayName,
       });
     } catch (saveError) {
-      console.error("[PersonWorkspace] Failed to update contact:", saveError);
+      clientLogger.error({
+        layer: "ui",
+        event: "person_contact_update:caught",
+        summary: "person contact update failed",
+        attrs: { person_id: personId },
+        error: saveError,
+      });
       toast.error("Failed to update contact", {
         description: saveError instanceof Error ? saveError.message : "Unknown error",
       });
@@ -397,7 +410,13 @@ export function PersonWorkspace({ personId, paneId }: PersonWorkspaceProps) {
           throw new Error(result.error?.message || "Failed to update contact view");
         }
       } catch (error) {
-        console.error("[PersonWorkspace] Failed to update contact view:", error);
+        clientLogger.error({
+          layer: "ui",
+          event: "person_view_update:caught",
+          summary: "person contact view update failed",
+          attrs: { person_id: personId },
+          error,
+        });
         setContentViewMode(previousViewMode);
         setContentViewPrefs(previousViewPrefs);
         if (viewMode !== "profile") {
@@ -466,7 +485,12 @@ export function PersonWorkspace({ personId, paneId }: PersonWorkspaceProps) {
           avatarUrl: item.avatarUrl || null,
         }));
     } catch (error) {
-      console.error("[PersonWorkspace] Error fetching people mentions:", error);
+      clientLogger.error({
+        layer: "ui",
+        event: "person_mentions_fetch:caught",
+        summary: "fetch people-mentions autocomplete failed",
+        error,
+      });
       return [];
     }
   }, []);
@@ -506,7 +530,13 @@ export function PersonWorkspace({ personId, paneId }: PersonWorkspaceProps) {
           })
         );
       } catch (error) {
-        console.error("[PersonWorkspace] Error opening person mention:", error);
+        clientLogger.error({
+          layer: "ui",
+          event: "person_mention_open:caught",
+          summary: "open person mention failed",
+          attrs: { target_person_id: targetPersonId },
+          error,
+        });
         toast.error("Failed to open person", {
           description: error instanceof Error ? error.message : "Unknown error",
         });
@@ -534,7 +564,12 @@ export function PersonWorkspace({ personId, paneId }: PersonWorkspaceProps) {
         usageCount: tag._count?.contentTags || 0,
       }));
     } catch (error) {
-      console.error("[PersonWorkspace] Error fetching tags:", error);
+      clientLogger.error({
+        layer: "ui",
+        event: "person_tags_fetch:caught",
+        summary: "fetch tags autocomplete failed (PersonWorkspace)",
+        error,
+      });
       return [];
     }
   }, []);
