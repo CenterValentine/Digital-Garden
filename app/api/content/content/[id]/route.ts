@@ -32,6 +32,22 @@ import type { JSONContent } from "@tiptap/core";
 import { getServerExtensions } from "@/lib/domain/editor/extensions-server";
 import { sanitizeTipTapJsonWithExtensions } from "@/lib/domain/editor/unsupported-content";
 import { logger, spanPayload, withRouteTrace, withSpan } from "@/lib/core/logger";
+import crypto from "node:crypto";
+
+/**
+ * Deterministic short hash of the tiptap JSON body. Used for `If-Match`
+ * preconditions on PATCH so clients can prove they're updating the version
+ * of the document they last saw. Slicing to 64 hex chars (SHA-256 truncated)
+ * keeps the header value compact while preserving negligible collision risk
+ * for per-document version checks.
+ */
+function hashTiptap(json: unknown): string {
+  return crypto
+    .createHash("sha256")
+    .update(JSON.stringify(json))
+    .digest("hex")
+    .slice(0, 64);
+}
 import type {
   ContentDetailResponse,
   UpdateContentRequest,
@@ -228,6 +244,11 @@ export async function GET(
           tiptapJson: content.notePayload.tiptapJson as Record<string, unknown>,
           searchText: content.notePayload.searchText,
           metadata: content.notePayload.metadata as Record<string, unknown>,
+          // bodyHash lets clients echo it back as `If-Match` on PATCH for
+          // optimistic-concurrency protection against the editor-mount-race
+          // overwrite class. Backwards compatible: clients that ignore the
+          // field continue working unchanged.
+          bodyHash: hashTiptap(content.notePayload.tiptapJson),
         };
       }
       if (content.filePayload) {
@@ -404,6 +425,48 @@ export async function PATCH(
           { status: 403 }
         );
       }
+
+      // ── If-Match precondition (optional) ─────────────────────────────────
+      // Standard HTTP precondition. When clients pass `If-Match: <bodyHash>`,
+      // we verify the current notePayload hash matches what they last saw.
+      // Mismatch → 409 Conflict; client should re-fetch and re-apply.
+      // Missing header → proceed (backwards compatible — existing clients
+      // are unaffected). Hash is computed on the fly from the existing
+      // tiptapJson, so no schema migration is required for this guard.
+      const ifMatch = request.headers.get("if-match");
+      if (ifMatch && existing.notePayload) {
+        const currentHash = hashTiptap(existing.notePayload.tiptapJson);
+        if (currentHash !== ifMatch.trim()) {
+          logger.warn({
+            layer: "content",
+            event: "write:if_match_failed",
+            summary: "If-Match precondition failed; refusing PATCH",
+            attrs: {
+              content_id: id,
+              client_supplied_hash: ifMatch.trim().slice(0, 16),
+              current_hash: currentHash.slice(0, 16),
+              refused_via: "if_match",
+            },
+          });
+          return NextResponse.json(
+            {
+              success: false,
+              error: {
+                code: "PRECONDITION_FAILED",
+                message:
+                  "Content has changed since you last loaded it. Re-fetch and re-apply your edits.",
+              },
+              meta: {
+                reason: "if_match",
+                currentBodyHash: currentHash,
+                clientSuppliedHash: ifMatch.trim(),
+              },
+            },
+            { status: 409 }
+          );
+        }
+      }
+      // ─────────────────────────────────────────────────────────────────────
 
       const {
         title,
@@ -961,6 +1024,9 @@ export async function PATCH(
           tiptapJson: updated.notePayload.tiptapJson as Record<string, unknown>,
           searchText: updated.notePayload.searchText,
           metadata: updated.notePayload.metadata as Record<string, unknown>,
+          // Post-write hash so the client can update its `If-Match` baseline
+          // immediately without needing another GET roundtrip.
+          bodyHash: hashTiptap(updated.notePayload.tiptapJson),
         };
       }
       if (updated.htmlPayload) {
