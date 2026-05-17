@@ -65,6 +65,8 @@ Wrap the last three unwrapped routes (`workspaces`, `collaboration/presence`, `p
 ### Phase 6 — Trace replay HTML viewer
 `lib/core/logger/event-recorder.ts` writes every LogEvent to `<trace>.events.jsonl` (sibling to payload sidecar). `scripts/render-trace.ts` reads both files, builds a span tree from `parent_span_id` chains, emits a self-contained HTML page (inline CSS + JS + payload data; no external deps). CLI: `pnpm trace:view [id]`, `pnpm trace:list`.
 
+**Cache hygiene:** `pnpm dev` is wired through a `predev` lifecycle hook (`pnpm clean:traces` → `rm -rf .local/debug-payloads`) so each dev session starts with a fresh trace cache. The event-recorder's `ensureDir()` recreates the directory on the first emit. Each dev session's `pnpm trace:list` shows only that session's traces — no stale cross-session noise. The `enable-pre-post-scripts=true` setting in `.npmrc` (pre-existing for native-module installs) is what lets the `predev` hook fire under pnpm.
+
 ## Gate state at branch tip
 
 - **`pnpm typecheck`** — clean

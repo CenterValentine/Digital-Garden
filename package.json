@@ -3,7 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "predev": "pnpm clean:traces",
     "dev": "next dev --port 3015",
+    "clean:traces": "rm -rf .local/debug-payloads",
     "dev:collab": "tsx server/hocuspocus/bootstrap.ts",
     "start:collab": "tsx server/hocuspocus/bootstrap.ts",
     "typecheck": "tsc --noEmit",
