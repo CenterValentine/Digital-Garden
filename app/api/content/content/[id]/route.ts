@@ -576,7 +576,8 @@ export async function PATCH(
       // strong data-loss prevention. Clients may opt out with `allowShrink:true`
       // on the body when the shrink is genuinely intentional (e.g. an explicit
       // "clear note" action).
-      const SHRINK_REFUSE_RATIO = 0.5;
+      const SHRINK_REFUSE_RATIO = 0.5;       // < 0.5×  → refuse (422)
+      const SHRINK_RISK_RATIO = 0.7;          // 0.5× ≤ ratio < 0.7× → log warning, allow
       const SHRINK_MIN_EXISTING_CHARS = 200;
 
       type WriteResult =
@@ -654,6 +655,36 @@ export async function PATCH(
                 newCharCount: newLen,
                 shrinkRatio,
               };
+            }
+
+            // ── Sub-threshold risk detection ───────────────────────────────
+            // Shrinks below the refuse cutoff but still substantial (between
+            // 50% and 70% of the previous size) get an informational warn
+            // event. We allow the write but leave a forensic breadcrumb so
+            // future incidents that *almost* trip the refusal threshold are
+            // visible in trace history without needing user reports.
+            if (
+              prevLen > SHRINK_MIN_EXISTING_CHARS &&
+              newLen < prevLen * SHRINK_RISK_RATIO &&
+              newLen >= prevLen * SHRINK_REFUSE_RATIO
+            ) {
+              const ratio = newLen / prevLen;
+              logger.warn({
+                layer: "content",
+                event: "write:overwrite_risk_detected",
+                summary: `substantial shrink ${prevLen}→${newLen} chars allowed (below refuse threshold)`,
+                attrs: {
+                  content_id: id,
+                  prev_char_count: prevLen,
+                  new_char_count: newLen,
+                  shrink_ratio: Number(ratio.toFixed(3)),
+                  refuse_threshold: SHRINK_REFUSE_RATIO,
+                  risk_threshold: SHRINK_RISK_RATIO,
+                },
+              });
+              span
+                .attr("shrink_risk_detected", true)
+                .attr("shrink_ratio", Number(ratio.toFixed(3)));
             }
             // ────────────────────────────────────────────────────────────────
 
