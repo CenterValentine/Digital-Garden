@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { usePublishTreeStore } from "../../state/publish-tree-store";
 import { PublishingTree } from "./PublishingTree";
 import { CreatePublicPathDialog } from "../dialogs/CreatePublicPathDialog";
+import { clientLogger } from "@/lib/core/logger/client";
 
 async function fetchPublicPaths() {
   const res = await fetch("/api/publishing/paths");
@@ -24,7 +25,12 @@ export function PublishingViewMode() {
       setPaths(data);
     } catch (err) {
       toast.error("Could not load publishing paths");
-      console.error(err);
+      clientLogger.error({
+        layer: "ui",
+        event: "publishing_paths_load:caught",
+        summary: "publishing paths fetch failed",
+        error: err,
+      });
     } finally {
       setIsLoading(false);
     }

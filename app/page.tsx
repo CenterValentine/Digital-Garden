@@ -117,12 +117,12 @@ export default async function Home() {
 
         <footer className="mt-24 pt-8 border-t border-white/5 flex items-center justify-between">
           <span className="text-xs text-white/15">Digital Garden</span>
-          <a
+          <Link
             href="/sign-in"
             className="text-xs text-white/15 hover:text-white/30 transition-colors"
           >
             Sign in
-          </a>
+          </Link>
         </footer>
       </main>
     </div>
@@ -139,18 +139,18 @@ function UnconfiguredLanding() {
         A personal knowledge space for notes, ideas, and connected thinking.
       </p>
       <div className="flex gap-3">
-        <a
+        <Link
           href="/sign-in"
           className="rounded-lg bg-gold-primary/15 dark:bg-gold-primary/20 px-5 py-2.5 text-sm font-medium text-gold-dark dark:text-gold-primary transition-colors hover:bg-gold-primary/25 dark:hover:bg-gold-primary/30"
         >
           Sign in
-        </a>
-        <a
+        </Link>
+        <Link
           href="/sign-up"
           className="rounded-lg border border-black/10 dark:border-white/10 px-5 py-2.5 text-sm font-medium text-gray-700 dark:text-gray-300 transition-colors hover:bg-black/[0.03] dark:hover:bg-white/5"
         >
           Create account
-        </a>
+        </Link>
       </div>
     </main>
   );

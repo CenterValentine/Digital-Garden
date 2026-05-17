@@ -6,88 +6,118 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { requireAuth } from "@/lib/infrastructure/auth/middleware";
 import { prisma } from "@/lib/database/client";
+import { logger } from "@/lib/core/logger";
+import { withRouteTrace } from "@/lib/core/logger/route-trace";
+import { withSpan } from "@/lib/core/logger/span";
+import { spanPayload } from "@/lib/core/logger/span-payload";
 
-export async function GET() {
-  const session = await requireAuth();
-  
+export async function GET(req: NextRequest) {
+  return withRouteTrace(req, { route: "/api/publishing/paths" }, async () => {
+    const session = await requireAuth();
 
-  const paths = await prisma.publicPath.findMany({
-    where: { ownerId: session.user.id },
-    orderBy: [{ parentId: "asc" }, { displayOrder: "asc" }],
-    include: {
-      _count: { select: { items: { where: { deletedAt: null } } } },
-    },
+    return withSpan(
+      { layer: "content", name: "publishing:paths_list" },
+      { summary: "publishing paths list" },
+      async (span) => {
+        const paths = await prisma.publicPath.findMany({
+          where: { ownerId: session.user.id },
+          orderBy: [{ parentId: "asc" }, { displayOrder: "asc" }],
+          include: {
+            _count: { select: { items: { where: { deletedAt: null } } } },
+          },
+        });
+
+        // Build tree client-side via parentId references
+        interface PathNode {
+          id: string;
+          parentId: string | null;
+          slug: string;
+          title: string;
+          description: string | null;
+          displayOrder: number;
+          icon: string | null;
+          children: PathNode[];
+          itemCount: number;
+        }
+
+        const nodeMap = new Map<string, PathNode>();
+        const roots: PathNode[] = [];
+
+        for (const p of paths) {
+          const node: PathNode = {
+            id: p.id,
+            parentId: p.parentId,
+            slug: p.slug,
+            title: p.title,
+            description: p.description,
+            displayOrder: p.displayOrder,
+            icon: p.icon,
+            children: [],
+            itemCount: p._count.items,
+          };
+          nodeMap.set(p.id, node);
+        }
+
+        for (const node of nodeMap.values()) {
+          if (node.parentId && nodeMap.has(node.parentId)) {
+            nodeMap.get(node.parentId)!.children.push(node);
+          } else {
+            roots.push(node);
+          }
+        }
+
+        span.attr("path_count", paths.length).attr("root_count", roots.length);
+        await spanPayload(span, "paths_response", roots);
+
+        return NextResponse.json(roots);
+      },
+    );
   });
-
-  // Build tree client-side via parentId references
-  interface PathNode {
-    id: string;
-    parentId: string | null;
-    slug: string;
-    title: string;
-    description: string | null;
-    displayOrder: number;
-    icon: string | null;
-    children: PathNode[];
-    itemCount: number;
-  }
-
-  const nodeMap = new Map<string, PathNode>();
-  const roots: PathNode[] = [];
-
-  for (const p of paths) {
-    const node: PathNode = {
-      id: p.id,
-      parentId: p.parentId,
-      slug: p.slug,
-      title: p.title,
-      description: p.description,
-      displayOrder: p.displayOrder,
-      icon: p.icon,
-      children: [],
-      itemCount: p._count.items,
-    };
-    nodeMap.set(p.id, node);
-  }
-
-  for (const node of nodeMap.values()) {
-    if (node.parentId && nodeMap.has(node.parentId)) {
-      nodeMap.get(node.parentId)!.children.push(node);
-    } else {
-      roots.push(node);
-    }
-  }
-
-  return NextResponse.json(roots);
 }
 
 export async function POST(req: NextRequest) {
-  const session = await requireAuth();
-  
+  return withRouteTrace(req, { route: "/api/publishing/paths" }, async () => {
+    const session = await requireAuth();
+    const body = (await req.json()) as {
+      slug: string;
+      title: string;
+      parentId?: string;
+      description?: string;
+      icon?: string;
+    };
+    const { slug, title, parentId, description, icon } = body;
 
-  const body = await req.json();
-  const { slug, title, parentId, description, icon } = body as {
-    slug: string;
-    title: string;
-    parentId?: string;
-    description?: string;
-    icon?: string;
-  };
+    if (!slug || !title) {
+      logger.warn({
+        layer: "content",
+        event: "publishing_path_create:rejected",
+        summary: "slug and title required",
+        attrs: { reason: "validation_error" },
+      });
+      return NextResponse.json({ error: "slug and title required" }, { status: 400 });
+    }
 
-  if (!slug || !title) {
-    return NextResponse.json({ error: "slug and title required" }, { status: 400 });
-  }
+    return withSpan(
+      { layer: "content", name: "publishing:path_create" },
+      { summary: "publishing path create", attrs: { slug, parent_id: parentId ?? "root" } },
+      async (span) => {
+        await spanPayload(span, "incoming_body", body);
 
-  const path = await prisma.publicPath.create({
-    data: {
-      ownerId: session.user.id,
-      slug,
-      title,
-      parentId: parentId ?? null,
-      description: description ?? null,
-      icon: icon ?? null,
-    },
+        const path = await prisma.publicPath.create({
+          data: {
+            ownerId: session.user.id,
+            slug,
+            title,
+            parentId: parentId ?? null,
+            description: description ?? null,
+            icon: icon ?? null,
+          },
+        });
+
+        span.attr("path_id", path.id);
+
+        return NextResponse.json(path, { status: 201 });
+      },
+    );
   });
-
-  return NextResponse.json(path, { status: 201 });
 }

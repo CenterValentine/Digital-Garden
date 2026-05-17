@@ -8,6 +8,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { getSurfaceStyles } from "@/lib/design/system";
 import { toast } from "sonner";
 
@@ -179,17 +180,16 @@ export default function APIKeysSettingsPage() {
             <h4 className="text-sm font-semibold text-blue-400">API Documentation</h4>
             <p className="text-sm text-gray-700 dark:text-gray-300 mt-1">
               Learn how to use the API in our{" "}
-              <a
+              <Link
                 href="/docs/api"
                 className="text-primary hover:underline"
                 onClick={(e) => {
                   e.preventDefault();
-                  console.log("[APIKeys] API docs link clicked");
                   toast.info("API Documentation (wired to console)");
                 }}
               >
                 API Documentation
-              </a>
+              </Link>
             </p>
           </div>
         </div>

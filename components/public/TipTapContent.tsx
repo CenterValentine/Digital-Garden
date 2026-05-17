@@ -10,6 +10,7 @@ import { DOMSerializer, Node, Fragment } from "@tiptap/pm/model";
 import { getSchema } from "@tiptap/core";
 import { JSDOM } from "jsdom";
 import { getServerExtensions } from "@/lib/domain/editor/extensions-server";
+import { logger } from "@/lib/core/logger";
 import type { JSONContent } from "@tiptap/core";
 
 interface TipTapContentProps {
@@ -105,8 +106,13 @@ function generateHTMLServer(doc: JSONContent): string {
     return container.innerHTML;
   } catch (fullErr) {
     // Full pass failed — fall back to per-node serialization so one broken
-    // block doesn't blank the entire page. Logs the failing node type.
-    console.error("[TipTapContent] Full serialization failed, trying per-node fallback:", fullErr);
+    // block doesn't blank the entire page.
+    logger.warn({
+      layer: "editor",
+      event: "public_render_full:failed",
+      summary: "full serialization failed, falling back to per-node",
+      error: fullErr,
+    });
     const container = jsdomDocument.createElement("div");
     contentNode.content.forEach((node) => {
       try {
@@ -115,7 +121,13 @@ function generateHTMLServer(doc: JSONContent): string {
         });
         container.appendChild(nodeFrag);
       } catch (nodeErr) {
-        console.error(`[TipTapContent] Block "${node.type.name}" failed to render — skipping:`, nodeErr);
+        logger.error({
+          layer: "editor",
+          event: "public_render_node:caught",
+          summary: "per-node serialization failed — skipping block",
+          attrs: { node_type: node.type.name },
+          error: nodeErr,
+        });
       }
     });
     postProcessDom(container, jsdomDocument);
@@ -128,7 +140,12 @@ export function TipTapContent({ bodyJson, className }: TipTapContentProps) {
   try {
     html = generateHTMLServer(normalizeDoc(bodyJson));
   } catch (err) {
-    console.error("[TipTapContent] generateHTMLServer failed:", err);
+    logger.error({
+      layer: "editor",
+      event: "public_render:caught",
+      summary: "TipTapContent server-render failed (returned fallback HTML)",
+      error: err,
+    });
     html = "<p><em>Content could not be rendered.</em></p>";
   }
 

@@ -6,6 +6,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/infrastructure/auth/middleware";
 import { prisma } from "@/lib/database/client";
+import { logger } from "@/lib/core/logger";
+import { withRouteTrace } from "@/lib/core/logger/route-trace";
+import { withSpan } from "@/lib/core/logger/span";
+import { spanPayload } from "@/lib/core/logger/span-payload";
 
 interface ValidationIssue {
   code: string;
@@ -82,64 +86,89 @@ function validateBlockNodes(bodyJson: TipTapNode): ValidationIssue[] {
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
-  const session = await requireAuth();
-  
+  return withRouteTrace(
+    req,
+    { route: "/api/publishing/items/[id]/validate" },
+    async () => {
+      const session = await requireAuth();
+      const { id } = await params;
 
-  const { id } = await params;
+      return withSpan(
+        { layer: "content", name: "publishing:validate" },
+        { summary: "publishing item validate", attrs: { public_item_id: id } },
+        async (span) => {
+          const item = await prisma.publicItem.findFirst({
+            where: { id, ownerId: session.user.id, deletedAt: null },
+            include: {
+              workingRevision: true,
+              contentNode: { include: { notePayload: true } },
+            },
+          });
 
-  const item = await prisma.publicItem.findFirst({
-    where: { id, ownerId: session.user.id, deletedAt: null },
-    include: {
-      workingRevision: true,
-      contentNode: { include: { notePayload: true } },
+          if (!item) {
+            logger.warn({
+              layer: "content",
+              event: "publishing_validate:rejected",
+              summary: "public item not found",
+              attrs: { public_item_id: id },
+            });
+            return NextResponse.json({ error: "Not found" }, { status: 404 });
+          }
+
+          const issues: ValidationIssue[] = [];
+
+          // Rule: must have a title
+          if (!item.publicTitle) {
+            issues.push({
+              code: "missing-title",
+              message: "Public title is required before publishing.",
+              severity: "error",
+            });
+          }
+
+          // Rule: must have body content (check working revision first, then live note payload)
+          const bodyJson = (item.workingRevision?.bodyJson ??
+            item.contentNode.notePayload?.tiptapJson) as unknown as TipTapNode | null;
+          const hasContent =
+            bodyJson?.content && Array.isArray(bodyJson.content) && bodyJson.content.length > 0;
+          if (!hasContent) {
+            issues.push({
+              code: "empty-body",
+              message: "Content body is empty. Add some content before publishing.",
+              severity: "error",
+            });
+          }
+
+          // Rule: validate block JSON attrs
+          if (bodyJson) {
+            issues.push(...validateBlockNodes(bodyJson));
+          }
+
+          const hasErrors = issues.some((i) => i.severity === "error");
+          const hasWarnings = issues.some((i) => i.severity === "warn");
+          const status = hasErrors ? "blocked" : hasWarnings ? "warnings" : "ok";
+
+          await prisma.publicItem.update({
+            where: { id },
+            data: {
+              validationStatus: status,
+              validationCheckedAt: new Date(),
+              validationIssues: issues as unknown as never,
+            },
+          });
+
+          span
+            .attr("status", status)
+            .attr("issue_count", issues.length)
+            .attr("error_count", issues.filter((i) => i.severity === "error").length)
+            .attr("warning_count", issues.filter((i) => i.severity === "warn").length);
+          await spanPayload(span, "validation_report", { status, issues });
+
+          return NextResponse.json({ status, issues });
+        },
+      );
     },
-  });
-
-  if (!item) return NextResponse.json({ error: "Not found" }, { status: 404 });
-
-  const issues: ValidationIssue[] = [];
-
-  // Rule: must have a title
-  if (!item.publicTitle) {
-    issues.push({
-      code: "missing-title",
-      message: "Public title is required before publishing.",
-      severity: "error",
-    });
-  }
-
-  // Rule: must have body content (check working revision first, then live note payload)
-  const bodyJson = (item.workingRevision?.bodyJson ??
-    item.contentNode.notePayload?.tiptapJson) as unknown as TipTapNode | null;
-  const hasContent =
-    bodyJson?.content && Array.isArray(bodyJson.content) && bodyJson.content.length > 0;
-  if (!hasContent) {
-    issues.push({
-      code: "empty-body",
-      message: "Content body is empty. Add some content before publishing.",
-      severity: "error",
-    });
-  }
-
-  // Rule: validate block JSON attrs
-  if (bodyJson) {
-    issues.push(...validateBlockNodes(bodyJson));
-  }
-
-  const hasErrors = issues.some((i) => i.severity === "error");
-  const hasWarnings = issues.some((i) => i.severity === "warn");
-  const status = hasErrors ? "blocked" : hasWarnings ? "warnings" : "ok";
-
-  await prisma.publicItem.update({
-    where: { id },
-    data: {
-      validationStatus: status,
-      validationCheckedAt: new Date(),
-      validationIssues: issues as unknown as never,
-    },
-  });
-
-  return NextResponse.json({ status, issues });
+  );
 }
