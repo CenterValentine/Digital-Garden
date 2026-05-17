@@ -11,6 +11,7 @@
 import { create } from "zustand";
 import type { SearchFilter, SearchResult } from "@/lib/domain/search/filters";
 import { DEFAULT_FILTER } from "@/lib/domain/search/filters";
+import { clientLogger } from "@/lib/core/logger/client";
 
 const STORAGE_KEY = "search-settings";
 const RESULTS_STORAGE_KEY = "search-results";
@@ -50,7 +51,12 @@ function loadSettings(): SearchSettings {
       return { ...DEFAULT_SETTINGS, ...JSON.parse(stored) };
     }
   } catch (e) {
-    console.error("Failed to load search settings:", e);
+    clientLogger.error({
+      layer: "store",
+      event: "search_settings_load:caught",
+      summary: "load search settings from localStorage failed",
+      error: e,
+    });
   }
 
   return DEFAULT_SETTINGS;
@@ -65,7 +71,12 @@ function saveSettings(settings: Partial<SearchSettings>) {
     const updated = { ...current, ...settings };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
   } catch (e) {
-    console.error("Failed to save search settings:", e);
+    clientLogger.error({
+      layer: "store",
+      event: "search_settings_save:caught",
+      summary: "save search settings to localStorage failed",
+      error: e,
+    });
   }
 }
 
@@ -86,7 +97,12 @@ function loadCachedResults(): SearchResultsCache | null {
       }
     }
   } catch (e) {
-    console.error("Failed to load cached search results:", e);
+    clientLogger.error({
+      layer: "store",
+      event: "search_results_cache_load:caught",
+      summary: "load cached search results failed",
+      error: e,
+    });
   }
 
   return null;
@@ -105,7 +121,12 @@ function saveCachedResults(query: string, tags: string[], results: SearchResult[
     };
     localStorage.setItem(RESULTS_STORAGE_KEY, JSON.stringify(cache));
   } catch (e) {
-    console.error("Failed to save search results:", e);
+    clientLogger.error({
+      layer: "store",
+      event: "search_results_cache_save:caught",
+      summary: "save cached search results failed",
+      error: e,
+    });
   }
 }
 
@@ -116,7 +137,12 @@ function clearCachedResults() {
   try {
     localStorage.removeItem(RESULTS_STORAGE_KEY);
   } catch (e) {
-    console.error("Failed to clear cached results:", e);
+    clientLogger.error({
+      layer: "store",
+      event: "search_results_cache_clear:caught",
+      summary: "clear cached search results failed",
+      error: e,
+    });
   }
 }
 

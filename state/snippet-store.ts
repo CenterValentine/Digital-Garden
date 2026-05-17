@@ -9,6 +9,7 @@
 import { create } from "zustand";
 import type { SnippetWithCategory } from "@/lib/domain/snippets";
 import type { ReusableCategoryWithCount } from "@/lib/domain/templates";
+import { clientLogger } from "@/lib/core/logger/client";
 
 interface SnippetStore {
   categories: ReusableCategoryWithCount[];
@@ -34,7 +35,12 @@ export const useSnippetStore = create<SnippetStore>((set, get) => ({
       const data = await res.json();
       set({ categories: data });
     } catch (err) {
-      console.error("Failed to fetch snippet categories:", err);
+      clientLogger.error({
+        layer: "store",
+        event: "snippet_categories_fetch:caught",
+        summary: "fetch snippet categories failed",
+        error: err,
+      });
     }
   },
 
@@ -60,7 +66,12 @@ export const useSnippetStore = create<SnippetStore>((set, get) => ({
         isLoading: false,
       });
     } catch (err) {
-      console.error("Failed to fetch snippets:", err);
+      clientLogger.error({
+        layer: "store",
+        event: "snippets_fetch:caught",
+        summary: "fetch snippets failed",
+        error: err,
+      });
       set({ isLoading: false });
     }
   },

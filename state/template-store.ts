@@ -8,6 +8,7 @@
 
 import { create } from "zustand";
 import type { ContentTemplateWithCategory, ReusableCategoryWithCount } from "@/lib/domain/templates";
+import { clientLogger } from "@/lib/core/logger/client";
 
 interface TemplateStore {
   categories: ReusableCategoryWithCount[];
@@ -35,7 +36,12 @@ export const useTemplateStore = create<TemplateStore>((set, get) => ({
       const data = await res.json();
       set({ categories: data });
     } catch (err) {
-      console.error("Failed to fetch template categories:", err);
+      clientLogger.error({
+        layer: "store",
+        event: "template_categories_fetch:caught",
+        summary: "fetch template categories failed",
+        error: err,
+      });
     }
   },
 
@@ -69,7 +75,12 @@ export const useTemplateStore = create<TemplateStore>((set, get) => ({
         });
       }
     } catch (err) {
-      console.error("Failed to fetch templates:", err);
+      clientLogger.error({
+        layer: "store",
+        event: "templates_fetch:caught",
+        summary: "fetch templates failed",
+        error: err,
+      });
       set({ isLoading: false });
     }
   },

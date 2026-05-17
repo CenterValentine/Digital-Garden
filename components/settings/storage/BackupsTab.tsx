@@ -28,13 +28,11 @@ export function StorageBackupsTab() {
   const [folders, setFolders] = useState(DUMMY_FOLDERS);
 
   const handleToggleGlobalBackup = (enabled: boolean) => {
-    console.log("[BackupsTab] Global backup toggle:", enabled);
     setBackupsEnabled(enabled);
     toast.success(enabled ? "Backups enabled" : "Backups disabled");
   };
 
   const handleToggleFolderBackup = (folderId: string, enabled: boolean) => {
-    console.log("[BackupsTab] Folder backup toggle:", folderId, enabled);
     setFolders(folders.map(f =>
       f.id === folderId ? { ...f, backupEnabled: enabled } : f
     ));
@@ -42,13 +40,11 @@ export function StorageBackupsTab() {
   };
 
   const handleScheduleChange = (schedule: string) => {
-    console.log("[BackupsTab] Schedule changed:", schedule);
     setBackupSchedule(schedule);
     toast.success(`Backup schedule: ${schedule}`);
   };
 
   const handleRetentionChange = (days: number) => {
-    console.log("[BackupsTab] Retention changed:", days);
     setRetentionDays(days);
     toast.success(`Retention policy: ${days} days`);
   };

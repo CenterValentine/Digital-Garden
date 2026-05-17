@@ -10,6 +10,7 @@
 import { useState } from "react";
 import { getSurfaceStyles } from "@/lib/design/system";
 import { toast } from "sonner";
+import { clientLogger } from "@/lib/core/logger/client";
 
 interface ProviderConfigFormProps {
   provider: "r2" | "s3" | "vercel";
@@ -93,7 +94,13 @@ export function ProviderConfigForm({ provider, onSuccess, onCancel }: ProviderCo
       toast.success(`${displayName} configured successfully`);
       onSuccess();
     } catch (error) {
-      console.error("[ProviderConfigForm] Submit error:", error);
+      clientLogger.error({
+        layer: "ui",
+        event: "storage_provider_config:caught",
+        summary: "provider config submit failed",
+        attrs: { provider },
+        error,
+      });
       toast.error(error instanceof Error ? error.message : "Failed to configure provider");
     } finally {
       setLoading(false);

@@ -8,6 +8,7 @@
 
 import { create } from "zustand";
 import type { PageTemplateWithCategory, ReusableCategoryWithCount } from "@/lib/domain/templates";
+import { clientLogger } from "@/lib/core/logger/client";
 
 interface PageTemplateStore {
   categories: ReusableCategoryWithCount[];
@@ -32,13 +33,23 @@ export const usePageTemplateStore = create<PageTemplateStore>((set, get) => ({
         credentials: "include",
       });
       if (!res.ok) {
-        console.error("Failed to fetch page template categories:", res.status, await res.text().catch(() => ""));
+        clientLogger.error({
+          layer: "store",
+          event: "page_template_categories_fetch:failed",
+          summary: "page template categories api non-ok",
+          attrs: { status: res.status },
+        });
         return;
       }
       const data = await res.json();
       set({ categories: data });
     } catch (err) {
-      console.error("Failed to fetch page template categories:", err);
+      clientLogger.error({
+        layer: "store",
+        event: "page_template_categories_fetch:caught",
+        summary: "fetch page template categories failed",
+        error: err,
+      });
     }
   },
 
@@ -50,7 +61,12 @@ export const usePageTemplateStore = create<PageTemplateStore>((set, get) => ({
         credentials: "include",
       });
       if (!res.ok) {
-        console.error("Failed to fetch page templates:", res.status, await res.text().catch(() => ""));
+        clientLogger.error({
+          layer: "store",
+          event: "page_templates_fetch:failed",
+          summary: "page templates api non-ok",
+          attrs: { status: res.status },
+        });
         set({ isLoading: false });
         return;
       }
@@ -61,7 +77,12 @@ export const usePageTemplateStore = create<PageTemplateStore>((set, get) => ({
         isLoading: false,
       });
     } catch (err) {
-      console.error("Failed to fetch page templates:", err);
+      clientLogger.error({
+        layer: "store",
+        event: "page_templates_fetch:caught",
+        summary: "fetch page templates failed",
+        error: err,
+      });
       set({ isLoading: false });
     }
   },

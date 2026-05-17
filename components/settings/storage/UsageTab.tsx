@@ -37,12 +37,10 @@ export function StorageUsageTab() {
   const percentUsed = (usage.used / usage.quota) * 100;
 
   const handleExportData = () => {
-    console.log("[UsageTab] Export data clicked");
     toast.success("Preparing data export... (wired to console)");
   };
 
   const handleUpgrade = () => {
-    console.log("[UsageTab] Upgrade clicked");
     toast.info("Upgrade to Pro (wired to console)");
   };
 
@@ -297,7 +295,6 @@ export function StorageUsageTab() {
                 {!tier.current && (
                   <button
                     onClick={() => {
-                      console.log("[UsageTab] Upgrade to:", tier.name);
                       toast.info(`Upgrade to ${tier.name} (wired to console)`);
                     }}
                     className="px-4 py-2 text-sm rounded-lg border border-white/10 hover:bg-white/5 transition-colors"

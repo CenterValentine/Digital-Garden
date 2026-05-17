@@ -7,6 +7,7 @@
 
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { clientLogger } from "@/lib/core/logger/client";
 
 export interface PanelState {
   // Version for migration
@@ -76,9 +77,12 @@ export const usePanelStore = create<PanelState>()(
       ): Partial<PanelState> => {
         // If stored version doesn't match current version, reset to defaults
         if (version !== CURRENT_VERSION) {
-          console.log(
-            `[Panel Store] Migrating from version ${version} to ${CURRENT_VERSION}`
-          );
+          clientLogger.info({
+            layer: "store",
+            event: "panel_layout_migrate:promoted",
+            summary: "panel layout schema version mismatch — reset to defaults",
+            attrs: { from_version: version, to_version: CURRENT_VERSION },
+          });
           return DEFAULT_STATE;
         }
         return persistedState as Partial<PanelState>;

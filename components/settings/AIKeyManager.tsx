@@ -13,6 +13,7 @@ import { PROVIDER_CATALOG } from "@/lib/domain/ai";
 import type { AIProviderId } from "@/lib/domain/ai";
 import { Key, Trash2, CheckCircle2, XCircle, Loader2, Plus } from "lucide-react";
 import { toast } from "sonner";
+import { clientLogger } from "@/lib/core/logger/client";
 
 interface MaskedKey {
   id: string;
@@ -44,7 +45,12 @@ export function AIKeyManager() {
       const data = await res.json();
       if (data.success) setKeys(data.data);
     } catch (err) {
-      console.error("Failed to load API keys:", err);
+      clientLogger.error({
+        layer: "ui",
+        event: "ai_keys_load:caught",
+        summary: "load ai keys failed",
+        error: err,
+      });
     } finally {
       setIsLoading(false);
     }
