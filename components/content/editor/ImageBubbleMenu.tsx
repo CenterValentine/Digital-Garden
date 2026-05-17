@@ -35,11 +35,19 @@ const imageShouldShow = ({
   return state.selection instanceof NodeSelection && editor.isActive("image");
 };
 
-/** Size preset: label + width value (null = full/auto) */
+/** Wrap mode buttons: label, mode value, title */
+const WRAP_MODES = [
+  { label: "⊟", mode: "inline", title: "Inline (full column width)" },
+  { label: "↤", mode: "left", title: "Float left" },
+  { label: "⊡", mode: "center", title: "Center align" },
+  { label: "↦", mode: "right", title: "Float right" },
+] as const;
+
+/** Size presets using the size attr (s=33%, m=50%, l=100% full-width) */
 const SIZE_PRESETS = [
-  { label: "S", title: "Small (25%)", width: "25%" },
-  { label: "M", title: "Medium (50%)", width: "50%" },
-  { label: "L", title: "Large (100%)", width: null },
+  { label: "S", title: "Small (33%)", size: "s" },
+  { label: "M", title: "Medium (50%)", size: "m" },
+  { label: "L", title: "Large (full width)", size: "l" },
 ] as const;
 
 export interface ImageBubbleMenuProps {
@@ -50,7 +58,8 @@ export function ImageBubbleMenu({ editor }: ImageBubbleMenuProps) {
   if (!editor) return null;
 
   const imageAttrs = editor.getAttributes("image");
-  const currentWidth = imageAttrs.width;
+  const currentWrap = (imageAttrs.wrap as string) || "inline";
+  const currentSize = (imageAttrs.size as string) || null;
   const isAiGenerated = imageAttrs.source === "ai-generated";
 
   return (
@@ -74,31 +83,53 @@ export function ImageBubbleMenu({ editor }: ImageBubbleMenuProps) {
         </>
       )}
 
+      {/* Wrap mode controls */}
+      {WRAP_MODES.map((wm) => (
+        <button
+          key={wm.mode}
+          onMouseDown={preventFocusLoss}
+          onClick={() =>
+            editor.chain().updateAttributes("image", { wrap: wm.mode }).run()
+          }
+          className={`rounded px-2 py-1 text-xs font-medium transition-colors ${
+            currentWrap === wm.mode
+              ? "bg-white/20 text-white"
+              : "text-gray-300 hover:bg-white/10"
+          }`}
+          title={wm.title}
+          type="button"
+        >
+          {wm.label}
+        </button>
+      ))}
+
+      <div className="mx-0.5 h-4 w-px bg-white/10" />
+
       {/* Size presets */}
-      {SIZE_PRESETS.map((preset) => {
-        const isActive =
-          preset.width === null
-            ? !currentWidth
-            : currentWidth === preset.width;
-        return (
-          <button
-            key={preset.label}
-            onMouseDown={preventFocusLoss}
-            onClick={() =>
-              editor.chain().updateAttributes("image", { width: preset.width }).run()
-            }
-            className={`rounded px-2 py-1 text-xs font-medium transition-colors ${
-              isActive
-                ? "bg-white/20 text-white"
-                : "text-gray-300 hover:bg-white/10"
-            }`}
-            title={preset.title}
-            type="button"
-          >
-            {preset.label}
-          </button>
-        );
-      })}
+      {SIZE_PRESETS.map((preset) => (
+        <button
+          key={preset.label}
+          onMouseDown={preventFocusLoss}
+          onClick={() => {
+            // L size forces out of float modes (left/right) but preserves center
+            const newWrap =
+              preset.size === "l" && currentWrap !== "center" ? "inline" : currentWrap;
+            editor
+              .chain()
+              .updateAttributes("image", { size: preset.size, width: null, wrap: newWrap })
+              .run();
+          }}
+          className={`rounded px-2 py-1 text-xs font-medium transition-colors ${
+            currentSize === preset.size
+              ? "bg-white/20 text-white"
+              : "text-gray-300 hover:bg-white/10"
+          }`}
+          title={preset.title}
+          type="button"
+        >
+          {preset.label}
+        </button>
+      ))}
 
       <div className="mx-0.5 h-4 w-px bg-white/10" />
 

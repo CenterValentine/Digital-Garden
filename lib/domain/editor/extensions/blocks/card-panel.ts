@@ -12,6 +12,7 @@ import { z } from "zod";
 import { createBlockSchema } from "@/lib/domain/blocks/schema";
 import { registerBlock } from "@/lib/domain/blocks/registry";
 import { createBlockNodeView } from "@/lib/domain/blocks/node-view-factory";
+import { makeWrapAttrs } from "@/lib/domain/blocks/wrap-size";
 
 const { schema: cardPanelSchema, defaults: cardPanelDefaults } =
   createBlockSchema("cardPanel", {
@@ -70,6 +71,7 @@ export const CardPanel = Node.create({
         parseHTML: (el) => el.getAttribute("data-card-bg") !== "hidden",
         renderHTML: (attrs) => attrs.showBackground ? {} : { "data-card-bg": "hidden" },
       },
+      ...makeWrapAttrs(),
     };
   },
 
@@ -94,6 +96,7 @@ export const CardPanel = Node.create({
       label: "Card / Panel",
       iconName: "SquareStack",
       atom: false,
+      supportWrap: true,
       renderContent(node, contentDom) {
         contentDom.classList.add("block-card-panel-content");
         contentDom.setAttribute("data-card-border", node.attrs.cardBorder || "subtle");
@@ -165,6 +168,7 @@ export const ServerCardPanel = Node.create({
         parseHTML: (el) => el.getAttribute("data-card-bg") !== "hidden",
         renderHTML: (attrs) => attrs.showBackground ? {} : { "data-card-bg": "hidden" },
       },
+      ...makeWrapAttrs(),
     };
   },
 

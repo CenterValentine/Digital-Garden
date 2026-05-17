@@ -188,6 +188,15 @@ const TOOL_REGISTRY: ToolDefinition[] = [
     order: 40,
     tabKey: "chat",
   },
+  {
+    id: "publish-tab",
+    label: "Publish",
+    iconName: "Globe",
+    surfaces: ["sidebar-tab"],
+    contentTypes: ["note", "file", "html", "code"],
+    order: 50,
+    tabKey: "publish",
+  },
 ];
 
 /**

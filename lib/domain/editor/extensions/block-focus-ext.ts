@@ -13,6 +13,7 @@
 import { Extension, type Editor } from "@tiptap/core";
 import type { Node as ProseMirrorNode } from "@tiptap/pm/model";
 import { createBlockFocusPlugin } from "../plugins/block-focus";
+import { useBlockStore } from "@/state/block-store";
 
 export const BlockFocusExtension = Extension.create({
   name: "blockFocus",
@@ -91,9 +92,17 @@ export const BlockFocusExtension = Extension.create({
       if (found) {
         editor.view.dispatch(tr);
 
-        // Dispatch block-attrs-update back so PropertiesPanel can sync
+        // The dispatch above may cause the block-focus plugin to call clearSelection()
+        // if the editor's current selection is not a NodeSelection (e.g. when the user
+        // is interacting with the Properties Panel in the sidebar). Re-assert the block
+        // selection here so the panel stays pinned to the correct block.
         const updatedNode = findNodeByBlockId(editor, blockId);
         if (updatedNode) {
+          useBlockStore.getState().setSelectedBlock(
+            blockId,
+            updatedNode.attrs.blockType as string,
+            updatedNode.attrs,
+          );
           window.dispatchEvent(
             new CustomEvent("block-attrs-update", {
               detail: { blockId, attrs: updatedNode.attrs },

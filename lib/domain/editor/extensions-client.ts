@@ -59,10 +59,12 @@ import { RatingInput } from "./extensions/blocks/rating-input";
 import { PromptInput } from "./extensions/blocks/prompt-input";
 import { Timestamp } from "./extensions/blocks/timestamp";
 import { DailySummary, WeeklySummary } from "./extensions/blocks/periodic-summary";
-import { HabitTracker } from "./extensions/blocks/habit-tracker";
-import { Stopwatch } from "./extensions/blocks/stopwatch";
 import { ExcalidrawBlock } from "./extensions/blocks/excalidraw-block";
 import { MermaidBlock } from "./extensions/blocks/mermaid-block";
+import { HabitTracker } from "./extensions/blocks/habit-tracker";
+import { Stopwatch } from "./extensions/blocks/stopwatch";
+import { PullQuote } from "./extensions/blocks/pull-quote";
+import { TableOfContents } from "./extensions/blocks/table-of-contents";
 import {
   UnsupportedBlock,
   UnsupportedInline,
@@ -289,10 +291,12 @@ export function getEditorExtensions(options?: EditorExtensionsOptions): Extensio
     Timestamp,
     DailySummary,
     WeeklySummary,
-    HabitTracker,
-    Stopwatch,
     ExcalidrawBlock,
     MermaidBlock,
+    HabitTracker,
+    Stopwatch,
+    PullQuote,
+    TableOfContents,
     UnsupportedBlock,
     UnsupportedInline,
     ...getExtensionClientEditorExtensions(),

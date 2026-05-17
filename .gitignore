@@ -80,3 +80,12 @@ yarn-error.log*
 
 # ── archived apps (not in build) ────────────────────────────────────────────
 archive/
+
+# git worktrees (local-only dev artifact)
+.worktrees/
+
+# Office lock/temp files
+~$*
+
+# memsearch index (local-only Claude Code artifact)
+.memsearch/
