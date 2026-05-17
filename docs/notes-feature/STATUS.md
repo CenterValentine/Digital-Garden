@@ -53,6 +53,15 @@ before planning and executing. There may be additions or modifications.
 
 ## Recent Completions (Last 30 Days)
 
+**May 17, 2026**: Epochs 15 + 17 integrated on branch `feature/observability-and-publishing` (ready for PR)
+- Phase B–H of `epochs/epoch-15-17-integration.md` complete. 31 commits ahead of `origin/main` / 0 behind; clean fast-forward.
+- Merge commit `71e37a0` absorbed `feature/publishing-system` (40 publishing commits — items/paths CRUD, revision lifecycle, scheduled-publish cron, 23 W2-W10 blocks, public renderer, jsdom-backed SSR, theme variables, polish wave). 8 files had conflicts; resolution log in the integration plan.
+- Prisma client regenerated against the merged schema (13 publishing models + workspace + collab + people).
+- Phase F aggressive harmonization (commit `d5678a5`): 13 publishing API routes + media upload + Vercel cron + `components/public/TipTapContent.tsx` SSR renderer + `PublishingViewMode.tsx` client component all brought up to observability standards. Each handler wrapped with `withRouteTrace`, named domain spans opened (e.g. `publishing:publish`, `publishing:sync`, `publishing:scheduled_publish_batch` with per-item child spans), `spanPayload` calls for revision bodies + diff summaries + validation reports + batch summaries. Cron handler uses `attrs.cron_run_id` (= `trace_id`) for correlation with Vercel cron history.
+- Side cleanup surfaced by strict lint: 5 `@next/next/no-html-link-for-pages` `<a>` → `<Link>` migrations across `app/page.tsx`, `app/(authenticated)/settings/api/page.tsx`, `components/settings/storage/UsageTab.tsx`.
+- All gates green at tip: `pnpm typecheck` ✓, `pnpm lint` 159/159 (0 errors, at ratchet), `pnpm collab:schema:check` ✓, `pnpm build` ✓ 132 pages, `pnpm trace:view --list` ✓ (Phase 6 viewer survives merge).
+- Branch is pre-flight for `git push -u origin feature/observability-and-publishing` + `gh pr create`.
+
 **May 17, 2026**: Epoch numbering reconciled + integration plan authored
 - Registered Epochs 14, 15, 16, 17 explicitly in `docs/notes-feature/work-tracking/epochs/`
 - Epoch 14 (Saved Content Workspaces): doc frontmatter corrected from `status: active` (stale) → `status: shipped`. The work shipped via April merge series (`a9c5570 → ... → e7c0beb`); `ContentWorkspace` models + `extensions/workplaces/` + `/api/content/workspaces/*` all on main.

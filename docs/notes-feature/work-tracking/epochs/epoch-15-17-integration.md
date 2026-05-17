@@ -178,15 +178,57 @@ If `pnpm trace:view --list` shows zero traces, that's fine — the dev server ha
 
 ## Conflict resolution log (filled in during execution)
 
-> *Empty at plan-doc-authoring time. Each conflict resolved during Phase D will be appended here with the file, the rule applied, and any non-mechanical judgment notes.*
+### Phase C merge output (`git merge feature/publishing-system` from observability tip)
+
+Auto-merged cleanly: `app/globals.css`, `components/content/blocks/PropertiesPanel.tsx`, `components/content/editor/MarkdownEditor.tsx`, `components/content/headers/RightSidebarHeader.tsx`, `lib/domain/editor/commands/slash-commands.tsx`, `pnpm-lock.yaml`, plus 77 additions from publishing.
+
+### 8 files with content conflicts
+
+| File | Rule applied | Notes |
+|---|---|---|
+| `.gitignore` | Additive merge | Both branches added entries below the existing `archive/` block. Resolution kept publishing's additions: `.worktrees/`, `.codex/`, `~$*` (Office lock files), `.memsearch/`. Observability had no additions in that section. |
+| `package.json` | Per Phase D rule | Kept observability's strict `lint: eslint --max-warnings 159` + Phase-6 `trace:view`/`trace:list` scripts + `build` calls strict `lint`. Kept publishing's new `lint:publishing` scoped script as an advisory tool (does NOT run in build pipeline). Kept publishing's `@types/jsdom` + `jsdom` deps required by `components/public/TipTapContent.tsx`. |
+| `lib/domain/editor/extensions-client.ts` | Drop redundant + union | The HEAD half of both conflict blocks re-imported `ExcalidrawBlock` + `MermaidBlock` — those imports were already 4 lines above (the auto-merge had picked them up from observability AND tried to re-add them from publishing). Resolution: drop the redundant duplicates, keep publishing's genuinely-new `PullQuote` + `TableOfContents`. |
+| `lib/domain/editor/extensions/blocks/excalidraw-block.ts` | Union | Kept HEAD's `consumePendingDiagramCreate` import + the `BlockContentDom` type (used elsewhere in file). Added publishing's `makeWrapAttrs` import. |
+| `lib/domain/editor/extensions/blocks/mermaid-block.ts` | Union | Same pattern as excalidraw-block: kept HEAD's `consumePendingDiagramCreate` + `BlockContentDom`, added publishing's `makeWrapAttrs`. |
+| `lib/domain/editor/commands/slash-commands-menu.tsx` | Took publishing's version wholesale | Publishing's version uses the React-Compiler-approved render-time reset pattern with a `fingerprint` state instead of `useEffect(setSelectedIndex(0), [props.items])` — this *removes* an `eslint-disable-next-line react-hooks/set-state-in-effect` suppression AND adds the `cycleTab` function for the All/Editor/Published tab system. Net warning reduction. |
+| `lib/domain/blocks/node-view-factory.ts` | Kept HEAD's style | Both sides declared the same `HTMLElement & { __cleanup?: () => void }` type, just inline vs. named. Kept HEAD's named `DomWithCleanup` type for consistency with the rest of the file. Functionally equivalent. |
+| `app/page.tsx` | Kept HEAD's dark-mode-aware styling | Publishing's branch pre-dated the dark-mode merge (Epoch 16), so its sign-in button styling was light-only (`bg-gray-100`). Kept HEAD's dark-aware `bg-gold-primary/15 dark:bg-gold-primary/20` styling + the second `Create account` button. Side effect: Phase F.4 had to convert these `<a>` tags to `<Link>` after the strict lint surfaced `@next/next/no-html-link-for-pages` on them. |
+
+### Prisma client regeneration (commit `71e37a0`)
+
+Per Phase D rule: deleted conflict markers in `lib/database/generated/prisma/**`, ran `npx prisma generate` against the merged schema (40 new tables/types combining publishing's 13 new models with the rest), then `git add -u lib/database/generated/` to stage the regenerated tracked files. Net: `lib/database/generated/prisma/*` updated in-place; no manual merge of generated code.
+
+### Phase E gate results
+
+- `pnpm typecheck`: failed initially (`Cannot find module 'jsdom'`) → ran `pnpm install` to install merged `jsdom` + `@types/jsdom` deps → clean.
+- `pnpm collab:schema:check`: passed on first run. All 23 W2-W10 publishing blocks have `Server*` variants properly registered.
+- `pnpm lint`: 9 errors initially:
+  - 4 `no-console` (1 in `app/api/media/upload/route.ts`, 3 in `components/public/TipTapContent.tsx`) — all from publishing's new code. Resolved in Phase F.
+  - 5 `@next/next/no-html-link-for-pages` (3 in `app/page.tsx`, 1 in `app/(authenticated)/settings/api/page.tsx`, 1 in `components/settings/storage/UsageTab.tsx`) — pre-existing `<a>` tags surfaced once strict lint applied to the merged tree. Resolved in Phase F.4 by importing `Link from "next/link"` and converting all 5.
+- Ratchet decision: no bump needed. Final state 159/159 = exactly at the existing `--max-warnings 159` ratchet established in Phase 4.
+
+### Phase F harmonization (commit `d5678a5`)
+
+All 13 publishing routes + media upload + 1 SSR renderer + 1 client component harmonized to Epoch 17 observability standards. Aggressive scope: `withRouteTrace` on every handler, named domain spans, `spanPayload` for bulk data (incoming bodies, responses, published revisions, validation reports, diff summaries). See the commit message for the full per-route table.
+
+Special Vercel-cron handling: `app/api/publishing/scheduled-publish/route.ts` uses `startSpan`/`itemSpan.end()` instead of `withSpan` for per-item child spans because `Promise.allSettled` runs its callbacks in parallel and ALS context doesn't propagate cleanly through that pattern. The batch span is the parent; each per-item child carries the same `trace_id` (the `cron_run_id`) and its own `span_id`. Per-item failures log structured `logger.error` with `payload_type` + `public_item_id` attrs for postmortem analysis.
+
+### Phase G — final smoke test (this commit)
+
+- `pnpm typecheck` ✓
+- `pnpm lint` ✓ (0 errors, 159 warnings — at ratchet)
+- `pnpm collab:schema:check` ✓
+- `pnpm build` ✓ (132 pages)
+- `pnpm trace:view --list` ✓ (Phase 6 viewer still operational post-merge)
 
 ## Gates checklist
 
-- [ ] Phase A — Epoch docs + STATUS registration
-- [ ] Phase B — Integration branch created
-- [ ] Phase C — Merge commit produced (with conflicts)
-- [ ] Phase D — All conflicts resolved per rules above
-- [ ] Phase E — `pnpm typecheck` + `pnpm collab:schema:check` + `pnpm build` green; ratchet decision made
-- [ ] Phase F — All 13 publishing routes harmonized; 1 client-side console retired; deferral list assessed
-- [ ] Phase G — Full gate pass on harmonization commit; smoke test via `pnpm trace:view`
-- [ ] Phase H — `STATUS.md` updated; conflict log filled in; branch ready for push + PR
+- [x] Phase A — Epoch docs + STATUS registration *(commit `7dec100`)*
+- [x] Phase B — Integration branch `feature/observability-and-publishing` created
+- [x] Phase C — Merge commit produced *(commit `71e37a0`)*
+- [x] Phase D — All 8 conflicts resolved per rules above; Prisma client regenerated against merged schema
+- [x] Phase E — `pnpm typecheck` ✓ + `pnpm collab:schema:check` ✓ + `pnpm build` ✓; ratchet decision: no bump (9 errors all resolved in F)
+- [x] Phase F — 13 publishing routes + 1 media route + Vercel cron + 1 SSR renderer + 1 client component harmonized *(commit `d5678a5`)*. ESLint deferral list assessment: `extensions/publishing/**` does NOT need deferral entry — all publishing client code is now console-free.
+- [x] Phase G — Full gate pass on harmonization commit (typecheck/lint/build/collab:schema:check); `pnpm trace:view --list` smoke test confirms Phase 6 viewer survives the merge.
+- [x] Phase H — `STATUS.md` updated with combined entry; conflict log filled in; branch ready for `git push -u origin feature/observability-and-publishing` + `gh pr create`.
