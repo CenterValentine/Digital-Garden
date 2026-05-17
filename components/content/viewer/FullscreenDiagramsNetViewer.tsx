@@ -18,6 +18,7 @@ import type {
   DiagramsNetConfig,
   DiagramsNetData,
 } from "@/lib/domain/visualization/types";
+import { clientLogger } from "@/lib/core/logger/client";
 
 interface FullscreenDiagramsNetViewerProps {
   contentId: string;
@@ -67,7 +68,13 @@ export function FullscreenDiagramsNetViewer({
         throw new Error(result.error?.message || "Failed to save diagram");
       }
     } catch (err) {
-      console.error("[FullscreenDiagramsNetViewer] Save failed:", err);
+      clientLogger.error({
+        layer: "ui",
+        event: "fullscreen_diagramsnet_save:caught",
+        summary: "fullscreen diagrams.net save handler caught",
+        attrs: { content_id: contentId },
+        error: err,
+      });
       throw err;
     }
   };

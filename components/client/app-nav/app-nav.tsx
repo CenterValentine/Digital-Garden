@@ -90,14 +90,9 @@ export default function AppNav({ navigationData }: AppNavProps) {
         branchDepthConfigs={branchDepthConfigs}
         navigationData={navigationData}
         scrollRotation={scrollRotation}
-        onNodeClick={(data) =>
-          console.log(
-            "Clicked branch:",
-            data.branchId,
-            "at",
-            data.yPercent + "%"
-          )
-        }
+        onNodeClick={() => {
+          // Placeholder — wire to router.push when branch routing lands
+        }}
       />
     </div>
   );

@@ -44,14 +44,9 @@ export function PanelLayout({
     // Small delay to ensure Allotment has initialized
     const timer = setTimeout(() => {
       setIsMounted(true);
-      console.log("[PanelLayout] Mounted with widths:", {
-        left: leftSidebarWidth,
-        right: rightSidebarWidth,
-      });
     }, 100);
     return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Only run once on mount
+  }, []);
 
   const glass0 = getSurfaceStyles("glass-0");
 
@@ -62,16 +57,9 @@ export function PanelLayout({
         <Allotment
           onDragEnd={(sizes) => {
             // Only save on drag end, not during initialization
-            if (!isMounted) {
-              console.log("[PanelLayout] Ignoring drag end - not mounted yet");
-              return;
-            }
+            if (!isMounted) return;
 
             if (leftSidebarVisible && sizes[0] !== leftSidebarWidth) {
-              console.log(
-                "[PanelLayout] Saving left width on drag end:",
-                sizes[0]
-              );
               setLeftSidebarWidth(sizes[0]);
             }
           }}
@@ -103,21 +91,12 @@ export function PanelLayout({
               vertical={false}
               onDragEnd={(sizes) => {
                 // Only save on drag end, not during initialization
-                if (!isMounted) {
-                  console.log(
-                    "[PanelLayout] Ignoring right drag end - not mounted yet"
-                  );
-                  return;
-                }
+                if (!isMounted) return;
 
                 if (rightSidebarVisible) {
                   const rightIndex = leftSidebarVisible ? 1 : 0;
                   const newWidth = sizes[rightIndex];
                   if (newWidth !== rightSidebarWidth) {
-                    console.log(
-                      "[PanelLayout] Saving right width on drag end:",
-                      newWidth
-                    );
                     setRightSidebarWidth(newWidth);
                   }
                 }

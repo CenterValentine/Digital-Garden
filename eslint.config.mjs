@@ -39,15 +39,18 @@ const eslintConfig = defineConfig([
       "no-console": "off",
     },
   },
-  // Phase 5 deferrals: client-reachable code that needs the client-safe
-  // logger (lib/core/logger/client.ts, ships in Phase 5 per
-  // FRONTEND-LOG-CHARTER.md). Each file here has its own `console.*` calls
-  // that will migrate to the client logger.
+  // Phase 5 deferrals: client-reachable code that still uses console.*
+  // (will migrate to the client logger in a future pass per
+  // FRONTEND-LOG-CHARTER.md). Each pattern below represents code that has
+  // NOT yet been swept; removing a pattern means the rule is enforced there.
   //
-  // Patterns use broad globs because minimatch doesn't handle Next.js's
-  // parenthesized route groups like `(authenticated)` cleanly. Everything
-  // under app/ except app/api/ is page/component code (client-reachable);
-  // everything under components/, state/, hooks/ is client by convention.
+  // Already swept (rule enforced):
+  //   - components/**/*  (Phase 5.4a–5.4e: ~270+ console.* retired)
+  //   - state/**/*       (Phase 5.4e-1: 6 stores migrated)
+  //   - hooks/**/*       (no console.* found at sweep time)
+  //
+  // Still deferred — patterns are broad because minimatch can't match
+  // Next.js's `(authenticated)` route group parens cleanly.
   {
     files: [
       // Pages and layouts (not API routes — those keep the rule on)
@@ -59,12 +62,6 @@ const eslintConfig = defineConfig([
       "app/**/loading.tsx",
       "app/**/*Client.tsx",
       "app/**/template.tsx",
-      // Components and client-only modules
-      "components/**/*.tsx",
-      "components/**/*.ts",
-      "state/**/*.ts",
-      "hooks/**/*.ts",
-      "hooks/**/*.tsx",
       // Utilities transitively reachable from "use client" boundaries
       "lib/domain/content/tag-sync.ts",
       "lib/domain/content/image-refs.ts",

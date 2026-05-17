@@ -29,6 +29,7 @@ import type { FolderViewProps } from "./FolderViewContainer";
 import { getDisplayExtension } from "@/lib/domain/content/file-extension-utils";
 import { useContentStore } from "@/state/content-store";
 import { buildContentListUrl } from "./content-query";
+import { clientLogger } from "@/lib/core/logger/client";
 
 interface ContentChild {
   id: string;
@@ -149,7 +150,12 @@ export function CanvasView({
       setNodes(newNodes);
       setEdges(newEdges);
     } catch (error) {
-      console.error("[CanvasView] Error loading canvas:", error);
+      clientLogger.error({
+        layer: "ui",
+        event: "canvas_load:caught",
+        summary: "canvas view load failed",
+        error,
+      });
       toast.error("Failed to load canvas view");
     } finally {
       setLoading(false);
@@ -195,7 +201,12 @@ export function CanvasView({
               },
             });
           } catch (error) {
-            console.error("[CanvasView] Failed to save positions:", error);
+            clientLogger.error({
+              layer: "ui",
+              event: "canvas_positions_save:caught",
+              summary: "canvas node positions save failed",
+              error,
+            });
           }
         }, 500);
       }

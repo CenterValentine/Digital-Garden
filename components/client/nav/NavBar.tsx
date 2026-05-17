@@ -7,6 +7,7 @@ import NavBarLogo from "../logo/NavBarLogo";
 import { Button } from "@/components/client/ui/button/Button";
 import type { SessionData } from "@/lib/infrastructure/auth/types";
 import { publishSignedOut } from "@/lib/infrastructure/auth/client-session-events";
+import { clientLogger } from "@/lib/core/logger/client";
 
 export default function NavBar() {
   const router = useRouter();
@@ -36,7 +37,12 @@ export default function NavBar() {
       router.push("/");
       router.refresh();
     } catch (error) {
-      console.error("Sign out error:", error);
+      clientLogger.error({
+        layer: "ui",
+        event: "sign_out:caught",
+        summary: "sign-out handler failed (NavBar)",
+        error,
+      });
     }
   };
 

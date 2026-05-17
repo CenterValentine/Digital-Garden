@@ -34,6 +34,7 @@ import type { FolderViewProps } from "./FolderViewContainer";
 import { getDisplayExtension } from "@/lib/domain/content/file-extension-utils";
 import { useContentStore, type WorkspacePaneId } from "@/state/content-store";
 import { buildContentListUrl } from "./content-query";
+import { clientLogger } from "@/lib/core/logger/client";
 
 interface ContentChild {
   id: string;
@@ -215,7 +216,12 @@ export function KanbanView({
         },
       });
     } catch (error) {
-      console.error("[KanbanView] Failed to save kanban state:", error);
+      clientLogger.error({
+        layer: "ui",
+        event: "kanban_save:caught",
+        summary: "kanban state save failed",
+        error,
+      });
     }
   };
 
@@ -291,7 +297,12 @@ export function KanbanView({
 
       setColumns(newColumns);
     } catch (error) {
-      console.error("[KanbanView] Error loading notes:", error);
+      clientLogger.error({
+        layer: "ui",
+        event: "kanban_load:caught",
+        summary: "kanban load notes failed",
+        error,
+      });
       toast.error("Failed to load kanban board");
     } finally {
       setLoading(false);

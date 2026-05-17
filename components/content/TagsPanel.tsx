@@ -13,6 +13,7 @@ import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useContentStore } from "@/state/content-store";
 import { useEditorStatsStore } from "@/state/editor-stats-store";
+import { clientLogger } from "@/lib/core/logger/client";
 
 interface Tag {
   id: string;
@@ -67,7 +68,12 @@ export function TagsPanel({ contentId }: TagsPanelProps) {
 
         // Handle 404 - content no longer exists (stale localStorage/URL)
         if (response.status === 404) {
-          console.warn(`Content ${contentId} not found (404). Clearing stale selection.`);
+          clientLogger.warn({
+            layer: "ui",
+            event: "tags_panel_content:stale_cleared",
+            summary: "content 404 — clearing stale selection",
+            attrs: { content_id: contentId },
+          });
           toast.error("Note not found. It may have been deleted.");
           clearSelection();
           return;
@@ -81,7 +87,13 @@ export function TagsPanel({ contentId }: TagsPanelProps) {
         setTags(data);
         hasLoadedRef.current = true;
       } catch (err) {
-        console.error("Error fetching tags:", err);
+        clientLogger.error({
+          layer: "ui",
+          event: "tags_panel_fetch:caught",
+          summary: "tags fetch failed (TagsPanel)",
+          attrs: { content_id: contentId },
+          error: err,
+        });
         setError(err instanceof Error ? err.message : "Failed to load tags");
       } finally {
         setIsLoading(false);
@@ -211,8 +223,7 @@ function TagPill({ tag }: TagPillProps) {
  * TODO: This requires access to the editor instance
  * Will be connected when integrating with MarkdownEditor component
  */
-function handleJumpToPosition(offset: number) {
-  console.log("[TagsPanel] Jump to offset:", offset);
+function handleJumpToPosition(_offset: number) {
   // TODO: Implement scroll-to-position in editor
   // This will require exposing editor instance or creating a store
 }

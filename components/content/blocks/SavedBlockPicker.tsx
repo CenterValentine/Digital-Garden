@@ -16,6 +16,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { X, Search, Package } from "lucide-react";
 import { regenerateBlockId } from "@/lib/domain/blocks/schema";
+import { clientLogger } from "@/lib/core/logger/client";
 
 interface SavedBlockItem {
   id: string;
@@ -66,7 +67,12 @@ export function SavedBlockPicker({ onInsert }: SavedBlockPickerProps) {
         setBlocks(data);
       }
     } catch (err) {
-      console.error("Failed to fetch saved blocks:", err);
+      clientLogger.error({
+        layer: "ui",
+        event: "saved_blocks_fetch:caught",
+        summary: "fetch saved blocks failed",
+        error: err,
+      });
     } finally {
       setLoading(false);
     }

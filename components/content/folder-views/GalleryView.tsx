@@ -17,6 +17,7 @@ import { MediaLightbox } from "./MediaLightbox";
 import { Button } from "@/components/ui/glass/button";
 import { getDisplayExtension } from "@/lib/domain/content/file-extension-utils";
 import { buildContentListUrl } from "./content-query";
+import { clientLogger } from "@/lib/core/logger/client";
 
 interface ContentChild {
   id: string;
@@ -71,7 +72,13 @@ export function GalleryView({
               batchUrls[item.id] = result.data.url;
             }
           } catch (error) {
-            console.error(`[GalleryView] Failed to fetch URL for ${item.id}:`, error);
+            clientLogger.error({
+              layer: "ui",
+              event: "gallery_thumbnail_url:caught",
+              summary: "fetch thumbnail download url failed",
+              attrs: { content_id: item.id },
+              error,
+            });
           }
         })
       );
@@ -129,7 +136,12 @@ export function GalleryView({
         fetchDownloadUrls(items);
       }
     } catch (error) {
-      console.error("[GalleryView] Error loading media items:", error);
+      clientLogger.error({
+        layer: "ui",
+        event: "gallery_load:caught",
+        summary: "gallery view load media items failed",
+        error,
+      });
       toast.error("Failed to load media items");
     } finally {
       setLoading(false);

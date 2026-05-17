@@ -24,6 +24,7 @@ import { useOutlineStore } from "@/state/outline-store";
 import type { SuggestionItem } from "../ai/ChatSuggestionMenu";
 import type { UIMessage } from "ai";
 import type { StoredChatMessage } from "@/lib/domain/ai/types";
+import { clientLogger } from "@/lib/core/logger/client";
 
 interface ChatViewerProps {
   contentId: string;
@@ -271,10 +272,21 @@ export function ChatViewer({
       });
 
       if (!res.ok) {
-        console.error("[ChatViewer] Failed to persist messages:", res.status);
+        clientLogger.error({
+          layer: "ui",
+          event: "chat_persist:failed",
+          summary: "chat persist api non-ok",
+          attrs: { content_id: contentId, status: res.status },
+        });
       }
     } catch (err) {
-      console.error("[ChatViewer] Persist error:", err);
+      clientLogger.error({
+        layer: "ui",
+        event: "chat_persist:caught",
+        summary: "chat persist handler caught",
+        attrs: { content_id: contentId },
+        error: err,
+      });
     }
   }, [messages, contentId, metadata, providerId, modelId]);
 

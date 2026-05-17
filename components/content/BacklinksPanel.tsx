@@ -11,6 +11,7 @@ import { useEffect, useState } from "react";
 import { ArrowLeft, ExternalLink, Link2 } from "lucide-react";
 import { toast } from "sonner";
 import { useContentStore } from "@/state/content-store";
+import { clientLogger } from "@/lib/core/logger/client";
 
 interface BacklinkItem {
   id: string;
@@ -123,7 +124,12 @@ export function BacklinksPanel({ contentId }: BacklinksPanelProps) {
         if (isOfflineLikeError(err)) {
           setError("Links are unavailable while offline.");
         } else {
-          console.error("[LinksPanel] Failed to fetch links:", err);
+          clientLogger.error({
+            layer: "ui",
+            event: "links_panel_fetch:caught",
+            summary: "links panel fetch failed",
+            error: err,
+          });
           setError(err instanceof Error ? err.message : "Failed to load links");
         }
       } finally {

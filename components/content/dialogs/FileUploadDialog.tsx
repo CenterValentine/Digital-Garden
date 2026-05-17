@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import { getSurfaceStyles } from "@/lib/design/system";
 import { Upload, Link, Cloud, Folder } from "lucide-react";
 import { useUploadSettingsStore } from "@/state/upload-settings-store";
+import { clientLogger } from "@/lib/core/logger/client";
 
 interface Folder {
   id: string;
@@ -125,7 +126,12 @@ export function FileUploadDialog({
           setFolders(folderItems);
         }
       } catch (error) {
-        console.error('Failed to load folders:', error);
+        clientLogger.error({
+          layer: "ui",
+          event: "upload_dialog_folders_load:caught",
+          summary: "load folder list for upload dialog failed",
+          error,
+        });
       } finally {
         setLoadingFolders(false);
       }
@@ -243,11 +249,15 @@ export function FileUploadDialog({
         )
       );
 
-      console.log("[FileUploadDialog] Upload success:", data);
-
       return data.slug || "";
     } catch (err) {
-      console.error("[FileUploadDialog] Upload error:", err);
+      clientLogger.error({
+        layer: "ui",
+        event: "file_upload:caught",
+        summary: "file upload handler caught",
+        attrs: { file_index: fileIndex },
+        error: err,
+      });
       const errorMessage = err instanceof Error ? err.message : "Upload failed";
 
       // Update status to error

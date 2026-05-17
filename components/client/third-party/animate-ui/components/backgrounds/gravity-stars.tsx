@@ -58,9 +58,8 @@ const cssVarToRgb = (cssVar: string): { r: number; g: number; b: number } => {
         b: parseInt(match[2], 10),
       };
     }
-  } catch (e) {
-    // If anything fails, fallback to gold
-    console.warn("Failed to parse color variable:", e);
+  } catch {
+    // If anything fails, fallback to gold (handled below)
   }
 
   // Fallback to gold color

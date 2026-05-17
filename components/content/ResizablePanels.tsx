@@ -75,7 +75,6 @@ export function ResizablePanels({ children }: ResizablePanelsProps) {
   useEffect(() => {
     const timer = setTimeout(() => {
       setIsMounted(true);
-      console.log("[ResizablePanels] Mounted");
     }, 100);
     return () => clearTimeout(timer);
   }, []);

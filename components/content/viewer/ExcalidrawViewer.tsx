@@ -30,6 +30,7 @@ import { ExcalidrawToolbar } from "./ExcalidrawToolbar";
 import { toast } from "sonner";
 import type { CollaborationRuntimeHandle } from "@/lib/domain/collaboration/runtime";
 import { useResolvedTheme } from "@/lib/features/theme";
+import { clientLogger } from "@/lib/core/logger/client";
 
 // Fields to compare when deciding if an element *meaningfully* changed.
 // Excludes `version` / `versionNonce` / `updated` — those get bumped by
@@ -203,7 +204,13 @@ export function ExcalidrawViewer({
             setLastSaved(new Date());
             setIsModified(false);
           } catch (error: unknown) {
-            console.error("[ExcalidrawViewer] Save failed:", error);
+            clientLogger.error({
+              layer: "ui",
+              event: "excalidraw_save:caught",
+              summary: "excalidraw auto-save failed",
+              attrs: { content_id: contentId },
+              error,
+            });
             toast.error("Failed to save drawing", {
               description: (error instanceof Error ? error.message : null) || "Could not save changes",
             });
@@ -426,7 +433,13 @@ export function ExcalidrawViewer({
       setTimeout(() => URL.revokeObjectURL(url), 100);
       toast.success(`Exported as ${format.toUpperCase()}`);
     } catch (error: unknown) {
-      console.error("[ExcalidrawViewer] Export failed:", error);
+      clientLogger.error({
+        layer: "ui",
+        event: "excalidraw_export:caught",
+        summary: "excalidraw export failed",
+        attrs: { content_id: contentId, format },
+        error,
+      });
       toast.error("Export failed", {
         description: (error instanceof Error ? error.message : null) || `Could not export as ${format.toUpperCase()}`,
       });

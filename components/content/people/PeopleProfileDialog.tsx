@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { X } from "lucide-react";
 import { toast } from "sonner";
+import { clientLogger } from "@/lib/core/logger/client";
 
 interface PeopleProfileDialogProps {
   personId: string;
@@ -145,7 +146,13 @@ export function PeopleProfileDialog({
         if (cancelled) {
           return;
         }
-        console.error("[PeopleProfileDialog] Failed to load person:", fetchError);
+        clientLogger.error({
+          layer: "ui",
+          event: "person_profile_load:caught",
+          summary: "person profile load failed",
+          attrs: { person_id: personId },
+          error: fetchError,
+        });
         setError(fetchError instanceof Error ? fetchError.message : "Failed to load person profile");
       } finally {
         if (!cancelled) {
@@ -225,7 +232,13 @@ export function PeopleProfileDialog({
       onUpdated();
       onClose();
     } catch (saveError) {
-      console.error("[PeopleProfileDialog] Failed to update person:", saveError);
+      clientLogger.error({
+        layer: "ui",
+        event: "person_profile_update:caught",
+        summary: "person profile update failed",
+        attrs: { person_id: personId },
+        error: saveError,
+      });
       toast.error("Failed to update contact", {
         description: saveError instanceof Error ? saveError.message : "Unknown error",
       });

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { X } from "lucide-react";
 import { toast } from "sonner";
+import { clientLogger } from "@/lib/core/logger/client";
 
 interface PeopleCreateDialogProps {
   mode: "person" | "group";
@@ -106,7 +107,13 @@ export function PeopleCreateDialog({
       onCreated();
       onClose();
     } catch (err) {
-      console.error("[PeopleCreateDialog] Create failed:", err);
+      clientLogger.error({
+        layer: "ui",
+        event: "people_create:caught",
+        summary: "people create dialog submit failed",
+        attrs: { mode },
+        error: err,
+      });
       toast.error(isPerson ? "Failed to create person" : "Failed to create group", {
         description: err instanceof Error ? err.message : "Unknown error",
       });

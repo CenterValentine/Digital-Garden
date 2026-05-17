@@ -15,6 +15,7 @@ import type { FolderViewProps } from "./FolderViewContainer";
 import { useContentStore } from "@/state/content-store";
 import { getDisplayExtension } from "@/lib/domain/content/file-extension-utils";
 import { buildContentListUrl } from "./content-query";
+import { clientLogger } from "@/lib/core/logger/client";
 
 interface ContentChild {
   id: string;
@@ -77,7 +78,12 @@ export function ListView({
 
       setChildren(items);
     } catch (error) {
-      console.error("[ListView] Error loading children:", error);
+      clientLogger.error({
+        layer: "ui",
+        event: "list_view_load:caught",
+        summary: "list view load children failed",
+        error,
+      });
       toast.error("Failed to load folder contents");
     } finally {
       setLoading(false);

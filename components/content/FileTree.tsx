@@ -18,6 +18,7 @@ import { useRef, useEffect, useMemo, useState, useCallback } from "react";
 import { Tree, type NodeApi, type TreeApi, type NodeRendererProps } from "react-arborist";
 import { FileNode } from "./FileNode";
 import { useTreeStateStore } from "@/state/tree-state-store";
+import { clientLogger } from "@/lib/core/logger/client";
 import type { TreeNode } from "@/lib/domain/content/types";
 
 interface FileTreeProps {
@@ -138,7 +139,6 @@ export function FileTree({
 
     // If any IDs were removed, update the store
     if (validIds.length !== selectedIds.length) {
-      console.log(`[FileTree] Cleaned stale selection IDs: ${selectedIds.length - validIds.length} removed`);
       setSelectedIds(validIds);
       return; // Will re-run with cleaned IDs
     }
@@ -156,8 +156,6 @@ export function FileTree({
       );
 
       if (nodesToSelect.length > 0) {
-        console.log(`[FileTree] Restoring selection for ${nodesToSelect.length} node(s)`, validIds);
-
         // Select each node using the node's select method
         nodesToSelect.forEach((node: NodeApi<TreeNode>, index: number) => {
           if (node && node.select) {
@@ -199,8 +197,6 @@ export function FileTree({
       selectedIds.some(id => !currentlySelectedSet.has(id));
 
     if (!hasChanged) return;
-
-    console.log('[FileTree] External selection change detected:', selectedIds);
 
     // Find nodes to select
     const nodesToSelect = tree.visibleNodes.filter((node: NodeApi<TreeNode>) =>
@@ -287,7 +283,12 @@ export function FileTree({
       try {
         await onMove(args);
       } catch (error) {
-        console.error("Failed to move node:", error);
+        clientLogger.error({
+          layer: "ui",
+          event: "filetree_move:caught",
+          summary: "filetree move handler caught",
+          error,
+        });
       }
     }
   };

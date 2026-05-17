@@ -17,6 +17,7 @@ import type {
   ExcalidrawData,
 } from "@/lib/domain/visualization/types";
 import type { CollaborationRuntimeHandle } from "@/lib/domain/collaboration/runtime";
+import { clientLogger } from "@/lib/core/logger/client";
 
 // Dynamically import viewer components to avoid loading until needed
 // This prevents Excalidraw's heavy CSS from blocking /content route compilation
@@ -81,9 +82,14 @@ export function VisualizationViewer({
         throw new Error(result.error?.message || "Failed to save visualization");
       }
 
-      console.log("[VisualizationViewer] Saved successfully");
     } catch (err) {
-      console.error("[VisualizationViewer] Save failed:", err);
+      clientLogger.error({
+        layer: "ui",
+        event: "visualization_save:caught",
+        summary: "visualization save handler caught",
+        attrs: { content_id: contentId },
+        error: err,
+      });
       throw err;
     }
   };

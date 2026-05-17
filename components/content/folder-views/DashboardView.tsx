@@ -18,6 +18,7 @@ import type { FolderViewProps } from "./FolderViewContainer";
 import { getDisplayExtension } from "@/lib/domain/content/file-extension-utils";
 import { useContentStore } from "@/state/content-store";
 import { buildContentListUrl } from "./content-query";
+import { clientLogger } from "@/lib/core/logger/client";
 
 interface ContentChild {
   id: string;
@@ -88,7 +89,12 @@ export function DashboardView({
       // Allow onLayoutChange saves only AFTER initialization settles
       setTimeout(() => { isLayoutInitializedRef.current = true; }, 300);
     } catch (error) {
-      console.error("[DashboardView] Error loading items:", error);
+      clientLogger.error({
+        layer: "ui",
+        event: "dashboard_load:caught",
+        summary: "dashboard view load items failed",
+        error,
+      });
       toast.error("Failed to load dashboard");
     } finally {
       setLoading(false);
@@ -111,7 +117,12 @@ export function DashboardView({
           },
         });
       } catch (error) {
-        console.error("[DashboardView] Failed to save layout:", error);
+        clientLogger.error({
+          layer: "ui",
+          event: "dashboard_layout_save:caught",
+          summary: "dashboard layout save failed",
+          error,
+        });
       }
     }, 500);
   };
