@@ -53,7 +53,15 @@ before planning and executing. There may be additions or modifications.
 
 ## Recent Completions (Last 30 Days)
 
-**May 17, 2026**: Observability cleanup — COMPLETE (worktree `observability-cleanup`, 27 commits ahead of `origin/main`)
+**May 17, 2026**: Epoch numbering reconciled + integration plan authored
+- Registered Epochs 14, 15, 16, 17 explicitly in `docs/notes-feature/work-tracking/epochs/`
+- Epoch 14 (Saved Content Workspaces): doc frontmatter corrected from `status: active` (stale) → `status: shipped`. The work shipped via April merge series (`a9c5570 → ... → e7c0beb`); `ContentWorkspace` models + `extensions/workplaces/` + `/api/content/workspaces/*` all on main.
+- Epoch 16 (Dark Mode): `feature-dark-mode.md` → `epoch-16-dark-mode.md` (git mv, history preserved); frontmatter updated with `status: shipped`, shipped_at `2026-05-13`, shipped_via PR #37.
+- Epoch 15 (Publishing): new wrapper at `epochs/epoch-15-publishing.md`. Branch `feature/publishing-system` is 40 ahead / 22 behind `origin/main`; integration plan authored.
+- Epoch 17 (Observability): new wrapper at `epochs/epoch-17-observability.md` pointing at the detailed `OBSERVABILITY-CLEANUP-PLAN.md`.
+- Integration plan: `epochs/epoch-15-17-integration.md` — Phases A–H for merging publishing into observability and harmonizing publishing's 12 API routes + 1 media route + cron handler to the observability standards. Integration branch will be `feature/observability-and-publishing`. Phase F is **aggressive**: spans + `spanPayload` for every route.
+
+**May 17, 2026**: Epoch 17 — Observability Cleanup — COMPLETE in branch (worktree `observability-cleanup`, 28 commits ahead of `origin/main`)
 - Phases 0–5 produced a complete three-layer observability system: structured logs (closed-set `Layer` + `Marker` enums, scalar-only `Attrs`), span traces with end-of-trace summary blocks, and per-trace payload sidecars under `.local/debug-payloads/`
 - Server-side console retirement: ~80+ API routes wrapped with `withRouteTrace`, Prisma `emit: 'event'` bridge silences raw `prisma:query` stdout, every `console.*` outside the logger module is now an ESLint error
 - Client-side console retirement: ~60 files, ~300 call sites across `components/`, `state/`, `hooks/`. Triage pattern: delete debug breadcrumbs covered by the trace, escalate state corrections to `clientLogger.warn`, real failures to `clientLogger.error` with scalar attrs
