@@ -8,6 +8,7 @@
 "use client";
 
 import { ExcalidrawViewer } from "./ExcalidrawViewer";
+import { clientLogger } from "@/lib/core/logger/client";
 import type { ExcalidrawData } from "@/lib/domain/visualization/types";
 
 interface FullscreenExcalidrawViewerProps {
@@ -35,8 +36,6 @@ export function FullscreenExcalidrawViewer({
   const handleSave = async (updatedData: Record<string, unknown>) => {
     if (isReadOnly) return;
     try {
-      console.log("[FullscreenExcalidrawViewer] Saving data:", updatedData);
-
       const response = await fetch(`/api/content/content/${contentId}`, {
         method: "PATCH",
         credentials: "include",
@@ -51,13 +50,25 @@ export function FullscreenExcalidrawViewer({
       const result = await response.json();
 
       if (!response.ok || !result.success) {
-        console.error("[FullscreenExcalidrawViewer] Save error response:", result);
+        clientLogger.error({
+          layer: "ui",
+          event: "fullscreen_excalidraw_save:failed",
+          summary: "fullscreen excalidraw save api rejected",
+          attrs: {
+            content_id: contentId,
+            error_code: result.error?.code ?? "unknown",
+          },
+        });
         throw new Error(result.error?.message || "Failed to save drawing");
       }
-
-      console.log("[FullscreenExcalidrawViewer] Saved successfully");
     } catch (err) {
-      console.error("[FullscreenExcalidrawViewer] Save failed:", err);
+      clientLogger.error({
+        layer: "ui",
+        event: "fullscreen_excalidraw_save:caught",
+        summary: "fullscreen excalidraw save handler caught",
+        attrs: { content_id: contentId },
+        error: err,
+      });
       throw err;
     }
   };

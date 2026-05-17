@@ -29,6 +29,7 @@ import { DiagramsNetToolbar } from "./DiagramsNetToolbar";
 import type { DiagramsNetConfig, DiagramsNetData, DiagramsNetTheme } from "@/lib/domain/visualization/types";
 import type { CollaborationRuntimeHandle } from "@/lib/domain/collaboration/runtime";
 import { useResolvedTheme } from "@/lib/features/theme";
+import { clientLogger } from "@/lib/core/logger/client";
 
 // Transaction origin tag for local edits — lets the Y.js observer skip its own writes.
 const LOCAL_ORIGIN = "diagramsnet-local";
@@ -106,7 +107,13 @@ export function DiagramsNetViewer({
         setLastSaved(new Date());
         setIsModified(false);
       } catch (error: unknown) {
-        console.error("Diagrams.net save failed:", error);
+        clientLogger.error({
+          layer: "ui",
+          event: "diagramsnet_save:caught",
+          summary: "diagrams.net auto-save failed",
+          attrs: { content_id: contentId },
+          error,
+        });
         toast.error("Failed to save diagram", {
           description: (error instanceof Error ? error.message : null) || "Could not save changes to database",
         });
@@ -161,32 +168,27 @@ export function DiagramsNetViewer({
     if (!ydoc) return;
 
     const ydocDiagram = ydoc.getMap<string>("diagram");
-    const dbg = () => (window as Window & { __dg_debug?: boolean }).__dg_debug;
 
     // Seed from Y.js if the shared doc already has content, otherwise seed
     // Y.js from the database snapshot so latecomers see the latest state.
     const existing = ydocDiagram.get("xml") ?? "";
     if (existing.length > 0) {
       if (existing !== xmlRef.current) {
-        if (dbg()) console.log("[dg/diagrams-net] seed from ydoc, len=", existing.length);
         xmlRef.current = existing;
         setXml(existing);
         editorRef.current?.loadXml(existing);
       }
     } else if (data.xml && data.xml.length > 0) {
-      if (dbg()) console.log("[dg/diagrams-net] seed ydoc from db, len=", data.xml.length);
       ydoc.transact(() => {
         ydocDiagram.set("xml", data.xml!);
       }, LOCAL_ORIGIN);
     }
 
     const handleRemoteChange = (_event: unknown, transaction: { origin: unknown }) => {
-      if (dbg()) console.log("[dg/diagrams-net] observer — origin=", transaction.origin);
       // Skip echo — this transaction was created by our own handleChange call.
       if (transaction.origin === LOCAL_ORIGIN) return;
       const remoteXml = ydocDiagram.get("xml") ?? "";
       if (remoteXml !== xmlRef.current) {
-        if (dbg()) console.log("[dg/diagrams-net] applying remote xml, len=", remoteXml.length);
         xmlRef.current = remoteXml;
         setXml(remoteXml);
         editorRef.current?.loadXml(remoteXml);
@@ -201,8 +203,6 @@ export function DiagramsNetViewer({
   // Stable identity so DiagramsNetEditor's [onChange]-dep useEffect doesn't
   // re-register its message listener on every render.
   const handleChange = useCallback((newXml: string) => {
-    const dbg = () => (window as Window & { __dg_debug?: boolean }).__dg_debug;
-    if (dbg()) console.log("[dg/diagrams-net] local change, len=", newXml.length);
     xmlRef.current = newXml;
     setXml(newXml);
     setIsModified(true);
@@ -275,7 +275,13 @@ export function DiagramsNetViewer({
       setTimeout(() => URL.revokeObjectURL(url), 100);
       toast.success(`Exported as ${format.toUpperCase()}`);
     } catch (error: unknown) {
-      console.error("Export failed:", error);
+      clientLogger.error({
+        layer: "ui",
+        event: "diagramsnet_export:caught",
+        summary: "diagrams.net export failed",
+        attrs: { content_id: contentId, format },
+        error,
+      });
       toast.error("Export failed", {
         description: (error instanceof Error ? error.message : null) || `Could not export as ${format.toUpperCase()}`,
       });

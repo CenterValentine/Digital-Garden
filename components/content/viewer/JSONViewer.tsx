@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/glass/button";
 import { toast } from "sonner";
 import { useEditorStatsStore } from "@/state/editor-stats-store";
 import { ToolBelt, getJSONToolBeltConfig } from "@/components/content/tool-belt";
+import { clientLogger } from "@/lib/core/logger/client";
 
 interface JSONViewerProps {
   fileName: string;
@@ -67,7 +68,13 @@ export function JSONViewer({
           setOriginalContent(text);
         }
       } catch (err) {
-        console.error("[JSONViewer] Failed to load JSON:", err);
+        clientLogger.error({
+          layer: "ui",
+          event: "json_load:failed",
+          summary: "json file load failed",
+          attrs: { content_id: contentId },
+          error: err,
+        });
         setError(err instanceof Error ? err.message : "Failed to load JSON");
       } finally {
         setIsLoading(false);
@@ -130,7 +137,6 @@ export function JSONViewer({
   const handleContentChange = (newContent: string) => {
     setEditorContent(newContent);
     const hasChanges = newContent !== originalContent;
-    console.log("[JSONViewer] Content changed:", { hasChanges, newLength: newContent.length, originalLength: originalContent.length });
     setHasUnsavedChanges(hasChanges);
     setGlobalUnsavedChanges(hasChanges);
   };
@@ -173,7 +179,13 @@ export function JSONViewer({
       setGlobalUnsavedChanges(false);
       toast.success("Saved successfully");
     } catch (err) {
-      console.error("[JSONViewer] Failed to save:", err);
+      clientLogger.error({
+        layer: "ui",
+        event: "json_save:caught",
+        summary: "json save handler caught",
+        attrs: { content_id: contentId },
+        error: err,
+      });
       toast.error("Failed to save", {
         description: err instanceof Error ? err.message : "Unknown error",
       });

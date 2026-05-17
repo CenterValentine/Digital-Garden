@@ -19,6 +19,7 @@ import { useState, useEffect } from "react";
 import { AlertCircle, Download, ExternalLink, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/glass/button";
 import { toast } from "sonner";
+import { clientLogger } from "@/lib/core/logger/client";
 
 interface GoogleDriveEditorProps {
   contentId: string;
@@ -95,7 +96,6 @@ export function GoogleDriveEditor({
     // CRITICAL: Only upload Office documents to Google Drive
     // Markdown, text files, and other file types should NOT be uploaded
     if (!isGoogleDriveSupportedType) {
-      console.log("[GoogleDriveEditor] File type not supported by Google Drive:", mimeType);
       setError("This file type is not supported by Google Docs");
       setIsUploading(false);
       return;
@@ -131,7 +131,6 @@ export function GoogleDriveEditor({
         const existingFileId = storageMetadata?.externalProviders?.googleDrive?.fileId;
 
         if (existingFileId) {
-          console.log("[GoogleDriveEditor] Reusing existing Google Drive file:", existingFileId);
           setGoogleFileId(existingFileId);
           setIsUploading(false);
           return;
@@ -162,7 +161,13 @@ export function GoogleDriveEditor({
         const isExpectedError = errorMessage.includes("authentication") || errorMessage.includes("permission");
 
         if (!isExpectedError) {
-          console.error("[GoogleDriveEditor] Upload failed:", err);
+          clientLogger.error({
+            layer: "ui",
+            event: "gdrive_upload:caught",
+            summary: "google drive upload failed",
+            attrs: { content_id: contentId, mime_type: mimeType },
+            error: err,
+          });
         }
 
         setError(errorMessage);
@@ -197,10 +202,15 @@ export function GoogleDriveEditor({
             // The server-side getValidGoogleAccessToken() will auto-refresh
             await fetch("/api/auth/provider");
             setLastTokenRefresh(Date.now());
-            console.log("[GoogleDriveEditor] Token refreshed on tab activation");
           } catch (err) {
             // Silent failure - token refresh will happen on next API call anyway
-            console.warn("[GoogleDriveEditor] Token refresh failed:", err);
+            clientLogger.warn({
+              layer: "ui",
+              event: "gdrive_token_refresh:failed",
+              summary: "google token refresh on tab activation failed",
+              attrs: { content_id: contentId },
+              error: err,
+            });
           }
         }
       }
@@ -331,7 +341,13 @@ export function GoogleDriveEditor({
         toast.error("Failed to clear metadata. Please try again.");
       }
     } catch (err) {
-      console.error("[GoogleDriveEditor] Failed to clear metadata:", err);
+      clientLogger.error({
+        layer: "ui",
+        event: "gdrive_clear_metadata:caught",
+        summary: "google drive clear-metadata handler caught",
+        attrs: { content_id: contentId },
+        error: err,
+      });
       toast.error("Failed to clear metadata. Please try again.");
     }
   };

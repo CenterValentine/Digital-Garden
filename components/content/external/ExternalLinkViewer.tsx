@@ -11,6 +11,7 @@ import { useState, useEffect } from "react";
 import { ExternalLink, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { getSurfaceStyles } from "@/lib/design/system";
+import { clientLogger } from "@/lib/core/logger/client";
 
 interface ExternalLinkViewerProps {
   contentId: string;
@@ -76,7 +77,6 @@ export function ExternalLinkViewer({
 
   // Reset preview when URL changes (e.g., after editing)
   useEffect(() => {
-    console.log("[ExternalLinkViewer] URL changed, resetting preview:", url);
     setPreviewData(preview.cached || null);
     setPreviewError(null);
   }, [url, preview.cached]);
@@ -86,8 +86,6 @@ export function ExternalLinkViewer({
       setIsRefreshing(true);
       setPreviewError(null);
 
-      console.log("[ExternalLinkViewer] Fetching preview for URL:", url);
-
       const response = await fetch("/api/content/external/preview", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -96,21 +94,20 @@ export function ExternalLinkViewer({
 
       const result = await response.json();
 
-      console.log("[ExternalLinkViewer] API response:", {
-        status: response.status,
-        ok: response.ok,
-        result,
-      });
-
       if (!response.ok || !result.success) {
         const errorCode = result.error?.code || "UNKNOWN_ERROR";
         const errorMessage = result.error?.message || "Failed to fetch preview";
         const fullError = `${errorMessage} (${errorCode})`;
 
-        console.error("[ExternalLinkViewer] Preview fetch failed:", {
-          errorCode,
-          errorMessage,
-          fullError: result.error,
+        clientLogger.error({
+          layer: "ui",
+          event: "external_preview_fetch:failed",
+          summary: "external preview api rejected",
+          attrs: {
+            content_id: contentId,
+            status: response.status,
+            error_code: errorCode,
+          },
         });
 
         setPreviewError(fullError);
@@ -118,13 +115,18 @@ export function ExternalLinkViewer({
         return;
       }
 
-      console.log("[ExternalLinkViewer] Preview data received:", result.data.metadata);
       setPreviewData(result.data.metadata);
       toast.success("Preview refreshed");
     } catch (err) {
       const errorMessage =
         err instanceof Error ? err.message : "Failed to fetch preview";
-      console.error("[ExternalLinkViewer] Preview fetch error:", err);
+      clientLogger.error({
+        layer: "ui",
+        event: "external_preview_fetch:caught",
+        summary: "external preview handler caught",
+        attrs: { content_id: contentId },
+        error: err,
+      });
       setPreviewError(errorMessage);
       toast.error(errorMessage);
     } finally {

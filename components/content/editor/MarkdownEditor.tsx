@@ -23,6 +23,7 @@ import { SnippetPicker } from "./SnippetPicker";
 import { TableBubbleMenu } from "./TableBubbleMenu";
 import { ImageBubbleMenu } from "./ImageBubbleMenu";
 import { extractOutline, type OutlineHeading } from "@/lib/domain/content/outline-extractor";
+import { clientLogger } from "@/lib/core/logger/client";
 import { uploadImage } from "@/lib/domain/editor/hooks/use-image-upload";
 import { isImageUrl } from "@/lib/domain/editor/utils/image-url";
 import { useEditorInstanceStore } from "@/state/editor-instance-store";
@@ -507,7 +508,13 @@ export function MarkdownEditor({
             await snapshotSave(json);
             setHasUnsavedChanges(false);
           } catch (error) {
-            console.error("Failed to save:", error);
+            clientLogger.error({
+              layer: "editor",
+              event: "markdown_autosave:caught",
+              summary: "tiptap autosave failed",
+              attrs: { content_id: contentId ?? "unknown" },
+              error,
+            });
             lastSavedContentRef.current = null;
             // Keep hasUnsavedChanges=true on error
           } finally {
@@ -801,7 +808,13 @@ export function MarkdownEditor({
           })
         );
       } catch (err: unknown) {
-        console.error("[MarkdownEditor] embed-diagram-create failed:", err);
+        clientLogger.error({
+          layer: "editor",
+          event: "embed_diagram_create:caught",
+          summary: "embed-diagram-create event handler failed",
+          attrs: { content_id: contentId ?? "unknown" },
+          error: err,
+        });
         toast.error("Failed to create diagram", {
           description: (err instanceof Error ? err.message : null) || "Could not create visualization",
         });
@@ -875,7 +888,13 @@ export function MarkdownEditor({
         }).run();
         toast.dismiss(toastId);
       } catch (err: unknown) {
-        console.error("[MarkdownEditor] create-diagram-block failed:", err);
+        clientLogger.error({
+          layer: "editor",
+          event: "create_diagram_block:caught",
+          summary: "create-diagram-block event handler failed",
+          attrs: { content_id: contentId ?? "unknown" },
+          error: err,
+        });
         toast.dismiss(toastId);
         toast.error("Failed to create diagram", {
           description: (err instanceof Error ? err.message : null) || "Could not create visualization",
@@ -1114,7 +1133,13 @@ export function MarkdownEditor({
                   .run();
               }
             } catch (err) {
-              console.error("[AI Image Drop] Error:", err);
+              clientLogger.error({
+                layer: "editor",
+                event: "ai_image_drop:caught",
+                summary: "ai image drop handler failed",
+                attrs: { content_id: contentId ?? "unknown" },
+                error: err,
+              });
             }
             return;
           }
