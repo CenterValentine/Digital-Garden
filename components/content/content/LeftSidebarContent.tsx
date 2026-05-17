@@ -25,6 +25,7 @@ import { useWorkspaceStore } from "@/extensions/workplaces/state/workspace-store
 import { useContextMenuStore } from "@/state/context-menu-store";
 import { usePageTemplateStore } from "@/state/page-template-store";
 import type { TreeNode, ContentType } from "@/lib/domain/content/types";
+import { clientLogger } from "@/lib/core/logger/client";
 
 interface TreeApiResponse {
   success: boolean;
@@ -284,7 +285,13 @@ export function LeftSidebarContent({
 
       setTreeData(result.data.tree);
     } catch (err) {
-      console.error("Failed to fetch tree:", err);
+      clientLogger.error({
+        layer: "ui",
+        event: "tree_fetch:failed",
+        summary: "left sidebar tree fetch failed",
+        attrs: { workspace_id: activeWorkspaceId ?? "none" },
+        error: err,
+      });
       setError(err instanceof Error ? err.message : "Failed to load file tree");
     } finally {
       setIsLoading(false);
@@ -304,7 +311,12 @@ export function LeftSidebarContent({
         const data = await response.json();
         setHasGoogleAuth(data.success && data.data.hasGoogleAuth);
       } catch (err) {
-        console.error("[LeftSidebar] Failed to check Google auth:", err);
+        clientLogger.error({
+          layer: "ui",
+          event: "google_auth_check:failed",
+          summary: "google auth probe failed",
+          error: err,
+        });
         setHasGoogleAuth(false);
       }
     }
@@ -423,7 +435,12 @@ export function LeftSidebarContent({
           editingId: id,
         });
       } catch (err) {
-        console.error("[LeftSidebarContent] Failed to load external link:", err);
+        clientLogger.error({
+          layer: "ui",
+          event: "external_link_load:failed",
+          summary: "external link load failed (edit dialog)",
+          error: err,
+        });
         toast.error("Failed to load external link", {
           description: err instanceof Error ? err.message : "Unknown error",
         });
@@ -648,16 +665,7 @@ export function LeftSidebarContent({
     const isSamePosition = isSameParent && (currentIndex === index || currentIndex === index - 1);
     const draggedNode = findTreeNode(originalTree, dragIds[0]);
 
-    // Debug logging
-    console.log('[handleMove] Drag analysis:', {
-      draggedItem: dragIds[0],
-      from: { parent: currentParentId || 'ROOT', index: currentIndex },
-      to: { parent: parentId || 'ROOT', index },
-      isSamePosition,
-    });
-
     if (isSamePosition) {
-      console.log('[handleMove] No position change detected, skipping API call');
       return; // Skip the move - item is being dropped in same position
     }
 
@@ -698,12 +706,6 @@ export function LeftSidebarContent({
         apiIndex = index - 1; // Adjust for removal shifting items left
       }
 
-      console.log('[handleMove] Sending to API:', {
-        contentId: dragIds[0],
-        targetParentId: parentId || 'ROOT',
-        newDisplayOrder: apiIndex,
-      });
-
       const response = isPeopleTreeNode(draggedNode)
         ? await fetch("/api/people/mounts", {
             method: "POST",
@@ -734,7 +736,16 @@ export function LeftSidebarContent({
       const result = await response.json();
 
       if (!response.ok || !result.success) {
-        console.error("Move failed:", result.error);
+        clientLogger.error({
+          layer: "ui",
+          event: "tree_move:failed",
+          summary: "tree move api rejected",
+          attrs: {
+            content_id: dragIds[0],
+            target_parent_id: parentId ?? "root",
+            error_code: result.error?.code ?? "unknown",
+          },
+        });
         // Rollback to original tree state
         setTreeData(originalTree);
         toast.error("Failed to move item", {
@@ -743,14 +754,18 @@ export function LeftSidebarContent({
         throw new Error(result.error?.message || "Failed to move content");
       }
 
-      // Success! Optimistic update is complete, no refetch needed
-      console.log("Move successful, optimistic update complete");
       if (isPeopleTreeNode(draggedNode)) {
         window.dispatchEvent(new CustomEvent("dg:tree-refresh"));
         window.dispatchEvent(new CustomEvent("dg:people-refresh"));
       }
     } catch (err) {
-      console.error("Failed to move node:", err);
+      clientLogger.error({
+        layer: "ui",
+        event: "tree_move:caught",
+        summary: "tree move handler caught",
+        attrs: { content_id: dragIds[0] ?? "unknown" },
+        error: err,
+      });
       // Rollback to original tree state on any error
       setTreeData(originalTree);
 
@@ -793,7 +808,6 @@ export function LeftSidebarContent({
     // Open content in main panel - use first selected
     const firstNode = nodes[0];
     if (firstNode) {
-      console.log("Selected node:", firstNode);
       if (firstNode.treeNodeKind === "person") {
         setSelectedContentId(firstNode.id, {
           title: firstNode.title,
@@ -836,7 +850,15 @@ export function LeftSidebarContent({
         const result = await response.json();
 
         if (!response.ok || !result.success) {
-          console.error("Update external link failed:", result.error);
+          clientLogger.error({
+            layer: "ui",
+            event: "external_link_update:failed",
+            summary: "external link update api rejected",
+            attrs: {
+              content_id: externalLinkDialog.editingId ?? "unknown",
+              error_code: result.error?.code ?? "unknown",
+            },
+          });
           setErrorDialog({
             title: "Failed to update external link",
             message: result.error?.message || "Unknown error occurred. Please try again.",
@@ -895,7 +917,12 @@ export function LeftSidebarContent({
         const result = await response.json();
 
         if (!response.ok || !result.success) {
-          console.error("Create external link failed:", result.error);
+          clientLogger.error({
+            layer: "ui",
+            event: "external_link_create:failed",
+            summary: "external link create api rejected",
+            attrs: { error_code: result.error?.code ?? "unknown" },
+          });
           setErrorDialog({
             title: "Failed to create external link",
             message: result.error?.message || "Unknown error occurred. Please try again.",
@@ -912,7 +939,13 @@ export function LeftSidebarContent({
         toast.success(`Created external link "${data.name}"`);
       }
     } catch (err) {
-      console.error("Failed to save external link:", err);
+      clientLogger.error({
+        layer: "ui",
+        event: "external_link_save:caught",
+        summary: "external link save handler caught",
+        attrs: { mode: externalLinkDialog.mode },
+        error: err,
+      });
       setErrorDialog({
         title: `Failed to ${externalLinkDialog.mode === "edit" ? "update" : "create"} external link`,
         message: "An unexpected error occurred. Please try again.",
@@ -1066,7 +1099,15 @@ export function LeftSidebarContent({
         const result = await response.json();
 
         if (!response.ok || !result.success) {
-          console.error("Create document failed:", result.error);
+          clientLogger.error({
+            layer: "ui",
+            event: "create_document:failed",
+            summary: "create-document api rejected",
+            attrs: {
+              file_type: config.fileType ?? "unknown",
+              error_code: result.error?.code ?? "unknown",
+            },
+          });
 
           // Remove temp node on error
           if (treeData) {
@@ -1099,7 +1140,6 @@ export function LeftSidebarContent({
           temporary: false,
           pin: true,
         });
-        console.log(`[LeftSidebarContent] ${type.toUpperCase()} created:`, result.data.id);
         return;
       }
 
@@ -1138,7 +1178,15 @@ export function LeftSidebarContent({
       const result = await response.json();
 
       if (!response.ok || !result.success) {
-        console.error("Create failed:", result.error);
+        clientLogger.error({
+          layer: "ui",
+          event: "content_create:failed",
+          summary: "content create api rejected",
+          attrs: {
+            content_type: type,
+            error_code: result.error?.code ?? "unknown",
+          },
+        });
 
         // Remove temp node on error
         if (treeData) {
@@ -1244,7 +1292,13 @@ export function LeftSidebarContent({
         await fetchTree();
       }
     } catch (err) {
-      console.error("Failed to create item:", err);
+      clientLogger.error({
+        layer: "ui",
+        event: "content_create:caught",
+        summary: "content create handler caught",
+        attrs: { content_type: type },
+        error: err,
+      });
 
       // Clear pending visualization engine on error
       pendingVisualizationEngine.current = null;
@@ -1358,7 +1412,15 @@ export function LeftSidebarContent({
       const result = await response.json();
 
       if (!response.ok || !result.success) {
-        console.error("Rename failed:", result.error);
+        clientLogger.error({
+          layer: "ui",
+          event: "content_rename:failed",
+          summary: "content rename api rejected",
+          attrs: {
+            content_id: id,
+            error_code: result.error?.code ?? "unknown",
+          },
+        });
         // Rollback to original tree data on failure
         setTreeData(originalTreeData);
         setErrorDialog({
@@ -1379,7 +1441,13 @@ export function LeftSidebarContent({
       // Optionally refresh to sync with server (slug, updatedAt, etc.)
       // For now, skip refresh to keep it snappy
     } catch (err) {
-      console.error("Failed to rename:", err);
+      clientLogger.error({
+        layer: "ui",
+        event: "content_rename:caught",
+        summary: "content rename handler caught",
+        attrs: { content_id: id },
+        error: err,
+      });
       // Rollback to original tree data on error
       setTreeData(originalTreeData);
       setErrorDialog({
@@ -1507,7 +1575,12 @@ export function LeftSidebarContent({
         const results = await Promise.all(metadataChecks);
         hasGoogleDriveFiles = results.some(hasGoogleDrive => hasGoogleDrive);
       } catch (err) {
-        console.error("[Delete] Failed to check Google Drive metadata:", err);
+        clientLogger.error({
+          layer: "ui",
+          event: "delete_gdrive_probe:caught",
+          summary: "google drive metadata probe failed (pre-confirm)",
+          error: err,
+        });
         hasGoogleDriveFiles = false;
       }
     }
@@ -1562,7 +1635,13 @@ export function LeftSidebarContent({
                   }
                 }
               } catch (err) {
-                console.error(`[Delete] Failed to fetch metadata for ${id}:`, err);
+                clientLogger.error({
+                  layer: "ui",
+                  event: "delete_metadata_fetch:caught",
+                  summary: "content metadata fetch failed during delete",
+                  attrs: { content_id: id },
+                  error: err,
+                });
               }
             }
           }
@@ -1573,7 +1652,12 @@ export function LeftSidebarContent({
 
       // Delete from Google Drive first (if applicable)
       if (googleDriveFiles.length > 0) {
-        console.log(`[Delete] Deleting ${googleDriveFiles.length} files from Google Drive...`);
+        clientLogger.info({
+          layer: "ui",
+          event: "delete_gdrive:started",
+          summary: "deleting files from google drive",
+          attrs: { file_count: googleDriveFiles.length },
+        });
         const googleDeletePromises = googleDriveFiles.map(async ({ contentId, fileId }) => {
           try {
             const response = await fetch("/api/google-drive/delete", {
@@ -1584,12 +1668,21 @@ export function LeftSidebarContent({
             });
 
             if (!response.ok) {
-              console.error(`[Delete] Failed to delete Google Drive file ${fileId}`);
-            } else {
-              console.log(`[Delete] Successfully deleted Google Drive file ${fileId}`);
+              clientLogger.error({
+                layer: "ui",
+                event: "delete_gdrive:failed",
+                summary: "google drive delete returned non-ok",
+                attrs: { content_id: contentId, status: response.status },
+              });
             }
           } catch (err) {
-            console.error(`[Delete] Error deleting Google Drive file ${fileId}:`, err);
+            clientLogger.error({
+              layer: "ui",
+              event: "delete_gdrive:caught",
+              summary: "google drive delete threw",
+              attrs: { content_id: contentId },
+              error: err,
+            });
           }
         });
 
@@ -1622,7 +1715,15 @@ export function LeftSidebarContent({
       const successes = results.filter(r => r.success);
 
       if (failures.length > 0) {
-        console.error("Some deletes failed:", failures);
+        clientLogger.error({
+          layer: "ui",
+          event: "content_delete:failed",
+          summary: "some deletes failed in batch",
+          attrs: {
+            failure_count: failures.length,
+            total_count: ids.length,
+          },
+        });
 
         // Build detailed error message with item names
         let errorMessage: string;
@@ -1652,7 +1753,12 @@ export function LeftSidebarContent({
       closeContentTabs(successes.map((item) => item.id));
       await fetchTree();
     } catch (err) {
-      console.error("Failed to delete:", err);
+      clientLogger.error({
+        layer: "ui",
+        event: "content_delete:caught",
+        summary: "content delete handler caught",
+        error: err,
+      });
       setErrorDialog({
         title: "Failed to delete",
         message: "An unexpected error occurred. Please try again.",
@@ -1690,7 +1796,12 @@ export function LeftSidebarContent({
         toast.success(`Started downloading ${idsToDownload.length} files`);
       }
     } catch (err) {
-      console.error("Failed to download:", err);
+      clientLogger.error({
+        layer: "ui",
+        event: "content_download:caught",
+        summary: "content download handler caught",
+        error: err,
+      });
       toast.error("Download failed", {
         description: "An unexpected error occurred. Please try again.",
       });
@@ -1727,7 +1838,13 @@ export function LeftSidebarContent({
       // Refresh tree to show duplicated items
       fetchTree();
     } catch (err) {
-      console.error("Failed to duplicate:", err);
+      clientLogger.error({
+        layer: "ui",
+        event: "content_duplicate:caught",
+        summary: "content duplicate handler caught",
+        attrs: { count: idsToDuplicate.length },
+        error: err,
+      });
       toast.error("Failed to duplicate", {
         description: err instanceof Error ? err.message : "An unexpected error occurred. Please try again.",
       });
@@ -1740,8 +1857,6 @@ export function LeftSidebarContent({
     viewMode: "list" | "gallery" | "kanban" | "dashboard" | "canvas"
   ) => {
     try {
-      console.log("[LeftSidebarContent] Setting folder view:", { id, viewMode });
-
       // Call API to persist view mode
       const response = await fetch(`/api/content/folder/${id}/view`, {
         method: "PATCH",
@@ -1756,8 +1871,7 @@ export function LeftSidebarContent({
         throw new Error(error.error?.message || "Failed to update folder view");
       }
 
-      const result = await response.json();
-      console.log("[LeftSidebarContent] Folder view updated:", result.data);
+      await response.json();
 
       // Show success toast
       toast.success(`Folder view changed to ${viewMode}`, {
@@ -1767,7 +1881,13 @@ export function LeftSidebarContent({
       // Refresh tree to reflect changes in main panel
       await fetchTree();
     } catch (err) {
-      console.error("Failed to set folder view:", err);
+      clientLogger.error({
+        layer: "ui",
+        event: "folder_view_set:caught",
+        summary: "set folder view handler caught",
+        attrs: { content_id: id, view_mode: viewMode },
+        error: err,
+      });
       toast.error("Failed to change folder view", {
         description: err instanceof Error ? err.message : "An unexpected error occurred. Please try again.",
       });
@@ -1778,7 +1898,6 @@ export function LeftSidebarContent({
   const handleToggleReferencedContent = async (id: string, currentValue: boolean) => {
     try {
       const newValue = !currentValue;
-      console.log("[LeftSidebarContent] Toggling referenced content:", { id, currentValue, newValue });
 
       // Call API to persist setting
       const response = await fetch(`/api/content/folder/${id}/view`, {
@@ -1794,8 +1913,7 @@ export function LeftSidebarContent({
         throw new Error(error.error?.message || "Failed to update folder setting");
       }
 
-      const result = await response.json();
-      console.log("[LeftSidebarContent] Referenced content toggled:", result.data);
+      await response.json();
 
       // Show success toast
       toast.success(newValue ? "Showing referenced content" : "Hiding referenced content", {
@@ -1805,7 +1923,13 @@ export function LeftSidebarContent({
       // Refresh tree to reflect changes in main panel
       await fetchTree();
     } catch (err) {
-      console.error("Failed to toggle referenced content:", err);
+      clientLogger.error({
+        layer: "ui",
+        event: "folder_referenced_toggle:caught",
+        summary: "toggle referenced content handler caught",
+        attrs: { content_id: id },
+        error: err,
+      });
       toast.error("Failed to update folder setting", {
         description: err instanceof Error ? err.message : "An unexpected error occurred. Please try again.",
       });
@@ -1901,7 +2025,13 @@ export function LeftSidebarContent({
 
       toast.success("Icon updated");
     } catch (err) {
-      console.error("Failed to update icon:", err);
+      clientLogger.error({
+        layer: "ui",
+        event: "icon_update:caught",
+        summary: "icon update handler caught",
+        attrs: { content_id: contentId },
+        error: err,
+      });
       toast.error("Failed to update icon", {
         description: err instanceof Error ? err.message : "An unexpected error occurred",
       });
