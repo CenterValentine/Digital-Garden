@@ -5,7 +5,7 @@
   "scripts": {
     "predev": "pnpm clean:traces",
     "dev": "next dev --port 3015",
-    "clean:traces": "rm -rf .local/debug-payloads",
+    "clean:traces": "tsx scripts/archive-traces.ts",
     "dev:collab": "tsx server/hocuspocus/bootstrap.ts",
     "start:collab": "tsx server/hocuspocus/bootstrap.ts",
     "typecheck": "tsc --noEmit",
