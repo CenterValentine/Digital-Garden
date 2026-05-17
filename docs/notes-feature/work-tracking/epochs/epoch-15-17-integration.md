@@ -232,3 +232,27 @@ Special Vercel-cron handling: `app/api/publishing/scheduled-publish/route.ts` us
 - [x] Phase F — 13 publishing routes + 1 media route + Vercel cron + 1 SSR renderer + 1 client component harmonized *(commit `d5678a5`)*. ESLint deferral list assessment: `extensions/publishing/**` does NOT need deferral entry — all publishing client code is now console-free.
 - [x] Phase G — Full gate pass on harmonization commit (typecheck/lint/build/collab:schema:check); `pnpm trace:view --list` smoke test confirms Phase 6 viewer survives the merge.
 - [x] Phase H — `STATUS.md` updated with combined entry; conflict log filled in; branch ready for `git push -u origin feature/observability-and-publishing` + `gh pr create`.
+- [x] Phase I — Anti-overwrite guards added in response to live data-loss incident (4 commits). Branch state still PR-ready.
+
+### Phase I (added 2026-05-17, response to data-loss incident)
+
+**Trigger:** While integration was held local pending PR creation, a user opened a daily note (`63a3a080-e702-4da4-a132-5bd0d61eebea`) in local dev (dev=prod database). The editor briefly rendered the real content from the GET, then the editor auto-saved a template/empty body via PATCH, overwriting the production NotePayload. Content was recovered via a still-open mobile Chromium tab whose y-indexeddb cache held the prior Yjs state and pushed it back when refocused.
+
+**Root cause:** `app/api/content/content/[id]/route.ts` PATCH handler had no precondition checks on `notePayload.upsert`. Any client sending `tiptapJson` got that body written verbatim. The trace at `01070acc` shows `content:write:completed 1 writes 408ms` with `INSERT NotePayload` and `Synced 0 tags` — the smoking gun.
+
+**Forensic loss:** The Phase H predev hook (`rm -rf .local/debug-payloads`) had wiped the incident's `01070acc` sidecar before it could be inspected. We can't reconstruct what the editor sent. Phase I.4 fixes the predev hook so future incidents don't lose this evidence.
+
+**4 commits ship in this PR as Phase I:**
+
+| # | Commit | What it does |
+|---|---|---|
+| I.1 | `3d6a7d2` | Shrink-refusal guard: PATCH refused with `422 OVERWRITE_REFUSED` when existing.searchText > 200 chars AND new < 0.5 × existing AND no `allowShrink: true` on body. Structured `content:write:overwrite_refused` event for trace visibility. |
+| I.2 | `773bead` | Optional `If-Match: <bodyHash>` precondition (on-the-fly SHA-256, no schema change). Mismatch → `409 PRECONDITION_FAILED`. `bodyHash` exposed in GET + PATCH `note` responses. Backwards-compatible. |
+| I.3 | `f89276b` | `content:write:overwrite_risk_detected` event for shrinks in the 50–70% range — informational warn, write still allowed but trace history shows the borderline case. |
+| I.4 | `f2caa3f` | `scripts/archive-traces.ts` replaces `rm -rf` — moves prior-session traces to `.local/debug-payloads/.archive/<ISO timestamp>/` with LRU 5-session cap. Predev hook still triggers it via `pnpm clean:traces`. |
+
+**What's NOT in this PR (separate follow-ups):**
+- Client-side adoption of `If-Match` in `MarkdownEditor`. The server guard is in place; clients can opt in incrementally. Without client adoption, `If-Match` is server-prepared infrastructure that never triggers.
+- Investigation of the specific *client trigger* that fired the destructive PATCH. The user theorizes a daily-notes left-rail tab click applied a template. `app/api/periodic-notes/resolve/route.ts` is verified idempotent (returns existing without template-application). The actual culprit is either editor mount behaviour, the periodic-summary block, or something else — needs reproduction with sidecars intact (Phase I.4 enables this).
+- `dev≠prod` database separation. Whole separate project (provision dev DB, point `.env.local` at it).
+- Same-class guards on `htmlPayload`, `codePayload`, etc. The destructive incident was NotePayload-only; expanding the guard is straightforward but lower priority.

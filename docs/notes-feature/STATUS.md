@@ -53,6 +53,15 @@ before planning and executing. There may be additions or modifications.
 
 ## Recent Completions (Last 30 Days)
 
+**May 17, 2026**: Phase I — anti-overwrite guards on content PATCH route + archival predev hook (response to live data-loss incident)
+- Live data-loss incident on integration branch: opening a daily note in local dev (dev=prod DB) caused the editor to auto-save an empty/template doc over real content. Content recovered via a still-open mobile prod tab's y-indexeddb cache. Root cause is broader than any one trigger — the PATCH route trusted any tiptapJson body unconditionally.
+- **Phase I.1** (commit `3d6a7d2`): Shrink-refusal guard on `app/api/content/content/[id]/route.ts` PATCH handler. Refuses with HTTP 422 OVERWRITE_REFUSED when existing.searchText > 200 chars AND new.searchText < 0.5 × existing AND no `allowShrink: true` on body. Emits `content:write:overwrite_refused` structured event. Span attrs `refused`, `refused_via`, `prev_char_count`, `new_char_count` record the decision.
+- **Phase I.2** (commit `773bead`): Optional `If-Match: <bodyHash>` precondition. On-the-fly SHA-256 hash of tiptapJson (no schema change). Mismatch → HTTP 409 PRECONDITION_FAILED with `currentBodyHash` in meta. `bodyHash` now exposed in GET and PATCH `note` responses so clients can capture and echo it. Backwards-compatible — clients that don't send the header are unaffected.
+- **Phase I.3** (commit `f89276b`): `content:write:overwrite_risk_detected` informational event for shrinks in the 50–70% range (below refuse threshold but still substantial). Allows the write but leaves a forensic breadcrumb so borderline incidents are visible in trace history.
+- **Phase I.4** (commit `f2caa3f`): Replaces destructive `rm -rf .local/debug-payloads` predev hook with archival via `scripts/archive-traces.ts`. Prior-session traces move to `.local/debug-payloads/.archive/<ISO timestamp>/` with LRU sweep keeping the most recent 5 session archives. The original wipe-on-start destroyed forensic evidence from this very incident — archival is the durable fix.
+- Out of scope (follow-up): client-side adoption of `If-Match` in MarkdownEditor + finding the specific trigger (daily-notes tab click suspect) that fired the destructive PATCH. Server guards are sufficient to *prevent* the data loss regardless of trigger.
+- Gates at tip: `pnpm typecheck` ✓, `pnpm lint` 159/159 (0 errors), `pnpm collab:schema:check` ✓.
+
 **May 17, 2026**: Epochs 15 + 17 integrated on branch `feature/observability-and-publishing` (ready for PR)
 - Phase B–H of `epochs/epoch-15-17-integration.md` complete. 31 commits ahead of `origin/main` / 0 behind; clean fast-forward.
 - Merge commit `71e37a0` absorbed `feature/publishing-system` (40 publishing commits — items/paths CRUD, revision lifecycle, scheduled-publish cron, 23 W2-W10 blocks, public renderer, jsdom-backed SSR, theme variables, polish wave). 8 files had conflicts; resolution log in the integration plan.
