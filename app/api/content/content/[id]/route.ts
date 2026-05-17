@@ -506,7 +506,35 @@ export async function PATCH(
         updateData.displayOrder = displayOrder;
       }
 
-      const updated = await withSpan(
+      // Anti-overwrite guard thresholds. Tuned to catch the editor-mount-race
+      // class of bug where an empty / template document is auto-saved over
+      // real content. Legitimate edits very rarely halve a substantial note
+      // in one PATCH; the threshold trades a tiny false-positive rate for
+      // strong data-loss prevention. Clients may opt out with `allowShrink:true`
+      // on the body when the shrink is genuinely intentional (e.g. an explicit
+      // "clear note" action).
+      const SHRINK_REFUSE_RATIO = 0.5;
+      const SHRINK_MIN_EXISTING_CHARS = 200;
+
+      type WriteResult =
+        | {
+            kind: "ok";
+            updated: Awaited<
+              ReturnType<typeof prisma.contentNode.findUnique<{
+                where: { id: string };
+                include: typeof CONTENT_WITH_PAYLOADS;
+              }>>
+            >;
+          }
+        | {
+            kind: "refused";
+            reason: "shrink_guard";
+            prevCharCount: number;
+            newCharCount: number;
+            shrinkRatio: number;
+          };
+
+      const writeResult: WriteResult = await withSpan(
         { layer: "content", name: "write" },
         { attrs: { content_id: id } },
         async (span) => {
@@ -525,6 +553,46 @@ export async function PATCH(
             const searchText = extractSearchTextFromTipTap(json);
             const wordCount = searchText.split(/\s+/).filter(Boolean).length;
             const readingTime = Math.ceil(wordCount / 200);
+
+            // ── Shrink-refusal guard ────────────────────────────────────────
+            const allowShrink = (body as { allowShrink?: boolean }).allowShrink === true;
+            const prevSearchText = existing.notePayload?.searchText ?? "";
+            const prevLen = prevSearchText.length;
+            const newLen = searchText.length;
+
+            if (
+              !allowShrink &&
+              prevLen > SHRINK_MIN_EXISTING_CHARS &&
+              newLen < prevLen * SHRINK_REFUSE_RATIO
+            ) {
+              const shrinkRatio = prevLen > 0 ? newLen / prevLen : 0;
+              logger.warn({
+                layer: "content",
+                event: "write:overwrite_refused",
+                summary: `refused PATCH that would shrink ${prevLen}→${newLen} chars`,
+                attrs: {
+                  content_id: id,
+                  prev_char_count: prevLen,
+                  new_char_count: newLen,
+                  shrink_ratio: Number(shrinkRatio.toFixed(3)),
+                  refused_via: "shrink_guard",
+                },
+              });
+              span
+                .attr("refused", true)
+                .attr("refused_via", "shrink_guard")
+                .attr("prev_char_count", prevLen)
+                .attr("new_char_count", newLen)
+                .summary(`refused: ${prevLen}→${newLen} chars (shrink_guard)`);
+              return {
+                kind: "refused" as const,
+                reason: "shrink_guard" as const,
+                prevCharCount: prevLen,
+                newCharCount: newLen,
+                shrinkRatio,
+              };
+            }
+            // ────────────────────────────────────────────────────────────────
 
             await prisma.notePayload.upsert({
               where: { contentId: id },
@@ -754,9 +822,33 @@ export async function PATCH(
 
           if (Object.keys(updateData).length > 0) writeCount++;
           span.attr("writes", writeCount).summary(`${writeCount} writes`);
-          return result;
+          return { kind: "ok" as const, updated: result };
         },
       );
+
+      // Anti-overwrite guard hit: refuse the PATCH and tell the client what
+      // would have happened. Client can retry with `allowShrink:true` if the
+      // shrink is genuinely intentional.
+      if (writeResult.kind === "refused") {
+        return NextResponse.json(
+          {
+            success: false,
+            error: {
+              code: "OVERWRITE_REFUSED",
+              message: `Refusing to overwrite ${writeResult.prevCharCount}-char content with ${writeResult.newCharCount}-char body. Pass allowShrink:true on the body to override.`,
+            },
+            meta: {
+              reason: writeResult.reason,
+              prevCharCount: writeResult.prevCharCount,
+              newCharCount: writeResult.newCharCount,
+              shrinkRatio: writeResult.shrinkRatio,
+            },
+          },
+          { status: 422 }
+        );
+      }
+
+      const updated = writeResult.updated;
 
       if (!updated) {
         return NextResponse.json(
