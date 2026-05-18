@@ -619,16 +619,37 @@ export async function PATCH(
             const readingTime = Math.ceil(wordCount / 200);
 
             // ── Shrink-refusal guard ────────────────────────────────────────
-            const allowShrink = (body as { allowShrink?: boolean }).allowShrink === true;
+            // Intent signals: either (a) the request explicitly opts out via
+            // `allowShrink: true` (used by action handlers like "Clear note"),
+            // or (b) the client tagged the write as user-initiated by passing
+            // `userInitiated: true` after observing a recent input gesture.
+            // Either signal counts as "human intent for this write" and lets
+            // the shrink through. Bug-class writes (editor mount race,
+            // background sync overwrites) have no preceding gesture and so
+            // never carry these flags.
+            //
+            // Optional `secondsSinceInput` telemetry helps us judge whether
+            // the recency window the client uses is calibrated correctly.
+            const intentBody = body as {
+              allowShrink?: boolean;
+              userInitiated?: boolean;
+              secondsSinceInput?: number;
+            };
+            const allowShrink = intentBody.allowShrink === true;
+            const userInitiated = intentBody.userInitiated === true;
+            const secondsSinceInput = typeof intentBody.secondsSinceInput === "number"
+              ? intentBody.secondsSinceInput
+              : null;
+            const hasIntent = allowShrink || userInitiated;
+
             const prevSearchText = existing.notePayload?.searchText ?? "";
             const prevLen = prevSearchText.length;
             const newLen = searchText.length;
-
-            if (
-              !allowShrink &&
+            const wouldTriggerShrinkRefuse =
               prevLen > SHRINK_MIN_EXISTING_CHARS &&
-              newLen < prevLen * SHRINK_REFUSE_RATIO
-            ) {
+              newLen < prevLen * SHRINK_REFUSE_RATIO;
+
+            if (wouldTriggerShrinkRefuse && !hasIntent) {
               const shrinkRatio = prevLen > 0 ? newLen / prevLen : 0;
               logger.warn({
                 layer: "content",
@@ -655,6 +676,34 @@ export async function PATCH(
                 newCharCount: newLen,
                 shrinkRatio,
               };
+            }
+
+            // ── Shrink with user intent ────────────────────────────────────
+            // The shrink WOULD have refused but the client provided an intent
+            // signal. Allow the write and log the event so destructive saves
+            // remain visible in trace history (and we can confirm the flag
+            // is being set responsibly by clients in audits).
+            if (wouldTriggerShrinkRefuse && hasIntent) {
+              const ratio = newLen / prevLen;
+              logger.warn({
+                layer: "content",
+                event: "write:shrink_with_user_intent",
+                summary: `allowed shrink ${prevLen}→${newLen} chars (user intent)`,
+                attrs: {
+                  content_id: id,
+                  prev_char_count: prevLen,
+                  new_char_count: newLen,
+                  shrink_ratio: Number(ratio.toFixed(3)),
+                  via_user_initiated: userInitiated,
+                  via_allow_shrink: allowShrink,
+                  seconds_since_input: secondsSinceInput ?? -1,
+                },
+              });
+              span
+                .attr("shrink_with_user_intent", true)
+                .attr("shrink_ratio", Number(ratio.toFixed(3)))
+                .attr("user_initiated", userInitiated)
+                .attr("allow_shrink", allowShrink);
             }
 
             // ── Sub-threshold risk detection ───────────────────────────────
@@ -929,7 +978,7 @@ export async function PATCH(
             success: false,
             error: {
               code: "OVERWRITE_REFUSED",
-              message: `Refusing to overwrite ${writeResult.prevCharCount}-char content with ${writeResult.newCharCount}-char body. Pass allowShrink:true on the body to override.`,
+              message: `Refusing to overwrite ${writeResult.prevCharCount}-char content with ${writeResult.newCharCount}-char body. Override by passing userInitiated:true (recent user gesture detected) or allowShrink:true (explicit destructive action) on the body.`,
             },
             meta: {
               reason: writeResult.reason,
