@@ -13,7 +13,7 @@
  * in tests/e2e/README.md.
  */
 
-import { test, expect } from "../_fixtures/auth";
+import { test, expect } from "../_fixtures/content";
 
 test.describe("authenticated dark-mode routes", () => {
   test("content workspace renders correctly", async ({ page, themedGoto }) => {
@@ -40,22 +40,80 @@ test.describe("authenticated dark-mode routes", () => {
     await expect(page).toHaveScreenshot("settings-preferences.png");
   });
 
-  test.skip(
-    "note editor with content renders correctly",
-    async ({ themedGoto }) => {
-      // TODO(content-seed-fixture): needs a seeded note with TipTap
-      // payload and a stable navigable slug. See "Known gaps" in
-      // tests/e2e/README.md.
-      await themedGoto("/content");
-    },
-  );
+  test("note editor with content renders correctly", async ({
+    page,
+    themedGoto,
+    seed,
+  }) => {
+    // Seed a note with deterministic content (so the screenshot is
+    // stable across runs) and navigate via the ?content= query param
+    // that the workspace store reads to select a node.
+    const note = await seed.note({
+      title: "Dark Mode Visual Anchor",
+      tiptapJson: {
+        type: "doc",
+        content: [
+          {
+            type: "heading",
+            attrs: { level: 1 },
+            content: [{ type: "text", text: "Editor Visual Baseline" }],
+          },
+          {
+            type: "paragraph",
+            content: [
+              {
+                type: "text",
+                text: "This paragraph anchors the dark-mode visual regression for the editor surface.",
+              },
+            ],
+          },
+          {
+            type: "bulletList",
+            content: [
+              {
+                type: "listItem",
+                content: [
+                  {
+                    type: "paragraph",
+                    content: [{ type: "text", text: "List item one" }],
+                  },
+                ],
+              },
+              {
+                type: "listItem",
+                content: [
+                  {
+                    type: "paragraph",
+                    content: [{ type: "text", text: "List item two" }],
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+    });
+
+    await themedGoto(`/content?content=${note.id}`);
+
+    // Wait for the editor to mount with the seeded heading visible.
+    await expect(
+      page.getByRole("heading", { name: "Editor Visual Baseline", level: 1 }),
+    ).toBeVisible();
+
+    await expect(page).toHaveScreenshot("note-with-content.png");
+  });
 
   test.skip(
     "embedded excalidraw block renders correctly",
     async ({ themedGoto }) => {
-      // TODO(content-seed-fixture + hocuspocus-fixture): needs a seeded
-      // note containing an Excalidraw block AND a Hocuspocus connection
-      // (the Excalidraw block relies on a Y.js sub-map keyed by block id).
+      // TODO(hocuspocus-fixture): the seed fixture can now create the
+      // host note + linked Visualization ContentNode, but the Excalidraw
+      // block reads its scene from a Y.js sub-map keyed by block id.
+      // Without a Hocuspocus connection (or a way to seed the Y.js
+      // doc directly via Prisma's CollaborationDocument model), the
+      // block renders empty. See lib/domain/editor/extensions/blocks/
+      // excalidraw-block.ts and lib/domain/collaboration/.
       await themedGoto("/content");
     },
   );
@@ -63,9 +121,12 @@ test.describe("authenticated dark-mode routes", () => {
   test.skip(
     "embedded mermaid block renders correctly",
     async ({ themedGoto }) => {
-      // TODO(content-seed-fixture): seeded note containing a Mermaid block.
-      // Mermaid renders client-side from a string — no collab dependency
-      // for the static read path, so this is less blocked than Excalidraw.
+      // TODO(hocuspocus-fixture or yjs-seed): same shape as the
+      // Excalidraw stub above — the Mermaid block's source lives in a
+      // Y.js sub-map (`blockMermaid:{blockId}`), not in the linked
+      // Visualization ContentNode's chartConfig. Static rendering
+      // without a Y.js doc isn't supported by the current block
+      // implementation.
       await themedGoto("/content");
     },
   );

@@ -7,8 +7,9 @@ End-to-end regression coverage for the Digital Garden app. Authored during the d
 | Layer | State | What runs |
 |---|---|---|
 | **`setup/`** | ✅ Operational | Signs in as the seeded admin user, persists storageState. Runs once before authenticated projects |
-| **`dark-mode/`** | ✅ Operational | Signed-out routes (home, sign-in, sign-up, embed/blank) + authenticated routes (content workspace, settings preferences) across light + dark themes |
-| **`auth/`** | ✅ Partial | Sign-in form (valid / invalid creds) + session persistence (reload, sign-out cookie clear) |
+| **`_fixtures/`** | ✅ Operational | `theme`, `auth`, `content` (seed helpers) and `db` (test-time Prisma client) |
+| **`dark-mode/`** | ✅ Operational | Signed-out routes (home, sign-in, sign-up, embed/blank) + authenticated routes (content workspace, settings preferences, note with seeded content) across light + dark themes |
+| **`auth/`** | ✅ Operational | Sign-in form (valid / invalid creds) + session persistence (reload, sign-out, expired-session redirect) |
 | `editor/` `file-tree/` `content/` `search/` `extensions/` | ⚠️ Stubs (`test.skip`) | Placeholders documenting what should be covered; not executed |
 
 The Playwright runner reports both passed and skipped tests on every run — `n passed, m skipped` is the signal of "how much we have left to fill in."
@@ -127,9 +128,61 @@ Defaults to the seed in `prisma/seed.ts` (`admin@example.com` / `changeme123`).
 
 ### Known gaps
 
-- **DB-access fixture** — would unlock `expired session redirects to /sign-in` and several other negative-path session tests that need to forge expired `Session.expiresAt` rows.
-- **Content-seeding fixture** — would unlock the 3 still-stubbed authenticated dark-mode tests (note with content, embedded Excalidraw, embedded Mermaid).
+- **Hocuspocus fixture** — the Excalidraw + Mermaid block stubs in `dark-mode/authenticated-routes.spec.ts` need a Y.js doc seeded for the embedded block's `blockExcalidraw:` / `blockMermaid:` sub-map. The block schema delegates source storage to collab state — there's no static-render path today.
 - **OAuth mock** — would unlock the Google OAuth handoff test in `auth/sign-in-flow.spec.ts`.
+
+## Content seed fixture
+
+For tests that need known content state (specific notes, folders, payload shapes), import from `_fixtures/content.ts`:
+
+```ts
+import { test, expect } from "../_fixtures/content";
+
+test("note renders with seeded content", async ({ page, themedGoto, seed }) => {
+  const note = await seed.note({
+    title: "My Test Note",
+    markdown: "# Hello\n\nWorld.",
+  });
+  await themedGoto(`/content?content=${note.id}`);
+  await expect(page.getByRole("heading", { name: "Hello" })).toBeVisible();
+});
+```
+
+### Available helpers
+
+- `seed.note({ title?, parentId?, tiptapJson? OR markdown? })` — creates a note
+- `seed.folder({ title?, parentId? })` — creates a folder
+- `seed.trackedIds()` — read-only view of all node IDs created this test
+
+### Lifecycle
+
+- **Create** via `POST /api/content/content` — exercises the real API path
+- **Cleanup** via direct `prisma.contentNode.deleteMany` — **hard-delete**, not the API's soft-delete to TrashBin (otherwise trash would accumulate from every test run)
+
+Cleanup runs automatically at end of test in reverse creation order so children delete before parents (the `Hierarchy` relation is `onDelete: NoAction`).
+
+### DB access requirement
+
+The content fixture and `db.ts` need `DATABASE_URL` in the test process's environment. The fixture reads `.env.local` and `.env` via `dotenv` — same files `pnpm dev` reads. If you're running tests in a fresh worktree, symlink or copy `.env.local` from your primary checkout:
+
+```bash
+ln -sf /path/to/primary/.env.local .env.local
+```
+
+### Mutating auth state in tests
+
+Tests that mutate auth state (sign-out, backdating sessions, account deletion) **must operate on a freshly-created session**, not the shared `admin.json` storageState that other concurrent workers also use. The pattern:
+
+```ts
+// Sign in fresh — response Set-Cookie lands in this context's jar,
+// replacing the storageState cookie. Mutate this fresh session's row,
+// not the shared admin one.
+await page.request.post("/api/auth/sign-in", {
+  data: { email: ADMIN_EMAIL, password: ADMIN_PASSWORD },
+});
+```
+
+**Important: use `page.request`, NOT the test-level `request` fixture.** Playwright's `request` fixture has its own isolated cookie jar that does NOT load the project's storageState — using it for auth-mutating requests will operate on the wrong cookie and break concurrent tests.
 
 ## SPA navigation gotcha
 

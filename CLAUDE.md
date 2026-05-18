@@ -74,16 +74,18 @@ tests/e2e/
 │   └── paths.ts               # ADMIN_STORAGE_STATE + AUTH_REQUIRED_SPECS globs
 ├── _fixtures/
 │   ├── theme.ts               # themedGoto: seeds notes:settings localStorage before nav
-│   └── auth.ts                # re-exports theme; marker for "this spec needs auth"
+│   ├── auth.ts                # re-exports theme; marker for "this spec needs auth"
+│   ├── content.ts             # seed.note() / seed.folder() with auto-cleanup
+│   └── db.ts                  # test-time Prisma client for hard-deletion + DB session ops
 ├── dark-mode/                 # OPERATIONAL
 │   ├── home.spec.ts                       # signed-out
 │   ├── sign-in.spec.ts                    # signed-out
 │   ├── sign-up.spec.ts                    # signed-out
 │   ├── embed-blank.spec.ts                # signed-out
-│   └── authenticated-routes.spec.ts       # auth — 2 active, 3 stubbed
+│   └── authenticated-routes.spec.ts       # auth — 3 active, 2 stubbed (collab-blocked)
 ├── auth/
 │   ├── sign-in-flow.spec.ts               # signed-out — 2 active, 2 stubbed
-│   └── session-persistence.spec.ts        # auth — 2 active, 1 stubbed
+│   └── session-persistence.spec.ts        # auth — 3 active
 ├── editor/ file-tree/ content/ search/ extensions/
 │   └── *.spec.ts              # STUBS — test.skip() with docstring describing scope
 └── __snapshots__/             # committed baseline screenshots, per-spec per-project
@@ -93,17 +95,20 @@ Four Playwright projects: `light` / `dark` (signed-out) and `auth-light` / `auth
 
 ### Theme propagation in tests
 
-Tests **MUST** import from `_fixtures/theme.ts` (signed-out) or `_fixtures/auth.ts` (authenticated) — not `@playwright/test` directly — so theme preference is set before navigation:
+Tests **MUST** import from one of the fixtures — not `@playwright/test` directly — so theme preference is set before navigation:
 
 ```ts
-import { test, expect } from "../_fixtures/theme";   // signed-out specs
-import { test, expect } from "../_fixtures/auth";    // authenticated specs
+import { test, expect } from "../_fixtures/theme";    // signed-out specs
+import { test, expect } from "../_fixtures/auth";     // authenticated specs (no DB seed needed)
+import { test, expect } from "../_fixtures/content";  // authenticated + seed.note()/seed.folder()
 
 test("my surface renders correctly in both themes", async ({ page, themedGoto }) => {
   await themedGoto("/my/route");
   await expect(page).toHaveScreenshot("my-surface.png");
 });
 ```
+
+Each fixture extends the previous one — `content` extends `auth` extends `theme` — so the lower-tier features (themedGoto, expect) are always available regardless of which import you choose.
 
 `themedGoto` writes `notes:settings.state.ui.theme` to localStorage before navigation, so the pre-hydration FOUC script in [lib/features/theme/script.ts](lib/features/theme/script.ts) applies the correct `.dark` class on first paint. It also uses `waitUntil: "domcontentloaded"` to handle SPA pages with persistent connections (HMR / collab WebSocket) where the default `load` event never fires.
 
@@ -151,11 +156,29 @@ To activate a stub:
 5. Run `pnpm test:e2e:update` to capture baselines, then `pnpm test:e2e` to verify.
 6. Commit both the spec and the generated PNG(s).
 
+### Content seed fixture
+
+For tests that need known content state (specific notes, folders, payload shapes), import from `_fixtures/content.ts` and use the `seed` helper:
+
+```ts
+import { test, expect } from "../_fixtures/content";
+
+test("note with content renders", async ({ page, themedGoto, seed }) => {
+  const note = await seed.note({ title: "Test", markdown: "# Hello" });
+  await themedGoto(`/content?content=${note.id}`);
+  await expect(page.getByRole("heading", { name: "Hello" })).toBeVisible();
+});
+```
+
+- **Create** via `POST /api/content/content` (exercises the real API)
+- **Cleanup** via direct `prisma.contentNode.deleteMany` (hard-delete; bypasses the API's soft-delete to TrashBin which would accumulate)
+- **Requires** `DATABASE_URL` in the test process env; symlink `.env.local` in fresh worktrees: `ln -sf /path/to/primary/.env.local .env.local`
+
+Tests that mutate auth state (sign-out, backdating sessions) **must sign in fresh via `page.request.post`** rather than mutating the shared `admin.json` session — otherwise they break concurrent workers. See [tests/e2e/README.md](tests/e2e/README.md#mutating-auth-state-in-tests) for the pattern.
+
 ### Known gaps (followups in BACKLOG.md)
 
-- **Hocuspocus fixture** for collaboration tests (`tests/e2e/editor/collaboration.spec.ts`) — needs a local Hocuspocus server or mock provider.
-- **Content-seeding fixture** — would unlock the 3 still-stubbed authenticated dark-mode tests (note with content, embedded Excalidraw, embedded Mermaid).
-- **DB-access fixture** — would unlock the `expired session redirects` test and other negative-path session tests that need to forge expired `Session.expiresAt` rows.
+- **Hocuspocus fixture** for collaboration tests (`tests/e2e/editor/collaboration.spec.ts`) — needs a local Hocuspocus server or mock provider. Also needed for embedded Excalidraw / Mermaid block render tests (their source lives in Y.js sub-maps).
 - **OAuth mock** — would unlock the Google OAuth handoff test in `auth/sign-in-flow.spec.ts`.
 
 ### CI integration
