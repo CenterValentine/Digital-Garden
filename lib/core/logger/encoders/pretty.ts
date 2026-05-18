@@ -143,13 +143,18 @@ function renderSummaryBlock(trace_id: string): string {
     (a, b) => b[1].duration_ms - a[1].duration_ms,
   );
   const rows = sortedLayers.map(([layer, stats]) => {
+    // stats.duration_ms is a sum of per-event durations. When a route fans
+    // out concurrent work (e.g., Promise.all of N queries) the sum
+    // exceeds the wall-clock total. Showing a >100% number reads like a
+    // math bug, so we label parallel cases explicitly instead.
     const pct = total_ms > 0 ? Math.round((stats.duration_ms / total_ms) * 100) : 0;
+    const pctLabel = pct > 100 ? "(parallel)" : `(${pct}%)`;
     const eventsLabel =
       stats.count === 1 ? "1 event " : `${stats.count} events`;
     return `  ${padRight(layer, 14)} ${padLeft(eventsLabel, 8)}  ${padLeft(
       `${stats.duration_ms}ms`,
       7,
-    )}  (${pct}%)`;
+    )}  ${pctLabel}`;
   });
 
   const block = [headerLine, ...rows, footerLine].join("\n");

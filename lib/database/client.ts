@@ -1,13 +1,24 @@
 // Prisma Client singleton + structured-log bridge.
 //
 // We use `emit: "event"` for all log levels so Prisma's output goes through
-// our logger instead of stdout. Each query becomes a `content:db:query`
-// debug-level event that inherits the active trace context via ALS.
+// our logger instead of stdout. Each query becomes a `<layer>:db:completed`
+// debug-level event that inherits the active trace context via ALS, where
+// <layer> is the ServerLayer the queried model belongs to (see
+// `tableToLayer` below). The event name uses the closed-set Marker
+// `completed` per the Phase 17 logger contract.
+//
+// Known gap: Prisma's `$on("query")` callbacks can flush *after* the
+// originating request's AsyncLocalStorage context tears down, producing
+// `[trace:no-trace]` lines in the dev stream. Fixing this requires a
+// Prisma `$extends` wrapper that captures the trace_id at query-start and
+// re-applies it inside the callback — a non-trivial rework deferred to a
+// future epoch. See log audit dated 2026-05-18.
 
 import { PrismaClient, Prisma } from "@/lib/database/generated/prisma";
 import { Pool } from "pg";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { logger } from "@/lib/core/logger";
+import type { ServerLayer } from "@/lib/core/logger/types";
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
@@ -93,6 +104,36 @@ function buildQuerySummary({ op, table, param_count }: QuerySummary): string {
 }
 
 // ----------------------------------------------------------------------
+// Table → ServerLayer routing
+// ----------------------------------------------------------------------
+// Models cluster into the ServerLayer they belong to so trace summaries
+// attribute DB time to the right domain rather than dumping everything
+// into `content`. Unknown models fall back to `content` (the historical
+// catch-all). Add entries here when you introduce a new model family.
+
+const TABLE_LAYER_MAP: Record<string, ServerLayer> = {
+  // auth
+  User: "auth",
+  Account: "auth",
+  Session: "auth",
+  VerificationToken: "auth",
+  // collab
+  CollaborationDocument: "collab",
+  CollaborationPresence: "collab",
+  CollaborationGrant: "collab",
+  // storage
+  StorageProvider: "storage",
+  FileObject: "storage",
+  // admin
+  AuditLog: "admin",
+  // editor / content payloads live under `content` (default)
+};
+
+function tableToLayer(table: string): ServerLayer {
+  return TABLE_LAYER_MAP[table] ?? "content";
+}
+
+// ----------------------------------------------------------------------
 // Client factory + bridge wiring
 // ----------------------------------------------------------------------
 
@@ -103,8 +144,8 @@ function attachLogBridge(client: PrismaClient): PrismaClient {
   client.$on("query" as never, (e: Prisma.QueryEvent) => {
     const summary = parseQuerySummary(e.query);
     logger.debug({
-      layer: "content",
-      event: "db:query",
+      layer: tableToLayer(summary.table),
+      event: "db:completed",
       summary: buildQuerySummary(summary),
       duration_ms: Math.round(e.duration),
       attrs: {
@@ -115,10 +156,15 @@ function attachLogBridge(client: PrismaClient): PrismaClient {
     });
   });
 
+  // info/warn/error events come from Prisma's own logger, not a specific
+  // query — they describe the client/engine, not a model — so they stay
+  // on the `content` catch-all layer. Event names use Marker states
+  // (`info` → `:completed` since there's no started/completed pair;
+  // `warn`/`error` → `:failed` to match the closed-set Marker).
   client.$on("info" as never, (e: Prisma.LogEvent) => {
     logger.info({
       layer: "content",
-      event: "db:info",
+      event: "db:completed",
       summary: e.message,
     });
   });
@@ -126,7 +172,7 @@ function attachLogBridge(client: PrismaClient): PrismaClient {
   client.$on("warn" as never, (e: Prisma.LogEvent) => {
     logger.warn({
       layer: "content",
-      event: "db:warn",
+      event: "db:failed",
       summary: e.message,
     });
   });
@@ -134,7 +180,7 @@ function attachLogBridge(client: PrismaClient): PrismaClient {
   client.$on("error" as never, (e: Prisma.LogEvent) => {
     logger.error({
       layer: "content",
-      event: "db:error",
+      event: "db:failed",
       summary: e.message,
     });
   });
