@@ -114,8 +114,20 @@ export interface MarkdownEditorProps {
   content: JSONContent;
   /** Callback when content changes */
   onChange?: (content: JSONContent) => void;
-  /** Callback for auto-save (debounced) */
-  onSave?: (content: JSONContent) => Promise<void>;
+  /**
+   * Callback for auto-save (debounced). The optional `meta` argument carries
+   * user-intent signals the editor observes locally — most importantly,
+   * `userInitiated` is true when there was a recent user gesture (keystroke,
+   * paste, drop, non-remote ProseMirror transaction) preceding the save. The
+   * content PATCH route uses this to differentiate deliberate user writes
+   * from app-state writes (editor mount race auto-saves), bypassing the
+   * shrink-refusal guard for the former. `secondsSinceInput` is reported
+   * for telemetry — helps calibrate the recency window over time.
+   */
+  onSave?: (
+    content: JSONContent,
+    meta?: { userInitiated?: boolean; secondsSinceInput?: number },
+  ) => Promise<void>;
   /** Callback when editor stats change */
   onStatsChange?: (stats: EditorStats) => void;
   /** Callback when outline changes (headings extracted) */
@@ -214,6 +226,16 @@ export function MarkdownEditor({
   // discard saves that fire after the user navigated away.
   const contentIdRef = useRef(contentId);
   contentIdRef.current = contentId;
+  // Track the timestamp of the last user-initiated input gesture (keystroke,
+  // paste, drop, non-remote ProseMirror transaction). Auto-saves within
+  // USER_INPUT_RECENCY_MS of the last gesture get tagged `userInitiated:true`
+  // on the PATCH body, which lets the server's shrink-refusal guard bypass.
+  // The bug class this addresses: editor mounts + 2-second auto-save fires
+  // with empty/template content + no user gesture ever happened on this
+  // instance → the ref is null → save goes out without the flag → server
+  // refuses the destructive overwrite. See app/api/content/content/[id]/route.ts.
+  const lastUserInputAtRef = useRef<number | null>(null);
+  const USER_INPUT_RECENCY_MS = 10_000;
   // Sprint 37: File input for image upload via slash command
   const fileInputRef = useRef<HTMLInputElement>(null);
   // Ref for insertImageFromFile — editorProps closures are frozen at first render
@@ -454,7 +476,7 @@ export function MarkdownEditor({
         return false;
       },
     },
-    onUpdate: ({ editor }) => {
+    onUpdate: ({ editor, transaction }) => {
       const json = editor.getJSON();
 
       // Trigger immediate onChange
@@ -475,6 +497,27 @@ export function MarkdownEditor({
         const outline = extractOutline(json);
         onOutlineChange(outline);
       }
+
+      // ── User-intent recency tracking ─────────────────────────────────────
+      // Only docChanged transactions count (cursor moves alone don't), and
+      // only transactions that did NOT originate from Yjs collab sync. The
+      // y-prosemirror integration tags incoming sync transactions with a
+      // `ySyncPluginKey`-derived meta key; checking for any falsy custom
+      // origin is a more portable signal. We additionally exclude
+      // transactions tagged with a literal `remote` meta key (used in some
+      // code paths). The result: a real user keystroke / paste / drop /
+      // delete updates the ref, while remote sync arrivals and programmatic
+      // setContent calls (which set their own meta) do not.
+      const isUserOrigin =
+        transaction.docChanged &&
+        !transaction.getMeta("y-sync$") &&
+        !transaction.getMeta("remote") &&
+        !transaction.getMeta("addToHistory") /* y-prosemirror history merges */ &&
+        transaction.getMeta("paste") !== false; /* paste is allowed */
+      if (isUserOrigin) {
+        lastUserInputAtRef.current = Date.now();
+      }
+      // ─────────────────────────────────────────────────────────────────────
 
       // Mark as unsaved
       setHasUnsavedChanges(true);
@@ -508,7 +551,22 @@ export function MarkdownEditor({
             // calls setNoteContent(content) after save, it echoes back as a
             // prop change. The ref lets us skip the setContent call for that echo.
             lastSavedContentRef.current = json;
-            await snapshotSave(json);
+            // Compute user-intent metadata for this specific save based on
+            // the most recent recorded gesture vs the save fire time. If
+            // the ref is null (no user input on this editor instance), the
+            // save goes out WITHOUT userInitiated — server shrink guard
+            // applies normally.
+            const lastInputAt = lastUserInputAtRef.current;
+            const secondsSinceInput =
+              lastInputAt !== null
+                ? Math.round(((Date.now() - lastInputAt) / 1000) * 100) / 100
+                : null;
+            const userInitiated =
+              lastInputAt !== null && Date.now() - lastInputAt < USER_INPUT_RECENCY_MS;
+            await snapshotSave(json, {
+              userInitiated,
+              secondsSinceInput: secondsSinceInput ?? undefined,
+            });
             setHasUnsavedChanges(false);
           } catch (error) {
             clientLogger.error({

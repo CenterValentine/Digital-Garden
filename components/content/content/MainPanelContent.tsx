@@ -673,7 +673,10 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
   // the API call, we verify it still matches the currently-viewed document.
   // An AbortController cancels any in-flight fetch if the user navigates away.
   const handleSave = useCallback(
-    async (content: JSONContent) => {
+    async (
+      content: JSONContent,
+      meta?: { userInitiated?: boolean; secondsSinceInput?: number },
+    ) => {
       if (!selectedContentId) return;
       if (typeof navigator !== "undefined" && !navigator.onLine) {
         setHasUnsavedChanges(true);
@@ -716,6 +719,17 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
           },
           body: JSON.stringify({
             tiptapJson: content,
+            // Forward user-intent metadata from the editor. The content
+            // PATCH route uses `userInitiated` to bypass the shrink-refusal
+            // guard when there's been a recent user gesture, allowing
+            // legitimate "select all + delete" flows while still refusing
+            // bug-class auto-saves (editor mount race with no input).
+            // `secondsSinceInput` is telemetry only — surfaces in trace
+            // span attrs so we can tune the recency window with real data.
+            ...(meta?.userInitiated === true && { userInitiated: true }),
+            ...(typeof meta?.secondsSinceInput === "number" && {
+              secondsSinceInput: meta.secondsSinceInput,
+            }),
           }),
           signal: abortController.signal,
           }
