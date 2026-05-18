@@ -29,8 +29,17 @@ interface ExpandableEditorProps {
   contentType: string;
   /** Existing note content (null if no notes yet) */
   noteContent: JSONContent | null;
-  /** Save handler — PATCHes to the content API */
-  onSave: (content: JSONContent) => Promise<void>;
+  /**
+   * Save handler — PATCHes to the content API. The optional `meta` arg
+   * carries user-intent signals (`userInitiated`, `secondsSinceInput`)
+   * observed by the inner MarkdownEditor; callers that PATCH content with
+   * a destructive-shrink risk should forward this to their PATCH body so
+   * the server's content:write shrink guard can bypass on real user intent.
+   */
+  onSave: (
+    content: JSONContent,
+    meta?: { userInitiated?: boolean; secondsSinceInput?: number },
+  ) => Promise<void>;
   /** Read-only mode */
   readOnly?: boolean;
   /** Callback when a wiki-link is clicked */
@@ -98,8 +107,11 @@ export function ExpandableEditor({
   };
 
   const handleSave = useCallback(
-    async (content: JSONContent) => {
-      await onSave(content);
+    async (
+      content: JSONContent,
+      meta?: { userInitiated?: boolean; secondsSinceInput?: number },
+    ) => {
+      await onSave(content, meta);
     },
     [onSave]
   );
