@@ -17,6 +17,7 @@ import TableRow from "@tiptap/extension-table-row";
 import TableHeader from "@tiptap/extension-table-header";
 import TableCell from "@tiptap/extension-table-cell";
 import CharacterCount from "@tiptap/extension-character-count";
+import Underline from "@tiptap/extension-underline";
 import { common, createLowlight } from "lowlight";
 import { Callout } from "./extensions/callout";
 import { HeadingHardbreakSplit } from "./extensions/heading-hardbreak-split";
@@ -45,6 +46,8 @@ import {
 } from "./extensions/blocks/periodic-summary";
 import { ServerHabitTracker } from "./extensions/blocks/habit-tracker";
 import { ServerStopwatch } from "./extensions/blocks/stopwatch";
+import { ServerPullQuote } from "./extensions/blocks/pull-quote";
+import { ServerTableOfContents } from "./extensions/blocks/table-of-contents";
 import {
   ServerUnsupportedBlock,
   ServerUnsupportedInline,
@@ -125,6 +128,7 @@ export function getServerExtensions(): Extensions {
     TableCell,
 
     CharacterCount,
+    Underline,
 
     // M7: Callouts (server-side markdown parsing)
     Callout,
@@ -165,6 +169,8 @@ export function getServerExtensions(): Extensions {
     ServerWeeklySummary,
     ServerHabitTracker,
     ServerStopwatch,
+    ServerPullQuote,
+    ServerTableOfContents,
     ServerUnsupportedBlock,
     ServerUnsupportedInline,
     ...getExtensionServerEditorExtensions(),

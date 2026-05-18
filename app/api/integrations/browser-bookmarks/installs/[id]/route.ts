@@ -4,6 +4,7 @@ import {
   refreshBrowserExtensionInstall,
   revokeBrowserExtensionInstall,
 } from "@/lib/domain/browser-bookmarks";
+import { logger } from "@/lib/core/logger";
 
 function errorResponse(error: unknown, fallback: string) {
   const message = error instanceof Error ? error.message : fallback;
@@ -31,7 +32,7 @@ export async function PATCH(_request: NextRequest, { params }: { params: Params 
     const data = await refreshBrowserExtensionInstall(session.user.id, id);
     return NextResponse.json({ success: true, data });
   } catch (error) {
-    console.error("[BrowserBookmarks Installs] PATCH error:", error);
+    logger.error({ layer: "browser_ext", event: "install_refresh:caught", summary: "PATCH caught", error });
     return errorResponse(error, "Failed to refresh trusted browser install");
   }
 }
@@ -43,7 +44,7 @@ export async function DELETE(_request: NextRequest, { params }: { params: Params
     const data = await revokeBrowserExtensionInstall(session.user.id, id);
     return NextResponse.json({ success: true, data });
   } catch (error) {
-    console.error("[BrowserBookmarks Installs] DELETE error:", error);
+    logger.error({ layer: "browser_ext", event: "install_revoke:caught", summary: "DELETE caught", error });
     return errorResponse(error, "Failed to revoke trusted browser install");
   }
 }

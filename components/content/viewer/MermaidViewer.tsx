@@ -20,6 +20,7 @@ import { toast } from "sonner";
 import type * as Y from "yjs";
 import type { CollaborationRuntimeHandle } from "@/lib/domain/collaboration/runtime";
 import { useResolvedTheme } from "@/lib/features/theme";
+import { clientLogger } from "@/lib/core/logger/client";
 
 // Dynamically import mermaid to avoid SSR issues. Theme is re-applied when the
 // resolved app theme changes (see effect below) so diagrams follow the user.
@@ -119,9 +120,14 @@ export function MermaidViewer({
             await onSave(source);
             setLastSaved(new Date());
             setIsModified(false);
-            console.log("[MermaidViewer] Auto-saved successfully");
           } catch (error: unknown) {
-            console.error("[MermaidViewer] Save failed:", error);
+            clientLogger.error({
+              layer: "ui",
+              event: "mermaid_save:caught",
+              summary: "mermaid auto-save failed",
+              attrs: { content_id: contentId },
+              error,
+            });
             toast.error("Failed to save diagram", {
               description: (error instanceof Error ? error.message : null) || "Could not save changes",
             });
@@ -232,7 +238,13 @@ export function MermaidViewer({
         previewRef.current!.innerHTML = svg;
         setRenderError(null);
       } catch (error: unknown) {
-        console.error("[MermaidViewer] Render error:", error);
+        clientLogger.warn({
+          layer: "ui",
+          event: "mermaid_render:failed",
+          summary: "mermaid render syntax error",
+          attrs: { content_id: contentId },
+          error,
+        });
         const errorMessage = (error instanceof Error ? error.message : null) || "Syntax error";
         setRenderError(errorMessage);
 
@@ -303,7 +315,13 @@ export function MermaidViewer({
         setTimeout(() => URL.revokeObjectURL(url), 100);
         toast.success("Exported as SVG");
       } catch (error: unknown) {
-        console.error("[MermaidViewer] SVG export failed:", error);
+        clientLogger.error({
+          layer: "ui",
+          event: "mermaid_export_svg:caught",
+          summary: "mermaid svg export failed",
+          attrs: { content_id: contentId },
+          error,
+        });
         toast.error("SVG export failed", {
           description: (error instanceof Error ? error.message : null) || "Could not export as SVG",
         });
@@ -355,15 +373,26 @@ export function MermaidViewer({
             }
           });
         } catch (error: unknown) {
-          console.error("[MermaidViewer] PNG export canvas error:", error);
+          clientLogger.error({
+            layer: "ui",
+            event: "mermaid_export_png_canvas:caught",
+            summary: "mermaid png canvas conversion failed",
+            attrs: { content_id: contentId },
+            error,
+          });
           toast.error("PNG export failed", {
             description: (error instanceof Error ? error.message : null) || "Could not convert to PNG",
           });
         }
       };
 
-      img.onerror = (error) => {
-        console.error("[MermaidViewer] PNG export image load error:", error);
+      img.onerror = () => {
+        clientLogger.error({
+          layer: "ui",
+          event: "mermaid_export_png_image:failed",
+          summary: "mermaid png image load failed",
+          attrs: { content_id: contentId },
+        });
         toast.error("PNG export failed", {
           description: "Could not load SVG image for conversion",
         });
@@ -371,7 +400,13 @@ export function MermaidViewer({
 
       img.src = "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(svgData)));
     } catch (error: unknown) {
-      console.error("[MermaidViewer] PNG export failed:", error);
+      clientLogger.error({
+        layer: "ui",
+        event: "mermaid_export_png:caught",
+        summary: "mermaid png export setup failed",
+        attrs: { content_id: contentId },
+        error,
+      });
       toast.error("PNG export failed", {
         description: (error instanceof Error ? error.message : null) || "Could not export as PNG",
       });
@@ -384,7 +419,13 @@ export function MermaidViewer({
       const url = `/content/visualization/${contentId}/fullscreen`;
       window.open(url, "_blank", "noopener,noreferrer");
     } catch (error) {
-      console.error("[MermaidViewer] Error opening fullscreen:", error);
+      clientLogger.error({
+        layer: "ui",
+        event: "mermaid_open_fullscreen:caught",
+        summary: "open fullscreen failed",
+        attrs: { content_id: contentId },
+        error,
+      });
     }
   }, [contentId]);
 

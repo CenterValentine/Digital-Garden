@@ -16,6 +16,7 @@ import { Folder, List, LayoutGrid, Columns3, LayoutDashboard, Network } from "lu
 import { FolderViewContainer } from "@/components/content/folder-views/FolderViewContainer";
 import type { WorkspacePaneId } from "@/state/content-store";
 import { toast } from "sonner";
+import { clientLogger } from "@/lib/core/logger/client";
 
 interface FolderViewerProps {
   contentId: string;
@@ -71,8 +72,7 @@ export function FolderViewer({
           throw new Error(error.error?.message || "Failed to update folder view");
         }
 
-        const result = await response.json();
-        console.log("[FolderViewer] View updated:", result.data);
+        await response.json();
 
         // Update local state
         if (updates.viewMode) {
@@ -84,7 +84,13 @@ export function FolderViewer({
 
         toast.success("Folder view updated");
       } catch (err) {
-        console.error("[FolderViewer] Failed to update view:", err);
+        clientLogger.error({
+          layer: "ui",
+          event: "folder_view_update:caught",
+          summary: "folder view update failed (FolderViewer)",
+          attrs: { content_id: contentId },
+          error: err,
+        });
         toast.error("Failed to update folder view", {
           description: err instanceof Error ? err.message : "An unexpected error occurred",
         });

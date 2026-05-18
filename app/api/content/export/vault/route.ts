@@ -10,70 +10,95 @@ import { requireAuth } from "@/lib/infrastructure/auth/middleware";
 import { getUserSettings } from "@/lib/features/settings";
 import { exportVault } from "@/lib/domain/export";
 import type { ExportFormat, BulkExportFilters, ExportBackupSettings } from "@/lib/domain/export/types";
+import { logger, withRouteTrace, withSpan } from "@/lib/core/logger";
+
+const ROUTE_PATH = "/api/content/export/vault";
 
 export async function POST(request: NextRequest) {
-  try {
-    const session = await requireAuth();
+  return withRouteTrace(request, { route: ROUTE_PATH }, async () => {
+    try {
+      const session = await withSpan(
+        { layer: "auth", name: "session" },
+        { summary: "session lookup" },
+        async () => requireAuth(),
+      );
 
-    // Parse request body
-    const body = await request.json();
-    const format = (body.format || "markdown") as ExportFormat;
-    const filters = (body.filters || {}) as BulkExportFilters;
+      // Parse request body
+      const body = await request.json();
+      const format = (body.format || "markdown") as ExportFormat;
+      const filters = (body.filters || {}) as BulkExportFilters;
 
-    // Get user settings
-    const settings = await getUserSettings(session.user.id);
+      // Get user settings
+      const settings = await withSpan(
+        { layer: "content", name: "settings_read" },
+        { summary: "user settings" },
+        async () => getUserSettings(session.user.id),
+      );
 
-    if (!settings.exportBackup) {
+      if (!settings.exportBackup) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: {
+              code: "SETTINGS_NOT_FOUND",
+              message: "Export settings not configured",
+            },
+          },
+          { status: 500 }
+        );
+      }
+
+      const zipBuffer = await withSpan(
+        { layer: "export", name: "vault" },
+        { attrs: { format }, summary: `vault export (${format})` },
+        async (span) => {
+          // Note: previous template-string log of session.user.id removed —
+          // identity stays in the auth:session span attrs, not in this layer.
+          const result = await exportVault({
+            userId: session.user.id,
+            format,
+            filters,
+            settings: settings.exportBackup as ExportBackupSettings,
+          });
+          span
+            .attr("bytes", result.length)
+            .summary(`${format} ${result.length} bytes`);
+          return result;
+        },
+      );
+
+      // Return ZIP file
+      const filename = `vault-export-${Date.now()}.zip`;
+
+      // Response constructor requires Uint8Array, not Buffer
+      const uint8Content = new Uint8Array(zipBuffer);
+
+      return new Response(uint8Content, {
+        headers: {
+          "Content-Type": "application/zip",
+          "Content-Disposition": `attachment; filename="${filename}"`,
+          "Content-Length": zipBuffer.length.toString(),
+        },
+      });
+    } catch (error) {
+      logger.error({
+        layer: "export",
+        event: "vault:caught",
+        summary: "vault export failed — 500",
+        error,
+      });
+
       return NextResponse.json(
         {
           success: false,
           error: {
-            code: "SETTINGS_NOT_FOUND",
-            message: "Export settings not configured",
+            code: "SERVER_ERROR",
+            message:
+              error instanceof Error ? error.message : "Vault export failed",
           },
         },
         { status: 500 }
       );
     }
-
-    console.log(`[Export] Starting vault export for user ${session.user.id}, format: ${format}`);
-
-    // Export vault
-    const zipBuffer = await exportVault({
-      userId: session.user.id,
-      format,
-      filters,
-      settings: settings.exportBackup as ExportBackupSettings,
-    });
-
-    console.log(`[Export] Vault export complete, size: ${zipBuffer.length} bytes`);
-
-    // Return ZIP file
-    const filename = `vault-export-${Date.now()}.zip`;
-
-    // Response constructor requires Uint8Array, not Buffer
-    const uint8Content = new Uint8Array(zipBuffer);
-
-    return new Response(uint8Content, {
-      headers: {
-        "Content-Type": "application/zip",
-        "Content-Disposition": `attachment; filename="${filename}"`,
-        "Content-Length": zipBuffer.length.toString(),
-      },
-    });
-  } catch (error) {
-    console.error("[Export] Vault export failed:", error);
-
-    return NextResponse.json(
-      {
-        success: false,
-        error: {
-          code: "SERVER_ERROR",
-          message:
-            error instanceof Error ? error.message : "Vault export failed",
-        },
-      },
-      { status: 500 }
-    );
-  }
+  });
 }

@@ -8,6 +8,7 @@
 "use client";
 
 import { MermaidViewer } from "./MermaidViewer";
+import { clientLogger } from "@/lib/core/logger/client";
 
 interface FullscreenMermaidViewerProps {
   contentId: string;
@@ -25,8 +26,6 @@ export function FullscreenMermaidViewer({
   // Client-side save handler
   const handleSave = async (source: string) => {
     try {
-      console.log("[FullscreenMermaidViewer] Saving data:", { source });
-
       const response = await fetch(`/api/content/content/${contentId}`, {
         method: "PATCH",
         credentials: "include",
@@ -41,13 +40,25 @@ export function FullscreenMermaidViewer({
       const result = await response.json();
 
       if (!response.ok || !result.success) {
-        console.error("[FullscreenMermaidViewer] Save error response:", result);
+        clientLogger.error({
+          layer: "ui",
+          event: "fullscreen_mermaid_save:failed",
+          summary: "fullscreen mermaid save api rejected",
+          attrs: {
+            content_id: contentId,
+            error_code: result.error?.code ?? "unknown",
+          },
+        });
         throw new Error(result.error?.message || "Failed to save diagram");
       }
-
-      console.log("[FullscreenMermaidViewer] Saved successfully");
     } catch (err) {
-      console.error("[FullscreenMermaidViewer] Save failed:", err);
+      clientLogger.error({
+        layer: "ui",
+        event: "fullscreen_mermaid_save:caught",
+        summary: "fullscreen mermaid save handler caught",
+        attrs: { content_id: contentId },
+        error: err,
+      });
       throw err;
     }
   };

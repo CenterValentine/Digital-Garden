@@ -24,6 +24,9 @@ import { createDefaultHabitTrackerAttrs } from "../extensions/blocks/habit-track
 // Plugin key for slash commands
 export const slashCommandsPluginKey = new PluginKey("slashCommands");
 
+/** Slash command category — drives the tab filter in SlashCommandsList. */
+export type SlashCommandKind = "editor" | "published";
+
 // Available slash commands
 export interface SlashCommand {
   title: string;
@@ -31,6 +34,12 @@ export interface SlashCommand {
   icon: string;
   command: ({ editor, range }: { editor: Editor; range: Range }) => void;
   aliases?: string[];
+  /**
+   * Category for tab filtering. Defaults to "editor" when omitted.
+   * Mark publishing-extension blocks (PostCard, ProjectCard, Hero, etc.)
+   * as "published" so the Editor tab stays focused on note-taking blocks.
+   */
+  kind?: SlashCommandKind;
 }
 
 interface SlashAllowProps {
@@ -174,6 +183,295 @@ export function getSlashCommands(): SlashCommand[] {
           .run();
       },
       aliases: ["blockquote"],
+    },
+    {
+      title: "Pull Quote",
+      description: "Styled quote block — 7 visual variants (bordered, card, featured…)",
+      icon: "❝",
+      command: ({ editor, range }) => {
+        editor
+          .chain()
+          .focus()
+          .deleteRange(range)
+          .insertContent({ type: "pullQuote", attrs: { variant: "bordered" } })
+          .run();
+      },
+      aliases: ["pullquote", "highlight", "featured", "citation", "pull"],
+      kind: "published",
+    },
+    {
+      title: "Table of Contents",
+      description: "Auto-generated outline of document headings",
+      icon: "≡",
+      command: ({ editor, range }) => {
+        editor
+          .chain()
+          .focus()
+          .deleteRange(range)
+          .insertContent({ type: "tableOfContents", attrs: {} })
+          .run();
+      },
+      aliases: ["toc", "contents", "outline", "navigation", "index", "headings"],
+      kind: "published",
+    },
+    {
+      title: "Gallery",
+      description: "Image gallery — grid, masonry, or carousel",
+      icon: "⊞",
+      command: ({ editor, range }) => {
+        editor.chain().focus().deleteRange(range)
+          .insertContent({ type: "gallery", attrs: {} }).run();
+      },
+      aliases: ["gallery", "images", "photos", "grid", "carousel"],
+      kind: "published",
+    },
+    {
+      title: "Hero Image",
+      description: "Full-width banner with headline and optional CTA",
+      icon: "▬",
+      command: ({ editor, range }) => {
+        editor.chain().focus().deleteRange(range)
+          .insertContent({ type: "heroImage", attrs: {} }).run();
+      },
+      aliases: ["hero", "banner", "header", "cover", "fullwidth"],
+      kind: "published",
+    },
+    {
+      title: "Post Card",
+      description: "Blog post preview card with cover, title, and tags",
+      icon: "▭",
+      command: ({ editor, range }) => {
+        editor.chain().focus().deleteRange(range)
+          .insertContent({ type: "postCard", attrs: {} }).run();
+      },
+      aliases: ["postcard", "post", "blog", "article", "preview"],
+      kind: "published",
+    },
+    {
+      title: "Project Card",
+      description: "Project showcase card with tech stack and links",
+      icon: "◱",
+      command: ({ editor, range }) => {
+        editor.chain().focus().deleteRange(range)
+          .insertContent({ type: "projectCard", attrs: {} }).run();
+      },
+      aliases: ["projectcard", "project", "portfolio", "showcase"],
+      kind: "published",
+    },
+    {
+      title: "Recent Posts",
+      description: "Dynamic list of recent posts from a publishing path",
+      icon: "≋",
+      command: ({ editor, range }) => {
+        editor.chain().focus().deleteRange(range)
+          .insertContent({ type: "recentPosts", attrs: {} }).run();
+      },
+      aliases: ["recentposts", "recent", "feed", "posts", "dynamic"],
+      kind: "published",
+    },
+    {
+      title: "Timeline",
+      description: "Ordered chronology of events — 10 visual variants",
+      icon: "⊢",
+      command: ({ editor, range }) => {
+        editor.chain().focus().deleteRange(range)
+          .insertContent({ type: "timeline", attrs: {} }).run();
+      },
+      aliases: ["timeline", "history", "events", "chronology", "milestones"],
+      kind: "published",
+    },
+    {
+      title: "Stat Block",
+      description: "Single large metric display with optional animation",
+      icon: "#",
+      command: ({ editor, range }) => {
+        editor.chain().focus().deleteRange(range)
+          .insertContent({ type: "statBlock", attrs: {} }).run();
+      },
+      aliases: ["stat", "metric", "number", "kpi", "counter"],
+      kind: "published",
+    },
+    {
+      title: "Metrics Strip",
+      description: "Horizontal row of multiple metrics and KPIs",
+      icon: "≣",
+      command: ({ editor, range }) => {
+        editor.chain().focus().deleteRange(range)
+          .insertContent({ type: "metricsStrip", attrs: {} }).run();
+      },
+      aliases: ["metrics", "kpi", "stats", "strip", "numbers"],
+      kind: "published",
+    },
+    {
+      title: "Process Steps",
+      description: "Step-by-step process or how-to list — 6 variants",
+      icon: "①",
+      command: ({ editor, range }) => {
+        editor.chain().focus().deleteRange(range)
+          .insertContent({ type: "processSteps", attrs: {} }).run();
+      },
+      aliases: ["steps", "process", "how-to", "guide", "workflow", "numbered"],
+      kind: "published",
+    },
+    // ── W5 ──────────────────────────────────────────────────────────────────
+    {
+      title: "Testimonial",
+      description: "Quote from a person with avatar, name, title, and star rating",
+      icon: "❝",
+      command: ({ editor, range }) => {
+        editor.chain().focus().deleteRange(range)
+          .insertContent({ type: "testimonialCard", attrs: {} }).run();
+      },
+      aliases: ["testimonial", "quote", "review", "feedback", "star"],
+      kind: "published",
+    },
+    {
+      title: "CTA Banner",
+      description: "Call-to-action section with headline and buttons",
+      icon: "⚡",
+      command: ({ editor, range }) => {
+        editor.chain().focus().deleteRange(range)
+          .insertContent({ type: "ctaBanner", attrs: {} }).run();
+      },
+      aliases: ["cta", "call to action", "banner", "button", "conversion"],
+      kind: "published",
+    },
+    // ── W6 ──────────────────────────────────────────────────────────────────
+    {
+      title: "Video",
+      description: "Embed a YouTube, Vimeo, or direct video URL",
+      icon: "▶",
+      command: ({ editor, range }) => {
+        editor.chain().focus().deleteRange(range)
+          .insertContent({ type: "videoEmbed", attrs: {} }).run();
+      },
+      aliases: ["video", "youtube", "vimeo", "embed", "player", "media"],
+      kind: "published",
+    },
+    // ── W7 ──────────────────────────────────────────────────────────────────
+    {
+      title: "FAQ",
+      description: "Collapsible question/answer accordion",
+      icon: "?",
+      command: ({ editor, range }) => {
+        editor.chain().focus().deleteRange(range)
+          .insertContent({ type: "faqAccordion", attrs: {} }).run();
+      },
+      aliases: ["faq", "questions", "accordion", "help", "support"],
+      kind: "published",
+    },
+    {
+      title: "Feature List",
+      description: "Grid of features/benefits with icon and description",
+      icon: "⊞",
+      command: ({ editor, range }) => {
+        editor.chain().focus().deleteRange(range)
+          .insertContent({ type: "featureList", attrs: {} }).run();
+      },
+      aliases: ["features", "benefits", "grid", "icons", "services"],
+      kind: "published",
+    },
+    // ── W8 ──────────────────────────────────────────────────────────────────
+    {
+      title: "Person Card",
+      description: "Profile card with photo, name, bio, and social links",
+      icon: "👤",
+      command: ({ editor, range }) => {
+        editor.chain().focus().deleteRange(range)
+          .insertContent({ type: "personCard", attrs: {} }).run();
+      },
+      aliases: ["person", "profile", "team", "author", "bio", "about"],
+      kind: "published",
+    },
+    {
+      title: "Newsletter Signup",
+      description: "Email capture form with configurable endpoint",
+      icon: "✉",
+      command: ({ editor, range }) => {
+        editor.chain().focus().deleteRange(range)
+          .insertContent({ type: "newsletterSignup", attrs: {} }).run();
+      },
+      aliases: ["newsletter", "email", "subscribe", "signup", "form"],
+      kind: "published",
+    },
+    // ── W9 ──────────────────────────────────────────────────────────────────
+    {
+      title: "Logo Strip",
+      description: "Horizontal row of partner or client logos",
+      icon: "◫",
+      command: ({ editor, range }) => {
+        editor.chain().focus().deleteRange(range)
+          .insertContent({ type: "logoStrip", attrs: {} }).run();
+      },
+      aliases: ["logos", "brand", "partner", "client", "sponsor"],
+      kind: "published",
+    },
+    {
+      title: "Social Links",
+      description: "Row of social media profile links",
+      icon: "⇢",
+      command: ({ editor, range }) => {
+        editor.chain().focus().deleteRange(range)
+          .insertContent({ type: "socialLinks", attrs: {} }).run();
+      },
+      aliases: ["social", "links", "twitter", "github", "linkedin", "follow"],
+      kind: "published",
+    },
+    {
+      title: "Pricing Card",
+      description: "Single pricing tier with features and CTA button",
+      icon: "$",
+      command: ({ editor, range }) => {
+        editor.chain().focus().deleteRange(range)
+          .insertContent({ type: "pricingCard", attrs: {} }).run();
+      },
+      aliases: ["pricing", "plan", "tier", "price", "subscription"],
+      kind: "published",
+    },
+    // ── W10 ─────────────────────────────────────────────────────────────────
+    {
+      title: "Spacer",
+      description: "Invisible vertical space for layout control",
+      icon: "↕",
+      command: ({ editor, range }) => {
+        editor.chain().focus().deleteRange(range)
+          .insertContent({ type: "spacer", attrs: {} }).run();
+      },
+      aliases: ["spacer", "space", "gap", "padding", "blank"],
+      kind: "published",
+    },
+    {
+      title: "Skill Badges",
+      description: "Grid of technology/skill pill badges",
+      icon: "⬡",
+      command: ({ editor, range }) => {
+        editor.chain().focus().deleteRange(range)
+          .insertContent({ type: "skillBadges", attrs: {} }).run();
+      },
+      aliases: ["skills", "tech", "stack", "badges", "technologies", "expertise"],
+      kind: "published",
+    },
+    {
+      title: "Bookmark Card",
+      description: "Styled link card with title, description, and preview image",
+      icon: "⊡",
+      command: ({ editor, range }) => {
+        editor.chain().focus().deleteRange(range)
+          .insertContent({ type: "bookmarkCard", attrs: {} }).run();
+      },
+      aliases: ["bookmark", "link", "card", "preview", "resource", "reading"],
+      kind: "published",
+    },
+    {
+      title: "Tag Cloud",
+      description: "Browsable topic tags with optional links and sizing",
+      icon: "#",
+      command: ({ editor, range }) => {
+        editor.chain().focus().deleteRange(range)
+          .insertContent({ type: "tagCloud", attrs: {} }).run();
+      },
+      aliases: ["tags", "cloud", "topics", "categories", "browse"],
+      kind: "published",
     },
     {
       title: "Code Block",

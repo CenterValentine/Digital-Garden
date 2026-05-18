@@ -26,6 +26,7 @@ import { createBlockSchema } from "@/lib/domain/blocks/schema";
 import { registerBlock } from "@/lib/domain/blocks/registry";
 import { createBlockNodeView } from "@/lib/domain/blocks/node-view-factory";
 import { consumePendingDiagramCreate } from "./pending-diagram-creates";
+import { makeWrapAttrs } from "@/lib/domain/blocks/wrap-size";
 
 /**
  * NodeView contentDom carries React lifecycle handles attached during render.
@@ -162,6 +163,7 @@ export const MermaidBlock = Node.create({
         renderHTML: (attrs) =>
           attrs.showContainer ? { "data-show-container": "true" } : {},
       },
+      ...makeWrapAttrs(),
     };
   },
 
@@ -252,6 +254,7 @@ export const ServerMermaidBlock = Node.create({
         renderHTML: (attrs) =>
           attrs.showContainer ? { "data-show-container": "true" } : {},
       },
+      ...makeWrapAttrs(),
     };
   },
 

@@ -28,6 +28,7 @@ import {
 import { Button } from "@/components/ui/glass/button";
 import { Slider } from "@/components/ui/slider";
 import { toast } from "sonner";
+import { clientLogger } from "@/lib/core/logger/client";
 
 interface AudioPlayerProps {
   downloadUrl: string;
@@ -145,7 +146,12 @@ export function AudioPlayer({ downloadUrl, fileName, mimeType, title, onDownload
         source.connect(analyserRef.current);
         analyserRef.current.connect(audioContextRef.current.destination);
       } catch (err) {
-        console.error("Web Audio API error:", err);
+        clientLogger.error({
+          layer: "ui",
+          event: "audio_player_webaudio:caught",
+          summary: "web audio api init failed",
+          error: err,
+        });
         return;
       }
     }

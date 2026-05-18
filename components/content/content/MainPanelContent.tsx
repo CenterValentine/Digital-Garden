@@ -12,6 +12,7 @@ import { createElement, useState, useEffect, useCallback, useMemo, useRef } from
 import { usePathname } from "next/navigation";
 import { AlertTriangle } from "lucide-react";
 import { ToolSurfaceProvider } from "@/lib/domain/tools";
+import { clientLogger } from "@/lib/core/logger/client";
 import { ContentToolbar } from "../toolbar";
 import { ToolDebugPanel } from "../toolbar/ToolDebugPanel";
 import type { ContentType as ToolContentType } from "@/lib/domain/tools";
@@ -350,9 +351,12 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
           );
 
           if (response.status === 404) {
-            console.warn(
-              `Page template ${selectedContentId} not found (404). Closing stale tab.`
-            );
+            clientLogger.warn({
+              layer: "ui",
+              event: "page_template_selection:stale_cleared",
+              summary: "page template not found (404), closing stale tab",
+              attrs: { content_id: selectedContentId },
+            });
             toast.error("Page template not found. It may have been deleted.");
             closeContentTabs([selectedContentId]);
             return;
@@ -419,25 +423,28 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
           credentials: "include",
         });
 
-        // Log response for debugging
-        console.log('API Response status:', response.status);
-
-        // Handle 404 - content no longer exists (stale localStorage/URL)
         if (response.status === 404) {
-          console.warn(`Content ${selectedContentId} not found (404). Clearing stale selection.`);
+          clientLogger.warn({
+            layer: "ui",
+            event: "content_selection:stale_cleared",
+            summary: "content not found (404), clearing stale selection",
+            attrs: { content_id: selectedContentId },
+          });
           toast.error("Note not found. It may have been deleted.");
           closeContentTabs([selectedContentId]);
           return;
         }
 
         const result: ContentResponse = await response.json();
-        console.log('API Response data:', result);
-        console.log('Content type:', result.data?.contentType);
-        console.log('Has note payload?', !!result.data?.note);
 
         if (!response.ok || !result.success) {
           const errorMsg = result.error?.message || "Failed to fetch note";
-          console.error('API Error:', errorMsg, result.error);
+          clientLogger.error({
+            layer: "fetch",
+            event: "content_fetch:failed",
+            summary: errorMsg,
+            attrs: { content_id: selectedContentId, status: response.status },
+          });
           throw new Error(errorMsg);
         }
 
@@ -496,7 +503,12 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
 
             // Validate that it's a valid TipTap document
             if (!content || typeof content !== 'object' || !content.type) {
-              console.warn('Invalid TipTap JSON structure, using empty document');
+              clientLogger.warn({
+                layer: "editor",
+                event: "tiptap_load:invalid_structure",
+                summary: "invalid TipTap JSON, using empty document",
+                attrs: { content_id: selectedContentId },
+              });
               const emptyDoc = {
                 type: "doc",
                 content: [{ type: "paragraph" }],
@@ -507,7 +519,6 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
               const initialOutline = extractOutline(emptyDoc);
               setOutline(selectedContentId, initialOutline);
             } else {
-              console.log('Setting note content:', content);
               const validContent = content as JSONContent;
               const sanitized = sanitizeTipTapJsonWithExtensions(
                 validContent,
@@ -517,10 +528,12 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
                 sanitized.rewritten.length > 0 &&
                 process.env.NODE_ENV === "development"
               ) {
-                console.warn(
-                  "[content] rewrote unsupported TipTap content while loading note",
-                  sanitized.rewritten
-                );
+                clientLogger.warn({
+                  layer: "editor",
+                  event: "tiptap_load:rewrote_unsupported",
+                  summary: "rewrote unsupported TipTap content while loading note",
+                  attrs: { content_id: selectedContentId, rewritten_count: sanitized.rewritten.length },
+                });
               }
               setNoteContent(sanitized.json);
 
@@ -529,8 +542,13 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
               setOutline(selectedContentId, initialOutline);
             }
           } catch (parseError) {
-            console.error('Failed to parse TipTap JSON:', parseError);
-            console.warn('Using empty document due to parse error');
+            clientLogger.error({
+              layer: "editor",
+              event: "tiptap_load:parse_failed",
+              summary: "failed to parse TipTap JSON, using empty document",
+              attrs: { content_id: selectedContentId },
+              error: parseError,
+            });
             const emptyDoc = {
               type: "doc",
               content: [{ type: "paragraph" }],
@@ -542,8 +560,7 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
             setOutline(selectedContentId, initialOutline);
           }
         } else {
-          console.log('No note payload, using empty document');
-          // Empty document
+          // No note payload — render empty doc
           const emptyDoc = {
             type: "doc",
             content: [{ type: "paragraph" }],
@@ -555,7 +572,13 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
           setOutline(selectedContentId, initialOutline);
         }
       } catch (err) {
-        console.error("Failed to fetch note:", err);
+        clientLogger.error({
+          layer: "fetch",
+          event: "content_fetch:caught",
+          summary: "failed to fetch note",
+          attrs: { content_id: selectedContentId },
+          error: err,
+        });
         setError(err instanceof Error ? err.message : "Failed to load note");
       } finally {
         setIsLoading(false);
@@ -591,8 +614,6 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
 
       // If the updated content is the currently selected one, refresh it
         if (contentId === selectedContentId) {
-          console.log('[MainPanelContent] Content updated, refreshing:', contentId, updates);
-
           // If only title changed, update it directly (faster than refetch)
           if (updates.title && Object.keys(updates).length === 1) {
             setNoteTitle(updates.title);
@@ -652,7 +673,10 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
   // the API call, we verify it still matches the currently-viewed document.
   // An AbortController cancels any in-flight fetch if the user navigates away.
   const handleSave = useCallback(
-    async (content: JSONContent) => {
+    async (
+      content: JSONContent,
+      meta?: { userInitiated?: boolean; secondsSinceInput?: number },
+    ) => {
       if (!selectedContentId) return;
       if (typeof navigator !== "undefined" && !navigator.onLine) {
         setHasUnsavedChanges(true);
@@ -663,9 +687,12 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
       // document. Another pane becoming focused should not cancel the save.
       const currentId = getPaneActiveContentId(useContentStore.getState(), paneId);
       if (currentId !== selectedContentId) {
-        console.warn(
-          `[MainPanelContent] Blocked cross-document save: handleSave targets ${selectedContentId}, but pane ${paneId} has ${currentId}`
-        );
+        clientLogger.warn({
+          layer: "ui",
+          event: "save:cross_document_blocked",
+          summary: "blocked cross-document save",
+          attrs: { pane_id: paneId, target_id: selectedContentId, current_id: currentId ?? "none" },
+        });
         return;
       }
 
@@ -692,6 +719,17 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
           },
           body: JSON.stringify({
             tiptapJson: content,
+            // Forward user-intent metadata from the editor. The content
+            // PATCH route uses `userInitiated` to bypass the shrink-refusal
+            // guard when there's been a recent user gesture, allowing
+            // legitimate "select all + delete" flows while still refusing
+            // bug-class auto-saves (editor mount race with no input).
+            // `secondsSinceInput` is telemetry only — surfaces in trace
+            // span attrs so we can tune the recency window with real data.
+            ...(meta?.userInitiated === true && { userInitiated: true }),
+            ...(typeof meta?.secondsSinceInput === "number" && {
+              secondsSinceInput: meta.secondsSinceInput,
+            }),
           }),
           signal: abortController.signal,
           }
@@ -712,21 +750,23 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
         // navigated during the network round-trip.
         const postSaveId = getPaneActiveContentId(useContentStore.getState(), paneId);
         if (postSaveId !== selectedContentId) {
-          console.warn(
-            `[MainPanelContent] Pane ${paneId} navigated during save — skipping state update for ${selectedContentId}`
-          );
+          clientLogger.warn({
+            layer: "ui",
+            event: "save:pane_navigated_mid_save",
+            summary: "pane navigated during save, skipping state update",
+            attrs: { pane_id: paneId, target_id: selectedContentId },
+          });
           return;
         }
 
-        console.log("Note saved successfully");
         setLastSaved(new Date());
         // Keep parent state in sync so re-mounts (e.g., ExpandableEditor
         // collapse/reopen) receive the latest persisted content
         setNoteContent(content);
       } catch (err: unknown) {
-        // AbortError is expected when we cancel a save due to navigation
+        // AbortError is expected when we cancel a save due to navigation —
+        // not worth a log line, the navigation that triggered it is the signal.
         if (err instanceof DOMException && err.name === "AbortError") {
-          console.log(`[MainPanelContent] Save aborted for ${selectedContentId} (navigation)`);
           return;
         }
         const message = err instanceof Error ? err.message : String(err);
@@ -738,7 +778,13 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
           setHasUnsavedChanges(true);
           return;
         }
-        console.error("Failed to save note:", err);
+        clientLogger.error({
+          layer: "fetch",
+          event: "content_save:failed",
+          summary: "failed to save note",
+          attrs: { content_id: selectedContentId },
+          error: err,
+        });
         throw err; // Re-throw so editor knows save failed
       } finally {
         setIsSaving(false);
@@ -757,10 +803,7 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
   // Wiki-link click handler - navigate to note or folder by title
   const handleWikiLinkClick = useCallback(
     async (targetTitle: string) => {
-      console.log('[MainPanelContent] Wiki-link clicked:', targetTitle);
-
       try {
-        // Search for the content by title (note or folder)
         const response = await fetch(`/api/content/content?search=${encodeURIComponent(targetTitle)}`, {
           credentials: "include",
         });
@@ -768,27 +811,41 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
         const result = await response.json();
 
         if (!response.ok || !result.success) {
-          console.error('[MainPanelContent] Failed to find content:', result.error);
+          clientLogger.error({
+            layer: "fetch",
+            event: "wiki_link_lookup:failed",
+            summary: "failed to find content for wiki-link",
+            attrs: { target_title: targetTitle, status: response.status },
+          });
           return;
         }
 
-        // Find exact title match (case-insensitive)
         const matchedContent = (result.data?.items as Array<{ id: string; title: string; contentType: string }> | undefined)?.find(
           (item) => item.title.toLowerCase() === targetTitle.toLowerCase()
         );
 
         if (matchedContent) {
-          console.log('[MainPanelContent] Navigating to:', matchedContent.contentType, matchedContent.id, matchedContent.title);
           setSelectedContentId(matchedContent.id, {
             title: matchedContent.title,
             contentType: matchedContent.contentType,
             paneId,
           });
         } else {
-          console.warn('[MainPanelContent] No content found with title:', targetTitle);
+          clientLogger.warn({
+            layer: "ui",
+            event: "wiki_link_lookup:no_match",
+            summary: "wiki-link target not found",
+            attrs: { target_title: targetTitle },
+          });
         }
       } catch (err) {
-        console.error('[MainPanelContent] Error finding content:', err);
+        clientLogger.error({
+          layer: "fetch",
+          event: "wiki_link_lookup:caught",
+          summary: "error finding content for wiki-link",
+          attrs: { target_title: targetTitle },
+          error: err,
+        });
       }
     },
     [paneId, setSelectedContentId]
@@ -797,10 +854,7 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
   // Fetch notes for wiki-link autocomplete
   const fetchNotesForWikiLink = useCallback(
     async (query: string) => {
-      console.log('[MainPanelContent] Fetching notes for autocomplete:', query);
-
       try {
-        // Search for notes matching the query
         const response = await fetch(`/api/content/content?search=${encodeURIComponent(query)}`, {
           credentials: "include",
         });
@@ -808,21 +862,31 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
         const result = await response.json();
 
         if (!response.ok || !result.success) {
-          console.error('[MainPanelContent] Failed to fetch notes:', result.error);
+          clientLogger.error({
+            layer: "fetch",
+            event: "wiki_link_autocomplete:failed",
+            summary: "failed to fetch notes for wiki-link autocomplete",
+            attrs: { query, status: response.status },
+          });
           return [];
         }
 
         type NoteItem = { id: string; title: string; slug: string; contentType: string };
-        // Return notes in the format expected by autocomplete
         return ((result.data?.items as NoteItem[] | undefined) || [])
-          .filter((item) => item.contentType === 'note') // Only show notes, not folders
+          .filter((item) => item.contentType === 'note')
           .map((item) => ({
             id: item.id,
             title: item.title,
             slug: item.slug,
           }));
       } catch (err) {
-        console.error('[MainPanelContent] Error fetching notes:', err);
+        clientLogger.error({
+          layer: "fetch",
+          event: "wiki_link_autocomplete:caught",
+          summary: "error fetching notes for autocomplete",
+          attrs: { query },
+          error: err,
+        });
         return [];
       }
     },
@@ -832,15 +896,18 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
   // Fetch tags for tag autocomplete
   const fetchTags = useCallback(
     async (query: string) => {
-      console.log('[MainPanelContent] Fetching tags for autocomplete:', query);
-
       try {
         const response = await fetch(`/api/content/tags?search=${encodeURIComponent(query)}`, {
           credentials: "include",
         });
 
         if (!response.ok) {
-          console.error('[MainPanelContent] Failed to fetch tags:', response.status);
+          clientLogger.error({
+            layer: "fetch",
+            event: "tag_autocomplete:failed",
+            summary: "failed to fetch tags for autocomplete",
+            attrs: { query, status: response.status },
+          });
           return [];
         }
 
@@ -853,7 +920,6 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
           color: string | null;
           _count?: { contentTags?: number };
         };
-        // Return tags in the format expected by autocomplete
         return (tags as TagItem[]).map((tag) => ({
           id: tag.id,
           name: tag.name,
@@ -862,7 +928,13 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
           usageCount: tag._count?.contentTags || 0,
         }));
       } catch (err) {
-        console.error('[MainPanelContent] Error fetching tags:', err);
+        clientLogger.error({
+          layer: "fetch",
+          event: "tag_autocomplete:caught",
+          summary: "error fetching tags",
+          attrs: { query },
+          error: err,
+        });
         return [];
       }
     },
@@ -906,7 +978,13 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
             avatarUrl: item.avatarUrl || null,
           }));
       } catch (error) {
-        console.error("[MainPanelContent] Error fetching people mentions:", error);
+        clientLogger.error({
+          layer: "fetch",
+          event: "people_mention_autocomplete:caught",
+          summary: "error fetching people mentions",
+          attrs: { query },
+          error,
+        });
         return [];
       }
     },
@@ -948,7 +1026,13 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
           })
         );
       } catch (error) {
-        console.error("[MainPanelContent] Error handling person mention click:", error);
+        clientLogger.error({
+          layer: "ui",
+          event: "person_mention_click:caught",
+          summary: "error handling person mention click",
+          attrs: { person_id: personId },
+          error,
+        });
         toast.error("Failed to open person", {
           description: error instanceof Error ? error.message : "Unknown error",
         });
@@ -960,8 +1044,6 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
   // Create a new tag
   const createTag = useCallback(
     async (tagName: string) => {
-      console.log('[MainPanelContent] Creating new tag:', tagName);
-
       try {
         const response = await fetch('/api/content/tags', {
           method: 'POST',
@@ -977,7 +1059,6 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
         }
 
         const newTag = await response.json();
-        console.log('[MainPanelContent] Tag created:', newTag);
 
         return {
           id: newTag.id,
@@ -987,7 +1068,13 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
           usageCount: 0,
         };
       } catch (err) {
-        console.error('[MainPanelContent] Error creating tag:', err);
+        clientLogger.error({
+          layer: "fetch",
+          event: "tag_create:caught",
+          summary: "error creating tag",
+          attrs: { tag_name: tagName },
+          error: err,
+        });
         throw err;
       }
     },

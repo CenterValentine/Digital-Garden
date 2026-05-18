@@ -1,6 +1,9 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/infrastructure/auth/middleware";
 import { revokeBrowserExtensionToken } from "@/lib/domain/browser-bookmarks";
+import { logger, withRouteTrace, withSpan } from "@/lib/core/logger";
+
+const ROUTE_PATH = "/api/integrations/browser-bookmarks/tokens/[id]";
 
 type Params = Promise<{ id: string }>;
 
@@ -21,16 +24,31 @@ function errorResponse(error: unknown, fallback: string) {
 }
 
 export async function DELETE(
-  _request: Request,
+  request: NextRequest,
   { params }: { params: Params }
 ) {
-  try {
-    const session = await requireAuth();
-    const { id } = await params;
-    const data = await revokeBrowserExtensionToken(session.user.id, id);
-    return NextResponse.json({ success: true, data });
-  } catch (error) {
-    console.error("[BrowserBookmarks Tokens] DELETE error:", error);
-    return errorResponse(error, "Failed to revoke browser extension token");
-  }
+  return withRouteTrace(request, { route: ROUTE_PATH }, async () => {
+    try {
+      const session = await withSpan(
+        { layer: "auth", name: "session" },
+        { summary: "session lookup" },
+        async () => requireAuth(),
+      );
+      const { id } = await params;
+      const data = await withSpan(
+        { layer: "browser_ext", name: "token_revoke" },
+        { attrs: { token_id: id } },
+        async () => revokeBrowserExtensionToken(session.user.id, id),
+      );
+      return NextResponse.json({ success: true, data });
+    } catch (error) {
+      logger.error({
+        layer: "browser_ext",
+        event: "token_revoke:caught",
+        summary: "revoke failed — 500",
+        error,
+      });
+      return errorResponse(error, "Failed to revoke browser extension token");
+    }
+  });
 }

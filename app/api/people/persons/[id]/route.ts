@@ -5,6 +5,7 @@ import type { Prisma } from "@/lib/database/generated/prisma";
 import { prisma } from "@/lib/database/client";
 import { requireAuth } from "@/lib/infrastructure/auth/middleware";
 import { generateSlug } from "@/lib/domain/content/slug";
+import { logger } from "@/lib/core/logger";
 
 type FolderViewMode = "list" | "gallery" | "kanban" | "dashboard" | "canvas";
 
@@ -269,7 +270,7 @@ export async function GET(
       },
     });
   } catch (error) {
-    console.error("GET /api/people/persons/[id] error:", error);
+    logger.error({ layer: "content", event: "person_read:caught", summary: "GET caught", error });
     return NextResponse.json(
       {
         success: false,
@@ -484,7 +485,7 @@ export async function PATCH(
       },
     });
   } catch (error) {
-    console.error("PATCH /api/people/persons/[id] error:", error);
+    logger.error({ layer: "content", event: "person_update:caught", summary: "PATCH caught", error });
     return NextResponse.json(
       {
         success: false,
@@ -567,7 +568,7 @@ export async function DELETE(
       },
     });
   } catch (error) {
-    console.error("DELETE /api/people/persons/[id] error:", error);
+    logger.error({ layer: "content", event: "person_delete:caught", summary: "DELETE caught", error });
     return NextResponse.json(
       {
         success: false,

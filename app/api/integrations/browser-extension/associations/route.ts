@@ -5,6 +5,7 @@ import {
   deleteWebResourceAssociation,
   getWebResourceContextById,
 } from "@/lib/domain/browser-extension";
+import { logger } from "@/lib/core/logger";
 
 function errorResponse(error: unknown, fallback: string) {
   const message = error instanceof Error ? error.message : fallback;
@@ -43,7 +44,7 @@ export async function GET(request: NextRequest) {
     const data = await getWebResourceContextById(token.user.id, installId, resourceId);
     return NextResponse.json({ success: true, data: data.associations });
   } catch (error) {
-    console.error("[BrowserExtension Associations] GET error:", error);
+    logger.error({ layer: "browser_ext", event: "associations_read:caught", summary: "GET caught", error });
     return errorResponse(error, "Failed to load associations");
   }
 }
@@ -59,7 +60,7 @@ export async function POST(request: NextRequest) {
     });
     return NextResponse.json({ success: true, data }, { status: 201 });
   } catch (error) {
-    console.error("[BrowserExtension Associations] POST error:", error);
+    logger.error({ layer: "browser_ext", event: "association_create:caught", summary: "POST caught", error });
     return errorResponse(error, "Failed to create association");
   }
 }
@@ -74,7 +75,7 @@ export async function DELETE(request: NextRequest) {
     });
     return NextResponse.json({ success: true, data });
   } catch (error) {
-    console.error("[BrowserExtension Associations] DELETE error:", error);
+    logger.error({ layer: "browser_ext", event: "association_delete:caught", summary: "DELETE caught", error });
     return errorResponse(error, "Failed to remove association");
   }
 }

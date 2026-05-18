@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireBrowserExtensionBearerAuth } from "@/lib/domain/browser-bookmarks/http";
 import { prisma } from "@/lib/database/client";
+import { logger } from "@/lib/core/logger";
 
 const MAX_RESULTS = 20;
 
@@ -80,7 +81,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ success: true, data: { items, total: items.length } });
   } catch (error) {
-    console.error("[BrowserExtension DomainAssociations] GET error:", error);
+    logger.error({ layer: "browser_ext", event: "domain_associations:caught", summary: "GET caught", error });
     return errorResponse(error, "Failed to load domain associations");
   }
 }

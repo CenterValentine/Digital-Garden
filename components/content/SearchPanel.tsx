@@ -25,6 +25,7 @@ import { useTreeStateStore } from "@/state/tree-state-store";
 import { parseSearchResults } from "@/lib/domain/search/filters";
 import type { SearchResult } from "@/lib/domain/search/filters";
 import type { ContentType } from "@/lib/domain/content/types";
+import { clientLogger } from "@/lib/core/logger/client";
 
 export function SearchPanel() {
   const {
@@ -99,7 +100,12 @@ export function SearchPanel() {
             setAvailableTags(tags);
           }
         } catch (err) {
-          console.error("Failed to fetch tags:", err);
+          clientLogger.error({
+            layer: "ui",
+            event: "search_tags_fetch:caught",
+            summary: "fetch tags for search filter failed",
+            error: err,
+          });
         }
       };
       fetchTags();
@@ -227,8 +233,6 @@ export function SearchPanel() {
 
   // Open note in editor or select folder in tree
   const handleResultClick = (result: SearchResult) => {
-    console.log('[SearchPanel] Clicking result:', result.id, result.title, 'type:', result.type);
-
     if (result.type === 'folder') {
       setSelectedIds([result.id]); // Select folder in file tree
       setExpanded(result.id, true); // Expand the folder

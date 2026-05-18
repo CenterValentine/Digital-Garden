@@ -22,6 +22,7 @@ import { Check, AlertCircle, Wrench, Key } from "lucide-react";
 import { toast } from "sonner";
 import { ALL_TOOL_IDS, ALL_TOOL_METADATA } from "@/lib/domain/ai/tools/metadata";
 import { AIKeyManager } from "@/components/settings/AIKeyManager";
+import { clientLogger } from "@/lib/core/logger/client";
 
 /** Shape of ai settings as stored in User.settings.ai */
 interface AISettings {
@@ -107,7 +108,12 @@ export default function AISettingsPage() {
           if (ai.showAiHighlight !== undefined) setShowAiHighlight(ai.showAiHighlight);
         }
       } catch (err) {
-        console.error("Failed to load AI settings:", err);
+        clientLogger.error({
+          layer: "ui",
+          event: "ai_settings_load:caught",
+          summary: "load ai settings failed",
+          error: err,
+        });
       } finally {
         setIsLoading(false);
       }
@@ -164,7 +170,12 @@ export default function AISettingsPage() {
         icon: <Check className="h-4 w-4" />,
       });
     } catch (err) {
-      console.error("Failed to save AI settings:", err);
+      clientLogger.error({
+        layer: "ui",
+        event: "ai_settings_save:caught",
+        summary: "save ai settings failed",
+        error: err,
+      });
       toast.error("Failed to save settings", {
         description: err instanceof Error ? err.message : "Please try again",
       });

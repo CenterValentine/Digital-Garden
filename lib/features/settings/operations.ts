@@ -12,6 +12,7 @@ import {
   type UserSettings,
 } from "./validation";
 import { deepMerge } from "@/lib/core/deep-merge";
+import { logger } from "@/lib/core/logger";
 
 /**
  * Get user settings from database
@@ -32,7 +33,12 @@ export async function getUserSettings(userId: string): Promise<UserSettings> {
     const validated = userSettingsSchema.parse(user.settings);
     return mergeWithDefaults(validated);
   } catch (error) {
-    console.error("[Settings Utils] Get settings error:", error);
+    logger.warn({
+      layer: "content",
+      event: "settings_read:caught",
+      summary: "settings read failed, falling back to defaults",
+      error,
+    });
     return DEFAULT_SETTINGS;
   }
 }
@@ -55,13 +61,9 @@ export async function updateUserSettings(
     // Validate
     const validated = userSettingsSchema.parse(updated);
 
-    console.log("[Settings Utils] Saving settings:", {
-      userId,
-      updates,
-      current: current.external,
-      updated: updated.external,
-      validated: validated.external,
-    });
+    // Previously logged the full user/current/updated/validated payload —
+    // dropped to avoid leaking user settings through stdout. The settings
+    // write outcome is captured by the caller's content:settings_update span.
 
     // Save to database
     await prisma.user.update({
@@ -72,11 +74,14 @@ export async function updateUserSettings(
       },
     });
 
-    console.log("[Settings Utils] Settings saved successfully");
-
     return validated;
   } catch (error) {
-    console.error("[Settings Utils] Update settings error:", error);
+    logger.error({
+      layer: "content",
+      event: "settings_update:caught",
+      summary: "settings update failed",
+      error,
+    });
     throw new Error("Failed to update settings");
   }
 }
@@ -98,7 +103,12 @@ export async function resetUserSettings(
     });
     return DEFAULT_SETTINGS;
   } catch (error) {
-    console.error("[Settings Utils] Reset settings error:", error);
+    logger.error({
+      layer: "content",
+      event: "settings_reset:caught",
+      summary: "settings reset failed",
+      error,
+    });
     throw new Error("Failed to reset settings");
   }
 }
@@ -130,7 +140,12 @@ export async function importUserSettings(
     const validated = userSettingsSchema.parse(parsed);
     return await updateUserSettings(userId, validated);
   } catch (error) {
-    console.error("[Settings Utils] Import settings error:", error);
+    logger.warn({
+      layer: "content",
+      event: "settings_import:caught",
+      summary: "settings import failed (invalid JSON or schema)",
+      error,
+    });
     throw new Error("Failed to import settings: Invalid JSON or schema");
   }
 }

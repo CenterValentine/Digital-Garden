@@ -6,6 +6,7 @@ import {
   listBookmarkSyncConnections,
 } from "@/lib/domain/browser-bookmarks";
 import { requireBrowserExtensionBearerAuth } from "@/lib/domain/browser-bookmarks/http";
+import { logger } from "@/lib/core/logger";
 
 function errorResponse(error: unknown, fallback: string) {
   const message = error instanceof Error ? error.message : fallback;
@@ -41,7 +42,7 @@ export async function GET(request: NextRequest) {
     const data = await listBookmarkSyncConnections(session.user.id);
     return NextResponse.json({ success: true, data });
   } catch (error) {
-    console.error("[BrowserBookmarks Connections] GET error:", error);
+    logger.error({ layer: "browser_ext", event: "connections_list:caught", summary: "GET caught", error });
     return errorResponse(error, "Failed to load bookmark sync connections");
   }
 }
@@ -70,7 +71,7 @@ export async function POST(request: NextRequest) {
     });
     return NextResponse.json({ success: true, data }, { status: 201 });
   } catch (error) {
-    console.error("[BrowserBookmarks Connections] POST error:", error);
+    logger.error({ layer: "browser_ext", event: "connection_create:caught", summary: "POST caught", error });
     return errorResponse(error, "Failed to create bookmark sync connection");
   }
 }

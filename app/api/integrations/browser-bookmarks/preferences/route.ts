@@ -4,6 +4,7 @@ import {
   updateBrowserBookmarkPreferences,
 } from "@/lib/domain/browser-bookmarks";
 import { requireBrowserExtensionBearerAuth } from "@/lib/domain/browser-bookmarks/http";
+import { logger } from "@/lib/core/logger";
 
 function errorResponse(error: unknown, fallback: string) {
   const message = error instanceof Error ? error.message : fallback;
@@ -27,7 +28,7 @@ export async function GET(request: NextRequest) {
     const data = await getBrowserBookmarkPreferences(token.user.id);
     return NextResponse.json({ success: true, data });
   } catch (error) {
-    console.error("[BrowserBookmarks Preferences] GET error:", error);
+    logger.error({ layer: "browser_ext", event: "preferences_read:caught", summary: "GET caught", error });
     return errorResponse(error, "Failed to load bookmark metadata preferences");
   }
 }
@@ -49,7 +50,7 @@ export async function PATCH(request: NextRequest) {
     });
     return NextResponse.json({ success: true, data });
   } catch (error) {
-    console.error("[BrowserBookmarks Preferences] PATCH error:", error);
+    logger.error({ layer: "browser_ext", event: "preferences_update:caught", summary: "PATCH caught", error });
     return errorResponse(error, "Failed to save bookmark metadata preferences");
   }
 }

@@ -4,6 +4,7 @@ import {
   type BrowserSyncMutation,
 } from "@/lib/domain/browser-bookmarks";
 import { requireBrowserExtensionBearerAuth } from "@/lib/domain/browser-bookmarks/http";
+import { logger } from "@/lib/core/logger";
 
 function errorResponse(error: unknown, fallback: string) {
   const message = error instanceof Error ? error.message : fallback;
@@ -34,13 +35,7 @@ export async function POST(request: NextRequest) {
 
     if (!connectionId) {
       return NextResponse.json(
-        {
-          success: false,
-          error: {
-            code: "INVALID_REQUEST",
-            message: "connectionId is required",
-          },
-        },
+        { success: false, error: { code: "INVALID_REQUEST", message: "connectionId is required" } },
         { status: 400 }
       );
     }
@@ -53,7 +48,12 @@ export async function POST(request: NextRequest) {
     );
     return NextResponse.json({ success: true, data });
   } catch (error) {
-    console.error("[BrowserBookmarks Push] POST error:", error);
+    logger.error({
+      layer: "browser_ext",
+      event: "sync_push:caught",
+      summary: "push failed",
+      error,
+    });
     return errorResponse(error, "Failed to apply browser bookmark mutations");
   }
 }

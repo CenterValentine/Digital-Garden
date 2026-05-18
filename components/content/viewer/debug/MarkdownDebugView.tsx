@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/glass/button";
 import { toast } from "sonner";
 import type { JSONContent } from "@tiptap/core";
 import { MarkdownConverter } from "@/lib/domain/export/converters/markdown";
+import { clientLogger } from "@/lib/core/logger/client";
 
 interface MarkdownDebugViewProps {
   content: JSONContent;
@@ -83,7 +84,12 @@ export function MarkdownDebugView({ content, title }: MarkdownDebugViewProps) {
           setMarkdown(typeof content === "string" ? content : content.toString("utf-8"));
         }
       } catch (error) {
-        console.error("[MarkdownDebugView] Conversion error:", error);
+        clientLogger.error({
+          layer: "ui",
+          event: "markdown_debug_convert:caught",
+          summary: "tiptap → markdown debug conversion failed",
+          error,
+        });
         toast.error("Failed to convert to markdown");
       } finally {
         setIsLoading(false);

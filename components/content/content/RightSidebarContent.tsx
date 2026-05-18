@@ -20,6 +20,7 @@ import { useOutlineStore } from "@/state/outline-store";
 import { useContentStore } from "@/state/content-store";
 import { useLeftPanelViewStore } from "@/state/left-panel-view-store";
 import { useExtensionRightSidebarPanel } from "@/lib/extensions/client-registry";
+import { PublishTab } from "@/extensions/publishing/components/sidebar/PublishTab";
 import type { OutlineHeading } from "@/lib/domain/content/outline-extractor";
 import type { ChatOutlineEntry } from "@/lib/domain/ai/chat-outline";
 import type { RightSidebarTab } from "@/state/right-sidebar-state-store";
@@ -30,6 +31,9 @@ interface RightSidebarContentProps {
 
 export function RightSidebarContent({ activeTab }: RightSidebarContentProps) {
   const selectedContentId = useContentStore((s) => s.selectedContentId);
+  const selectedContentTitle = useContentStore((s) =>
+    s.selectedContentId ? (s.tabs[`tab:${s.selectedContentId}`]?.title ?? null) : null
+  );
   const outline = useOutlineStore((state) =>
     state.getViewState(selectedContentId).outline
   );
@@ -89,6 +93,9 @@ export function RightSidebarContent({ activeTab }: RightSidebarContentProps) {
       {activeTab === "tags" && <TagsPanel contentId={selectedContentId} />}
       {activeTab === "chat" && <ChatPanel contentId={selectedContentId} />}
       {activeTab === "properties" && <PropertiesPanel />}
+      {activeTab === "publish" && (
+        <PublishTab contentId={selectedContentId} contentTitle={selectedContentTitle} />
+      )}
     </div>
   );
 }

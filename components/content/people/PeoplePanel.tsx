@@ -46,6 +46,7 @@ import { calculateMenuPosition } from "@/lib/core/menu-positioning";
 import { PeopleCreateDialog } from "./PeopleCreateDialog";
 import { PeopleProfileDialog } from "./PeopleProfileDialog";
 import { FileUploadDialog } from "../dialogs/FileUploadDialog";
+import { clientLogger } from "@/lib/core/logger/client";
 
 interface PeopleTreeApiResponse {
   success: boolean;
@@ -179,7 +180,12 @@ export function PeoplePanel() {
       setTree(result.data);
     } catch (err) {
       if (err instanceof DOMException && err.name === "AbortError") return;
-      console.error("[PeoplePanel] Failed to load People tree:", err);
+      clientLogger.error({
+        layer: "ui",
+        event: "people_tree_load:caught",
+        summary: "people tree load failed",
+        error: err,
+      });
       setError(err instanceof Error ? err.message : "Failed to load People tree");
     } finally {
       setIsLoadingTree(false);
@@ -230,7 +236,13 @@ export function PeoplePanel() {
         setResults(result.data.results);
       } catch (err) {
         if (err instanceof DOMException && err.name === "AbortError") return;
-        console.error("[PeoplePanel] Failed to search People records:", err);
+        clientLogger.error({
+          layer: "ui",
+          event: "people_search:caught",
+          summary: "people search request failed",
+          attrs: { query_length: trimmedQuery.length },
+          error: err,
+        });
         setResults([]);
       } finally {
         setIsSearching(false);
@@ -394,7 +406,12 @@ export function PeoplePanel() {
       });
       await refreshViews();
     } catch (err) {
-      console.error("[PeoplePanel] Failed to move People record:", err);
+      clientLogger.error({
+        layer: "ui",
+        event: "people_move:caught",
+        summary: "people record move failed",
+        error: err,
+      });
       toast.error("Move failed", {
         description: err instanceof Error ? err.message : "Unknown error",
       });
@@ -479,7 +496,13 @@ export function PeoplePanel() {
         });
       }
     } catch (err) {
-      console.error("[PeoplePanel] Failed to create People content:", err);
+      clientLogger.error({
+        layer: "ui",
+        event: "people_content_create:caught",
+        summary: "people-assigned content create failed",
+        attrs: { content_type: type },
+        error: err,
+      });
       toast.error(type === "folder" ? "Failed to add folder" : "Failed to add note", {
         description: err instanceof Error ? err.message : "Unknown error",
       });
@@ -537,7 +560,13 @@ export function PeoplePanel() {
         });
       }
     } catch (err) {
-      console.error("[PeoplePanel] Failed to create People document:", err);
+      clientLogger.error({
+        layer: "ui",
+        event: "people_document_create:caught",
+        summary: "people-assigned document create failed",
+        attrs: { file_type: fileType },
+        error: err,
+      });
       toast.error("Failed to add document", {
         description: err instanceof Error ? err.message : "Unknown error",
       });
@@ -637,7 +666,12 @@ export function PeoplePanel() {
       setRenameValue("");
       await refreshViews();
     } catch (err) {
-      console.error("[PeoplePanel] Rename failed:", err);
+      clientLogger.error({
+        layer: "ui",
+        event: "people_rename:caught",
+        summary: "people rename failed",
+        error: err,
+      });
       toast.error("Rename failed", {
         description: err instanceof Error ? err.message : "Unknown error",
       });
@@ -692,7 +726,13 @@ export function PeoplePanel() {
       }
       await refreshViews();
     } catch (err) {
-      console.error("[PeoplePanel] Delete failed:", err);
+      clientLogger.error({
+        layer: "ui",
+        event: "people_delete:caught",
+        summary: "people delete failed",
+        attrs: { kind: target.kind },
+        error: err,
+      });
       toast.error("Delete failed", {
         description: err instanceof Error ? err.message : "Unknown error",
       });

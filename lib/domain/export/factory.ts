@@ -11,6 +11,7 @@ import type {
   ConversionResult,
 } from "./types";
 import type { JSONContent } from "@tiptap/core";
+import { logger } from "@/lib/core/logger";
 
 /**
  * Get converter for specified format
@@ -69,7 +70,13 @@ export async function convertDocument(
     const converter = await getConverter(options.format);
     return await converter.convert(tiptapJson, options);
   } catch (error) {
-    console.error(`[Export] Conversion failed for format ${options.format}:`, error);
+    logger.error({
+      layer: "export",
+      event: "convert:caught",
+      summary: `format ${options.format} conversion threw`,
+      attrs: { format: options.format },
+      error,
+    });
 
     return {
       success: false,

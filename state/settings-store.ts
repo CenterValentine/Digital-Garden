@@ -9,6 +9,7 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { UserSettings } from "@/lib/features/settings/validation";
 import { DEFAULT_SETTINGS } from "@/lib/features/settings/validation";
+import { clientLogger } from "@/lib/core/logger/client";
 
 interface SettingsStore extends UserSettings {
   // Sync state
@@ -69,7 +70,12 @@ export const useSettingsStore = create<SettingsStore>()(
             throw new Error(data.error || "Failed to fetch settings");
           }
         } catch (error) {
-          console.error("[Settings Store] Fetch failed:", error);
+          clientLogger.error({
+            layer: "store",
+            event: "settings_fetch:caught",
+            summary: "fetch settings from backend failed",
+            error,
+          });
           set({
             error: error instanceof Error ? error.message : "Fetch failed",
             isSyncing: false,
@@ -116,7 +122,12 @@ export const useSettingsStore = create<SettingsStore>()(
             throw new Error(data.error || "Failed to save settings");
           }
         } catch (error) {
-          console.error("[Settings Store] Save failed:", error);
+          clientLogger.error({
+            layer: "store",
+            event: "settings_save:caught",
+            summary: "save settings to backend failed",
+            error,
+          });
           set({
             hasPendingChanges: true, // Mark for retry
             error: error instanceof Error ? error.message : "Save failed",
@@ -146,7 +157,12 @@ export const useSettingsStore = create<SettingsStore>()(
             throw new Error(data.error || "Failed to reset settings");
           }
         } catch (error) {
-          console.error("[Settings Store] Reset failed:", error);
+          clientLogger.error({
+            layer: "store",
+            event: "settings_reset:caught",
+            summary: "reset settings failed",
+            error,
+          });
           set({
             error: error instanceof Error ? error.message : "Reset failed",
             isSyncing: false,

@@ -12,98 +12,118 @@ import {
   updateUserSettings,
 } from "@/lib/features/settings/operations";
 import { userSettingsSchema } from "@/lib/features/settings/validation";
+import { logger, withRouteTrace, withSpan } from "@/lib/core/logger";
 
-/**
- * GET /api/user/settings
- * Fetch current user's settings
- */
+const ROUTE_PATH = "/api/user/settings";
+
 export async function GET(request: NextRequest) {
-  try {
-    const session = await requireAuth();
-
-    const settings = await getUserSettings(session.user.id);
-
-    return NextResponse.json({
-      success: true,
-      data: settings,
-    });
-  } catch (error) {
-    console.error("[Settings API] GET error:", error);
-
-    const isAuthError =
-      error instanceof Error &&
-      (error.message === "Unauthorized" ||
-        error.message === "Authentication required" ||
-        error.message.toLowerCase().includes("auth"));
-
-    if (isAuthError) {
-      return NextResponse.json(
-        { success: false, error: "Unauthorized" },
-        { status: 401 }
+  return withRouteTrace(request, { route: ROUTE_PATH }, async () => {
+    try {
+      const session = await withSpan(
+        { layer: "auth", name: "session" },
+        { summary: "session lookup" },
+        async () => requireAuth(),
       );
-    }
 
-    return NextResponse.json(
-      {
-        success: false,
-        error: "Failed to fetch settings",
-        details: error instanceof Error ? error.message : "Unknown error",
-      },
-      { status: 500 }
-    );
-  }
-}
-
-/**
- * PATCH /api/user/settings
- * Update user settings (partial update)
- */
-export async function PATCH(request: NextRequest) {
-  try {
-    const session = await requireAuth();
-
-    const body = await request.json();
-
-    // Validate partial settings
-    const validated = userSettingsSchema.partial().parse(body);
-
-    // Update (merges with existing settings)
-    const updated = await updateUserSettings(session.user.id, validated);
-
-    return NextResponse.json({
-      success: true,
-      data: updated,
-      message: "Settings updated successfully",
-    });
-  } catch (error) {
-    console.error("[Settings API] PATCH error:", error);
-
-    if (error instanceof Error && error.message === "Unauthorized") {
-      return NextResponse.json(
-        { success: false, error: "Unauthorized" },
-        { status: 401 }
+      const settings = await withSpan(
+        { layer: "content", name: "settings_read" },
+        undefined,
+        async () => getUserSettings(session.user.id),
       );
-    }
 
-    // Zod validation errors
-    if (error instanceof Error && error.name === "ZodError") {
+      return NextResponse.json({
+        success: true,
+        data: settings,
+      });
+    } catch (error) {
+      const isAuthError =
+        error instanceof Error &&
+        (error.message === "Unauthorized" ||
+          error.message === "Authentication required" ||
+          error.message.toLowerCase().includes("auth"));
+
+      if (isAuthError) {
+        return NextResponse.json(
+          { success: false, error: "Unauthorized" },
+          { status: 401 }
+        );
+      }
+
+      logger.error({
+        layer: "content",
+        event: "settings_read:caught",
+        summary: "GET caught — translated to 500",
+        error,
+      });
       return NextResponse.json(
         {
           success: false,
-          error: "Invalid settings data",
-          details: error.message,
+          error: "Failed to fetch settings",
+          details: error instanceof Error ? error.message : "Unknown error",
         },
-        { status: 400 }
+        { status: 500 }
       );
     }
+  });
+}
 
-    return NextResponse.json(
-      {
-        success: false,
-        error: "Failed to update settings",
-        details: error instanceof Error ? error.message : "Unknown error",
-      },
-      { status: 500 }
-    );
-  }
+export async function PATCH(request: NextRequest) {
+  return withRouteTrace(request, { route: ROUTE_PATH }, async () => {
+    try {
+      const session = await withSpan(
+        { layer: "auth", name: "session" },
+        { summary: "session lookup" },
+        async () => requireAuth(),
+      );
+
+      const body = await request.json();
+
+      const validated = userSettingsSchema.partial().parse(body);
+
+      const updated = await withSpan(
+        { layer: "content", name: "settings_update" },
+        undefined,
+        async () => updateUserSettings(session.user.id, validated),
+      );
+
+      return NextResponse.json({
+        success: true,
+        data: updated,
+        message: "Settings updated successfully",
+      });
+    } catch (error) {
+      if (error instanceof Error && error.message === "Unauthorized") {
+        return NextResponse.json(
+          { success: false, error: "Unauthorized" },
+          { status: 401 }
+        );
+      }
+
+      if (error instanceof Error && error.name === "ZodError") {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "Invalid settings data",
+            details: error.message,
+          },
+          { status: 400 }
+        );
+      }
+
+      logger.error({
+        layer: "content",
+        event: "settings_update:caught",
+        summary: "PATCH caught — translated to 500",
+        error,
+      });
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Failed to update settings",
+          details: error instanceof Error ? error.message : "Unknown error",
+        },
+        { status: 500 }
+      );
+    }
+  });
 }

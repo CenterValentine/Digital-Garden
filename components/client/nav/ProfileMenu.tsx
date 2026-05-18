@@ -6,6 +6,7 @@ import { ChevronDown, Shield, LogOut, MessageSquare, Bug, Settings } from "lucid
 import type { SessionData } from "@/lib/infrastructure/auth/types";
 import { getSurfaceStyles } from "@/lib/design/system";
 import { publishSignedOut } from "@/lib/infrastructure/auth/client-session-events";
+import { clientLogger } from "@/lib/core/logger/client";
 
 export default function ProfileMenu() {
   const router = useRouter();
@@ -49,15 +50,9 @@ export default function ProfileMenu() {
   }, [isOpen]);
 
   const handleSignOut = async () => {
-    console.log("[ProfileMenu] Sign out clicked"); // Debug log
-
     try {
-      console.log("[ProfileMenu] Calling sign-out API..."); // Debug log
-
       // Call sign-out API
       const response = await fetch("/api/auth/sign-out", { method: "POST" });
-
-      console.log("[ProfileMenu] Sign-out API response:", response.status); // Debug log
 
       if (!response.ok) {
         throw new Error("Sign out failed");
@@ -70,13 +65,16 @@ export default function ProfileMenu() {
       // Close the menu
       setIsOpen(false);
 
-      console.log("[ProfileMenu] Navigating to home page..."); // Debug log
-
       // Use full page navigation to ensure clean session clear
       // This prevents any stale client state from persisting
       window.location.href = "/";
     } catch (error) {
-      console.error("[ProfileMenu] Sign out error:", error);
+      clientLogger.error({
+        layer: "ui",
+        event: "sign_out:caught",
+        summary: "sign-out handler failed",
+        error,
+      });
       // Even on error, try to navigate home
       window.location.href = "/";
     }
@@ -166,7 +164,6 @@ export default function ProfileMenu() {
             <button
               type="button"
               onClick={() => {
-                console.log("[ProfileMenu] Settings clicked");
                 setIsOpen(false);
                 router.push("/settings");
               }}
@@ -181,7 +178,6 @@ export default function ProfileMenu() {
               <button
                 type="button"
                 onClick={() => {
-                  console.log("[ProfileMenu] Admin Panel clicked");
                   setIsOpen(false);
                   router.push("/admin");
                 }}
@@ -224,7 +220,6 @@ export default function ProfileMenu() {
             <button
               type="button"
               onClick={handleSignOut}
-              onMouseEnter={() => console.log("[ProfileMenu] Mouse entered Sign Out button")}
               className="w-full px-4 py-2 flex items-center gap-3 text-sm text-foreground hover:bg-white/5 transition-colors text-left cursor-pointer"
             >
               <LogOut className="h-4 w-4 text-gold-primary" />

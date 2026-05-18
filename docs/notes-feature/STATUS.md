@@ -1,5 +1,5 @@
 ---
-last_updated: 2026-05-13
+last_updated: 2026-05-17
 current_epoch: 13
 current_sprint: 58
 sprint_status: planned
@@ -52,6 +52,58 @@ before planning and executing. There may be additions or modifications.
 **Detailed Plan**: `docs/notes-feature/work-tracking/epochs/epoch-13-people-and-collaboration.md`
 
 ## Recent Completions (Last 30 Days)
+
+**May 17, 2026**: Phase I.6 — user-intent gate for shrink guard (lets users clear documents intentionally)
+
+Refinement of the Phase I.1 shrink guard. The original guard refused destructive shrinks unless `allowShrink: true` was set on the body — which blocked legitimate user actions like "select all + backspace + auto-save" unless every code path explicitly opted in. The user-intent gate uses **recent input recency** as the signal: the editor tracks `lastUserInputAt` and tags each auto-save with `userInitiated: true` when the gap is < 10 seconds. The server's shrink guard accepts either flag.
+
+- **Phase I.6.1** (commit `315e12a`): Server-side bypass + `content:write:shrink_with_user_intent` event. The shrink-refusal at `/api/content/content/[id]` now accepts `body.userInitiated === true` OR `body.allowShrink === true`. When the shrink WOULD refuse but a flag IS set, an informational warn event records the decision with `prev_char_count`, `new_char_count`, `shrink_ratio`, which-flag-was-set, and `seconds_since_input` for calibration data.
+- **Phase I.6.2** (commit `a251194`): MarkdownEditor input-recency tracking. `lastUserInputAtRef` updates on each `onUpdate` callback when the ProseMirror transaction has `docChanged === true` AND is not tagged with `y-sync$`, `remote`, or `addToHistory` (which mark remote/sync/history-merge origin). Auto-save fires include `userInitiated: true` when `now - lastUserInputAt < 10000ms`. `MainPanelContent.handleSave` accepts the meta and forwards it into the PATCH body alongside `tiptapJson`.
+- **Phase I.6.3** (commit `6704d9f`): Audit + type passthrough. Verified the editor-driven save path is the only destructive content-write surface; other paths either go through the editor (and inherit recency tracking via TipTap docChanged) or use different routes that don't trigger the shrink guard. ExpandableEditor's `onSave` prop signature extended to accept the optional meta so future consumers can opt in.
+
+Bug-class trace:
+  - Editor mounts on existing content → y-sync seed transaction fires → `onUpdate` sees `y-sync$` meta → ref NOT updated → 2s later auto-save fires WITHOUT `userInitiated` → server REFUSES the shrink. ✓
+  - User presses Cmd+A → Backspace → real keydown + docChanged transaction → ref updates → 2s later auto-save fires WITH `userInitiated: true` → server ALLOWS the shrink (and logs `content:write:shrink_with_user_intent` for audit). ✓
+  - User edited 5 minutes ago then walked away → some background save fires → 5min > 10s window → `userInitiated: false` → server refuses. Client can retry with explicit `allowShrink: true` if appropriate. ✓
+
+Gates at tip: `pnpm typecheck` ✓, `pnpm lint` 159/159 (0 errors), `pnpm build` ✓.
+
+**May 17, 2026**: Phase I — anti-overwrite guards on content PATCH route + archival predev hook (response to live data-loss incident)
+- Live data-loss incident on integration branch: opening a daily note in local dev (dev=prod DB) caused the editor to auto-save an empty/template doc over real content. Content recovered via a still-open mobile prod tab's y-indexeddb cache. Root cause is broader than any one trigger — the PATCH route trusted any tiptapJson body unconditionally.
+- **Phase I.1** (commit `3d6a7d2`): Shrink-refusal guard on `app/api/content/content/[id]/route.ts` PATCH handler. Refuses with HTTP 422 OVERWRITE_REFUSED when existing.searchText > 200 chars AND new.searchText < 0.5 × existing AND no `allowShrink: true` on body. Emits `content:write:overwrite_refused` structured event. Span attrs `refused`, `refused_via`, `prev_char_count`, `new_char_count` record the decision.
+- **Phase I.2** (commit `773bead`): Optional `If-Match: <bodyHash>` precondition. On-the-fly SHA-256 hash of tiptapJson (no schema change). Mismatch → HTTP 409 PRECONDITION_FAILED with `currentBodyHash` in meta. `bodyHash` now exposed in GET and PATCH `note` responses so clients can capture and echo it. Backwards-compatible — clients that don't send the header are unaffected.
+- **Phase I.3** (commit `f89276b`): `content:write:overwrite_risk_detected` informational event for shrinks in the 50–70% range (below refuse threshold but still substantial). Allows the write but leaves a forensic breadcrumb so borderline incidents are visible in trace history.
+- **Phase I.4** (commit `f2caa3f`): Replaces destructive `rm -rf .local/debug-payloads` predev hook with archival via `scripts/archive-traces.ts`. Prior-session traces move to `.local/debug-payloads/.archive/<ISO timestamp>/` with LRU sweep keeping the most recent 5 session archives. The original wipe-on-start destroyed forensic evidence from this very incident — archival is the durable fix.
+- Out of scope (follow-up): client-side adoption of `If-Match` in MarkdownEditor + finding the specific trigger (daily-notes tab click suspect) that fired the destructive PATCH. Server guards are sufficient to *prevent* the data loss regardless of trigger.
+- Gates at tip: `pnpm typecheck` ✓, `pnpm lint` 159/159 (0 errors), `pnpm collab:schema:check` ✓.
+
+**May 17, 2026**: Epochs 15 + 17 integrated on branch `feature/observability-and-publishing` (ready for PR)
+- Phase B–H of `epochs/epoch-15-17-integration.md` complete. 31 commits ahead of `origin/main` / 0 behind; clean fast-forward.
+- Merge commit `71e37a0` absorbed `feature/publishing-system` (40 publishing commits — items/paths CRUD, revision lifecycle, scheduled-publish cron, 23 W2-W10 blocks, public renderer, jsdom-backed SSR, theme variables, polish wave). 8 files had conflicts; resolution log in the integration plan.
+- Prisma client regenerated against the merged schema (13 publishing models + workspace + collab + people).
+- Phase F aggressive harmonization (commit `d5678a5`): 13 publishing API routes + media upload + Vercel cron + `components/public/TipTapContent.tsx` SSR renderer + `PublishingViewMode.tsx` client component all brought up to observability standards. Each handler wrapped with `withRouteTrace`, named domain spans opened (e.g. `publishing:publish`, `publishing:sync`, `publishing:scheduled_publish_batch` with per-item child spans), `spanPayload` calls for revision bodies + diff summaries + validation reports + batch summaries. Cron handler uses `attrs.cron_run_id` (= `trace_id`) for correlation with Vercel cron history.
+- Side cleanup surfaced by strict lint: 5 `@next/next/no-html-link-for-pages` `<a>` → `<Link>` migrations across `app/page.tsx`, `app/(authenticated)/settings/api/page.tsx`, `components/settings/storage/UsageTab.tsx`.
+- All gates green at tip: `pnpm typecheck` ✓, `pnpm lint` 159/159 (0 errors, at ratchet), `pnpm collab:schema:check` ✓, `pnpm build` ✓ 132 pages, `pnpm trace:view --list` ✓ (Phase 6 viewer survives merge).
+- Branch is pre-flight for `git push -u origin feature/observability-and-publishing` + `gh pr create`.
+
+**May 17, 2026**: Epoch numbering reconciled + integration plan authored
+- Registered Epochs 14, 15, 16, 17 explicitly in `docs/notes-feature/work-tracking/epochs/`
+- Epoch 14 (Saved Content Workspaces): doc frontmatter corrected from `status: active` (stale) → `status: shipped`. The work shipped via April merge series (`a9c5570 → ... → e7c0beb`); `ContentWorkspace` models + `extensions/workplaces/` + `/api/content/workspaces/*` all on main.
+- Epoch 16 (Dark Mode): `feature-dark-mode.md` → `epoch-16-dark-mode.md` (git mv, history preserved); frontmatter updated with `status: shipped`, shipped_at `2026-05-13`, shipped_via PR #37.
+- Epoch 15 (Publishing): new wrapper at `epochs/epoch-15-publishing.md`. Branch `feature/publishing-system` is 40 ahead / 22 behind `origin/main`; integration plan authored.
+- Epoch 17 (Observability): new wrapper at `epochs/epoch-17-observability.md` pointing at the detailed `OBSERVABILITY-CLEANUP-PLAN.md`.
+- Integration plan: `epochs/epoch-15-17-integration.md` — Phases A–H for merging publishing into observability and harmonizing publishing's 12 API routes + 1 media route + cron handler to the observability standards. Integration branch will be `feature/observability-and-publishing`. Phase F is **aggressive**: spans + `spanPayload` for every route.
+
+**May 17, 2026**: Epoch 17 — Observability Cleanup — COMPLETE in branch (worktree `observability-cleanup`, 28 commits ahead of `origin/main`)
+- Phases 0–5 produced a complete three-layer observability system: structured logs (closed-set `Layer` + `Marker` enums, scalar-only `Attrs`), span traces with end-of-trace summary blocks, and per-trace payload sidecars under `.local/debug-payloads/`
+- Server-side console retirement: ~80+ API routes wrapped with `withRouteTrace`, Prisma `emit: 'event'` bridge silences raw `prisma:query` stdout, every `console.*` outside the logger module is now an ESLint error
+- Client-side console retirement: ~60 files, ~300 call sites across `components/`, `state/`, `hooks/`. Triage pattern: delete debug breadcrumbs covered by the trace, escalate state corrections to `clientLogger.warn`, real failures to `clientLogger.error` with scalar attrs
+- Phase 5 foundation: `lib/core/logger/client.ts` (client-safe, no `node:async_hooks`), `app/api/logs/client/route.ts` beacon endpoint (auth-gated, 100/min rate limit, error/fatal only), `lib/core/logger/client-fetch.ts` `tracedFetch` wrapper, `Layer` split into `ServerLayer | FrontendLayer` closed unions
+- Phase 6 trace viewer: `lib/core/logger/event-recorder.ts` writes every LogEvent to `<trace>.events.jsonl`, `scripts/render-trace.ts` builds a span tree and emits self-contained HTML (`pnpm trace:view [id]`, `pnpm trace:list`)
+- ESLint deferral list shrunk: `no-console=error` now enforced in `components/`, `state/`, `hooks/`. Still deferred (with file globs as tracker): `app/**/page.tsx`, TipTap extensions, design integrations, `extensions/**`, lib utilities transitively reachable from `"use client"`
+- PII firewall by type: `Attrs = Readonly<Record<string, string | number | boolean>>` makes non-scalar attrs a compile error; bulk data flows through `spanPayload()` → sidecar JSONL instead
+- Gates locked at ratchet `--max-warnings 159`. `pnpm typecheck` / `pnpm lint` / `pnpm build` all green on the branch tip
+- Plan docs in `docs/notes-feature/work-tracking/`: `OBSERVABILITY-CLEANUP-PLAN.md`, `FRONTEND-LOG-CHARTER.md`, `PII-AUDIT-2026-05.md`
 
 **May 13, 2026**: Dark Mode epoch — COMPLETE
 - Foundation: theme provider, `useResolvedTheme()` hook, FOUC-prevention inline script reading `notes:settings` from localStorage, `suppressHydrationWarning` on `<html>` to handle pre-hydration class application

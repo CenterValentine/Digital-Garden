@@ -9,101 +9,111 @@ import {
 } from "@/lib/infrastructure/auth/types";
 
 import { prisma } from "@/lib/database/client";
+import { logger, withRouteTrace, withSpan } from "@/lib/core/logger";
 
-export async function POST(request: NextRequest): Promise<NextResponse> {
-  try {
-    const body: unknown = await request.json();
+const ROUTE_PATH = "/api/auth/sign-in";
 
-    // Validate request body
-    if (
-      !body ||
-      typeof body !== "object" ||
-      !("email" in body) ||
-      !("password" in body)
-    ) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: {
-            code: "INVALID_CREDENTIALS",
-            message: "Invalid request body",
-          },
-        } as ApiResponse<never>,
-        { status: 400 }
-      );
-    }
+export async function POST(request: NextRequest) {
+  return withRouteTrace(request, { route: ROUTE_PATH }, async () => {
+    try {
+      const body: unknown = await request.json();
 
-    const input = body as SignInInput;
+      if (
+        !body ||
+        typeof body !== "object" ||
+        !("email" in body) ||
+        !("password" in body)
+      ) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: {
+              code: "INVALID_CREDENTIALS",
+              message: "Invalid request body",
+            },
+          } as ApiResponse<never>,
+          { status: 400 }
+        );
+      }
 
-    // Validate email
-    if (!isValidEmail(input.email)) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: {
-            code: "INVALID_EMAIL",
-            message: "Invalid email address",
-          },
-        } as ApiResponse<never>,
-        { status: 400 }
-      );
-    }
+      const input = body as SignInInput;
 
-    // Find user by email
-    const user = await prisma.user.findUnique({
-      where: { email: input.email },
-    });
+      if (!isValidEmail(input.email)) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: {
+              code: "INVALID_EMAIL",
+              message: "Invalid email address",
+            },
+          } as ApiResponse<never>,
+          { status: 400 }
+        );
+      }
 
-    if (!user || !user.passwordHash) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: {
-            code: "INVALID_CREDENTIALS",
-            message: "Invalid email or password",
-          },
-        } as ApiResponse<never>,
-        { status: 401 }
-      );
-    }
+      // Email and password are deliberately NOT logged.
+      const session = await withSpan(
+        { layer: "auth", name: "sign_in" },
+        { summary: "password sign-in" },
+        async (span) => {
+          const user = await prisma.user.findUnique({
+            where: { email: input.email },
+          });
 
-    // Verify password
-    const isValid = await verifyPassword(input.password, user.passwordHash);
+          if (!user || !user.passwordHash) {
+            span.attr("ok", false).summary("user not found");
+            return { failed: true as const };
+          }
 
-    if (!isValid) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: {
-            code: "INVALID_CREDENTIALS",
-            message: "Invalid email or password",
-          },
-        } as ApiResponse<never>,
-        { status: 401 }
-      );
-    }
+          const isValid = await verifyPassword(input.password, user.passwordHash);
+          if (!isValid) {
+            span.attr("ok", false).summary("password mismatch");
+            return { failed: true as const };
+          }
 
-    // Create session
-    const session = await createSession(user.id);
-
-    return NextResponse.json(
-      {
-        success: true,
-        data: session,
-      } as ApiResponse<SessionData>,
-      { status: 200 }
-    );
-  } catch (error) {
-    console.error("Sign-in error:", error);
-    return NextResponse.json(
-      {
-        success: false,
-        error: {
-          code: "UNAUTHORIZED",
-          message: error instanceof Error ? error.message : "An error occurred",
+          const sess = await createSession(user.id);
+          span.attr("ok", true).summary("session created");
+          return { failed: false as const, session: sess };
         },
-      } as ApiResponse<never>,
-      { status: 500 }
-    );
-  }
+      );
+
+      if (session.failed) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: {
+              code: "INVALID_CREDENTIALS",
+              message: "Invalid email or password",
+            },
+          } as ApiResponse<never>,
+          { status: 401 }
+        );
+      }
+
+      return NextResponse.json(
+        {
+          success: true,
+          data: session.session,
+        } as ApiResponse<SessionData>,
+        { status: 200 }
+      );
+    } catch (error) {
+      logger.error({
+        layer: "auth",
+        event: "sign_in:caught",
+        summary: "sign-in failed — 500",
+        error,
+      });
+      return NextResponse.json(
+        {
+          success: false,
+          error: {
+            code: "UNAUTHORIZED",
+            message: error instanceof Error ? error.message : "An error occurred",
+          },
+        } as ApiResponse<never>,
+        { status: 500 }
+      );
+    }
+  });
 }

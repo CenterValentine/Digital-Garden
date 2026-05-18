@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/database/client";
 import { generateSlug } from "@/lib/domain/content/slug";
 import { requireAuth } from "@/lib/infrastructure/auth/middleware";
+import { logger } from "@/lib/core/logger";
 
 type Params = Promise<{ id: string }>;
 
@@ -104,7 +105,7 @@ export async function PATCH(
       },
     });
   } catch (error) {
-    console.error("PATCH /api/people/groups/[id] error:", error);
+    logger.error({ layer: "content", event: "people_group_update:caught", summary: "PATCH caught", error });
     return NextResponse.json(
       {
         success: false,
@@ -214,7 +215,7 @@ export async function DELETE(
       },
     });
   } catch (error) {
-    console.error("DELETE /api/people/groups/[id] error:", error);
+    logger.error({ layer: "content", event: "people_group_delete:caught", summary: "DELETE caught", error });
     return NextResponse.json(
       {
         success: false,

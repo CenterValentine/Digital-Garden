@@ -7,6 +7,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { getSurfaceStyles } from "@/lib/design/system";
 import { toast } from "sonner";
 
@@ -37,12 +38,10 @@ export function StorageUsageTab() {
   const percentUsed = (usage.used / usage.quota) * 100;
 
   const handleExportData = () => {
-    console.log("[UsageTab] Export data clicked");
     toast.success("Preparing data export... (wired to console)");
   };
 
   const handleUpgrade = () => {
-    console.log("[UsageTab] Upgrade clicked");
     toast.info("Upgrade to Pro (wired to console)");
   };
 
@@ -236,7 +235,7 @@ export function StorageUsageTab() {
               <h4 className="text-sm font-semibold text-blue-400">Your Data, Your Control</h4>
               <p className="text-sm text-gray-300 mt-1">
                 Your data remains yours. You can export and migrate at any time.{" "}
-                <a
+                <Link
                   href="/docs/data-export"
                   className="text-primary hover:underline"
                   onClick={(e) => {
@@ -245,7 +244,7 @@ export function StorageUsageTab() {
                   }}
                 >
                   Learn more
-                </a>
+                </Link>
               </p>
             </div>
           </div>
@@ -297,7 +296,6 @@ export function StorageUsageTab() {
                 {!tier.current && (
                   <button
                     onClick={() => {
-                      console.log("[UsageTab] Upgrade to:", tier.name);
                       toast.info(`Upgrade to ${tier.name} (wired to console)`);
                     }}
                     className="px-4 py-2 text-sm rounded-lg border border-white/10 hover:bg-white/5 transition-colors"

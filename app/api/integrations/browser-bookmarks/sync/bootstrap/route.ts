@@ -3,6 +3,7 @@ import {
   getBookmarkSyncBootstrap,
 } from "@/lib/domain/browser-bookmarks";
 import { requireBrowserExtensionBearerAuth } from "@/lib/domain/browser-bookmarks/http";
+import { logger } from "@/lib/core/logger";
 
 function errorResponse(error: unknown, fallback: string) {
   const message = error instanceof Error ? error.message : fallback;
@@ -45,7 +46,7 @@ export async function GET(request: NextRequest) {
     );
     return NextResponse.json({ success: true, data });
   } catch (error) {
-    console.error("[BrowserBookmarks Bootstrap] GET error:", error);
+    logger.error({ layer: "browser_ext", event: "sync_bootstrap:caught", summary: "bootstrap failed", error });
     return errorResponse(error, "Failed to build bookmark sync snapshot");
   }
 }

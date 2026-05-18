@@ -9,6 +9,7 @@ import type { Prisma } from "@/lib/database/generated/prisma";
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import type { AuditAction } from "./api-types";
+import { logger } from "@/lib/core/logger";
 
 /**
  * Log an admin action to the audit trail
@@ -45,7 +46,15 @@ export async function logAuditAction(
       },
     });
   } catch (error) {
-    console.error("[AuditLog] Failed to log action:", error);
+    // The audit-write itself failed — fall back to the structured logger at
+    // fatal level so ops still see it (this is the one site where the app's
+    // own audit trail can't capture the error).
+    logger.fatal({
+      layer: "admin",
+      event: "audit_write:failed",
+      summary: "audit write failed (request not blocked)",
+      error,
+    });
     // Don't throw - audit failure shouldn't break the request
   }
 }
@@ -191,7 +200,12 @@ export function generateCSV(
  * @returns NextResponse with formatted error
  */
 export function handleApiError(error: unknown): NextResponse {
-  console.error("[Admin API Error]:", error);
+  logger.error({
+    layer: "admin",
+    event: "api_error:caught",
+    summary: "admin API error — handled",
+    error,
+  });
 
   if (error instanceof Error) {
     // Authentication/Authorization errors

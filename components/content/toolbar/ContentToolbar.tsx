@@ -21,6 +21,8 @@ import {
 import { useIsExtensionEnabled } from "@/lib/extensions/client-registry";
 import { useContentStore } from "@/state/content-store";
 import { useLeftPanelViewStore } from "@/state/left-panel-view-store";
+import { PUBLISHING_EXTENSION_ID } from "@/extensions/publishing/manifest";
+import { PublishStatusPill } from "@/extensions/publishing/components/toolbar/PublishStatusPill";
 
 /** Map iconName strings to lucide-react components */
 const ICON_MAP: Record<string, ComponentType<{ className?: string }>> = {
@@ -41,6 +43,7 @@ export function ContentToolbar() {
   });
   const setActiveView = useLeftPanelViewStore((state) => state.setActiveView);
   const flashcardsEnabled = useIsExtensionEnabled(FLASHCARDS_EXTENSION_ID);
+  const publishingEnabled = useIsExtensionEnabled(PUBLISHING_EXTENSION_ID);
   const [sourceFlashcardCount, setSourceFlashcardCount] = useState<{
     sourceContentId: string;
     count: number;
@@ -107,7 +110,9 @@ export function ContentToolbar() {
     }, 50);
   }, [selectedTitle, setActiveView, sourceContentId]);
 
-  if (tools.length === 0 && visibleSourceFlashcardCount === 0) {
+  const showPublishPill = publishingEnabled && sourceContentId;
+
+  if (tools.length === 0 && visibleSourceFlashcardCount === 0 && !showPublishPill) {
     return null;
   }
 
@@ -117,6 +122,9 @@ export function ContentToolbar() {
       role="toolbar"
       aria-label="Content actions"
     >
+      {showPublishPill && (
+        <PublishStatusPill contentId={sourceContentId} />
+      )}
       {tools.map((tool) => {
         const Icon = ICON_MAP[tool.definition.iconName];
         return (

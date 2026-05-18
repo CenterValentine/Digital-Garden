@@ -251,13 +251,6 @@ export function useLogoAnimation(
         const nodes = group.filter((g) => g.kind === "node");
         const others = group.filter((g) => g.kind !== "node");
 
-        if (opts.debug) {
-          console.log(
-            `[logo-anim] group ${num}:`,
-            group.map((g) => g.id)
-          );
-        }
-
         // Nodes must never appear while prior line segments are still drawing.
         // If we allowed overlap, wait for any in-flight draw animations to finish.
         if (nodes.length && activeDraws.length) {
@@ -274,7 +267,6 @@ export function useLogoAnimation(
           await Promise.all(
             nodes.map(async (n) => {
               if (cancelled) return;
-              if (opts.debug) console.log(`[logo-anim] node -> ${n.id}`);
               await animateNode(n.el, nodeMs);
             })
           );
@@ -298,11 +290,6 @@ export function useLogoAnimation(
 
             const delay = jitter(opts.drawJitterMs ?? 0);
             if (delay > 0) await sleep(delay);
-
-            if (opts.debug)
-              console.log(
-                `[logo-anim] draw -> ${o.id} (+${Math.round(delay)}ms)`
-              );
 
             if (isDrawable(o.el)) {
               await animateDraw(

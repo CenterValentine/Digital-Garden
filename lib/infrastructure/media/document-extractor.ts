@@ -10,6 +10,7 @@
 
 import mammoth from 'mammoth';
 import type { StorageProvider } from '@/lib/infrastructure/storage';
+import { logger } from "@/lib/core/logger";
 
 /**
  * Document Text Extractor
@@ -60,7 +61,12 @@ export class DocumentExtractor {
       // Future: Add support for .xlsx, .pptx, etc.
       return '';
     } catch (error) {
-      console.error('Text extraction failed:', error);
+      logger.warn({
+        layer: "content",
+        event: "text_extract:caught",
+        summary: "text extraction failed (continuing)",
+        error,
+      });
       // Don't throw - return empty string if extraction fails
       return '';
     }
@@ -191,7 +197,11 @@ export class DocumentExtractor {
    */
   private async extractImageText(storageKey: string): Promise<string> {
     // TODO: Re-enable after configuring webpack CopyPlugin
-    console.warn('[OCR] Image text extraction is disabled. Requires webpack configuration.');
+    logger.warn({
+      layer: "content",
+      event: "ocr:disabled",
+      summary: "OCR disabled (requires webpack config)",
+    });
     return '';
 
     /* Disabled OCR implementation - requires webpack config
@@ -202,7 +212,11 @@ export class DocumentExtractor {
       // Dynamic import for Tesseract.js v5
       const { createWorker } = await import('tesseract.js');
 
-      console.log('[OCR] Starting text extraction from image...');
+      logger.info({
+        layer: "content",
+        event: "ocr:started",
+        summary: "OCR text extraction starting",
+      });
 
       // Create worker (v5 syntax - simpler, no config needed)
       const worker = await createWorker('eng');
@@ -212,11 +226,21 @@ export class DocumentExtractor {
 
       await worker.terminate();
 
-      console.log('[OCR] Extraction complete. Text length:', text.length);
+      logger.info({
+        layer: "content",
+        event: "ocr:completed",
+        summary: `${text.length} chars extracted`,
+        attrs: { text_chars: text.length },
+      });
 
       return this.truncateText(text, 100_000);
     } catch (error) {
-      console.error('[OCR] Extraction failed:', error);
+      logger.error({
+        layer: "content",
+        event: "ocr:caught",
+        summary: "OCR extraction failed",
+        error,
+      });
       return '';
     }
     */

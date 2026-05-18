@@ -14,144 +14,160 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/database/client";
 import { requireAuth } from "@/lib/infrastructure/auth/middleware";
 import type { Prisma } from "@/lib/database/generated/prisma";
+import { logger, withRouteTrace, withSpan } from "@/lib/core/logger";
+
+const ROUTE_PATH = "/api/content/tags";
 
 export async function GET(request: NextRequest) {
-  try {
-    const session = await requireAuth();
-    const { searchParams } = new URL(request.url);
-    const search = searchParams.get("search") || "";
+  return withRouteTrace(request, { route: ROUTE_PATH }, async () => {
+    try {
+      const session = await withSpan(
+        { layer: "auth", name: "session" },
+        { summary: "session lookup" },
+        async () => requireAuth(),
+      );
+      const { searchParams } = new URL(request.url);
+      const search = searchParams.get("search") || "";
 
-    // Build where clause with optional search
-    const where: Prisma.TagWhereInput = {
-      userId: session.user.id,
-    };
-
-    if (search) {
-      where.name = {
-        contains: search,
-        mode: "insensitive",
+      const where: Prisma.TagWhereInput = {
+        userId: session.user.id,
       };
-    }
 
-    // Get all tags for user with usage counts
-    const tags = await prisma.tag.findMany({
-      where,
-      select: {
-        id: true,
-        name: true,
-        slug: true,
-        color: true,
-        createdAt: true,
-        _count: {
-          select: {
-            contentTags: true, // Usage count
-          },
+      if (search) {
+        where.name = { contains: search, mode: "insensitive" };
+      }
+
+      const tags = await withSpan(
+        { layer: "content", name: "tags_list" },
+        { attrs: { has_search: Boolean(search) } },
+        async (span) => {
+          const result = await prisma.tag.findMany({
+            where,
+            select: {
+              id: true,
+              name: true,
+              slug: true,
+              color: true,
+              createdAt: true,
+              _count: { select: { contentTags: true } },
+            },
+            orderBy: [
+              { contentTags: { _count: "desc" } },
+              { name: "asc" },
+            ],
+          });
+          span.attr("count", result.length).summary(`${result.length} tags`);
+          return result;
         },
-      },
-      orderBy: [
-        { contentTags: { _count: "desc" } }, // Most used first
-        { name: "asc" }, // Then alphabetically
-      ],
-    });
+      );
 
-    // Transform to response format
-    const results = tags.map((tag) => ({
-      id: tag.id,
-      name: tag.name,
-      slug: tag.slug,
-      color: tag.color,
-      usageCount: tag._count.contentTags,
-      createdAt: tag.createdAt.toISOString(),
-    }));
+      const results = tags.map((tag) => ({
+        id: tag.id,
+        name: tag.name,
+        slug: tag.slug,
+        color: tag.color,
+        usageCount: tag._count.contentTags,
+        createdAt: tag.createdAt.toISOString(),
+      }));
 
-    return NextResponse.json(results);
-  } catch (error) {
-    console.error("List tags error:", error);
-
-    // Handle authentication errors
-    if (error instanceof Error && error.message === "Authentication required") {
+      return NextResponse.json(results);
+    } catch (error) {
+      if (error instanceof Error && error.message === "Authentication required") {
+        return NextResponse.json(
+          { error: "Authentication required" },
+          { status: 401 }
+        );
+      }
+      logger.error({
+        layer: "content",
+        event: "tags_list:caught",
+        summary: "list failed — 500",
+        error,
+      });
       return NextResponse.json(
-        { error: "Authentication required" },
-        { status: 401 }
+        { error: "Failed to list tags", details: error instanceof Error ? error.message : "Unknown error" },
+        { status: 500 }
       );
     }
-
-    return NextResponse.json(
-      { error: "Failed to list tags", details: error instanceof Error ? error.message : "Unknown error" },
-      { status: 500 }
-    );
-  }
+  });
 }
 
 export async function POST(request: NextRequest) {
-  try {
-    const session = await requireAuth();
-    const body = await request.json();
-    const { name, color } = body;
+  return withRouteTrace(request, { route: ROUTE_PATH }, async () => {
+    try {
+      const session = await withSpan(
+        { layer: "auth", name: "session" },
+        { summary: "session lookup" },
+        async () => requireAuth(),
+      );
+      const body = await request.json();
+      const { name, color } = body;
 
-    if (!name || typeof name !== "string" || !name.trim()) {
-      return NextResponse.json({ error: "Tag name is required" }, { status: 400 });
-    }
+      if (!name || typeof name !== "string" || !name.trim()) {
+        return NextResponse.json({ error: "Tag name is required" }, { status: 400 });
+      }
 
-    // Generate slug from name (lowercase, replace spaces with hyphens)
-    const slug = name
-      .toLowerCase()
-      .trim()
-      .replace(/\s+/g, "-")
-      .replace(/[^a-z0-9-]/g, "");
+      const slug = name
+        .toLowerCase()
+        .trim()
+        .replace(/\s+/g, "-")
+        .replace(/[^a-z0-9-]/g, "");
 
-    // Check if tag with this slug already exists for this user
-    const existing = await prisma.tag.findUnique({
-      where: {
-        userId_slug: {
-          userId: session.user.id,
-          slug,
-        },
-      },
-    });
-
-    if (existing) {
-      // Return existing tag instead of error
-      return NextResponse.json({
-        id: existing.id,
-        name: existing.name,
-        slug: existing.slug,
-        color: existing.color,
-        createdAt: existing.createdAt.toISOString(),
+      const existing = await prisma.tag.findUnique({
+        where: { userId_slug: { userId: session.user.id, slug } },
       });
-    }
 
-    // Create new tag
-    const tag = await prisma.tag.create({
-      data: {
-        userId: session.user.id,
-        name: name.trim(),
-        slug,
-        color: color || null,
-      },
-    });
+      if (existing) {
+        return NextResponse.json({
+          id: existing.id,
+          name: existing.name,
+          slug: existing.slug,
+          color: existing.color,
+          createdAt: existing.createdAt.toISOString(),
+        });
+      }
 
-    return NextResponse.json({
-      id: tag.id,
-      name: tag.name,
-      slug: tag.slug,
-      color: tag.color,
-      createdAt: tag.createdAt.toISOString(),
-    });
-  } catch (error) {
-    console.error("Create tag error:", error);
+      const tag = await withSpan(
+        { layer: "content", name: "tag_create" },
+        undefined,
+        async (span) => {
+          const created = await prisma.tag.create({
+            data: {
+              userId: session.user.id,
+              name: name.trim(),
+              slug,
+              color: color || null,
+            },
+          });
+          span.attr("tag_id", created.id).summary("created");
+          return created;
+        },
+      );
 
-    // Handle authentication errors
-    if (error instanceof Error && error.message === "Authentication required") {
+      return NextResponse.json({
+        id: tag.id,
+        name: tag.name,
+        slug: tag.slug,
+        color: tag.color,
+        createdAt: tag.createdAt.toISOString(),
+      });
+    } catch (error) {
+      if (error instanceof Error && error.message === "Authentication required") {
+        return NextResponse.json(
+          { error: "Authentication required" },
+          { status: 401 }
+        );
+      }
+      logger.error({
+        layer: "content",
+        event: "tag_create:caught",
+        summary: "create failed — 500",
+        error,
+      });
       return NextResponse.json(
-        { error: "Authentication required" },
-        { status: 401 }
+        { error: "Failed to create tag", details: error instanceof Error ? error.message : "Unknown error" },
+        { status: 500 }
       );
     }
-
-    return NextResponse.json(
-      { error: "Failed to create tag", details: error instanceof Error ? error.message : "Unknown error" },
-      { status: 500 }
-    );
-  }
+  });
 }

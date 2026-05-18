@@ -18,6 +18,81 @@ const eslintConfig = defineConfig([
           destructuredArrayIgnorePattern: "^_",
         },
       ],
+      // Phase 4: no console.* outside the logger module. Promoted to "error"
+      // after the Phase 4 sweep — zero violations in the main app server.
+      // Phase 5 deferrals (client code, TipTap extensions, "use client" utils)
+      // get the rule turned off via the file-glob override below.
+      "no-console": "error",
+    },
+  },
+  // Logger module is the only allowed `console.*` site — it writes directly
+  // to process.stdout / process.stderr via its encoders. Same for the
+  // instrumentation entry point's startup marker.
+  {
+    files: [
+      "lib/core/logger/**/*.{ts,tsx}",
+      "instrumentation.{ts,js}",
+      // Smoke test for the logger exercises process.stdout/stderr directly.
+      "scripts/smoke-logger.ts",
+    ],
+    rules: {
+      "no-console": "off",
+    },
+  },
+  // Phase 5 deferrals: client-reachable code that still uses console.*
+  // (will migrate to the client logger in a future pass per
+  // FRONTEND-LOG-CHARTER.md). Each pattern below represents code that has
+  // NOT yet been swept; removing a pattern means the rule is enforced there.
+  //
+  // Already swept (rule enforced):
+  //   - components/**/*  (Phase 5.4a–5.4e: ~270+ console.* retired)
+  //   - state/**/*       (Phase 5.4e-1: 6 stores migrated)
+  //   - hooks/**/*       (no console.* found at sweep time)
+  //
+  // Still deferred — patterns are broad because minimatch can't match
+  // Next.js's `(authenticated)` route group parens cleanly.
+  {
+    files: [
+      // Pages and layouts (not API routes — those keep the rule on)
+      "app/**/page.tsx",
+      "app/**/page.ts",
+      "app/**/layout.tsx",
+      "app/**/error.tsx",
+      "app/**/not-found.tsx",
+      "app/**/loading.tsx",
+      "app/**/*Client.tsx",
+      "app/**/template.tsx",
+      // Utilities transitively reachable from "use client" boundaries
+      "lib/domain/content/tag-sync.ts",
+      "lib/domain/content/image-refs.ts",
+      "lib/domain/content/markdown.ts",
+      "lib/domain/content/person-mention-sync.ts",
+      "lib/domain/content/metadata-validation.ts",
+      // TipTap extensions and visualization hooks
+      "lib/domain/editor/extensions/**/*.ts",
+      "lib/domain/editor/ai/edit-orchestrator.ts",
+      "lib/domain/visualization/**/use-collaboration.ts",
+      "lib/domain/blocks/registry.ts",
+      "lib/design/**/*.ts",
+      "lib/design/**/*.tsx",
+      // Import service's round-trip-verify is a dev-only debug tool
+      "lib/domain/import/round-trip-verify.ts",
+      // Extensions (TipTap + browser extension JS)
+      "extensions/**/*.tsx",
+      "extensions/**/*.ts",
+      "extensions/**/*.js",
+      "extensions/**/*.mjs",
+      // Collaboration runtime is `"use client"`
+      "lib/domain/collaboration/runtime.ts",
+      // Out-of-scope / not part of the app server pipeline
+      "scripts/**/*.ts",
+      "scripts/**/*.mjs",
+      "scripts/**/*.js",
+      "prisma/seed.ts",
+      "server/hocuspocus/**/*.ts",
+    ],
+    rules: {
+      "no-console": "off",
     },
   },
   // Override default ignores of eslint-config-next.

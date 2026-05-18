@@ -22,6 +22,7 @@ import { PDFViewer } from "./PDFViewer";
 import { VideoPlayer } from "./VideoPlayer";
 import { AudioPlayer } from "./AudioPlayer";
 import { JSONViewer } from "./JSONViewer";
+import { clientLogger } from "@/lib/core/logger/client";
 
 interface FileViewerProps {
   contentId: string;
@@ -110,7 +111,13 @@ export function FileViewer({ contentId, title }: FileViewerProps) {
         }
 
         if (!isCancelled) {
-          console.error("Failed to fetch file:", err);
+          clientLogger.error({
+            layer: "ui",
+            event: "file_viewer_fetch:caught",
+            summary: "file viewer fetch failed",
+            attrs: { content_id: contentId },
+            error: err,
+          });
           setError(err instanceof Error ? err.message : "Failed to load file");
         }
       } finally {

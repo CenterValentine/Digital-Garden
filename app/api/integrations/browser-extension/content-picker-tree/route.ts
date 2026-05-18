@@ -4,6 +4,7 @@ import {
   createExtensionContentPickerItem,
   getExtensionContentPickerTree,
 } from "@/lib/domain/browser-extension";
+import { logger } from "@/lib/core/logger";
 
 export async function GET(request: NextRequest) {
   try {
@@ -12,7 +13,7 @@ export async function GET(request: NextRequest) {
     const data = await getExtensionContentPickerTree(token.user.id, { workspaceId });
     return NextResponse.json({ success: true, data });
   } catch (error) {
-    console.error("[BrowserExtension ContentPickerTree] GET error:", error);
+    logger.error({ layer: "browser_ext", event: "content_picker_tree:caught", summary: "GET caught", error });
     return NextResponse.json(
       {
         success: false,
@@ -41,7 +42,7 @@ export async function POST(request: NextRequest) {
     });
     return NextResponse.json({ success: true, data });
   } catch (error) {
-    console.error("[BrowserExtension ContentPickerTree] POST error:", error);
+    logger.error({ layer: "browser_ext", event: "content_picker_create:caught", summary: "POST caught", error });
     return NextResponse.json(
       {
         success: false,

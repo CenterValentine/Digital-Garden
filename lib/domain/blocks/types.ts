@@ -20,7 +20,9 @@ export type BlockGroup =
   | "divider"
   | "input"
   | "selector"
-  | "display";
+  | "display"
+  | "media"
+  | "publishing";
 
 /**
  * Static block definition — registered once in the block registry.
@@ -92,7 +94,11 @@ export interface PropertiesField {
     | "color"
     | "range"
     | "array"
-    | "icon";
+    | "icon"
+    | "image-upload"
+    | "gallery-items"
+    | "json-array"
+    | "string-array";
   /** Current value */
   value: unknown;
   /** For select fields: available options */
@@ -105,4 +111,12 @@ export interface PropertiesField {
   description?: string;
   /** Optional helper text shown in a tooltip icon next to the label */
   tooltip?: string;
+  /** For json-array fields: item field definitions */
+  jsonArraySchema?: import("@/components/content/blocks/JsonArrayEditor").JsonArrayItemField[];
+  /** For json-array and string-array fields: "Add item" button label */
+  addLabel?: string;
+  /** For json-array and string-array fields: empty state message */
+  emptyMessage?: string;
+  /** For string-array fields: per-item placeholder text */
+  placeholder?: string;
 }

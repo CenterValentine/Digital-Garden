@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { useSettingsStore } from "@/state/settings-store";
+import { clientLogger } from "@/lib/core/logger/client";
 
 /**
  * Settings Initializer
@@ -18,7 +19,12 @@ export function SettingsInitializer() {
     if (!hasInitialized.current) {
       hasInitialized.current = true;
       fetchFromBackend().catch((error) => {
-        console.error("[SettingsInitializer] Failed to load settings:", error);
+        clientLogger.error({
+          layer: "store",
+          event: "settings_initial_load:caught",
+          summary: "initial settings fetch failed (will use defaults)",
+          error,
+        });
         // Silent fail - defaults will be used
       });
     }

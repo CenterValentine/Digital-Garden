@@ -22,6 +22,7 @@
 
 import { useEffect, useRef, useMemo, useImperativeHandle, forwardRef } from "react";
 import type { DiagramsNetTheme } from "@/lib/domain/visualization/types";
+import { clientLogger } from "@/lib/core/logger/client";
 
 interface DiagramsNetEditorProps {
   xml: string;
@@ -142,7 +143,12 @@ export const DiagramsNetEditor = forwardRef<DiagramsNetEditorHandle, DiagramsNet
               break;
           }
         } catch (error) {
-          console.error("[DiagramsNetEditor] Failed to parse message:", error);
+          clientLogger.error({
+            layer: "ui",
+            event: "diagramsnet_postmessage:caught",
+            summary: "diagrams.net postMessage parse failed",
+            error,
+          });
         }
       };
 

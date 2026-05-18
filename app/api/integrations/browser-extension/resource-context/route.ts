@@ -4,6 +4,7 @@ import {
   getWebResourceContext,
   getWebResourceContextById,
 } from "@/lib/domain/browser-extension";
+import { logger } from "@/lib/core/logger";
 
 function errorResponse(error: unknown, fallback: string) {
   const message = error instanceof Error ? error.message : fallback;
@@ -48,7 +49,7 @@ export async function GET(request: NextRequest) {
     });
     return NextResponse.json({ success: true, data });
   } catch (error) {
-    console.error("[BrowserExtension ResourceContext] GET error:", error);
+    logger.error({ layer: "browser_ext", event: "resource_context_read:caught", summary: "GET caught", error });
     return errorResponse(error, "Failed to load resource context");
   }
 }
@@ -79,7 +80,7 @@ export async function POST(request: NextRequest) {
     });
     return NextResponse.json({ success: true, data });
   } catch (error) {
-    console.error("[BrowserExtension ResourceContext] POST error:", error);
+    logger.error({ layer: "browser_ext", event: "resource_context_resolve:caught", summary: "POST caught", error });
     return errorResponse(error, "Failed to resolve resource context");
   }
 }

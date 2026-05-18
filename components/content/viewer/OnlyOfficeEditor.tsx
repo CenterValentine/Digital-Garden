@@ -20,6 +20,7 @@ import { Button } from "@/components/ui/glass/button";
 import { toast } from "sonner";
 import { useUploadSettingsStore } from "@/state/upload-settings-store";
 import { useResolvedTheme } from "@/lib/features/theme";
+import { clientLogger } from "@/lib/core/logger/client";
 
 interface OnlyOfficeEditorProps {
   contentId: string;
@@ -164,24 +165,38 @@ export function OnlyOfficeEditor({
     },
     events: {
       onDocumentReady: () => {
-        console.log("[OnlyOffice] Document ready");
         setIsReady(true);
       },
       // OnlyOffice's React wrapper doesn't export its event types. Use narrow
       // inline shapes that match the documented DocumentEditor event payloads.
-      onDocumentStateChange: (event: { data?: unknown }) => {
-        console.log("[OnlyOffice] Document state changed:", event);
+      onDocumentStateChange: (_event: { data?: unknown }) => {
         // Auto-save is handled by callbackUrl
       },
       onError: (event: { data?: string }) => {
-        console.error("[OnlyOffice] Error:", event);
+        clientLogger.error({
+          layer: "ui",
+          event: "onlyoffice_editor:failed",
+          summary: "onlyoffice editor reported error",
+          attrs: {
+            content_id: contentId,
+            detail: event.data ?? "unknown",
+          },
+        });
         setError(`Editor error: ${event.data || "Unknown error"}`);
         toast.error("Editor error", {
           description: event.data || "Failed to load document editor",
         });
       },
       onWarning: (event: { data?: unknown }) => {
-        console.warn("[OnlyOffice] Warning:", event);
+        clientLogger.warn({
+          layer: "ui",
+          event: "onlyoffice_editor:warning",
+          summary: "onlyoffice editor warning",
+          attrs: {
+            content_id: contentId,
+            detail: typeof event.data === "string" ? event.data : String(event.data ?? "unknown"),
+          },
+        });
       },
     },
     height: "100%",
@@ -244,7 +259,13 @@ export function OnlyOfficeEditor({
           documentServerUrl={onlyofficeServerUrl}
           config={config}
           onLoadComponentError={(error: unknown) => {
-            console.error("[OnlyOffice] Component load error:", error);
+            clientLogger.error({
+              layer: "ui",
+              event: "onlyoffice_component_load:failed",
+              summary: "onlyoffice component load failed",
+              attrs: { content_id: contentId },
+              error,
+            });
             setError("Failed to load ONLYOFFICE editor component");
           }}
         />

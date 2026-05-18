@@ -9,6 +9,7 @@ import {
   parsePeopleMountTarget,
   type PeopleMountRequestBody,
 } from "../request";
+import { logger } from "@/lib/core/logger";
 
 async function buildContentAncestorIds(ownerId: string, contentParentId: string | null) {
   const ids: string[] = [];
@@ -172,7 +173,7 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error("POST /api/people/mounts/preview error:", error);
+    logger.error({ layer: "content", event: "people_mount_preview:caught", summary: "POST caught", error });
     return NextResponse.json(
       {
         success: false,

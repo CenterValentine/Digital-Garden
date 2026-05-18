@@ -4,6 +4,7 @@ import {
   getExtensionNoteContent,
   updateExtensionNoteContent,
 } from "@/lib/domain/browser-extension";
+import { logger } from "@/lib/core/logger";
 
 type Params = Promise<{ id: string }>;
 
@@ -30,7 +31,7 @@ export async function GET(request: NextRequest, { params }: { params: Params }) 
     const data = await getExtensionNoteContent(token.user.id, id);
     return NextResponse.json({ success: true, data });
   } catch (error) {
-    console.error("[BrowserExtension NoteContent] GET error:", error);
+    logger.error({ layer: "browser_ext", event: "note_content_read:caught", summary: "GET caught", error });
     return errorResponse(error, "Failed to load note content");
   }
 }
@@ -48,7 +49,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Params }
     });
     return NextResponse.json({ success: true, data });
   } catch (error) {
-    console.error("[BrowserExtension NoteContent] PATCH error:", error);
+    logger.error({ layer: "browser_ext", event: "note_content_update:caught", summary: "PATCH caught", error });
     return errorResponse(error, "Failed to save note content");
   }
 }

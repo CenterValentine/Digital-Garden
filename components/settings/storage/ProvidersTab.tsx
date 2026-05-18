@@ -12,6 +12,7 @@ import { getSurfaceStyles } from "@/lib/design/system";
 import { toast } from "sonner";
 import { maskSensitiveValue } from "@/lib/infrastructure/crypto/encryption";
 import { ProviderConfigForm } from "./ProviderConfigForm";
+import { clientLogger } from "@/lib/core/logger/client";
 
 interface StorageProvider {
   id: string;
@@ -52,7 +53,12 @@ export function StorageProvidersTab() {
       const data = await response.json();
       setProviders(data.data.configs || []);
     } catch (error) {
-      console.error("[ProvidersTab] Fetch error:", error);
+      clientLogger.error({
+        layer: "ui",
+        event: "storage_providers_fetch:caught",
+        summary: "storage providers fetch failed",
+        error,
+      });
       toast.error("Failed to load storage providers");
     } finally {
       setLoading(false);
@@ -60,7 +66,6 @@ export function StorageProvidersTab() {
   };
 
   const handleSetDefault = (providerId: string) => {
-    console.log("[ProvidersTab] Set default provider:", providerId);
     setPendingDefaultId(providerId);
     setShowWarning(true);
   };
@@ -82,18 +87,22 @@ export function StorageProvidersTab() {
       setPendingDefaultId(null);
       await fetchProviders(); // Refresh the list
     } catch (error) {
-      console.error("[ProvidersTab] Set default error:", error);
+      clientLogger.error({
+        layer: "ui",
+        event: "storage_default_set:caught",
+        summary: "set default storage provider failed",
+        attrs: { provider_id: pendingDefaultId ?? "unknown" },
+        error,
+      });
       toast.error("Failed to update default provider");
     }
   };
 
   const handleAddProvider = () => {
-    console.log("[ProvidersTab] Add provider clicked");
     setShowAddProvider(true);
   };
 
-  const handleEditProvider = (providerId: string) => {
-    console.log("[ProvidersTab] Edit provider:", providerId);
+  const handleEditProvider = (_providerId: string) => {
     toast.info("Edit configuration form coming soon");
   };
 
@@ -112,7 +121,13 @@ export function StorageProvidersTab() {
       toast.success("Provider deleted");
       await fetchProviders(); // Refresh the list
     } catch (error) {
-      console.error("[ProvidersTab] Delete error:", error);
+      clientLogger.error({
+        layer: "ui",
+        event: "storage_provider_delete:caught",
+        summary: "delete storage provider failed",
+        attrs: { provider_id: providerId },
+        error,
+      });
       toast.error("Failed to delete provider");
     }
   };

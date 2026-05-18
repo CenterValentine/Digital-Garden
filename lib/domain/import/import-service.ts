@@ -13,6 +13,7 @@ import type { ImportResult, ImportWarning } from "./types";
 import { parseMarkdown } from "./markdown-parser";
 import { parseSidecar, enrichWithSidecar } from "./sidecar-reader";
 import { prisma } from "@/lib/database/client";
+import { logger } from "@/lib/core/logger";
 import {
   generateUniqueSlug,
   extractSearchTextFromTipTap,
@@ -146,7 +147,7 @@ export async function importFile(input: ImportFileInput): Promise<ImportResult> 
       warnings,
     };
   } catch (error) {
-    console.error("[importFile] Error creating content:", error);
+    logger.error({ layer: "content", event: "import_create:caught", summary: "import failed", error });
     return {
       success: false,
       title,

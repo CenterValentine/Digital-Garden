@@ -16,71 +16,106 @@ import type {
   VercelConfig,
   StorageConfig,
 } from "@/lib/domain/content/api-types";
+import { logger, spanPayload, withRouteTrace, withSpan } from "@/lib/core/logger";
+
+const ROUTE_PATH = "/api/content/storage";
 
 // ============================================================
 // GET /api/content/storage - List Storage Configurations
 // ============================================================
 
 export async function GET(request: NextRequest) {
-  try {
-    const session = await requireAuth();
-
-    const rawConfigs = await prisma.storageProviderConfig.findMany({
-      where: {
-        userId: session.user.id,
-      },
-      select: {
-        id: true,
-        provider: true,
-        isDefault: true,
-        displayName: true,
-        isActive: true,
-        config: true,
-        createdAt: true,
-        updatedAt: true,
-      },
-      orderBy: [{ isDefault: "desc" }, { createdAt: "desc" }],
-    });
-
-    // Sanitize configs - remove sensitive credentials, keep display info
-    const configs = rawConfigs.map((config) => {
-      const sanitizedConfig = sanitizeConfig(
-        config.provider as "r2" | "s3" | "vercel",
-        config.config as unknown as StorageConfig
+  return withRouteTrace(request, { route: ROUTE_PATH }, async () => {
+    try {
+      const session = await withSpan(
+        { layer: "auth", name: "session" },
+        { summary: "session lookup" },
+        async () => requireAuth(),
       );
 
-      return {
-        id: config.id,
-        provider: config.provider,
-        isDefault: config.isDefault,
-        displayName: config.displayName,
-        isActive: config.isActive,
-        config: sanitizedConfig,
-        createdAt: config.createdAt,
-        updatedAt: config.updatedAt,
-      };
-    });
-
-    return NextResponse.json({
-      success: true,
-      data: {
-        configs,
-        count: configs.length,
-      },
-    });
-  } catch (error) {
-    console.error("GET /api/content/storage error:", error);
-    return NextResponse.json(
-      {
-        success: false,
-        error: {
-          code: "SERVER_ERROR",
-          message: "Failed to fetch storage configurations",
+      const rawConfigs = await withSpan(
+        { layer: "storage", name: "configs_list" },
+        undefined,
+        async (span) => {
+          const result = await prisma.storageProviderConfig.findMany({
+            where: { userId: session.user.id },
+            select: {
+              id: true,
+              provider: true,
+              isDefault: true,
+              displayName: true,
+              isActive: true,
+              config: true,
+              createdAt: true,
+              updatedAt: true,
+            },
+            orderBy: [{ isDefault: "desc" }, { createdAt: "desc" }],
+          });
+          span.attr("count", result.length).summary(`${result.length} configs`);
+          // Note: full configs contain credentials. Sidecar uses the
+          // sanitized shape only (provider + display info).
+          await spanPayload(
+            span,
+            "storage_configs",
+            result.map((c) => ({
+              id: c.id,
+              provider: c.provider,
+              displayName: c.displayName,
+              isDefault: c.isDefault,
+              isActive: c.isActive,
+              createdAt: c.createdAt,
+              updatedAt: c.updatedAt,
+            })),
+          );
+          return result;
         },
-      },
-      { status: 500 }
-    );
-  }
+      );
+
+      // Sanitize configs — remove sensitive credentials, keep display info
+      const configs = rawConfigs.map((config) => {
+        const sanitizedConfig = sanitizeConfig(
+          config.provider as "r2" | "s3" | "vercel",
+          config.config as unknown as StorageConfig
+        );
+
+        return {
+          id: config.id,
+          provider: config.provider,
+          isDefault: config.isDefault,
+          displayName: config.displayName,
+          isActive: config.isActive,
+          config: sanitizedConfig,
+          createdAt: config.createdAt,
+          updatedAt: config.updatedAt,
+        };
+      });
+
+      return NextResponse.json({
+        success: true,
+        data: {
+          configs,
+          count: configs.length,
+        },
+      });
+    } catch (error) {
+      logger.error({
+        layer: "storage",
+        event: "configs_list:caught",
+        summary: "GET caught — translated to 500",
+        error,
+      });
+      return NextResponse.json(
+        {
+          success: false,
+          error: {
+            code: "SERVER_ERROR",
+            message: "Failed to fetch storage configurations",
+          },
+        },
+        { status: 500 }
+      );
+    }
+  });
 }
 
 // ============================================================
@@ -88,140 +123,143 @@ export async function GET(request: NextRequest) {
 // ============================================================
 
 export async function POST(request: NextRequest) {
-  try {
-    const session = await requireAuth();
-    const body = (await request.json()) as CreateStorageConfigRequest;
-
-    const { provider, displayName, config, isDefault } = body;
-
-    // Validation
-    if (!provider || !config) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: {
-            code: "VALIDATION_ERROR",
-            message: "provider and config are required",
-          },
-        },
-        { status: 400 }
+  return withRouteTrace(request, { route: ROUTE_PATH }, async () => {
+    try {
+      const session = await withSpan(
+        { layer: "auth", name: "session" },
+        { summary: "session lookup" },
+        async () => requireAuth(),
       );
-    }
+      const body = (await request.json()) as CreateStorageConfigRequest;
 
-    // Validate provider type
-    const validProviders = ["r2", "s3", "vercel"];
-    if (!validProviders.includes(provider)) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: {
-            code: "VALIDATION_ERROR",
-            message: `Invalid provider. Must be one of: ${validProviders.join(", ")}`,
+      const { provider, displayName, config, isDefault } = body;
+
+      if (!provider || !config) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: {
+              code: "VALIDATION_ERROR",
+              message: "provider and config are required",
+            },
           },
-        },
-        { status: 400 }
-      );
-    }
+          { status: 400 }
+        );
+      }
 
-    // Validate required config fields
-    const validationError = validateProviderConfig(provider, config);
-    if (validationError) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: {
-            code: "VALIDATION_ERROR",
-            message: validationError,
+      const validProviders = ["r2", "s3", "vercel"];
+      if (!validProviders.includes(provider)) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: {
+              code: "VALIDATION_ERROR",
+              message: `Invalid provider. Must be one of: ${validProviders.join(", ")}`,
+            },
           },
-        },
-        { status: 400 }
-      );
-    }
+          { status: 400 }
+        );
+      }
 
-    // Check if configuration already exists
-    const existing = await prisma.storageProviderConfig.findFirst({
-      where: {
-        userId: session.user.id,
-        provider,
-      },
-    });
-
-    if (existing) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: {
-            code: "CONFLICT",
-            message: `Configuration for ${provider} already exists`,
+      const validationError = validateProviderConfig(provider, config);
+      if (validationError) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: { code: "VALIDATION_ERROR", message: validationError },
           },
-        },
-        { status: 409 }
-      );
-    }
+          { status: 400 }
+        );
+      }
 
-    // If setting as default, unset other defaults
-    if (isDefault) {
-      await prisma.storageProviderConfig.updateMany({
+      const existing = await prisma.storageProviderConfig.findFirst({
         where: {
           userId: session.user.id,
-          isDefault: true,
-        },
-        data: {
-          isDefault: false,
+          provider,
         },
       });
-    }
 
-    // Create configuration
-    const newConfig = await prisma.storageProviderConfig.create({
-      data: {
-        userId: session.user.id,
-        provider,
-        displayName: displayName || `${provider.toUpperCase()} Storage`,
-        config: config as unknown as Prisma.InputJsonValue,
-        isDefault: isDefault || false,
-        isActive: true,
-      },
-      select: {
-        id: true,
-        provider: true,
-        displayName: true,
-        isDefault: true,
-        isActive: true,
-        createdAt: true,
-        updatedAt: true,
-      },
-    });
+      if (existing) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: {
+              code: "CONFLICT",
+              message: `Configuration for ${provider} already exists`,
+            },
+          },
+          { status: 409 }
+        );
+      }
 
-    return NextResponse.json(
-      {
-        success: true,
-        data: newConfig,
-      },
-      { status: 201 }
-    );
-  } catch (error) {
-    console.error("POST /api/content/storage error:", error);
-    return NextResponse.json(
-      {
-        success: false,
-        error: {
-          code: "SERVER_ERROR",
-          message: "Failed to create storage configuration",
+      if (isDefault) {
+        await prisma.storageProviderConfig.updateMany({
+          where: { userId: session.user.id, isDefault: true },
+          data: { isDefault: false },
+        });
+      }
+
+      // Note: `config` contains credentials and is NOT logged in attrs.
+      const newConfig = await withSpan(
+        { layer: "storage", name: "config_create" },
+        { attrs: { provider, default: isDefault ?? false } },
+        async (span) => {
+          const created = await prisma.storageProviderConfig.create({
+            data: {
+              userId: session.user.id,
+              provider,
+              displayName: displayName || `${provider.toUpperCase()} Storage`,
+              config: config as unknown as Prisma.InputJsonValue,
+              isDefault: isDefault || false,
+              isActive: true,
+            },
+            select: {
+              id: true,
+              provider: true,
+              displayName: true,
+              isDefault: true,
+              isActive: true,
+              createdAt: true,
+              updatedAt: true,
+            },
+          });
+          span.attr("config_id", created.id);
+          return created;
         },
-      },
-      { status: 500 }
-    );
-  }
+      );
+
+      return NextResponse.json(
+        {
+          success: true,
+          data: newConfig,
+        },
+        { status: 201 }
+      );
+    } catch (error) {
+      logger.error({
+        layer: "storage",
+        event: "config_create:caught",
+        summary: "POST caught — translated to 500",
+        error,
+      });
+      return NextResponse.json(
+        {
+          success: false,
+          error: {
+            code: "SERVER_ERROR",
+            message: "Failed to create storage configuration",
+          },
+        },
+        { status: 500 }
+      );
+    }
+  });
 }
 
 // ============================================================
 // SANITIZATION HELPERS
 // ============================================================
 
-/**
- * Sanitize config for safe display - remove credentials, keep display info
- */
 function sanitizeConfig(
   provider: "r2" | "s3" | "vercel",
   config: StorageConfig
@@ -230,19 +268,14 @@ function sanitizeConfig(
     return {
       bucket: ("bucket" in config && config.bucket) || null,
       endpoint: ("endpoint" in config && config.endpoint) || null,
-      // Omit: accountId, accessKeyId, secretAccessKey
     };
   } else if (provider === "s3") {
     return {
       bucket: ("bucket" in config && config.bucket) || null,
       region: ("region" in config && config.region) || null,
-      // Omit: accessKeyId, secretAccessKey
     };
   } else if (provider === "vercel") {
-    return {
-      // Vercel doesn't have non-sensitive config to show
-      // Omit: token
-    };
+    return {};
   }
 
   return {};
@@ -266,10 +299,6 @@ function validateProviderConfig(
     ) {
       return "R2 requires: accountId, accessKeyId, secretAccessKey, bucket";
     }
-
-    // Access config values like this:
-    // const { accountId, accessKeyId, secretAccessKey, bucket } = r2Config;
-    // Or: r2Config.accountId, r2Config.accessKeyId, etc.
   } else if (provider === "s3") {
     const s3Config = config as S3Config;
     if (
@@ -280,17 +309,11 @@ function validateProviderConfig(
     ) {
       return "S3 requires: region, accessKeyId, secretAccessKey, bucket";
     }
-
-    // Access config values like this:
-    // const { region, accessKeyId, secretAccessKey, bucket } = s3Config;
   } else if (provider === "vercel") {
     const vercelConfig = config as VercelConfig;
     if (!vercelConfig.token) {
       return "Vercel Blob requires: token";
     }
-
-    // Access config values like this:
-    // const { token } = vercelConfig;
   }
 
   return null;

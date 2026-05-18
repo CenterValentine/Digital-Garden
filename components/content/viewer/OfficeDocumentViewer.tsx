@@ -19,6 +19,7 @@ import mammoth from "mammoth";
 import { useUploadSettingsStore } from "@/state/upload-settings-store";
 import { OnlyOfficeEditor } from "./OnlyOfficeEditor";
 import { GoogleDriveEditor } from "./GoogleDriveEditor";
+import { clientLogger } from "@/lib/core/logger/client";
 
 interface OfficeDocumentViewerProps {
   contentId: string;
@@ -77,10 +78,21 @@ export function OfficeDocumentViewer({
       setClientHtml(result.value);
 
       if (result.messages.length > 0) {
-        console.warn("[mammoth] Conversion warnings:", result.messages);
+        clientLogger.warn({
+          layer: "ui",
+          event: "mammoth_render:warnings",
+          summary: "mammoth conversion produced warnings",
+          attrs: { content_id: contentId, warning_count: result.messages.length },
+        });
       }
     } catch (error) {
-      console.error("[OfficeDocumentViewer] Client-side rendering failed:", error);
+      clientLogger.error({
+        layer: "ui",
+        event: "office_client_render:caught",
+        summary: "client-side office render failed",
+        attrs: { content_id: contentId },
+        error,
+      });
       toast.error("Failed to render document", {
         description: "Please download the file to view it.",
       });
@@ -88,16 +100,7 @@ export function OfficeDocumentViewer({
     } finally {
       setIsLoadingClient(false);
     }
-  }, [downloadUrl]);
-
-  // Debug: Log current settings
-  useEffect(() => {
-    console.log("[OfficeDocumentViewer] Current settings:", {
-      officeViewerMode,
-      onlyofficeServerUrl,
-      hasServerUrl: !!onlyofficeServerUrl,
-    });
-  }, [officeViewerMode, onlyofficeServerUrl]);
+  }, [downloadUrl, contentId]);
 
   // Reset state when file changes (was below the early returns — moved here to
   // satisfy react-hooks/rules-of-hooks: every render must call the same hooks
@@ -111,7 +114,6 @@ export function OfficeDocumentViewer({
   // Auto-fallback to client-side rendering for .docx if Office Online fails.
   useEffect(() => {
     if (iframeError && isDocx && viewerMode === "office-online") {
-      console.log("[OfficeDocumentViewer] Office Online failed, trying client-side rendering");
       loadDocxClientSide();
     }
   }, [iframeError, isDocx, viewerMode, loadDocxClientSide]);
@@ -178,7 +180,12 @@ export function OfficeDocumentViewer({
   };
 
   const handleOfficeOnlineError = () => {
-    console.log("[OfficeDocumentViewer] Office Online iframe failed to load");
+    clientLogger.warn({
+      layer: "ui",
+      event: "office_online_iframe:failed",
+      summary: "office online iframe failed to load",
+      attrs: { content_id: contentId, is_docx: isDocx },
+    });
     setIframeError(true);
   };
 

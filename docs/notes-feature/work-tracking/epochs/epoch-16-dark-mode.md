@@ -1,13 +1,19 @@
 ---
-feature: Dark Mode
+epoch: 16
+title: Dark Mode
 branch: feature/dark-mode
-duration: 3 sprints (estimated)
-status: planning
-scope: Full app, manual toggle (light/dark/system), ship complete across all surfaces including third-party viewers
+status: shipped
+shipped_at: 2026-05-13
+shipped_via: PR #37 merge into origin/main (commit 7ef9d51)
+last_updated: 2026-05-17
+duration: 3 sprints (as estimated)
+scope: Full app, manual toggle (light/dark/system), shipped complete across all surfaces including third-party viewers
 trigger: Browser-extension overlay forces a dark context; the embedded app currently renders light, creating a visible seam between overlay chrome and app content.
 ---
 
-# Feature: Dark Mode
+# Epoch 16: Dark Mode
+
+> **Status: shipped 2026-05-13** via PR #37 merge into `origin/main` (commit `7ef9d51`). This file is preserved as the epoch's planning record. The shipped state is summarized in `docs/notes-feature/STATUS.md` under "Recent Completions — May 13, 2026". The integration plan in [`epoch-15-17-integration.md`](epoch-15-17-integration.md) references this epoch as the most recent merge into `main` (the fork point for both Epoch 15 and Epoch 17).
 
 ## Goal
 Ship a complete dark mode across every surface of the Digital Garden app — editor, dialogs, menus, sidebars, settings, auth pages, and third-party viewers (Mermaid, Excalidraw, diagrams.net, OnlyOffice, PDF, code). User chooses `light | dark | system` from `/settings/preferences`. No partial release; no "beta" flag.

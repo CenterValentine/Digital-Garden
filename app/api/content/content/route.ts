@@ -31,6 +31,9 @@ import type {
   ContentDetailResponse,
 } from "@/lib/domain/content/api-types";
 import type { StoredChatMessage } from "@/lib/domain/ai/types";
+import { logger, withRouteTrace, withSpan } from "@/lib/core/logger";
+
+const ROUTE_PATH = "/api/content/content";
 
 function getExternalDomainParts(url: string) {
   try {
@@ -96,8 +99,13 @@ function formatExternalResponse(payload: {
 // ============================================================
 
 export async function GET(request: NextRequest) {
+  return withRouteTrace(request, { route: ROUTE_PATH }, async () => {
   try {
-    const session = await requireAuth();
+    const session = await withSpan(
+      { layer: "auth", name: "session" },
+      { summary: "session lookup" },
+      async () => requireAuth(),
+    );
 
     // Parse query parameters
     const { searchParams } = new URL(request.url);
@@ -329,7 +337,12 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error("GET /api/content/content error:", error);
+    logger.error({
+      layer: "content",
+      event: "list:caught",
+      summary: "GET caught — translated to 500",
+      error,
+    });
     return NextResponse.json(
       {
         success: false,
@@ -341,6 +354,7 @@ export async function GET(request: NextRequest) {
       { status: 500 }
     );
   }
+  });
 }
 
 // ============================================================
@@ -348,8 +362,13 @@ export async function GET(request: NextRequest) {
 // ============================================================
 
 export async function POST(request: NextRequest) {
+  return withRouteTrace(request, { route: ROUTE_PATH }, async () => {
   try {
-    const session = await requireAuth();
+    const session = await withSpan(
+      { layer: "auth", name: "session" },
+      { summary: "session lookup" },
+      async () => requireAuth(),
+    );
     const body = (await request.json()) as CreateContentRequest;
 
     const {
@@ -896,7 +915,12 @@ export async function POST(request: NextRequest) {
       { status: 201 }
     );
   } catch (error) {
-    console.error("POST /api/content/content error:", error);
+    logger.error({
+      layer: "content",
+      event: "create:caught",
+      summary: "POST caught — translated to 500",
+      error,
+    });
     // In development, surface the real error to the client so toasts become
     // actionable. In production, keep the generic message to avoid leaking
     // internal details. Prisma errors have a `.code` (e.g. "P2002") which
@@ -916,4 +940,5 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
+  });
 }

@@ -19,6 +19,7 @@ import { PEOPLE_VIEW_KEY } from "@/extensions/people/manifest";
 import { useLeftPanelCollapseStore } from "@/state/left-panel-collapse-store";
 import { useLeftPanelViewStore } from "@/state/left-panel-view-store";
 import { useExtensionLeftSidebarPanel } from "@/lib/extensions/client-registry";
+import { clientLogger } from "@/lib/core/logger/client";
 
 export function LeftSidebar() {
   const { mode } = useLeftPanelCollapseStore();
@@ -62,7 +63,12 @@ export function LeftSidebar() {
         const data = await response.json();
         setHasGoogleAuth(data.success && data.data.hasGoogleAuth);
       } catch (err) {
-        console.error("[LeftSidebar] Failed to check Google auth:", err);
+        clientLogger.error({
+          layer: "ui",
+          event: "google_auth_check:caught",
+          summary: "google auth probe failed (LeftSidebar)",
+          error: err,
+        });
         setHasGoogleAuth(false);
       }
     }
@@ -189,13 +195,12 @@ export function LeftSidebar() {
   //   setCreateTrigger({ type: "workflow", timestamp: Date.now() });
   // }, []);
 
-  const handleFileUploadSuccess = useCallback((fileId: string) => {
+  const handleFileUploadSuccess = useCallback((_fileId: string) => {
     setShowFileUpload(false);
     setFileUploadParentId(null);
     setDraggedFiles(null);  // Clear dragged files to prevent re-upload
     // Refresh tree to show new file
     setRefreshTrigger((prev) => prev + 1);
-    console.log("[LeftSidebar] File uploaded successfully:", fileId);
   }, []);
 
   const handleFileUploadCancel = useCallback(() => {

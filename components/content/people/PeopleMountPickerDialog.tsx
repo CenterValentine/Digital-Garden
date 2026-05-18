@@ -9,6 +9,7 @@ import type { PeopleSearchResult } from "@/lib/domain/people";
 import { PeopleCreateDialog } from "./PeopleCreateDialog";
 import { useLeftPanelViewStore } from "@/state/left-panel-view-store";
 import { useTreeStateStore } from "@/state/tree-state-store";
+import { clientLogger } from "@/lib/core/logger/client";
 
 interface PeopleMountPickerDialogProps {
   parentId: string | null;
@@ -122,7 +123,12 @@ export function PeopleMountPickerDialog({
         setResults(result.data.results);
       } catch (err) {
         if (err instanceof DOMException && err.name === "AbortError") return;
-        console.error("[PeopleMountPickerDialog] Search failed:", err);
+        clientLogger.error({
+          layer: "ui",
+          event: "people_mount_picker_search:caught",
+          summary: "people-mount picker search failed",
+          error: err,
+        });
         setResults([]);
         setError(err instanceof Error ? err.message : "Failed to search People records");
       } finally {
@@ -189,7 +195,12 @@ export function PeopleMountPickerDialog({
       onMounted();
       onClose();
     } catch (err) {
-      console.error("[PeopleMountPickerDialog] Mount failed:", err);
+      clientLogger.error({
+        layer: "ui",
+        event: "people_mount:caught",
+        summary: "people mount request failed",
+        error: err,
+      });
       toast.error("Failed to add People record", {
         description: err instanceof Error ? err.message : "Unknown error",
       });
@@ -232,7 +243,12 @@ export function PeopleMountPickerDialog({
       onMounted();
       onClose();
     } catch (err) {
-      console.error("[PeopleMountPickerDialog] Remount failed:", err);
+      clientLogger.error({
+        layer: "ui",
+        event: "people_remount:caught",
+        summary: "people remount request failed",
+        error: err,
+      });
       toast.error("Failed to move People record", {
         description: err instanceof Error ? err.message : "Unknown error",
       });

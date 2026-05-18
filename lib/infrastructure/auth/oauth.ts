@@ -2,14 +2,18 @@ import { OAuth2Client } from "google-auth-library";
 import type { User, Account, OAuthProvider } from "./types";
 
 import { prisma } from "@/lib/database/client";
+import { logger } from "@/lib/core/logger";
 
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
 
 if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) {
-  console.warn(
-    "Google OAuth credentials not configured. Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET environment variables."
-  );
+  // Module-load-time warning — emits with trace_id="no-trace" by design.
+  logger.warn({
+    layer: "auth",
+    event: "oauth_config:missing",
+    summary: "Google OAuth credentials not configured (set GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET)",
+  });
 }
 
 /**

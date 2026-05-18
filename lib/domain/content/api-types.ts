@@ -128,6 +128,14 @@ export interface ContentDetailResponse {
     tiptapJson: JSONContent;
     searchText: string;
     metadata: Record<string, unknown>;
+    /**
+     * Deterministic hash of `tiptapJson` for optimistic-concurrency PATCH.
+     * Clients should echo this back as the `If-Match` header on subsequent
+     * PATCH requests; mismatched hashes get a 409 Conflict from the API.
+     * Backwards compatible — optional in case older response payloads predate
+     * the field.
+     */
+    bodyHash?: string;
   };
   file?: {
     fileName: string;

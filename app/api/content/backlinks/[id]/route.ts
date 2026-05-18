@@ -8,6 +8,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/database/client";
 import { requireAuth } from "@/lib/infrastructure/auth/middleware";
 import type { JSONContent } from "@tiptap/core";
+import { logger, spanPayload, withRouteTrace, withSpan } from "@/lib/core/logger";
+
+const ROUTE_PATH = "/api/content/backlinks/[id]";
 
 type Params = Promise<{ id: string }>;
 
@@ -15,8 +18,8 @@ interface Backlink {
   id: string;
   title: string;
   slug: string;
-  excerpt: string; // Context around the link
-  linkText: string; // The actual link text
+  excerpt: string;
+  linkText: string;
   updatedAt: Date;
 }
 
@@ -38,137 +41,152 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Params }
 ) {
-  try {
-    const session = await requireAuth();
-    const { id } = await params;
-
-    // First, get the target note to know what we're looking for
-    const targetNote = await prisma.contentNode.findUnique({
-      where: { id },
-      select: {
-        id: true,
-        title: true,
-        slug: true,
-        ownerId: true,
-      },
-    });
-
-    if (!targetNote) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: {
-            code: "NOT_FOUND",
-            message: "Note not found",
-          },
-        },
-        { status: 404 }
+  return withRouteTrace(request, { route: ROUTE_PATH }, async () => {
+    try {
+      const session = await withSpan(
+        { layer: "auth", name: "session" },
+        { summary: "session lookup" },
+        async () => requireAuth(),
       );
-    }
+      const { id } = await params;
 
-    // Check ownership
-    if (targetNote.ownerId !== session.user.id) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: {
-            code: "FORBIDDEN",
-            message: "Access denied",
+      const targetNote = await prisma.contentNode.findUnique({
+        where: { id },
+        select: { id: true, title: true, slug: true, ownerId: true },
+      });
+
+      if (!targetNote) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: { code: "NOT_FOUND", message: "Note not found" },
           },
-        },
-        { status: 403 }
-      );
-    }
-
-    // Get all notes owned by this user (we'll search their content for links)
-    const allNotes = await prisma.contentNode.findMany({
-      where: {
-        ownerId: session.user.id,
-        deletedAt: null,
-        notePayload: {
-          isNot: null, // Only notes (not folders, files, etc.)
-        },
-      },
-      include: {
-        notePayload: {
-          select: {
-            tiptapJson: true,
-          },
-        },
-      },
-    });
-
-    // Search each note's TipTap JSON for links to the target note
-    const backlinks: Backlink[] = [];
-
-    for (const note of allNotes) {
-      try {
-        // Skip the target note itself
-        if (note.id === targetNote.id) continue;
-
-        const tiptapJson = note.notePayload?.tiptapJson;
-        if (!tiptapJson) continue;
-
-        // Parse TipTap JSON and find links
-        const content = typeof tiptapJson === 'string'
-          ? JSON.parse(tiptapJson)
-          : tiptapJson;
-
-        const linksFound = findLinksInTipTap(
-          content as JSONContent,
-          targetNote.slug,
-          targetNote.id,
-          targetNote.title
+          { status: 404 }
         );
-
-        // If this note contains links to the target, add it to backlinks
-        if (linksFound.length > 0) {
-          // Use the first link found for the excerpt
-          const firstLink = linksFound[0];
-
-          backlinks.push({
-            id: note.id,
-            title: note.title,
-            slug: note.slug,
-            excerpt: firstLink.context,
-            linkText: firstLink.linkText,
-            updatedAt: note.updatedAt,
-          });
-        }
-      } catch (error) {
-        console.error(`Error processing note ${note.id} (${note.title}):`, error);
-        // Continue processing other notes even if one fails
-        continue;
       }
-    }
 
-    // Sort by most recently updated
-    backlinks.sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
+      if (targetNote.ownerId !== session.user.id) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: { code: "FORBIDDEN", message: "Access denied" },
+          },
+          { status: 403 }
+        );
+      }
 
-    const response: BacklinksResponse = {
-      success: true,
-      data: {
-        targetId: targetNote.id,
-        targetTitle: targetNote.title,
-        backlinks,
-        count: backlinks.length,
-      },
-    };
-
-    return NextResponse.json(response);
-  } catch (error) {
-    console.error("Failed to fetch backlinks:", error);
-    return NextResponse.json(
-      {
-        success: false,
-        error: {
-          code: "INTERNAL_ERROR",
-          message: error instanceof Error ? error.message : "Failed to fetch backlinks",
+      const allNotes = await withSpan(
+        { layer: "content", name: "fetch_all_notes" },
+        undefined,
+        async (span) => {
+          const result = await prisma.contentNode.findMany({
+            where: {
+              ownerId: session.user.id,
+              deletedAt: null,
+              notePayload: { isNot: null },
+            },
+            include: {
+              notePayload: { select: { tiptapJson: true } },
+            },
+          });
+          span.attr("notes", result.length).summary(`${result.length} notes to scan`);
+          return result;
         },
-      },
-      { status: 500 }
-    );
-  }
+      );
+
+      const backlinks = await withSpan(
+        { layer: "content", name: "backlinks_scan" },
+        {
+          attrs: { target_id: id, scanned: allNotes.length },
+          summary: `scanning ${allNotes.length} notes`,
+        },
+        async (span) => {
+          const results: Backlink[] = [];
+          let scanErrors = 0;
+
+          for (const note of allNotes) {
+            try {
+              if (note.id === targetNote.id) continue;
+
+              const tiptapJson = note.notePayload?.tiptapJson;
+              if (!tiptapJson) continue;
+
+              const content = typeof tiptapJson === 'string'
+                ? JSON.parse(tiptapJson)
+                : tiptapJson;
+
+              const linksFound = findLinksInTipTap(
+                content as JSONContent,
+                targetNote.slug,
+                targetNote.id,
+                targetNote.title
+              );
+
+              if (linksFound.length > 0) {
+                const firstLink = linksFound[0];
+                results.push({
+                  id: note.id,
+                  title: note.title,
+                  slug: note.slug,
+                  excerpt: firstLink.context,
+                  linkText: firstLink.linkText,
+                  updatedAt: note.updatedAt,
+                });
+              }
+            } catch {
+              scanErrors++;
+              continue;
+            }
+          }
+
+          span.attr("found", results.length).attr("scan_errors", scanErrors);
+          span.summary(`${results.length} backlinks${scanErrors > 0 ? ` (${scanErrors} parse errors)` : ""}`);
+          await spanPayload(span, "backlinks", results);
+
+          if (scanErrors > 0) {
+            logger.warn({
+              layer: "content",
+              event: "backlinks_scan:parse_errors",
+              summary: `${scanErrors} notes failed to parse`,
+              attrs: { errors: scanErrors, scanned: allNotes.length },
+            });
+          }
+          return results;
+        },
+      );
+
+      backlinks.sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
+
+      const response: BacklinksResponse = {
+        success: true,
+        data: {
+          targetId: targetNote.id,
+          targetTitle: targetNote.title,
+          backlinks,
+          count: backlinks.length,
+        },
+      };
+
+      return NextResponse.json(response);
+    } catch (error) {
+      logger.error({
+        layer: "content",
+        event: "backlinks_scan:caught",
+        summary: "backlinks fetch failed — 500",
+        error,
+      });
+      return NextResponse.json(
+        {
+          success: false,
+          error: {
+            code: "INTERNAL_ERROR",
+            message: error instanceof Error ? error.message : "Failed to fetch backlinks",
+          },
+        },
+        { status: 500 }
+      );
+    }
+  });
 }
 
 // ============================================================
@@ -178,17 +196,14 @@ export async function GET(
 interface LinkMatch {
   linkText: string;
   href: string;
-  context: string; // Surrounding text for preview
+  context: string;
 }
 
 /**
- * Recursively search TipTap JSON for links to a specific note
+ * Recursively search TipTap JSON for links to a specific note.
  *
- * @param node - TipTap JSONContent node
- * @param targetSlug - The slug of the note we're looking for links to
- * @param targetId - The ID of the note we're looking for links to
- * @param targetTitle - The title of the note we're looking for links to
- * @returns Array of link matches with context
+ * Per-node debug console.logs from the previous implementation were retired
+ * — they fired O(nodes_per_note × all_notes) which saturated dev terminals.
  */
 function findLinksInTipTap(
   node: JSONContent,
@@ -198,9 +213,6 @@ function findLinksInTipTap(
 ): LinkMatch[] {
   const matches: LinkMatch[] = [];
 
-  console.log('[findLinksInTipTap] Searching for links to:', { targetSlug, targetId, targetTitle });
-
-  // Helper to extract text from a node and its children
   function extractText(n: JSONContent): string {
     if (n.type === 'text') {
       return n.text || '';
@@ -211,22 +223,16 @@ function findLinksInTipTap(
     return '';
   }
 
-  // Helper to check if a node contains a link to the target
   function searchNode(n: JSONContent, parentContext: string = ''): void {
-    // Check if this is a wiki-link node [[Note Title]]
     if (n.type === 'wikiLink' && n.attrs?.targetTitle) {
       const targetTitleAttr = n.attrs.targetTitle;
       const displayText = n.attrs.displayText;
 
-      console.log('[findLinksInTipTap] Found wiki-link node:', targetTitleAttr, 'comparing to:', targetTitle);
-
-      // Check if the wiki link references our target note by title or slug
       const isMatch =
         targetTitleAttr.toLowerCase() === targetTitle.toLowerCase() ||
         targetTitleAttr.toLowerCase() === targetSlug.toLowerCase();
 
       if (isMatch) {
-        console.log('[findLinksInTipTap] MATCH! Adding backlink');
         const linkText = displayText
           ? `[[${targetTitleAttr}|${displayText}]]`
           : `[[${targetTitleAttr}]]`;
@@ -239,20 +245,12 @@ function findLinksInTipTap(
       }
     }
 
-    // Check if this is a text node with marks (for regular links)
     if (n.type === 'text' && n.marks) {
-      // Check for regular link marks
       const linkMark = n.marks.find((mark) => mark.type === 'link');
 
       if (linkMark && linkMark.attrs?.href) {
         const href = linkMark.attrs.href;
 
-        // Check if the link points to our target note
-        // Links might be in formats like:
-        // - /notes/slug
-        // - /notes?content=id
-        // - Just the slug
-        // - Just the id
         const isMatch =
           href.includes(targetSlug) ||
           href.includes(targetId) ||
@@ -269,9 +267,7 @@ function findLinksInTipTap(
       }
     }
 
-    // Recursively search children
     if (n.content) {
-      // If this is a paragraph or similar container, extract its full text for context
       const nodeText = n.type === 'paragraph' || n.type === 'heading'
         ? extractText(n)
         : parentContext;

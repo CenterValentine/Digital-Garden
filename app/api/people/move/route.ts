@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/database/client";
 import { movePeopleGroup, movePersonToGroup } from "@/lib/domain/people";
 import { requireAuth } from "@/lib/infrastructure/auth/middleware";
+import { logger } from "@/lib/core/logger";
 
 interface PeopleMoveRequest {
   source?: {
@@ -102,7 +103,7 @@ export async function POST(request: NextRequest) {
       { status: 400 }
     );
   } catch (error) {
-    console.error("POST /api/people/move error:", error);
+    logger.error({ layer: "content", event: "people_move:caught", summary: "POST caught", error });
     return NextResponse.json(
       {
         success: false,

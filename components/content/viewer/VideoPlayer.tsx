@@ -29,6 +29,7 @@ import {
 import { Button } from "@/components/ui/glass/button";
 import { Slider } from "@/components/ui/slider";
 import { toast } from "sonner";
+import { clientLogger } from "@/lib/core/logger/client";
 
 interface VideoPlayerProps {
   downloadUrl: string;
@@ -131,7 +132,12 @@ export function VideoPlayer({ downloadUrl, fileName, mimeType, title, onDownload
         await videoRef.current.requestPictureInPicture();
       }
     } catch (err) {
-      console.error("PiP error:", err);
+      clientLogger.error({
+        layer: "ui",
+        event: "video_pip:caught",
+        summary: "picture-in-picture toggle failed",
+        error: err,
+      });
       toast.error("Picture-in-picture not supported");
     }
   };

@@ -4,6 +4,7 @@ import {
   listBrowserExtensionInstalls,
   trustBrowserExtensionInstall,
 } from "@/lib/domain/browser-bookmarks";
+import { logger } from "@/lib/core/logger";
 
 function errorResponse(error: unknown, fallback: string) {
   const message = error instanceof Error ? error.message : fallback;
@@ -28,7 +29,7 @@ export async function GET() {
     const data = await listBrowserExtensionInstalls(session.user.id);
     return NextResponse.json({ success: true, data });
   } catch (error) {
-    console.error("[BrowserBookmarks Installs] GET error:", error);
+    logger.error({ layer: "browser_ext", event: "installs_list:caught", summary: "GET caught", error });
     return errorResponse(error, "Failed to load trusted browser installs");
   }
 }
@@ -55,7 +56,7 @@ export async function POST(request: NextRequest) {
     });
     return NextResponse.json({ success: true, data }, { status: 201 });
   } catch (error) {
-    console.error("[BrowserBookmarks Installs] POST error:", error);
+    logger.error({ layer: "browser_ext", event: "install_trust:caught", summary: "POST caught", error });
     return errorResponse(error, "Failed to trust browser extension");
   }
 }

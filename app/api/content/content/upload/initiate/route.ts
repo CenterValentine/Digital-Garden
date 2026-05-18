@@ -13,225 +13,222 @@ import { requireAuth } from "@/lib/infrastructure/auth/middleware";
 import { generateUniqueSlug } from "@/lib/domain/content";
 import type { InitiateUploadRequest } from "@/lib/domain/content/api-types";
 import crypto from "crypto";
+import { logger, withRouteTrace, withSpan } from "@/lib/core/logger";
 
-// ============================================================
-// POST /api/content/content/upload/initiate
-// ============================================================
+const ROUTE_PATH = "/api/content/content/upload/initiate";
 
 export async function POST(request: NextRequest) {
-  try {
-    const session = await requireAuth();
-    const body = (await request.json()) as InitiateUploadRequest;
-
-    const {
-      fileName,
-      fileSize,
-      mimeType,
-      checksum,
-      parentId,
-      title,
-      customIcon,
-      iconColor,
-      role,
-    } = body;
-
-    // Validation
-    if (!fileName || !fileSize || !mimeType) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: {
-            code: "VALIDATION_ERROR",
-            message: "fileName, fileSize, and mimeType are required",
-          },
-        },
-        { status: 400 }
+  return withRouteTrace(request, { route: ROUTE_PATH }, async () => {
+    try {
+      const session = await withSpan(
+        { layer: "auth", name: "session" },
+        { summary: "session lookup" },
+        async () => requireAuth(),
       );
-    }
+      const body = (await request.json()) as InitiateUploadRequest;
 
-    if (fileSize > 100 * 1024 * 1024) {
-      // 100 MB limit
-      return NextResponse.json(
-        {
-          success: false,
-          error: {
-            code: "VALIDATION_ERROR",
-            message: "File size exceeds 100 MB limit",
-          },
-        },
-        { status: 400 }
-      );
-    }
+      const {
+        fileName,
+        fileSize,
+        mimeType,
+        checksum,
+        parentId,
+        title,
+        customIcon,
+        iconColor,
+        role,
+      } = body;
 
-    // Validate parent
-    if (parentId) {
-      const parent = await prisma.contentNode.findUnique({
-        where: { id: parentId },
-      });
-
-      if (!parent || parent.ownerId !== session.user.id) {
+      if (!fileName || !fileSize || !mimeType) {
         return NextResponse.json(
           {
             success: false,
             error: {
-              code: "NOT_FOUND",
-              message: "Parent not found",
+              code: "VALIDATION_ERROR",
+              message: "fileName, fileSize, and mimeType are required",
             },
           },
-          { status: 404 }
+          { status: 400 }
         );
       }
-    }
 
-    // Check for duplicate file (by checksum + size)
-    if (checksum) {
-      const duplicate = await prisma.filePayload.findFirst({
-        where: {
-          checksum,
-          fileSize: BigInt(fileSize),
-          content: {
-            ownerId: session.user.id,
+      if (fileSize > 100 * 1024 * 1024) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: {
+              code: "VALIDATION_ERROR",
+              message: "File size exceeds 100 MB limit",
+            },
           },
-          uploadStatus: "ready",
-        },
-        include: {
-          content: true,
+          { status: 400 }
+        );
+      }
+
+      if (parentId) {
+        const parent = await prisma.contentNode.findUnique({
+          where: { id: parentId },
+        });
+
+        if (!parent || parent.ownerId !== session.user.id) {
+          return NextResponse.json(
+            {
+              success: false,
+              error: { code: "NOT_FOUND", message: "Parent not found" },
+            },
+            { status: 404 }
+          );
+        }
+      }
+
+      // Check for duplicate file (by checksum + size)
+      if (checksum) {
+        const duplicate = await prisma.filePayload.findFirst({
+          where: {
+            checksum,
+            fileSize: BigInt(fileSize),
+            content: { ownerId: session.user.id },
+            uploadStatus: "ready",
+          },
+          include: { content: true },
+        });
+
+        if (duplicate) {
+          return NextResponse.json({
+            success: true,
+            data: {
+              isDuplicate: true,
+              existingContentId: duplicate.contentId,
+              message: "File already exists. Reference the existing file.",
+            },
+          });
+        }
+      }
+
+      const storageConfig = await prisma.storageProviderConfig.findFirst({
+        where: {
+          userId: session.user.id,
+          isDefault: true,
+          isActive: true,
         },
       });
 
-      if (duplicate) {
-        return NextResponse.json({
-          success: true,
-          data: {
-            isDuplicate: true,
-            existingContentId: duplicate.contentId,
-            message: "File already exists. Reference the existing file.",
+      if (!storageConfig) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: {
+              code: "STORAGE_ERROR",
+              message: "No storage provider configured",
+            },
           },
-        });
+          { status: 500 }
+        );
       }
-    }
 
-    // Get user's default storage provider
-    const storageConfig = await prisma.storageProviderConfig.findFirst({
-      where: {
-        userId: session.user.id,
-        isDefault: true,
-        isActive: true,
-      },
-    });
+      const fileExtension = fileName.split(".").pop() || "";
+      const uniqueId = crypto.randomUUID();
+      const storageKey = `uploads/${session.user.id}/${uniqueId}.${fileExtension}`;
 
-    if (!storageConfig) {
+      const contentTitle = title || fileName;
+      const slug = await generateUniqueSlug(contentTitle, session.user.id);
+
+      const content = await withSpan(
+        { layer: "content", name: "create" },
+        { attrs: { kind: "file", ext: fileExtension, bytes: fileSize } },
+        async (span) => {
+          const created = await prisma.contentNode.create({
+            data: {
+              ownerId: session.user.id,
+              title: contentTitle,
+              slug,
+              contentType: "file",
+              parentId: parentId || null,
+              role: role || "primary",
+              customIcon: customIcon || null,
+              iconColor: iconColor || null,
+              filePayload: {
+                create: {
+                  fileName,
+                  fileExtension,
+                  mimeType,
+                  fileSize: BigInt(fileSize),
+                  checksum: checksum || "",
+                  storageProvider: storageConfig.provider,
+                  storageKey,
+                  uploadStatus: "uploading",
+                },
+              },
+            },
+            include: { filePayload: true },
+          });
+          span.attr("content_id", created.id);
+          return created;
+        },
+      );
+
+      const presignedUrl = await withSpan(
+        { layer: "storage", name: "presign_upload" },
+        { attrs: { provider: storageConfig.provider, mime: mimeType } },
+        async () =>
+          generatePresignedUploadUrl(
+            storageConfig.provider,
+            storageConfig.config as Record<string, unknown>,
+            storageKey,
+            mimeType
+          ),
+      );
+
+      return NextResponse.json({
+        success: true,
+        data: {
+          contentId: content.id,
+          uploadUrl: presignedUrl,
+          storageKey,
+          expiresIn: 3600,
+          message:
+            "Upload initiated. Upload file to the provided URL, then call /finalize.",
+        },
+      });
+    } catch (error) {
+      logger.error({
+        layer: "storage",
+        event: "upload_initiate:caught",
+        summary: "initiate failed — 500",
+        error,
+      });
       return NextResponse.json(
         {
           success: false,
           error: {
-            code: "STORAGE_ERROR",
-            message: "No storage provider configured",
+            code: "SERVER_ERROR",
+            message: "Failed to initiate upload",
           },
         },
         { status: 500 }
       );
     }
-
-    // Generate storage key
-    const fileExtension = fileName.split(".").pop() || "";
-    const uniqueId = crypto.randomUUID();
-    const storageKey = `uploads/${session.user.id}/${uniqueId}.${fileExtension}`;
-
-    // Generate slug and title
-    const contentTitle = title || fileName;
-    const slug = await generateUniqueSlug(contentTitle, session.user.id);
-
-    // Create ContentNode + FilePayload (uploadStatus="uploading")
-    const content = await prisma.contentNode.create({
-      data: {
-        ownerId: session.user.id,
-        title: contentTitle,
-        slug,
-        contentType: "file",
-        parentId: parentId || null,
-        role: role || "primary",
-        customIcon: customIcon || null,
-        iconColor: iconColor || null,
-        filePayload: {
-          create: {
-            fileName,
-            fileExtension,
-            mimeType,
-            fileSize: BigInt(fileSize),
-            checksum: checksum || "",
-            storageProvider: storageConfig.provider,
-            storageKey,
-            uploadStatus: "uploading",
-          },
-        },
-      },
-      include: {
-        filePayload: true,
-      },
-    });
-
-    // Generate presigned URL for direct upload
-    const presignedUrl = await generatePresignedUploadUrl(
-      storageConfig.provider,
-      storageConfig.config as Record<string, unknown>,
-      storageKey,
-      mimeType
-    );
-
-    return NextResponse.json({
-      success: true,
-      data: {
-        contentId: content.id,
-        uploadUrl: presignedUrl,
-        storageKey,
-        expiresIn: 3600, // 1 hour
-        message:
-          "Upload initiated. Upload file to the provided URL, then call /finalize.",
-      },
-    });
-  } catch (error) {
-    console.error("POST /api/content/content/upload/initiate error:", error);
-    return NextResponse.json(
-      {
-        success: false,
-        error: {
-          code: "SERVER_ERROR",
-          message: "Failed to initiate upload",
-        },
-      },
-      { status: 500 }
-    );
-  }
+  });
 }
 
 // ============================================================
 // PRESIGNED URL GENERATION
 // ============================================================
 
-/**
- * Generate presigned upload URL for storage provider
- *
- * Uses real storage SDK integration (R2, S3, Vercel Blob)
- */
 async function generatePresignedUploadUrl(
   provider: string,
   config: Record<string, unknown>,
   storageKey: string,
   mimeType: string
 ): Promise<string> {
-  // Import storage factory
   const { getDefaultStorageProvider } = await import('@/lib/infrastructure/storage');
 
-  // For now, use environment-based provider
-  // Later: use config parameter for user-specific providers
   const storageProvider = getDefaultStorageProvider();
 
-  // Generate presigned URL
   const presignedUrl = await storageProvider.generateUploadUrl(
     storageKey,
     mimeType,
-    3600 // 1 hour expiration
+    3600
   );
 
   return presignedUrl.url;

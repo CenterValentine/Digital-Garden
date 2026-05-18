@@ -3,7 +3,13 @@
  *
  * Fetches and parses Open Graph metadata from external URLs.
  * Phase 2: ExternalPayload support
+ *
+ * This is a utility module called from route handlers. It uses the logger
+ * directly (with layer "external") and assumes the caller has established
+ * a trace context via withRouteTrace.
  */
+
+import { logger } from "@/lib/core/logger";
 
 export interface OpenGraphData {
   title?: string;
@@ -15,15 +21,15 @@ export interface OpenGraphData {
 }
 
 export interface FetchOptions {
-  timeout?: number; // Request timeout in milliseconds (default: 3000ms)
-  maxSize?: number; // Maximum response size in bytes (default: 128KB)
-  followRedirects?: boolean; // Follow redirects (default: true)
-  allowCrossDomain?: boolean; // Allow cross-domain redirects (default: false)
+  timeout?: number;
+  maxSize?: number;
+  followRedirects?: boolean;
+  allowCrossDomain?: boolean;
 }
 
 const DEFAULT_OPTIONS: Required<FetchOptions> = {
   timeout: 3000,
-  maxSize: 128 * 1024, // 128KB
+  maxSize: 128 * 1024,
   followRedirects: true,
   allowCrossDomain: false,
 };
@@ -42,7 +48,6 @@ export async function fetchOpenGraphData(
   const opts = { ...DEFAULT_OPTIONS, ...options };
 
   try {
-    // Set up abort controller for timeout
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), opts.timeout);
 
@@ -58,12 +63,10 @@ export async function fetchOpenGraphData(
 
       clearTimeout(timeoutId);
 
-      // Check if redirect crossed domains
       if (!opts.allowCrossDomain) {
         const originalHost = new URL(url).hostname;
         const finalHost = new URL(response.url).hostname;
 
-        // Allow common redirects like example.com → www.example.com
         const isSameDomain =
           originalHost === finalHost ||
           originalHost === `www.${finalHost}` ||
@@ -71,33 +74,44 @@ export async function fetchOpenGraphData(
           originalHost.replace(/^www\./, '') === finalHost.replace(/^www\./, '');
 
         if (!isSameDomain) {
-          console.warn(
-            `[OpenGraph] Cross-domain redirect blocked: ${originalHost} → ${finalHost}`
-          );
+          logger.warn({
+            layer: "external",
+            event: "og_fetch:cross_domain_blocked",
+            summary: `${originalHost} → ${finalHost}`,
+            attrs: { from: originalHost, to: finalHost },
+          });
           return null;
         }
       }
 
       if (!response.ok) {
-        console.warn(
-          `[OpenGraph] HTTP ${response.status} when fetching ${url}`
-        );
+        logger.warn({
+          layer: "external",
+          event: "og_fetch:http_error",
+          summary: `HTTP ${response.status}`,
+          attrs: { status: response.status },
+        });
         return null;
       }
 
-      // Check content type
       const contentType = response.headers.get("content-type") || "";
       if (!contentType.includes("text/html")) {
-        console.warn(
-          `[OpenGraph] Non-HTML content type: ${contentType} for ${url}`
-        );
+        logger.warn({
+          layer: "external",
+          event: "og_fetch:wrong_content_type",
+          summary: `not text/html`,
+          attrs: { content_type: contentType },
+        });
         return null;
       }
 
-      // Read response with size limit
       const reader = response.body?.getReader();
       if (!reader) {
-        console.warn(`[OpenGraph] No response body for ${url}`);
+        logger.warn({
+          layer: "external",
+          event: "og_fetch:no_body",
+          summary: "empty response body",
+        });
         return null;
       }
 
@@ -110,9 +124,12 @@ export async function fetchOpenGraphData(
 
         bytesRead += value.length;
         if (bytesRead > opts.maxSize) {
-          console.warn(
-            `[OpenGraph] Response too large (>${opts.maxSize} bytes) for ${url}`
-          );
+          logger.warn({
+            layer: "external",
+            event: "og_fetch:too_large",
+            summary: `exceeded ${opts.maxSize} bytes`,
+            attrs: { limit: opts.maxSize, read: bytesRead },
+          });
           reader.cancel();
           return null;
         }
@@ -126,25 +143,42 @@ export async function fetchOpenGraphData(
         }
       }
 
-      // Parse Open Graph tags
       return parseOpenGraphTags(html);
     } finally {
       clearTimeout(timeoutId);
     }
   } catch (err) {
     if (err instanceof Error && err.name === "AbortError") {
-      console.warn(`[OpenGraph] Request timeout for ${url}`);
+      logger.warn({
+        layer: "external",
+        event: "og_fetch:timeout",
+        summary: `${opts.timeout}ms timeout`,
+        attrs: { timeout_ms: opts.timeout },
+      });
     } else if (err instanceof Error && 'cause' in err) {
       const cause = (err as Error & { cause?: { code?: string } }).cause;
       if (cause?.code === 'UNABLE_TO_VERIFY_LEAF_SIGNATURE' || cause?.code === 'CERT_HAS_EXPIRED') {
-        console.error(`[OpenGraph] SSL certificate error for ${url}:`, cause.code);
-        console.error(`[OpenGraph] To bypass SSL verification in development, set NODE_TLS_REJECT_UNAUTHORIZED=0`);
-        console.error(`[OpenGraph] WARNING: Never use NODE_TLS_REJECT_UNAUTHORIZED=0 in production!`);
+        logger.warn({
+          layer: "external",
+          event: "og_fetch:ssl_error",
+          summary: cause.code,
+          attrs: { code: cause.code },
+        });
       } else {
-        console.error(`[OpenGraph] Fetch error for ${url}:`, err);
+        logger.warn({
+          layer: "external",
+          event: "og_fetch:caught",
+          summary: "fetch error",
+          error: err,
+        });
       }
     } else {
-      console.error(`[OpenGraph] Fetch error for ${url}:`, err);
+      logger.warn({
+        layer: "external",
+        event: "og_fetch:caught",
+        summary: "fetch error",
+        error: err instanceof Error ? err : new Error(String(err)),
+      });
     }
     return null;
   }
@@ -152,15 +186,10 @@ export async function fetchOpenGraphData(
 
 /**
  * Parses Open Graph meta tags from HTML
- *
- * @param html - HTML content to parse
- * @returns Parsed Open Graph data
  */
 function parseOpenGraphTags(html: string): OpenGraphData {
   const data: OpenGraphData = {};
 
-  // Extract Open Graph meta tags using regex
-  // Matches: <meta property="og:title" content="..." />
   const ogTagRegex =
     /<meta\s+property=["']og:([^"']+)["']\s+content=["']([^"']+)["']\s*\/?>/gi;
 
@@ -198,7 +227,6 @@ function parseOpenGraphTags(html: string): OpenGraphData {
     if (titleMatch) {
       data.title = decodeHtmlEntities(titleMatch[1]);
     } else {
-      // Fallback to <title> tag
       const titleTagMatch = html.match(/<title>([^<]+)<\/title>/i);
       if (titleTagMatch) {
         data.title = decodeHtmlEntities(titleTagMatch[1]);
@@ -220,9 +248,6 @@ function parseOpenGraphTags(html: string): OpenGraphData {
 
 /**
  * Decodes common HTML entities
- *
- * @param text - Text with HTML entities
- * @returns Decoded text
  */
 function decodeHtmlEntities(text: string): string {
   const entities: Record<string, string> = {

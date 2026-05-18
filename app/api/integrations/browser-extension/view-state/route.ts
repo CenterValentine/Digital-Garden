@@ -4,6 +4,7 @@ import {
   getExtensionViewState,
   upsertExtensionViewState,
 } from "@/lib/domain/browser-extension";
+import { logger } from "@/lib/core/logger";
 
 function errorResponse(error: unknown, fallback: string) {
   const message = error instanceof Error ? error.message : fallback;
@@ -35,7 +36,7 @@ export async function GET(request: NextRequest) {
     const data = await getExtensionViewState(token.user.id, installId, resourceId);
     return NextResponse.json({ success: true, data });
   } catch (error) {
-    console.error("[BrowserExtension ViewState] GET error:", error);
+    logger.error({ layer: "browser_ext", event: "view_state_read:caught", summary: "GET caught", error });
     return errorResponse(error, "Failed to load view state");
   }
 }
@@ -80,7 +81,7 @@ export async function PATCH(request: NextRequest) {
     });
     return NextResponse.json({ success: true, data });
   } catch (error) {
-    console.error("[BrowserExtension ViewState] PATCH error:", error);
+    logger.error({ layer: "browser_ext", event: "view_state_update:caught", summary: "PATCH caught", error });
     return errorResponse(error, "Failed to save view state");
   }
 }

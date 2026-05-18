@@ -7,6 +7,9 @@
  * to know which node types to produce).
  */
 
+// NOTE: client-reachable via ChatPanel → edit-orchestrator. Cannot import the
+// server logger here without breaking the client bundle (node:async_hooks).
+// Migrates to client-safe logger in Phase 5.
 import { generateJSON, generateHTML } from "@tiptap/core";
 import type { JSONContent, Extensions } from "@tiptap/core";
 import { marked } from "marked";

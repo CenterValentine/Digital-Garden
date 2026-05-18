@@ -11,7 +11,6 @@
 import { v4 as uuid } from "uuid";
 import type { BuilderNode } from "./builder-types";
 import type { TipTapNode } from "./builder-to-tiptap";
-import { getBlockDefinition } from "./registry";
 
 /** Block types that are recognized by the builder */
 const BUILDER_BLOCK_TYPES = new Set([

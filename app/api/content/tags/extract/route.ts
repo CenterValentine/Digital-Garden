@@ -4,15 +4,6 @@
  * POST /api/content/tags/extract
  * Extracts tags from TipTap JSON and syncs with database
  *
- * Request body:
- * {
- *   userId: string;
- *   contentId: string;
- *   tiptapJson: JSONContent;
- * }
- *
- * Returns: Array of tags with positions
- *
  * M6: Search & Knowledge Features - Tags
  */
 
@@ -21,6 +12,9 @@ import { prisma } from "@/lib/database/client";
 import { extractTags } from "@/lib/domain/content/tag-extractor";
 import type { JSONContent } from "@tiptap/core";
 import type { Prisma } from "@/lib/database/generated/prisma";
+import { logger, spanPayload, withRouteTrace, withSpan } from "@/lib/core/logger";
+
+const ROUTE_PATH = "/api/content/tags/extract";
 
 interface ExtractTagsRequest {
   userId: string;
@@ -29,119 +23,115 @@ interface ExtractTagsRequest {
 }
 
 export async function POST(request: NextRequest) {
-  try {
-    const body: ExtractTagsRequest = await request.json();
-    const { userId, contentId, tiptapJson } = body;
+  return withRouteTrace(request, { route: ROUTE_PATH }, async () => {
+    try {
+      const body: ExtractTagsRequest = await request.json();
+      const { userId, contentId, tiptapJson } = body;
 
-    // Validate required fields
-    if (!userId || !contentId || !tiptapJson) {
+      if (!userId || !contentId || !tiptapJson) {
+        return NextResponse.json(
+          { error: "userId, contentId, and tiptapJson are required" },
+          { status: 400 }
+        );
+      }
+
+      const results = await withSpan(
+        { layer: "content", name: "tags_extract_sync" },
+        { attrs: { content_id: contentId } },
+        async (span) => {
+          const extractedTags = extractTags(tiptapJson);
+          const out: Array<{
+            id: string;
+            name: string;
+            slug: string;
+            color: string | null;
+            positions: unknown;
+          }> = [];
+
+          for (const extractedTag of extractedTags) {
+            const tag = await prisma.tag.upsert({
+              where: { userId_slug: { userId, slug: extractedTag.slug } },
+              update: {},
+              create: {
+                userId,
+                name: extractedTag.name,
+                slug: extractedTag.slug,
+                color: generateColorFromSlug(extractedTag.slug),
+              },
+            });
+
+            await prisma.contentTag.upsert({
+              where: { contentId_tagId: { contentId, tagId: tag.id } },
+              update: {
+                positions: extractedTag.positions as unknown as Prisma.InputJsonValue,
+              },
+              create: {
+                contentId,
+                tagId: tag.id,
+                positions: extractedTag.positions as unknown as Prisma.InputJsonValue,
+              },
+            });
+
+            out.push({
+              id: tag.id,
+              name: tag.name,
+              slug: tag.slug,
+              color: tag.color,
+              positions: extractedTag.positions,
+            });
+          }
+
+          const currentTagIds = out.map((r) => r.id);
+
+          await prisma.contentTag.deleteMany({
+            where: {
+              contentId,
+              tagId: {
+                notIn: currentTagIds.length > 0 ? currentTagIds : ["__none__"],
+              },
+            },
+          });
+
+          span.attr("extracted", out.length).summary(`${out.length} tags`);
+          await spanPayload(span, "extracted_tags", out);
+          return out;
+        },
+      );
+
+      return NextResponse.json({
+        tags: results,
+        extractedCount: results.length,
+      });
+    } catch (error) {
+      logger.error({
+        layer: "content",
+        event: "tags_extract_sync:caught",
+        summary: "extract failed — 500",
+        error,
+      });
       return NextResponse.json(
-        { error: "userId, contentId, and tiptapJson are required" },
-        { status: 400 }
+        {
+          error: "Failed to extract tags",
+          details: error instanceof Error ? error.message : "Unknown error",
+        },
+        { status: 500 }
       );
     }
-
-    // Extract tags from content
-    const extractedTags = extractTags(tiptapJson);
-
-    // For each extracted tag:
-    // 1. Create tag if it doesn't exist (upsert)
-    // 2. Link tag to content with positions (upsert ContentTag)
-    const results = [];
-
-    for (const extractedTag of extractedTags) {
-      // Create or get existing tag
-      const tag = await prisma.tag.upsert({
-        where: {
-          userId_slug: {
-            userId,
-            slug: extractedTag.slug,
-          },
-        },
-        update: {},
-        create: {
-          userId,
-          name: extractedTag.name,
-          slug: extractedTag.slug,
-          // Auto-assign color based on hash of slug
-          color: generateColorFromSlug(extractedTag.slug),
-        },
-      });
-
-      // Link tag to content with positions
-      const contentTag = await prisma.contentTag.upsert({
-        where: {
-          contentId_tagId: {
-            contentId,
-            tagId: tag.id,
-          },
-        },
-        update: {
-          positions: extractedTag.positions as unknown as Prisma.InputJsonValue,
-        },
-        create: {
-          contentId,
-          tagId: tag.id,
-          positions: extractedTag.positions as unknown as Prisma.InputJsonValue,
-        },
-      });
-
-      results.push({
-        id: tag.id,
-        name: tag.name,
-        slug: tag.slug,
-        color: tag.color,
-        positions: extractedTag.positions,
-      });
-    }
-
-    // Remove tags that are no longer in the content
-    // Get current tag IDs from extracted tags
-    const currentTagIds = results.map((r) => r.id);
-
-    // Delete ContentTag entries not in current list
-    await prisma.contentTag.deleteMany({
-      where: {
-        contentId,
-        tagId: {
-          notIn: currentTagIds.length > 0 ? currentTagIds : ["__none__"], // Prevent empty array
-        },
-      },
-    });
-
-    return NextResponse.json({
-      tags: results,
-      extractedCount: extractedTags.length,
-    });
-  } catch (error) {
-    console.error("Extract tags error:", error);
-    return NextResponse.json(
-      {
-        error: "Failed to extract tags",
-        details: error instanceof Error ? error.message : "Unknown error",
-      },
-      { status: 500 }
-    );
-  }
+  });
 }
 
-/**
- * Generate a consistent color from a slug
- * Uses a simple hash to pick from predefined colors
- */
 function generateColorFromSlug(slug: string): string {
   const colors = [
-    "#3b82f6", // blue
-    "#8b5cf6", // purple
-    "#10b981", // green
-    "#f59e0b", // amber
-    "#ef4444", // red
-    "#ec4899", // pink
-    "#06b6d4", // cyan
-    "#f97316", // orange
+    "#3b82f6",
+    "#8b5cf6",
+    "#10b981",
+    "#f59e0b",
+    "#ef4444",
+    "#ec4899",
+    "#06b6d4",
+    "#f97316",
   ];
 
-  // Simple hash function
   let hash = 0;
   for (let i = 0; i < slug.length; i++) {
     hash = slug.charCodeAt(i) + ((hash << 5) - hash);
