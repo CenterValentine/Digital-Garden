@@ -91,7 +91,7 @@ export function CreatePublicItemDialog({
       {/* Panel */}
       <form
         onSubmit={handleSubmit}
-        className="relative z-10 w-full max-w-md mx-4 rounded-xl bg-zinc-900 border border-white/10 shadow-2xl"
+        className="relative z-10 w-full max-w-md mx-4 rounded-xl bg-card border border-white/10 shadow-2xl"
       >
         {/* Header */}
         <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-white/5">
@@ -146,7 +146,7 @@ export function CreatePublicItemDialog({
               <select
                 value={pathId}
                 onChange={(e) => setPathId(e.target.value)}
-                className="w-full rounded-md border border-white/10 bg-zinc-800 px-3 py-2 text-sm text-white focus:border-white/20 focus:outline-none"
+                className="w-full rounded-md border border-white/10 bg-muted px-3 py-2 text-sm text-white focus:border-white/20 focus:outline-none"
               >
                 {paths.map((p) => (
                   <option key={p.id} value={p.id}>
@@ -256,7 +256,7 @@ function ContentTypePicker({
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="w-full flex items-center justify-between rounded-md border border-white/10 bg-zinc-800 px-3 py-2 text-sm text-white hover:border-white/20 focus:outline-none transition-colors"
+        className="w-full flex items-center justify-between rounded-md border border-white/10 bg-muted px-3 py-2 text-sm text-white hover:border-white/20 focus:outline-none transition-colors"
       >
         <span>{selectedLabel}</span>
         <ChevronDown className={cn("w-4 h-4 text-white/30 transition-transform", open && "rotate-180")} />
@@ -264,7 +264,7 @@ function ContentTypePicker({
 
       {/* Dropdown */}
       {open && (
-        <div className="absolute left-0 right-0 top-full mt-1 z-50 rounded-lg border border-white/10 bg-zinc-900 shadow-xl overflow-hidden">
+        <div className="absolute left-0 right-0 top-full mt-1 z-50 rounded-lg border border-white/10 bg-popover shadow-xl overflow-hidden">
           {/* Type list */}
           <div className="max-h-40 overflow-y-auto py-1">
             {types.map((type) => (

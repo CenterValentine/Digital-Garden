@@ -87,7 +87,7 @@ export function PublishItemRow({ item, onRefresh }: PublishItemRowProps) {
     : `/${item.slug}`;
 
   return (
-    <div className="group flex items-start gap-2 px-3 py-2 hover:bg-gray-50 transition-colors">
+    <div className="group flex items-start gap-2 px-3 py-2 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
       {/* State icon */}
       <div className="shrink-0 mt-0.5">
         {pendingChanges && item.state === "published" ? (
@@ -109,14 +109,14 @@ export function PublishItemRow({ item, onRefresh }: PublishItemRowProps) {
       <div className="flex-1 min-w-0">
         {/* Title + options button */}
         <div className="flex items-start justify-between gap-1">
-          <span className="text-xs text-gray-700 truncate">
+          <span className="text-xs text-gray-700 dark:text-gray-200 truncate">
             {item.publicTitle ?? item.slug}
           </span>
           {isActing ? (
-            <Loader2 className="w-3 h-3 animate-spin text-gray-300 shrink-0" />
+            <Loader2 className="w-3 h-3 animate-spin text-gray-300 dark:text-gray-500 shrink-0" />
           ) : (
             <button
-              className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 rounded text-gray-300 hover:text-gray-500"
+              className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 rounded text-gray-300 dark:text-gray-500 hover:text-gray-500 dark:hover:text-gray-300"
               title="More options"
               onClick={() => toast.info("Item options — coming soon")}
             >
@@ -152,7 +152,7 @@ export function PublishItemRow({ item, onRefresh }: PublishItemRowProps) {
             <button
               onClick={handlePublish}
               disabled={isActing || blocked}
-              className="rounded px-1.5 py-0.5 text-[10px] font-medium text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700 transition-colors disabled:opacity-40"
+              className="rounded px-1.5 py-0.5 text-[10px] font-medium text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 hover:text-emerald-700 dark:hover:text-emerald-300 transition-colors disabled:opacity-40"
             >
               Publish now
             </button>
@@ -161,7 +161,7 @@ export function PublishItemRow({ item, onRefresh }: PublishItemRowProps) {
             <button
               onClick={() => { setShowScheduler((v) => !v); setScheduledValue(""); }}
               disabled={isActing}
-              className="flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-medium text-sky-500 hover:bg-sky-50 hover:text-sky-600 transition-colors disabled:opacity-40"
+              className="flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-medium text-sky-500 dark:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-500/10 hover:text-sky-600 dark:hover:text-sky-300 transition-colors disabled:opacity-40"
             >
               <CalendarClock className="w-2.5 h-2.5" />
               Schedule
@@ -175,8 +175,8 @@ export function PublishItemRow({ item, onRefresh }: PublishItemRowProps) {
                 className={cn(
                   "rounded px-1.5 py-0.5 text-[10px] font-medium transition-colors disabled:opacity-40",
                   pendingChanges
-                    ? "text-amber-600 hover:bg-amber-50 hover:text-amber-700"
-                    : "text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                    ? "text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-500/10 hover:text-amber-700 dark:hover:text-amber-300"
+                    : "text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-white/5 hover:text-gray-600 dark:hover:text-gray-300"
                 )}
               >
                 {pendingChanges ? "Update" : "Re-publish"}
@@ -184,7 +184,7 @@ export function PublishItemRow({ item, onRefresh }: PublishItemRowProps) {
               <button
                 onClick={handleUnpublish}
                 disabled={isActing}
-                className="rounded px-1.5 py-0.5 text-[10px] font-medium text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors disabled:opacity-40"
+                className="rounded px-1.5 py-0.5 text-[10px] font-medium text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-white/5 hover:text-gray-600 dark:hover:text-gray-300 transition-colors disabled:opacity-40"
               >
                 Unpublish
               </button>
@@ -192,7 +192,7 @@ export function PublishItemRow({ item, onRefresh }: PublishItemRowProps) {
                 href={viewHref}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-medium text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
+                className="flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-medium text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-white/5 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
               >
                 <ExternalLink className="w-2.5 h-2.5" />
                 View
@@ -208,18 +208,18 @@ export function PublishItemRow({ item, onRefresh }: PublishItemRowProps) {
               type="datetime-local"
               value={scheduledValue}
               onChange={(e) => setScheduledValue(e.target.value)}
-              className="flex-1 rounded border border-gray-200 px-1.5 py-0.5 text-[10px] text-gray-700 bg-white focus:outline-none focus:border-sky-400"
+              className="flex-1 rounded border border-gray-200 dark:border-white/10 px-1.5 py-0.5 text-[10px] text-gray-700 dark:text-gray-200 bg-white dark:bg-white/5 focus:outline-none focus:border-sky-400 dark:focus:border-sky-500/50"
             />
             <button
               onClick={handleSchedule}
               disabled={!scheduledValue || isActing}
-              className="rounded px-1.5 py-0.5 text-[10px] font-medium text-sky-600 bg-sky-50 hover:bg-sky-100 transition-colors disabled:opacity-40"
+              className="rounded px-1.5 py-0.5 text-[10px] font-medium text-sky-600 dark:text-sky-300 bg-sky-50 dark:bg-sky-500/10 hover:bg-sky-100 dark:hover:bg-sky-500/20 transition-colors disabled:opacity-40"
             >
               Set
             </button>
             <button
               onClick={() => { setShowScheduler(false); setScheduledValue(""); }}
-              className="rounded p-0.5 text-gray-300 hover:text-gray-500 transition-colors"
+              className="rounded p-0.5 text-gray-300 dark:text-gray-500 hover:text-gray-500 dark:hover:text-gray-300 transition-colors"
             >
               <X className="w-3 h-3" />
             </button>
