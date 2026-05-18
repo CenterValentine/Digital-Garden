@@ -53,6 +53,21 @@ before planning and executing. There may be additions or modifications.
 
 ## Recent Completions (Last 30 Days)
 
+**May 17, 2026**: Phase I.6 — user-intent gate for shrink guard (lets users clear documents intentionally)
+
+Refinement of the Phase I.1 shrink guard. The original guard refused destructive shrinks unless `allowShrink: true` was set on the body — which blocked legitimate user actions like "select all + backspace + auto-save" unless every code path explicitly opted in. The user-intent gate uses **recent input recency** as the signal: the editor tracks `lastUserInputAt` and tags each auto-save with `userInitiated: true` when the gap is < 10 seconds. The server's shrink guard accepts either flag.
+
+- **Phase I.6.1** (commit `315e12a`): Server-side bypass + `content:write:shrink_with_user_intent` event. The shrink-refusal at `/api/content/content/[id]` now accepts `body.userInitiated === true` OR `body.allowShrink === true`. When the shrink WOULD refuse but a flag IS set, an informational warn event records the decision with `prev_char_count`, `new_char_count`, `shrink_ratio`, which-flag-was-set, and `seconds_since_input` for calibration data.
+- **Phase I.6.2** (commit `a251194`): MarkdownEditor input-recency tracking. `lastUserInputAtRef` updates on each `onUpdate` callback when the ProseMirror transaction has `docChanged === true` AND is not tagged with `y-sync$`, `remote`, or `addToHistory` (which mark remote/sync/history-merge origin). Auto-save fires include `userInitiated: true` when `now - lastUserInputAt < 10000ms`. `MainPanelContent.handleSave` accepts the meta and forwards it into the PATCH body alongside `tiptapJson`.
+- **Phase I.6.3** (commit `6704d9f`): Audit + type passthrough. Verified the editor-driven save path is the only destructive content-write surface; other paths either go through the editor (and inherit recency tracking via TipTap docChanged) or use different routes that don't trigger the shrink guard. ExpandableEditor's `onSave` prop signature extended to accept the optional meta so future consumers can opt in.
+
+Bug-class trace:
+  - Editor mounts on existing content → y-sync seed transaction fires → `onUpdate` sees `y-sync$` meta → ref NOT updated → 2s later auto-save fires WITHOUT `userInitiated` → server REFUSES the shrink. ✓
+  - User presses Cmd+A → Backspace → real keydown + docChanged transaction → ref updates → 2s later auto-save fires WITH `userInitiated: true` → server ALLOWS the shrink (and logs `content:write:shrink_with_user_intent` for audit). ✓
+  - User edited 5 minutes ago then walked away → some background save fires → 5min > 10s window → `userInitiated: false` → server refuses. Client can retry with explicit `allowShrink: true` if appropriate. ✓
+
+Gates at tip: `pnpm typecheck` ✓, `pnpm lint` 159/159 (0 errors), `pnpm build` ✓.
+
 **May 17, 2026**: Phase I — anti-overwrite guards on content PATCH route + archival predev hook (response to live data-loss incident)
 - Live data-loss incident on integration branch: opening a daily note in local dev (dev=prod DB) caused the editor to auto-save an empty/template doc over real content. Content recovered via a still-open mobile prod tab's y-indexeddb cache. Root cause is broader than any one trigger — the PATCH route trusted any tiptapJson body unconditionally.
 - **Phase I.1** (commit `3d6a7d2`): Shrink-refusal guard on `app/api/content/content/[id]/route.ts` PATCH handler. Refuses with HTTP 422 OVERWRITE_REFUSED when existing.searchText > 200 chars AND new.searchText < 0.5 × existing AND no `allowShrink: true` on body. Emits `content:write:overwrite_refused` structured event. Span attrs `refused`, `refused_via`, `prev_char_count`, `new_char_count` record the decision.

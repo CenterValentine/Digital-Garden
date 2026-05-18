@@ -250,6 +250,9 @@ Special Vercel-cron handling: `app/api/publishing/scheduled-publish/route.ts` us
 | I.2 | `773bead` | Optional `If-Match: <bodyHash>` precondition (on-the-fly SHA-256, no schema change). Mismatch → `409 PRECONDITION_FAILED`. `bodyHash` exposed in GET + PATCH `note` responses. Backwards-compatible. |
 | I.3 | `f89276b` | `content:write:overwrite_risk_detected` event for shrinks in the 50–70% range — informational warn, write still allowed but trace history shows the borderline case. |
 | I.4 | `f2caa3f` | `scripts/archive-traces.ts` replaces `rm -rf` — moves prior-session traces to `.local/debug-payloads/.archive/<ISO timestamp>/` with LRU 5-session cap. Predev hook still triggers it via `pnpm clean:traces`. |
+| I.6.1 | `315e12a` | Server accepts `userInitiated: true` (parallel to `allowShrink: true`) as a shrink-refusal bypass. New `content:write:shrink_with_user_intent` event when the flag excuses a shrink. |
+| I.6.2 | `a251194` | MarkdownEditor tracks `lastUserInputAtRef` from non-remote ProseMirror transactions. Auto-saves tag `userInitiated: true` when input is within 10s. `MainPanelContent.handleSave` forwards meta to PATCH body. |
+| I.6.3 | `6704d9f` | ExpandableEditor `onSave` prop signature extended with the optional meta arg so any future consumer can opt into the user-intent gate without a follow-up commit. Audit conclusion: no other content-PATCH paths needed updates. |
 
 **What's NOT in this PR (separate follow-ups):**
 - Client-side adoption of `If-Match` in `MarkdownEditor`. The server guard is in place; clients can opt in incrementally. Without client adoption, `If-Match` is server-prepared infrastructure that never triggers.
