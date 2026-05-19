@@ -21,6 +21,7 @@ pnpm db:seed          # Seed database with test ContentNode data
 pnpm collab:schema:check  # CI gate: validate collaboration schema covers all editor extensions
 pnpm publishing:schema:check  # CI gate: validate every publishing block has Server* variant + correct registerBlock type
 pnpm publishing:audit:defaults  # Static drift detector: Zod defaults vs renderHTML fallbacks across publishing blocks
+pnpm publishing:audit:themes  # Static theme-coverage audit: flags `.public-prose .block-*` rules with extreme colors (white-ish / dark-ish) that lack a `.dark` companion. Triage required — theme-stable surfaces (pricing, testimonial, etc.) are intentional false positives.
 pnpm test:e2e         # Playwright visual regression (assumes pnpm dev is running)
 pnpm test:e2e:update  # Regenerate baseline screenshots
 pnpm test:e2e:report  # Open last HTML run report
