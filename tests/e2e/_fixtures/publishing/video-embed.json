@@ -5,7 +5,7 @@
       "type": "videoEmbed",
       "attrs": {
         "blockType": "videoEmbed",
-        "url": "https://example.com/videos/product-demo.mp4",
+        "url": "https://example.com/product-demo-page",
         "caption": "2-minute walkthrough of the core features",
         "aspectRatio": "16:9",
         "autoplay": false
