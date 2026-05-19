@@ -1,5 +1,5 @@
 ---
-last_updated: 2026-05-17
+last_updated: 2026-05-18
 current_epoch: 13
 current_sprint: 58
 sprint_status: planned
@@ -52,6 +52,12 @@ before planning and executing. There may be additions or modifications.
 **Detailed Plan**: `docs/notes-feature/work-tracking/epochs/epoch-13-people-and-collaboration.md`
 
 ## Recent Completions (Last 30 Days)
+
+**May 18, 2026**: Epoch 18 (Multi-Tenancy Foundation) started — plan promoted from Claude scratchpad to canonical doc; foundation worktree provisioned
+
+- Worktree: `/Users/davidvalentine/Code/Digital-Garden/.claude/worktrees/feature+multi-tenancy` on branch `feature/multi-tenancy`, based on `132b3dc` (PR #38 publishing + observability merge).
+- Detailed plan promoted to [`work-tracking/MULTI-TENANCY-PLAN.md`](work-tracking/MULTI-TENANCY-PLAN.md); epoch tracker at [`work-tracking/epochs/epoch-18-multi-tenancy.md`](work-tracking/epochs/epoch-18-multi-tenancy.md). Phase 0 (dev DB isolation via Neon branch `dev-david` on `neondb`, `pg_trgm` extension enabled, schema synced via `prisma db push`) ✅. Phase 1 (additive schema + tenancy helper module + backfill script) in progress.
+- Note: the `current_epoch: 13` frontmatter and Active Epoch section below are unchanged pending your input on whether to make Epoch 18 the active focus or interleave with Epoch 13. Recommendation: promote Epoch 18 to active since the worktree is live and dev-DB-isolated.
 
 **May 17, 2026**: Phase I.6 — user-intent gate for shrink guard (lets users clear documents intentionally)
 
