@@ -11,6 +11,7 @@ export {
   normalizeHost,
 } from "./resolve-tenant";
 export { getCurrentTenant } from "./get-current-tenant";
+export { resolveWritableTenantId, TenantAuthError } from "./api";
 export type {
   ResolvedTenant,
   TenantResolutionSource,

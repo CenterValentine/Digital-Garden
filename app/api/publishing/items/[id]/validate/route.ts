@@ -100,7 +100,7 @@ export async function POST(
         { summary: "publishing item validate", attrs: { public_item_id: id } },
         async (span) => {
           const item = await prisma.publicItem.findFirst({
-            where: { id, ownerId: session.user.id, deletedAt: null },
+            where: { id, tenant: { ownerId: session.user.id }, deletedAt: null },
             include: {
               workingRevision: true,
               contentNode: { include: { notePayload: true } },

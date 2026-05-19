@@ -34,7 +34,7 @@ export async function POST(
       { summary: "publishing item sync", attrs: { public_item_id: id } },
       async (span) => {
         const item = await prisma.publicItem.findFirst({
-          where: { id, ownerId: session.user.id, deletedAt: null },
+          where: { id, tenant: { ownerId: session.user.id }, deletedAt: null },
           include: {
             workingRevision: true,
             publishedRevision: { select: { bodyHash: true } },

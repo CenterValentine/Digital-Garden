@@ -22,8 +22,12 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       { layer: "content", name: "publishing:path_update" },
       { summary: "publishing path update", attrs: { path_id: id } },
       async (span) => {
-        const path = await prisma.publicPath.findUnique({ where: { id } });
-        if (!path || path.ownerId !== session.user.id) {
+        // Authorize via tenant ownership: the user can update any path
+        // on a tenant they own.
+        const path = await prisma.publicPath.findFirst({
+          where: { id, tenant: { ownerId: session.user.id } },
+        });
+        if (!path) {
           logger.warn({
             layer: "content",
             event: "publishing_path_update:rejected",
@@ -66,8 +70,8 @@ export async function DELETE(req: NextRequest, { params }: Params) {
       { layer: "content", name: "publishing:path_delete" },
       { summary: "publishing path delete", attrs: { path_id: id } },
       async (span) => {
-        const path = await prisma.publicPath.findUnique({
-          where: { id },
+        const path = await prisma.publicPath.findFirst({
+          where: { id, tenant: { ownerId: session.user.id } },
           include: {
             _count: {
               select: {
@@ -78,7 +82,7 @@ export async function DELETE(req: NextRequest, { params }: Params) {
           },
         });
 
-        if (!path || path.ownerId !== session.user.id) {
+        if (!path) {
           logger.warn({
             layer: "content",
             event: "publishing_path_delete:rejected",

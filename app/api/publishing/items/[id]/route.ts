@@ -24,7 +24,7 @@ export async function GET(
       { summary: "publishing item read", attrs: { public_item_id: id } },
       async (span) => {
         const item = await prisma.publicItem.findFirst({
-          where: { id, ownerId: session.user.id, deletedAt: null },
+          where: { id, tenant: { ownerId: session.user.id }, deletedAt: null },
           include: {
             path: true,
             series: true,
@@ -80,7 +80,7 @@ export async function PATCH(
       { summary: "publishing item update", attrs: { public_item_id: id } },
       async (span) => {
         const item = await prisma.publicItem.findFirst({
-          where: { id, ownerId: session.user.id, deletedAt: null },
+          where: { id, tenant: { ownerId: session.user.id }, deletedAt: null },
         });
         if (!item) {
           logger.warn({

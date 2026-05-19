@@ -71,9 +71,24 @@ With flag off, the helper returns David's tenant via the legacy fallback (`SITE_
 **Lessons captured:**
 - `withSpan` throws outside `withTrace`. Helpers callable from build-time prerender, scripts, OR request handlers need self-created trace context. Added `ensureTraceContext` utility to `lib/domain/tenancy/resolve-tenant.ts`: no-op when a trace is active, opens a fresh one when not. Pattern saved as project memory.
 
-### Phase 3b — Tenant-scoped publishing API ⚪
+### Phase 3b — Tenant-scoped publishing API ✅
 
-All `/api/publishing/*` writes accept optional `tenantId`, default to `session.user.primaryTenantId`, and authorize via `tenant.ownerId === session.user.id`. Scheduled-publish cron iterates by tenant.
+All 9 publishing API routes updated. GET/PATCH/DELETE handlers filter by Prisma relation `where: { ..., tenant: { ownerId: session.user.id } }` instead of `ownerId: session.user.id` — semantically the same today (because backfill set `ownerId = tenant.ownerId`), but future-proof against tenant transfers. POST handlers (`items/route.ts`, `paths/route.ts`) accept optional `tenantId` and default to `session.user.primaryTenantId` via a new helper `lib/domain/tenancy/api.ts::resolveWritableTenantId`. The helper validates that the user owns the requested tenant, throwing a typed `TenantAuthError` that routes catch and convert to 403/404 responses.
+
+**Cron unchanged.** The scheduled-publish route already iterates all due `PublicItem.state === "scheduled"` rows across the whole DB regardless of owner — multi-tenant friendly out of the box. The plan's "iterate by tenant" was a misread of the existing implementation.
+
+**No `archive` route exists** despite the plan listing one. Either renamed or deferred — not blocking.
+
+Files modified (9):
+- `app/api/publishing/items/route.ts` (GET + POST)
+- `app/api/publishing/items/[id]/route.ts` (GET + PATCH)
+- `app/api/publishing/items/[id]/{publish,unpublish,sync,schedule,validate,revisions}/route.ts`
+- `app/api/publishing/paths/route.ts` (GET + POST)
+- `app/api/publishing/paths/[id]/route.ts` (PATCH + DELETE)
+
+Files added: `lib/domain/tenancy/api.ts`, barrel update in `lib/domain/tenancy/index.ts`.
+
+Today's clients (which don't send `tenantId`) get exact same behavior: items/paths created on user's primary tenant. Phase 6b will introduce the first client that passes `tenantId` explicitly (the destination picker).
 
 ### Phase 4 — Cache tags scoped by tenant ⚪
 

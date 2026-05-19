@@ -56,7 +56,7 @@ export async function POST(
         },
         async (span) => {
           const item = await prisma.publicItem.findFirst({
-            where: { id, ownerId: session.user.id, deletedAt: null },
+            where: { id, tenant: { ownerId: session.user.id }, deletedAt: null },
           });
 
           if (!item) {
