@@ -21,6 +21,10 @@ import { z } from "zod";
 import { createBlockSchema } from "@/lib/domain/blocks/schema";
 import { registerBlock } from "@/lib/domain/blocks/registry";
 import { createBlockNodeView } from "@/lib/domain/blocks/node-view-factory";
+import {
+  BACKGROUND_SCHEMA_SHAPE,
+  backgroundAttrs,
+} from "../lib/background-attrs";
 
 function parseFeatures(raw: string): string[] {
   try { return JSON.parse(raw) as string[]; } catch { return []; }
@@ -49,8 +53,7 @@ const { schema: pricingSchema, defaults: pricingDefaults } = createBlockSchema(
     ctaUrl: z.string().default("").describe("Button URL"),
     highlighted: z.boolean().default(false).describe("Visually highlight as the recommended tier"),
     variant: z.enum(VARIANTS).default("default"),
-    bgColor: z.string().default("").describe("Custom background color (any CSS color value)"),
-    bgGradient: z.string().default("").describe('CSS gradient — e.g. linear-gradient(135deg, #667eea 0%, #764ba2 100%)'),
+    ...BACKGROUND_SCHEMA_SHAPE,
   }
 );
 
@@ -118,16 +121,7 @@ function pricingAttrs() {
       parseHTML: (el: Element) => el.getAttribute("data-variant") ?? "default",
       renderHTML: (attrs: Record<string, unknown>) => ({ "data-variant": attrs.variant }),
     },
-    bgColor: {
-      default: "",
-      parseHTML: (el: Element) => el.getAttribute("data-bg-color") ?? "",
-      renderHTML: (attrs: Record<string, unknown>) => attrs.bgColor ? { "data-bg-color": attrs.bgColor } : {},
-    },
-    bgGradient: {
-      default: "",
-      parseHTML: (el: Element) => el.getAttribute("data-bg-gradient") ?? "",
-      renderHTML: (attrs: Record<string, unknown>) => attrs.bgGradient ? { "data-bg-gradient": attrs.bgGradient } : {},
-    },
+    ...backgroundAttrs(),
   };
 }
 

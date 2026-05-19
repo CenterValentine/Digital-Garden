@@ -19,6 +19,10 @@ import { Node, mergeAttributes } from "@tiptap/core";
 import { z } from "zod";
 import { createBlockSchema } from "@/lib/domain/blocks/schema";
 import { registerBlock } from "@/lib/domain/blocks/registry";
+import {
+  BACKGROUND_SCHEMA_SHAPE,
+  backgroundAttrs,
+} from "../lib/background-attrs";
 import { createBlockNodeView } from "@/lib/domain/blocks/node-view-factory";
 
 // ─── Schema ──────────────────────────────────────────────────────────────────
@@ -35,8 +39,7 @@ const { schema: newsletterSchema, defaults: newsletterDefaults } = createBlockSc
     endpoint: z.string().default("").describe("POST URL for the subscription (receives { email } JSON)"),
     successText: z.string().default("Thanks! You're on the list.").describe("Text shown after successful signup"),
     variant: z.enum(VARIANTS).default("default"),
-    bgColor: z.string().default("").describe("Custom background color (any CSS color value)"),
-    bgGradient: z.string().default("").describe('CSS gradient — e.g. linear-gradient(135deg, #667eea 0%, #764ba2 100%)'),
+    ...BACKGROUND_SCHEMA_SHAPE,
   }
 );
 
@@ -96,16 +99,7 @@ function newsletterAttrs() {
       parseHTML: (el: Element) => el.getAttribute("data-variant") ?? "default",
       renderHTML: (attrs: Record<string, unknown>) => ({ "data-variant": attrs.variant }),
     },
-    bgColor: {
-      default: "",
-      parseHTML: (el: Element) => el.getAttribute("data-bg-color") ?? "",
-      renderHTML: (attrs: Record<string, unknown>) => attrs.bgColor ? { "data-bg-color": attrs.bgColor } : {},
-    },
-    bgGradient: {
-      default: "",
-      parseHTML: (el: Element) => el.getAttribute("data-bg-gradient") ?? "",
-      renderHTML: (attrs: Record<string, unknown>) => attrs.bgGradient ? { "data-bg-gradient": attrs.bgGradient } : {},
-    },
+    ...backgroundAttrs(),
   };
 }
 
