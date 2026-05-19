@@ -11,6 +11,7 @@ import { useEffect, useState } from "react";
 import { ArrowLeft, ExternalLink, Link2 } from "lucide-react";
 import { toast } from "sonner";
 import { useContentStore } from "@/state/content-store";
+import { useFadeScrollbar } from "@/components/common/useFadeScrollbar";
 import { clientLogger } from "@/lib/core/logger/client";
 
 interface BacklinkItem {
@@ -70,6 +71,7 @@ function isOfflineLikeError(value: unknown) {
 }
 
 export function BacklinksPanel({ contentId }: BacklinksPanelProps) {
+  const scrollRef = useFadeScrollbar<HTMLDivElement>();
   const setSelectedContentId = useContentStore((state) => state.setSelectedContentId);
   const clearSelection = useContentStore((state) => state.clearSelection);
   const [data, setData] = useState<LinksResponse | null>(null);
@@ -195,7 +197,7 @@ export function BacklinksPanel({ contentId }: BacklinksPanelProps) {
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-5">
+      <div ref={scrollRef} className="fade-scroll flex-1 overflow-y-auto p-4 space-y-5">
         {hasBacklinks && (
           <section className="space-y-3">
             <div className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">

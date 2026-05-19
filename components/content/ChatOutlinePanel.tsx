@@ -13,6 +13,7 @@
 "use client";
 
 import { useOutlineStore } from "@/state/outline-store";
+import { useFadeScrollbar } from "@/components/common/useFadeScrollbar";
 import type { ChatOutlineEntry } from "@/lib/domain/ai/chat-outline";
 
 interface ChatOutlinePanelProps {
@@ -39,6 +40,7 @@ export function ChatOutlinePanel({
   const toggleGranularity = useOutlineStore(
     (s) => s.toggleChatOutlineGranularity
   );
+  const scrollRef = useFadeScrollbar<HTMLDivElement>();
 
   const handleEntryClick = (entry: ChatOutlineEntry) => {
     if (!contentId) return;
@@ -123,7 +125,7 @@ export function ChatOutlinePanel({
       </div>
 
       {/* Entries list */}
-      <div className="flex-1 overflow-y-auto p-2">
+      <div ref={scrollRef} className="fade-scroll flex-1 overflow-y-auto p-2">
         <div className="space-y-0.5">
           {chatOutline.map((entry) => (
             <OutlineEntryRow
