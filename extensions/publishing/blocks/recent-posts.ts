@@ -20,6 +20,7 @@ import { z } from "zod";
 import { createBlockSchema } from "@/lib/domain/blocks/schema";
 import { registerBlock } from "@/lib/domain/blocks/registry";
 import { createBlockNodeView } from "@/lib/domain/blocks/node-view-factory";
+import { dataAttr } from "../lib/data-attr";
 
 // ─── Schema ──────────────────────────────────────────────────────────────────
 
@@ -57,41 +58,13 @@ function recentPostsAttrs() {
   return {
     blockId: { default: null },
     blockType: { default: "recentPosts" },
-    count: {
-      default: 5,
-      parseHTML: (el: Element) => parseInt(el.getAttribute("data-count") ?? "5", 10),
-      renderHTML: (attrs: Record<string, unknown>) => ({ "data-count": attrs.count }),
-    },
-    pathSlug: {
-      default: "",
-      parseHTML: (el: Element) => el.getAttribute("data-path-slug") ?? "",
-      renderHTML: (attrs: Record<string, unknown>) => attrs.pathSlug ? { "data-path-slug": attrs.pathSlug } : {},
-    },
-    showExcerpt: {
-      default: true,
-      parseHTML: (el: Element) => el.getAttribute("data-show-excerpt") !== "false",
-      renderHTML: (attrs: Record<string, unknown>) => ({ "data-show-excerpt": attrs.showExcerpt }),
-    },
-    showDate: {
-      default: true,
-      parseHTML: (el: Element) => el.getAttribute("data-show-date") !== "false",
-      renderHTML: (attrs: Record<string, unknown>) => ({ "data-show-date": attrs.showDate }),
-    },
-    showCover: {
-      default: false,
-      parseHTML: (el: Element) => el.getAttribute("data-show-cover") === "true",
-      renderHTML: (attrs: Record<string, unknown>) => ({ "data-show-cover": attrs.showCover }),
-    },
-    layout: {
-      default: "list",
-      parseHTML: (el: Element) => el.getAttribute("data-layout") ?? "list",
-      renderHTML: (attrs: Record<string, unknown>) => ({ "data-layout": attrs.layout }),
-    },
-    excludeSelf: {
-      default: true,
-      parseHTML: (el: Element) => el.getAttribute("data-exclude-self") !== "false",
-      renderHTML: (attrs: Record<string, unknown>) => ({ "data-exclude-self": attrs.excludeSelf }),
-    },
+    count: dataAttr<number>("count", { default: 5, parseAs: "number" }),
+    pathSlug: dataAttr("pathSlug"),
+    showExcerpt: dataAttr<boolean>("showExcerpt", { default: true, parseAs: "boolean" }),
+    showDate: dataAttr<boolean>("showDate", { default: true, parseAs: "boolean" }),
+    showCover: dataAttr<boolean>("showCover", { default: false, parseAs: "boolean" }),
+    layout: dataAttr("layout", { default: "list" }),
+    excludeSelf: dataAttr<boolean>("excludeSelf", { default: true, parseAs: "boolean" }),
   };
 }
 

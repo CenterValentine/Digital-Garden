@@ -15,6 +15,7 @@ import { z } from "zod";
 import { createBlockSchema } from "@/lib/domain/blocks/schema";
 import { registerBlock } from "@/lib/domain/blocks/registry";
 import { createBlockNodeView } from "@/lib/domain/blocks/node-view-factory";
+import { dataAttr } from "../lib/data-attr";
 
 export interface SocialLink {
   platform: string;
@@ -121,26 +122,10 @@ function socialAttrs() {
   return {
     blockId: { default: null },
     blockType: { default: "socialLinks" },
-    links: {
-      default: "[]",
-      parseHTML: (el: Element) => el.getAttribute("data-links") ?? "[]",
-      renderHTML: (attrs: Record<string, unknown>) => ({ "data-links": attrs.links }),
-    },
-    variant: {
-      default: "icon-label",
-      parseHTML: (el: Element) => el.getAttribute("data-variant") ?? "icon-label",
-      renderHTML: (attrs: Record<string, unknown>) => ({ "data-variant": attrs.variant }),
-    },
-    size: {
-      default: "md",
-      parseHTML: (el: Element) => el.getAttribute("data-size") ?? "md",
-      renderHTML: (attrs: Record<string, unknown>) => ({ "data-size": attrs.size }),
-    },
-    align: {
-      default: "left",
-      parseHTML: (el: Element) => el.getAttribute("data-align") ?? "left",
-      renderHTML: (attrs: Record<string, unknown>) => ({ "data-align": attrs.align }),
-    },
+    links: dataAttr("links", { default: "[]" }),
+    variant: dataAttr("variant", { default: "icon-label" }),
+    size: dataAttr("size", { default: "md" }),
+    align: dataAttr("align", { default: "left" }),
   };
 }
 

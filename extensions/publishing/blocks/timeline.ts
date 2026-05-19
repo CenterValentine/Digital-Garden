@@ -16,6 +16,7 @@ import { z } from "zod";
 import { createBlockSchema } from "@/lib/domain/blocks/schema";
 import { registerBlock } from "@/lib/domain/blocks/registry";
 import { createBlockNodeView } from "@/lib/domain/blocks/node-view-factory";
+import { dataAttr } from "../lib/data-attr";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -123,26 +124,10 @@ function timelineAttrs() {
   return {
     blockId: { default: null },
     blockType: { default: "timeline" },
-    items: {
-      default: "[]",
-      parseHTML: (el: Element) => el.getAttribute("data-items") ?? "[]",
-      renderHTML: (attrs: Record<string, unknown>) => ({ "data-items": attrs.items }),
-    },
-    variant: {
-      default: "default",
-      parseHTML: (el: Element) => el.getAttribute("data-variant") ?? "default",
-      renderHTML: (attrs: Record<string, unknown>) => ({ "data-variant": attrs.variant }),
-    },
-    dateFormat: {
-      default: "short",
-      parseHTML: (el: Element) => el.getAttribute("data-date-format") ?? "short",
-      renderHTML: (attrs: Record<string, unknown>) => ({ "data-date-format": attrs.dateFormat }),
-    },
-    customDateFormat: {
-      default: "",
-      parseHTML: (el: Element) => el.getAttribute("data-custom-date-format") ?? "",
-      renderHTML: (attrs: Record<string, unknown>) => attrs.customDateFormat ? { "data-custom-date-format": attrs.customDateFormat } : {},
-    },
+    items: dataAttr("items", { default: "[]" }),
+    variant: dataAttr("variant", { default: "default" }),
+    dateFormat: dataAttr("dateFormat", { default: "short" }),
+    customDateFormat: dataAttr("customDateFormat"),
   };
 }
 

@@ -14,6 +14,7 @@ import { z } from "zod";
 import { createBlockSchema } from "@/lib/domain/blocks/schema";
 import { registerBlock } from "@/lib/domain/blocks/registry";
 import { createBlockNodeView } from "@/lib/domain/blocks/node-view-factory";
+import { dataAttr } from "../lib/data-attr";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -74,16 +75,8 @@ function processStepsAttrs() {
   return {
     blockId: { default: null },
     blockType: { default: "processSteps" },
-    steps: {
-      default: "[]",
-      parseHTML: (el: Element) => el.getAttribute("data-steps") ?? "[]",
-      renderHTML: (attrs: Record<string, unknown>) => ({ "data-steps": attrs.steps }),
-    },
-    variant: {
-      default: "numbered",
-      parseHTML: (el: Element) => el.getAttribute("data-variant") ?? "numbered",
-      renderHTML: (attrs: Record<string, unknown>) => ({ "data-variant": attrs.variant }),
-    },
+    steps: dataAttr("steps", { default: "[]" }),
+    variant: dataAttr("variant", { default: "numbered" }),
   };
 }
 

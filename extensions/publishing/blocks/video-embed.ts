@@ -16,6 +16,7 @@ import { z } from "zod";
 import { createBlockSchema } from "@/lib/domain/blocks/schema";
 import { registerBlock } from "@/lib/domain/blocks/registry";
 import { createBlockNodeView } from "@/lib/domain/blocks/node-view-factory";
+import { dataAttr } from "../lib/data-attr";
 
 // ─── Schema ──────────────────────────────────────────────────────────────────
 
@@ -126,26 +127,10 @@ function videoAttrs() {
   return {
     blockId: { default: null },
     blockType: { default: "videoEmbed" },
-    url: {
-      default: "",
-      parseHTML: (el: Element) => el.getAttribute("data-url") ?? "",
-      renderHTML: (attrs: Record<string, unknown>) => ({ "data-url": attrs.url }),
-    },
-    caption: {
-      default: "",
-      parseHTML: (el: Element) => el.getAttribute("data-caption") ?? "",
-      renderHTML: (attrs: Record<string, unknown>) => ({ "data-caption": attrs.caption }),
-    },
-    aspectRatio: {
-      default: "16:9",
-      parseHTML: (el: Element) => el.getAttribute("data-aspect-ratio") ?? "16:9",
-      renderHTML: (attrs: Record<string, unknown>) => ({ "data-aspect-ratio": attrs.aspectRatio }),
-    },
-    autoplay: {
-      default: false,
-      parseHTML: (el: Element) => el.getAttribute("data-autoplay") === "true",
-      renderHTML: (attrs: Record<string, unknown>) => ({ "data-autoplay": attrs.autoplay }),
-    },
+    url: dataAttr("url"),
+    caption: dataAttr("caption"),
+    aspectRatio: dataAttr("aspectRatio", { default: "16:9" }),
+    autoplay: dataAttr<boolean>("autoplay", { default: false, parseAs: "boolean" }),
   };
 }
 

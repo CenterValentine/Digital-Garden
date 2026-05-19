@@ -17,6 +17,7 @@ import { z } from "zod";
 import { createBlockSchema } from "@/lib/domain/blocks/schema";
 import { registerBlock } from "@/lib/domain/blocks/registry";
 import { createBlockNodeView } from "@/lib/domain/blocks/node-view-factory";
+import { dataAttr } from "../lib/data-attr";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -75,21 +76,9 @@ function faqAttrs() {
   return {
     blockId: { default: null },
     blockType: { default: "faqAccordion" },
-    items: {
-      default: "[]",
-      parseHTML: (el: Element) => el.getAttribute("data-items") ?? "[]",
-      renderHTML: (attrs: Record<string, unknown>) => ({ "data-items": attrs.items }),
-    },
-    variant: {
-      default: "default",
-      parseHTML: (el: Element) => el.getAttribute("data-variant") ?? "default",
-      renderHTML: (attrs: Record<string, unknown>) => ({ "data-variant": attrs.variant }),
-    },
-    openAll: {
-      default: false,
-      parseHTML: (el: Element) => el.getAttribute("data-open-all") === "true",
-      renderHTML: (attrs: Record<string, unknown>) => ({ "data-open-all": attrs.openAll }),
-    },
+    items: dataAttr("items", { default: "[]" }),
+    variant: dataAttr("variant", { default: "default" }),
+    openAll: dataAttr<boolean>("openAll", { default: false, parseAs: "boolean" }),
   };
 }
 
