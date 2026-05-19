@@ -5236,12 +5236,20 @@ mark {
 }
 
 /* ─── Metrics Strip ──────────────────────────────────────────────────────── */
+/* Light-mode defaults; .dark overrides below for dark-mode tones.
+   Pre-fix the rules used rgba(255,255,255,...) and color:#fff
+   unconditionally, which made the entire block invisible on a
+   light-mode white page. */
 .public-prose .block-metrics-strip {
   display: flex;
   margin: 2em 0;
   border-radius: 12px;
   overflow: hidden;
-  border: 1px solid rgba(255,255,255,0.1);
+  border: 1px solid rgba(0,0,0,0.1);
+  background: rgba(0,0,0,0.02);
+}
+.dark .public-prose .block-metrics-strip {
+  border-color: rgba(255,255,255,0.1);
   background: rgba(255,255,255,0.03);
 }
 .public-prose .block-metrics-strip--inline {
@@ -5260,7 +5268,10 @@ mark {
   flex: 1;
   padding: 20px 16px;
   text-align: center;
-  border-right: 1px solid rgba(255,255,255,0.07);
+  border-right: 1px solid rgba(0,0,0,0.06);
+}
+.dark .public-prose .block-metrics-strip-item {
+  border-right-color: rgba(255,255,255,0.07);
 }
 .public-prose .block-metrics-strip-item:last-child { border-right: none; }
 .public-prose .block-metrics-strip--inline .block-metrics-strip-item,
@@ -5272,18 +5283,34 @@ mark {
   display: block;
   font-size: 1.75rem;
   font-weight: 700;
-  color: #fff;
+  color: #111827;
   line-height: 1;
+}
+.dark .public-prose .block-metrics-strip-value {
+  color: #fff;
 }
 .public-prose .block-metrics-strip-number { font-variant-numeric: tabular-nums; }
 .public-prose .block-metrics-strip-prefix,
-.public-prose .block-metrics-strip-suffix { font-size: 0.6em; color: rgba(255,255,255,0.45); }
-.public-prose .block-metrics-strip-trend--up   { color: #4ade80; }
-.public-prose .block-metrics-strip-trend--down { color: #f87171; }
-.public-prose .block-metrics-strip-trend--flat { color: rgba(255,255,255,0.35); }
+.public-prose .block-metrics-strip-suffix {
+  font-size: 0.6em;
+  color: rgba(0,0,0,0.45);
+}
+.dark .public-prose .block-metrics-strip-prefix,
+.dark .public-prose .block-metrics-strip-suffix {
+  color: rgba(255,255,255,0.45);
+}
+.public-prose .block-metrics-strip-trend--up   { color: #16a34a; }
+.public-prose .block-metrics-strip-trend--down { color: #dc2626; }
+.public-prose .block-metrics-strip-trend--flat { color: rgba(0,0,0,0.35); }
+.dark .public-prose .block-metrics-strip-trend--up   { color: #4ade80; }
+.dark .public-prose .block-metrics-strip-trend--down { color: #f87171; }
+.dark .public-prose .block-metrics-strip-trend--flat { color: rgba(255,255,255,0.35); }
 .public-prose .block-metrics-strip-label {
   margin: 6px 0 0;
   font-size: 0.75rem;
+  color: rgba(0,0,0,0.55);
+}
+.dark .public-prose .block-metrics-strip-label {
   color: rgba(255,255,255,0.4);
 }
 
@@ -6250,7 +6277,8 @@ mark {
   .public-prose .block-gallery--masonry { columns: 2; }
   .public-prose .block-post-card--horizontal { grid-template-columns: 1fr; }
   .public-prose .block-metrics-strip { flex-wrap: wrap; }
-  .public-prose .block-metrics-strip-item { flex: 0 0 50%; border-right: none; border-bottom: 1px solid rgba(255,255,255,0.07); }
+  .public-prose .block-metrics-strip-item { flex: 0 0 50%; border-right: none; border-bottom: 1px solid rgba(0,0,0,0.06); }
+  .dark .public-prose .block-metrics-strip-item { border-bottom-color: rgba(255,255,255,0.07); }
   .public-prose .block-feature-grid { grid-template-columns: repeat(2, 1fr); }
   .public-prose .block-feature-list--cols-4 .block-feature-grid { grid-template-columns: repeat(2, 1fr); }
   .public-prose .block-person--horizontal { flex-direction: column; align-items: center; text-align: center; }
