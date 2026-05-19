@@ -50,13 +50,17 @@ Numbering follows [`../MULTI-TENANCY-PLAN.md`](../MULTI-TENANCY-PLAN.md). Status
 - **0.3 Edge Config store** — deferred to Phase 6.
 - **0.4 `/etc/hosts` entries** — pending; needed for Phase 2 local testing.
 
-### Phase 1 — Schema + tenancy helpers (additive, no behavior change) 🟡
+### Phase 1 — Schema + tenancy helpers (additive, no behavior change) ✅
 
-`prisma/schema.prisma` adds `Tenant`, `TenantHost`, `User.primaryTenantId`, `PublicItem.tenantId`, `PublicPath.tenantId`. Composite indexes for the new query shape (`[tenantId, state, deletedAt]`, `[tenantId, slug]`, `[tenantId, parentId]`). `lib/domain/tenancy/` module: `types.ts`, `resolve-tenant.ts`, `get-current-tenant.ts`, `index.ts` (barrel). One-shot `scripts/backfill-tenants.ts` creates one `Tenant` per existing User who owns publications, sets `primaryTenantId`, creates `davidvalentine.org` `TenantHost` mapping, and populates `tenantId` on all existing `PublicItem` / `PublicPath` rows. Follow-up PR makes the new columns non-null after backfill verifies clean.
+`prisma/schema.prisma` added `Tenant`, `TenantHost`, `User.primaryTenantId`, `PublicItem.tenantId`, `PublicPath.tenantId`, `PublicPathRedirect.tenantId`. Composite indexes for the new query shape (`[tenantId, state, deletedAt]`, `[tenantId, lastPublishedAt desc]`, `[tenantId, parentId]`, `[tenantId, isActive]`). `lib/domain/tenancy/` module: `types.ts`, `resolve-tenant.ts`, `get-current-tenant.ts`, `index.ts` (barrel). One-shot `scripts/backfill-tenants.ts` + `scripts/_load-env.ts` helper created `david` tenant + `davidvalentine.org` / `www.davidvalentine.org` TenantHost rows and backfilled 5 PublicItems + 3 PublicPaths cleanly on dev branch. Follow-up PR will make the new columns non-null after prod backfill verifies clean. Commits: `44c8c31` (docs) + `83c18cd` (code). Gates: build ✓, lint 159/159 (0 errors).
 
-### Phase 2 — Middleware in pass-through mode ⚪
+### Phase 2 — Proxy in pass-through mode ✅
 
-`middleware.ts` reads host, calls `resolveTenant(host)` wrapped in a `tenancy:host:resolve` span, injects `x-tenant-id` + `x-tenant-slug` headers. Does NOT rewrite URLs in this phase. With `MULTITENANT_ENABLED=false`, falls back to `SITE_OWNER_ID`-derived tenant so behavior is identical.
+Integrated tenant resolution into the existing `proxy.ts` (Next 16 renamed `middleware.ts` → `proxy.ts`). Reads `host` header, wraps work in `withTrace(traceId, …)` so spans get a valid context, calls `resolveTenantByHost` which opens `tenancy:host:resolve` + `tenancy:tenant:lookup` spans, injects `x-tenant-id` + `x-tenant-slug` + `x-trace-id` headers. With `MULTITENANT_ENABLED=false` (default) the proxy short-circuits — zero overhead, no DB call. URL rewriting deferred to Phase 7. Smoke tested both flag states: flag off renders identically, flag on resolves `davidvalentine.org` → `david` tenant with full trace emitted.
+
+**Lessons captured:**
+- `startSpan` / `withSpan` require an active `withTrace` context — the proxy must open its own (the route-trace wrapper hasn't run yet at proxy time). `logger.*` calls handle no-trace gracefully (fall back to `[trace:no-trace]`), but spans throw.
+- Forwarding the proxy's `trace_id` via `x-trace-id` header lets the downstream `withRouteTrace` continue the same trace tree instead of starting a new one.
 
 ### Phase 3 — Wire public-render routes to query by tenant ⚪
 
