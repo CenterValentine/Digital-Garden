@@ -1,11 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { OctagonAlert, TriangleAlert, X } from "lucide-react";
+import { OctagonAlert, TriangleAlert } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/core/utils";
 import { usePublishStore } from "../../state/publish-store";
 import { publishItem } from "../../lib/client-api";
+import { PublishingDialog } from "./PublishingDialog";
 
 interface ValidationIssue {
   field?: string;
@@ -58,37 +59,18 @@ export function PrePublishDialog({ onRefresh }: { onRefresh: () => void }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      {/* Backdrop */}
-      <div
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-        onClick={closePrePublishDialog}
-      />
-
-      {/* Panel */}
-      <div className="relative z-10 w-full max-w-sm mx-4 rounded-xl bg-zinc-900 border border-white/10 shadow-2xl">
-        {/* Header */}
-        <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-white/5">
-          <div className="flex items-center gap-2">
-            {isBlocked ? (
-              <OctagonAlert className="w-4 h-4 text-rose-500" />
-            ) : (
-              <TriangleAlert className="w-4 h-4 text-amber-400" />
-            )}
-            <span className="text-sm font-medium text-white">
-              {isBlocked ? "Cannot publish" : "Publish with warnings"}
-            </span>
-          </div>
-          <button
-            onClick={closePrePublishDialog}
-            className="p-1 rounded-md text-white/30 hover:text-white/70 transition-colors"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-
-        {/* Body */}
-        <div className="px-4 py-3">
+    <PublishingDialog
+      title={isBlocked ? "Cannot publish" : "Publish with warnings"}
+      titleIcon={
+        isBlocked ? (
+          <OctagonAlert className="w-4 h-4 text-rose-500" />
+        ) : (
+          <TriangleAlert className="w-4 h-4 text-amber-400" />
+        )
+      }
+      onClose={closePrePublishDialog}
+    >
+      <div className="px-4 py-3">
           <p className="text-xs text-white/50 mb-3">
             {isBlocked
               ? "Fix the issues below before publishing."
@@ -140,7 +122,6 @@ export function PrePublishDialog({ onRefresh }: { onRefresh: () => void }) {
             </button>
           )}
         </div>
-      </div>
-    </div>
+    </PublishingDialog>
   );
 }

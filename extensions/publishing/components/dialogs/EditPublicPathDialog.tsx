@@ -1,11 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { X } from "lucide-react";
 import { toast } from "sonner";
-import { slugify, isValidSlug } from "../../lib/slug";
+import { useAutoSlug } from "../../lib/use-auto-slug";
 import { updatePublicPath } from "../../lib/client-api";
 import type { PublicPathNode } from "../../state/publish-tree-store";
+import { PublishingDialog } from "./PublishingDialog";
 
 interface EditPublicPathDialogProps {
   node: PublicPathNode;
@@ -15,17 +15,15 @@ interface EditPublicPathDialogProps {
 
 export function EditPublicPathDialog({ node, onClose, onSaved }: EditPublicPathDialogProps) {
   const [title, setTitle] = useState(node.title);
-  const [slug, setSlug] = useState(node.slug);
+  const { slug, setSlug, syncFromTitle, error: slugError } = useAutoSlug(node.slug);
   const [description, setDescription] = useState(node.description ?? "");
-  const [slugTouched, setSlugTouched] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   function handleTitleChange(v: string) {
     setTitle(v);
-    if (!slugTouched) setSlug(slugify(v));
+    syncFromTitle(v);
   }
 
-  const slugError = slug && !isValidSlug(slug) ? "Slug can only contain a-z, 0-9, and hyphens" : null;
   const hasChanges =
     title.trim() !== node.title ||
     slug !== node.slug ||
@@ -52,23 +50,11 @@ export function EditPublicPathDialog({ node, onClose, onSaved }: EditPublicPathD
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-      <form
-        onSubmit={handleSubmit}
-        className="relative z-10 w-full max-w-sm mx-4 rounded-xl bg-zinc-900 border border-white/10 shadow-2xl"
-      >
-        <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-white/5">
-          <span className="text-sm font-medium text-white">Edit path</span>
-          <button
-            type="button"
-            onClick={onClose}
-            className="p-1 rounded-md text-white/30 hover:text-white/70 transition-colors"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-
+    <PublishingDialog
+      title="Edit path"
+      onClose={onClose}
+      onSubmit={handleSubmit}
+    >
         <div className="px-4 py-4 space-y-4">
           <label className="block">
             <span className="text-xs text-white/40 mb-1 block">Title</span>
@@ -91,7 +77,7 @@ export function EditPublicPathDialog({ node, onClose, onSaved }: EditPublicPathD
               <input
                 type="text"
                 value={slug}
-                onChange={(e) => { setSlugTouched(true); setSlug(e.target.value); }}
+                onChange={(e) => setSlug(e.target.value)}
                 className="flex-1 bg-transparent pr-3 py-2 text-sm text-white placeholder:text-white/20 focus:outline-none"
               />
             </div>
@@ -126,7 +112,6 @@ export function EditPublicPathDialog({ node, onClose, onSaved }: EditPublicPathD
             {isSubmitting ? "Saving…" : "Save changes"}
           </button>
         </div>
-      </form>
-    </div>
+    </PublishingDialog>
   );
 }
