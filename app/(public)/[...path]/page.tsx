@@ -1,9 +1,6 @@
 import { notFound, permanentRedirect } from "next/navigation";
 import { prisma } from "@/lib/database/client";
-
-// Single site owner — resolved at build/runtime from env.
-// In a multi-tenant future this comes from the request host.
-const SITE_OWNER_ID = process.env.SITE_OWNER_ID ?? "";
+import { getCurrentTenant } from "@/lib/domain/tenancy";
 
 interface Params {
   path: string[];
@@ -17,14 +14,21 @@ export default async function PublicCatchAll({
   const { path: segments } = await params;
   const fullPath = "/" + segments.join("/");
 
-  if (!SITE_OWNER_ID) {
-    // Not configured — show nothing publicly
+  // Tenant resolution: header (multi-tenant) → SITE_OWNER_ID fallback
+  // (legacy single-tenant). When neither resolves the public surface
+  // is unconfigured for this host → show nothing.
+  const ctx = await getCurrentTenant();
+  if (!ctx) {
     notFound();
   }
+  const { tenant } = ctx;
 
-  // 1. Check redirects first
-  const redirect = await prisma.publicPathRedirect.findUnique({
-    where: { fromPath: fullPath },
+  // 1. Check redirects first. Redirects are tenant-scoped so two
+  //    tenants could legitimately use the same /old-url. Using
+  //    findFirst with a tenantId filter; the standalone fromPath
+  //    unique constraint becomes [tenantId, fromPath] in a follow-up.
+  const redirect = await prisma.publicPathRedirect.findFirst({
+    where: { tenantId: tenant.tenantId, fromPath: fullPath },
     include: {
       toPath: true,
       toPublicItem: { include: { path: true } },
@@ -50,7 +54,7 @@ export default async function PublicCatchAll({
 
     // Find matching path + item
     const publicItem = await resolvePublicItem(
-      SITE_OWNER_ID,
+      tenant.tenantId,
       pathSlugs,
       slug
     );
@@ -66,7 +70,7 @@ export default async function PublicCatchAll({
   }
 
   // 3. Try to resolve as a PublicPath listing
-  const publicPath = await resolvePublicPath(SITE_OWNER_ID, segments);
+  const publicPath = await resolvePublicPath(tenant.tenantId, segments);
   if (publicPath) {
     const { PublicPathListing } = await import(
       "../../../components/public/renderers/PublicPathListing"
@@ -78,7 +82,7 @@ export default async function PublicCatchAll({
 }
 
 async function resolvePublicItem(
-  ownerId: string,
+  tenantId: string,
   pathSlugs: string[],
   slug: string
 ) {
@@ -86,7 +90,7 @@ async function resolvePublicItem(
   let parentId: string | null = null;
   for (const pathSlug of pathSlugs) {
     const segment = await prisma.publicPath.findFirst({
-      where: { ownerId, parentId, slug: pathSlug },
+      where: { tenantId, parentId, slug: pathSlug },
     });
     if (!segment) return null;
     parentId = segment.id;
@@ -101,7 +105,7 @@ async function resolvePublicItem(
 
   return prisma.publicItem.findFirst({
     where: {
-      ownerId,
+      tenantId,
       slug,
       pathId: path?.id ?? { not: undefined as never },
       deletedAt: null,
@@ -120,13 +124,13 @@ async function resolvePublicItem(
   });
 }
 
-async function resolvePublicPath(ownerId: string, segments: string[]) {
+async function resolvePublicPath(tenantId: string, segments: string[]) {
   let parentId: string | null = null;
   let current: Awaited<ReturnType<typeof prisma.publicPath.findFirst>> = null;
 
   for (const seg of segments) {
     current = await prisma.publicPath.findFirst({
-      where: { ownerId, parentId, slug: seg },
+      where: { tenantId, parentId, slug: seg },
     });
     if (!current) return null;
     parentId = current.id;
@@ -135,7 +139,7 @@ async function resolvePublicPath(ownerId: string, segments: string[]) {
   if (!current) return null;
 
   const items = await prisma.publicItem.findMany({
-    where: { ownerId, pathId: current.id, state: "published", deletedAt: null },
+    where: { tenantId, pathId: current.id, state: "published", deletedAt: null },
     select: {
       id: true,
       slug: true,

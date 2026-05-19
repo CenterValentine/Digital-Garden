@@ -62,9 +62,14 @@ Integrated tenant resolution into the existing `proxy.ts` (Next 16 renamed `midd
 - `startSpan` / `withSpan` require an active `withTrace` context — the proxy must open its own (the route-trace wrapper hasn't run yet at proxy time). `logger.*` calls handle no-trace gracefully (fall back to `[trace:no-trace]`), but spans throw.
 - Forwarding the proxy's `trace_id` via `x-trace-id` header lets the downstream `withRouteTrace` continue the same trace tree instead of starting a new one.
 
-### Phase 3 — Wire public-render routes to query by tenant ⚪
+### Phase 3 — Wire public-render routes to query by tenant ✅
 
-[app/page.tsx](app/page.tsx) and [app/(public)/[...path]/page.tsx](app/(public)/[...path]/page.tsx) swap `SITE_OWNER_ID` reads for `await getCurrentTenant()` and query by `tenantId` instead of `ownerId`. With flag off, the helper returns David's tenant via the legacy fallback so output is identical.
+[app/page.tsx](app/page.tsx) and [app/(public)/[...path]/page.tsx](app/(public)/[...path]/page.tsx) swapped `SITE_OWNER_ID` reads for `await getCurrentTenant()` and query by `tenantId` instead of `ownerId`. Helper functions in the catch-all (`resolvePublicItem`, `resolvePublicPath`) refactored to take `tenantId`. Redirect lookup tenant-scoped via `findFirst({ where: { tenantId, fromPath } })` — the global `fromPath @unique` constraint will become `[tenantId, fromPath]` composite in a follow-up.
+
+With flag off, the helper returns David's tenant via the legacy fallback (`SITE_OWNER_ID` → user → `primaryTenantId`), so rendered output is identical. Smoke-tested all three states: flag off, flag on with known host (`davidvalentine.org` → `david` tenant), flag on with unknown host (legacy fallback kicks in). Build clean: 136 static pages generated, ratchet held at 159/159.
+
+**Lessons captured:**
+- `withSpan` throws outside `withTrace`. Helpers callable from build-time prerender, scripts, OR request handlers need self-created trace context. Added `ensureTraceContext` utility to `lib/domain/tenancy/resolve-tenant.ts`: no-op when a trace is active, opens a fresh one when not. Pattern saved as project memory.
 
 ### Phase 3b — Tenant-scoped publishing API ⚪
 

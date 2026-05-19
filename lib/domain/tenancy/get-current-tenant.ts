@@ -17,14 +17,14 @@ import { headers } from "next/headers";
 import { prisma } from "@/lib/database/client";
 import { logger } from "@/lib/core/logger/emit";
 import { withSpan } from "@/lib/core/logger/span";
-import { resolveTenantById } from "./resolve-tenant";
+import { ensureTraceContext, resolveTenantById } from "./resolve-tenant";
 import type { CurrentTenantContext } from "./types";
 
 const SITE_OWNER_ID = process.env.SITE_OWNER_ID ?? "";
 const MULTITENANT_ENABLED = process.env.MULTITENANT_ENABLED === "true";
 
 export async function getCurrentTenant(): Promise<CurrentTenantContext | null> {
-  return withSpan(
+  return ensureTraceContext(() => withSpan(
     { layer: "route", name: "tenancy:current:resolve" },
     { attrs: { flag_enabled: MULTITENANT_ENABLED } },
     async () => {
@@ -84,5 +84,5 @@ export async function getCurrentTenant(): Promise<CurrentTenantContext | null> {
         source: "legacy_env" as const,
       };
     },
-  );
+  ));
 }

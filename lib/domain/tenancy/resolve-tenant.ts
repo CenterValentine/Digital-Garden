@@ -9,10 +9,25 @@
 // requirements"). Until then we tag these spans under "route" since
 // host-routing is conceptually a routing concern.
 
+import { randomUUID } from "node:crypto";
 import { prisma } from "@/lib/database/client";
 import { logger } from "@/lib/core/logger/emit";
 import { withSpan } from "@/lib/core/logger/span";
+import { getActiveTrace, withTrace } from "@/lib/core/logger/context";
 import type { ResolvedTenant } from "./types";
+
+// Self-contained trace context guard. These helpers are called from three
+// kinds of callsites:
+//   1. API route handlers (already inside withRouteTrace)
+//   2. The Next.js proxy (already inside its own withTrace)
+//   3. Build-time prerender / scripts (no trace context exists yet)
+// withSpan throws outside withTrace, so we ensure a context exists before
+// any span work. Inside an existing trace this is a no-op (re-uses the
+// parent context); standalone callers get a fresh trace_id.
+export function ensureTraceContext<T>(fn: () => Promise<T>): Promise<T> {
+  if (getActiveTrace()) return fn();
+  return withTrace(randomUUID(), fn) as Promise<T>;
+}
 
 // Normalize a Host header value into a lookup key.
 // Strips port (`example.com:3015` → `example.com`) and lowercases.
@@ -31,7 +46,7 @@ export async function resolveTenantByHost(
   rawHost: string | null | undefined,
 ): Promise<ResolvedTenant | null> {
   const host = normalizeHost(rawHost);
-  return withSpan(
+  return ensureTraceContext(() => withSpan(
     { layer: "route", name: "tenancy:host:resolve" },
     { attrs: { host: host ?? "(none)" } },
     async (span) => {
@@ -81,7 +96,7 @@ export async function resolveTenantByHost(
 
       return resolved;
     },
-  );
+  ));
 }
 
 // Look up a tenant by its id (e.g. from an x-tenant-id header injected by
@@ -89,7 +104,7 @@ export async function resolveTenantByHost(
 export async function resolveTenantById(
   tenantId: string,
 ): Promise<ResolvedTenant | null> {
-  return withSpan(
+  return ensureTraceContext(() => withSpan(
     { layer: "route", name: "tenancy:tenant:lookup" },
     { attrs: { tenant_id: tenantId, source: "db" } },
     async () => {
@@ -103,5 +118,5 @@ export async function resolveTenantById(
         isPersonal: tenant.isPersonal,
       };
     },
-  );
+  ));
 }
