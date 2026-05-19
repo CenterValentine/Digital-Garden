@@ -121,6 +121,10 @@ export const Columns = Node.create({
     return [{ tag: 'div[data-block-type="columns"]' }];
   },
 
+  // Wrap children in `.block-columns-grid` to match the editor NodeView's
+  // DOM structure. Without this, the CSS grid layout rules
+  // (`:is(.ProseMirror, .public-prose) .block-columns-grid { display: grid }`)
+  // have nothing to bind to and columns render stacked.
   renderHTML({ HTMLAttributes }) {
     return [
       "div",
@@ -128,7 +132,7 @@ export const Columns = Node.create({
         class: "block-columns",
         "data-block-type": "columns",
       }),
-      0,
+      ["div", { class: "block-columns-grid" }, 0],
     ];
   },
 
@@ -410,6 +414,10 @@ export const ServerColumns = Node.create({
     return [{ tag: 'div[data-block-type="columns"]' }];
   },
 
+  // Wrap children in `.block-columns-grid` to match the editor NodeView's
+  // DOM structure. Without this, the CSS grid layout rules
+  // (`:is(.ProseMirror, .public-prose) .block-columns-grid { display: grid }`)
+  // have nothing to bind to and columns render stacked.
   renderHTML({ HTMLAttributes }) {
     return [
       "div",
@@ -417,7 +425,7 @@ export const ServerColumns = Node.create({
         class: "block-columns",
         "data-block-type": "columns",
       }),
-      0,
+      ["div", { class: "block-columns-grid" }, 0],
     ];
   },
 });

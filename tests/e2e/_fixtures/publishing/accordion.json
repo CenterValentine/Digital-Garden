@@ -1,0 +1,27 @@
+{
+  "type": "doc",
+  "content": [
+    {
+      "type": "accordion",
+      "attrs": {
+        "headerText": "How does setup work?",
+        "headerLevel": "2",
+        "openBehavior": "expanded",
+        "openState": true,
+        "showContainer": false,
+        "showDivider": false
+      },
+      "content": [
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "Setup takes about 5 minutes. You'll create an account, configure your integrations, and deploy your first project. We provide templates and guided onboarding throughout."
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,44 @@
+{
+  "type": "doc",
+  "content": [
+    {
+      "type": "blockColumns",
+      "attrs": {
+        "columnCount": 2,
+        "gapSize": "medium",
+        "columnBorder": "subtle",
+        "showContainer": false
+      },
+      "content": [
+        {
+          "type": "blockColumn",
+          "content": [
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "First block column. Designed as a container for other publishing blocks rather than inline text."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "blockColumn",
+          "content": [
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Second block column. Each column acts as an isolation boundary so embedded blocks behave independently."
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

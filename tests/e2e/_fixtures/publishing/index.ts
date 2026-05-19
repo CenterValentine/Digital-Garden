@@ -15,6 +15,7 @@
  */
 
 export const PUBLISHING_FIXTURE_BLOCKS = [
+  // Publishing blocks (in extensions/publishing/blocks/)
   "bookmark-card",
   "cta-banner",
   "faq-accordion",
@@ -38,6 +39,15 @@ export const PUBLISHING_FIXTURE_BLOCKS = [
   "testimonial-card",
   "timeline",
   "video-embed",
+  // Layout blocks (in lib/domain/editor/extensions/blocks/) — added 2026-05-20
+  // to bring them under the same snapshot/CI coverage as publishing blocks
+  // ahead of the R5 (editor uses publisher markup) work.
+  "accordion",
+  "block-columns",
+  "card-panel",
+  "columns",
+  "section-header",
+  "tabs",
 ] as const;
 
 export type PublishingFixtureBlock = (typeof PUBLISHING_FIXTURE_BLOCKS)[number];

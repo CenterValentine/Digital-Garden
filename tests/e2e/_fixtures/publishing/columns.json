@@ -1,0 +1,45 @@
+{
+  "type": "doc",
+  "content": [
+    {
+      "type": "columns",
+      "attrs": {
+        "columnCount": 2,
+        "gapSize": "medium",
+        "columnBorder": "subtle",
+        "showContainer": false,
+        "showBackground": true
+      },
+      "content": [
+        {
+          "type": "column",
+          "content": [
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Left column content. This text fills the first column of a two-column layout. Multi-column layouts work well for comparing features or splitting related ideas."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "column",
+          "content": [
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Right column content. This text fills the second column. The columns block scales gracefully from two to four columns depending on the layout you choose."
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
