@@ -5092,7 +5092,7 @@ mark {
   font-size: 0.75rem;
   color: rgba(0,0,0,0.5);
 }
-.dark .public-prose .block-post-card-date { color: rgba(255,255,255,0.35); }
+.dark .public-prose .block-post-card-date { color: rgba(255,255,255,0.6); }
 .public-prose .block-post-card-tags {
   display: flex;
   gap: 4px;
@@ -5109,8 +5109,8 @@ mark {
   color: rgba(0,0,0,0.6);
 }
 .dark .public-prose .block-post-card-tag {
-  background: rgba(255,255,255,0.07);
-  color: rgba(255,255,255,0.5);
+  background: rgba(255,255,255,0.12);
+  color: rgba(255,255,255,0.75);
 }
 .public-prose .block-post-card--horizontal {
   display: grid;
@@ -5199,9 +5199,13 @@ mark {
   font-size: 0.7rem;
   padding: 2px 8px;
   border-radius: 5px;
-  background: rgba(99,102,241,0.12);
-  color: rgba(165,180,252,0.9);
+  background: rgba(99,102,241,0.15);
+  color: #4f46e5;
   font-family: ui-monospace, monospace;
+}
+.dark .public-prose .block-project-card-tech-item {
+  background: rgba(99,102,241,0.22);
+  color: #c7d2fe;
 }
 .public-prose .block-project-card-links {
   display: flex;
@@ -5288,7 +5292,7 @@ mark {
   color: rgba(0,0,0,0.5);
 }
 .dark .public-prose .block-stat-description {
-  color: rgba(255,255,255,0.3);
+  color: rgba(255,255,255,0.6);
 }
 
 /* ─── Metrics Strip ──────────────────────────────────────────────────────── */
@@ -5467,15 +5471,20 @@ mark {
   width: 28px;
   height: 28px;
   border-radius: 50%;
-  background: rgba(99,102,241,0.12);
-  border: 1.5px solid rgba(99,102,241,0.3);
+  background: rgba(99,102,241,0.15);
+  border: 1.5px solid rgba(99,102,241,0.5);
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 0.75rem;
   font-weight: 700;
-  color: #a5b4fc;
+  color: #4f46e5;
   margin-top: 2px;
+}
+.dark .public-prose .block-process-steps-number {
+  background: rgba(99,102,241,0.22);
+  border-color: rgba(165,180,252,0.6);
+  color: #c7d2fe;
 }
 .public-prose .block-process-steps-content { flex: 1; }
 .public-prose .block-process-steps-title {
@@ -5664,15 +5673,15 @@ mark {
   background: #4f46e5;
   color: #fff;
 }
+/* The cta-banner's default surface (#f3f4f6) is theme-stable — it stays
+   light gray on both light and dark pages. So the secondary button
+   text needs to stay dark in both themes; the .dark page-level override
+   would invert it to white-on-light-gray (invisible). The variant
+   overrides below handle the genuinely-dark banner surfaces. */
 .public-prose .block-cta-btn--secondary {
   border: 2px solid currentColor;
   color: #111827;
 }
-.dark .public-prose .block-cta-btn--secondary {
-  color: rgba(255,255,255,0.85);
-}
-/* Within the dark/brand banner variants, the secondary button sits on a
-   dark bg regardless of page theme — keep its text light. */
 .public-prose .block-cta--dark .block-cta-btn--secondary,
 .public-prose .block-cta--brand .block-cta-btn--secondary {
   color: rgba(255,255,255,0.9);
@@ -5703,6 +5712,7 @@ mark {
   color: #6b7280;
   text-align: center;
 }
+.dark .public-prose .block-video-caption { color: rgba(255,255,255,0.7); }
 .public-prose .block-video-error {
   padding: 16px;
   background: #fef2f2;
@@ -5795,6 +5805,8 @@ mark {
   list-style: none;
   gap: 12px;
 }
+.dark .public-prose .block-faq-question { color: rgba(255,255,255,0.92); }
+.dark .public-prose .block-faq-question::after { color: rgba(255,255,255,0.5); }
 .public-prose .block-faq--bordered .block-faq-question,
 .public-prose .block-faq--card .block-faq-question { padding: 14px 16px; }
 .public-prose .block-faq-question::-webkit-details-marker { display: none; }
@@ -5813,6 +5825,7 @@ mark {
   line-height: 1.65;
   font-size: 0.9375rem;
 }
+.dark .public-prose .block-faq-answer { color: rgba(255,255,255,0.72); }
 .public-prose .block-faq--bordered .block-faq-answer,
 .public-prose .block-faq--card .block-faq-answer { padding: 0 16px 16px; }
 .public-prose .block-faq-answer p { margin: 0; }
@@ -5862,12 +5875,14 @@ mark {
   font-weight: 600;
   color: #111827;
 }
+.dark .public-prose .block-feature-title { color: rgba(255,255,255,0.92); }
 .public-prose .block-feature-desc {
   margin: 0;
   font-size: 0.875rem;
   color: #6b7280;
   line-height: 1.55;
 }
+.dark .public-prose .block-feature-desc { color: rgba(255,255,255,0.65); }
 .public-prose .block-feature-empty {
   color: #9ca3af;
   font-size: 0.875rem;
@@ -6192,6 +6207,7 @@ mark {
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
+.dark .public-prose .block-skill-badges-label { color: rgba(255,255,255,0.75); }
 .public-prose .block-skill-badges-grid {
   display: flex;
   flex-wrap: wrap;
@@ -6295,6 +6311,7 @@ mark {
   font-weight: 600;
   color: #374151;
 }
+.dark .public-prose .block-tag-cloud-label { color: rgba(255,255,255,0.75); }
 .public-prose .block-tag-cloud-items {
   display: flex;
   flex-wrap: wrap;
