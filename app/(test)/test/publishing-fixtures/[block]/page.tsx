@@ -66,12 +66,16 @@ export default async function PublishingFixturePage({
       data-publishing-fixture-ready="true"
       className="public-prose"
       style={{
-        // 80px top clears the root layout's NavBar logo, which overflows
-        // below its pt-20 allocation by ~60px. Keeps element-cropped
-        // snapshots from including stray navbar pixels.
-        padding: "80px 24px 24px",
+        // marginTop pushes the wrapper's bounding box past the root
+        // layout's NavBar logo. The logo overflows below its pt-20
+        // allocation by ~60px (centered emblem with curved text), and
+        // element-locator screenshots capture the full bbox including
+        // any transparent padding — so padding alone wouldn't crop it
+        // out. 100px puts the wrapper top at ~y=180 in page coords,
+        // well below the logo's ~y=140 bottom edge.
+        padding: "24px",
         maxWidth: "960px",
-        margin: "0 auto",
+        margin: "100px auto 0",
       }}
     >
       <TipTapContent bodyJson={bodyJson} />
