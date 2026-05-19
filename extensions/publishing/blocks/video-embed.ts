@@ -250,6 +250,14 @@ export const ServerVideoEmbed = Node.create({
             src: embed.src,
             class: "block-video-native",
             controls: "",
+            // If the URL 404s or the file is unplayable, swap the broken
+            // native player UI for the styled error markup. Without this,
+            // a stale .mp4 URL on a published page shows the user a
+            // broken-looking video player instead of a graceful error.
+            // The handler guards via this.dataset.errored so loops can't
+            // re-fire if the swap itself somehow triggers another error.
+            onerror:
+              "if(!this.dataset.errored){this.dataset.errored='1';this.outerHTML='<p class=\"block-video-error\">Video could not be loaded.</p>';}",
             ...(autoplay ? { autoplay: "", muted: "", playsinline: "" } : {}),
           },
         ];
