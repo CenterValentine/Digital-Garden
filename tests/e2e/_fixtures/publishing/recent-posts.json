@@ -1,0 +1,18 @@
+{
+  "type": "doc",
+  "content": [
+    {
+      "type": "recentPosts",
+      "attrs": {
+        "blockType": "recentPosts",
+        "count": 5,
+        "pathSlug": "",
+        "showExcerpt": true,
+        "showDate": true,
+        "showCover": false,
+        "layout": "list",
+        "excludeSelf": true
+      }
+    }
+  ]
+}

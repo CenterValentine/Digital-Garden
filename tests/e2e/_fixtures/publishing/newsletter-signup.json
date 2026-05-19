@@ -1,0 +1,20 @@
+{
+  "type": "doc",
+  "content": [
+    {
+      "type": "newsletterSignup",
+      "attrs": {
+        "blockType": "newsletterSignup",
+        "headline": "Stay ahead of the curve",
+        "subheadline": "Get weekly insights on AI, product development, and scaling your business.",
+        "placeholder": "jane@example.com",
+        "buttonLabel": "Subscribe",
+        "endpoint": "https://example.com/api/subscribe",
+        "successText": "Thanks! Check your email for the welcome guide.",
+        "variant": "default",
+        "bgColor": "",
+        "bgGradient": ""
+      }
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "type": "doc",
+  "content": [
+    {
+      "type": "projectCard",
+      "attrs": {
+        "blockType": "projectCard",
+        "title": "Content Platform Redesign",
+        "description": "Led redesign of publishing platform serving 50K+ creators monthly. Improved performance by 40%.",
+        "tech": "[\"React\",\"TypeScript\",\"Tailwind\",\"PostgreSQL\"]",
+        "coverUrl": "data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20viewBox%3D%270%200%20600%20400%27%3E%3Crect%20width%3D%27600%27%20height%3D%27400%27%20fill%3D%27%2306b6d4%27%2F%3E%3C%2Fsvg%3E",
+        "liveUrl": "https://example.com/projects/content-platform",
+        "repoUrl": "https://github.com/example/content-platform",
+        "status": "active",
+        "variant": "default"
+      }
+    }
+  ]
+}

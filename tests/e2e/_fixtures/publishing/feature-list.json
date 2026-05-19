@@ -1,0 +1,16 @@
+{
+  "type": "doc",
+  "content": [
+    {
+      "type": "featureList",
+      "attrs": {
+        "blockType": "featureList",
+        "items": "[{\"icon\":\"⚡\",\"title\":\"Lightning Fast\",\"description\":\"Load times under 100ms, optimized for global scale\"},{\"icon\":\"🔒\",\"title\":\"Enterprise Security\",\"description\":\"Bank-level encryption, SOC 2 certified, GDPR compliant\"},{\"icon\":\"🚀\",\"title\":\"Deploy Anywhere\",\"description\":\"Works on any platform: cloud, on-prem, or hybrid\"}]",
+        "columns": 3,
+        "variant": "default",
+        "bgColor": "",
+        "bgGradient": ""
+      }
+    }
+  ]
+}

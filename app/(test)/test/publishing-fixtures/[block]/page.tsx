@@ -1,0 +1,80 @@
+/**
+ * Synthetic publishing-block fixture route.
+ *
+ * Renders a single publishing block from a checked-in TipTap JSON fixture,
+ * using the *same* server-render pipeline (`TipTapContent` →
+ * `getServerExtensions()` → DOMSerializer) that powers public pages at
+ * `/(public)/[...path]/page.tsx`. This is the surface Playwright snapshots
+ * for per-block visual-regression coverage.
+ *
+ * Gated to non-production environments. To exercise on a Vercel preview
+ * (e.g. running Playwright against a preview deploy), set
+ * `PLAYWRIGHT_FIXTURES_ENABLED=1` in that preview's env.
+ */
+
+import { notFound } from "next/navigation";
+import { promises as fs } from "node:fs";
+import path from "node:path";
+import { TipTapContent } from "@/components/public/TipTapContent";
+import type { JSONContent } from "@tiptap/core";
+
+const FIXTURES_ENABLED =
+  process.env.NODE_ENV !== "production" ||
+  process.env.PLAYWRIGHT_FIXTURES_ENABLED === "1";
+
+// Kebab-case slugs only — blocks path traversal (`..`, `/`) and other
+// shenanigans on the filesystem read below.
+const VALID_BLOCK_SLUG = /^[a-z][a-z0-9-]*$/;
+
+export const dynamic = "force-dynamic";
+
+type RouteParams = { block: string };
+
+async function loadFixture(block: string): Promise<JSONContent | null> {
+  const fixturePath = path.join(
+    process.cwd(),
+    "tests",
+    "e2e",
+    "_fixtures",
+    "publishing",
+    `${block}.json`,
+  );
+  try {
+    const raw = await fs.readFile(fixturePath, "utf-8");
+    return JSON.parse(raw) as JSONContent;
+  } catch {
+    return null;
+  }
+}
+
+export default async function PublishingFixturePage({
+  params,
+}: {
+  params: Promise<RouteParams>;
+}) {
+  if (!FIXTURES_ENABLED) notFound();
+
+  const { block } = await params;
+  if (!VALID_BLOCK_SLUG.test(block)) notFound();
+
+  const bodyJson = await loadFixture(block);
+  if (!bodyJson) notFound();
+
+  return (
+    <main
+      data-publishing-fixture={block}
+      data-publishing-fixture-ready="true"
+      className="public-prose"
+      style={{
+        // 80px top clears the root layout's NavBar logo, which overflows
+        // below its pt-20 allocation by ~60px. Keeps element-cropped
+        // snapshots from including stray navbar pixels.
+        padding: "80px 24px 24px",
+        maxWidth: "960px",
+        margin: "0 auto",
+      }}
+    >
+      <TipTapContent bodyJson={bodyJson} />
+    </main>
+  );
+}

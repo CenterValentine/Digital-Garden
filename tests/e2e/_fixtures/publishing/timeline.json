@@ -1,0 +1,15 @@
+{
+  "type": "doc",
+  "content": [
+    {
+      "type": "timeline",
+      "attrs": {
+        "blockType": "timeline",
+        "items": "[{\"date\":\"2024-01-15\",\"title\":\"Beta Launch\",\"body\":\"Opened beta to 500 early adopters\"},{\"date\":\"2024-03-20\",\"title\":\"Series A Funding\",\"body\":\"Raised $5M to accelerate product development\"},{\"date\":\"2024-06-10\",\"title\":\"GA Release\",\"body\":\"Full platform launch with 50+ integrations\"},{\"date\":\"2025-02-01\",\"title\":\"1M Users Milestone\",\"body\":\"Surpassed 1 million monthly active users\"}]",
+        "variant": "default",
+        "dateFormat": "short",
+        "customDateFormat": ""
+      }
+    }
+  ]
+}

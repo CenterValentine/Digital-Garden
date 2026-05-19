@@ -1,0 +1,15 @@
+{
+  "type": "doc",
+  "content": [
+    {
+      "type": "logoStrip",
+      "attrs": {
+        "blockType": "logoStrip",
+        "items": "[{\"src\":\"data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20viewBox%3D%270%200%20120%2040%27%3E%3Crect%20width%3D%27120%27%20height%3D%2740%27%20fill%3D%27%233b82f6%27%2F%3E%3C%2Fsvg%3E\",\"alt\":\"Acme Inc\"},{\"src\":\"data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20viewBox%3D%270%200%20120%2040%27%3E%3Crect%20width%3D%27120%27%20height%3D%2740%27%20fill%3D%27%23ec4899%27%2F%3E%3C%2Fsvg%3E\",\"alt\":\"TechFlow\"},{\"src\":\"data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20viewBox%3D%270%200%20120%2040%27%3E%3Crect%20width%3D%27120%27%20height%3D%2740%27%20fill%3D%27%238b5cf6%27%2F%3E%3C%2Fsvg%3E\",\"alt\":\"CloudWorks\"},{\"src\":\"data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20viewBox%3D%270%200%20120%2040%27%3E%3Crect%20width%3D%27120%27%20height%3D%2740%27%20fill%3D%27%2314b8a6%27%2F%3E%3C%2Fsvg%3E\",\"alt\":\"DataSense\"}]",
+        "label": "Trusted by leading companies",
+        "grayscale": true,
+        "variant": "default"
+      }
+    }
+  ]
+}

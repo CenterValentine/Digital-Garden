@@ -1,0 +1,19 @@
+{
+  "type": "doc",
+  "content": [
+    {
+      "type": "bookmarkCard",
+      "attrs": {
+        "blockType": "bookmarkCard",
+        "url": "https://example.com/article/building-with-ai",
+        "title": "Building with AI: The Complete Guide",
+        "description": "Learn how to integrate AI into your workflows and ship faster with modern LLMs.",
+        "imageUrl": "data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20viewBox%3D%270%200%20400%20250%27%3E%3Crect%20width%3D%27400%27%20height%3D%27250%27%20fill%3D%27%238b5cf6%27%2F%3E%3C%2Fsvg%3E",
+        "domain": "example.com",
+        "variant": "default",
+        "bgColor": "",
+        "bgGradient": ""
+      }
+    }
+  ]
+}

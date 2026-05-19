@@ -14,6 +14,12 @@
  */
 
 import { defineConfig, devices } from "@playwright/test";
+import { config as loadEnv } from "dotenv";
+import { resolve } from "node:path";
+
+// Load .env.local the same way Next.js dev does, so a worktree-specific
+// port/base-URL override stays consistent between dev server and tests.
+loadEnv({ path: resolve(__dirname, ".env.local") });
 
 const PORT = process.env.PORT ?? "3015";
 const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? `http://localhost:${PORT}`;

@@ -1,0 +1,14 @@
+{
+  "type": "doc",
+  "content": [
+    {
+      "type": "metricsStrip",
+      "attrs": {
+        "blockType": "metricsStrip",
+        "items": "[{\"value\":\"2.4M\",\"label\":\"Active Users\",\"trend\":\"up\"},{\"value\":\"99.99\",\"label\":\"Uptime\",\"suffix\":\"%\"},{\"value\":\"150K\",\"label\":\"Deployments/Day\",\"trend\":\"up\"},{\"value\":\"800\",\"label\":\"Avg Response\",\"suffix\":\"ms\"}]",
+        "variant": "bar",
+        "dividers": true
+      }
+    }
+  ]
+}
