@@ -191,7 +191,7 @@ export const Tabs = Node.create({
         class: "block-tabs",
         "data-block-type": "tabs",
       }),
-      0,
+      ["div", { class: "block-tabs-content" }, 0],
     ];
   },
 
@@ -944,7 +944,7 @@ export const ServerTabs = Node.create({
         class: "block-tabs",
         "data-block-type": "tabs",
       }),
-      0,
+      ["div", { class: "block-tabs-content" }, 0],
     ];
   },
 });

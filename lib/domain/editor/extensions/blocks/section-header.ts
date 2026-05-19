@@ -87,14 +87,23 @@ export const SectionHeader = Node.create({
     return [{ tag: 'div[data-block-type="sectionHeader"]' }];
   },
 
-  renderHTML({ HTMLAttributes }) {
+  renderHTML({ node, HTMLAttributes }) {
+    const dividerStyle = (node.attrs.dividerStyle as string) || "solid";
+    const innerAttrs: Record<string, string> = {
+      class: "block-section-header-content",
+      "data-level": String(node.attrs.level ?? 1),
+    };
+    if (dividerStyle !== "none") {
+      innerAttrs["data-show-divider"] = "true";
+      innerAttrs["data-divider-style"] = dividerStyle;
+    }
     return [
       "div",
       mergeAttributes(HTMLAttributes, {
         class: "block-section-header",
         "data-block-type": "sectionHeader",
       }),
-      0, // Content hole for inline text
+      ["div", innerAttrs, 0],
     ];
   },
 
@@ -170,14 +179,23 @@ export const ServerSectionHeader = Node.create({
     return [{ tag: 'div[data-block-type="sectionHeader"]' }];
   },
 
-  renderHTML({ HTMLAttributes }) {
+  renderHTML({ node, HTMLAttributes }) {
+    const dividerStyle = (node.attrs.dividerStyle as string) || "solid";
+    const innerAttrs: Record<string, string> = {
+      class: "block-section-header-content",
+      "data-level": String(node.attrs.level ?? 1),
+    };
+    if (dividerStyle !== "none") {
+      innerAttrs["data-show-divider"] = "true";
+      innerAttrs["data-divider-style"] = dividerStyle;
+    }
     return [
       "div",
       mergeAttributes(HTMLAttributes, {
         class: "block-section-header",
         "data-block-type": "sectionHeader",
       }),
-      0,
+      ["div", innerAttrs, 0],
     ];
   },
 });

@@ -79,15 +79,29 @@ export const CardPanel = Node.create({
     return [{ tag: 'div[data-block-type="cardPanel"]' }];
   },
 
-  renderHTML({ HTMLAttributes }) {
-    return [
-      "div",
-      mergeAttributes(HTMLAttributes, {
-        class: "block-card-panel",
-        "data-block-type": "cardPanel",
-      }),
-      0,
-    ];
+  renderHTML({ node, HTMLAttributes }) {
+    const headerText = (node.attrs.headerText as string) || "";
+    const cardBorder = (node.attrs.cardBorder as string) || "subtle";
+    const innerAttrs: Record<string, string> = {
+      class: "block-card-panel-content",
+      "data-card-border": cardBorder,
+    };
+    if (node.attrs.showBackground === false) {
+      innerAttrs["data-card-bg"] = "hidden";
+    }
+    const outerAttrs = mergeAttributes(HTMLAttributes, {
+      class: "block-card-panel",
+      "data-block-type": "cardPanel",
+    });
+    if (headerText) {
+      return [
+        "div",
+        outerAttrs,
+        ["div", { class: "block-card-header" }, headerText],
+        ["div", innerAttrs, 0],
+      ];
+    }
+    return ["div", outerAttrs, ["div", innerAttrs, 0]];
   },
 
   addNodeView() {
@@ -176,14 +190,28 @@ export const ServerCardPanel = Node.create({
     return [{ tag: 'div[data-block-type="cardPanel"]' }];
   },
 
-  renderHTML({ HTMLAttributes }) {
-    return [
-      "div",
-      mergeAttributes(HTMLAttributes, {
-        class: "block-card-panel",
-        "data-block-type": "cardPanel",
-      }),
-      0,
-    ];
+  renderHTML({ node, HTMLAttributes }) {
+    const headerText = (node.attrs.headerText as string) || "";
+    const cardBorder = (node.attrs.cardBorder as string) || "subtle";
+    const innerAttrs: Record<string, string> = {
+      class: "block-card-panel-content",
+      "data-card-border": cardBorder,
+    };
+    if (node.attrs.showBackground === false) {
+      innerAttrs["data-card-bg"] = "hidden";
+    }
+    const outerAttrs = mergeAttributes(HTMLAttributes, {
+      class: "block-card-panel",
+      "data-block-type": "cardPanel",
+    });
+    if (headerText) {
+      return [
+        "div",
+        outerAttrs,
+        ["div", { class: "block-card-header" }, headerText],
+        ["div", innerAttrs, 0],
+      ];
+    }
+    return ["div", outerAttrs, ["div", innerAttrs, 0]];
   },
 });

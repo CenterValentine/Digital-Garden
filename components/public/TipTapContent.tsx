@@ -39,10 +39,14 @@ function slugifyAnchor(text: string): string {
 }
 
 /**
- * Two-pass DOM post-processor:
+ * Three-pass DOM post-processor:
  * 1. Assign unique `id` attributes to every heading so anchor links resolve.
  * 2. Fill each `.block-toc-list-placeholder` with the actual <ol> list,
  *    respecting the TOC block's `data-max-depth` attribute.
+ * 3. Synthesize a `.block-tabs-bar` for every `.block-tabs` by reading each
+ *    child panel's `data-label`, and mark the active panel/button per
+ *    `data-active-tab`. (Panels can't compute their own active state in
+ *    renderHTML because they don't see their parent's attrs.)
  */
 function postProcessDom(container: HTMLElement, jsdomDocument: Document): void {
   // Pass 1 — heading IDs
@@ -84,6 +88,36 @@ function postProcessDom(container: HTMLElement, jsdomDocument: Document): void {
       ol.appendChild(li);
     });
     placeholder.appendChild(ol);
+  });
+
+  // Pass 3 — Tabs: build tab bar + mark active panel
+  container.querySelectorAll<HTMLElement>(".block-tabs").forEach((tabsEl) => {
+    const activeIndex = parseInt(tabsEl.getAttribute("data-active-tab") ?? "0", 10);
+    const content = tabsEl.querySelector<HTMLElement>(".block-tabs-content");
+    if (!content) return;
+    const panels = Array.from(content.querySelectorAll<HTMLElement>(":scope > .block-tab-panel"));
+    if (panels.length === 0) return;
+
+    const bar = jsdomDocument.createElement("div");
+    bar.className = "block-tabs-bar";
+
+    panels.forEach((panel, i) => {
+      const label = panel.getAttribute("data-label") || `Tab ${i + 1}`;
+      const isActive = i === activeIndex;
+
+      const btn = jsdomDocument.createElement("button");
+      btn.className = "block-tab-btn" + (isActive ? " block-tab-active" : "");
+      btn.type = "button";
+      const labelSpan = jsdomDocument.createElement("span");
+      labelSpan.className = "block-tab-label";
+      labelSpan.textContent = label;
+      btn.appendChild(labelSpan);
+      bar.appendChild(btn);
+
+      panel.classList.add(isActive ? "block-tab-panel-active" : "block-tab-panel-hidden");
+    });
+
+    tabsEl.insertBefore(bar, content);
   });
 }
 

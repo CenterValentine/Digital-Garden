@@ -225,14 +225,34 @@ export const Accordion = Node.create({
     return [{ tag: 'div[data-block-type="accordion"]' }];
   },
 
-  renderHTML({ HTMLAttributes }) {
+  renderHTML({ node, HTMLAttributes }) {
+    const isOpen = node.attrs.openState !== false;
+    const showDivider = node.attrs.showDivider === true;
+    const headerText = (node.attrs.headerText as string) || "";
+    const headerLevel = (node.attrs.headerLevel as string) || "2";
+    const summaryClass =
+      "block-accordion-summary" + (showDivider ? "" : " block-accordion-no-divider");
+    const chevronClass =
+      "block-accordion-chevron" + (isOpen ? " block-accordion-chevron-open" : "");
+    const bodyClass =
+      "block-accordion-body " + (isOpen ? "block-accordion-open" : "block-accordion-closed");
     return [
       "div",
       mergeAttributes(HTMLAttributes, {
         class: "block-accordion",
         "data-block-type": "accordion",
       }),
-      0,
+      [
+        "div",
+        { class: summaryClass },
+        ["span", { class: chevronClass }, "▶"],
+        [
+          "span",
+          { class: "block-accordion-title", "data-header-level": headerLevel },
+          headerText,
+        ],
+      ],
+      ["div", { class: bodyClass }, 0],
     ];
   },
 
@@ -715,14 +735,34 @@ export const ServerAccordion = Node.create({
     return [{ tag: 'div[data-block-type="accordion"]' }];
   },
 
-  renderHTML({ HTMLAttributes }) {
+  renderHTML({ node, HTMLAttributes }) {
+    const isOpen = node.attrs.openState !== false;
+    const showDivider = node.attrs.showDivider === true;
+    const headerText = (node.attrs.headerText as string) || "";
+    const headerLevel = (node.attrs.headerLevel as string) || "2";
+    const summaryClass =
+      "block-accordion-summary" + (showDivider ? "" : " block-accordion-no-divider");
+    const chevronClass =
+      "block-accordion-chevron" + (isOpen ? " block-accordion-chevron-open" : "");
+    const bodyClass =
+      "block-accordion-body " + (isOpen ? "block-accordion-open" : "block-accordion-closed");
     return [
       "div",
       mergeAttributes(HTMLAttributes, {
         class: "block-accordion",
         "data-block-type": "accordion",
       }),
-      0,
+      [
+        "div",
+        { class: summaryClass },
+        ["span", { class: chevronClass }, "▶"],
+        [
+          "span",
+          { class: "block-accordion-title", "data-header-level": headerLevel },
+          headerText,
+        ],
+      ],
+      ["div", { class: bodyClass }, 0],
     ];
   },
 });

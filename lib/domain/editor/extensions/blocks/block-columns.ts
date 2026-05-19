@@ -185,7 +185,7 @@ export const BlockColumns = Node.create({
         class: "block-block-columns",
         "data-block-type": "blockColumns",
       }),
-      0,
+      ["div", { class: "block-columns-grid" }, 0],
     ];
   },
 
@@ -445,7 +445,7 @@ export const ServerBlockColumns = Node.create({
         class: "block-block-columns",
         "data-block-type": "blockColumns",
       }),
-      0,
+      ["div", { class: "block-columns-grid" }, 0],
     ];
   },
 });
