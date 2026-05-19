@@ -19,6 +19,8 @@ pnpm lint             # ESLint with --max-warnings 175 ratchet (fails if count g
 pnpm build:tokens     # Regenerate CSS variables from design tokens
 pnpm db:seed          # Seed database with test ContentNode data
 pnpm collab:schema:check  # CI gate: validate collaboration schema covers all editor extensions
+pnpm publishing:schema:check  # CI gate: validate every publishing block has Server* variant + correct registerBlock type
+pnpm publishing:audit:defaults  # Static drift detector: Zod defaults vs renderHTML fallbacks across publishing blocks
 pnpm test:e2e         # Playwright visual regression (assumes pnpm dev is running)
 pnpm test:e2e:update  # Regenerate baseline screenshots
 pnpm test:e2e:report  # Open last HTML run report
@@ -36,6 +38,7 @@ npx prisma studio     # Database GUI (http://localhost:5555)
 **CI gates** (`.github/workflows/`):
 - **quality.yml** — runs `pnpm lint` (with the `--max-warnings 175` ratchet) and `pnpm typecheck` on every PR. Lint failures or warning count growth block merge.
 - **collaboration-hardening.yml** — runs `pnpm collab:schema:check` on collab-touching PRs. Scans all TipTap extension source files for `Node.create`/`Mark.create` and asserts every discovered node/mark is covered in `getCollaborationServerExtensions()`. Every new TipTap Node/Mark **must** export a `Server*` variant and be registered in `lib/domain/collaboration/extensions.ts`.
+- **publishing-visual.yml** — runs on PRs touching the publishing surface (`extensions/publishing/`, `components/public/`, `app/(public)/`, `app/(test)/test/publishing-fixtures/`, `app/globals.css`, the publishing fixtures/spec/schema scripts). Two jobs: `schema` (typecheck + `publishing:schema:check` + `publishing:audit:defaults`) and `visual` (Playwright per-block snapshot suite against the synthetic fixture route). Visual job uploads diff PNGs as an artifact on failure. Hard-gate; failures block merge. Can be temporarily skipped via repo var `PUBLISHING_VISUAL_GATE=skip`.
 
 ## Visual Regression Testing (Playwright)
 
