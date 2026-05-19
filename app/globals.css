@@ -70,6 +70,30 @@
   background-color: var(--scrollbar-thumb-hover);
 }
 
+/* ────────────────────────────────────────────────────────────────────────
+ * Excalidraw mobile bottom toolbar — allow horizontal scroll.
+ *
+ * Excalidraw sets `max-width: 98vw` + `overflow: visible` on its mobile
+ * tool strip. On narrow phones the natural width of the icons exceeds
+ * 98vw and the leftmost tools get clipped off-screen with no way to
+ * reach them. Override overflow-x to auto so the user can swipe to
+ * the cut-off tools, force tool icons to keep their natural size, and
+ * hide the scrollbar chrome (the strip is too short to host one cleanly).
+ * ──────────────────────────────────────────────────────────────────── */
+.excalidraw .App-toolbar--mobile,
+.excalidraw .App-toolbar-content {
+  overflow-x: auto !important;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.excalidraw .App-toolbar--mobile::-webkit-scrollbar,
+.excalidraw .App-toolbar-content::-webkit-scrollbar {
+  display: none;
+}
+.excalidraw .App-toolbar-content > * {
+  flex-shrink: 0;
+}
+
 /* Hide default navbar on notes routes (uses its own NotesNavBar) */
 body[data-notes-route] .notes-route-hides-default-nav {
   display: none !important;
