@@ -429,8 +429,19 @@ export function createBlockNodeView(options: BlockNodeViewOptions) {
     }
 
     // --- Outer wrapper: block-node chrome ---
+    // The outer dom carries TWO classes: `block-node` (editor chrome
+    // marker — selectors like .block-node target editor-only state) and
+    // `block-${kebab(blockType)}` (publisher-aligned class — selectors
+    // like .block-section-header target both editor and publisher).
+    // The kebab conversion matters: prior to R5 this was the raw
+    // camelCase `block-${blockType}` which produced unmatched classes
+    // like `.block-sectionHeader` while CSS targeted `.block-section-header`.
+    const kebabBlockType = options.blockType.replace(
+      /[A-Z]/g,
+      (m) => `-${m.toLowerCase()}`,
+    );
     const dom = document.createElement("div");
-    dom.classList.add("block-node", `block-${options.blockType}`);
+    dom.classList.add("block-node", `block-${kebabBlockType}`);
     dom.setAttribute("data-block-type", options.blockType);
     dom.setAttribute("data-block-id", resolvedBlockId);
     // containerAttr: toggle block-container-hidden based on a boolean attr
