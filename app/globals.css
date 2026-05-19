@@ -6340,10 +6340,14 @@ mark {
   from { opacity: 0; transform: translateX(-28px); }
   to   { opacity: 1; transform: translateX(0); }
 }
-/* Initial state: blocks start invisible, JS adds .block-revealed */
+/* Pre-fix: this selector had `opacity: 0` unconditionally, gating block
+   visibility on client JS that toggled `.block-revealed`. No-JS users,
+   reduced-motion users, and snapshot tools saw every published block
+   as invisible. The fix makes blocks visible at rest; the entrance
+   animation now ENHANCES first paint rather than GATING it. */
 .public-prose [data-block-type] {
-  opacity: 0;
   animation: none;
+  animation-delay: var(--reveal-delay, 0ms);
 }
 .public-prose [data-block-type].block-revealed {
   animation: blockFadeUp 0.55s cubic-bezier(0.4, 0, 0.2, 1) forwards;
@@ -6354,8 +6358,16 @@ mark {
 .public-prose [data-block-type].block-revealed--slide {
   animation: blockSlideRight 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
 }
-/* Stagger via CSS custom property set by JS */
-.public-prose [data-block-type] { animation-delay: var(--reveal-delay, 0ms); }
+/* Respect motion preferences: skip the reveal animation entirely for
+   users who prefer reduced motion. Blocks remain visible (no opacity:0
+   default), they just appear instantly. */
+@media (prefers-reduced-motion: reduce) {
+  .public-prose [data-block-type].block-revealed,
+  .public-prose [data-block-type].block-revealed--swing,
+  .public-prose [data-block-type].block-revealed--slide {
+    animation: none;
+  }
+}
 
 /* ─── Responsive tweaks ──────────────────────────────────────────────────── */
 @media (max-width: 640px) {
