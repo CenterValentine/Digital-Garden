@@ -11,6 +11,7 @@ import { withRouteTrace } from "@/lib/core/logger/route-trace";
 import { withSpan } from "@/lib/core/logger/span";
 import { spanPayload } from "@/lib/core/logger/span-payload";
 import { resolveWritableTenantId, TenantAuthError } from "@/lib/domain/tenancy/api";
+import { invalidateTenantCache } from "@/lib/domain/tenancy/cache";
 
 export async function GET(req: NextRequest) {
   return withRouteTrace(req, { route: "/api/publishing/paths" }, async () => {
@@ -138,6 +139,9 @@ export async function POST(req: NextRequest) {
         });
 
         span.attr("path_id", path.id);
+
+        // New path appears in the tenant's listings (even if empty).
+        await invalidateTenantCache({ type: "tenant", tenantId: destTenantId });
 
         return NextResponse.json(path, { status: 201 });
       },

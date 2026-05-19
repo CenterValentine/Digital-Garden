@@ -10,6 +10,7 @@ import { logger } from "@/lib/core/logger";
 import { withRouteTrace } from "@/lib/core/logger/route-trace";
 import { withSpan } from "@/lib/core/logger/span";
 import { spanPayload } from "@/lib/core/logger/span-payload";
+import { invalidateTenantCache } from "@/lib/domain/tenancy/cache";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -54,6 +55,10 @@ export async function PATCH(req: NextRequest, { params }: Params) {
             ...(body.icon !== undefined && { icon: body.icon }),
           },
         });
+
+        // Title/description/icon changes ripple through listings; slug
+        // change additionally moves every item under this path to a new URL.
+        await invalidateTenantCache({ type: "path", pathId: id });
 
         return NextResponse.json(updated);
       },
@@ -121,8 +126,22 @@ export async function DELETE(req: NextRequest, { params }: Params) {
           );
         }
 
+        // Capture tenantId BEFORE the delete so the post-mutation
+        // invalidation can find the right scope (the row is gone afterwards).
+        const tenantIdForInvalidate = await prisma.publicPath
+          .findUnique({ where: { id }, select: { tenantId: true } })
+          .then((p) => p?.tenantId);
+
         await prisma.publicPath.delete({ where: { id } });
         span.attr("deleted_slug", path.slug);
+
+        if (tenantIdForInvalidate) {
+          await invalidateTenantCache({
+            type: "tenant",
+            tenantId: tenantIdForInvalidate,
+          });
+        }
+
         return new NextResponse(null, { status: 204 });
       },
     );

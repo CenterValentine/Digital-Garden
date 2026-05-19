@@ -10,6 +10,7 @@ import { logger } from "@/lib/core/logger";
 import { withRouteTrace } from "@/lib/core/logger/route-trace";
 import { withSpan } from "@/lib/core/logger/span";
 import { spanPayload } from "@/lib/core/logger/span-payload";
+import { invalidateTenantCache } from "@/lib/domain/tenancy/cache";
 
 export async function GET(
   req: NextRequest,
@@ -148,6 +149,11 @@ export async function PATCH(
         });
 
         await spanPayload(span, "updated_item", updated);
+
+        // Metadata change may affect public rendering (slug → URL change,
+        // title → header text, tags → badge list). Invalidate the tenant
+        // and the item's URL.
+        await invalidateTenantCache({ type: "item", itemId: id });
 
         return NextResponse.json(updated);
       },

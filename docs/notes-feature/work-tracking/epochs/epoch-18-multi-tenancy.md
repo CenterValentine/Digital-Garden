@@ -90,9 +90,22 @@ Files added: `lib/domain/tenancy/api.ts`, barrel update in `lib/domain/tenancy/i
 
 Today's clients (which don't send `tenantId`) get exact same behavior: items/paths created on user's primary tenant. Phase 6b will introduce the first client that passes `tenantId` explicitly (the destination picker).
 
-### Phase 4 — Cache tags scoped by tenant ⚪
+### Phase 4 — Cache invalidation scaffolding ✅ *(scope reduced)*
 
-Every public render adds `cacheTag('tenant:<id>:...')`. Every publishing mutation calls `revalidateTag('tenant:<id>')` looked up from the affected item (NOT from the session — critical for items on a non-primary tenant).
+Original plan was "every public render is `cacheTag`'d and every mutation calls `revalidateTag`." In Next.js 16, `cacheTag` requires `cacheComponents: true` in next.config.ts, which makes every component dynamic by default — far too broad a blast radius for this phase.
+
+**Pragmatic substitute shipped:**
+- New helper `lib/domain/tenancy/cache.ts` → `invalidateTenantCache({ type, id })`. Two effects per call:
+  1. `revalidateTag(`tenant:<id>`, "default")` — forward-compat scaffolding. No tagged caches exist today (no `unstable_cache` wrappers, no `'use cache'` directives), so this is a no-op. Becomes meaningful when a future Cache Components epoch lands.
+  2. `revalidatePath("/")` plus the affected URL — invalidates ISR-cached pages immediately. Works today because the public pages set `export const revalidate = 60`.
+- Wired into 7 publishing mutation routes: `items/route.ts` POST, `items/[id]/route.ts` PATCH, `items/[id]/publish/route.ts`, `items/[id]/unpublish/route.ts`, `paths/route.ts` POST, `paths/[id]/route.ts` PATCH + DELETE.
+- `sync`, `schedule`, `validate`, `revisions` routes skipped — none change the rendered public output (working revision / scheduledFor / validation state are IDE-internal; the cron handles actual publish render changes via the publish route's path on each tick).
+
+**Known limitation, documented:** `revalidatePath` is host-agnostic. In a multi-tenant prod deployment, a publish on tenant A also invalidates tenant B's same-URL pages (e.g., both have `/garden/note`). Acceptable single-tenant today; the long-term fix is migrating to Cache Components where `cacheTag` IS host-aware.
+
+**Lessons captured:**
+- `revalidateTag` in Next 16 requires 2 args: `(tag, profile)`. Saved as project memory.
+- Cache Components opt-in is global, not per-page. Enabling it changes the default rendering model app-wide.
 
 ### Phase 5 — Static-first published content ⚪
 

@@ -11,6 +11,7 @@ import { withRouteTrace } from "@/lib/core/logger/route-trace";
 import { withSpan } from "@/lib/core/logger/span";
 import { spanPayload } from "@/lib/core/logger/span-payload";
 import { resolveWritableTenantId, TenantAuthError } from "@/lib/domain/tenancy/api";
+import { invalidateTenantCache } from "@/lib/domain/tenancy/cache";
 
 export async function GET(req: NextRequest) {
   return withRouteTrace(req, { route: "/api/publishing/items" }, async () => {
@@ -200,6 +201,11 @@ export async function POST(req: NextRequest) {
 
         span.attr("public_item_id", item.id);
         await spanPayload(span, "created_item", item);
+
+        // New item created as draft — listing on tenant's home doesn't
+        // change until it's published, but we invalidate the tenant tag
+        // anyway so the IDE's data fetches stay consistent.
+        await invalidateTenantCache({ type: "tenant", tenantId: destTenantId });
 
         return NextResponse.json(item, { status: 201 });
       },

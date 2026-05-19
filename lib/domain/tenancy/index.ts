@@ -12,6 +12,7 @@ export {
 } from "./resolve-tenant";
 export { getCurrentTenant } from "./get-current-tenant";
 export { resolveWritableTenantId, TenantAuthError } from "./api";
+export { invalidateTenantCache } from "./cache";
 export type {
   ResolvedTenant,
   TenantResolutionSource,
