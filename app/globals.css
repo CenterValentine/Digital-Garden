@@ -5393,9 +5393,28 @@ mark {
   line-height: 1.5;
 }
 
-/* ─── Recent Posts (placeholder — filled by post-processor) ─────────────── */
-.public-prose .block-recent-posts--placeholder {
-  display: none;
+/* ─── Recent Posts ──────────────────────────────────────────────────────── */
+/* The placeholder renders a visible empty state until a server post-
+   processor populates real items. Pre-fix: display:none here made
+   every recent-posts block invisible on every published page, since
+   no post-processor existed. */
+.public-prose .block-recent-posts {
+  margin: 1.5rem 0;
+}
+.public-prose .block-recent-posts-empty {
+  margin: 0;
+  padding: 2rem 1.5rem;
+  text-align: center;
+  color: #6b7280;
+  font-size: 0.875rem;
+  border: 1px dashed rgba(0, 0, 0, 0.12);
+  border-radius: 0.5rem;
+  background: rgba(0, 0, 0, 0.015);
+}
+.dark .public-prose .block-recent-posts-empty {
+  color: rgba(255, 255, 255, 0.5);
+  border-color: rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.02);
 }
 
 /* ─── W5: TestimonialCard ────────────────────────────────────────────────── */

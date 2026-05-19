@@ -184,14 +184,19 @@ export const ServerRecentPosts = Node.create({
   },
 
   renderHTML({ HTMLAttributes }) {
-    // The server post-processor replaces this placeholder with live data.
-    // data-* attrs are preserved for the post-processor to read.
+    // The placeholder wrapper preserves data-* attrs so a future server
+    // post-processor can read its config and replace the inner empty
+    // state with live data. Until that post-processor exists, every
+    // recent-posts block on every published page renders this empty
+    // state — see project_publishing_recent_posts_no_processor memory.
+    const layout = (HTMLAttributes["data-layout"] as string) || "list";
     return [
       "div",
       mergeAttributes(HTMLAttributes, {
-        class: "block-recent-posts block-recent-posts--placeholder",
+        class: `block-recent-posts block-recent-posts--${layout} block-recent-posts--placeholder`,
         "data-block-type": "recentPosts",
       }),
+      ["p", { class: "block-recent-posts-empty" }, "No posts yet — published items in this path will appear here."],
     ];
   },
 });
