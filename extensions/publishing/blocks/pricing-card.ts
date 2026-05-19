@@ -33,7 +33,7 @@ const { schema: pricingSchema, defaults: pricingDefaults } = createBlockSchema(
   {
     tierName: z.string().default("Pro").describe("Tier name"),
     price: z.string().default("$49").describe('Price string (e.g. "$49" or "Free")'),
-    period: z.string().default("/month").describe('Billing period (e.g. "/month", "one-time")'),
+    period: z.string().default("").describe('Billing period (e.g. "/month", "one-time") — leave blank to hide'),
     description: z.string().default("").describe("Short description of the tier"),
     features: z
       .string()
@@ -84,8 +84,8 @@ function pricingAttrs() {
       renderHTML: (attrs: Record<string, unknown>) => ({ "data-price": attrs.price }),
     },
     period: {
-      default: "/month",
-      parseHTML: (el: Element) => el.getAttribute("data-period") ?? "/month",
+      default: "",
+      parseHTML: (el: Element) => el.getAttribute("data-period") ?? "",
       renderHTML: (attrs: Record<string, unknown>) => ({ "data-period": attrs.period }),
     },
     description: {
@@ -192,7 +192,7 @@ export const ServerPricingCard = Node.create({
 
   renderHTML({ HTMLAttributes }) {
     const tierName = (HTMLAttributes["data-tier-name"] as string) || "Pro";
-    const price = (HTMLAttributes["data-price"] as string) || "";
+    const price = (HTMLAttributes["data-price"] as string) || "$49";
     const period = (HTMLAttributes["data-period"] as string) || "";
     const description = (HTMLAttributes["data-description"] as string) || "";
     const features = parseFeatures(HTMLAttributes["data-features"] ?? "[]");

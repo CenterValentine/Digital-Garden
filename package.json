@@ -17,6 +17,7 @@
     "build:tokens": "style-dictionary build --config style-dictionary.config.js",
     "collab:schema:check": "tsx scripts/validate-collaboration-schema.ts",
     "publishing:schema:check": "tsx scripts/validate-publishing-schema.ts",
+    "publishing:audit:defaults": "tsx scripts/audit-publishing-defaults.ts",
     "db:seed": "tsx prisma/seed.ts",
     "collab:env:check": "tsx scripts/check-hocuspocus-env.ts",
     "trace:view": "tsx scripts/render-trace.ts",
