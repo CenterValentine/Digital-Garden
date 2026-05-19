@@ -16,7 +16,7 @@ import { z } from "zod";
 import { createBlockSchema } from "@/lib/domain/blocks/schema";
 import { registerBlock } from "@/lib/domain/blocks/registry";
 import { createBlockNodeView } from "@/lib/domain/blocks/node-view-factory";
-import { dataAttr } from "../lib/data-attr";
+import { dataAttr } from "@/lib/domain/blocks/data-attr";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 

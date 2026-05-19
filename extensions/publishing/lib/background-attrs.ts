@@ -12,7 +12,7 @@
  */
 
 import { z } from "zod";
-import { dataAttr } from "./data-attr";
+import { dataAttr } from "@/lib/domain/blocks/data-attr";
 
 /**
  * Zod shape — spread into the second arg of `createBlockSchema(name, shape)`.

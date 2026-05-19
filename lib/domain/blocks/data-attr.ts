@@ -30,6 +30,22 @@ interface DataAttrOptions<T> {
   default?: T;
   /** Optional parser for non-string fallback values. */
   parseAs?: "string" | "number" | "boolean";
+  /**
+   * Override the kebab-cased data attribute name. Defaults to
+   * `data-${camelToKebab(camelKey)}`. Use this when the on-disk attribute
+   * name has historically diverged from the camelCase JS name (e.g.
+   * `gapSize` → `data-gap`, `showBackground` → `data-col-bg`).
+   */
+  dataKey?: string;
+  /**
+   * When true, only emit the data attribute for "truthy" values: skip
+   * `false`, `0`, `""`, and the option's default value. Useful when
+   * legacy CSS uses `[data-foo="true"]` matching and treats absence as
+   * the default — emitting the literal `false`/default would not change
+   * styling but would clutter the serialized HTML. Defaults to false
+   * (publishing-block convention is to always emit).
+   */
+  skipDefault?: boolean;
 }
 
 interface TipTapAttrSpec<T> {
@@ -68,10 +84,10 @@ export function dataAttr<T = string>(
   camelKey: string,
   options: DataAttrOptions<T> = {},
 ): TipTapAttrSpec<T> {
-  const kebabKey = camelToKebab(camelKey);
-  const dataKey = `data-${kebabKey}`;
+  const dataKey = options.dataKey ?? `data-${camelToKebab(camelKey)}`;
   const fallback = (options.default ?? ("" as unknown as T)) as T;
   const parseAs = options.parseAs ?? "string";
+  const skipDefault = options.skipDefault ?? false;
 
   return {
     default: fallback,
@@ -82,6 +98,11 @@ export function dataAttr<T = string>(
       // those are valid explicit values (e.g. overlay=0 means no overlay).
       if (value === undefined || value === null) return {};
       if (typeof value === "string" && value === "") return {};
+      // Opt-in: drop falsy/default values when caller wants minimal HTML.
+      if (skipDefault) {
+        if (value === false) return {};
+        if (value === fallback) return {};
+      }
       return { [dataKey]: value };
     },
   };

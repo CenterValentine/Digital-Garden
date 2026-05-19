@@ -18,6 +18,7 @@ import { z } from "zod";
 import { createBlockSchema } from "@/lib/domain/blocks/schema";
 import { registerBlock } from "@/lib/domain/blocks/registry";
 import { createBlockNodeView } from "@/lib/domain/blocks/node-view-factory";
+import { dataAttr } from "@/lib/domain/blocks/data-attr";
 
 // Schema
 const { schema: sectionHeaderSchema, defaults: sectionHeaderDefaults } =
@@ -57,29 +58,12 @@ export const SectionHeader = Node.create({
     return {
       blockId: { default: null },
       blockType: { default: "sectionHeader" },
-      level: {
-        default: 1,
-        parseHTML: (el) => parseInt(el.getAttribute("data-level") || "1"),
-        renderHTML: (attrs) => ({ "data-level": attrs.level }),
-      },
-      label: {
-        default: "",
-        parseHTML: (el) => el.getAttribute("data-label") || "",
-        renderHTML: (attrs) => {
-          if (!attrs.label) return {};
-          return { "data-label": attrs.label };
-        },
-      },
-      dividerStyle: {
-        default: "solid",
-        parseHTML: (el) => el.getAttribute("data-divider-style") || "solid",
-        renderHTML: (attrs) => ({ "data-divider-style": attrs.dividerStyle }),
-      },
-      showContainer: {
-        default: false,
-        parseHTML: (el) => el.getAttribute("data-show-container") === "true",
-        renderHTML: (attrs) => attrs.showContainer ? { "data-show-container": "true" } : {},
-      },
+      level: dataAttr<number>("level", { default: 1, parseAs: "number" }),
+      label: dataAttr("label"),
+      dividerStyle: dataAttr("dividerStyle", { default: "solid" }),
+      // skipDefault keeps the historical "omit when false" emission shape
+      // so existing content round-trips byte-identically (dev=prod DB).
+      showContainer: dataAttr<boolean>("showContainer", { default: false, parseAs: "boolean", skipDefault: true }),
     };
   },
 
@@ -149,29 +133,12 @@ export const ServerSectionHeader = Node.create({
     return {
       blockId: { default: null },
       blockType: { default: "sectionHeader" },
-      level: {
-        default: 1,
-        parseHTML: (el) => parseInt(el.getAttribute("data-level") || "1"),
-        renderHTML: (attrs) => ({ "data-level": attrs.level }),
-      },
-      label: {
-        default: "",
-        parseHTML: (el) => el.getAttribute("data-label") || "",
-        renderHTML: (attrs) => {
-          if (!attrs.label) return {};
-          return { "data-label": attrs.label };
-        },
-      },
-      dividerStyle: {
-        default: "solid",
-        parseHTML: (el) => el.getAttribute("data-divider-style") || "solid",
-        renderHTML: (attrs) => ({ "data-divider-style": attrs.dividerStyle }),
-      },
-      showContainer: {
-        default: false,
-        parseHTML: (el) => el.getAttribute("data-show-container") === "true",
-        renderHTML: (attrs) => attrs.showContainer ? { "data-show-container": "true" } : {},
-      },
+      level: dataAttr<number>("level", { default: 1, parseAs: "number" }),
+      label: dataAttr("label"),
+      dividerStyle: dataAttr("dividerStyle", { default: "solid" }),
+      // skipDefault keeps the historical "omit when false" emission shape
+      // so existing content round-trips byte-identically (dev=prod DB).
+      showContainer: dataAttr<boolean>("showContainer", { default: false, parseAs: "boolean", skipDefault: true }),
     };
   },
 

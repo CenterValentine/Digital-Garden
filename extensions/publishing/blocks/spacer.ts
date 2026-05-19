@@ -12,7 +12,7 @@ import { z } from "zod";
 import { createBlockSchema } from "@/lib/domain/blocks/schema";
 import { registerBlock } from "@/lib/domain/blocks/registry";
 import { createBlockNodeView } from "@/lib/domain/blocks/node-view-factory";
-import { dataAttr } from "../lib/data-attr";
+import { dataAttr } from "@/lib/domain/blocks/data-attr";
 
 const HEIGHTS = ["xs", "sm", "md", "lg", "xl", "2xl"] as const;
 const HEIGHT_PX: Record<string, number> = { xs: 16, sm: 32, md: 48, lg: 64, xl: 96, "2xl": 128 };
