@@ -2567,6 +2567,9 @@ mark {
   transition: color 0.15s ease;
   position: relative;
 }
+.dark :is(.ProseMirror, .public-prose) .block-tab-btn {
+  color: rgba(255, 255, 255, 0.55);
+}
 
 /* Tab label (editable on double-click) */
 :is(.ProseMirror, .public-prose) .block-tab-label {
@@ -2604,9 +2607,15 @@ mark {
 :is(.ProseMirror, .public-prose) .block-tab-btn:hover {
   color: rgba(0, 0, 0, 0.75);
 }
+.dark :is(.ProseMirror, .public-prose) .block-tab-btn:hover {
+  color: rgba(255, 255, 255, 0.85);
+}
 
 :is(.ProseMirror, .public-prose) .block-tab-active {
   color: rgba(0, 0, 0, 0.9);
+}
+.dark :is(.ProseMirror, .public-prose) .block-tab-active {
+  color: rgba(255, 255, 255, 0.95);
 }
 
 /* Underline style (default) */
@@ -4047,7 +4056,10 @@ mark {
   opacity: 1;
 }
 
-:is(.ProseMirror, .public-prose) .block-column-insert-btn:hover {
+/* Editor-only affordance: ServerBlockColumn doesn't render the insert
+   button, so this rule is scoped to .ProseMirror only (and avoids
+   flagging the audit for a non-issue on the publisher). */
+.ProseMirror .block-column-insert-btn:hover {
   background: var(--intent-primary, #3b82f6);
   border-color: var(--intent-primary, #3b82f6);
   color: #fff;

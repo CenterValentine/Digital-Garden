@@ -30,11 +30,19 @@ const REPO_ROOT = process.cwd();
 const CSS_PATH = join(REPO_ROOT, "app/globals.css");
 
 // A rule opener like `.public-prose .block-foo--variant > .child {` — we
-// extract the block name (block-foo).
-const LIGHT_OPENER = /^\s*(\.public-prose\s+\.(block-[a-z][\w-]*)[^{]*)\{/;
+// extract the block name (block-foo). Also matches the unified form
+// `:is(.ProseMirror, .public-prose) .block-foo` used by layout blocks
+// (columns, tabs, accordion, card-panel, section-header, block-columns)
+// so this audit catches editor-shared block CSS too.
+const PROSE_PREFIX = String.raw`(?:\.public-prose|:is\([^)]*\.public-prose[^)]*\))`;
+const LIGHT_OPENER = new RegExp(
+  String.raw`^\s*(${PROSE_PREFIX}\s+\.(block-[a-z][\w-]*)[^{]*)\{`,
+);
 // `.dark .public-prose .block-foo { ... }` — marks that this block has
-// at least one dark-mode override.
-const DARK_OPENER = /^\s*\.dark\s+\.public-prose\s+\.(block-[a-z][\w-]*)/;
+// at least one dark-mode override. Also accepts the unified prefix.
+const DARK_OPENER = new RegExp(
+  String.raw`^\s*\.dark\s+${PROSE_PREFIX}\s+\.(block-[a-z][\w-]*)`,
+);
 
 // "Extreme light" color tokens — likely to be invisible on a light page.
 const EXTREME_LIGHT_COLOR =
