@@ -20,6 +20,7 @@ import { z } from "zod";
 import { createBlockSchema } from "@/lib/domain/blocks/schema";
 import { registerBlock } from "@/lib/domain/blocks/registry";
 import { createBlockNodeView } from "@/lib/domain/blocks/node-view-factory";
+import { dataAttr } from "../lib/data-attr";
 
 const { schema: heroSchema, defaults: heroDefaults } = createBlockSchema("heroImage", {
   src: z.string().default("").describe("Image URL").meta({ uploadType: "image" }),
@@ -49,37 +50,23 @@ registerBlock({
 });
 
 function heroAttrs() {
-  const str = (key: string, fallback = "") => ({
-    default: fallback,
-    parseHTML: (el: Element) => el.getAttribute(`data-${key}`) ?? fallback,
-    renderHTML: (attrs: Record<string, unknown>) =>
-      attrs[key] ? { [`data-${key}`]: attrs[key] } : {},
-  });
-
   return {
     blockId: { default: null },
     blockType: { default: "heroImage" },
-    src: str("src"),
-    alt: str("alt"),
-    headline: str("headline"),
-    subheadline: str("subheadline"),
-    ctaText: str("cta-text"),
-    ctaUrl: str("cta-url"),
-    overlay: {
-      default: 40,
-      parseHTML: (el: Element) => parseInt(el.getAttribute("data-overlay") ?? "40", 10),
-      renderHTML: (attrs: Record<string, unknown>) => ({ "data-overlay": attrs.overlay }),
-    },
-    height: {
-      default: "lg",
-      parseHTML: (el: Element) => el.getAttribute("data-height") ?? "lg",
-      renderHTML: (attrs: Record<string, unknown>) => ({ "data-height": attrs.height }),
-    },
-    align: {
-      default: "center",
-      parseHTML: (el: Element) => el.getAttribute("data-align") ?? "center",
-      renderHTML: (attrs: Record<string, unknown>) => ({ "data-align": attrs.align }),
-    },
+    src: dataAttr("src"),
+    alt: dataAttr("alt"),
+    headline: dataAttr("headline"),
+    subheadline: dataAttr("subheadline"),
+    // Pre-R2 these used a local helper that accessed attrs by kebab-case
+    // key — so `attrs["cta-text"]` returned undefined and the data
+    // attribute was never emitted. The CTA link silently dropped from
+    // every hero-image block. dataAttr() fixes this by always reading
+    // attrs[camelKey] and emitting the kebab-derived data attribute.
+    ctaText: dataAttr("ctaText"),
+    ctaUrl: dataAttr("ctaUrl"),
+    overlay: dataAttr("overlay", { default: 40, parseAs: "number" }),
+    height: dataAttr("height", { default: "lg" }),
+    align: dataAttr("align", { default: "center" }),
   };
 }
 
