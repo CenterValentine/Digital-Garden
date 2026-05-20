@@ -12,6 +12,7 @@ import { TextSelection } from "@tiptap/pm/state";
 import { z } from "zod";
 import { createBlockSchema } from "@/lib/domain/blocks/schema";
 import { registerBlock } from "@/lib/domain/blocks/registry";
+import { blockIdAttr } from "@/lib/domain/blocks/data-attr";
 import { useBlockStore } from "@/state/block-store";
 import { useRightPanelCollapseStore } from "@/state/right-panel-collapse-store";
 import { openBlockInsertMenu, syncAttrsToPanel } from "@/lib/domain/blocks/node-view-factory";
@@ -87,7 +88,7 @@ export const Columns = Node.create({
 
   addAttributes() {
     return {
-      blockId: { default: null },
+      blockId: blockIdAttr,
       blockType: { default: "columns" },
       columnCount: {
         default: 2,
@@ -380,7 +381,7 @@ export const ServerColumns = Node.create({
 
   addAttributes() {
     return {
-      blockId: { default: null },
+      blockId: blockIdAttr,
       blockType: { default: "columns" },
       columnCount: {
         default: 2,

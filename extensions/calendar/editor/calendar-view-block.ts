@@ -4,6 +4,7 @@ import type { Node as ProseMirrorNode } from "@tiptap/pm/model";
 import { z } from "zod";
 import { createBlockNodeView } from "@/lib/domain/blocks/node-view-factory";
 import { registerBlock } from "@/lib/domain/blocks/registry";
+import { blockIdAttr } from "@/lib/domain/blocks/data-attr";
 import { createBlockSchema } from "@/lib/domain/blocks/schema";
 import { useCalendarStore } from "@/extensions/calendar/state/calendar-store";
 import { useLeftPanelViewStore } from "@/state/left-panel-view-store";
@@ -544,7 +545,7 @@ function renderCalendarViewBlock(
 }
 
 const calendarViewBlockAttributes = {
-  blockId: { default: null },
+  blockId: blockIdAttr,
   blockType: { default: "calendarViewBlock" },
   title: { default: "Calendar" },
   view: { default: "month" },

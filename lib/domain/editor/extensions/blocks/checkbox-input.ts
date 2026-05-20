@@ -11,6 +11,7 @@ import { Node, mergeAttributes } from "@tiptap/core";
 import { z } from "zod";
 import { createBlockSchema } from "@/lib/domain/blocks/schema";
 import { registerBlock } from "@/lib/domain/blocks/registry";
+import { blockIdAttr } from "@/lib/domain/blocks/data-attr";
 import { createBlockNodeView } from "@/lib/domain/blocks/node-view-factory";
 
 const { schema: checkboxInputSchema, defaults: checkboxInputDefaults } =
@@ -119,7 +120,7 @@ export const CheckboxInput = Node.create({
 
   addAttributes() {
     return {
-      blockId: { default: null },
+      blockId: blockIdAttr,
       blockType: { default: "checkboxInput" },
       label: { default: "", parseHTML: (el) => el.getAttribute("data-label") || "", renderHTML: (attrs) => attrs.label ? { "data-label": attrs.label } : {} },
       checked: { default: false, parseHTML: (el) => el.getAttribute("data-checked") === "true", renderHTML: (attrs) => attrs.checked ? { "data-checked": "true" } : {} },
@@ -157,7 +158,7 @@ export const ServerCheckboxInput = Node.create({
 
   addAttributes() {
     return {
-      blockId: { default: null },
+      blockId: blockIdAttr,
       blockType: { default: "checkboxInput" },
       label: { default: "", parseHTML: (el) => el.getAttribute("data-label") || "", renderHTML: (attrs) => attrs.label ? { "data-label": attrs.label } : {} },
       checked: { default: false, parseHTML: (el) => el.getAttribute("data-checked") === "true", renderHTML: (attrs) => attrs.checked ? { "data-checked": "true" } : {} },

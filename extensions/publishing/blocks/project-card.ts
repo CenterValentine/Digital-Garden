@@ -9,6 +9,7 @@ import { Node, mergeAttributes } from "@tiptap/core";
 import { z } from "zod";
 import { createBlockSchema } from "@/lib/domain/blocks/schema";
 import { registerBlock } from "@/lib/domain/blocks/registry";
+import { blockIdAttr } from "@/lib/domain/blocks/data-attr";
 import { createBlockNodeView } from "@/lib/domain/blocks/node-view-factory";
 import { dataAttr } from "@/lib/domain/blocks/data-attr";
 import { makeWrapAttrs } from "@/lib/domain/blocks/wrap-size";
@@ -50,7 +51,7 @@ registerBlock({
 
 function projectCardAttrs() {
   return {
-    blockId: { default: null },
+    blockId: blockIdAttr,
     blockType: { default: "projectCard" },
     title: dataAttr("title"),
     description: dataAttr("description"),

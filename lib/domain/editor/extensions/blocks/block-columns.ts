@@ -16,6 +16,7 @@ import { Node, mergeAttributes } from "@tiptap/core";
 import { z } from "zod";
 import { createBlockSchema } from "@/lib/domain/blocks/schema";
 import { registerBlock } from "@/lib/domain/blocks/registry";
+import { blockIdAttr } from "@/lib/domain/blocks/data-attr";
 import { openBlockInsertMenu, syncAttrsToPanel } from "@/lib/domain/blocks/node-view-factory";
 import { useBlockStore } from "@/state/block-store";
 import { useRightPanelCollapseStore } from "@/state/right-panel-collapse-store";
@@ -149,7 +150,7 @@ export const BlockColumns = Node.create({
 
   addAttributes() {
     return {
-      blockId: { default: null },
+      blockId: blockIdAttr,
       blockType: { default: "blockColumns" },
       columnCount: {
         default: 2,
@@ -409,7 +410,7 @@ export const ServerBlockColumns = Node.create({
 
   addAttributes() {
     return {
-      blockId: { default: null },
+      blockId: blockIdAttr,
       blockType: { default: "blockColumns" },
       columnCount: {
         default: 2,

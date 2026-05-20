@@ -62,4 +62,4 @@ export type { TipTapNode } from "./builder-to-tiptap";
 
 export { tiptapToBuilderNodes, registerBuilderBlockType } from "./tiptap-to-builder";
 
-export { dataAttr } from "./data-attr";
+export { dataAttr, blockIdAttr } from "./data-attr";

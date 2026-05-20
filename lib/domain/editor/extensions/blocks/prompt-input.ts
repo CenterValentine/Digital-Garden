@@ -12,6 +12,7 @@ import { Node, mergeAttributes } from "@tiptap/core";
 import { z } from "zod";
 import { createBlockSchema } from "@/lib/domain/blocks/schema";
 import { registerBlock } from "@/lib/domain/blocks/registry";
+import { blockIdAttr } from "@/lib/domain/blocks/data-attr";
 import { createBlockNodeView } from "@/lib/domain/blocks/node-view-factory";
 
 const { schema: promptInputSchema, defaults: promptInputDefaults } =
@@ -180,7 +181,7 @@ export const PromptInput = Node.create({
 
   addAttributes() {
     return {
-      blockId: { default: null },
+      blockId: blockIdAttr,
       blockType: { default: "promptInput" },
       label: { default: "", parseHTML: (el) => el.getAttribute("data-label") || "", renderHTML: (attrs) => attrs.label ? { "data-label": attrs.label } : {} },
       prompt: { default: "", parseHTML: (el) => el.getAttribute("data-prompt") || "", renderHTML: (attrs) => attrs.prompt ? { "data-prompt": attrs.prompt } : {} },
@@ -220,7 +221,7 @@ export const ServerPromptInput = Node.create({
 
   addAttributes() {
     return {
-      blockId: { default: null },
+      blockId: blockIdAttr,
       blockType: { default: "promptInput" },
       label: { default: "", parseHTML: (el) => el.getAttribute("data-label") || "", renderHTML: (attrs) => attrs.label ? { "data-label": attrs.label } : {} },
       prompt: { default: "", parseHTML: (el) => el.getAttribute("data-prompt") || "", renderHTML: (attrs) => attrs.prompt ? { "data-prompt": attrs.prompt } : {} },

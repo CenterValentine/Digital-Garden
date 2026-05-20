@@ -11,6 +11,7 @@ import { Node, mergeAttributes } from "@tiptap/core";
 import { z } from "zod";
 import { createBlockSchema } from "@/lib/domain/blocks/schema";
 import { registerBlock } from "@/lib/domain/blocks/registry";
+import { blockIdAttr } from "@/lib/domain/blocks/data-attr";
 import { createBlockNodeView } from "@/lib/domain/blocks/node-view-factory";
 
 const { schema: dateInputSchema, defaults: dateInputDefaults } =
@@ -103,7 +104,7 @@ export const DateInput = Node.create({
 
   addAttributes() {
     return {
-      blockId: { default: null },
+      blockId: blockIdAttr,
       blockType: { default: "dateInput" },
       label: { default: "", parseHTML: (el) => el.getAttribute("data-label") || "", renderHTML: (attrs) => attrs.label ? { "data-label": attrs.label } : {} },
       value: { default: "", parseHTML: (el) => el.getAttribute("data-value") || "", renderHTML: (attrs) => attrs.value ? { "data-value": attrs.value } : {} },
@@ -142,7 +143,7 @@ export const ServerDateInput = Node.create({
 
   addAttributes() {
     return {
-      blockId: { default: null },
+      blockId: blockIdAttr,
       blockType: { default: "dateInput" },
       label: { default: "", parseHTML: (el) => el.getAttribute("data-label") || "", renderHTML: (attrs) => attrs.label ? { "data-label": attrs.label } : {} },
       value: { default: "", parseHTML: (el) => el.getAttribute("data-value") || "", renderHTML: (attrs) => attrs.value ? { "data-value": attrs.value } : {} },

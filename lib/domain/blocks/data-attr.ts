@@ -16,7 +16,7 @@
  *
  * Usage:
  *   addAttributes: () => ({
- *     blockId: { default: null },
+ *     blockId: blockIdAttr,
  *     blockType: { default: "heroImage" },
  *     ctaText: dataAttr("ctaText"),
  *     ctaUrl: dataAttr("ctaUrl"),
@@ -80,6 +80,29 @@ function coerceValue<T>(raw: string | null, fallback: T, parseAs: "string" | "nu
  * only when the value is truthy — so empty strings don't pollute the
  * serialized HTML. Override behavior by passing a non-string `parseAs`.
  */
+/**
+ * Shared TipTap attr spec for the `blockId` attribute that every block
+ * carries on its base schema. Round-trips through `data-block-id` so
+ * the publisher's renderHTML emits the same id that the editor's
+ * NodeView already stamps onto its outer wrapper.
+ *
+ * Why this matters: prior to R5 Track 2, only the editor's NodeView
+ * added `data-block-id`. Publisher pages had no id on block outers, so
+ * deep links, analytics, and inline anchor targeting all had nothing
+ * to grab. Wiring the attr through `mergeAttributes(HTMLAttributes,
+ * ...)` (which every block's renderHTML already does for class +
+ * data-block-type) propagates the id automatically.
+ *
+ * Default is `null` — when blockId is unset (e.g. legacy content
+ * before the schema added it), no attribute is emitted.
+ */
+export const blockIdAttr = {
+  default: null as string | null,
+  parseHTML: (el: Element): string | null => el.getAttribute("data-block-id") || null,
+  renderHTML: (attrs: Record<string, unknown>): Record<string, unknown> =>
+    attrs.blockId ? { "data-block-id": attrs.blockId } : {},
+};
+
 export function dataAttr<T = string>(
   camelKey: string,
   options: DataAttrOptions<T> = {},

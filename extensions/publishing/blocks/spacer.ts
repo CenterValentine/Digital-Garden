@@ -11,6 +11,7 @@ import { Node, mergeAttributes } from "@tiptap/core";
 import { z } from "zod";
 import { createBlockSchema } from "@/lib/domain/blocks/schema";
 import { registerBlock } from "@/lib/domain/blocks/registry";
+import { blockIdAttr } from "@/lib/domain/blocks/data-attr";
 import { createBlockNodeView } from "@/lib/domain/blocks/node-view-factory";
 import { dataAttr } from "@/lib/domain/blocks/data-attr";
 
@@ -41,7 +42,7 @@ registerBlock({
 
 function spacerAttrs() {
   return {
-    blockId: { default: null },
+    blockId: blockIdAttr,
     blockType: { default: "spacer" },
     height: dataAttr("height", { default: "md" }),
   };

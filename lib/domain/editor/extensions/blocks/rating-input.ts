@@ -11,6 +11,7 @@ import { Node, mergeAttributes } from "@tiptap/core";
 import { z } from "zod";
 import { createBlockSchema } from "@/lib/domain/blocks/schema";
 import { registerBlock } from "@/lib/domain/blocks/registry";
+import { blockIdAttr } from "@/lib/domain/blocks/data-attr";
 import { createBlockNodeView } from "@/lib/domain/blocks/node-view-factory";
 
 const { schema: ratingInputSchema, defaults: ratingInputDefaults } =
@@ -111,7 +112,7 @@ export const RatingInput = Node.create({
 
   addAttributes() {
     return {
-      blockId: { default: null },
+      blockId: blockIdAttr,
       blockType: { default: "ratingInput" },
       label: { default: "", parseHTML: (el) => el.getAttribute("data-label") || "", renderHTML: (attrs) => attrs.label ? { "data-label": attrs.label } : {} },
       value: { default: 0, parseHTML: (el) => parseInt(el.getAttribute("data-value") || "0", 10), renderHTML: (attrs) => ({ "data-value": String(attrs.value) }) },
@@ -148,7 +149,7 @@ export const ServerRatingInput = Node.create({
 
   addAttributes() {
     return {
-      blockId: { default: null },
+      blockId: blockIdAttr,
       blockType: { default: "ratingInput" },
       label: { default: "", parseHTML: (el) => el.getAttribute("data-label") || "", renderHTML: (attrs) => attrs.label ? { "data-label": attrs.label } : {} },
       value: { default: 0, parseHTML: (el) => parseInt(el.getAttribute("data-value") || "0", 10), renderHTML: (attrs) => ({ "data-value": String(attrs.value) }) },

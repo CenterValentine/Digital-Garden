@@ -18,6 +18,7 @@ import type { Node as ProseMirrorNode } from "@tiptap/pm/model";
 import { z } from "zod";
 import { createBlockSchema } from "@/lib/domain/blocks/schema";
 import { registerBlock } from "@/lib/domain/blocks/registry";
+import { blockIdAttr } from "@/lib/domain/blocks/data-attr";
 import { useBlockStore } from "@/state/block-store";
 import { useRightPanelCollapseStore } from "@/state/right-panel-collapse-store";
 import {
@@ -160,7 +161,7 @@ export const Tabs = Node.create({
 
   addAttributes() {
     return {
-      blockId: { default: null },
+      blockId: blockIdAttr,
       blockType: { default: "tabs" },
       activeTab: {
         default: 0,
@@ -918,7 +919,7 @@ export const ServerTabs = Node.create({
 
   addAttributes() {
     return {
-      blockId: { default: null },
+      blockId: blockIdAttr,
       blockType: { default: "tabs" },
       activeTab: {
         default: 0,

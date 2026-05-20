@@ -13,6 +13,7 @@ import { TextSelection } from "@tiptap/pm/state";
 import { z } from "zod";
 import { createBlockSchema } from "@/lib/domain/blocks/schema";
 import { registerBlock } from "@/lib/domain/blocks/registry";
+import { blockIdAttr } from "@/lib/domain/blocks/data-attr";
 import { useBlockStore } from "@/state/block-store";
 import { useRightPanelCollapseStore } from "@/state/right-panel-collapse-store";
 import {
@@ -184,7 +185,7 @@ export const Accordion = Node.create({
 
   addAttributes() {
     return {
-      blockId: { default: null },
+      blockId: blockIdAttr,
       blockType: { default: "accordion" },
       headerText: {
         default: "",
@@ -694,7 +695,7 @@ export const ServerAccordion = Node.create({
 
   addAttributes() {
     return {
-      blockId: { default: null },
+      blockId: blockIdAttr,
       blockType: { default: "accordion" },
       headerText: {
         default: "",

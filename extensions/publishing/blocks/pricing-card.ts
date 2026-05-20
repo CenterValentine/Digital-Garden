@@ -20,6 +20,7 @@ import { Node, mergeAttributes } from "@tiptap/core";
 import { z } from "zod";
 import { createBlockSchema } from "@/lib/domain/blocks/schema";
 import { registerBlock } from "@/lib/domain/blocks/registry";
+import { blockIdAttr } from "@/lib/domain/blocks/data-attr";
 import { createBlockNodeView } from "@/lib/domain/blocks/node-view-factory";
 import {
   BACKGROUND_SCHEMA_SHAPE,
@@ -74,7 +75,7 @@ registerBlock({
 
 function pricingAttrs() {
   return {
-    blockId: { default: null },
+    blockId: blockIdAttr,
     blockType: { default: "pricingCard" },
     tierName: {
       default: "Pro",
