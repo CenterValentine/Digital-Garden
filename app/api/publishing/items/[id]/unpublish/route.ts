@@ -9,6 +9,7 @@ import { prisma } from "@/lib/database/client";
 import { logger } from "@/lib/core/logger";
 import { withRouteTrace } from "@/lib/core/logger/route-trace";
 import { withSpan } from "@/lib/core/logger/span";
+import { invalidateTenantCache } from "@/lib/domain/tenancy/cache";
 
 export async function POST(
   req: NextRequest,
@@ -26,7 +27,7 @@ export async function POST(
         { summary: "publishing item unpublish", attrs: { public_item_id: id } },
         async (span) => {
           const item = await prisma.publicItem.findFirst({
-            where: { id, ownerId: session.user.id, deletedAt: null },
+            where: { id, tenant: { ownerId: session.user.id }, deletedAt: null },
           });
 
           if (!item) {
@@ -57,6 +58,10 @@ export async function POST(
           });
 
           span.attr("prev_state", item.state).attr("new_state", "unpublished");
+
+          // Item disappears from the public surface. Invalidate both
+          // the tenant's home (listing change) and the item's URL.
+          await invalidateTenantCache({ type: "item", itemId: id });
 
           return NextResponse.json({ ok: true });
         },

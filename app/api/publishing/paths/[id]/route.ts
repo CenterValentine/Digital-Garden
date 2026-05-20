@@ -10,6 +10,7 @@ import { logger } from "@/lib/core/logger";
 import { withRouteTrace } from "@/lib/core/logger/route-trace";
 import { withSpan } from "@/lib/core/logger/span";
 import { spanPayload } from "@/lib/core/logger/span-payload";
+import { invalidateTenantCache } from "@/lib/domain/tenancy/cache";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -22,8 +23,12 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       { layer: "content", name: "publishing:path_update" },
       { summary: "publishing path update", attrs: { path_id: id } },
       async (span) => {
-        const path = await prisma.publicPath.findUnique({ where: { id } });
-        if (!path || path.ownerId !== session.user.id) {
+        // Authorize via tenant ownership: the user can update any path
+        // on a tenant they own.
+        const path = await prisma.publicPath.findFirst({
+          where: { id, tenant: { ownerId: session.user.id } },
+        });
+        if (!path) {
           logger.warn({
             layer: "content",
             event: "publishing_path_update:rejected",
@@ -51,6 +56,10 @@ export async function PATCH(req: NextRequest, { params }: Params) {
           },
         });
 
+        // Title/description/icon changes ripple through listings; slug
+        // change additionally moves every item under this path to a new URL.
+        await invalidateTenantCache({ type: "path", pathId: id });
+
         return NextResponse.json(updated);
       },
     );
@@ -66,8 +75,8 @@ export async function DELETE(req: NextRequest, { params }: Params) {
       { layer: "content", name: "publishing:path_delete" },
       { summary: "publishing path delete", attrs: { path_id: id } },
       async (span) => {
-        const path = await prisma.publicPath.findUnique({
-          where: { id },
+        const path = await prisma.publicPath.findFirst({
+          where: { id, tenant: { ownerId: session.user.id } },
           include: {
             _count: {
               select: {
@@ -78,7 +87,7 @@ export async function DELETE(req: NextRequest, { params }: Params) {
           },
         });
 
-        if (!path || path.ownerId !== session.user.id) {
+        if (!path) {
           logger.warn({
             layer: "content",
             event: "publishing_path_delete:rejected",
@@ -117,8 +126,22 @@ export async function DELETE(req: NextRequest, { params }: Params) {
           );
         }
 
+        // Capture tenantId BEFORE the delete so the post-mutation
+        // invalidation can find the right scope (the row is gone afterwards).
+        const tenantIdForInvalidate = await prisma.publicPath
+          .findUnique({ where: { id }, select: { tenantId: true } })
+          .then((p) => p?.tenantId);
+
         await prisma.publicPath.delete({ where: { id } });
         span.attr("deleted_slug", path.slug);
+
+        if (tenantIdForInvalidate) {
+          await invalidateTenantCache({
+            type: "tenant",
+            tenantId: tenantIdForInvalidate,
+          });
+        }
+
         return new NextResponse(null, { status: 204 });
       },
     );

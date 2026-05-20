@@ -10,6 +10,8 @@ import { logger } from "@/lib/core/logger";
 import { withRouteTrace } from "@/lib/core/logger/route-trace";
 import { withSpan } from "@/lib/core/logger/span";
 import { spanPayload } from "@/lib/core/logger/span-payload";
+import { resolveWritableTenantId, TenantAuthError } from "@/lib/domain/tenancy/api";
+import { invalidateTenantCache } from "@/lib/domain/tenancy/cache";
 
 export async function GET(req: NextRequest) {
   return withRouteTrace(req, { route: "/api/publishing/items" }, async () => {
@@ -32,9 +34,13 @@ export async function GET(req: NextRequest) {
       { layer: "content", name: "publishing:list" },
       { summary: "publishing items list", attrs: { content_node_id: contentNodeId } },
       async (span) => {
+        // Scope by tenant ownership rather than ownerId so that listing
+        // an item linked to a ContentNode finds copies on any tenant the
+        // user owns (a node can be published to multiple of the user's
+        // sites — one PublicItem per site).
         const items = await prisma.publicItem.findMany({
           where: {
-            ownerId: session.user.id,
+            tenant: { ownerId: session.user.id },
             contentNodeId,
             deletedAt: null,
           },
@@ -86,8 +92,12 @@ export async function POST(req: NextRequest) {
       slug: string;
       payloadType: string;
       publicTitle?: string;
+      // Optional. If omitted, the item is created on the user's primary
+      // tenant. Multi-tenant clients (Phase 6b CreatePublicItemDialog
+      // picker) pass the chosen tenant explicitly.
+      tenantId?: string;
     };
-    const { contentNodeId, pathId, slug, payloadType, publicTitle } = body;
+    const { contentNodeId, pathId, slug, payloadType, publicTitle, tenantId } = body;
 
     if (!contentNodeId || !pathId || !slug || !payloadType) {
       logger.warn({
@@ -111,6 +121,23 @@ export async function POST(req: NextRequest) {
       async (span) => {
         await spanPayload(span, "incoming_body", body);
 
+        // Resolve destination tenant (explicit body.tenantId or user's primary).
+        let destTenantId: string;
+        try {
+          destTenantId = await resolveWritableTenantId(session.user.id, tenantId);
+        } catch (err) {
+          if (err instanceof TenantAuthError) {
+            logger.warn({
+              layer: "content",
+              event: "publishing_item_create:rejected",
+              summary: err.message,
+              attrs: { reason: err.code, requested_tenant_id: tenantId ?? "(primary)" },
+            });
+            return NextResponse.json({ error: err.message }, { status: err.status });
+          }
+          throw err;
+        }
+
         // Verify the ContentNode belongs to this user
         const node = await prisma.contentNode.findFirst({
           where: { id: contentNodeId, ownerId: session.user.id },
@@ -128,6 +155,7 @@ export async function POST(req: NextRequest) {
         const item = await prisma.publicItem.create({
           data: {
             ownerId: session.user.id,
+            tenantId: destTenantId,
             contentNodeId,
             pathId,
             slug,
@@ -173,6 +201,11 @@ export async function POST(req: NextRequest) {
 
         span.attr("public_item_id", item.id);
         await spanPayload(span, "created_item", item);
+
+        // New item created as draft — listing on tenant's home doesn't
+        // change until it's published, but we invalidate the tenant tag
+        // anyway so the IDE's data fetches stay consistent.
+        await invalidateTenantCache({ type: "tenant", tenantId: destTenantId });
 
         return NextResponse.json(item, { status: 201 });
       },

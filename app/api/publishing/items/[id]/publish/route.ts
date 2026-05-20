@@ -9,6 +9,7 @@ import { prisma } from "@/lib/database/client";
 import { logger } from "@/lib/core/logger";
 import { withRouteTrace } from "@/lib/core/logger/route-trace";
 import { withSpan } from "@/lib/core/logger/span";
+import { invalidateTenantCache } from "@/lib/domain/tenancy/cache";
 import { spanPayload } from "@/lib/core/logger/span-payload";
 import crypto from "crypto";
 
@@ -38,7 +39,7 @@ export async function POST(
         { summary: "publishing item publish", attrs: { public_item_id: id } },
         async (span) => {
           const item = await prisma.publicItem.findFirst({
-            where: { id, ownerId: session.user.id, deletedAt: null },
+            where: { id, tenant: { ownerId: session.user.id }, deletedAt: null },
             include: {
               workingRevision: true,
               contentNode: { include: { notePayload: true } },
@@ -124,6 +125,10 @@ export async function POST(
             note,
             publishedAt: now.toISOString(),
           });
+
+          // Publish made the item visible (or refreshed an existing
+          // publication). Invalidate the tenant's home + the item's URL.
+          await invalidateTenantCache({ type: "item", itemId: id });
 
           return NextResponse.json({ ok: true, revisionId: revision.id });
         },
