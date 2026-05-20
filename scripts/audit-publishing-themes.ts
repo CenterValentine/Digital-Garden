@@ -102,9 +102,117 @@ function parseSurfaceFlag(): readonly Surface[] {
   process.exit(2);
 }
 
+function parseModeFlag(): "theme-coverage" | "unification-candidates" {
+  const arg = process.argv.find((a) => a.startsWith("--mode="));
+  if (!arg) return "theme-coverage";
+  const value = arg.slice("--mode=".length);
+  if (value === "theme-coverage" || value === "unification-candidates") return value;
+  console.error(`Unknown mode "${value}". Use theme-coverage|unification-candidates.`);
+  process.exit(2);
+}
+
+/**
+ * Mode: unification-candidates
+ *
+ * After R5 Step 1, the editor's outer block class is kebab-case and
+ * matches the publisher's. CSS rules using the unified prefix
+ * `:is(.ProseMirror, .public-prose) .block-X` apply to both surfaces.
+ * But many existing rules still use `.public-prose .block-X` (publisher-
+ * only) for blocks that ARE rendered in the editor too. Those are
+ * migration candidates: switching to the unified prefix would close
+ * the editor/publisher visual gap for that styling.
+ *
+ * A candidate is a publisher-only rule on a block that has at least
+ * one editor-side rule (either `.ProseMirror .block-X` or the unified
+ * prefix). The rule's properties are NOT inspected — caller triages.
+ *
+ * Reduces the noise vs. flagging every publisher-only rule: blocks
+ * that ONLY appear in publisher contexts (no editor-side coverage at
+ * all) are correctly excluded.
+ */
+function runUnificationAudit(lines: string[]): void {
+  type BlockSurfaceTrack = {
+    publisherOnly: Array<{ line: number; selector: string }>;
+    editorOnly: number; // count
+    unified: number; // count
+  };
+  const tracking = new Map<string, BlockSurfaceTrack>();
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]!;
+    const lightMatch = line.match(LIGHT_OPENER);
+    if (!lightMatch) continue;
+    const selector = lightMatch[1]!.trim();
+    const block = lightMatch[2]!;
+    const surfaces = surfacesForSelector(selector);
+    const entry =
+      tracking.get(block) ??
+      ({ publisherOnly: [], editorOnly: 0, unified: 0 } as BlockSurfaceTrack);
+    if (surfaces.length === 2) {
+      entry.unified += 1;
+    } else if (surfaces[0] === "publisher") {
+      entry.publisherOnly.push({ line: i + 1, selector });
+    } else if (surfaces[0] === "editor") {
+      entry.editorOnly += 1;
+    }
+    tracking.set(block, entry);
+  }
+
+  const candidates: Array<{ block: string; line: number; selector: string }> = [];
+  for (const [block, entry] of tracking) {
+    const hasEditorCoverage = entry.editorOnly > 0 || entry.unified > 0;
+    if (!hasEditorCoverage) continue;
+    for (const rule of entry.publisherOnly) {
+      candidates.push({ block, ...rule });
+    }
+  }
+
+  if (candidates.length === 0) {
+    console.log(
+      "\nNo unification candidates found. Every publisher-only rule on a block with editor coverage has been migrated.\n",
+    );
+    return;
+  }
+
+  console.log(
+    `\nUnification candidates: ${candidates.length} publisher-only rule(s) on ${new Set(candidates.map((c) => c.block)).size} block(s) that also have editor-side coverage. Switching the prefix to \`:is(.ProseMirror, .public-prose)\` would close the editor/publisher visual gap.\n`,
+  );
+
+  const grouped = new Map<string, typeof candidates>();
+  for (const c of candidates) {
+    const list = grouped.get(c.block) ?? [];
+    list.push(c);
+    grouped.set(c.block, list);
+  }
+
+  for (const block of Array.from(grouped.keys()).sort()) {
+    console.log(`  ${block}`);
+    for (const c of grouped.get(block)!) {
+      console.log(`    L${c.line}: ${c.selector}`);
+    }
+    console.log("");
+  }
+
+  console.log(
+    "Each candidate is a `.public-prose .block-X` rule whose block ALSO\n" +
+      "has at least one editor-side rule (`.ProseMirror .block-X` or the\n" +
+      "unified `:is(...)` prefix). Some publisher-only rules are\n" +
+      "intentional (reveal animations, publisher-specific hover, etc.).\n" +
+      "Triage per rule — if it's pure visual styling that should look the\n" +
+      "same in the editor, switch the prefix to the unified form.\n",
+  );
+}
+
 function main(): void {
-  const requested = parseSurfaceFlag();
+  const mode = parseModeFlag();
   const lines = readFileSync(CSS_PATH, "utf8").split("\n");
+
+  if (mode === "unification-candidates") {
+    runUnificationAudit(lines);
+    return;
+  }
+
+  const requested = parseSurfaceFlag();
 
   // Per-surface dark coverage: blockName -> set of surfaces with .dark rules.
   const darkBlockCoverage = new Map<string, Set<Surface>>();
