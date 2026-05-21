@@ -15,7 +15,7 @@
  * render this component at all. For now it's always shown.
  */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 
 type ThemePreference = "light" | "dark" | "system";
 
@@ -79,14 +79,39 @@ const ICONS: Record<ThemePreference, string> = {
   dark: "☾",
 };
 
-export function PublicThemeToggle() {
-  const [pref, setPref] = useState<ThemePreference>("system");
-  const [mounted, setMounted] = useState(false);
+// Module-level subscription so the same handler doesn't duplicate per render.
+function subscribePreference(cb: () => void): () => void {
+  if (typeof window === "undefined") return () => {};
+  // Storage events fire when ANOTHER tab writes to localStorage. Same-tab
+  // writes are pushed via a custom "publictheme:change" event from cycle().
+  window.addEventListener("storage", cb);
+  window.addEventListener("publictheme:change", cb);
+  return () => {
+    window.removeEventListener("storage", cb);
+    window.removeEventListener("publictheme:change", cb);
+  };
+}
 
-  useEffect(() => {
-    setPref(readPreference());
-    setMounted(true);
-  }, []);
+export function PublicThemeToggle() {
+  // useSyncExternalStore is the React-recommended way to subscribe to
+  // browser state (localStorage). It handles SSR via the third arg
+  // (server snapshot) and avoids the "synchronous setState in effect"
+  // pattern the React Compiler flags. The bump counter forces
+  // re-reads on cycle() without the snapshot needing a stable cache.
+  const [bump, setBump] = useState(0);
+  const pref = useSyncExternalStore(
+    subscribePreference,
+    () => {
+      void bump; // keep the snapshot tied to the bump counter
+      return readPreference();
+    },
+    () => "system" as ThemePreference,
+  );
+  const mounted = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  );
 
   // When the user is in "system" mode, follow OS changes at runtime too.
   useEffect(() => {
@@ -102,12 +127,14 @@ export function PublicThemeToggle() {
   }, [pref]);
 
   const cycle = useCallback(() => {
-    setPref((current) => {
-      const next = ORDER[(ORDER.indexOf(current) + 1) % ORDER.length] ?? "system";
-      writePreference(next);
-      applyClass(next);
-      return next;
-    });
+    const current = readPreference();
+    const next = ORDER[(ORDER.indexOf(current) + 1) % ORDER.length] ?? "system";
+    writePreference(next);
+    applyClass(next);
+    setBump((b) => b + 1);
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new Event("publictheme:change"));
+    }
   }, []);
 
   // Hide until mounted — avoids a hydration flash where the button shows
