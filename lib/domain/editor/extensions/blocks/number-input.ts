@@ -8,6 +8,7 @@
  */
 
 import { Node, mergeAttributes } from "@tiptap/core";
+import type { DOMOutputSpec } from "@tiptap/pm/model";
 import { z } from "zod";
 import { createBlockSchema } from "@/lib/domain/blocks/schema";
 import { registerBlock } from "@/lib/domain/blocks/registry";
@@ -158,5 +159,28 @@ export const ServerNumberInput = Node.create({
   },
 
   parseHTML() { return [{ tag: 'div[data-block-type="numberInput"]' }]; },
-  renderHTML({ HTMLAttributes }) { return ["div", mergeAttributes(HTMLAttributes, { class: "block-number-input", "data-block-type": "numberInput" })]; },
+  renderHTML({ node, HTMLAttributes }) {
+    // Numbers always render: 0 is ambiguous (default vs. explicit zero),
+    // so we don't apply the empty-omit rule. Min/max bracket the input.
+    const value = Number(node.attrs.value ?? 0);
+    const label = String(node.attrs.label ?? "");
+    const unit = String(node.attrs.unit ?? "");
+    const min = Number(node.attrs.min ?? 0);
+    const max = Number(node.attrs.max ?? 100);
+    const step = Number(node.attrs.step ?? 1);
+    const inputEl: DOMOutputSpec = ["input", {
+      class: "block-form-control",
+      type: "number",
+      value: String(value),
+      min: String(min),
+      max: String(max),
+      step: String(step),
+    }];
+    const outerAttrs = mergeAttributes(HTMLAttributes, { class: "block-number-input block-form-rendered", "data-block-type": "numberInput" });
+    const children: DOMOutputSpec[] = [];
+    if (label) children.push(["label", { class: "block-form-label" }, label]);
+    children.push(inputEl);
+    if (unit) children.push(["span", { class: "block-form-unit" }, unit]);
+    return ["div", outerAttrs, ...children] as DOMOutputSpec;
+  },
 });

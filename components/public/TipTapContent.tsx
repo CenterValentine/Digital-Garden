@@ -39,7 +39,7 @@ function slugifyAnchor(text: string): string {
 }
 
 /**
- * Three-pass DOM post-processor:
+ * Four-pass DOM post-processor:
  * 1. Assign unique `id` attributes to every heading so anchor links resolve.
  * 2. Fill each `.block-toc-list-placeholder` with the actual <ol> list,
  *    respecting the TOC block's `data-max-depth` attribute.
@@ -47,6 +47,10 @@ function slugifyAnchor(text: string): string {
  *    child panel's `data-label`, and mark the active panel/button per
  *    `data-active-tab`. (Panels can't compute their own active state in
  *    renderHTML because they don't see their parent's attrs.)
+ * 4. Strip elements marked `data-form-empty="true"`. Form-input blocks
+ *    (text-input, date-input, select-input, etc.) emit this marker when
+ *    their value is empty so the publisher omits them entirely — keeping
+ *    the published output clean of "unfilled form" artifacts.
  */
 function postProcessDom(container: HTMLElement, jsdomDocument: Document): void {
   // Pass 1 — heading IDs
@@ -118,6 +122,12 @@ function postProcessDom(container: HTMLElement, jsdomDocument: Document): void {
     });
 
     tabsEl.insertBefore(bar, content);
+  });
+
+  // Pass 4 — Strip empty form-input blocks (text-input, date-input, etc.)
+  // Policy: forms with no value contribute nothing to the published page.
+  container.querySelectorAll<HTMLElement>('[data-form-empty="true"]').forEach((el) => {
+    el.remove();
   });
 }
 

@@ -8,6 +8,7 @@
  */
 
 import { Node, mergeAttributes } from "@tiptap/core";
+import type { DOMOutputSpec } from "@tiptap/pm/model";
 import { z } from "zod";
 import { createBlockSchema } from "@/lib/domain/blocks/schema";
 import { registerBlock } from "@/lib/domain/blocks/registry";
@@ -153,5 +154,17 @@ export const ServerDateInput = Node.create({
   },
 
   parseHTML() { return [{ tag: 'div[data-block-type="dateInput"]' }]; },
-  renderHTML({ HTMLAttributes }) { return ["div", mergeAttributes(HTMLAttributes, { class: "block-date-input", "data-block-type": "dateInput" })]; },
+  renderHTML({ node, HTMLAttributes }) {
+    const value = String(node.attrs.value ?? "");
+    const label = String(node.attrs.label ?? "");
+    const includeTime = Boolean(node.attrs.includeTime);
+    if (!value) {
+      return ["div", mergeAttributes(HTMLAttributes, { class: "block-date-input", "data-block-type": "dateInput", "data-form-empty": "true" })];
+    }
+    const inputEl: DOMOutputSpec = ["input", { class: "block-form-control", type: includeTime ? "datetime-local" : "date", value }];
+    const outerAttrs = mergeAttributes(HTMLAttributes, { class: "block-date-input block-form-rendered", "data-block-type": "dateInput" });
+    return label
+      ? ["div", outerAttrs, ["label", { class: "block-form-label" }, label], inputEl]
+      : ["div", outerAttrs, inputEl];
+  },
 });
