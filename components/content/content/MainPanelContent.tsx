@@ -13,6 +13,7 @@ import { usePathname } from "next/navigation";
 import { AlertTriangle } from "lucide-react";
 import { ToolSurfaceProvider } from "@/lib/domain/tools";
 import { clientLogger } from "@/lib/core/logger/client";
+import { tracedFetch } from "@/lib/core/logger/client-fetch";
 import { ContentToolbar } from "../toolbar";
 import { ToolDebugPanel } from "../toolbar/ToolDebugPanel";
 import type { ContentType as ToolContentType } from "@/lib/domain/tools";
@@ -343,7 +344,7 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
 
       try {
         if (isPageTemplateTab) {
-          const response = await fetch(
+          const response = await tracedFetch(
             `/api/content/page-templates/${selectedContentId}`,
             {
               credentials: "include",
@@ -419,7 +420,7 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
           return;
         }
 
-        const response = await fetch(`/api/content/content/${selectedContentId}`, {
+        const response = await tracedFetch(`/api/content/content/${selectedContentId}`, {
           credentials: "include",
         });
 
@@ -707,7 +708,7 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
       setHasUnsavedChanges(true);
 
       try {
-        const response = await fetch(
+        const response = await tracedFetch(
           isPageTemplateTab
             ? `/api/content/page-templates/${selectedContentId}`
             : `/api/content/content/${selectedContentId}`,
@@ -804,7 +805,7 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
   const handleWikiLinkClick = useCallback(
     async (targetTitle: string) => {
       try {
-        const response = await fetch(`/api/content/content?search=${encodeURIComponent(targetTitle)}`, {
+        const response = await tracedFetch(`/api/content/content?search=${encodeURIComponent(targetTitle)}`, {
           credentials: "include",
         });
 
@@ -855,7 +856,7 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
   const fetchNotesForWikiLink = useCallback(
     async (query: string) => {
       try {
-        const response = await fetch(`/api/content/content?search=${encodeURIComponent(query)}`, {
+        const response = await tracedFetch(`/api/content/content?search=${encodeURIComponent(query)}`, {
           credentials: "include",
         });
 
@@ -897,7 +898,7 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
   const fetchTags = useCallback(
     async (query: string) => {
       try {
-        const response = await fetch(`/api/content/tags?search=${encodeURIComponent(query)}`, {
+        const response = await tracedFetch(`/api/content/tags?search=${encodeURIComponent(query)}`, {
           credentials: "include",
         });
 
@@ -947,7 +948,7 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
         const params = new URLSearchParams();
         params.set("q", query);
         params.set("limit", "20");
-        const response = await fetch(`/api/people/search?${params.toString()}`, {
+        const response = await tracedFetch(`/api/people/search?${params.toString()}`, {
           credentials: "include",
         });
 
@@ -994,7 +995,7 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
   const handlePersonMentionClick = useCallback(
     async (personId: string) => {
       try {
-        const response = await fetch(`/api/people/persons/${personId}`, {
+        const response = await tracedFetch(`/api/people/persons/${personId}`, {
           credentials: "include",
         });
         const result = await response.json();
@@ -1045,7 +1046,7 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
   const createTag = useCallback(
     async (tagName: string) => {
       try {
-        const response = await fetch('/api/content/tags', {
+        const response = await tracedFetch('/api/content/tags', {
           method: 'POST',
           credentials: "include",
           headers: {
@@ -1111,7 +1112,7 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
   const handleExportMarkdown = useCallback(async () => {
     if (!selectedContentId) return;
     try {
-      const response = await fetch(`/api/content/export/${selectedContentId}`, {
+      const response = await tracedFetch(`/api/content/export/${selectedContentId}`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -1171,7 +1172,7 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
       }
 
       try {
-        const response = await fetch("/api/content/import", {
+        const response = await tracedFetch("/api/content/import", {
           method: "POST",
           credentials: "include",
           body: formData,
@@ -1249,7 +1250,7 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
     updateContentTab(selectedContentId, { title: newTitle });
 
     try {
-      const response = await fetch(
+      const response = await tracedFetch(
         isPageTemplateTab
           ? `/api/content/page-templates/${selectedContentId}`
           : `/api/content/content/${selectedContentId}`,
@@ -1303,7 +1304,7 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
 
     setIsShareGrantsLoading(true);
     try {
-      const response = await fetch(
+      const response = await tracedFetch(
         `/api/collaboration/grants?contentId=${encodeURIComponent(selectedContentId)}`,
         {
           method: "GET",
@@ -1403,7 +1404,7 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
       setContentIsPublished(nextPublished);
 
       try {
-        const response = await fetch(`/api/content/content/${selectedContentId}`, {
+        const response = await tracedFetch(`/api/content/content/${selectedContentId}`, {
           method: "PATCH",
           credentials: "include",
           headers: { "Content-Type": "application/json" },
@@ -1457,7 +1458,7 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
       try {
         const results = await Promise.all(
           normalizedEmails.map(async (targetEmail) => {
-            const response = await fetch("/api/collaboration/grants", {
+            const response = await tracedFetch("/api/collaboration/grants", {
               method: "POST",
               credentials: "include",
               headers: { "Content-Type": "application/json" },
@@ -1501,7 +1502,7 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
 
       setIsSharing(true);
       try {
-        const response = await fetch("/api/collaboration/grants", {
+        const response = await tracedFetch("/api/collaboration/grants", {
           method: "DELETE",
           credentials: "include",
           headers: { "Content-Type": "application/json" },
