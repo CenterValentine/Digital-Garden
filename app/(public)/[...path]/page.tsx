@@ -1,5 +1,6 @@
 import { notFound, permanentRedirect } from "next/navigation";
 import { prisma } from "@/lib/database/client";
+import { withPageTrace } from "@/lib/core/logger";
 
 // Single site owner — resolved at build/runtime from env.
 // In a multi-tenant future this comes from the request host.
@@ -17,6 +18,13 @@ export default async function PublicCatchAll({
   const { path: segments } = await params;
   const fullPath = "/" + segments.join("/");
 
+  return withPageTrace(
+    { route: "/(public)/[...path]", attrs: { path: fullPath } },
+    () => renderPublic(fullPath, segments),
+  );
+}
+
+async function renderPublic(fullPath: string, segments: string[]) {
   if (!SITE_OWNER_ID) {
     // Not configured — show nothing publicly
     notFound();

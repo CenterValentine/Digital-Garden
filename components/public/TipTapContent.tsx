@@ -16,7 +16,7 @@ import { DOMSerializer, Node, Fragment } from "@tiptap/pm/model";
 import { getSchema } from "@tiptap/core";
 import { JSDOM } from "jsdom";
 import { getServerExtensions } from "@/lib/domain/editor/extensions-server";
-import { logger } from "@/lib/core/logger";
+import { getActiveTrace, logger, withSpan } from "@/lib/core/logger";
 import { prisma } from "@/lib/database/client";
 import type { JSONContent } from "@tiptap/core";
 
@@ -58,40 +58,64 @@ function collectVisualizationContentIds(json: JSONContent): {
 /**
  * Batch-fetch visualization sources for every block in this document.
  * One query per engine type. Returns a Map keyed by contentId.
+ *
+ * Wrapped in a span when called from a traced context (the public page
+ * route now opens one via withPageTrace). When invoked from contexts
+ * without a trace (build-time prerender, scripts), the span call is
+ * skipped — bare DB query, logger.warn fallback on failure.
  */
 async function fetchVisualizationSources(
   json: JSONContent,
 ): Promise<VisualizationSourceMap> {
-  const map: VisualizationSourceMap = new Map();
   const { mermaid, excalidraw } = collectVisualizationContentIds(json);
-  if (mermaid.length === 0 && excalidraw.length === 0) return map;
-
-  try {
-    const rows = await prisma.visualizationPayload.findMany({
-      where: { contentId: { in: [...mermaid, ...excalidraw] } },
-      select: { contentId: true, engine: true, data: true },
-    });
-    for (const row of rows) {
-      if (row.engine === "mermaid") {
-        const source = (row.data as { source?: string })?.source ?? "";
-        map.set(row.contentId, { mermaidSource: source });
-      } else if (row.engine === "excalidraw") {
-        // cachedSvg lives on row.data.cachedSvg — populated by the editor
-        // save flow (deferred work). Until that lands, this is absent
-        // and the publisher renders a placeholder.
-        const cachedSvg = (row.data as { cachedSvg?: string })?.cachedSvg;
-        map.set(row.contentId, { cachedSvg });
-      }
-    }
-  } catch (err) {
-    logger.warn({
-      layer: "editor",
-      event: "public_render_visualization_fetch:failed",
-      summary: "could not fetch visualization sources; diagrams will render empty",
-      error: err,
-    });
+  if (mermaid.length === 0 && excalidraw.length === 0) {
+    return new Map();
   }
-  return map;
+
+  const doFetch = async (): Promise<VisualizationSourceMap> => {
+    const map: VisualizationSourceMap = new Map();
+    try {
+      const rows = await prisma.visualizationPayload.findMany({
+        where: { contentId: { in: [...mermaid, ...excalidraw] } },
+        select: { contentId: true, engine: true, data: true },
+      });
+      for (const row of rows) {
+        if (row.engine === "mermaid") {
+          const source = (row.data as { source?: string })?.source ?? "";
+          map.set(row.contentId, { mermaidSource: source });
+        } else if (row.engine === "excalidraw") {
+          const cachedSvg = (row.data as { cachedSvg?: string })?.cachedSvg;
+          map.set(row.contentId, { cachedSvg });
+        }
+      }
+    } catch (err) {
+      logger.warn({
+        layer: "editor",
+        event: "public_render_visualization_fetch:failed",
+        summary: "could not fetch visualization sources; diagrams will render empty",
+        error: err,
+      });
+    }
+    return map;
+  };
+
+  // Span only when trace context exists — withSpan throws without one.
+  if (!getActiveTrace()) return doFetch();
+  return withSpan(
+    { layer: "editor", name: "publisher_visualization_fetch" },
+    {
+      summary: `fetch ${mermaid.length + excalidraw.length} visualization source(s)`,
+      attrs: {
+        mermaid_count: mermaid.length,
+        excalidraw_count: excalidraw.length,
+      },
+    },
+    async (span) => {
+      const result = await doFetch();
+      span.attr("rows_returned", result.size);
+      return result;
+    },
+  );
 }
 
 // Ensure every node has a content array — ProseMirror fromJSON is tolerant
