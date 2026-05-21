@@ -48,6 +48,23 @@ export const PUBLISHING_FIXTURE_BLOCKS = [
   "columns",
   "section-header",
   "tabs",
+  // Editor-only blocks (in lib/domain/editor/extensions/blocks/) — added
+  // 2026-05-20 to lock in publisher render parity. Form inputs use
+  // *filled* fixtures (empty state is policy-omitted from publisher and
+  // doesn't need a snapshot). mermaid-block and excalidraw-block are
+  // deliberately excluded — their server render emits an empty div
+  // pending a server-side diagram pipeline.
+  "text-input",
+  "date-input",
+  "number-input",
+  "rating-input",
+  "select-input",
+  "checkbox-input",
+  "prompt-input",
+  "divider",
+  "pull-quote",
+  "stopwatch",
+  "habit-tracker",
 ] as const;
 
 export type PublishingFixtureBlock = (typeof PUBLISHING_FIXTURE_BLOCKS)[number];

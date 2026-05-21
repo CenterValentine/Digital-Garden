@@ -1,0 +1,24 @@
+{
+  "type": "doc",
+  "content": [
+    {
+      "type": "pullQuote",
+      "attrs": {
+        "blockId": "fixture-pull-quote-001",
+        "variant": "bordered",
+        "attribution": "Edsger W. Dijkstra"
+      },
+      "content": [
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "Simplicity is prerequisite for reliability."
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

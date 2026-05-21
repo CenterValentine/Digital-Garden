@@ -1,0 +1,17 @@
+{
+  "type": "doc",
+  "content": [
+    {
+      "type": "habitTracker",
+      "attrs": {
+        "blockId": "fixture-habit-tracker-001",
+        "title": "Habits this week",
+        "showStats": true,
+        "showBackground": true,
+        "showBorder": true,
+        "habits": [],
+        "entries": {}
+      }
+    }
+  ]
+}
