@@ -9,6 +9,7 @@
 import { getSurfaceStyles } from "@/lib/design/system";
 import { ConditionalNotesLayout } from "@/components/content/ConditionalNotesLayout";
 import { NotesLayoutMarker } from "@/components/content/NotesLayoutMarker";
+import { PageLifecycle, WebVitalsReporter } from "@/lib/features/observability";
 
 export default function NotesLayout({
   children,
@@ -30,6 +31,10 @@ export default function NotesLayout({
       <div className="notes-layout-page">
         {/* Mark body element to trigger CSS for hiding default navbar */}
         <NotesLayoutMarker />
+
+        {/* Observability — page lifecycle markers and Core Web Vitals */}
+        <PageLifecycle route="/content" />
+        <WebVitalsReporter route="/content" />
 
         {/* Conditional layout: full panels or just children (fullscreen) */}
         <ConditionalNotesLayout glass0={glass0}>

@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { performance } from "node:perf_hooks";
 import { withTrace } from "./context";
 import { withSpan } from "./span";
 
@@ -60,10 +61,25 @@ export async function withRouteTrace(
         attrs: { method, route: options.route },
       },
       async (span) => {
+        const startedAt = performance.now();
         const response = await fn();
+        const durationMs = Math.round((performance.now() - startedAt) * 1000) / 1000;
         span
           .attr("status", response.status)
           .summary(`${method} ${options.route} ${response.status}`);
+        // Surface the trace id and total wall-clock time into the response so
+        // the browser's network panel can correlate against client-side spans
+        // without round-tripping to the trace replay viewer. Server-Timing is
+        // the W3C primitive Chrome / Firefox / Safari devtools already render.
+        try {
+          response.headers.set("x-trace-id", traceId);
+          const prior = response.headers.get("Server-Timing");
+          const next = `trace;desc="${traceId}", total;dur=${durationMs}`;
+          response.headers.set("Server-Timing", prior ? `${prior}, ${next}` : next);
+        } catch {
+          // Some responses (notably from external proxies) ship immutable
+          // headers. Silently skip — the span still emits via the logger.
+        }
         return response;
       },
     ),

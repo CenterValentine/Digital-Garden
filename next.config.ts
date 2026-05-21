@@ -14,6 +14,14 @@ const nextConfig: NextConfig = {
     'canvas',
     // Sharp (image processing)
     'sharp',
+    // JSDOM (used by components/public/TipTapContent.tsx to server-render
+    // TipTap JSON via ProseMirror's DOMSerializer). Recent JSDOM versions
+    // pull in @exodus/bytes as an ESM-only transitive via html-encoding-
+    // sniffer@6. Bundled CJS require() of that ESM throws ERR_REQUIRE_ESM
+    // at runtime on Vercel — see the page_render:failed traces against
+    // davidvalentine.org/blog/* on 2026-05-21. Marking jsdom external
+    // lets Node's loader handle the ESM/CJS interop natively.
+    'jsdom',
   ],
   // Webpack configuration for production builds (Vercel uses --webpack flag)
   webpack: (config, { isServer }) => {
@@ -25,6 +33,7 @@ const nextConfig: NextConfig = {
         '@ffmpeg-installer/ffmpeg',
         'canvas',
         'sharp',
+        'jsdom',
       ];
     }
     return config;
