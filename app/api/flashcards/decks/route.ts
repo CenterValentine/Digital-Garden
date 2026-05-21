@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@/lib/database/generated/prisma";
 import { prisma } from "@/lib/database/client";
 import { requireAuth } from "@/lib/infrastructure/auth/middleware";
 import {
+  FLASHCARD_DECK_SELECT,
   sanitizeFlashcardCategory,
   sanitizeFlashcardSubcategory,
+  slugifyDeckName,
+  toFlashcardDeckRecordDto,
 } from "@/lib/domain/flashcards";
 import type { FlashcardDeckDto } from "@/lib/domain/flashcards";
 
@@ -121,6 +125,108 @@ export async function PATCH(request: NextRequest) {
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Failed to update deck.";
+    return NextResponse.json(
+      { success: false, error: { code: "SERVER_ERROR", message } },
+      { status: message.includes("Authentication") ? 401 : 500 }
+    );
+  }
+}
+
+// POST /api/flashcards/decks
+//
+// Create a new FlashcardDeck row (Epoch 19 FK paradigm).
+//
+// Body: { name (required), parentDeckId?, description?, iconName?,
+//   iconColor?, displayOrder? }
+//
+// Path is computed server-side as parentPath + "/" + slug. Slug is
+// generated from name via slugifyDeckName so it matches the convention
+// used by the backfill script.
+//
+// 409 CONFLICT if a sibling deck with the same name already exists
+// (enforced by the (ownerId, parentDeckId, name) unique constraint).
+export async function POST(request: NextRequest) {
+  try {
+    const session = await requireAuth();
+    const body = (await request.json()) as Record<string, unknown>;
+
+    const name = typeof body.name === "string" ? body.name.trim().slice(0, 120) : "";
+    if (!name) {
+      return NextResponse.json(
+        { success: false, error: { code: "INVALID_INPUT", message: "Deck name is required." } },
+        { status: 400 }
+      );
+    }
+
+    let parentDeckId: string | null = null;
+    let parentPath: string | null = null;
+    if (typeof body.parentDeckId === "string" && body.parentDeckId) {
+      const parent = await prisma.flashcardDeck.findFirst({
+        where: { id: body.parentDeckId, ownerId: session.user.id, deletedAt: null },
+        select: { id: true, path: true },
+      });
+      if (!parent) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: { code: "INVALID_INPUT", message: "Parent deck not found." },
+          },
+          { status: 400 }
+        );
+      }
+      parentDeckId = parent.id;
+      parentPath = parent.path;
+    }
+
+    const slug = slugifyDeckName(name);
+    const path = parentPath ? `${parentPath}/${slug}` : slug;
+    const description =
+      typeof body.description === "string" ? body.description.trim().slice(0, 500) || null : null;
+    const iconName =
+      typeof body.iconName === "string" ? body.iconName.trim().slice(0, 60) || null : null;
+    const iconColor =
+      typeof body.iconColor === "string" ? body.iconColor.trim().slice(0, 20) || null : null;
+    const displayOrder =
+      typeof body.displayOrder === "number" && Number.isFinite(body.displayOrder)
+        ? Math.trunc(body.displayOrder)
+        : 0;
+
+    try {
+      const deck = await prisma.flashcardDeck.create({
+        data: {
+          ownerId: session.user.id,
+          name,
+          slug,
+          path,
+          description,
+          iconName,
+          iconColor,
+          displayOrder,
+          ...(parentDeckId ? { parentDeckId } : {}),
+        },
+        select: FLASHCARD_DECK_SELECT,
+      });
+      return NextResponse.json(
+        { success: true, data: toFlashcardDeckRecordDto(deck) },
+        { status: 201 }
+      );
+    } catch (err) {
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
+        return NextResponse.json(
+          {
+            success: false,
+            error: {
+              code: "CONFLICT",
+              message: "A deck with this name already exists at that level.",
+            },
+          },
+          { status: 409 }
+        );
+      }
+      throw err;
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Failed to create deck";
     return NextResponse.json(
       { success: false, error: { code: "SERVER_ERROR", message } },
       { status: message.includes("Authentication") ? 401 : 500 }

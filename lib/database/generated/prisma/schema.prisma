@@ -71,11 +71,39 @@ enum FlashcardReviewMode {
   front_to_back
   back_to_front
   random
+  reference
 }
 
 enum FlashcardShownSide {
   front
   back
+}
+
+// FSRS scheduling state (Epoch 19). Mirrors ts-fsrs's State enum:
+//   new(0) | learning(1) | review(2) | relearning(3).
+// suspended/archived are user-driven holds the algorithm ignores.
+enum FlashcardState {
+  new
+  learning
+  review
+  relearning
+  suspended
+  archived
+}
+
+// 4-button rating used by FSRS. Mirrors ts-fsrs's Rating enum:
+//   again(1) | hard(2) | good(3) | easy(4).
+enum FlashcardRating {
+  again
+  hard
+  good
+  easy
+}
+
+// Card variant. v1 only ships `basic`; the column exists so cloze/typing/
+// choice can land without a second migration.
+enum FlashcardCardType {
+  basic
 }
 
 enum ExternalReadingStatus {
@@ -182,48 +210,116 @@ model PeriodicNoteIndex {
   @@index([contentId])
 }
 
+// Nested deck for grouping flashcards (Epoch 19, Migration A). Belongs to
+// a single owner. parentDeckId + materialized `path` gives Anki-style
+// hierarchical decks ("spanish/verbs/irregular") with cheap descendant
+// queries via path LIKE 'spanish/%'.
+model FlashcardDeck {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ownerId      String    @db.Uuid
+  parentDeckId String?   @db.Uuid
+  name         String    @db.VarChar(120)
+  slug         String    @db.VarChar(140)
+  path         String    @db.VarChar(500)
+  description  String?   @db.VarChar(500)
+  displayOrder Int       @default(0)
+  iconName     String?   @db.VarChar(60)
+  iconColor    String?   @db.VarChar(20)
+  createdAt    DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt    DateTime  @updatedAt @db.Timestamptz(6)
+  deletedAt    DateTime? @db.Timestamptz(6)
+
+  owner      User            @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  parent     FlashcardDeck?  @relation("FlashcardDeckHierarchy", fields: [parentDeckId], references: [id], onDelete: SetNull)
+  children   FlashcardDeck[] @relation("FlashcardDeckHierarchy")
+  flashcards Flashcard[]
+
+  @@unique([ownerId, slug])
+  @@unique([ownerId, parentDeckId, name])
+  @@index([ownerId, deletedAt])
+  @@index([ownerId, path])
+  @@index([parentDeckId, displayOrder])
+}
+
 model Flashcard {
-  id              String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  ownerId         String                   @db.Uuid
-  sourceContentId String?                  @db.Uuid
-  frontLabel      String                   @default("Question") @db.VarChar(80)
-  backLabel       String                   @default("Answer") @db.VarChar(80)
+  id              String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ownerId         String                @db.Uuid
+  sourceContentId String?               @db.Uuid
+  frontLabel      String                @default("Question") @db.VarChar(80)
+  backLabel       String                @default("Answer") @db.VarChar(80)
   frontContent    Json
   backContent     Json
-  isFrontRichText Boolean                  @default(false)
-  category        String                   @default("General") @db.VarChar(120)
-  subcategory     String                   @default("") @db.VarChar(120)
-  reviewStatus    FlashcardReviewStatus    @default(new)
-  reviewCount     Int                      @default(0)
-  viewCount       Int                      @default(0)
-  lastReviewedAt  DateTime?                @db.Timestamptz(6)
-  lastViewedAt    DateTime?                @db.Timestamptz(6)
-  masteredAt      DateTime?                @db.Timestamptz(6)
-  createdAt       DateTime                 @default(now()) @db.Timestamptz(6)
-  updatedAt       DateTime                 @updatedAt @db.Timestamptz(6)
-  owner           User                     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  sourceContent   ContentNode?             @relation("FlashcardSourceContent", fields: [sourceContentId], references: [id], onDelete: SetNull)
-  reviewAttempts  FlashcardReviewAttempt[]
+  isFrontRichText Boolean               @default(false)
+  category        String                @default("General") @db.VarChar(120)
+  subcategory     String                @default("") @db.VarChar(120)
+  reviewStatus    FlashcardReviewStatus @default(new)
+  reviewCount     Int                   @default(0)
+  viewCount       Int                   @default(0)
+  lastReviewedAt  DateTime?             @db.Timestamptz(6)
+  lastViewedAt    DateTime?             @db.Timestamptz(6)
+  masteredAt      DateTime?             @db.Timestamptz(6)
+  createdAt       DateTime              @default(now()) @db.Timestamptz(6)
+  updatedAt       DateTime              @updatedAt @db.Timestamptz(6)
+
+  // ---- FSRS additions (Epoch 19, Migration A) ----
+  // deckId is nullable in Migration A so existing rows stay valid; the
+  // backfill script populates it, then Migration C will alter to NOT NULL.
+  deckId        String?           @db.Uuid
+  cardType      FlashcardCardType @default(basic)
+  state         FlashcardState    @default(new)
+  due           DateTime          @default(now()) @db.Timestamptz(6)
+  stability     Float             @default(0)
+  difficulty    Float             @default(0)
+  elapsedDays   Float             @default(0)
+  scheduledDays Float             @default(0)
+  reps          Int               @default(0)
+  lapses        Int               @default(0)
+  learningSteps Int               @default(0)
+  suspendedAt   DateTime?         @db.Timestamptz(6)
+  archivedAt    DateTime?         @db.Timestamptz(6)
+  deletedAt     DateTime?         @db.Timestamptz(6)
+
+  owner          User                     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  deck           FlashcardDeck?           @relation(fields: [deckId], references: [id], onDelete: Restrict)
+  sourceContent  ContentNode?             @relation("FlashcardSourceContent", fields: [sourceContentId], references: [id], onDelete: SetNull)
+  reviewAttempts FlashcardReviewAttempt[]
 
   @@index([ownerId, category, subcategory])
   @@index([ownerId, reviewStatus])
   @@index([sourceContentId])
+  @@index([ownerId, deckId])
+  @@index([ownerId, due])
+  @@index([ownerId, state, due])
+  @@index([ownerId, deletedAt])
 }
 
 model FlashcardReviewAttempt {
-  id             String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  flashcardId    String                 @db.Uuid
-  ownerId        String                 @db.Uuid
-  outcome        FlashcardReviewOutcome
-  reviewMode     FlashcardReviewMode
-  shownSide      FlashcardShownSide
-  responseTimeMs Int?
-  createdAt      DateTime               @default(now()) @db.Timestamptz(6)
-  flashcard      Flashcard              @relation(fields: [flashcardId], references: [id], onDelete: Cascade)
-  owner          User                   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  id                 String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  flashcardId        String                 @db.Uuid
+  ownerId            String                 @db.Uuid
+  outcome            FlashcardReviewOutcome
+  reviewMode         FlashcardReviewMode
+  shownSide          FlashcardShownSide
+  responseTimeMs     Int?
+  // ---- FSRS additions (Epoch 19, Migration A). rating is nullable so
+  // ---- back-compat rows (no 4-button data) coexist, and reference-mode
+  // ---- skims log a row without polluting the scheduler.
+  rating             FlashcardRating?
+  stateBefore        FlashcardState?
+  stateAfter         FlashcardState?
+  previousDue        DateTime?              @db.Timestamptz(6)
+  scheduledDue       DateTime?              @db.Timestamptz(6)
+  previousStability  Float?
+  newStability       Float?
+  previousDifficulty Float?
+  newDifficulty      Float?
+  createdAt          DateTime               @default(now()) @db.Timestamptz(6)
+  flashcard          Flashcard              @relation(fields: [flashcardId], references: [id], onDelete: Cascade)
+  owner              User                   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
 
   @@index([flashcardId, createdAt])
   @@index([ownerId, createdAt])
+  @@index([ownerId, rating, createdAt])
 }
 
 model NotePayload {
@@ -417,6 +513,11 @@ model User {
   updatedAt               DateTime                 @updatedAt @db.Timestamptz(6)
   settings                Json?
   settingsVersion         Int                      @default(1)
+  // ---- FSRS user-level settings (Epoch 19, Migration A) ----
+  fsrsParameters          Json                     @default("{}")
+  desiredRetention        Float                    @default(0.9)
+  fsrsMaxInterval         Int                      @default(36500)
+  defaultFlashcardDeckId  String?                  @db.Uuid
   accounts                Account[]
   aiProviderKeys          AIProviderKey[]
   auditTargets            AuditLog[]               @relation("AuditTargets")
@@ -447,6 +548,7 @@ model User {
   periodicNoteIndexes     PeriodicNoteIndex[]
   flashcards              Flashcard[]
   flashcardReviewAttempts FlashcardReviewAttempt[]
+  flashcardDecks          FlashcardDeck[]
   publicPaths             PublicPath[]
   publicItems             PublicItem[]
   publicItemRevisions     PublicItemRevision[]

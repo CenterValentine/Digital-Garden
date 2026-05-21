@@ -274,6 +274,7 @@ model Flashcard {
   scheduledDays   Float                 @default(0)
   reps            Int                   @default(0)
   lapses          Int                   @default(0)
+  learningSteps   Int                   @default(0)
   suspendedAt     DateTime?             @db.Timestamptz(6)
   archivedAt      DateTime?             @db.Timestamptz(6)
   deletedAt       DateTime?             @db.Timestamptz(6)

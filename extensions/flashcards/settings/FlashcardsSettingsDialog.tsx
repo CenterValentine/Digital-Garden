@@ -3,10 +3,10 @@
 import { useState } from "react";
 import { Layers, Save } from "lucide-react";
 import { toast } from "sonner";
-import type { FlashcardReviewMode } from "@/lib/domain/flashcards";
+import type { FlashcardSettingsReviewMode } from "@/lib/domain/flashcards";
 import { useSettingsStore } from "@/state/settings-store";
 
-const REVIEW_MODES: Array<{ value: FlashcardReviewMode; label: string }> = [
+const REVIEW_MODES: Array<{ value: FlashcardSettingsReviewMode; label: string }> = [
   { value: "front_to_back", label: "Front to Back" },
   { value: "back_to_front", label: "Back to Front" },
   { value: "random", label: "Random" },
@@ -26,7 +26,7 @@ export default function FlashcardsSettingsDialog() {
     flashcards?.defaultBackLabel ?? "Answer"
   );
   const [defaultReviewMode, setDefaultReviewMode] =
-    useState<FlashcardReviewMode>(
+    useState<FlashcardSettingsReviewMode>(
       flashcards?.defaultReviewMode ?? "front_to_back"
     );
   const [lastUsedCategory, setLastUsedCategory] = useState(
@@ -111,7 +111,7 @@ export default function FlashcardsSettingsDialog() {
         <select
           value={defaultReviewMode}
           onChange={(event) =>
-            setDefaultReviewMode(event.target.value as FlashcardReviewMode)
+            setDefaultReviewMode(event.target.value as FlashcardSettingsReviewMode)
           }
           className={MENU_SELECT_CLASS}
         >
