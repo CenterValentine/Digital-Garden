@@ -1,18 +1,24 @@
 import Link from "next/link";
 import { prisma } from "@/lib/database/client";
-
-const SITE_OWNER_ID = process.env.SITE_OWNER_ID ?? "";
+import { getCurrentTenant } from "@/lib/domain/tenancy";
 
 export const revalidate = 60;
 
 export default async function Home() {
-  if (!SITE_OWNER_ID) {
+  // Tenant resolution path:
+  //   1. MULTITENANT_ENABLED=true + proxy injected x-tenant-id  → header path
+  //   2. Flag off OR no header                                  → legacy
+  //      fallback via SITE_OWNER_ID's primaryTenantId
+  //   3. Neither resolves                                       → unconfigured
+  const ctx = await getCurrentTenant();
+  if (!ctx) {
     return <UnconfiguredLanding />;
   }
+  const { tenant } = ctx;
 
   const [paths, recentItems] = await Promise.all([
     prisma.publicPath.findMany({
-      where: { ownerId: SITE_OWNER_ID, parentId: null },
+      where: { tenantId: tenant.tenantId, parentId: null },
       include: {
         _count: {
           select: {
@@ -23,7 +29,7 @@ export default async function Home() {
       orderBy: { title: "asc" },
     }),
     prisma.publicItem.findMany({
-      where: { ownerId: SITE_OWNER_ID, state: "published", deletedAt: null },
+      where: { tenantId: tenant.tenantId, state: "published", deletedAt: null },
       select: {
         id: true,
         slug: true,

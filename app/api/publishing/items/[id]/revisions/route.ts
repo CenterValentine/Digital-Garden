@@ -27,7 +27,7 @@ export async function GET(
         async (span) => {
           // Verify ownership
           const item = await prisma.publicItem.findFirst({
-            where: { id, ownerId: session.user.id, deletedAt: null },
+            where: { id, tenant: { ownerId: session.user.id }, deletedAt: null },
             select: {
               id: true,
               workingRevisionId: true,

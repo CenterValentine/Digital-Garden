@@ -10,6 +10,8 @@ import { logger } from "@/lib/core/logger";
 import { withRouteTrace } from "@/lib/core/logger/route-trace";
 import { withSpan } from "@/lib/core/logger/span";
 import { spanPayload } from "@/lib/core/logger/span-payload";
+import { resolveWritableTenantId, TenantAuthError } from "@/lib/domain/tenancy/api";
+import { invalidateTenantCache } from "@/lib/domain/tenancy/cache";
 
 export async function GET(req: NextRequest) {
   return withRouteTrace(req, { route: "/api/publishing/paths" }, async () => {
@@ -19,8 +21,11 @@ export async function GET(req: NextRequest) {
       { layer: "content", name: "publishing:paths_list" },
       { summary: "publishing paths list" },
       async (span) => {
+        // Return paths across all tenants the user owns. Phase 6c (Settings
+        // Sites UI) can add a tenantId query param to narrow this; today's
+        // single-tenant users see no behavior change.
         const paths = await prisma.publicPath.findMany({
-          where: { ownerId: session.user.id },
+          where: { tenant: { ownerId: session.user.id } },
           orderBy: [{ parentId: "asc" }, { displayOrder: "asc" }],
           include: {
             _count: { select: { items: { where: { deletedAt: null } } } },
@@ -84,8 +89,10 @@ export async function POST(req: NextRequest) {
       parentId?: string;
       description?: string;
       icon?: string;
+      // Optional. Defaults to user's primary tenant when omitted.
+      tenantId?: string;
     };
-    const { slug, title, parentId, description, icon } = body;
+    const { slug, title, parentId, description, icon, tenantId } = body;
 
     if (!slug || !title) {
       logger.warn({
@@ -103,9 +110,26 @@ export async function POST(req: NextRequest) {
       async (span) => {
         await spanPayload(span, "incoming_body", body);
 
+        let destTenantId: string;
+        try {
+          destTenantId = await resolveWritableTenantId(session.user.id, tenantId);
+        } catch (err) {
+          if (err instanceof TenantAuthError) {
+            logger.warn({
+              layer: "content",
+              event: "publishing_path_create:rejected",
+              summary: err.message,
+              attrs: { reason: err.code, requested_tenant_id: tenantId ?? "(primary)" },
+            });
+            return NextResponse.json({ error: err.message }, { status: err.status });
+          }
+          throw err;
+        }
+
         const path = await prisma.publicPath.create({
           data: {
             ownerId: session.user.id,
+            tenantId: destTenantId,
             slug,
             title,
             parentId: parentId ?? null,
@@ -115,6 +139,9 @@ export async function POST(req: NextRequest) {
         });
 
         span.attr("path_id", path.id);
+
+        // New path appears in the tenant's listings (even if empty).
+        await invalidateTenantCache({ type: "tenant", tenantId: destTenantId });
 
         return NextResponse.json(path, { status: 201 });
       },

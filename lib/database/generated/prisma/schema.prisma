@@ -408,50 +408,54 @@ model AIProviderKey {
 }
 
 model User {
-  id                       String                    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  username                 String                    @unique @db.VarChar(50)
-  passwordHash             String?                   @db.Char(60)
-  email                    String                    @unique @db.VarChar(255)
-  role                     UserRole                  @default(guest)
-  createdAt                DateTime                  @default(now()) @db.Timestamptz(6)
-  updatedAt                DateTime                  @updatedAt @db.Timestamptz(6)
-  settings                 Json?
-  settingsVersion          Int                       @default(1)
-  accounts                 Account[]
-  aiProviderKeys           AIProviderKey[]
-  auditTargets             AuditLog[]                @relation("AuditTargets")
-  adminActions             AuditLog[]                @relation("AdminActions")
-  categories               Category[]
-  contentHistory           ContentHistory[]
-  contentNodes             ContentNode[]
-  sessions                 Session[]
-  storageConfigs           StorageProviderConfig[]
-  tags                     Tag[]
-  trashedContent           TrashBin[]
-  viewGrants               ViewGrant[]
-  peopleGroups             PeopleGroup[]
-  peopleDefaultGroups      PeopleGroup[]             @relation("DefaultPeopleGroup")
-  people                   Person[]
-  peopleFileTreeMounts     PeopleFileTreeMount[]
-  personMentions           PersonMention[]
-  reusableCategories       ReusableCategory[]
-  savedBlocks              SavedBlock[]
-  contentTemplates         ContentTemplate[]
-  snippets                 Snippet[]
-  pageTemplates            PageTemplate[]
-  calendarConnections      CalendarConnection[]
-  calendarSources          CalendarSource[]
-  calendarEvents           CalendarEvent[]
-  contentWorkspaces        ContentWorkspace[]
-  collaborationDocuments   CollaborationDocument[]
-  periodicNoteIndexes      PeriodicNoteIndex[]
-  flashcards               Flashcard[]
-  flashcardReviewAttempts  FlashcardReviewAttempt[]
-  publicPaths              PublicPath[]
-  publicItems              PublicItem[]
-  publicItemRevisions      PublicItemRevision[]
-  previewTokens            PreviewToken[]
-  publicPathRedirects      PublicPathRedirect[]
+  id                      String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  username                String                   @unique @db.VarChar(50)
+  passwordHash            String?                  @db.Char(60)
+  email                   String                   @unique @db.VarChar(255)
+  role                    UserRole                 @default(guest)
+  createdAt               DateTime                 @default(now()) @db.Timestamptz(6)
+  updatedAt               DateTime                 @updatedAt @db.Timestamptz(6)
+  settings                Json?
+  settingsVersion         Int                      @default(1)
+  accounts                Account[]
+  aiProviderKeys          AIProviderKey[]
+  auditTargets            AuditLog[]               @relation("AuditTargets")
+  adminActions            AuditLog[]               @relation("AdminActions")
+  categories              Category[]
+  contentHistory          ContentHistory[]
+  contentNodes            ContentNode[]
+  sessions                Session[]
+  storageConfigs          StorageProviderConfig[]
+  tags                    Tag[]
+  trashedContent          TrashBin[]
+  viewGrants              ViewGrant[]
+  peopleGroups            PeopleGroup[]
+  peopleDefaultGroups     PeopleGroup[]            @relation("DefaultPeopleGroup")
+  people                  Person[]
+  peopleFileTreeMounts    PeopleFileTreeMount[]
+  personMentions          PersonMention[]
+  reusableCategories      ReusableCategory[]
+  savedBlocks             SavedBlock[]
+  contentTemplates        ContentTemplate[]
+  snippets                Snippet[]
+  pageTemplates           PageTemplate[]
+  calendarConnections     CalendarConnection[]
+  calendarSources         CalendarSource[]
+  calendarEvents          CalendarEvent[]
+  contentWorkspaces       ContentWorkspace[]
+  collaborationDocuments  CollaborationDocument[]
+  periodicNoteIndexes     PeriodicNoteIndex[]
+  flashcards              Flashcard[]
+  flashcardReviewAttempts FlashcardReviewAttempt[]
+  publicPaths             PublicPath[]
+  publicItems             PublicItem[]
+  publicItemRevisions     PublicItemRevision[]
+  previewTokens           PreviewToken[]
+  publicPathRedirects     PublicPathRedirect[]
+  primaryTenantId         String?                  @db.Uuid
+  primaryTenant           Tenant?                  @relation("PrimaryTenantOfUser", fields: [primaryTenantId], references: [id], onDelete: SetNull)
+  ownedTenants            Tenant[]                 @relation("OwnedTenants")
+
   series                   Series[]
   browserExtensionTokens   BrowserExtensionToken[]
   browserExtensionInstalls BrowserExtensionInstall[]
@@ -1344,10 +1348,49 @@ enum MediaDisplayVariant {
   mosaic
 }
 
+// Multi-tenancy foundation (Epoch 18). A Tenant is a publishing destination
+// — typically a website — that one or more hosts route to. A user owns one
+// or more tenants; each PublicItem and PublicPath belongs to exactly one.
+// In UI we call this "Site". See docs/notes-feature/work-tracking/epochs/epoch-18-multi-tenancy.md.
+model Tenant {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ownerId      String   @db.Uuid
+  slug         String   @unique @db.VarChar(120)
+  displayName  String   @db.VarChar(255)
+  isPersonal   Boolean  @default(false)
+  // Forward-looking placeholder for a future tenant-authored home template.
+  // Not read by any code in Epoch 18 — reserved so a future template engine
+  // can land without a schema migration.
+  homeTemplate String?  @db.VarChar(120)
+  createdAt    DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt    DateTime @updatedAt @db.Timestamptz(6)
+
+  owner               User                 @relation("OwnedTenants", fields: [ownerId], references: [id], onDelete: Cascade)
+  hosts               TenantHost[]
+  publicPaths         PublicPath[]
+  publicItems         PublicItem[]
+  publicPathRedirects PublicPathRedirect[]
+  primaryForUsers     User[]               @relation("PrimaryTenantOfUser")
+
+  @@index([ownerId])
+}
+
+model TenantHost {
+  host      String   @id @db.VarChar(253)
+  tenantId  String   @db.Uuid
+  isPrimary Boolean  @default(false)
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+}
+
 model PublicPath {
   id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   ownerId      String   @db.Uuid
   parentId     String?  @db.Uuid
+  tenantId     String?  @db.Uuid
   slug         String   @db.VarChar(120)
   title        String   @db.VarChar(255)
   description  String?
@@ -1356,7 +1399,9 @@ model PublicPath {
   createdAt    DateTime @default(now()) @db.Timestamptz(6)
   updatedAt    DateTime @updatedAt @db.Timestamptz(6)
 
-  owner       User                 @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  owner  User    @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  tenant Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
   parent      PublicPath?          @relation("PublicPathHierarchy", fields: [parentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   children    PublicPath[]         @relation("PublicPathHierarchy")
   items       PublicItem[]
@@ -1365,6 +1410,7 @@ model PublicPath {
   @@unique([parentId, slug])
   @@index([ownerId, parentId, displayOrder])
   @@index([ownerId])
+  @@index([tenantId, parentId])
 }
 
 model Series {
@@ -1388,6 +1434,7 @@ model Series {
 model PublicItem {
   id                  String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   ownerId             String           @db.Uuid
+  tenantId            String?          @db.Uuid
   contentNodeId       String           @db.Uuid
   pathId              String           @db.Uuid
   slug                String           @db.VarChar(120)
@@ -1410,6 +1457,7 @@ model PublicItem {
   updatedAt           DateTime         @updatedAt @db.Timestamptz(6)
 
   owner             User                 @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  tenant            Tenant?              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   contentNode       ContentNode          @relation(fields: [contentNodeId], references: [id], onDelete: Cascade)
   path              PublicPath           @relation(fields: [pathId], references: [id], onDelete: Restrict)
   series            Series?              @relation(fields: [seriesId], references: [id], onDelete: SetNull)
@@ -1435,6 +1483,9 @@ model PublicItem {
   @@index([scheduledFor])
   @@index([deletedAt])
   @@index([ownerId, lastPublishedAt(sort: Desc)])
+  @@index([tenantId, state])
+  @@index([tenantId, state, deletedAt])
+  @@index([tenantId, lastPublishedAt(sort: Desc)])
 }
 
 model PublicItemRevision {
@@ -1465,8 +1516,10 @@ model PublicItemRevision {
 }
 
 model PublicPathRedirect {
-  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  ownerId        String    @db.Uuid
+  id       String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ownerId  String  @db.Uuid
+  tenantId String? @db.Uuid
+
   fromPath       String    @unique @db.VarChar(2048)
   toPathId       String?   @db.Uuid
   toPublicItemId String?   @db.Uuid
@@ -1475,12 +1528,15 @@ model PublicPathRedirect {
   createdAt      DateTime  @default(now()) @db.Timestamptz(6)
   updatedAt      DateTime  @updatedAt @db.Timestamptz(6)
 
-  owner        User        @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  owner  User    @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  tenant Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
   toPath       PublicPath? @relation("TargetPath", fields: [toPathId], references: [id], onDelete: SetNull)
   toPublicItem PublicItem? @relation(fields: [toPublicItemId], references: [id], onDelete: SetNull)
 
   @@index([ownerId, isActive])
   @@index([expiresAt])
+  @@index([tenantId, isActive])
 }
 
 model PreviewToken {
