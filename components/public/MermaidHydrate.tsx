@@ -19,6 +19,7 @@
  */
 
 import { useEffect } from "react";
+import { clientLogger } from "@/lib/core/logger/client";
 
 export function MermaidHydrate() {
   useEffect(() => {
@@ -40,9 +41,15 @@ export function MermaidHydrate() {
       } catch (err) {
         // Mermaid runtime errors shouldn't blank the page — log and move on.
         // The unrendered <pre> stays in the DOM showing the source code,
-        // which is at least somewhat readable for the visitor.
-        // eslint-disable-next-line no-console
-        console.warn("[MermaidHydrate] render failed", err);
+        // which is at least somewhat readable for the visitor. Per
+        // FRONTEND-LOG-CHARTER, render failures are visitor-facing
+        // breakage worth surfacing to the prod beacon (error level).
+        clientLogger.error({
+          layer: "ui",
+          event: "public_mermaid_hydrate:failed",
+          summary: "mermaid client-side render failed; <pre class='mermaid'> stays visible with raw source",
+          error: err instanceof Error ? err : new Error(String(err)),
+        });
       }
     })();
     return () => {

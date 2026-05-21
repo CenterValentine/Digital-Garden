@@ -36,6 +36,14 @@ npx prisma studio     # Database GUI (http://localhost:5555)
 
 **Vercel build** skips the `tsc --noEmit` and `lint` steps (`vercel-build` script). Those gates are enforced locally and in CI; Vercel stays minimal for fast deploys. Local dev uses Turbopack (no webpack flag). Migrations are run manually via `npx prisma migrate deploy`.
 
+**Heap size for local `pnpm build`** — Node's default V8 heap (~4 GB) is no longer enough on this codebase; full builds can abort with `Abort trap: 6` during the type-emit or compilation phase. Local builds need `NODE_OPTIONS='--max-old-space-size=8192'`:
+
+```bash
+NODE_OPTIONS='--max-old-space-size=8192' pnpm build
+```
+
+CI runners (GitHub Actions, Vercel) have larger heaps by default and don't need this. Add it to your shell rc or build-script alias if you're on a machine with <16 GB RAM.
+
 **CI gates** (`.github/workflows/`):
 - **quality.yml** — runs `pnpm lint` (with the `--max-warnings 175` ratchet) and `pnpm typecheck` on every PR. Lint failures or warning count growth block merge.
 - **collaboration-hardening.yml** — runs `pnpm collab:schema:check` on collab-touching PRs. Scans all TipTap extension source files for `Node.create`/`Mark.create` and asserts every discovered node/mark is covered in `getCollaborationServerExtensions()`. Every new TipTap Node/Mark **must** export a `Server*` variant and be registered in `lib/domain/collaboration/extensions.ts`.
