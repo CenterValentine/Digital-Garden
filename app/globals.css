@@ -2995,6 +2995,48 @@ mark {
   padding: 0.25rem 0;
 }
 
+/* ─── Public theme toggle (visitor-facing) ────────────────────────────────
+   A small floating control that lets visitors cycle the publisher's
+   theme (light → system → dark). Reads + writes localStorage's
+   notes:settings key so the choice persists across page loads. */
+
+.public-theme-toggle {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  z-index: 30;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.75rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+  font-family: inherit;
+  border-radius: 9999px;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  background: rgba(255, 255, 255, 0.85);
+  color: rgba(0, 0, 0, 0.75);
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+.public-theme-toggle:hover {
+  background: rgba(255, 255, 255, 0.95);
+  color: rgba(0, 0, 0, 0.9);
+}
+.dark .public-theme-toggle {
+  border-color: rgba(255, 255, 255, 0.15);
+  background: rgba(20, 20, 20, 0.7);
+  color: rgba(255, 255, 255, 0.75);
+}
+.dark .public-theme-toggle:hover {
+  background: rgba(30, 30, 30, 0.85);
+  color: rgba(255, 255, 255, 0.95);
+}
+.public-theme-toggle-label {
+  letter-spacing: 0.02em;
+}
+
 /* ─── Publisher visualization render (mermaid + excalidraw) ───────────────
    Mermaid: <pre class="mermaid">{source}</pre> is injected by
    TipTapContent.postProcessDom Pass 6; MermaidHydrate (client) replaces

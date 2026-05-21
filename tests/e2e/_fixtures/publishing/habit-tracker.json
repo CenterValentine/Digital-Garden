@@ -9,8 +9,45 @@
         "showStats": true,
         "showBackground": true,
         "showBorder": true,
-        "habits": [],
-        "entries": {}
+        "habits": [
+          {
+            "id": "habit-meditate",
+            "name": "Meditate",
+            "icon": "Sparkles",
+            "statusIcon": "Check",
+            "color": "#10b981",
+            "valueMode": "boolean",
+            "intervalMode": "single",
+            "showIntervalTimes": false,
+            "intervals": [{ "id": "default", "startMinute": 0, "endMinute": 1440 }],
+            "target": 1,
+            "unit": ""
+          },
+          {
+            "id": "habit-read",
+            "name": "Read",
+            "icon": "BookOpen",
+            "statusIcon": "Check",
+            "color": "#3b82f6",
+            "valueMode": "count",
+            "intervalMode": "single",
+            "showIntervalTimes": false,
+            "intervals": [{ "id": "default", "startMinute": 0, "endMinute": 1440 }],
+            "target": 30,
+            "unit": "min"
+          }
+        ],
+        "entries": {
+          "habit-meditate": {
+            "2026-05-18": true,
+            "2026-05-19": true,
+            "2026-05-20": true
+          },
+          "habit-read": {
+            "2026-05-18": 25,
+            "2026-05-20": 40
+          }
+        }
       }
     }
   ]

@@ -17,6 +17,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import { TipTapContent } from "@/components/public/TipTapContent";
 import { MermaidHydrate } from "@/components/public/MermaidHydrate";
+import { PublicThemeToggle } from "@/components/public/PublicThemeToggle";
 import type { JSONContent } from "@tiptap/core";
 
 const FIXTURES_ENABLED =
@@ -61,26 +62,31 @@ export default async function PublishingFixturePage({
   const bodyJson = await loadFixture(block);
   if (!bodyJson) notFound();
 
+  // Match the actual public layout's surface context. Publisher is
+  // theme-aware: light mode = white surface, dark mode = near-black.
+  // Driven by the root layout's pre-hydration theme script which sets
+  // .dark on <html>. Previously the fixture inherited the root layout's
+  // default slate background, which meant snapshots were captured on
+  // a surface that didn't match real published pages.
   return (
-    <main
-      data-publishing-fixture={block}
-      data-publishing-fixture-ready="true"
-      className="public-prose"
-      style={{
-        // marginTop pushes the wrapper's bounding box past the root
-        // layout's NavBar logo. The logo overflows below its pt-20
-        // allocation by ~60px (centered emblem with curved text), and
-        // element-locator screenshots capture the full bbox including
-        // any transparent padding — so padding alone wouldn't crop it
-        // out. 100px puts the wrapper top at ~y=180 in page coords,
-        // well below the logo's ~y=140 bottom edge.
-        padding: "24px",
-        maxWidth: "960px",
-        margin: "100px auto 0",
-      }}
+    <div
+      className="public-route min-h-screen bg-white text-gray-900 dark:bg-[#0a0a0a] dark:text-white"
+      data-publishing-fixture-context="public"
     >
-      <TipTapContent bodyJson={bodyJson} />
-      <MermaidHydrate />
-    </main>
+      <main
+        data-publishing-fixture={block}
+        data-publishing-fixture-ready="true"
+        className="public-prose"
+        style={{
+          padding: "24px",
+          maxWidth: "960px",
+          margin: "100px auto 0",
+        }}
+      >
+        <TipTapContent bodyJson={bodyJson} />
+        <MermaidHydrate />
+      </main>
+      <PublicThemeToggle />
+    </div>
   );
 }
