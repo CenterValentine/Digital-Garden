@@ -612,13 +612,18 @@ export const ServerCalendarViewBlock = Node.create({
   },
 
   renderHTML({ HTMLAttributes }) {
+    // Calendar policy (decided 2026-05-20): strip entirely from
+    // publisher output. Calendars contain potentially sensitive event
+    // data and are stale by definition on a published page. The
+    // post-process pass in TipTapContent removes any element marked
+    // `data-publisher-omit="true"`.
     return [
       "div",
       mergeAttributes(HTMLAttributes, {
         class: "block-calendar-view",
         "data-block-type": "calendarViewBlock",
+        "data-publisher-omit": "true",
       }),
-      `Calendar ${HTMLAttributes.view || "month"} view`,
     ];
   },
 });

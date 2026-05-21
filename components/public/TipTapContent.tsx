@@ -51,6 +51,10 @@ function slugifyAnchor(text: string): string {
  *    (text-input, date-input, select-input, etc.) emit this marker when
  *    their value is empty so the publisher omits them entirely — keeping
  *    the published output clean of "unfilled form" artifacts.
+ * 5. Strip elements marked `data-publisher-omit="true"`. Different
+ *    semantic from data-form-empty: these blocks (currently calendar) are
+ *    deliberately not rendered on the publisher for privacy/data-stale
+ *    reasons regardless of whether they have content.
  */
 function postProcessDom(container: HTMLElement, jsdomDocument: Document): void {
   // Pass 1 — heading IDs
@@ -127,6 +131,13 @@ function postProcessDom(container: HTMLElement, jsdomDocument: Document): void {
   // Pass 4 — Strip empty form-input blocks (text-input, date-input, etc.)
   // Policy: forms with no value contribute nothing to the published page.
   container.querySelectorAll<HTMLElement>('[data-form-empty="true"]').forEach((el) => {
+    el.remove();
+  });
+
+  // Pass 5 — Strip blocks explicitly omitted from publisher.
+  // Currently: calendar (privacy + staleness). May extend later if
+  // other blocks need a "never on publisher" policy.
+  container.querySelectorAll<HTMLElement>('[data-publisher-omit="true"]').forEach((el) => {
     el.remove();
   });
 }
