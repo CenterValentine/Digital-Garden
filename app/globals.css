@@ -2995,6 +2995,147 @@ mark {
   padding: 0.25rem 0;
 }
 
+/* ─── Publisher form-input rendering ─────────────────────────────────────
+   Form-input blocks (text/date/number/rating/select/checkbox/prompt) emit
+   functional pre-filled controls on the publisher (.block-form-rendered)
+   when their value is set. These rules style that publisher render with
+   parity for the editor, so authors see a faithful preview.
+   See feat(blocks): editor-only form inputs render on publisher (3834670). */
+
+:is(.ProseMirror, .public-prose) .block-form-rendered {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin: 0.75rem 0;
+  align-items: stretch;
+}
+
+:is(.ProseMirror, .public-prose) .block-form-label {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: rgba(0, 0, 0, 0.82);
+  line-height: 1.4;
+}
+.dark :is(.ProseMirror, .public-prose) .block-form-label {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+:is(.ProseMirror, .public-prose) .block-form-control {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.9);
+  color: rgba(0, 0, 0, 0.85);
+  font-size: 0.9rem;
+  font-family: inherit;
+  line-height: 1.4;
+  width: 100%;
+  max-width: 360px;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+:is(.ProseMirror, .public-prose) .block-form-control:focus {
+  outline: none;
+  border-color: rgba(59, 130, 246, 0.6);
+  background: #fff;
+}
+.dark :is(.ProseMirror, .public-prose) .block-form-control {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.15);
+  color: rgba(255, 255, 255, 0.92);
+}
+.dark :is(.ProseMirror, .public-prose) .block-form-control:focus {
+  border-color: rgba(96, 165, 250, 0.7);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+:is(.ProseMirror, .public-prose) textarea.block-form-control {
+  min-height: 4.5em;
+  resize: vertical;
+}
+
+:is(.ProseMirror, .public-prose) .block-number-input.block-form-rendered {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+:is(.ProseMirror, .public-prose) .block-number-input .block-form-label {
+  flex: 0 0 auto;
+}
+:is(.ProseMirror, .public-prose) .block-number-input .block-form-control {
+  max-width: 8rem;
+}
+:is(.ProseMirror, .public-prose) .block-form-unit {
+  font-size: 0.85rem;
+  color: rgba(0, 0, 0, 0.55);
+}
+.dark :is(.ProseMirror, .public-prose) .block-form-unit {
+  color: rgba(255, 255, 255, 0.55);
+}
+
+:is(.ProseMirror, .public-prose) .block-rating-input.block-form-rendered {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.6rem;
+}
+:is(.ProseMirror, .public-prose) .block-rating-display {
+  font-size: 1.1rem;
+  letter-spacing: 0.1em;
+  color: rgba(245, 158, 11, 0.95);
+}
+.dark :is(.ProseMirror, .public-prose) .block-rating-display {
+  color: rgba(251, 191, 36, 0.95);
+}
+
+:is(.ProseMirror, .public-prose) .block-checkbox-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+:is(.ProseMirror, .public-prose) .block-form-checkbox-item,
+:is(.ProseMirror, .public-prose) .block-form-checkbox-single {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+:is(.ProseMirror, .public-prose) .block-form-checkbox-item input[type="checkbox"],
+:is(.ProseMirror, .public-prose) .block-form-checkbox-single input[type="checkbox"] {
+  width: 1rem;
+  height: 1rem;
+  accent-color: var(--intent-primary, #3b82f6);
+  cursor: pointer;
+}
+
+:is(.ProseMirror, .public-prose) .block-prompt-input.block-form-rendered {
+  gap: 0.6rem;
+  max-width: 720px;
+}
+:is(.ProseMirror, .public-prose) .block-prompt-input-prompt {
+  font-size: 0.85rem;
+  color: rgba(0, 0, 0, 0.6);
+  font-style: italic;
+  padding-left: 0.75rem;
+  border-left: 3px solid rgba(0, 0, 0, 0.15);
+}
+.dark :is(.ProseMirror, .public-prose) .block-prompt-input-prompt {
+  color: rgba(255, 255, 255, 0.6);
+  border-left-color: rgba(255, 255, 255, 0.18);
+}
+:is(.ProseMirror, .public-prose) .block-prompt-input-response {
+  font-size: 0.95rem;
+  color: rgba(0, 0, 0, 0.85);
+  line-height: 1.55;
+  padding: 0.6rem 0.85rem;
+  background: rgba(0, 0, 0, 0.03);
+  border-radius: 6px;
+}
+.dark :is(.ProseMirror, .public-prose) .block-prompt-input-response {
+  color: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.05);
+}
+
 /* ─── Date Input format row ─── */
 
 .ProseMirror .input-block-date-row {
