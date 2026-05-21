@@ -1,4 +1,5 @@
 import React from "react";
+import { MermaidHydrate } from "@/components/public/MermaidHydrate";
 
 const PUBLIC_SCRIPT = `
 (function() {
@@ -176,6 +177,7 @@ export default function PublicLayout({
     // and remove the default pt-20 padding applied by the root layout
     <div className="public-route min-h-screen bg-[#0a0a0a] text-white">
       {children}
+      <MermaidHydrate />
       <script dangerouslySetInnerHTML={{ __html: PUBLIC_SCRIPT }} />
     </div>
   );

@@ -1,0 +1,14 @@
+{
+  "type": "doc",
+  "content": [
+    { "type": "paragraph", "content": [{ "type": "text", "text": "Drawing below:" }] },
+    {
+      "type": "excalidrawBlock",
+      "attrs": {
+        "blockId": "fixture-excalidraw-001",
+        "contentId": null,
+        "title": "Untitled Drawing"
+      }
+    }
+  ]
+}

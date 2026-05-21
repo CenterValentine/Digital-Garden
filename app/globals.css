@@ -2995,6 +2995,81 @@ mark {
   padding: 0.25rem 0;
 }
 
+/* ─── Publisher visualization render (mermaid + excalidraw) ───────────────
+   Mermaid: <pre class="mermaid">{source}</pre> is injected by
+   TipTapContent.postProcessDom Pass 6; MermaidHydrate (client) replaces
+   it with an inline SVG on visitor's browser. These rules style the
+   source-display before hydration AND the unrendered fallback.
+   Excalidraw: cached SVG injected inline when populated by editor save
+   flow; placeholder shown otherwise. */
+
+.public-prose .block-mermaid {
+  margin: 1rem 0;
+}
+.public-prose .block-mermaid pre.mermaid {
+  background: rgba(0, 0, 0, 0.03);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+  padding: 1rem;
+  overflow-x: auto;
+  font-family: monospace;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: rgba(0, 0, 0, 0.75);
+  text-align: center;
+}
+.dark .public-prose .block-mermaid pre.mermaid {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.85);
+}
+.public-prose .block-mermaid pre.mermaid[data-processed="true"] {
+  background: transparent;
+  border: none;
+  padding: 0;
+}
+.public-prose .block-mermaid-empty {
+  min-height: 2.5rem;
+  border: 1px dashed rgba(0, 0, 0, 0.15);
+  border-radius: 8px;
+  padding: 1rem;
+  color: rgba(0, 0, 0, 0.4);
+  font-size: 0.85rem;
+  font-style: italic;
+  text-align: center;
+}
+.public-prose .block-mermaid-empty::before {
+  content: "Mermaid diagram — source not available";
+}
+.dark .public-prose .block-mermaid-empty {
+  border-color: rgba(255, 255, 255, 0.15);
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.public-prose .block-excalidraw {
+  margin: 1rem 0;
+}
+.public-prose .block-excalidraw-rendered svg {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 0 auto;
+}
+.public-prose .block-excalidraw-placeholder-inner {
+  min-height: 4rem;
+  border: 1px dashed rgba(0, 0, 0, 0.15);
+  border-radius: 8px;
+  padding: 1.25rem;
+  color: rgba(0, 0, 0, 0.5);
+  font-size: 0.9rem;
+  font-style: italic;
+  text-align: center;
+}
+.dark .public-prose .block-excalidraw-placeholder-inner {
+  border-color: rgba(255, 255, 255, 0.15);
+  color: rgba(255, 255, 255, 0.45);
+}
+
 /* ─── Publisher form-input rendering ─────────────────────────────────────
    Form-input blocks (text/date/number/rating/select/checkbox/prompt) emit
    functional pre-filled controls on the publisher (.block-form-rendered)

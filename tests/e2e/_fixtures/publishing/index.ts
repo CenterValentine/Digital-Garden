@@ -75,6 +75,16 @@ export const PUBLISHING_FIXTURE_BLOCKS = [
   // (strip policy from 3475417). Editor snapshot shows the calendar
   // block in NodeView form. Both surfaces still verified.
   "calendar-view",
+  // Visualization blocks (added 2026-05-20).
+  // Both render placeholder by default — full hydration depends on:
+  //   - mermaid: a VisualizationPayload row in DB whose contentId
+  //     matches the block's. Publisher fetches source, MermaidHydrate
+  //     (client) renders SVG.
+  //   - excalidraw: a cachedSvg field on VisualizationPayload.data.
+  //     Populated by editor save flow (deferred work). Until then,
+  //     publisher shows a styled "view in app" placeholder.
+  "mermaid-block",
+  "excalidraw-block",
 ] as const;
 
 export type PublishingFixtureBlock = (typeof PUBLISHING_FIXTURE_BLOCKS)[number];

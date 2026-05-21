@@ -1,0 +1,14 @@
+{
+  "type": "doc",
+  "content": [
+    { "type": "paragraph", "content": [{ "type": "text", "text": "Diagram below:" }] },
+    {
+      "type": "mermaidBlock",
+      "attrs": {
+        "blockId": "fixture-mermaid-001",
+        "contentId": null,
+        "title": "Untitled Diagram"
+      }
+    }
+  ]
+}

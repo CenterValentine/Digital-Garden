@@ -16,6 +16,7 @@ import { notFound } from "next/navigation";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { TipTapContent } from "@/components/public/TipTapContent";
+import { MermaidHydrate } from "@/components/public/MermaidHydrate";
 import type { JSONContent } from "@tiptap/core";
 
 const FIXTURES_ENABLED =
@@ -79,6 +80,7 @@ export default async function PublishingFixturePage({
       }}
     >
       <TipTapContent bodyJson={bodyJson} />
+      <MermaidHydrate />
     </main>
   );
 }
