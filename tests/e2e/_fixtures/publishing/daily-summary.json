@@ -1,0 +1,14 @@
+{
+  "type": "doc",
+  "content": [
+    {
+      "type": "dailySummary",
+      "attrs": {
+        "blockId": "fixture-daily-summary-001",
+        "summaryDate": "2026-05-20",
+        "templateDateMode": "refresh",
+        "workdayCutoffHour": 0
+      }
+    }
+  ]
+}

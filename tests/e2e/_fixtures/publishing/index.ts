@@ -65,6 +65,16 @@ export const PUBLISHING_FIXTURE_BLOCKS = [
   "pull-quote",
   "stopwatch",
   "habit-tracker",
+  // Remaining editor-only blocks — added 2026-05-20 to fill out
+  // visual coverage across both editor and publisher fixture surfaces.
+  "list-container",
+  "table-of-contents",
+  "timestamp",
+  "daily-summary",
+  // calendar-view: publisher snapshot is intentionally near-empty
+  // (strip policy from 3475417). Editor snapshot shows the calendar
+  // block in NodeView form. Both surfaces still verified.
+  "calendar-view",
 ] as const;
 
 export type PublishingFixtureBlock = (typeof PUBLISHING_FIXTURE_BLOCKS)[number];
