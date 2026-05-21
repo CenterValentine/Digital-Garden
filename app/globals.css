@@ -3195,7 +3195,7 @@ mark {
 /* ─── Habit Tracker Block ─── */
 
 .ProseMirror .block-habitTracker,
-.ProseMirror .block-habit-tracker {
+:is(.ProseMirror, .public-prose) .block-habit-tracker {
   width: 100%;
   min-width: 0;
   max-width: 100%;
@@ -3203,7 +3203,7 @@ mark {
   overflow: hidden;
 }
 
-.ProseMirror .habit-tracker-content {
+:is(.ProseMirror, .public-prose) .habit-tracker-content {
   --habit-cell-size: clamp(1.45rem, 1.7vw, 1.8rem);
   --habit-cell-height: clamp(1.45rem, 1.7vw, 1.8rem);
   --habit-habit-col-width: clamp(14rem, 17vw, 18rem);
@@ -3217,17 +3217,17 @@ mark {
   min-width: 0;
 }
 
-.ProseMirror .habit-tracker-content[data-preset="monthly-grid"] {
+:is(.ProseMirror, .public-prose) .habit-tracker-content[data-preset="monthly-grid"] {
   --habit-cell-size: clamp(1.35rem, 1.55vw, 1.65rem);
   --habit-cell-height: clamp(1.35rem, 1.55vw, 1.65rem);
 }
 
-.ProseMirror .habit-tracker-content[data-preset="weekly-grid"] {
+:is(.ProseMirror, .public-prose) .habit-tracker-content[data-preset="weekly-grid"] {
   --habit-cell-size: clamp(1.6rem, 1.9vw, 2rem);
   --habit-cell-height: clamp(1.6rem, 1.9vw, 2rem);
 }
 
-.ProseMirror .habit-tracker-content[data-background="visible"] {
+:is(.ProseMirror, .public-prose) .habit-tracker-content[data-background="visible"] {
   border-radius: 16px;
   padding: 0.9rem;
   background:
@@ -3235,24 +3235,24 @@ mark {
     rgba(15, 23, 42, 0.03);
 }
 
-.ProseMirror .habit-tracker-header {
+:is(.ProseMirror, .public-prose) .habit-tracker-header {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 1rem;
 }
 
-.ProseMirror .habit-tracker-title-wrap {
+:is(.ProseMirror, .public-prose) .habit-tracker-title-wrap {
   min-width: 0;
 }
 
-.ProseMirror .habit-tracker-title {
+:is(.ProseMirror, .public-prose) .habit-tracker-title {
   font-size: 1rem;
   font-weight: 700;
   color: var(--text-primary, #1f2937);
 }
 
-.ProseMirror .habit-tracker-subtitle {
+:is(.ProseMirror, .public-prose) .habit-tracker-subtitle {
   margin-top: 0.2rem;
   font-size: 0.72rem;
   font-weight: 700;
@@ -3261,14 +3261,14 @@ mark {
   color: var(--text-secondary, #64748b);
 }
 
-.ProseMirror .habit-tracker-period-label {
+:is(.ProseMirror, .public-prose) .habit-tracker-period-label {
   margin-top: 0.18rem;
   font-size: 1.05rem;
   font-weight: 800;
   color: var(--text-primary);
 }
 
-.ProseMirror .habit-tracker-header-actions {
+:is(.ProseMirror, .public-prose) .habit-tracker-header-actions {
   display: flex;
   align-items: center;
   gap: 0.4rem;
@@ -3276,9 +3276,9 @@ mark {
   justify-content: flex-end;
 }
 
-.ProseMirror .habit-tracker-nav-btn,
-.ProseMirror .habit-tracker-settings-btn,
-.ProseMirror .habit-tracker-empty-btn {
+:is(.ProseMirror, .public-prose) .habit-tracker-nav-btn,
+:is(.ProseMirror, .public-prose) .habit-tracker-settings-btn,
+:is(.ProseMirror, .public-prose) .habit-tracker-empty-btn {
   border: 1px solid var(--border-secondary, rgba(0, 0, 0, 0.12));
   border-radius: 9999px;
   background: rgba(255, 255, 255, 0.58);
@@ -3289,25 +3289,25 @@ mark {
   transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
 }
 
-.ProseMirror .habit-tracker-nav-btn,
-.ProseMirror .habit-tracker-settings-btn {
+:is(.ProseMirror, .public-prose) .habit-tracker-nav-btn,
+:is(.ProseMirror, .public-prose) .habit-tracker-settings-btn {
   min-height: 2rem;
   padding: 0.35rem 0.7rem;
 }
 
-.ProseMirror .habit-tracker-empty-btn {
+:is(.ProseMirror, .public-prose) .habit-tracker-empty-btn {
   padding: 0.55rem 0.9rem;
 }
 
-.ProseMirror .habit-tracker-nav-btn:hover,
-.ProseMirror .habit-tracker-settings-btn:hover,
-.ProseMirror .habit-tracker-empty-btn:hover {
+:is(.ProseMirror, .public-prose) .habit-tracker-nav-btn:hover,
+:is(.ProseMirror, .public-prose) .habit-tracker-settings-btn:hover,
+:is(.ProseMirror, .public-prose) .habit-tracker-empty-btn:hover {
   background: rgba(255, 255, 255, 0.82);
   border-color: rgba(59, 130, 246, 0.28);
   transform: translateY(-1px);
 }
 
-.ProseMirror .habit-tracker-empty {
+:is(.ProseMirror, .public-prose) .habit-tracker-empty {
   display: flex;
   flex-direction: column;
   gap: 0.55rem;
@@ -3318,45 +3318,45 @@ mark {
   background: rgba(255, 255, 255, 0.4);
 }
 
-.ProseMirror .habit-tracker-empty-title {
+:is(.ProseMirror, .public-prose) .habit-tracker-empty-title {
   font-weight: 700;
   color: var(--text-primary, #1f2937);
 }
 
-.ProseMirror .habit-tracker-empty-copy {
+:is(.ProseMirror, .public-prose) .habit-tracker-empty-copy {
   margin: 0;
   font-size: 0.9rem;
   color: var(--text-secondary, #6b7280);
 }
 
-.ProseMirror .habit-tracker-grid-scroll {
+:is(.ProseMirror, .public-prose) .habit-tracker-grid-scroll {
   overflow-x: auto;
   overflow-y: hidden;
   padding-bottom: 0.1rem;
   max-width: 100%;
 }
 
-.ProseMirror .habit-tracker-stats-wrap {
+:is(.ProseMirror, .public-prose) .habit-tracker-stats-wrap {
   overflow-x: auto;
   overflow-y: hidden;
   max-width: 100%;
   margin-bottom: 0.15rem;
 }
 
-.ProseMirror .habit-tracker-stats-table {
+:is(.ProseMirror, .public-prose) .habit-tracker-stats-table {
   width: 100%;
   min-width: 32rem;
   border-collapse: separate;
   border-spacing: 0;
 }
 
-.ProseMirror .habit-tracker-stats-table th,
-.ProseMirror .habit-tracker-stats-table td {
+:is(.ProseMirror, .public-prose) .habit-tracker-stats-table th,
+:is(.ProseMirror, .public-prose) .habit-tracker-stats-table td {
   padding: 0.3rem 0.45rem;
   text-align: left;
 }
 
-.ProseMirror .habit-tracker-stats-header {
+:is(.ProseMirror, .public-prose) .habit-tracker-stats-header {
   font-size: 0.68rem;
   font-weight: 700;
   letter-spacing: 0.04em;
@@ -3365,36 +3365,36 @@ mark {
   white-space: nowrap;
 }
 
-.ProseMirror .habit-tracker-stats-row th,
-.ProseMirror .habit-tracker-stats-row td {
+:is(.ProseMirror, .public-prose) .habit-tracker-stats-row th,
+:is(.ProseMirror, .public-prose) .habit-tracker-stats-row td {
   border-top: 1px solid rgba(148, 163, 184, 0.14);
 }
 
-.ProseMirror .habit-tracker-stats-habit {
+:is(.ProseMirror, .public-prose) .habit-tracker-stats-habit {
   min-width: var(--habit-habit-col-width);
   width: var(--habit-habit-col-width);
 }
 
-.ProseMirror .habit-tracker-stats-value {
+:is(.ProseMirror, .public-prose) .habit-tracker-stats-value {
   font-size: 0.78rem;
   font-weight: 600;
   color: var(--text-secondary);
   white-space: nowrap;
 }
 
-.ProseMirror .habit-tracker-grid {
+:is(.ProseMirror, .public-prose) .habit-tracker-grid {
   width: max-content;
   min-width: 100%;
   border-collapse: separate;
   border-spacing: 0;
 }
 
-.ProseMirror .habit-tracker-grid th,
-.ProseMirror .habit-tracker-grid td {
+:is(.ProseMirror, .public-prose) .habit-tracker-grid th,
+:is(.ProseMirror, .public-prose) .habit-tracker-grid td {
   padding: 0.18rem;
 }
 
-.ProseMirror .habit-tracker-grid-header {
+:is(.ProseMirror, .public-prose) .habit-tracker-grid-header {
   position: sticky;
   top: 0;
   z-index: 1;
@@ -3409,7 +3409,7 @@ mark {
   width: var(--habit-cell-size);
 }
 
-.ProseMirror .habit-tracker-grid-header-habit {
+:is(.ProseMirror, .public-prose) .habit-tracker-grid-header-habit {
   position: sticky;
   left: 0;
   z-index: 3;
@@ -3419,7 +3419,7 @@ mark {
   background: rgba(241, 245, 249, 0.98);
 }
 
-.ProseMirror .habit-tracker-grid-header-interval {
+:is(.ProseMirror, .public-prose) .habit-tracker-grid-header-interval {
   position: sticky;
   left: var(--habit-habit-col-width);
   z-index: 2;
@@ -3428,29 +3428,29 @@ mark {
   padding-inline: 0.2rem;
 }
 
-.ProseMirror .habit-tracker-time-header-icon {
+:is(.ProseMirror, .public-prose) .habit-tracker-time-header-icon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
 }
 
-.ProseMirror .habit-tracker-time-header-icon svg,
-.ProseMirror .habit-tracker-time-header-icon-svg {
+:is(.ProseMirror, .public-prose) .habit-tracker-time-header-icon svg,
+:is(.ProseMirror, .public-prose) .habit-tracker-time-header-icon-svg {
   width: 0.82rem;
   height: 0.82rem;
   stroke: currentColor;
 }
 
-.ProseMirror .habit-tracker-grid-weekday,
-.ProseMirror .habit-tracker-grid-day {
+:is(.ProseMirror, .public-prose) .habit-tracker-grid-weekday,
+:is(.ProseMirror, .public-prose) .habit-tracker-grid-day {
   display: block;
 }
 
-.ProseMirror .habit-tracker-grid-day {
+:is(.ProseMirror, .public-prose) .habit-tracker-grid-day {
   color: var(--text-primary, #334155);
 }
 
-.ProseMirror .habit-tracker-habit-cell {
+:is(.ProseMirror, .public-prose) .habit-tracker-habit-cell {
   position: sticky;
   left: 0;
   z-index: 2;
@@ -3462,7 +3462,7 @@ mark {
   vertical-align: top;
 }
 
-.ProseMirror .habit-tracker-interval-cell {
+:is(.ProseMirror, .public-prose) .habit-tracker-interval-cell {
   position: sticky;
   left: var(--habit-habit-col-width);
   z-index: 1;
@@ -3478,7 +3478,7 @@ mark {
   vertical-align: middle;
 }
 
-.ProseMirror .habit-tracker-habit-chip {
+:is(.ProseMirror, .public-prose) .habit-tracker-habit-chip {
   display: flex;
   align-items: center;
   gap: 0.7rem;
@@ -3486,7 +3486,7 @@ mark {
   padding-right: 0.45rem;
 }
 
-.ProseMirror .habit-tracker-habit-icon {
+:is(.ProseMirror, .public-prose) .habit-tracker-habit-icon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -3498,21 +3498,21 @@ mark {
   flex-shrink: 0;
 }
 
-.ProseMirror .habit-tracker-habit-icon svg,
-.ProseMirror .habit-tracker-icon-svg {
+:is(.ProseMirror, .public-prose) .habit-tracker-habit-icon svg,
+:is(.ProseMirror, .public-prose) .habit-tracker-icon-svg {
   width: 1rem;
   height: 1rem;
   stroke: currentColor;
 }
 
-.ProseMirror .habit-tracker-habit-text {
+:is(.ProseMirror, .public-prose) .habit-tracker-habit-text {
   min-width: 0;
   padding-top: 0;
   white-space: nowrap;
   overflow: hidden;
 }
 
-.ProseMirror .habit-tracker-habit-name {
+:is(.ProseMirror, .public-prose) .habit-tracker-habit-name {
   display: block;
   font-size: 0.98rem;
   line-height: 1.3;
@@ -3523,21 +3523,21 @@ mark {
   text-overflow: ellipsis;
 }
 
-.ProseMirror .habit-tracker-habit-target {
+:is(.ProseMirror, .public-prose) .habit-tracker-habit-target {
   display: block;
   margin-top: 0.2rem;
   font-size: 0.72rem;
   color: var(--text-secondary, #64748b);
 }
 
-.ProseMirror .habit-tracker-grid-cell {
+:is(.ProseMirror, .public-prose) .habit-tracker-grid-cell {
   text-align: center;
   min-width: var(--habit-cell-size);
   width: var(--habit-cell-size);
   vertical-align: middle;
 }
 
-.ProseMirror .habit-tracker-cell {
+:is(.ProseMirror, .public-prose) .habit-tracker-cell {
   width: var(--habit-cell-size);
   min-width: var(--habit-cell-size);
   min-height: var(--habit-cell-height);
@@ -3554,47 +3554,47 @@ mark {
   transition: transform 0.12s ease, border-color 0.12s ease, background 0.12s ease;
 }
 
-.ProseMirror .habit-tracker-cell svg,
-.ProseMirror .habit-tracker-cell-icon {
+:is(.ProseMirror, .public-prose) .habit-tracker-cell svg,
+:is(.ProseMirror, .public-prose) .habit-tracker-cell-icon {
   width: clamp(0.7rem, 0.78vw, 0.88rem);
   height: clamp(0.7rem, 0.78vw, 0.88rem);
   stroke: currentColor;
   stroke-width: 2.1;
 }
 
-.ProseMirror .habit-tracker-cell:hover {
+:is(.ProseMirror, .public-prose) .habit-tracker-cell:hover {
   transform: translateY(-1px);
   border-color: rgba(59, 130, 246, 0.35);
 }
 
-.ProseMirror .habit-tracker-cell[data-complete="true"] {
+:is(.ProseMirror, .public-prose) .habit-tracker-cell[data-complete="true"] {
   border-color: rgba(34, 197, 94, 0.32);
   background: rgba(34, 197, 94, 0.16);
 }
 
-.ProseMirror .habit-tracker-cell[data-status="missed"] {
+:is(.ProseMirror, .public-prose) .habit-tracker-cell[data-status="missed"] {
   border-color: rgba(239, 68, 68, 0.26);
   background: rgba(239, 68, 68, 0.12);
   color: #b91c1c;
 }
 
-.ProseMirror .habit-tracker-cell[data-status="thinking"] {
+:is(.ProseMirror, .public-prose) .habit-tracker-cell[data-status="thinking"] {
   border-color: rgba(59, 130, 246, 0.24);
   background: rgba(59, 130, 246, 0.1);
   color: #1d4ed8;
 }
 
-.ProseMirror .habit-tracker-cell-count {
+:is(.ProseMirror, .public-prose) .habit-tracker-cell-count {
   padding: 0.12rem;
 }
 
-.ProseMirror .habit-tracker-count-stepper {
+:is(.ProseMirror, .public-prose) .habit-tracker-count-stepper {
   display: inline-flex;
   align-items: center;
   gap: 0.1rem;
 }
 
-.ProseMirror .habit-tracker-stepper-btn {
+:is(.ProseMirror, .public-prose) .habit-tracker-stepper-btn {
   width: clamp(0.82rem, 0.95vw, 1.05rem);
   height: clamp(0.82rem, 0.95vw, 1.05rem);
   display: inline-flex;
@@ -3609,32 +3609,32 @@ mark {
   line-height: 1;
 }
 
-.ProseMirror .habit-tracker-stepper-btn:hover {
+:is(.ProseMirror, .public-prose) .habit-tracker-stepper-btn:hover {
   background: rgba(15, 23, 42, 0.14);
 }
 
-.ProseMirror .habit-tracker-count-value {
+:is(.ProseMirror, .public-prose) .habit-tracker-count-value {
   min-width: 0.8rem;
   font-size: clamp(0.58rem, 0.62vw, 0.72rem);
   font-weight: 700;
   text-align: center;
 }
 
-.ProseMirror .habit-tracker-grid-row-split .habit-tracker-grid-cell,
-.ProseMirror .habit-tracker-grid-row-split .habit-tracker-interval-cell {
+:is(.ProseMirror, .public-prose) .habit-tracker-grid-row-split .habit-tracker-grid-cell,
+:is(.ProseMirror, .public-prose) .habit-tracker-grid-row-split .habit-tracker-interval-cell {
   padding-top: 0.08rem;
   padding-bottom: 0.08rem;
 }
 
-.ProseMirror .habit-tracker-stat-badges,
-.ProseMirror .habit-tracker-card-top {
+:is(.ProseMirror, .public-prose) .habit-tracker-stat-badges,
+:is(.ProseMirror, .public-prose) .habit-tracker-card-top {
   display: flex;
   flex-wrap: nowrap;
   gap: 0.35rem;
   align-items: center;
 }
 
-.ProseMirror .habit-tracker-stat {
+:is(.ProseMirror, .public-prose) .habit-tracker-stat {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -3647,27 +3647,27 @@ mark {
   font-weight: 600;
 }
 
-.ProseMirror .habit-tracker-cards {
+:is(.ProseMirror, .public-prose) .habit-tracker-cards {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 0.8rem;
 }
 
-.ProseMirror .habit-tracker-card {
+:is(.ProseMirror, .public-prose) .habit-tracker-card {
   border: 1px solid rgba(148, 163, 184, 0.14);
   border-radius: 16px;
   padding: 0.85rem;
   background: rgba(255, 255, 255, 0.62);
 }
 
-.ProseMirror .habit-tracker-card-top {
+:is(.ProseMirror, .public-prose) .habit-tracker-card-top {
   justify-content: space-between;
   align-items: flex-start;
   gap: 0.7rem;
   margin-bottom: 0.75rem;
 }
 
-.ProseMirror .habit-tracker-card-identity {
+:is(.ProseMirror, .public-prose) .habit-tracker-card-identity {
   display: flex;
   align-items: center;
   gap: 0.7rem;
@@ -3675,7 +3675,7 @@ mark {
   flex: 1 1 auto;
 }
 
-.ProseMirror .habit-tracker-stat-badges {
+:is(.ProseMirror, .public-prose) .habit-tracker-stat-badges {
   min-width: 0;
   flex: 0 1 auto;
   overflow-x: auto;
@@ -3683,17 +3683,17 @@ mark {
   scrollbar-width: none;
 }
 
-.ProseMirror .habit-tracker-stat-badges::-webkit-scrollbar {
+:is(.ProseMirror, .public-prose) .habit-tracker-stat-badges::-webkit-scrollbar {
   display: none;
 }
 
-.ProseMirror .habit-tracker-card-strip {
+:is(.ProseMirror, .public-prose) .habit-tracker-card-strip {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: 0.35rem;
 }
 
-.ProseMirror .habit-tracker-card-day {
+:is(.ProseMirror, .public-prose) .habit-tracker-card-day {
   display: flex;
   flex-direction: column;
   gap: 0.1rem;
@@ -3705,17 +3705,17 @@ mark {
   background: rgba(255, 255, 255, 0.68);
 }
 
-.ProseMirror .habit-tracker-card-day[data-complete="true"] {
+:is(.ProseMirror, .public-prose) .habit-tracker-card-day[data-complete="true"] {
   border-color: rgba(34, 197, 94, 0.32);
   background: rgba(34, 197, 94, 0.14);
 }
 
-.ProseMirror .habit-tracker-card-day-label {
+:is(.ProseMirror, .public-prose) .habit-tracker-card-day-label {
   font-size: 0.65rem;
   color: var(--text-secondary, #64748b);
 }
 
-.ProseMirror .habit-tracker-card-day-value {
+:is(.ProseMirror, .public-prose) .habit-tracker-card-day-value {
   font-size: 0.78rem;
   font-weight: 700;
   color: var(--text-primary, #0f172a);
@@ -3723,13 +3723,13 @@ mark {
 
 /* ─── Stopwatch Block ─── */
 
-.ProseMirror .block-stopwatch {
+:is(.ProseMirror, .public-prose) .block-stopwatch {
   width: 100%;
   min-width: 0;
   max-width: 100%;
 }
 
-.ProseMirror .stopwatch-content {
+:is(.ProseMirror, .public-prose) .stopwatch-content {
   --stopwatch-accent: #ff6b57;
   display: flex;
   flex-direction: column;
@@ -3739,7 +3739,7 @@ mark {
   padding: 0.2rem 0;
 }
 
-.ProseMirror .stopwatch-content[data-background="visible"] {
+:is(.ProseMirror, .public-prose) .stopwatch-content[data-background="visible"] {
   border-radius: 18px;
   padding: 1rem;
   background:
@@ -3747,24 +3747,24 @@ mark {
     rgba(15, 23, 42, 0.03);
 }
 
-.ProseMirror .stopwatch-header {
+:is(.ProseMirror, .public-prose) .stopwatch-header {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 1rem;
 }
 
-.ProseMirror .stopwatch-title-wrap {
+:is(.ProseMirror, .public-prose) .stopwatch-title-wrap {
   min-width: 0;
 }
 
-.ProseMirror .stopwatch-title {
+:is(.ProseMirror, .public-prose) .stopwatch-title {
   font-size: 0.95rem;
   font-weight: 700;
   color: var(--text-primary);
 }
 
-.ProseMirror .stopwatch-status {
+:is(.ProseMirror, .public-prose) .stopwatch-status {
   margin-top: 0.12rem;
   font-size: 0.72rem;
   font-weight: 700;
@@ -3773,7 +3773,7 @@ mark {
   color: var(--text-secondary);
 }
 
-.ProseMirror .stopwatch-edit-btn {
+:is(.ProseMirror, .public-prose) .stopwatch-edit-btn {
   min-height: 2rem;
   padding: 0.35rem 0.8rem;
   border: 1px solid rgba(148, 163, 184, 0.25);
@@ -3785,7 +3785,7 @@ mark {
   cursor: pointer;
 }
 
-.ProseMirror .stopwatch-display {
+:is(.ProseMirror, .public-prose) .stopwatch-display {
   display: flex;
   flex-wrap: nowrap;
   align-items: flex-end;
@@ -3795,11 +3795,11 @@ mark {
   scrollbar-width: none;
 }
 
-.ProseMirror .stopwatch-display::-webkit-scrollbar {
+:is(.ProseMirror, .public-prose) .stopwatch-display::-webkit-scrollbar {
   display: none;
 }
 
-.ProseMirror .stopwatch-segment {
+:is(.ProseMirror, .public-prose) .stopwatch-segment {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
@@ -3807,7 +3807,7 @@ mark {
   flex-shrink: 0;
 }
 
-.ProseMirror .stopwatch-separator {
+:is(.ProseMirror, .public-prose) .stopwatch-separator {
   align-self: center;
   font-variant-numeric: tabular-nums;
   color: var(--text-primary);
@@ -3818,49 +3818,49 @@ mark {
   transform: translateY(var(--stopwatch-separator-offset, -0.28em));
 }
 
-.ProseMirror .stopwatch-segment-value {
+:is(.ProseMirror, .public-prose) .stopwatch-segment-value {
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.04em;
   color: var(--text-primary);
 }
 
-.ProseMirror .stopwatch-content[data-variant="ios"] .stopwatch-segment-value {
+:is(.ProseMirror, .public-prose) .stopwatch-content[data-variant="ios"] .stopwatch-segment-value {
   font-size: clamp(2.4rem, 5vw, 4.4rem);
   font-weight: 300;
   line-height: 0.95;
 }
 
-.ProseMirror .stopwatch-content[data-variant="ios"] .stopwatch-separator {
+:is(.ProseMirror, .public-prose) .stopwatch-content[data-variant="ios"] .stopwatch-separator {
   font-size: clamp(2.2rem, 4.5vw, 4rem);
   font-weight: 300;
   --stopwatch-separator-offset: -0.3em;
 }
 
-.ProseMirror .stopwatch-content[data-variant="minimal"] .stopwatch-segment-value {
+:is(.ProseMirror, .public-prose) .stopwatch-content[data-variant="minimal"] .stopwatch-segment-value {
   font-size: clamp(2rem, 4vw, 3.4rem);
   font-weight: 600;
   line-height: 1;
 }
 
-.ProseMirror .stopwatch-content[data-variant="minimal"] .stopwatch-separator {
+:is(.ProseMirror, .public-prose) .stopwatch-content[data-variant="minimal"] .stopwatch-separator {
   font-size: clamp(1.85rem, 3.6vw, 3rem);
   font-weight: 600;
   --stopwatch-separator-offset: -0.24em;
 }
 
-.ProseMirror .stopwatch-content[data-variant="panel"] .stopwatch-segment-value {
+:is(.ProseMirror, .public-prose) .stopwatch-content[data-variant="panel"] .stopwatch-segment-value {
   font-size: clamp(1.9rem, 3.4vw, 3rem);
   font-weight: 700;
   line-height: 1;
 }
 
-.ProseMirror .stopwatch-content[data-variant="panel"] .stopwatch-separator {
+:is(.ProseMirror, .public-prose) .stopwatch-content[data-variant="panel"] .stopwatch-separator {
   font-size: clamp(1.7rem, 3vw, 2.7rem);
   font-weight: 700;
   --stopwatch-separator-offset: -0.22em;
 }
 
-.ProseMirror .stopwatch-segment-label {
+:is(.ProseMirror, .public-prose) .stopwatch-segment-label {
   font-size: 0.62rem;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -3868,19 +3868,19 @@ mark {
   color: var(--text-secondary);
 }
 
-.ProseMirror .stopwatch-meta {
+:is(.ProseMirror, .public-prose) .stopwatch-meta {
   font-size: 0.76rem;
   color: var(--text-secondary);
 }
 
-.ProseMirror .stopwatch-controls {
+:is(.ProseMirror, .public-prose) .stopwatch-controls {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
 }
 
-.ProseMirror .stopwatch-control {
+:is(.ProseMirror, .public-prose) .stopwatch-control {
   min-width: 6.25rem;
   min-height: 2.9rem;
   padding: 0.4rem 1rem;
@@ -3892,47 +3892,47 @@ mark {
   transition: transform 0.12s ease, opacity 0.12s ease, background 0.12s ease;
 }
 
-.ProseMirror .stopwatch-control:hover:not(:disabled) {
+:is(.ProseMirror, .public-prose) .stopwatch-control:hover:not(:disabled) {
   transform: translateY(-1px);
 }
 
-.ProseMirror .stopwatch-control-secondary,
-.ProseMirror .stopwatch-control-ghost {
+:is(.ProseMirror, .public-prose) .stopwatch-control-secondary,
+:is(.ProseMirror, .public-prose) .stopwatch-control-ghost {
   background: rgba(15, 23, 42, 0.06);
   color: var(--text-secondary);
 }
 
-.ProseMirror .stopwatch-control-start {
+:is(.ProseMirror, .public-prose) .stopwatch-control-start {
   background: color-mix(in srgb, var(--stopwatch-accent) 18%, white);
   color: color-mix(in srgb, var(--stopwatch-accent) 78%, black);
   border-color: color-mix(in srgb, var(--stopwatch-accent) 26%, white);
 }
 
-.ProseMirror .stopwatch-control-stop {
+:is(.ProseMirror, .public-prose) .stopwatch-control-stop {
   background: color-mix(in srgb, var(--stopwatch-accent) 16%, white);
   color: color-mix(in srgb, var(--stopwatch-accent) 82%, black);
   border-color: color-mix(in srgb, var(--stopwatch-accent) 24%, white);
 }
 
-.ProseMirror .stopwatch-control:disabled {
+:is(.ProseMirror, .public-prose) .stopwatch-control:disabled {
   opacity: 0.35;
   cursor: default;
 }
 
-.ProseMirror .stopwatch-laps {
+:is(.ProseMirror, .public-prose) .stopwatch-laps {
   border-top: 1px solid rgba(148, 163, 184, 0.14);
   padding-top: 0.8rem;
 }
 
-.ProseMirror .stopwatch-laps-header,
-.ProseMirror .stopwatch-lap-row {
+:is(.ProseMirror, .public-prose) .stopwatch-laps-header,
+:is(.ProseMirror, .public-prose) .stopwatch-lap-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr);
   gap: 0.75rem;
   align-items: center;
 }
 
-.ProseMirror .stopwatch-laps-header {
+:is(.ProseMirror, .public-prose) .stopwatch-laps-header {
   margin-bottom: 0.45rem;
   font-size: 0.66rem;
   font-weight: 700;
@@ -3941,83 +3941,83 @@ mark {
   color: var(--text-secondary);
 }
 
-.ProseMirror .stopwatch-laps-list {
+:is(.ProseMirror, .public-prose) .stopwatch-laps-list {
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
 }
 
-.ProseMirror .stopwatch-lap-row {
+:is(.ProseMirror, .public-prose) .stopwatch-lap-row {
   padding: 0.45rem 0.2rem;
   border-top: 1px solid rgba(148, 163, 184, 0.12);
   font-variant-numeric: tabular-nums;
 }
 
-.ProseMirror .stopwatch-lap-index {
+:is(.ProseMirror, .public-prose) .stopwatch-lap-index {
   font-size: 0.8rem;
   font-weight: 600;
   color: var(--text-primary);
 }
 
-.ProseMirror .stopwatch-lap-value,
-.ProseMirror .stopwatch-lap-split {
+:is(.ProseMirror, .public-prose) .stopwatch-lap-value,
+:is(.ProseMirror, .public-prose) .stopwatch-lap-split {
   font-size: 0.8rem;
   font-weight: 600;
   color: var(--text-secondary);
   text-align: right;
 }
 
-.ProseMirror .stopwatch-laps-empty {
+:is(.ProseMirror, .public-prose) .stopwatch-laps-empty {
   font-size: 0.78rem;
   color: var(--text-secondary);
 }
 
-.ProseMirror .stopwatch-content[data-variant="minimal"] .stopwatch-laps,
-.ProseMirror .stopwatch-content[data-variant="minimal"] .stopwatch-controls {
+:is(.ProseMirror, .public-prose) .stopwatch-content[data-variant="minimal"] .stopwatch-laps,
+:is(.ProseMirror, .public-prose) .stopwatch-content[data-variant="minimal"] .stopwatch-controls {
   border-top-color: rgba(148, 163, 184, 0.1);
 }
 
-.ProseMirror .stopwatch-content[data-variant="panel"] {
+:is(.ProseMirror, .public-prose) .stopwatch-content[data-variant="panel"] {
   gap: 0.75rem;
 }
 
-.ProseMirror .stopwatch-content[data-variant="panel"][data-background="visible"] {
+:is(.ProseMirror, .public-prose) .stopwatch-content[data-variant="panel"][data-background="visible"] {
   background:
     linear-gradient(180deg, rgba(15, 23, 42, 0.04), rgba(15, 23, 42, 0.02)),
     rgba(248, 250, 252, 0.92);
 }
 
 @media (max-width: 768px) {
-  .ProseMirror .habit-tracker-header {
+  :is(.ProseMirror, .public-prose) .habit-tracker-header {
     flex-direction: column;
     align-items: stretch;
   }
 
-  .ProseMirror .habit-tracker-header-actions {
+  :is(.ProseMirror, .public-prose) .habit-tracker-header-actions {
     justify-content: flex-start;
   }
 
-  .ProseMirror .habit-tracker-grid {
+  :is(.ProseMirror, .public-prose) .habit-tracker-grid {
     min-width: 640px;
   }
 
   .ProseMirror .block-habitTracker,
-  .ProseMirror .block-habit-tracker {
+  :is(.ProseMirror, .public-prose) .block-habit-tracker {
     width: 100%;
     max-width: 100%;
   }
 
-  .ProseMirror .habit-tracker-card-strip {
+  :is(.ProseMirror, .public-prose) .habit-tracker-card-strip {
     grid-template-columns: repeat(7, minmax(0, 1fr));
   }
 
-  .ProseMirror .stopwatch-header,
-  .ProseMirror .stopwatch-controls {
+  :is(.ProseMirror, .public-prose) .stopwatch-header,
+  :is(.ProseMirror, .public-prose) .stopwatch-controls {
     flex-direction: column;
     align-items: stretch;
   }
 
-  .ProseMirror .stopwatch-control {
+  :is(.ProseMirror, .public-prose) .stopwatch-control {
     width: 100%;
   }
 }
@@ -4025,58 +4025,58 @@ mark {
 /* ─── Habit Tracker + Stopwatch — dark mode (slate parchment surfaces) ─── */
 
 /* Outer card background — replace white-on-slate gradient with subtle beige sheen on darker slate. */
-.dark .ProseMirror .habit-tracker-content[data-background="visible"],
-.dark .ProseMirror .stopwatch-content[data-background="visible"] {
+.dark :is(.ProseMirror, .public-prose) .habit-tracker-content[data-background="visible"],
+.dark :is(.ProseMirror, .public-prose) .stopwatch-content[data-background="visible"] {
   background:
     linear-gradient(180deg, rgba(229, 212, 176, 0.05), rgba(229, 212, 176, 0.02)),
     rgba(15, 25, 35, 0.4);
 }
 
 /* Pill buttons (nav, settings, empty-action, edit) — beige-tinted dark pill. */
-.dark .ProseMirror .habit-tracker-nav-btn,
-.dark .ProseMirror .habit-tracker-settings-btn,
-.dark .ProseMirror .habit-tracker-empty-btn,
-.dark .ProseMirror .stopwatch-edit-btn {
+.dark :is(.ProseMirror, .public-prose) .habit-tracker-nav-btn,
+.dark :is(.ProseMirror, .public-prose) .habit-tracker-settings-btn,
+.dark :is(.ProseMirror, .public-prose) .habit-tracker-empty-btn,
+.dark :is(.ProseMirror, .public-prose) .stopwatch-edit-btn {
   background: rgba(229, 212, 176, 0.06);
   border-color: rgba(229, 212, 176, 0.18);
 }
 
-.dark .ProseMirror .habit-tracker-nav-btn:hover,
-.dark .ProseMirror .habit-tracker-settings-btn:hover,
-.dark .ProseMirror .habit-tracker-empty-btn:hover {
+.dark :is(.ProseMirror, .public-prose) .habit-tracker-nav-btn:hover,
+.dark :is(.ProseMirror, .public-prose) .habit-tracker-settings-btn:hover,
+.dark :is(.ProseMirror, .public-prose) .habit-tracker-empty-btn:hover {
   background: rgba(229, 212, 176, 0.1);
   border-color: rgba(201, 168, 108, 0.45);
 }
 
 /* Empty-state dashed card. */
-.dark .ProseMirror .habit-tracker-empty {
+.dark :is(.ProseMirror, .public-prose) .habit-tracker-empty {
   background: rgba(15, 25, 35, 0.3);
 }
 
 /* Habit icon avatars — beige-tinted background. */
-.dark .ProseMirror .habit-tracker-habit-icon {
+.dark :is(.ProseMirror, .public-prose) .habit-tracker-habit-icon {
   background: rgba(229, 212, 176, 0.1);
 }
 
 /* Day cells (interval grid). */
-.dark .ProseMirror .habit-tracker-day-cell {
+.dark :is(.ProseMirror, .public-prose) .habit-tracker-day-cell {
   background: rgba(15, 25, 35, 0.45);
   border-color: rgba(229, 212, 176, 0.16);
 }
 
 /* Period toggle pill in header. */
-.dark .ProseMirror .habit-tracker-period-toggle {
+.dark :is(.ProseMirror, .public-prose) .habit-tracker-period-toggle {
   background: rgba(229, 212, 176, 0.06);
   border-color: rgba(229, 212, 176, 0.18);
 }
 
 /* Habit cards (monthly-grid preset). */
-.dark .ProseMirror .habit-tracker-card {
+.dark :is(.ProseMirror, .public-prose) .habit-tracker-card {
   background: rgba(15, 25, 35, 0.5);
   border-color: rgba(229, 212, 176, 0.14);
 }
 
-.dark .ProseMirror .habit-tracker-card-day {
+.dark :is(.ProseMirror, .public-prose) .habit-tracker-card-day {
   background: rgba(15, 25, 35, 0.4);
   border-color: rgba(229, 212, 176, 0.16);
 }
