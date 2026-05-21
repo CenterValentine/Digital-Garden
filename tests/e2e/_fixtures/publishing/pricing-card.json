@@ -1,0 +1,22 @@
+{
+  "type": "doc",
+  "content": [
+    {
+      "type": "pricingCard",
+      "attrs": {
+        "blockType": "pricingCard",
+        "tierName": "Pro",
+        "price": "$49",
+        "period": "/month",
+        "description": "Everything you need to scale your team.",
+        "features": "[\"Unlimited projects\",\"Priority support\",\"Advanced analytics\",\"Custom integrations\"]",
+        "ctaLabel": "Get started",
+        "ctaUrl": "https://example.com/signup",
+        "highlighted": true,
+        "variant": "default",
+        "bgColor": "",
+        "bgGradient": ""
+      }
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "type": "doc",
+  "content": [
+    {
+      "type": "postCard",
+      "attrs": {
+        "blockType": "postCard",
+        "title": "The Future of AI in Web Development",
+        "excerpt": "Discover how AI-powered tools are transforming how we build web applications and the skills developers need to master.",
+        "publishedAt": "2026-05-15",
+        "tags": "[\"AI\",\"Web Development\",\"Tutorial\"]",
+        "coverUrl": "data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20viewBox%3D%270%200%20600%20400%27%3E%3Crect%20width%3D%27600%27%20height%3D%27400%27%20fill%3D%27%236366f1%27%2F%3E%3C%2Fsvg%3E",
+        "href": "https://example.com/blog/ai-web-development",
+        "variant": "default"
+      }
+    }
+  ]
+}

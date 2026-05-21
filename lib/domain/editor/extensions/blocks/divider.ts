@@ -13,6 +13,7 @@ import { Node, mergeAttributes } from "@tiptap/core";
 import { z } from "zod";
 import { createBlockSchema } from "@/lib/domain/blocks/schema";
 import { registerBlock } from "@/lib/domain/blocks/registry";
+import { blockIdAttr } from "@/lib/domain/blocks/data-attr";
 import { createBlockNodeView } from "@/lib/domain/blocks/node-view-factory";
 
 const VARIANTS = ["none", "dots", "stars", "wave", "ornament"] as const;
@@ -66,7 +67,7 @@ function variantGlyph(variant: string): string {
 
 function dividerAttrs() {
   return {
-    blockId: { default: null },
+    blockId: blockIdAttr,
     blockType: { default: "blockDivider" },
     style: {
       default: "solid",

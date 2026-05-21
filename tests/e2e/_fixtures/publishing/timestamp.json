@@ -1,0 +1,15 @@
+{
+  "type": "doc",
+  "content": [
+    {
+      "type": "timestamp",
+      "attrs": {
+        "blockId": "fixture-timestamp-001",
+        "isoDate": "2026-05-20",
+        "displayFormat": "MMMM D, YYYY",
+        "prefix": "Published:",
+        "showContainer": false
+      }
+    }
+  ]
+}

@@ -14,6 +14,12 @@
  */
 
 import { defineConfig, devices } from "@playwright/test";
+import { config as loadEnv } from "dotenv";
+import { resolve } from "node:path";
+
+// Load .env.local the same way Next.js dev does, so a worktree-specific
+// port/base-URL override stays consistent between dev server and tests.
+loadEnv({ path: resolve(__dirname, ".env.local") });
 
 const PORT = process.env.PORT ?? "3015";
 const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? `http://localhost:${PORT}`;
@@ -38,8 +44,21 @@ export default defineConfig({
 
   expect: {
     toHaveScreenshot: {
-      // Small per-pixel threshold tolerates anti-aliasing differences.
-      maxDiffPixelRatio: 0.01,
+      // Per-pixel threshold tolerates anti-aliasing differences.
+      //
+      // Baselines are captured locally on macOS but CI runs Ubuntu, and
+      // the two platforms render fonts + borders with slightly different
+      // anti-aliasing — observed drift of ~2% pixel diff per snapshot
+      // even on identical DOM (see the failures in
+      // https://github.com/CenterValentine/Digital-Garden/pull/40
+      // before this CI-aware threshold landed).
+      //
+      // Local devs stay on 0.01 so small regressions caught during
+      // iteration aren't masked. CI relaxes to 0.03 to absorb the
+      // platform drift. The proper long-term fix is to capture
+      // baselines on Linux (Docker-based update workflow); until then
+      // this is the pragmatic threshold.
+      maxDiffPixelRatio: process.env.CI ? 0.03 : 0.01,
       animations: "disabled",
     },
   },

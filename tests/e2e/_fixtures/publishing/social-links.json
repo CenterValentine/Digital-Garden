@@ -1,0 +1,15 @@
+{
+  "type": "doc",
+  "content": [
+    {
+      "type": "socialLinks",
+      "attrs": {
+        "blockType": "socialLinks",
+        "links": "[{\"platform\":\"github\",\"url\":\"https://github.com/example\"},{\"platform\":\"twitter\",\"url\":\"https://twitter.com/example\"},{\"platform\":\"linkedin\",\"url\":\"https://linkedin.com/company/example\"},{\"platform\":\"youtube\",\"url\":\"https://youtube.com/@example\"}]",
+        "variant": "icon-label",
+        "size": "md",
+        "align": "left"
+      }
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "type": "doc",
+  "content": [
+    {
+      "type": "textInput",
+      "attrs": {
+        "blockId": "fixture-text-input-001",
+        "label": "Today's win",
+        "value": "Shipped the publishing-consistency audit",
+        "placeholder": "Enter text...",
+        "inputType": "text",
+        "maxLength": 0,
+        "required": false,
+        "showContainer": false
+      }
+    }
+  ]
+}

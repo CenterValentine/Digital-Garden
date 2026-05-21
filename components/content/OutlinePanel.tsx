@@ -15,6 +15,7 @@
 "use client";
 
 import { useOutlineStore } from "@/state/outline-store";
+import { useFadeScrollbar } from "@/components/common/useFadeScrollbar";
 import type { OutlineHeading } from "@/lib/domain/content/outline-extractor";
 
 interface OutlinePanelProps {
@@ -35,6 +36,7 @@ export function OutlinePanel({
     state.getViewState(contentId).activeHeadingId
   );
   const setActiveHeadingId = useOutlineStore((state) => state.setActiveHeadingId);
+  const scrollRef = useFadeScrollbar<HTMLDivElement>();
 
   // Handle heading click
   const handleHeadingClick = (heading: OutlineHeading) => {
@@ -108,7 +110,7 @@ export function OutlinePanel({
       </div>
 
       {/* Headings List */}
-      <div className="flex-1 overflow-y-auto p-2">
+      <div ref={scrollRef} className="fade-scroll flex-1 overflow-y-auto p-2">
         <div className="space-y-0.5">
           {outline.map((heading) => {
             const isActive = activeHeadingId === heading.id;

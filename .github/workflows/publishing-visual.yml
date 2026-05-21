@@ -1,0 +1,106 @@
+name: Publishing Hardening
+
+on:
+  pull_request:
+    paths:
+      - "app/(public)/**"
+      - "app/(test)/test/publishing-fixtures/**"
+      - "app/globals.css"
+      - "components/public/**"
+      - "extensions/publishing/**"
+      - "tests/e2e/_fixtures/publishing/**"
+      - "tests/e2e/publishing/**"
+      - "tests/e2e/__snapshots__/publishing/**"
+      - "playwright.config.ts"
+      - "scripts/validate-publishing-schema.ts"
+      - "scripts/audit-publishing-defaults.ts"
+      - "package.json"
+      - "pnpm-lock.yaml"
+  push:
+    branches:
+      - main
+
+jobs:
+  schema:
+    name: Schema + defaults + typecheck
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.25.0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma client
+        run: pnpm prisma generate
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Validate publishing schema
+        run: pnpm publishing:schema:check
+
+      - name: Audit publishing defaults drift
+        run: pnpm publishing:audit:defaults
+
+  visual:
+    name: Per-block Playwright snapshots
+    runs-on: ubuntu-latest
+    # Visual regression needs the dev server, which needs a DATABASE_URL
+    # to instantiate Prisma — but the synthetic fixture route itself does
+    # not query the DB. Gated on the secret existing so forks without DB
+    # access can still land non-publishing changes.
+    if: ${{ vars.PUBLISHING_VISUAL_GATE != 'skip' }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.25.0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma client
+        run: pnpm prisma generate
+
+      - name: Install Playwright browsers
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Run publishing per-block snapshot suite
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          STORAGE_ENCRYPTION_KEY: ${{ secrets.STORAGE_ENCRYPTION_KEY }}
+          PLAYWRIGHT_AUTOSTART: "1"
+        run: pnpm exec playwright test publishing/per-block.spec.ts
+
+      - name: Upload diff report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-publishing-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 14

@@ -1,0 +1,14 @@
+{
+  "type": "doc",
+  "content": [
+    {
+      "type": "skillBadges",
+      "attrs": {
+        "blockType": "skillBadges",
+        "items": "[{\"label\":\"TypeScript\",\"category\":\"language\"},{\"label\":\"React\",\"category\":\"frontend\"},{\"label\":\"Node.js\",\"category\":\"backend\"},{\"label\":\"PostgreSQL\",\"category\":\"database\"},{\"label\":\"GraphQL\",\"category\":\"api\"},{\"label\":\"AWS\",\"category\":\"cloud\"}]",
+        "label": "Technologies",
+        "variant": "pills"
+      }
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "type": "doc",
+  "content": [
+    {
+      "type": "selectInput",
+      "attrs": {
+        "blockId": "fixture-select-input-001",
+        "label": "Project status",
+        "placeholder": "Select an option...",
+        "options": ["Backlog", "In progress", "Review", "Shipped"],
+        "selectedValue": "In progress",
+        "selectedValues": [],
+        "allowMultiple": false,
+        "required": false,
+        "showContainer": false
+      }
+    }
+  ]
+}

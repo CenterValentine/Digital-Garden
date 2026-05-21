@@ -1,0 +1,19 @@
+{
+  "type": "doc",
+  "content": [
+    {
+      "type": "numberInput",
+      "attrs": {
+        "blockId": "fixture-number-input-001",
+        "label": "Hours of deep work",
+        "value": 4,
+        "min": 0,
+        "max": 12,
+        "step": 0.5,
+        "unit": "hr",
+        "required": false,
+        "showContainer": false
+      }
+    }
+  ]
+}

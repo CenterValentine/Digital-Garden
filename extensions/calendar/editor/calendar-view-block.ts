@@ -4,6 +4,7 @@ import type { Node as ProseMirrorNode } from "@tiptap/pm/model";
 import { z } from "zod";
 import { createBlockNodeView } from "@/lib/domain/blocks/node-view-factory";
 import { registerBlock } from "@/lib/domain/blocks/registry";
+import { blockIdAttr } from "@/lib/domain/blocks/data-attr";
 import { createBlockSchema } from "@/lib/domain/blocks/schema";
 import { useCalendarStore } from "@/extensions/calendar/state/calendar-store";
 import { useLeftPanelViewStore } from "@/state/left-panel-view-store";
@@ -544,7 +545,7 @@ function renderCalendarViewBlock(
 }
 
 const calendarViewBlockAttributes = {
-  blockId: { default: null },
+  blockId: blockIdAttr,
   blockType: { default: "calendarViewBlock" },
   title: { default: "Calendar" },
   view: { default: "month" },
@@ -611,13 +612,18 @@ export const ServerCalendarViewBlock = Node.create({
   },
 
   renderHTML({ HTMLAttributes }) {
+    // Calendar policy (decided 2026-05-20): strip entirely from
+    // publisher output. Calendars contain potentially sensitive event
+    // data and are stale by definition on a published page. The
+    // post-process pass in TipTapContent removes any element marked
+    // `data-publisher-omit="true"`.
     return [
       "div",
       mergeAttributes(HTMLAttributes, {
         class: "block-calendar-view",
         "data-block-type": "calendarViewBlock",
+        "data-publisher-omit": "true",
       }),
-      `Calendar ${HTMLAttributes.view || "month"} view`,
     ];
   },
 });

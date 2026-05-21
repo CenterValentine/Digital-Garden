@@ -24,6 +24,7 @@ import type * as Y from "yjs";
 import type { Root as ReactRoot } from "react-dom/client";
 import { createBlockSchema } from "@/lib/domain/blocks/schema";
 import { registerBlock } from "@/lib/domain/blocks/registry";
+import { blockIdAttr } from "@/lib/domain/blocks/data-attr";
 import { createBlockNodeView } from "@/lib/domain/blocks/node-view-factory";
 import { consumePendingDiagramCreate } from "./pending-diagram-creates";
 import { makeWrapAttrs } from "@/lib/domain/blocks/wrap-size";
@@ -130,7 +131,7 @@ export const MermaidBlock = Node.create({
 
   addAttributes() {
     return {
-      blockId: { default: null },
+      blockId: blockIdAttr,
       blockType: { default: "mermaidBlock" },
       contentId: {
         default: null,
@@ -223,7 +224,7 @@ export const ServerMermaidBlock = Node.create({
 
   addAttributes() {
     return {
-      blockId: { default: null },
+      blockId: blockIdAttr,
       blockType: { default: "mermaidBlock" },
       contentId: {
         default: null,

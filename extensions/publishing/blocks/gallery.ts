@@ -15,7 +15,9 @@ import { Node, mergeAttributes } from "@tiptap/core";
 import { z } from "zod";
 import { createBlockSchema } from "@/lib/domain/blocks/schema";
 import { registerBlock } from "@/lib/domain/blocks/registry";
+import { blockIdAttr } from "@/lib/domain/blocks/data-attr";
 import { createBlockNodeView } from "@/lib/domain/blocks/node-view-factory";
+import { dataAttr } from "@/lib/domain/blocks/data-attr";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -64,45 +66,15 @@ registerBlock({
 
 function galleryAttrs() {
   return {
-    blockId: { default: null },
+    blockId: blockIdAttr,
     blockType: { default: "gallery" },
-    items: {
-      default: "[]",
-      parseHTML: (el: Element) => el.getAttribute("data-items") ?? "[]",
-      renderHTML: (attrs: Record<string, unknown>) => ({ "data-items": attrs.items }),
-    },
-    layout: {
-      default: "grid",
-      parseHTML: (el: Element) => el.getAttribute("data-layout") ?? "grid",
-      renderHTML: (attrs: Record<string, unknown>) => ({ "data-layout": attrs.layout }),
-    },
-    columns: {
-      default: 3,
-      parseHTML: (el: Element) => parseInt(el.getAttribute("data-columns") ?? "3", 10),
-      renderHTML: (attrs: Record<string, unknown>) => ({ "data-columns": attrs.columns }),
-    },
-    gap: {
-      default: "md",
-      parseHTML: (el: Element) => el.getAttribute("data-gap") ?? "md",
-      renderHTML: (attrs: Record<string, unknown>) => ({ "data-gap": attrs.gap }),
-    },
-    hoverEffect: {
-      default: "zoom",
-      parseHTML: (el: Element) => el.getAttribute("data-hover-effect") ?? "zoom",
-      renderHTML: (attrs: Record<string, unknown>) => ({ "data-hover-effect": attrs.hoverEffect }),
-    },
-    autoScroll: {
-      default: false,
-      parseHTML: (el: Element) => el.getAttribute("data-auto-scroll") === "true",
-      renderHTML: (attrs: Record<string, unknown>) =>
-        attrs.autoScroll ? { "data-auto-scroll": "true" } : {},
-    },
-    fullWidth: {
-      default: false,
-      parseHTML: (el: Element) => el.getAttribute("data-full-width") === "true",
-      renderHTML: (attrs: Record<string, unknown>) =>
-        attrs.fullWidth ? { "data-full-width": "true" } : {},
-    },
+    items: dataAttr("items", { default: "[]" }),
+    layout: dataAttr("layout", { default: "grid" }),
+    columns: dataAttr<number>("columns", { default: 3, parseAs: "number" }),
+    gap: dataAttr("gap", { default: "md" }),
+    hoverEffect: dataAttr("hoverEffect", { default: "zoom" }),
+    autoScroll: dataAttr<boolean>("autoScroll", { default: false, parseAs: "boolean" }),
+    fullWidth: dataAttr<boolean>("fullWidth", { default: false, parseAs: "boolean" }),
   };
 }
 

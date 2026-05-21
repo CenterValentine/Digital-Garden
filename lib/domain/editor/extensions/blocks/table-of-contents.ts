@@ -15,6 +15,7 @@ import { Plugin, PluginKey } from "@tiptap/pm/state";
 import { z } from "zod";
 import { createBlockSchema } from "@/lib/domain/blocks/schema";
 import { registerBlock } from "@/lib/domain/blocks/registry";
+import { blockIdAttr } from "@/lib/domain/blocks/data-attr";
 import { createBlockNodeView } from "@/lib/domain/blocks/node-view-factory";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -197,7 +198,7 @@ export const TableOfContents = Node.create({
 
   addAttributes() {
     return {
-      blockId: { default: null },
+      blockId: blockIdAttr,
       blockType: { default: "tableOfContents" },
       maxDepth: {
         default: 3,
@@ -322,7 +323,7 @@ export const ServerTableOfContents = Node.create({
 
   addAttributes() {
     return {
-      blockId: { default: null },
+      blockId: blockIdAttr,
       blockType: { default: "tableOfContents" },
       maxDepth: {
         default: 3,

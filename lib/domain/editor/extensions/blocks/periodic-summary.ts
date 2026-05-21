@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import { createBlockSchema } from "@/lib/domain/blocks/schema";
 import { registerBlock } from "@/lib/domain/blocks/registry";
+import { blockIdAttr } from "@/lib/domain/blocks/data-attr";
 import { createBlockNodeView } from "@/lib/domain/blocks/node-view-factory";
 import {
   clampSummaryCutoffHour,
@@ -589,7 +590,7 @@ function createPeriodicSummaryNode(kind: PeriodicSummaryKind) {
 
     addAttributes() {
       return {
-        blockId: { default: null },
+        blockId: blockIdAttr,
         blockType: { default: name },
         [dateKey]: {
           default: "",
@@ -695,7 +696,7 @@ function createServerPeriodicSummaryNode(kind: PeriodicSummaryKind) {
 
     addAttributes() {
       return {
-        blockId: { default: null },
+        blockId: blockIdAttr,
         blockType: { default: name },
         [dateKey]: {
           default: "",

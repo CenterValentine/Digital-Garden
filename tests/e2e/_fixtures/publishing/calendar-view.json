@@ -1,0 +1,16 @@
+{
+  "type": "doc",
+  "content": [
+    { "type": "paragraph", "content": [{ "type": "text", "text": "Note context before the calendar." }] },
+    {
+      "type": "calendarViewBlock",
+      "attrs": {
+        "blockId": "fixture-calendar-view-001",
+        "view": "month",
+        "year": 2026,
+        "month": 5
+      }
+    },
+    { "type": "paragraph", "content": [{ "type": "text", "text": "Note context after the calendar." }] }
+  ]
+}

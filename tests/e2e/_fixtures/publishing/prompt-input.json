@@ -1,0 +1,19 @@
+{
+  "type": "doc",
+  "content": [
+    {
+      "type": "promptInput",
+      "attrs": {
+        "blockId": "fixture-prompt-input-001",
+        "label": "What did you learn?",
+        "prompt": "Summarize one concept I learned today.",
+        "response": "Visual regression PNGs are a binding contract — keep anti-aliasing drift out of commits so byte changes mean pixel changes.",
+        "maxResponseLength": 500,
+        "snippetCategoryId": "",
+        "snippetId": "",
+        "isLoading": false,
+        "showContainer": false
+      }
+    }
+  ]
+}

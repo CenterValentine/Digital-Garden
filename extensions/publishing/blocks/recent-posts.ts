@@ -19,7 +19,9 @@ import { Node, mergeAttributes } from "@tiptap/core";
 import { z } from "zod";
 import { createBlockSchema } from "@/lib/domain/blocks/schema";
 import { registerBlock } from "@/lib/domain/blocks/registry";
+import { blockIdAttr } from "@/lib/domain/blocks/data-attr";
 import { createBlockNodeView } from "@/lib/domain/blocks/node-view-factory";
+import { dataAttr } from "@/lib/domain/blocks/data-attr";
 
 // ─── Schema ──────────────────────────────────────────────────────────────────
 
@@ -55,43 +57,15 @@ registerBlock({
 
 function recentPostsAttrs() {
   return {
-    blockId: { default: null },
+    blockId: blockIdAttr,
     blockType: { default: "recentPosts" },
-    count: {
-      default: 5,
-      parseHTML: (el: Element) => parseInt(el.getAttribute("data-count") ?? "5", 10),
-      renderHTML: (attrs: Record<string, unknown>) => ({ "data-count": attrs.count }),
-    },
-    pathSlug: {
-      default: "",
-      parseHTML: (el: Element) => el.getAttribute("data-path-slug") ?? "",
-      renderHTML: (attrs: Record<string, unknown>) => attrs.pathSlug ? { "data-path-slug": attrs.pathSlug } : {},
-    },
-    showExcerpt: {
-      default: true,
-      parseHTML: (el: Element) => el.getAttribute("data-show-excerpt") !== "false",
-      renderHTML: (attrs: Record<string, unknown>) => ({ "data-show-excerpt": attrs.showExcerpt }),
-    },
-    showDate: {
-      default: true,
-      parseHTML: (el: Element) => el.getAttribute("data-show-date") !== "false",
-      renderHTML: (attrs: Record<string, unknown>) => ({ "data-show-date": attrs.showDate }),
-    },
-    showCover: {
-      default: false,
-      parseHTML: (el: Element) => el.getAttribute("data-show-cover") === "true",
-      renderHTML: (attrs: Record<string, unknown>) => ({ "data-show-cover": attrs.showCover }),
-    },
-    layout: {
-      default: "list",
-      parseHTML: (el: Element) => el.getAttribute("data-layout") ?? "list",
-      renderHTML: (attrs: Record<string, unknown>) => ({ "data-layout": attrs.layout }),
-    },
-    excludeSelf: {
-      default: true,
-      parseHTML: (el: Element) => el.getAttribute("data-exclude-self") !== "false",
-      renderHTML: (attrs: Record<string, unknown>) => ({ "data-exclude-self": attrs.excludeSelf }),
-    },
+    count: dataAttr<number>("count", { default: 5, parseAs: "number" }),
+    pathSlug: dataAttr("pathSlug"),
+    showExcerpt: dataAttr<boolean>("showExcerpt", { default: true, parseAs: "boolean" }),
+    showDate: dataAttr<boolean>("showDate", { default: true, parseAs: "boolean" }),
+    showCover: dataAttr<boolean>("showCover", { default: false, parseAs: "boolean" }),
+    layout: dataAttr("layout", { default: "list" }),
+    excludeSelf: dataAttr<boolean>("excludeSelf", { default: true, parseAs: "boolean" }),
   };
 }
 
@@ -184,14 +158,19 @@ export const ServerRecentPosts = Node.create({
   },
 
   renderHTML({ HTMLAttributes }) {
-    // The server post-processor replaces this placeholder with live data.
-    // data-* attrs are preserved for the post-processor to read.
+    // The placeholder wrapper preserves data-* attrs so a future server
+    // post-processor can read its config and replace the inner empty
+    // state with live data. Until that post-processor exists, every
+    // recent-posts block on every published page renders this empty
+    // state — see project_publishing_recent_posts_no_processor memory.
+    const layout = (HTMLAttributes["data-layout"] as string) || "list";
     return [
       "div",
       mergeAttributes(HTMLAttributes, {
-        class: "block-recent-posts block-recent-posts--placeholder",
+        class: `block-recent-posts block-recent-posts--${layout} block-recent-posts--placeholder`,
         "data-block-type": "recentPosts",
       }),
+      ["p", { class: "block-recent-posts-empty" }, "No posts yet — published items in this path will appear here."],
     ];
   },
 });

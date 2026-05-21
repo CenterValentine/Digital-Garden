@@ -15,7 +15,9 @@ import { Node, mergeAttributes } from "@tiptap/core";
 import { z } from "zod";
 import { createBlockSchema } from "@/lib/domain/blocks/schema";
 import { registerBlock } from "@/lib/domain/blocks/registry";
+import { blockIdAttr } from "@/lib/domain/blocks/data-attr";
 import { createBlockNodeView } from "@/lib/domain/blocks/node-view-factory";
+import { dataAttr } from "@/lib/domain/blocks/data-attr";
 
 export interface LogoItem {
   src: string;
@@ -69,28 +71,12 @@ registerBlock({
 
 function logoAttrs() {
   return {
-    blockId: { default: null },
+    blockId: blockIdAttr,
     blockType: { default: "logoStrip" },
-    items: {
-      default: "[]",
-      parseHTML: (el: Element) => el.getAttribute("data-items") ?? "[]",
-      renderHTML: (attrs: Record<string, unknown>) => ({ "data-items": attrs.items }),
-    },
-    label: {
-      default: "",
-      parseHTML: (el: Element) => el.getAttribute("data-label") ?? "",
-      renderHTML: (attrs: Record<string, unknown>) => ({ "data-label": attrs.label }),
-    },
-    grayscale: {
-      default: true,
-      parseHTML: (el: Element) => el.getAttribute("data-grayscale") !== "false",
-      renderHTML: (attrs: Record<string, unknown>) => ({ "data-grayscale": attrs.grayscale }),
-    },
-    variant: {
-      default: "default",
-      parseHTML: (el: Element) => el.getAttribute("data-variant") ?? "default",
-      renderHTML: (attrs: Record<string, unknown>) => ({ "data-variant": attrs.variant }),
-    },
+    items: dataAttr("items", { default: "[]" }),
+    label: dataAttr("label"),
+    grayscale: dataAttr<boolean>("grayscale", { default: true, parseAs: "boolean" }),
+    variant: dataAttr("variant", { default: "default" }),
   };
 }
 

@@ -8,3 +8,4 @@
 export * from "./surfaces";
 export * from "./intents";
 export * from "./motion";
+export * from "./scrollbars";

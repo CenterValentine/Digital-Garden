@@ -4,6 +4,7 @@ import { z } from "zod";
 import { createBlockNodeView } from "@/lib/domain/blocks/node-view-factory";
 import { createBlockSchema } from "@/lib/domain/blocks/schema";
 import { registerBlock } from "@/lib/domain/blocks/registry";
+import { blockIdAttr } from "@/lib/domain/blocks/data-attr";
 import {
   UNSUPPORTED_BLOCK_NODE_TYPE,
   UNSUPPORTED_INLINE_NODE_TYPE,
@@ -67,7 +68,7 @@ function createUnsupportedBlockExtension(name: string) {
 
     addAttributes() {
       return {
-        blockId: { default: null },
+        blockId: blockIdAttr,
         blockType: { default: UNSUPPORTED_BLOCK_NODE_TYPE },
         originalType: {
           default: "",

@@ -1,0 +1,15 @@
+{
+  "type": "doc",
+  "content": [
+    {
+      "type": "dateInput",
+      "attrs": {
+        "blockId": "fixture-date-input-001",
+        "label": "Completion date",
+        "value": "2026-05-20",
+        "includeTime": false,
+        "required": false
+      }
+    }
+  ]
+}

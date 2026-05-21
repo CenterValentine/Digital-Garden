@@ -1,0 +1,20 @@
+{
+  "type": "doc",
+  "content": [
+    {
+      "type": "testimonialCard",
+      "attrs": {
+        "blockType": "testimonialCard",
+        "quote": "This platform cut our deployment time from 45 minutes to under 2 minutes. Game changer for our team.",
+        "name": "Sarah Martinez",
+        "title": "Engineering Manager",
+        "company": "TechVenture Labs",
+        "avatarUrl": "data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20viewBox%3D%270%200%2064%2064%27%3E%3Ccircle%20cx%3D%2732%27%20cy%3D%2732%27%20r%3D%2732%27%20fill%3D%27%23fbbf24%27%2F%3E%3C%2Fsvg%3E",
+        "rating": 5,
+        "variant": "default",
+        "bgColor": "",
+        "bgGradient": ""
+      }
+    }
+  ]
+}

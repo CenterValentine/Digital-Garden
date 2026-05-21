@@ -1,0 +1,17 @@
+{
+  "type": "doc",
+  "content": [
+    {
+      "type": "checkboxInput",
+      "attrs": {
+        "blockId": "fixture-checkbox-input-001",
+        "label": "Morning routine",
+        "checked": false,
+        "groupMode": true,
+        "options": ["Meditate", "Stretch", "Read", "Journal"],
+        "selectedValues": ["Meditate", "Read"],
+        "showContainer": false
+      }
+    }
+  ]
+}

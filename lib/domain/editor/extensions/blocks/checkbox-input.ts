@@ -8,9 +8,11 @@
  */
 
 import { Node, mergeAttributes } from "@tiptap/core";
+import type { DOMOutputSpec } from "@tiptap/pm/model";
 import { z } from "zod";
 import { createBlockSchema } from "@/lib/domain/blocks/schema";
 import { registerBlock } from "@/lib/domain/blocks/registry";
+import { blockIdAttr } from "@/lib/domain/blocks/data-attr";
 import { createBlockNodeView } from "@/lib/domain/blocks/node-view-factory";
 
 const { schema: checkboxInputSchema, defaults: checkboxInputDefaults } =
@@ -119,7 +121,7 @@ export const CheckboxInput = Node.create({
 
   addAttributes() {
     return {
-      blockId: { default: null },
+      blockId: blockIdAttr,
       blockType: { default: "checkboxInput" },
       label: { default: "", parseHTML: (el) => el.getAttribute("data-label") || "", renderHTML: (attrs) => attrs.label ? { "data-label": attrs.label } : {} },
       checked: { default: false, parseHTML: (el) => el.getAttribute("data-checked") === "true", renderHTML: (attrs) => attrs.checked ? { "data-checked": "true" } : {} },
@@ -157,7 +159,7 @@ export const ServerCheckboxInput = Node.create({
 
   addAttributes() {
     return {
-      blockId: { default: null },
+      blockId: blockIdAttr,
       blockType: { default: "checkboxInput" },
       label: { default: "", parseHTML: (el) => el.getAttribute("data-label") || "", renderHTML: (attrs) => attrs.label ? { "data-label": attrs.label } : {} },
       checked: { default: false, parseHTML: (el) => el.getAttribute("data-checked") === "true", renderHTML: (attrs) => attrs.checked ? { "data-checked": "true" } : {} },
@@ -169,5 +171,39 @@ export const ServerCheckboxInput = Node.create({
   },
 
   parseHTML() { return [{ tag: 'div[data-block-type="checkboxInput"]' }]; },
-  renderHTML({ HTMLAttributes }) { return ["div", mergeAttributes(HTMLAttributes, { class: "block-checkbox-input", "data-block-type": "checkboxInput" })]; },
+  renderHTML({ node, HTMLAttributes }) {
+    const label = String(node.attrs.label ?? "");
+    const groupMode = Boolean(node.attrs.groupMode);
+    const checked = Boolean(node.attrs.checked);
+    const options = Array.isArray(node.attrs.options) ? (node.attrs.options as string[]) : [];
+    const selectedValues = Array.isArray(node.attrs.selectedValues) ? (node.attrs.selectedValues as string[]) : [];
+    const hasSelection = groupMode ? selectedValues.length > 0 : checked;
+    if (!hasSelection) {
+      return ["div", mergeAttributes(HTMLAttributes, { class: "block-checkbox-input", "data-block-type": "checkboxInput", "data-form-empty": "true" })];
+    }
+    const outerAttrs = mergeAttributes(HTMLAttributes, { class: "block-checkbox-input block-form-rendered", "data-block-type": "checkboxInput" });
+    if (groupMode) {
+      const items: DOMOutputSpec[] = options.map((opt) => {
+        const isChecked = selectedValues.includes(opt);
+        const inputAttrs: Record<string, string> = { type: "checkbox", value: opt };
+        if (isChecked) inputAttrs.checked = "true";
+        return [
+          "label",
+          { class: "block-form-checkbox-item" },
+          ["input", inputAttrs],
+          ["span", {}, opt],
+        ];
+      });
+      return label
+        ? ["div", outerAttrs, ["span", { class: "block-form-label" }, label], ["div", { class: "block-checkbox-group" }, ...items] as DOMOutputSpec]
+        : ["div", outerAttrs, ["div", { class: "block-checkbox-group" }, ...items] as DOMOutputSpec];
+    }
+    // Single checkbox
+    const inputAttrs: Record<string, string> = { type: "checkbox", class: "block-form-control" };
+    if (checked) inputAttrs.checked = "true";
+    const single: DOMOutputSpec = label
+      ? ["label", { class: "block-form-checkbox-single" }, ["input", inputAttrs], ["span", {}, label]]
+      : ["input", inputAttrs];
+    return ["div", outerAttrs, single];
+  },
 });

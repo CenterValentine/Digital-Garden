@@ -15,7 +15,9 @@ import { Node, mergeAttributes } from "@tiptap/core";
 import { z } from "zod";
 import { createBlockSchema } from "@/lib/domain/blocks/schema";
 import { registerBlock } from "@/lib/domain/blocks/registry";
+import { blockIdAttr } from "@/lib/domain/blocks/data-attr";
 import { createBlockNodeView } from "@/lib/domain/blocks/node-view-factory";
+import { dataAttr } from "@/lib/domain/blocks/data-attr";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -84,23 +86,11 @@ registerBlock({
 
 function metricsStripAttrs() {
   return {
-    blockId: { default: null },
+    blockId: blockIdAttr,
     blockType: { default: "metricsStrip" },
-    items: {
-      default: "[]",
-      parseHTML: (el: Element) => el.getAttribute("data-items") ?? "[]",
-      renderHTML: (attrs: Record<string, unknown>) => ({ "data-items": attrs.items }),
-    },
-    variant: {
-      default: "bar",
-      parseHTML: (el: Element) => el.getAttribute("data-variant") ?? "bar",
-      renderHTML: (attrs: Record<string, unknown>) => ({ "data-variant": attrs.variant }),
-    },
-    dividers: {
-      default: true,
-      parseHTML: (el: Element) => el.getAttribute("data-dividers") !== "false",
-      renderHTML: (attrs: Record<string, unknown>) => ({ "data-dividers": attrs.dividers }),
-    },
+    items: dataAttr("items", { default: "[]" }),
+    variant: dataAttr("variant", { default: "bar" }),
+    dividers: dataAttr<boolean>("dividers", { default: true, parseAs: "boolean" }),
   };
 }
 

@@ -20,7 +20,12 @@ import { Node, mergeAttributes } from "@tiptap/core";
 import { z } from "zod";
 import { createBlockSchema } from "@/lib/domain/blocks/schema";
 import { registerBlock } from "@/lib/domain/blocks/registry";
+import { blockIdAttr } from "@/lib/domain/blocks/data-attr";
 import { createBlockNodeView } from "@/lib/domain/blocks/node-view-factory";
+import {
+  BACKGROUND_SCHEMA_SHAPE,
+  backgroundAttrs,
+} from "../lib/background-attrs";
 
 function parseFeatures(raw: string): string[] {
   try { return JSON.parse(raw) as string[]; } catch { return []; }
@@ -33,7 +38,7 @@ const { schema: pricingSchema, defaults: pricingDefaults } = createBlockSchema(
   {
     tierName: z.string().default("Pro").describe("Tier name"),
     price: z.string().default("$49").describe('Price string (e.g. "$49" or "Free")'),
-    period: z.string().default("/month").describe('Billing period (e.g. "/month", "one-time")'),
+    period: z.string().default("").describe('Billing period (e.g. "/month", "one-time") — leave blank to hide'),
     description: z.string().default("").describe("Short description of the tier"),
     features: z
       .string()
@@ -49,8 +54,7 @@ const { schema: pricingSchema, defaults: pricingDefaults } = createBlockSchema(
     ctaUrl: z.string().default("").describe("Button URL"),
     highlighted: z.boolean().default(false).describe("Visually highlight as the recommended tier"),
     variant: z.enum(VARIANTS).default("default"),
-    bgColor: z.string().default("").describe("Custom background color (any CSS color value)"),
-    bgGradient: z.string().default("").describe('CSS gradient — e.g. linear-gradient(135deg, #667eea 0%, #764ba2 100%)'),
+    ...BACKGROUND_SCHEMA_SHAPE,
   }
 );
 
@@ -71,7 +75,7 @@ registerBlock({
 
 function pricingAttrs() {
   return {
-    blockId: { default: null },
+    blockId: blockIdAttr,
     blockType: { default: "pricingCard" },
     tierName: {
       default: "Pro",
@@ -84,8 +88,8 @@ function pricingAttrs() {
       renderHTML: (attrs: Record<string, unknown>) => ({ "data-price": attrs.price }),
     },
     period: {
-      default: "/month",
-      parseHTML: (el: Element) => el.getAttribute("data-period") ?? "/month",
+      default: "",
+      parseHTML: (el: Element) => el.getAttribute("data-period") ?? "",
       renderHTML: (attrs: Record<string, unknown>) => ({ "data-period": attrs.period }),
     },
     description: {
@@ -118,16 +122,7 @@ function pricingAttrs() {
       parseHTML: (el: Element) => el.getAttribute("data-variant") ?? "default",
       renderHTML: (attrs: Record<string, unknown>) => ({ "data-variant": attrs.variant }),
     },
-    bgColor: {
-      default: "",
-      parseHTML: (el: Element) => el.getAttribute("data-bg-color") ?? "",
-      renderHTML: (attrs: Record<string, unknown>) => attrs.bgColor ? { "data-bg-color": attrs.bgColor } : {},
-    },
-    bgGradient: {
-      default: "",
-      parseHTML: (el: Element) => el.getAttribute("data-bg-gradient") ?? "",
-      renderHTML: (attrs: Record<string, unknown>) => attrs.bgGradient ? { "data-bg-gradient": attrs.bgGradient } : {},
-    },
+    ...backgroundAttrs(),
   };
 }
 
@@ -192,7 +187,7 @@ export const ServerPricingCard = Node.create({
 
   renderHTML({ HTMLAttributes }) {
     const tierName = (HTMLAttributes["data-tier-name"] as string) || "Pro";
-    const price = (HTMLAttributes["data-price"] as string) || "";
+    const price = (HTMLAttributes["data-price"] as string) || "$49";
     const period = (HTMLAttributes["data-period"] as string) || "";
     const description = (HTMLAttributes["data-description"] as string) || "";
     const features = parseFeatures(HTMLAttributes["data-features"] ?? "[]");

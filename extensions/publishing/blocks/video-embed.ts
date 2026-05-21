@@ -15,7 +15,9 @@ import { Node, mergeAttributes } from "@tiptap/core";
 import { z } from "zod";
 import { createBlockSchema } from "@/lib/domain/blocks/schema";
 import { registerBlock } from "@/lib/domain/blocks/registry";
+import { blockIdAttr } from "@/lib/domain/blocks/data-attr";
 import { createBlockNodeView } from "@/lib/domain/blocks/node-view-factory";
+import { dataAttr } from "@/lib/domain/blocks/data-attr";
 
 // ─── Schema ──────────────────────────────────────────────────────────────────
 
@@ -124,28 +126,12 @@ function editorHtml(url: string, caption: string, aspectRatio: string): string {
 
 function videoAttrs() {
   return {
-    blockId: { default: null },
+    blockId: blockIdAttr,
     blockType: { default: "videoEmbed" },
-    url: {
-      default: "",
-      parseHTML: (el: Element) => el.getAttribute("data-url") ?? "",
-      renderHTML: (attrs: Record<string, unknown>) => ({ "data-url": attrs.url }),
-    },
-    caption: {
-      default: "",
-      parseHTML: (el: Element) => el.getAttribute("data-caption") ?? "",
-      renderHTML: (attrs: Record<string, unknown>) => ({ "data-caption": attrs.caption }),
-    },
-    aspectRatio: {
-      default: "16:9",
-      parseHTML: (el: Element) => el.getAttribute("data-aspect-ratio") ?? "16:9",
-      renderHTML: (attrs: Record<string, unknown>) => ({ "data-aspect-ratio": attrs.aspectRatio }),
-    },
-    autoplay: {
-      default: false,
-      parseHTML: (el: Element) => el.getAttribute("data-autoplay") === "true",
-      renderHTML: (attrs: Record<string, unknown>) => ({ "data-autoplay": attrs.autoplay }),
-    },
+    url: dataAttr("url"),
+    caption: dataAttr("caption"),
+    aspectRatio: dataAttr("aspectRatio", { default: "16:9" }),
+    autoplay: dataAttr<boolean>("autoplay", { default: false, parseAs: "boolean" }),
   };
 }
 
@@ -250,6 +236,14 @@ export const ServerVideoEmbed = Node.create({
             src: embed.src,
             class: "block-video-native",
             controls: "",
+            // If the URL 404s or the file is unplayable, swap the broken
+            // native player UI for the styled error markup. Without this,
+            // a stale .mp4 URL on a published page shows the user a
+            // broken-looking video player instead of a graceful error.
+            // The handler guards via this.dataset.errored so loops can't
+            // re-fire if the swap itself somehow triggers another error.
+            onerror:
+              "if(!this.dataset.errored){this.dataset.errored='1';this.outerHTML='<p class=\"block-video-error\">Video could not be loaded.</p>';}",
             ...(autoplay ? { autoplay: "", muted: "", playsinline: "" } : {}),
           },
         ];

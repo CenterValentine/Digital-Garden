@@ -1,0 +1,14 @@
+{
+  "type": "doc",
+  "content": [
+    {
+      "type": "tagCloud",
+      "attrs": {
+        "blockType": "tagCloud",
+        "items": "[{\"label\":\"React\",\"weight\":5},{\"label\":\"Vue\",\"weight\":4},{\"label\":\"Svelte\",\"weight\":3},{\"label\":\"Angular\",\"weight\":3},{\"label\":\"TypeScript\",\"weight\":5},{\"label\":\"JavaScript\",\"weight\":4},{\"label\":\"Python\",\"weight\":4},{\"label\":\"Go\",\"weight\":2}]",
+        "label": "Popular Topics",
+        "variant": "cloud"
+      }
+    }
+  ]
+}

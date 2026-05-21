@@ -1,4 +1,6 @@
 import React from "react";
+import { MermaidHydrate } from "@/components/public/MermaidHydrate";
+import { PublicThemeToggle } from "@/components/public/PublicThemeToggle";
 
 const PUBLIC_SCRIPT = `
 (function() {
@@ -173,9 +175,14 @@ export default function PublicLayout({
 }) {
   return (
     // public-route class is used in globals.css to suppress the app nav
-    // and remove the default pt-20 padding applied by the root layout
-    <div className="public-route min-h-screen bg-[#0a0a0a] text-white">
+    // and remove the default pt-20 padding applied by the root layout.
+    // Theme-aware: light mode = white surface + dark text, dark mode =
+    // near-black surface + white text. Driven by the root layout's
+    // pre-hydration theme script which sets .dark on <html>.
+    <div className="public-route min-h-screen bg-white text-gray-900 dark:bg-[#0a0a0a] dark:text-white">
       {children}
+      <PublicThemeToggle />
+      <MermaidHydrate />
       <script dangerouslySetInnerHTML={{ __html: PUBLIC_SCRIPT }} />
     </div>
   );

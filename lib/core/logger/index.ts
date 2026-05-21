@@ -13,6 +13,8 @@ export type { SpanHandle, SpanOptions } from "./span";
 export { getActiveSpan, getActiveTrace, withTrace } from "./context";
 export { withRouteTrace } from "./route-trace";
 export type { RouteTraceOptions } from "./route-trace";
+export { withPageTrace } from "./page-trace";
+export type { PageTraceOptions } from "./page-trace";
 export { writePayload } from "./payload-sidecar";
 export { spanPayload } from "./span-payload";
 export type {

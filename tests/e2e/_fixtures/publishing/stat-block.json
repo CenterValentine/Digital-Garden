@@ -1,0 +1,20 @@
+{
+  "type": "doc",
+  "content": [
+    {
+      "type": "statBlock",
+      "attrs": {
+        "blockType": "statBlock",
+        "value": "10x",
+        "label": "Faster Development",
+        "prefix": "",
+        "suffix": "",
+        "description": "Average time saved per deploy across customer base",
+        "animation": "none",
+        "variant": "default",
+        "bgColor": "",
+        "bgGradient": ""
+      }
+    }
+  ]
+}

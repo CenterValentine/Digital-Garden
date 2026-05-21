@@ -1,0 +1,94 @@
+/**
+ * Publishing block fixture roster.
+ *
+ * Each entry is a publishing block whose render parity we want to lock in
+ * with a Playwright visual snapshot. The fixture JSON lives at
+ * `./<block>.json` and matches the TipTap doc shape consumed by
+ * `<TipTapContent>` in the synthetic fixture route at
+ * `/test/publishing-fixtures/[block]`.
+ *
+ * To add a new fixture:
+ *   1. Drop a `<block>.json` next to this file.
+ *   2. Add its kebab-case name to PUBLISHING_FIXTURE_BLOCKS below.
+ *   3. Run `pnpm test:e2e:update` to capture light + dark baselines.
+ *   4. Commit the JSON + the new PNG(s).
+ */
+
+export const PUBLISHING_FIXTURE_BLOCKS = [
+  // Publishing blocks (in extensions/publishing/blocks/)
+  "bookmark-card",
+  "cta-banner",
+  "faq-accordion",
+  "feature-list",
+  "gallery",
+  "hero-image",
+  "logo-strip",
+  "metrics-strip",
+  "newsletter-signup",
+  "person-card",
+  "post-card",
+  "pricing-card",
+  "process-steps",
+  "project-card",
+  "recent-posts",
+  "skill-badges",
+  "social-links",
+  "spacer",
+  "stat-block",
+  "tag-cloud",
+  "testimonial-card",
+  "timeline",
+  "video-embed",
+  // Layout blocks (in lib/domain/editor/extensions/blocks/) — added 2026-05-20
+  // to bring them under the same snapshot/CI coverage as publishing blocks
+  // ahead of the R5 (editor uses publisher markup) work.
+  "accordion",
+  "block-columns",
+  "card-panel",
+  "columns",
+  "section-header",
+  "tabs",
+  // Editor-only blocks (in lib/domain/editor/extensions/blocks/) — added
+  // 2026-05-20 to lock in publisher render parity. Form inputs use
+  // *filled* fixtures (empty state is policy-omitted from publisher and
+  // doesn't need a snapshot). mermaid-block and excalidraw-block are
+  // deliberately excluded — their server render emits an empty div
+  // pending a server-side diagram pipeline.
+  "text-input",
+  "date-input",
+  "number-input",
+  "rating-input",
+  "select-input",
+  "checkbox-input",
+  "prompt-input",
+  "divider",
+  "pull-quote",
+  "stopwatch",
+  "habit-tracker",
+  // Remaining editor-only blocks — added 2026-05-20 to fill out
+  // visual coverage across both editor and publisher fixture surfaces.
+  "list-container",
+  "table-of-contents",
+  "timestamp",
+  "daily-summary",
+  // calendar-view: publisher snapshot is intentionally near-empty
+  // (strip policy from 3475417). Editor snapshot shows the calendar
+  // block in NodeView form. Both surfaces still verified.
+  "calendar-view",
+  // Visualization blocks (added 2026-05-20).
+  // Both render placeholder by default — full hydration depends on:
+  //   - mermaid: a VisualizationPayload row in DB whose contentId
+  //     matches the block's. Publisher fetches source, MermaidHydrate
+  //     (client) renders SVG.
+  //   - excalidraw: a cachedSvg field on VisualizationPayload.data.
+  //     Populated by editor save flow (deferred work). Until then,
+  //     publisher shows a styled "view in app" placeholder.
+  "mermaid-block",
+  "excalidraw-block",
+] as const;
+
+export type PublishingFixtureBlock = (typeof PUBLISHING_FIXTURE_BLOCKS)[number];
+
+export function isPublishingFixtureBlock(value: string): value is PublishingFixtureBlock {
+  return (PUBLISHING_FIXTURE_BLOCKS as readonly string[]).includes(value);
+}

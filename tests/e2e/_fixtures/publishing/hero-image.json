@@ -1,0 +1,20 @@
+{
+  "type": "doc",
+  "content": [
+    {
+      "type": "heroImage",
+      "attrs": {
+        "blockType": "heroImage",
+        "src": "data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20viewBox%3D%270%200%201600%20600%27%3E%3Crect%20width%3D%271600%27%20height%3D%27600%27%20fill%3D%27%234f46e5%27%2F%3E%3C%2Fsvg%3E",
+        "alt": "Hero fixture background",
+        "headline": "Build something people love",
+        "subheadline": "A complete platform for shipping faster, together.",
+        "ctaText": "Start free trial",
+        "ctaUrl": "https://example.com/trial",
+        "overlay": 40,
+        "height": "lg",
+        "align": "center"
+      }
+    }
+  ]
+}

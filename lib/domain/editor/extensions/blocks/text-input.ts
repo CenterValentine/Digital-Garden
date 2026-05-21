@@ -9,9 +9,11 @@
  */
 
 import { Node, mergeAttributes } from "@tiptap/core";
+import type { DOMOutputSpec } from "@tiptap/pm/model";
 import { z } from "zod";
 import { createBlockSchema } from "@/lib/domain/blocks/schema";
 import { registerBlock } from "@/lib/domain/blocks/registry";
+import { blockIdAttr } from "@/lib/domain/blocks/data-attr";
 import { createBlockNodeView } from "@/lib/domain/blocks/node-view-factory";
 
 const { schema: textInputSchema, defaults: textInputDefaults } =
@@ -122,7 +124,7 @@ export const TextInput = Node.create({
 
   addAttributes() {
     return {
-      blockId: { default: null },
+      blockId: blockIdAttr,
       blockType: { default: "textInput" },
       label: {
         default: "",
@@ -200,7 +202,7 @@ export const ServerTextInput = Node.create({
 
   addAttributes() {
     return {
-      blockId: { default: null },
+      blockId: blockIdAttr,
       blockType: { default: "textInput" },
       label: {
         default: "",
@@ -244,13 +246,50 @@ export const ServerTextInput = Node.create({
     return [{ tag: 'div[data-block-type="textInput"]' }];
   },
 
-  renderHTML({ HTMLAttributes }) {
-    return [
-      "div",
-      mergeAttributes(HTMLAttributes, {
-        class: "block-text-input",
-        "data-block-type": "textInput",
-      }),
-    ];
+  renderHTML({ node, HTMLAttributes }) {
+    const value = String(node.attrs.value ?? "");
+    const label = String(node.attrs.label ?? "");
+    const placeholder = String(node.attrs.placeholder ?? "");
+    const inputType = String(node.attrs.inputType ?? "text");
+    const maxLength = Number(node.attrs.maxLength ?? 0);
+
+    // Policy: empty form-inputs are omitted from the publisher.
+    // The post-process pass in TipTapContent walks the rendered DOM
+    // and removes anything marked data-form-empty.
+    if (!value) {
+      return [
+        "div",
+        mergeAttributes(HTMLAttributes, {
+          class: "block-text-input",
+          "data-block-type": "textInput",
+          "data-form-empty": "true",
+        }),
+      ];
+    }
+
+    const isTextarea = inputType === "textarea";
+    const inputAttrs: Record<string, string> = {
+      class: "block-form-control",
+      placeholder,
+    };
+    if (maxLength > 0) inputAttrs.maxlength = String(maxLength);
+
+    const inputEl: DOMOutputSpec = isTextarea
+      ? ["textarea", { ...inputAttrs, rows: "3" }, value]
+      : ["input", { ...inputAttrs, type: inputType, value }];
+
+    const outerAttrs = mergeAttributes(HTMLAttributes, {
+      class: "block-text-input block-form-rendered",
+      "data-block-type": "textInput",
+    });
+
+    return label
+      ? [
+          "div",
+          outerAttrs,
+          ["label", { class: "block-form-label" }, label],
+          inputEl,
+        ]
+      : ["div", outerAttrs, inputEl];
   },
 });
