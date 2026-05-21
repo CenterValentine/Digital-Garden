@@ -4886,44 +4886,70 @@ mark {
 .public-prose .block-pull-quote {
   margin: 2em 0;
 }
+/* Pull-quote variants — light-mode defaults + .dark overrides.
+   Previously dark-mode-first (color: rgba(255,255,255,...)) which
+   rendered invisible on the light surface. Fixed 2026-05-20. */
 .public-prose .block-pull-quote--bordered,
 .public-prose blockquote[data-block-type="pullQuote"][data-variant="bordered"] {
-  border-left: 3px solid rgba(255,255,255,0.3);
+  border-left: 3px solid rgba(0,0,0,0.2);
   padding-left: 1.5em;
   font-size: 1.15em;
-  color: rgba(255,255,255,0.7);
+  color: rgba(0,0,0,0.7);
   font-style: italic;
 }
+.dark .public-prose .block-pull-quote--bordered,
+.dark .public-prose blockquote[data-block-type="pullQuote"][data-variant="bordered"] {
+  border-left-color: rgba(255,255,255,0.3);
+  color: rgba(255,255,255,0.7);
+}
+
 .public-prose blockquote[data-block-type="pullQuote"][data-variant="pullquote"] {
   text-align: center;
   font-size: 1.5em;
-  color: #fff;
+  color: rgba(0,0,0,0.9);
   font-weight: 600;
   font-style: normal;
   border: none;
   padding: 0.5em 1em;
 }
+.dark .public-prose blockquote[data-block-type="pullQuote"][data-variant="pullquote"] {
+  color: #fff;
+}
+
 .public-prose blockquote[data-block-type="pullQuote"][data-variant="card"] {
-  background: rgba(255,255,255,0.04);
-  border: 1px solid rgba(255,255,255,0.1);
+  background: rgba(0,0,0,0.03);
+  border: 1px solid rgba(0,0,0,0.1);
   border-radius: 12px;
   padding: 1.5em;
   font-style: italic;
+  color: rgba(0,0,0,0.75);
+}
+.dark .public-prose blockquote[data-block-type="pullQuote"][data-variant="card"] {
+  background: rgba(255,255,255,0.04);
+  border-color: rgba(255,255,255,0.1);
   color: rgba(255,255,255,0.75);
 }
+
 .public-prose blockquote[data-block-type="pullQuote"][data-variant="featured"] {
   background: rgba(99,102,241,0.08);
   border: 1px solid rgba(99,102,241,0.2);
   border-radius: 12px;
   padding: 1.5em;
   font-size: 1.15em;
+  color: rgba(0,0,0,0.82);
+}
+.dark .public-prose blockquote[data-block-type="pullQuote"][data-variant="featured"] {
   color: rgba(255,255,255,0.85);
 }
+
 .public-prose .block-pull-quote-attribution {
   display: block;
   margin-top: 0.75em;
   font-size: 0.8em;
   font-style: normal;
+  color: rgba(0,0,0,0.5);
+}
+.dark .public-prose .block-pull-quote-attribution {
   color: rgba(255,255,255,0.4);
 }
 
