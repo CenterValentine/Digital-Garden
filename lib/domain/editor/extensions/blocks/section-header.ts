@@ -14,12 +14,30 @@
  */
 
 import { Node, mergeAttributes } from "@tiptap/core";
+import type { Node as ProseMirrorNode, DOMOutputSpec } from "@tiptap/pm/model";
 import { z } from "zod";
 import { createBlockSchema } from "@/lib/domain/blocks/schema";
 import { registerBlock } from "@/lib/domain/blocks/registry";
-import { blockIdAttr } from "@/lib/domain/blocks/data-attr";
 import { createBlockNodeView } from "@/lib/domain/blocks/node-view-factory";
-import { dataAttr } from "@/lib/domain/blocks/data-attr";
+import { dataAttr, blockIdAttr } from "@/lib/domain/blocks/data-attr";
+
+/**
+ * R5 Track 1: shared inner DOM spec used by BOTH the publisher's
+ * renderHTML and the editor's NodeView (via `innerSpec` option).
+ * Guarantees identical inner markup across surfaces.
+ */
+function sectionHeaderInnerSpec(node: ProseMirrorNode): DOMOutputSpec {
+  const dividerStyle = (node.attrs.dividerStyle as string) || "solid";
+  const innerAttrs: Record<string, string> = {
+    class: "block-section-header-content",
+    "data-level": String(node.attrs.level ?? 1),
+  };
+  if (dividerStyle !== "none") {
+    innerAttrs["data-show-divider"] = "true";
+    innerAttrs["data-divider-style"] = dividerStyle;
+  }
+  return ["div", innerAttrs, 0];
+}
 
 // Schema
 const { schema: sectionHeaderSchema, defaults: sectionHeaderDefaults } =
@@ -73,22 +91,13 @@ export const SectionHeader = Node.create({
   },
 
   renderHTML({ node, HTMLAttributes }) {
-    const dividerStyle = (node.attrs.dividerStyle as string) || "solid";
-    const innerAttrs: Record<string, string> = {
-      class: "block-section-header-content",
-      "data-level": String(node.attrs.level ?? 1),
-    };
-    if (dividerStyle !== "none") {
-      innerAttrs["data-show-divider"] = "true";
-      innerAttrs["data-divider-style"] = dividerStyle;
-    }
     return [
       "div",
       mergeAttributes(HTMLAttributes, {
         class: "block-section-header",
         "data-block-type": "sectionHeader",
       }),
-      ["div", innerAttrs, 0],
+      sectionHeaderInnerSpec(node),
     ];
   },
 
@@ -99,25 +108,15 @@ export const SectionHeader = Node.create({
       iconName: "Heading",
       atom: false,
       containerAttr: "showContainer",
-      renderContent(node, contentDom) {
-        contentDom.classList.add("block-section-header-content");
-        contentDom.setAttribute("data-level", String(node.attrs.level));
-        const style = node.attrs.dividerStyle || "solid";
-        if (style !== "none") {
-          contentDom.setAttribute("data-show-divider", "true");
-          contentDom.setAttribute("data-divider-style", style);
-        }
-      },
-      updateContent(node, contentDom) {
-        contentDom.setAttribute("data-level", String(node.attrs.level));
-        const style = node.attrs.dividerStyle || "solid";
-        if (style !== "none") {
-          contentDom.setAttribute("data-show-divider", "true");
-          contentDom.setAttribute("data-divider-style", style);
-        } else {
-          contentDom.removeAttribute("data-show-divider");
-        }
-        return true;
+      // R5 Track 1: editor and publisher render identical inner markup
+      // by sharing the same spec builder. No imperative renderContent
+      // needed — DOMSerializer.renderSpec materializes the spec, and
+      // attr changes force a NodeView rebuild (handled in the factory).
+      innerSpec: sectionHeaderInnerSpec,
+      // renderContent is required by the type contract but unused when
+      // innerSpec is set. Kept as a no-op for the type checker.
+      renderContent() {
+        /* handled by innerSpec */
       },
     });
   },
@@ -148,22 +147,13 @@ export const ServerSectionHeader = Node.create({
   },
 
   renderHTML({ node, HTMLAttributes }) {
-    const dividerStyle = (node.attrs.dividerStyle as string) || "solid";
-    const innerAttrs: Record<string, string> = {
-      class: "block-section-header-content",
-      "data-level": String(node.attrs.level ?? 1),
-    };
-    if (dividerStyle !== "none") {
-      innerAttrs["data-show-divider"] = "true";
-      innerAttrs["data-divider-style"] = dividerStyle;
-    }
     return [
       "div",
       mergeAttributes(HTMLAttributes, {
         class: "block-section-header",
         "data-block-type": "sectionHeader",
       }),
-      ["div", innerAttrs, 0],
+      sectionHeaderInnerSpec(node),
     ];
   },
 });

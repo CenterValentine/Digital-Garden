@@ -14,7 +14,8 @@
  * Epoch 11 Sprint 43 (updated Sprint 44b: hover chrome, inline insertion)
  */
 
-import type { Node as ProseMirrorNode } from "@tiptap/pm/model";
+import type { Node as ProseMirrorNode, DOMOutputSpec } from "@tiptap/pm/model";
+import { DOMSerializer } from "@tiptap/pm/model";
 import { NodeSelection, TextSelection } from "@tiptap/pm/state";
 import type { EditorView } from "@tiptap/pm/view";
 import type { Editor } from "@tiptap/core";
@@ -56,13 +57,43 @@ export interface BlockNodeViewOptions {
   iconName: string;
   /** Whether this is an atom block (no editable ProseMirror content) */
   atom: boolean;
-  /** Render the block-specific content area into the provided container */
+  /**
+   * Render the block-specific content area into the provided container.
+   *
+   * Legacy path: each block imperatively builds its inner DOM. Used by
+   * blocks where the inner shape diverges from the publisher's
+   * renderHTML (interactive cells, custom controls, etc.).
+   */
   renderContent: (
     node: ProseMirrorNode,
     contentDom: HTMLElement,
     editor: Editor,
     getPos?: () => number | undefined
   ) => void;
+  /**
+   * R5 Track 1 path: provide a DOMOutputSpec describing the INNER
+   * structure (everything inside the chrome wrapper). When set, the
+   * factory uses DOMSerializer.renderSpec to materialize the spec —
+   * the SAME spec the publisher's renderHTML uses internally — and
+   * mounts it as the content area. This guarantees editor and
+   * publisher produce identical inner markup for that block.
+   *
+   * Takes precedence over `renderContent`. The spec must include
+   * exactly one `0` (the content hole) for non-atom blocks.
+   *
+   * Example usage:
+   *
+   *   const innerSpec = (node) => ["div", { class: "block-X-content" }, 0];
+   *
+   *   // in renderHTML:
+   *   renderHTML({ node, HTMLAttributes }) {
+   *     return ["div", mergeAttributes(HTMLAttributes, {...}), innerSpec(node)];
+   *   }
+   *
+   *   // in addNodeView:
+   *   createBlockNodeView({ ..., innerSpec });
+   */
+  innerSpec?: (node: ProseMirrorNode) => DOMOutputSpec;
   /** Update the content area when node attrs change. Return false to force re-render. */
   updateContent?: (
     node: ProseMirrorNode,
@@ -635,14 +666,25 @@ export function createBlockNodeView(options: BlockNodeViewOptions) {
     dom.appendChild(chrome);
 
     // --- Content area ---
-    const contentDom = document.createElement("div");
-    contentDom.classList.add("block-content");
-
-    // Append to DOM FIRST so renderContent can use contentDom.parentElement
-    dom.appendChild(contentDom);
-
-    // Render block-specific content (may insert siblings via parentElement)
-    options.renderContent(node, contentDom, editor, getNodePos);
+    // Two paths: innerSpec (R5 Track 1, shared with publisher renderHTML)
+    // and renderContent (legacy imperative). innerSpec takes precedence.
+    let contentDom: HTMLElement;
+    let contentDOMHole: HTMLElement | null = null;
+    if (options.innerSpec) {
+      const spec = options.innerSpec(node);
+      const rendered = DOMSerializer.renderSpec(document, spec);
+      contentDom = rendered.dom as HTMLElement;
+      contentDOMHole = (rendered.contentDOM as HTMLElement) ?? null;
+      // Editor chrome marker — gives the content area a min-height so empty
+      // states are still clickable. Publisher doesn't need this.
+      contentDom.classList.add("block-content");
+      dom.appendChild(contentDom);
+    } else {
+      contentDom = document.createElement("div");
+      contentDom.classList.add("block-content");
+      dom.appendChild(contentDom);
+      options.renderContent(node, contentDom, editor, getNodePos);
+    }
 
     // --- "+" button BELOW block ---
     const insertBelow = document.createElement("button");
@@ -705,8 +747,11 @@ export function createBlockNodeView(options: BlockNodeViewOptions) {
 
     return {
       dom,
-      // For non-atom blocks, ProseMirror needs a content hole
-      contentDOM: options.atom ? undefined : contentDom,
+      // For non-atom blocks, ProseMirror needs a content hole. With
+      // innerSpec, the hole is the element marked `0` in the spec
+      // (returned by DOMSerializer.renderSpec as contentDOM). Without,
+      // contentDom IS the hole.
+      contentDOM: options.atom ? undefined : (contentDOMHole ?? contentDom),
 
       selectNode() {
         dom.classList.add("block-selected", "ProseMirror-selectednode");
@@ -769,7 +814,17 @@ export function createBlockNodeView(options: BlockNodeViewOptions) {
           }
         }
 
-        // Let the block handle its own content update
+        // Inner re-render. innerSpec path: re-materialize the spec and
+        // swap into place. ProseMirror will redraw contentDOM children
+        // since we return a fresh contentDOM reference, so signal the
+        // caller via the return: returning false forces ProseMirror to
+        // rebuild the NodeView entirely (safest for attr-driven shape
+        // changes like data-divider-style on section-header). The
+        // renderContent path keeps its current behavior.
+        if (options.innerSpec) {
+          // Spec re-render swaps contentDOM identity → safest to rebuild
+          return false;
+        }
         if (options.updateContent) {
           const handled = options.updateContent(
             updatedNode,
