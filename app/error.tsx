@@ -16,17 +16,17 @@ export default function Error({
   }, [error])
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-gray-50 px-4">
+    <div className="flex min-h-screen flex-col items-center justify-center bg-gray-50 dark:bg-gray-950 px-4">
       <div className="text-center">
-        <h1 className="text-6xl font-bold text-gray-900">500</h1>
-        <h2 className="mt-4 text-2xl font-semibold text-gray-700">
+        <h1 className="text-6xl font-bold text-gray-900 dark:text-gray-100">500</h1>
+        <h2 className="mt-4 text-2xl font-semibold text-gray-700 dark:text-gray-200">
           Something went wrong!
         </h2>
-        <p className="mt-2 text-gray-600">
+        <p className="mt-2 text-gray-600 dark:text-gray-400">
           We&apos;re sorry, but something unexpected happened. Please try again.
         </p>
         {error.digest && (
-          <p className="mt-2 text-sm text-gray-500">
+          <p className="mt-2 text-sm text-gray-500 dark:text-gray-500">
             Error ID: {error.digest}
           </p>
         )}
@@ -39,7 +39,7 @@ export default function Error({
           </button>
           <Link
             href="/"
-            className="inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm hover:bg-gray-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+            className="inline-flex items-center rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-2 text-sm font-semibold text-gray-700 dark:text-gray-200 shadow-sm hover:bg-gray-50 dark:hover:bg-gray-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
           >
             Go back home
           </Link>
