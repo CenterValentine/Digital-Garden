@@ -217,18 +217,30 @@ function openInBrowser(path: string) {
 
 function buildTree(events: LogEvent[]): Node[] {
   const roots: Node[] = [];
-  const stack: Node[] = []; // active spans (top is innermost)
   const spanIndex = new Map<string, Extract<Node, { kind: "span" }>>();
+  // Fallback stack for events that lack a parent_span_id (older traces or
+  // leaf events emitted before their parent span was indexed). Top is
+  // innermost active span.
+  const fallbackStack: Extract<Node, { kind: "span" }>[] = [];
 
   const isStarted = (e: LogEvent) => e.event.endsWith(":started");
   const isTerminal = (e: LogEvent) =>
     e.event.endsWith(":completed") || e.event.endsWith(":failed");
 
-  for (const ev of events) {
-    const parent = stack[stack.length - 1];
-    const siblings =
-      parent && parent.kind === "span" ? parent.children : roots;
+  // Resolve which span should own a new node. Prefer parent_span_id from
+  // the event itself — it's authoritative and survives parallel spans
+  // arriving interleaved (Promise.all + forkTraceContext). Fall back to
+  // the sequential stack only when the explicit pointer is absent.
+  const resolveContainer = (ev: LogEvent): Node[] => {
+    if (ev.parent_span_id) {
+      const parent = spanIndex.get(ev.parent_span_id);
+      if (parent) return parent.children;
+    }
+    const top = fallbackStack[fallbackStack.length - 1];
+    return top ? top.children : roots;
+  };
 
+  for (const ev of events) {
     if (isStarted(ev) && ev.span_id) {
       const span: Extract<Node, { kind: "span" }> = {
         kind: "span",
@@ -241,9 +253,9 @@ function buildTree(events: LogEvent[]): Node[] {
         span_id: ev.span_id,
         children: [],
       };
-      siblings.push(span);
+      resolveContainer(ev).push(span);
       spanIndex.set(ev.span_id, span);
-      stack.push(span);
+      fallbackStack.push(span);
       continue;
     }
 
@@ -266,15 +278,17 @@ function buildTree(events: LogEvent[]): Node[] {
           span.level = ev.level;
         }
       }
-      // Pop only if the innermost active span matches.
-      if (parent?.kind === "span" && parent.span_id === ev.span_id) {
-        stack.pop();
-      }
+      // Remove the span from the fallback stack regardless of position —
+      // with parallel spans, terminal events can arrive in non-LIFO order
+      // (e.g., a fast auth completion before a slow payload), so popping
+      // only the top would leak stack state.
+      const idx = fallbackStack.findIndex((s) => s.span_id === ev.span_id);
+      if (idx !== -1) fallbackStack.splice(idx, 1);
       continue;
     }
 
     // Leaf event (e.g., content:db:query, an info breadcrumb, an error).
-    siblings.push({
+    resolveContainer(ev).push({
       kind: "event",
       layer: ev.layer,
       event: ev.event,
