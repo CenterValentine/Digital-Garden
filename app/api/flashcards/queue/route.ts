@@ -86,7 +86,11 @@ export async function GET(request: NextRequest) {
     const newLimit = includeNew ? Math.min(limit, NEW_PER_QUEUE_CAP) : 0;
     const reviewLimit = limit - newLimit;
 
-    const [dueCards, newCards]: [SelectedCard[], SelectedCard[]] = await Promise.all([
+    const [dueCards, newCards, debugAllInScope]: [
+      SelectedCard[],
+      SelectedCard[],
+      Array<{ id: string; state: string; due: Date; deckId: string }>,
+    ] = await Promise.all([
       reviewLimit > 0
         ? prisma.flashcard.findMany({
             where: {
@@ -110,7 +114,35 @@ export async function GET(request: NextRequest) {
             take: newLimit,
           })
         : Promise.resolve<SelectedCard[]>([]),
+      // ─── DEBUG (temporary) — Sprint 6 follow-up bug: dueCount and
+      // queue disagree on card visibility for the same deckId. Surface
+      // every card in scope so we can see what state/due/deckId they
+      // actually have. Remove this diagnostic once root cause is fixed.
+      prisma.flashcard.findMany({
+        where: { ownerId, deletedAt: null, ...(deckIdFilter ? { deckId: { in: deckIdFilter } } : {}) },
+        select: { id: true, state: true, due: true, deckId: true },
+        take: 25,
+      }) as unknown as Promise<Array<{ id: string; state: string; due: Date; deckId: string }>>,
     ]);
+
+    // ─── DEBUG log (temporary) ───────────────────────────────────────
+    console.warn("[flashcards/queue diagnostic]", {
+      requestedDeckId: deckId,
+      resolvedDeckIdFilter: deckIdFilter,
+      includeNew,
+      limit,
+      newLimit,
+      reviewLimit,
+      nowIso: now.toISOString(),
+      dueCardsReturned: dueCards.length,
+      newCardsReturned: newCards.length,
+      allCardsInScope: debugAllInScope.map((c) => ({
+        id: c.id,
+        state: c.state,
+        due: c.due.toISOString(),
+        deckId: c.deckId,
+      })),
+    });
 
     const data = [...dueCards, ...newCards].map((card) => toFlashcardDto(card));
 
