@@ -6,8 +6,10 @@ import { resolveContentAccess } from "@/lib/domain/collaboration/access";
 import {
   FLASHCARD_SELECT,
   createTextTiptapDoc,
+  deriveStateFromLegacyStatus,
   isTiptapDoc,
   normalizeTiptapDoc,
+  resolveLegacyDeckId,
   sanitizeFlashcardCategory,
   sanitizeFlashcardLabel,
   sanitizeFlashcardSubcategory,
@@ -15,6 +17,14 @@ import {
   toFlashcardDto,
 } from "@/lib/domain/flashcards";
 import type { FlashcardReviewStatus } from "@/lib/domain/flashcards";
+
+// Sprint 6 changes:
+//  - PATCH accepts deckId. If only category/subcategory strings are
+//    provided (legacy Panel UI), they resolve to a deckId via
+//    resolveLegacyDeckId.
+//  - reviewStatus is translated to FSRS state via the legacy-compat
+//    map. The legacy reviewStatus / reviewCount / masteredAt columns
+//    are gone post-Migration-C.
 
 type Params = Promise<{ id: string }>;
 
@@ -55,7 +65,7 @@ export async function PATCH(
     const { id } = await params;
     const body = (await request.json()) as Record<string, unknown>;
     const existing = await prisma.flashcard.findFirst({
-      where: { id, ownerId: session.user.id },
+      where: { id, ownerId: session.user.id, deletedAt: null },
       select: { id: true, isFrontRichText: true },
     });
 
@@ -73,12 +83,41 @@ export async function PATCH(
     if ("backLabel" in body) {
       data.backLabel = sanitizeFlashcardLabel(body.backLabel, "Answer");
     }
-    if ("category" in body) {
-      data.category = sanitizeFlashcardCategory(body.category);
+
+    // Sprint 6: deck reassignment. Explicit deckId wins; otherwise the
+    // legacy category/subcategory pair resolves to a deck.
+    if ("deckId" in body && typeof body.deckId === "string") {
+      const deckId = body.deckId.trim();
+      if (deckId) {
+        const deck = await prisma.flashcardDeck.findFirst({
+          where: { id: deckId, ownerId: session.user.id, deletedAt: null },
+          select: { id: true },
+        });
+        if (!deck) {
+          return NextResponse.json(
+            {
+              success: false,
+              error: { code: "INVALID_INPUT", message: "Deck not found." },
+            },
+            { status: 400 }
+          );
+        }
+        data.deck = { connect: { id: deckId } };
+      }
+    } else if ("category" in body || "subcategory" in body) {
+      // Legacy category/subcategory PATCH — resolve to deckId.
+      const category =
+        "category" in body ? sanitizeFlashcardCategory(body.category) : "General";
+      const subcategory =
+        "subcategory" in body ? sanitizeFlashcardSubcategory(body.subcategory) : "";
+      const deckId = await resolveLegacyDeckId(
+        session.user.id,
+        category,
+        subcategory
+      );
+      data.deck = { connect: { id: deckId } };
     }
-    if ("subcategory" in body) {
-      data.subcategory = sanitizeFlashcardSubcategory(body.subcategory);
-    }
+
     if ("isFrontRichText" in body) {
       data.isFrontRichText = body.isFrontRichText === true;
     }
@@ -123,13 +162,21 @@ export async function PATCH(
       }
       data.backContent = normalizeTiptapDoc(body.backContent) as Prisma.InputJsonValue;
     }
+
+    // Sprint 6: reviewStatus PATCH translates to a state change.
+    // archived → state=archived (manual hold).
+    // new      → state=new (un-archive; resets scheduling).
+    // review / mastered → no-op (FSRS-controlled, can't be set from outside).
     if ("reviewStatus" in body) {
       const reviewStatus = parseReviewStatus(body.reviewStatus);
       if (reviewStatus) {
-        data.reviewStatus = reviewStatus;
-        if (reviewStatus !== "mastered") data.masteredAt = null;
+        const translated = deriveStateFromLegacyStatus(reviewStatus, new Date());
+        if (translated.state !== undefined) data.state = translated.state;
+        if (translated.archivedAt !== undefined) data.archivedAt = translated.archivedAt;
+        if (translated.suspendedAt !== undefined) data.suspendedAt = translated.suspendedAt;
       }
     }
+
     if ("sourceContentId" in body) {
       const sourceContentId = await resolveSourceContentId(
         body.sourceContentId,
@@ -170,11 +217,16 @@ export async function DELETE(
   try {
     const session = await requireAuth();
     const { id } = await params;
-    const deleted = await prisma.flashcard.deleteMany({
-      where: { id, ownerId: session.user.id },
+    // Sprint 6: soft-delete instead of hard-delete. The deletedAt
+    // column was added in Migration A for exactly this — keeps the
+    // FlashcardReviewAttempt audit trail intact, lets users undo, and
+    // doesn't break FK references from review attempts.
+    const updated = await prisma.flashcard.updateMany({
+      where: { id, ownerId: session.user.id, deletedAt: null },
+      data: { deletedAt: new Date() },
     });
 
-    if (deleted.count === 0) {
+    if (updated.count === 0) {
       return NextResponse.json(
         { success: false, error: { code: "NOT_FOUND", message: "Flashcard not found" } },
         { status: 404 }

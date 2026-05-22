@@ -223,12 +223,9 @@ export async function POST(request: NextRequest) {
           lapses: schedule.next.lapses,
           learningSteps: schedule.next.learningSteps,
           lastReviewedAt: now,
-          // Keep legacy reviewStatus + reviewCount + lastReviewedAt in
-          // sync during the transition window. UI components that read
-          // these stay functional until Migration C drops them.
-          reviewStatus:
-            schedule.next.state === "review" && rating === "easy" ? "mastered" : "review",
-          reviewCount: { increment: 1 },
+          // Sprint 6: legacy reviewStatus + reviewCount columns dropped
+          // by Migration C. UI now reads derived legacy fields from
+          // toFlashcardDto via lib/domain/flashcards/legacy-compat.ts.
         },
         select: FLASHCARD_SELECT,
       });

@@ -3,17 +3,24 @@ import {
   normalizeTiptapDoc,
   summarizeFlashcardContent,
 } from "./content";
+import {
+  deriveLegacyCategoryAndSubcategory,
+  deriveLegacyReviewStatus,
+} from "./legacy-compat";
 import type {
   FlashcardCardType,
   FlashcardDeckRecordDto,
   FlashcardDto,
-  FlashcardReviewStatus,
   FlashcardState,
 } from "./types";
 
-// Card select with the legacy + FSRS column set. Extended in Epoch 19 —
-// new columns are at the bottom of the literal so a `git blame` makes
-// the addition obvious.
+// Card select (Epoch 19, Sprint 6 — legacy columns removed).
+//
+// After Migration C, Flashcard no longer carries category / subcategory /
+// reviewStatus / reviewCount / masteredAt. The legacy DTO fields are
+// derived from the deck FK + FSRS state instead — see
+// `legacy-compat.ts`. The Panel UI keeps consuming the same DTO shape
+// without modification.
 export const FLASHCARD_SELECT = {
   id: true,
   sourceContentId: true,
@@ -27,17 +34,12 @@ export const FLASHCARD_SELECT = {
   frontContent: true,
   backContent: true,
   isFrontRichText: true,
-  category: true,
-  subcategory: true,
-  reviewStatus: true,
-  reviewCount: true,
   viewCount: true,
   lastReviewedAt: true,
   lastViewedAt: true,
-  masteredAt: true,
   createdAt: true,
   updatedAt: true,
-  // FSRS additions (Epoch 19, Sprint 2).
+  // FSRS columns (Epoch 19, Sprint 2).
   deckId: true,
   cardType: true,
   state: true,
@@ -52,6 +54,18 @@ export const FLASHCARD_SELECT = {
   suspendedAt: true,
   archivedAt: true,
   deletedAt: true,
+  // Deck record (Sprint 6) — joined so legacy DTO fields can be
+  // derived. The Panel UI reads category/subcategory; we synthesize
+  // those from the deck record at the DTO boundary.
+  deck: {
+    select: {
+      id: true,
+      name: true,
+      parentDeckId: true,
+      path: true,
+      parent: { select: { name: true } },
+    },
+  },
 } satisfies Prisma.FlashcardSelect;
 
 type SelectedFlashcard = Prisma.FlashcardGetPayload<{
@@ -61,6 +75,16 @@ type SelectedFlashcard = Prisma.FlashcardGetPayload<{
 export function toFlashcardDto(card: SelectedFlashcard): FlashcardDto {
   const frontContent = normalizeTiptapDoc(card.frontContent);
   const backContent = normalizeTiptapDoc(card.backContent);
+
+  const { category, subcategory } = deriveLegacyCategoryAndSubcategory(
+    card.deck
+      ? {
+          name: card.deck.name,
+          parentDeckId: card.deck.parentDeckId,
+          parent: card.deck.parent ?? null,
+        }
+      : null,
+  );
 
   return {
     id: card.id,
@@ -73,14 +97,26 @@ export function toFlashcardDto(card: SelectedFlashcard): FlashcardDto {
     frontPreview: summarizeFlashcardContent(frontContent),
     backPreview: summarizeFlashcardContent(backContent),
     isFrontRichText: card.isFrontRichText,
-    category: card.category,
-    subcategory: card.subcategory,
-    reviewStatus: card.reviewStatus as FlashcardReviewStatus,
-    reviewCount: card.reviewCount,
+    // Legacy fields derived from FK + FSRS state.
+    category,
+    subcategory,
+    reviewStatus: deriveLegacyReviewStatus(
+      card.state as FlashcardState,
+      card.reps,
+      card.lapses,
+    ),
+    // `reviewCount` was historically a strict counter of POST /review
+    // calls; `reps` is the FSRS analogue (also counts every scored
+    // review). Same semantics, different column name.
+    reviewCount: card.reps,
     viewCount: card.viewCount,
     lastReviewedAt: card.lastReviewedAt?.toISOString() ?? null,
     lastViewedAt: card.lastViewedAt?.toISOString() ?? null,
-    masteredAt: card.masteredAt?.toISOString() ?? null,
+    // `masteredAt` data is lost in Sprint 6's drop — the legacy column
+    // captured a one-time timestamp that we can't reconstruct from FSRS
+    // state. Returning null preserves the DTO shape; UI that depended
+    // on "when was this first mastered?" loses that one piece of info.
+    masteredAt: null,
     createdAt: card.createdAt.toISOString(),
     updatedAt: card.updatedAt.toISOString(),
     // FSRS additions.

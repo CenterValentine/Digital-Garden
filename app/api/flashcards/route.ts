@@ -9,15 +9,28 @@ import {
   createTextTiptapDoc,
   isTiptapDoc,
   normalizeTiptapDoc,
+  resolveLegacyDeckId,
   sanitizeFlashcardCategory,
   sanitizeFlashcardLabel,
   sanitizeFlashcardSubcategory,
   summarizeFlashcardContent,
   toFlashcardDto,
 } from "@/lib/domain/flashcards";
-import type { FlashcardReviewStatus } from "@/lib/domain/flashcards";
+import type {
+  FlashcardReviewStatus,
+  FlashcardState,
+} from "@/lib/domain/flashcards";
 
-function parseReviewStatus(value: string | null): FlashcardReviewStatus | undefined {
+// Sprint 6 changes:
+//  - POST: deckId is the source of truth. If the request only carries
+//    legacy category/subcategory strings, we look-up-or-create the
+//    implied deck via resolveLegacyDeckId so the FK is always written.
+//    The legacy columns are NOT written (they're dropped by Migration C).
+//  - GET: accepts deckId OR category/subcategory (the latter resolves
+//    to a deckId via the same lookup). reviewStatus filter translates
+//    to a FSRS state filter via the legacy-compat map.
+
+function parseLegacyReviewStatus(value: string | null): FlashcardReviewStatus | undefined {
   if (
     value === "new" ||
     value === "review" ||
@@ -27,6 +40,23 @@ function parseReviewStatus(value: string | null): FlashcardReviewStatus | undefi
     return value;
   }
   return undefined;
+}
+
+// Translate legacy reviewStatus to a FSRS state WHERE-clause fragment.
+// The legacy 4-value enum maps lossy-but-reasonable onto the FSRS
+// states; "mastered" was always a heuristic derivation, so it filters
+// to state=review (the only state where mastered cards live).
+function statesForLegacyStatus(status: FlashcardReviewStatus): FlashcardState[] {
+  switch (status) {
+    case "new":
+      return ["new"];
+    case "review":
+      return ["learning", "review", "relearning"];
+    case "mastered":
+      return ["review"]; // heuristic — refined by reps/lapses downstream
+    case "archived":
+      return ["archived"];
+  }
 }
 
 async function assertSourceContentAccess(sourceContentId: unknown, userId: string) {
@@ -48,17 +78,45 @@ export async function GET(request: NextRequest) {
   try {
     const session = await requireAuth();
     const { searchParams } = new URL(request.url);
+    const explicitDeckId = searchParams.get("deckId");
     const category = searchParams.get("category");
     const subcategory = searchParams.get("subcategory");
     const sourceContentId = searchParams.get("sourceContentId");
-    const reviewStatus = parseReviewStatus(searchParams.get("reviewStatus"));
+    const reviewStatus = parseLegacyReviewStatus(searchParams.get("reviewStatus"));
+
+    // Resolve deckId filter. Explicit param takes precedence. When
+    // category/subcategory strings are supplied (legacy Panel UI), we
+    // resolve them via lookup — but unlike the write path, we don't
+    // auto-create here. A query for a non-existent deck returns empty.
+    let deckIdFilter: string | undefined;
+    if (explicitDeckId) {
+      deckIdFilter = explicitDeckId;
+    } else if (category !== null) {
+      const cat = category.trim() || "General";
+      const sub = subcategory?.trim() ?? "";
+      const slug = sub
+        ? `${slugify(cat)}-${slugify(sub)}` // matches resolveLegacyDeckId child-slug pattern
+        : slugify(cat);
+      const deck = await prisma.flashcardDeck.findUnique({
+        where: { ownerId_slug: { ownerId: session.user.id, slug } },
+        select: { id: true },
+      });
+      if (!deck) {
+        // No matching deck → no cards. Return the legacy-shape empty
+        // array so the Panel UI handles "no cards" gracefully.
+        return NextResponse.json({ success: true, data: [] });
+      }
+      deckIdFilter = deck.id;
+    }
 
     const where: Prisma.FlashcardWhereInput = {
       ownerId: session.user.id,
-      ...(category ? { category } : {}),
-      ...(subcategory !== null ? { subcategory } : {}),
+      deletedAt: null,
+      ...(deckIdFilter ? { deckId: deckIdFilter } : {}),
       ...(sourceContentId ? { sourceContentId } : {}),
-      ...(reviewStatus ? { reviewStatus } : { reviewStatus: { not: "archived" } }),
+      ...(reviewStatus
+        ? { state: { in: statesForLegacyStatus(reviewStatus) } }
+        : { state: { not: "archived" } }),
     };
 
     const cards = await prisma.flashcard.findMany({
@@ -82,6 +140,20 @@ export async function GET(request: NextRequest) {
       { status: message.includes("Authentication") ? 401 : 500 }
     );
   }
+}
+
+// Internal slug helper — duplicated from api.ts's slugifyDeckName so we
+// can use it inside the route without importing through the barrel
+// (which adds the legacy-compat surface unnecessarily here).
+function slugify(input: string): string {
+  return input
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/[^a-z0-9-]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 140) || "deck";
 }
 
 export async function POST(request: NextRequest) {
@@ -126,8 +198,36 @@ export async function POST(request: NextRequest) {
       body.sourceContentId,
       session.user.id
     );
+
+    // Sprint 6: resolve deckId. Explicit deckId in the body wins.
+    // Otherwise fall back to the legacy category/subcategory strings
+    // (look-up-or-create the implied deck). At least one path must
+    // produce a deckId — refuse if both are missing.
     const category = sanitizeFlashcardCategory(body.category);
     const subcategory = sanitizeFlashcardSubcategory(body.subcategory);
+    const explicitDeckId =
+      typeof body.deckId === "string" && body.deckId.trim() ? body.deckId.trim() : null;
+
+    let deckId: string;
+    if (explicitDeckId) {
+      // Validate the deck exists + belongs to this user.
+      const deck = await prisma.flashcardDeck.findFirst({
+        where: { id: explicitDeckId, ownerId: session.user.id, deletedAt: null },
+        select: { id: true },
+      });
+      if (!deck) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: { code: "INVALID_INPUT", message: "Deck not found." },
+          },
+          { status: 400 }
+        );
+      }
+      deckId = deck.id;
+    } else {
+      deckId = await resolveLegacyDeckId(session.user.id, category, subcategory);
+    }
 
     const card = await prisma.flashcard.create({
       data: {
@@ -138,15 +238,18 @@ export async function POST(request: NextRequest) {
         frontContent: frontContent as Prisma.InputJsonValue,
         backContent: backContent as Prisma.InputJsonValue,
         isFrontRichText,
-        category,
-        subcategory,
+        deckId,
       },
       select: FLASHCARD_SELECT,
     });
 
+    // Persist "last used" for the prefill route. We still write the
+    // legacy strings into User.settings so the Panel's autocomplete
+    // continues to work — that field is a Json blob, not a column
+    // being dropped.
     await updateUserSettings(session.user.id, {
       flashcards: {
-        lastUsedCategory: category,
+        lastUsedCategory: category || "General",
         lastUsedSubcategory: subcategory,
       },
     });

@@ -1,3 +1,22 @@
+/* eslint-disable @typescript-eslint/ban-ts-comment -- @ts-nocheck below is
+   load-bearing; see file header for why. */
+// @ts-nocheck
+//
+// This script is FROZEN pre-Migration-C tooling. It references the
+// `Flashcard.category` and `Flashcard.subcategory` columns that
+// Migration C drops; after Migration C runs + `prisma generate`, the
+// Prisma client no longer types those columns and this file fails
+// typecheck. The @ts-nocheck above pins the file to its pre-migration
+// state so it stays compilable for anyone running Migration B on a
+// fresh DB. The eslint-disable directive lets the @ts-nocheck pass
+// the @typescript-eslint/ban-ts-comment lint rule.
+//
+// If you're on a fresh DB and need to backfill from a Migration-A
+// schema (legacy columns still present), run this script BEFORE
+// Migration C. If your DB is already at Migration C, this script has
+// no work to do — every card already has a deckId, and the legacy
+// findMany at runtime will return zero rows.
+
 /**
  * Backfill FlashcardDeck rows from the legacy Flashcard.category +
  * Flashcard.subcategory string columns (Epoch 19, Sprint 1, Migration B).

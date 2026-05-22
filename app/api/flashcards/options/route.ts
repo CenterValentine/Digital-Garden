@@ -4,6 +4,11 @@ import { requireAuth } from "@/lib/infrastructure/auth/middleware";
 import { getUserSettings } from "@/lib/features/settings/operations";
 import type { FlashcardOptionsDto } from "@/lib/domain/flashcards";
 
+// Sprint 6: legacy categories/subcategories derived from the
+// FlashcardDeck table (root deck name → category, child deck name →
+// subcategory). frontLabels/backLabels still come from Flashcard rows
+// since those columns weren't dropped.
+
 function sorted(values: Iterable<string>) {
   return Array.from(values)
     .map((value) => value.trim())
@@ -14,17 +19,19 @@ function sorted(values: Iterable<string>) {
 export async function GET() {
   try {
     const session = await requireAuth();
-    const [settings, cards] = await Promise.all([
+    const [settings, decks, cards] = await Promise.all([
       getUserSettings(session.user.id),
-      prisma.flashcard.findMany({
-        where: { ownerId: session.user.id },
+      prisma.flashcardDeck.findMany({
+        where: { ownerId: session.user.id, deletedAt: null },
         select: {
-          category: true,
-          subcategory: true,
-          frontLabel: true,
-          backLabel: true,
+          name: true,
+          parentDeckId: true,
+          parent: { select: { name: true } },
         },
-        orderBy: [{ category: "asc" }, { subcategory: "asc" }],
+      }),
+      prisma.flashcard.findMany({
+        where: { ownerId: session.user.id, deletedAt: null },
+        select: { frontLabel: true, backLabel: true },
         take: 1000,
       }),
     ]);
@@ -43,16 +50,21 @@ export async function GET() {
     ]);
     const subcategoriesByCategory = new Map<string, Set<string>>();
 
+    for (const deck of decks) {
+      if (deck.parentDeckId && deck.parent) {
+        categories.add(deck.parent.name);
+        const existing =
+          subcategoriesByCategory.get(deck.parent.name) ?? new Set<string>();
+        existing.add(deck.name);
+        subcategoriesByCategory.set(deck.parent.name, existing);
+      } else {
+        categories.add(deck.name);
+      }
+    }
+
     for (const card of cards) {
-      categories.add(card.category);
       frontLabels.add(card.frontLabel);
       backLabels.add(card.backLabel);
-      if (card.subcategory.trim()) {
-        const existing =
-          subcategoriesByCategory.get(card.category) ?? new Set<string>();
-        existing.add(card.subcategory);
-        subcategoriesByCategory.set(card.category, existing);
-      }
     }
 
     if (settings.flashcards?.lastUsedSubcategory?.trim()) {

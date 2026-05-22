@@ -3,8 +3,8 @@ epoch: 19
 title: Flashcards FSRS — Anki-Grade Spaced Repetition + Editor Block
 status: shipped_in_branch
 started: 2026-05-20
-completed: 2026-05-21
-last_updated: 2026-05-21
+completed: 2026-05-22
+last_updated: 2026-05-22
 worktree: /Users/davidvalentine/Code/Digital-Garden-flashcards-fsrs
 branch: epoch-19/sprint-1-flashcards-schema
 detailed_plan: ../FLASHCARDS-FSRS-PLAN.md
@@ -84,12 +84,38 @@ Commits: `c944476 feat(flashcards): flashcardEmbed TipTap block + NodeView` · `
 
 ### Sprint 5 — Deck picker + epoch wrap-up
 
-This sprint.
-
 - `FlashcardDeckPickerDialog` — portal-mounted modal with tree view, search, and inline "Create new deck" form. Used by `FlashcardEmbedNodeView`'s no-deck state.
 - Wired the dialog into the block; the previously-scaffolded `updateAttrs()` helper persists `{ deckId }` to the node when the user picks.
 - This epoch tracker; plan doc closeout.
-- **Migration C deferred** — see "Open work" below.
+- Migration C deferred to Sprint 6 (shipped in the same PR — see below).
+
+### Sprint 6 — Legacy column sunset + Migration C
+
+Commit: `<this sprint's commit>` (see git log)
+
+Migration C ran end-to-end on the same branch as Sprints 1–5, deviating from the original plan that had Sprint 6 as a separate PR. The deviation is justified: PR #44 was still in review, so adding Sprint 6 commits avoided the cost of a dependent PR cascade. The destructive migration is gated behind 3 expand-pattern prerequisites (Migration A applied, Migration B run, app code reading from FK paradigm only) — all satisfied before the commit.
+
+**Server-side compatibility shim approach (the key design call):** instead of rewriting the ~900-line `FlashcardsPanel` and ~450-line `FlashcardQuickAddForm` to consume the FK paradigm directly, the legacy API routes were rewritten to *derive* the old `{category, subcategory, reviewStatus}` shape from the new FK paradigm at the server boundary. The UI consumes the same DTO it always has; the underlying source pivoted to `FlashcardDeck` + FSRS state. This deferred ~1500 lines of client-side rewrite to a future polish sprint without blocking Migration C.
+
+**Files touched:**
+- `lib/domain/flashcards/legacy-compat.ts` (NEW) — `deriveLegacyCategoryAndSubcategory`, `deriveLegacyReviewStatus`, `resolveLegacyDeckId`, `deriveStateFromLegacyStatus`
+- `lib/domain/flashcards/api.ts` — `FLASHCARD_SELECT` joins `deck` with `parent.name`; `toFlashcardDto` derives `category`/`subcategory`/`reviewStatus`/`reviewCount` from FK + FSRS state; `masteredAt` returns null (one-time data loss, see below)
+- `app/api/flashcards/route.ts` (POST + GET) — accepts `deckId` OR legacy strings; resolves legacy strings via `resolveLegacyDeckId`; reads no longer touch legacy columns
+- `app/api/flashcards/[id]/route.ts` (PATCH + DELETE) — accepts `deckId`; translates `reviewStatus` PATCHes to FSRS state changes via `deriveStateFromLegacyStatus`; DELETE soft-deletes (sets `deletedAt`) instead of hard-deleting
+- `app/api/flashcards/[id]/review/route.ts` (legacy outcome endpoint) — drops `reviewStatus`/`reviewCount`/`masteredAt` writes; logs the attempt audit row + touches `lastReviewedAt` only. The new `/api/flashcards/review` endpoint remains the canonical FSRS path.
+- `app/api/flashcards/decks/route.ts` (legacy aggregate GET + rename PATCH) — derives aggregate counts from `FlashcardDeck` table + Prisma `groupBy` on cards; rename PATCH translates to deck rename / cross-deck card move with 3 code paths (rename / move-up / move-down)
+- `app/api/flashcards/options/route.ts` — `categories` derived from root deck names; `subcategoriesByCategory` derived from parent→child deck relationship
+- `app/api/flashcards/count/route.ts` — `reviewStatus: { not: "archived" }` → `state: { not: "archived" }`
+- `app/api/flashcards/review/route.ts` (new FSRS endpoint) — drops the back-compat `reviewStatus`/`reviewCount` writes that were in Sprint 2 (now dead code post-Migration-C)
+- `prisma/migrations/20260522120000_flashcards_migration_c_legacy_sunset/migration.sql` (NEW) — the destructive migration: drops 2 legacy indexes, promotes `deckId` to NOT NULL, drops 5 legacy columns, drops `FlashcardReviewStatus` enum
+- `prisma/schema.prisma` — matches the post-Migration-C state
+- `scripts/backfill-flashcard-decks.ts` — pinned to its pre-Migration-C state via `@ts-nocheck` (with eslint-disable for `@typescript-eslint/ban-ts-comment`); see file header for why
+
+**Lossy at the boundaries (documented):**
+- `masteredAt` returns `null` — the legacy column captured a one-time timestamp we can't reconstruct from FSRS state. UI that surfaced "first mastered date" loses that one piece of info.
+- `reviewStatus === "mastered"` is now a heuristic: state=`review` AND lapses=0 AND reps≥5. Doesn't affect scheduling, just classification in the legacy aggregate.
+
+**Soft-delete now via `deletedAt`** on the card — Sprint 6's DELETE handler stops hard-deleting. The Sprint 1 schema added `Flashcard.deletedAt` for exactly this; switching the handler preserves the `FlashcardReviewAttempt` audit chain (FK references would otherwise break on hard delete).
 
 ## Verification gates (all green on this branch)
 
@@ -99,9 +125,26 @@ This sprint.
 
 **Pre-existing failure (not caused by this epoch)**: `pnpm collab:schema:check` fails at runtime due to a tsx + Node 25 + TipTap ESM incompatibility (`CharacterCount` → `code-block-lowlight`'s `CodeBlock.extend(...)` resolves to `undefined`). Same failure on `main`. Static-regex portion of the validator would detect `flashcardEmbed` correctly; runtime portion's failure is unrelated infrastructure debt.
 
-## Open work (deferred from Sprint 5)
+## Open work (deferred to a follow-up sprint)
 
-The plan called for Migration C (drop legacy columns) in Sprint 5. Grep across the worktree showed Migration C is **load-bearing blocked** — these surfaces still read or write the legacy columns:
+Sprint 6 ran Migration C on this branch via the server-side compatibility shim, NOT a full UI rewrite. The Panel + QuickAddForm still consume the legacy DTO shape; they just receive derived data now. The full FK-paradigm rewrite is genuinely deferred:
+
+| Item | Sprint target | Notes |
+|---|---|---|
+| Rewrite `FlashcardsPanel.tsx` to use deck FK directly | future polish | ~900 lines of UI; no longer urgent because shim handles it |
+| Rewrite `FlashcardQuickAddForm.tsx` to use `FlashcardDeckPickerDialog` instead of skill/skill-category dropdowns | future polish | Better UX (tree-shaped picker > paired dropdowns) but not required for correctness |
+| Collapse `registerBlock` ↔ `getSlashCommands` dual-registry | future polish | Every new block currently needs both registrations |
+| Settings sub-page UI (desiredRetention slider, default deck, Optimize button) | future polish | API + DTOs exist; just needs UI under `app/(authenticated)/settings/` |
+| Playwright visual regression baselines | future polish | Block in study mode, block in reference mode, overlay 4-button row |
+| FSRS optimizer actual training | v1.1 | Currently throws `OptimizerNotReadyError` until 100 reviews, then `NOT_IMPLEMENTED` |
+| Card-type variants (cloze, typing, multiple-choice) | v1.1+ | `cardType` column reserved |
+| Anki `.apkg` import/export | v1.2 | Round-trip semantics complex |
+| Sub-card relations (Anki "siblings") | v1.2+ | Card-type variants prerequisite |
+| AI-generated cards via MCP | "much later" | Explicit user out-of-scope |
+
+## Historical note (Sprint 6 — Migration C prerequisites, NOW RESOLVED)
+
+The original plan flagged 30+ surfaces reading legacy columns before Migration C could safely run:
 
 | File | Legacy columns referenced |
 |---|---|

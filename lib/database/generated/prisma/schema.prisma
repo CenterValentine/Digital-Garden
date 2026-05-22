@@ -55,13 +55,6 @@ enum ContentWorkspaceItemScope {
   recursive
 }
 
-enum FlashcardReviewStatus {
-  new
-  review
-  mastered
-  archived
-}
-
 enum FlashcardReviewOutcome {
   review
   mastered
@@ -242,29 +235,23 @@ model FlashcardDeck {
 }
 
 model Flashcard {
-  id              String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  ownerId         String                @db.Uuid
-  sourceContentId String?               @db.Uuid
-  frontLabel      String                @default("Question") @db.VarChar(80)
-  backLabel       String                @default("Answer") @db.VarChar(80)
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ownerId         String    @db.Uuid
+  sourceContentId String?   @db.Uuid
+  frontLabel      String    @default("Question") @db.VarChar(80)
+  backLabel       String    @default("Answer") @db.VarChar(80)
   frontContent    Json
   backContent     Json
-  isFrontRichText Boolean               @default(false)
-  category        String                @default("General") @db.VarChar(120)
-  subcategory     String                @default("") @db.VarChar(120)
-  reviewStatus    FlashcardReviewStatus @default(new)
-  reviewCount     Int                   @default(0)
-  viewCount       Int                   @default(0)
-  lastReviewedAt  DateTime?             @db.Timestamptz(6)
-  lastViewedAt    DateTime?             @db.Timestamptz(6)
-  masteredAt      DateTime?             @db.Timestamptz(6)
-  createdAt       DateTime              @default(now()) @db.Timestamptz(6)
-  updatedAt       DateTime              @updatedAt @db.Timestamptz(6)
+  isFrontRichText Boolean   @default(false)
+  viewCount       Int       @default(0)
+  lastReviewedAt  DateTime? @db.Timestamptz(6)
+  lastViewedAt    DateTime? @db.Timestamptz(6)
+  createdAt       DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt       DateTime  @updatedAt @db.Timestamptz(6)
 
-  // ---- FSRS additions (Epoch 19, Migration A) ----
-  // deckId is nullable in Migration A so existing rows stay valid; the
-  // backfill script populates it, then Migration C will alter to NOT NULL.
-  deckId        String?           @db.Uuid
+  // ---- FSRS additions (Epoch 19, Migration A; deckId promoted to
+  // ---- NOT NULL in Migration C, Sprint 6 — legacy columns sunset).
+  deckId        String            @db.Uuid
   cardType      FlashcardCardType @default(basic)
   state         FlashcardState    @default(new)
   due           DateTime          @default(now()) @db.Timestamptz(6)
@@ -280,12 +267,10 @@ model Flashcard {
   deletedAt     DateTime?         @db.Timestamptz(6)
 
   owner          User                     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  deck           FlashcardDeck?           @relation(fields: [deckId], references: [id], onDelete: Restrict)
+  deck           FlashcardDeck            @relation(fields: [deckId], references: [id], onDelete: Restrict)
   sourceContent  ContentNode?             @relation("FlashcardSourceContent", fields: [sourceContentId], references: [id], onDelete: SetNull)
   reviewAttempts FlashcardReviewAttempt[]
 
-  @@index([ownerId, category, subcategory])
-  @@index([ownerId, reviewStatus])
   @@index([sourceContentId])
   @@index([ownerId, deckId])
   @@index([ownerId, due])
