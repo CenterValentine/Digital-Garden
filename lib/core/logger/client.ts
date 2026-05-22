@@ -144,13 +144,23 @@ function consoleMirror(ev: LogEvent) {
   if (typeof console === "undefined") return;
   // Single-line tag + structured detail. Devs can drill into the second arg in
   // DevTools without reading a long inline string.
-  const tag = `[${ev.layer}:${ev.event}]`;
+  //
+  // The tag dedupes the layer prefix when the event already starts with it
+  // (e.g. layer="page" + event="page:hydrated" → "[page:hydrated]", not
+  // "[page:page:hydrated]"). Both naming styles exist in the codebase; this
+  // is the formatter side of the deduplication.
+  const eventLabel = ev.event.startsWith(`${ev.layer}:`)
+    ? ev.event.slice(ev.layer.length + 1)
+    : ev.event;
+  const tag = `[${ev.layer}:${eventLabel}]`;
+  const durationLabel = typeof ev.duration_ms === "number" ? ` (${ev.duration_ms}ms)` : "";
   const detail = ev.summary ?? "";
   const method = CONSOLE_BY_LEVEL[ev.level];
   // This file is the console boundary — the lib/core/logger/** glob in
   // eslint.config.mjs disables `no-console` here intentionally.
-  console[method](`${tag} ${detail}`, {
+  console[method](`${tag} ${detail}${durationLabel}`, {
     trace_id: ev.trace_id,
+    duration_ms: ev.duration_ms,
     attrs: ev.attrs,
     error: ev.error,
   });
