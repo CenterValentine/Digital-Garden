@@ -3,6 +3,11 @@ import { v4 as uuidv4 } from "uuid";
 import type { SessionData, User } from "./types";
 
 import { prisma } from "@/lib/database/client";
+import {
+  getCachedSession,
+  invalidateCachedSession,
+  setCachedSession,
+} from "./session-cache";
 
 const SESSION_COOKIE_NAME = "session_token";
 const EMBED_SESSION_HEADER = "x-embed-session";
@@ -80,6 +85,15 @@ export async function validateSession(
     return null;
   }
 
+  // Per-process cache absorbs the dominant cost in the auth:session_lookup
+  // span. Hits are <1ms; misses fall through to the DB query below and
+  // populate the cache for next time. TTL + session.expiresAt re-checks
+  // are handled inside getCachedSession.
+  const cached = getCachedSession(sessionToken);
+  if (cached !== undefined) {
+    return cached;
+  }
+
   const session = await prisma.session.findUnique({
     where: { token: sessionToken },
     include: {
@@ -95,6 +109,10 @@ export async function validateSession(
   });
 
   if (!session) {
+    // Negative-cache the bad token so spammed invalid tokens don't each
+    // cost a DB hit. The TTL bounds correctness if the token is ever
+    // legitimately created later.
+    setCachedSession(sessionToken, null);
     return null;
   }
 
@@ -102,14 +120,17 @@ export async function validateSession(
   if (new Date() > session.expiresAt) {
     // Delete expired session
     await prisma.session.delete({ where: { id: session.id } });
+    invalidateCachedSession(sessionToken);
     return null;
   }
 
-  return {
+  const result: SessionData = {
     user: session.user as Omit<User, "passwordHash">,
     sessionId: session.id,
     expiresAt: session.expiresAt,
   };
+  setCachedSession(sessionToken, result);
+  return result;
 }
 
 /**
@@ -121,6 +142,10 @@ export async function deleteSession(token?: string): Promise<void> {
   const sessionToken = token || cookieStore.get(SESSION_COOKIE_NAME)?.value;
 
   if (sessionToken) {
+    // Drop the local cache entry first so an in-flight request on this
+    // instance can't read the just-revoked session from cache after the
+    // DB delete. Other instances catch up via TTL expiry.
+    invalidateCachedSession(sessionToken);
     await prisma.session.deleteMany({
       where: { token: sessionToken },
     });
