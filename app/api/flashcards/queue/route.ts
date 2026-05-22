@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@/lib/database/generated/prisma";
 import { prisma } from "@/lib/database/client";
+import { logger } from "@/lib/core/logger";
 import { requireAuth } from "@/lib/infrastructure/auth/middleware";
 import {
   FLASHCARD_SELECT,
@@ -126,22 +127,33 @@ export async function GET(request: NextRequest) {
     ]);
 
     // ─── DEBUG log (temporary) ───────────────────────────────────────
-    console.warn("[flashcards/queue diagnostic]", {
-      requestedDeckId: deckId,
-      resolvedDeckIdFilter: deckIdFilter,
-      includeNew,
-      limit,
-      newLimit,
-      reviewLimit,
-      nowIso: now.toISOString(),
-      dueCardsReturned: dueCards.length,
-      newCardsReturned: newCards.length,
-      allCardsInScope: debugAllInScope.map((c) => ({
-        id: c.id,
-        state: c.state,
-        due: c.due.toISOString(),
-        deckId: c.deckId,
-      })),
+    // Uses logger.warn (no-console lint rule). attrs are scalars only
+    // per the PII firewall; the card-list array is serialized as a
+    // single JSON-string attr for visibility.
+    logger.warn({
+      layer: "editor",
+      event: "flashcards_queue:diagnostic",
+      summary: "deck-count vs queue mismatch — scope dump",
+      attrs: {
+        requested_deck_id: deckId ?? "",
+        resolved_deck_id_filter: (deckIdFilter ?? []).join(","),
+        include_new: includeNew,
+        limit,
+        new_limit: newLimit,
+        review_limit: reviewLimit,
+        now_iso: now.toISOString(),
+        due_cards_returned: dueCards.length,
+        new_cards_returned: newCards.length,
+        all_cards_in_scope_count: debugAllInScope.length,
+        all_cards_in_scope_json: JSON.stringify(
+          debugAllInScope.map((c) => ({
+            id: c.id,
+            state: c.state,
+            due: c.due.toISOString(),
+            deckId: c.deckId,
+          })),
+        ),
+      },
     });
 
     const data = [...dueCards, ...newCards].map((card) => toFlashcardDto(card));
