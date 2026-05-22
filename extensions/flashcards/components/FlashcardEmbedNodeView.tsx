@@ -8,6 +8,7 @@ import type {
   FlashcardDeckRecordDto,
   FlashcardDto,
 } from "@/lib/domain/flashcards";
+import { FlashcardDeckPickerDialog } from "./FlashcardDeckPickerDialog";
 import { FlashcardReviewOverlay } from "./FlashcardReviewOverlay";
 import type { FlashcardEmbedAttrs } from "@/lib/domain/editor/extensions/blocks/flashcard-embed";
 
@@ -50,6 +51,7 @@ export function FlashcardEmbedNodeView({ attrs, editor, getPos }: NodeViewProps)
   const [cardIndex, setCardIndex] = useState(0);
   const [flipped, setFlipped] = useState(false);
   const [overlayOpen, setOverlayOpen] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   // Keep local mode in sync if the editor mutates the attribute.
   useEffect(() => {
@@ -101,26 +103,23 @@ export function FlashcardEmbedNodeView({ attrs, editor, getPos }: NodeViewProps)
 
   const currentCard = data?.visibleCards[cardIndex] ?? null;
 
-  // Mutate node attrs (toggle mode, change deck, etc.). Scaffolding for
-  // Session 5 polish — the "Set as default" submenu and properties-panel
-  // write-back path will call this. Underscored to satisfy the unused-
-  // var lint without removing the helper, since adding it back would
-  // duplicate the getPos() lookup pattern.
-  const _updateAttrs = useCallback(
+  // Mutate node attrs — used by the deck picker (Session 5) to write
+  // back the chosen deckId. Resolves getPos() fresh per call because
+  // TipTap captures position at NodeView mount and an upstream edit
+  // could shift it.
+  const updateAttrs = useCallback(
     (patch: Partial<FlashcardEmbedAttrs>) => {
       const pos = getPos();
       if (pos === undefined) return;
-      editor.chain().focus().setNodeSelection(pos).updateAttributes(
-        "flashcardEmbed",
-        patch as Record<string, unknown>,
-      ).run();
+      editor
+        .chain()
+        .focus()
+        .setNodeSelection(pos)
+        .updateAttributes("flashcardEmbed", patch as Record<string, unknown>)
+        .run();
     },
     [editor, getPos],
   );
-  // Reference _updateAttrs so the React Compiler doesn't strip the
-  // useCallback (and the unused-var lint stays happy at the leading-
-  // underscore level rather than complaining about a no-op assignment).
-  void _updateAttrs;
 
   // Local-only mode flip — UX nicety. Doesn't persist to attrs unless
   // the user uses the "Set as default" submenu (out of v1 scope).
@@ -162,22 +161,34 @@ export function FlashcardEmbedNodeView({ attrs, editor, getPos }: NodeViewProps)
 
   // ───────── Render branches ─────────
 
-  // Unlinked: block was inserted without a deck. Show an inviting
-  // "Pick a deck" affordance + Add card. (Full deck-picker dialog is
-  // a TODO; for v1 we surface a clickable hint that hands off to the
-  // standalone flashcards UI.)
+  // Unlinked: block was inserted without a deck. Open the picker
+  // dialog inline — saves the user a trip to block properties.
   if (!deckId) {
     return (
-      <div className="rounded-md border border-dashed border-gold-primary/40 bg-gold-primary/[0.04] p-4 text-center text-sm">
-        <Layers className="mx-auto mb-2 h-5 w-5 text-gold-primary" />
-        <p className="font-medium text-gray-900 dark:text-gray-100">
-          Flashcards block — no deck selected
-        </p>
-        <p className="mt-1 text-xs text-gray-600 dark:text-gray-400">
-          Use the block properties panel to pick a deck, or open the
-          Flashcards extension to create one.
-        </p>
-      </div>
+      <>
+        <div className="rounded-md border border-dashed border-gold-primary/40 bg-gold-primary/[0.04] p-4 text-center text-sm">
+          <Layers className="mx-auto mb-2 h-5 w-5 text-gold-primary" />
+          <p className="font-medium text-gray-900 dark:text-gray-100">
+            Flashcards block — no deck selected
+          </p>
+          <p className="mt-1 text-xs text-gray-600 dark:text-gray-400">
+            Pick an existing deck or create one to start studying.
+          </p>
+          <button
+            type="button"
+            onClick={() => setPickerOpen(true)}
+            className="mt-3 inline-flex items-center gap-1.5 rounded-md border border-gold-primary bg-gold-primary px-3 py-1.5 text-sm font-medium text-black hover:bg-gold-light"
+          >
+            <Layers className="h-3.5 w-3.5" />
+            Pick a deck
+          </button>
+        </div>
+        <FlashcardDeckPickerDialog
+          open={pickerOpen}
+          onClose={() => setPickerOpen(false)}
+          onSelect={(pickedDeckId) => updateAttrs({ deckId: pickedDeckId })}
+        />
+      </>
     );
   }
 
