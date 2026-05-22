@@ -37,14 +37,13 @@ export async function GET() {
           ownerId,
           deletedAt: null,
           state: { not: "archived" },
-          deckId: { not: null },
         },
         _count: { _all: true },
         _sum: { reps: true, viewCount: true },
       }),
       prisma.flashcard.groupBy({
         by: ["deckId"],
-        where: { ownerId, deletedAt: null, state: "new", deckId: { not: null } },
+        where: { ownerId, deletedAt: null, state: "new" },
         _count: { _all: true },
       }),
       prisma.flashcard.groupBy({
@@ -55,7 +54,6 @@ export async function GET() {
           state: "review",
           lapses: 0,
           reps: { gte: 5 }, // legacy "mastered" heuristic — see legacy-compat.ts
-          deckId: { not: null },
         },
         _count: { _all: true },
       }),

@@ -34,7 +34,7 @@ export async function GET() {
       }),
       prisma.flashcard.groupBy({
         by: ["deckId"],
-        where: { ownerId, deletedAt: null, deckId: { not: null } },
+        where: { ownerId, deletedAt: null },
         _count: { _all: true },
       }),
       prisma.flashcard.groupBy({
@@ -42,7 +42,6 @@ export async function GET() {
         where: {
           ownerId,
           deletedAt: null,
-          deckId: { not: null },
           due: { lte: now },
           state: { notIn: ["suspended", "archived"] },
         },
@@ -50,7 +49,7 @@ export async function GET() {
       }),
       prisma.flashcard.groupBy({
         by: ["deckId"],
-        where: { ownerId, deletedAt: null, deckId: { not: null }, state: "new" },
+        where: { ownerId, deletedAt: null, state: "new" },
         _count: { _all: true },
       }),
     ]);

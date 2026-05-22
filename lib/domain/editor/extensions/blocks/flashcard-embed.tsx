@@ -1,4 +1,4 @@
-import { Node, mergeAttributes } from "@tiptap/core";
+import { Node } from "@tiptap/core";
 import { z } from "zod";
 
 import { createBlockSchema } from "@/lib/domain/blocks/schema";
@@ -157,9 +157,18 @@ export function flashcardEmbedAttrSpec(): Record<string, unknown> {
 //   - getCollaborationServerExtensions() for the Hocuspocus server's
 //     Y.Doc schema (so a collab session knows this node type exists)
 //
-// The export-time renderHTML emits a static placeholder so non-interactive
-// surfaces (PDF export, RSS feeds) get a sensible label rather than a
-// blank div.
+// PUBLIC-SAFETY: this is also the schema used by the public-page
+// renderer in `components/public/TipTapContent.tsx`. We intentionally
+// do NOT propagate the deckId / cardIds attributes into the rendered
+// HTML — flashcards are private user data, and a published note that
+// embeds a deck should not leak the deck's UUID. Same pattern as
+// `ServerCalendarViewBlock` in extensions/calendar: emit a static
+// generic placeholder, not the underlying identifiers.
+//
+// The attribute spec stays defined (so parseHTML on the server can
+// still hydrate documents that DO carry data-deck-id, e.g. a fresh
+// editor save round-tripping through API → DB → render). The outer
+// renderHTML just doesn't propagate them onto the output element.
 
 export const ServerFlashcardEmbed = Node.create({
   name: "flashcardEmbed",
@@ -174,21 +183,18 @@ export const ServerFlashcardEmbed = Node.create({
     return [{ tag: 'div[data-block-type="flashcardEmbed"]' }];
   },
 
-  renderHTML({ HTMLAttributes }) {
-    const deckId = HTMLAttributes["data-deck-id"];
-    const cardIds = HTMLAttributes["data-card-ids"];
-    const summary = deckId
-      ? cardIds
-        ? `Flashcards (deck ${deckId}, ${String(cardIds).split(",").length} pinned)`
-        : `Flashcards (deck ${deckId})`
-      : "Flashcards (unlinked)";
+  renderHTML() {
+    // Generic placeholder — no deckId, no cardIds, no card content.
+    // The block is interactive in the authenticated editor; in any
+    // server-rendered surface (publishing, markdown export, search
+    // indexing, etc.) it shows up as a single static label.
     return [
       "div",
-      mergeAttributes(HTMLAttributes, {
+      {
         class: "block-flashcard-embed",
         "data-block-type": "flashcardEmbed",
-      }),
-      ["span", { class: "block-flashcard-embed-export-label" }, summary],
+      },
+      ["span", { class: "block-flashcard-embed-export-label" }, "Flashcards"],
     ];
   },
 });
