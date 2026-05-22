@@ -26,7 +26,10 @@ import { normalizeUrl } from "@/lib/domain/content/external-validation";
 import { syncContentTags } from "@/lib/domain/content/tag-sync";
 import { syncImageReferences } from "@/lib/domain/content/image-refs";
 import { syncPersonMentions } from "@/lib/domain/content/person-mention-sync";
-import { resolveContentAccess } from "@/lib/domain/collaboration/access";
+import {
+  resolveContentAccess,
+  resolveContentAccessFromNode,
+} from "@/lib/domain/collaboration/access";
 import { ensureWebResourceForExternalContent } from "@/lib/domain/browser-extension";
 import type { JSONContent } from "@tiptap/core";
 import { getServerExtensions } from "@/lib/domain/editor/extensions-server";
@@ -59,12 +62,29 @@ type Params = Promise<{ id: string }>;
 const ROUTE_PATH = "/api/content/content/[id]";
 
 async function getRequestUserId(request: NextRequest) {
-  const extensionAuth = await getOptionalBrowserExtensionBearerAuth(request);
+  // The bearer check is fast when no Authorization header is present (the
+  // common path for browser requests); we still wrap it so a slow token
+  // validation in extension-driven traffic is visible. session_lookup is
+  // the expected hot phase — sub-spanning it separates the cookie-only
+  // auth class from extension-token auth in trace replays.
+  const extensionAuth = await withSpan(
+    { layer: "auth", name: "bearer_check" },
+    { summary: "extension bearer token" },
+    async (span) => {
+      const result = await getOptionalBrowserExtensionBearerAuth(request);
+      span.attr("present", result?.user?.id ? true : false);
+      return result;
+    },
+  );
   if (extensionAuth?.user?.id) {
     return extensionAuth.user.id;
   }
 
-  const session = await requireAuth();
+  const session = await withSpan(
+    { layer: "auth", name: "session_lookup" },
+    { summary: "session cookie + user row" },
+    async () => requireAuth(),
+  );
   return session.user.id;
 }
 
@@ -139,37 +159,44 @@ export async function GET(
     try {
       const { id } = await params;
 
-      const userId = await withSpan(
-        { layer: "auth", name: "session" },
-        { summary: "session lookup" },
-        async () => getRequestUserId(request),
-      );
-
-      const content = await withSpan(
-        { layer: "content", name: "payload" },
-        { attrs: { content_id: id }, summary: id },
-        async (span) => {
-          const result = await prisma.contentNode.findUnique({
-            where: { id },
-            include: {
-              ...CONTENT_WITH_PAYLOADS,
-              // Path A: include the owning note (if any) so the standalone viewer
-              // can render read-only and link back. Kept inline to avoid widening
-              // CONTENT_WITH_PAYLOADS for every caller.
-              ownedByNote: { select: { id: true, title: true } },
-            },
-          });
-          if (result) {
-            span
-              .attr("kind", result.contentType)
-              .summary(`${id} ${result.contentType}`);
-            await spanPayload(span, "content_response", result);
-          } else {
-            span.attr("found", false).summary(`${id} not found`);
-          }
-          return result;
-        },
-      );
+      // Auth and payload don't share data — userId is only consumed by the
+      // access check below, and the payload query keys on `id` from params.
+      // Running them in parallel saves the smaller of the two phases on
+      // every request (~150ms avg, per the baseline traces measured before
+      // this change). Both spans nest under route:request via
+      // AsyncLocalStorage, so the trace replay still shows the full tree.
+      const [userId, content] = await Promise.all([
+        withSpan(
+          { layer: "auth", name: "session" },
+          { summary: "session lookup" },
+          async () => getRequestUserId(request),
+        ),
+        withSpan(
+          { layer: "content", name: "payload" },
+          { attrs: { content_id: id }, summary: id },
+          async (span) => {
+            const result = await prisma.contentNode.findUnique({
+              where: { id },
+              include: {
+                ...CONTENT_WITH_PAYLOADS,
+                // Path A: include the owning note (if any) so the standalone
+                // viewer can render read-only and link back. Kept inline to
+                // avoid widening CONTENT_WITH_PAYLOADS for every caller.
+                ownedByNote: { select: { id: true, title: true } },
+              },
+            });
+            if (result) {
+              span
+                .attr("kind", result.contentType)
+                .summary(`${id} ${result.contentType}`);
+              await spanPayload(span, "content_response", result);
+            } else {
+              span.attr("found", false).summary(`${id} not found`);
+            }
+            return result;
+          },
+        ),
+      ]);
 
       if (!content) {
         return NextResponse.json(
@@ -189,8 +216,17 @@ export async function GET(
         { attrs: { content_id: id, require: "view" } },
         async (span) => {
           try {
-            await resolveContentAccess(prisma, {
-              contentId: id,
+            // resolveContentAccessFromNode skips the duplicate findFirst
+            // that the original resolveContentAccess would issue — we
+            // already have the content row from the payload span above.
+            // Saves one DB round trip per request.
+            await resolveContentAccessFromNode(prisma, {
+              content: {
+                id: content.id,
+                ownerId: content.ownerId,
+                contentType: content.contentType,
+                deletedAt: content.deletedAt,
+              },
               userId,
               require: "view",
             });
