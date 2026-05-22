@@ -117,6 +117,22 @@ Migration C ran end-to-end on the same branch as Sprints 1–5, deviating from t
 
 **Soft-delete now via `deletedAt`** on the card — Sprint 6's DELETE handler stops hard-deleting. The Sprint 1 schema added `Flashcard.deletedAt` for exactly this; switching the handler preserves the `FlashcardReviewAttempt` audit chain (FK references would otherwise break on hard delete).
 
+### Sprint 7 — Image support on flashcards
+
+Plan: [`../FLASHCARDS-IMAGES-PLAN.md`](../FLASHCARDS-IMAGES-PLAN.md)
+
+Adds end-to-end image support to the flashcard editor + review surfaces so users can build image-prompt cards (identify a plant, name a face / place / building) without leaving the app.
+
+**Three changes**:
+
+1. **Extracted `useImagePasteHandler` hook** to `lib/domain/editor/hooks/use-image-paste.ts`. Returns `{ handlePaste, handleDrop, insertImageFromFile }`. Takes an `editorRef` (instead of editor instance) so the chicken-egg with `useEditor`'s frozen-editorProps is resolved at the call site. `MarkdownEditor.tsx` is NOT yet refactored to use this hook — that's a follow-up cleanup; it still has its in-line duplicate. The hook starts as a flashcard-only consumer; deduping later is a nice-to-have.
+2. **Wired the hook into `AdaptiveFlashcardEditor`** with a hidden file input + "Image" toolbar button (rich-text mode only). Paste/drop/click-to-upload all route through the same `insertImageFromFile` pipeline that the main editor uses — placeholder image with blob URL → background upload → swap to proxied download URL → revoke blob.
+3. **Image-only card layout in `CardFace`** — `isImageOnlyContent()` detects a TipTap doc whose only block is an image (with or without a paragraph wrapper); image-only faces bypass the `text-xl leading-relaxed` typography and render `<img>` centered with `max-h-full max-w-full object-contain` filling the available frame. Caption-style cards (image + text) keep the typography path.
+
+**Plain-text mode still strips images** — by design. The toolbar button only appears in rich mode; users have to flip the "Enable rich text" toggle before they see the image-insert affordance. Auto-flip-on-paste was scoped out for v1 (would require imperative-handle plumbing from the form into the editor); documented in the plan doc as a future polish.
+
+**`MarkdownEditor.tsx` refactor deferred** — the hook is byte-identical to MarkdownEditor's existing implementation, so the main editor could refactor to use it for free. Skipped here to keep the Sprint 7 diff focused on the flashcard surface; cleanup ticket noted.
+
 ## Verification gates (all green on this branch)
 
 - `tsc --noEmit` exit 0 at every sprint boundary

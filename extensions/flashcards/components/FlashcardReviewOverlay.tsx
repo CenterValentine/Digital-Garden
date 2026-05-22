@@ -790,6 +790,46 @@ function RatingButton({
   );
 }
 
+// Sprint 7 — detect a card-face whose body is a single image node
+// (no caption, no headings, no anything else). Image-only faces get a
+// centered fill-the-frame layout instead of inheriting the typography
+// padding meant for text-heavy cards.
+function isImageOnlyContent(content: FlashcardDto["frontContent"]): {
+  src: string;
+  alt: string;
+} | null {
+  // TipTap docs are { type: "doc", content: [...] }. An image-only doc
+  // has exactly one top-level block that's an image, OR exactly one
+  // paragraph containing exactly one image child. Both shapes can
+  // surface depending on how the editor inserted it (block-level
+  // image vs inline image in an otherwise-empty paragraph).
+  const blocks = content?.content;
+  if (!Array.isArray(blocks) || blocks.length !== 1) return null;
+  const first = blocks[0];
+  if (!first) return null;
+  if (first.type === "image") {
+    const src = typeof first.attrs?.src === "string" ? first.attrs.src : null;
+    if (!src) return null;
+    const alt = typeof first.attrs?.alt === "string" ? first.attrs.alt : "";
+    return { src, alt };
+  }
+  if (first.type === "paragraph" && Array.isArray(first.content)) {
+    // Strip any zero-width text nodes that some editors insert; if the
+    // only meaningful child is an image, treat the paragraph as image-only.
+    const nonEmpty = first.content.filter(
+      (c) => c.type !== "text" || (typeof c.text === "string" && c.text.trim() !== ""),
+    );
+    if (nonEmpty.length === 1 && nonEmpty[0].type === "image") {
+      const node = nonEmpty[0];
+      const src = typeof node.attrs?.src === "string" ? node.attrs.src : null;
+      if (!src) return null;
+      const alt = typeof node.attrs?.alt === "string" ? node.attrs.alt : "";
+      return { src, alt };
+    }
+  }
+  return null;
+}
+
 function CardFace({
   label,
   content,
@@ -801,6 +841,38 @@ function CardFace({
   plain?: boolean;
   back?: boolean;
 }) {
+  // Image-only faces bypass the typography layout — fills the frame
+  // edge-to-edge with the image centered. Caption-style cards (image
+  // + text) keep the standard layout via the regular branch below.
+  const imageOnly = !plain ? isImageOnlyContent(content) : null;
+
+  if (imageOnly) {
+    return (
+      <div
+        className="absolute inset-0 flex flex-col rounded-lg"
+        style={{
+          backfaceVisibility: "hidden",
+          transform: back ? "rotateY(180deg)" : undefined,
+        }}
+      >
+        <div className="shrink-0 px-5 pt-5 text-xs font-semibold uppercase tracking-wide text-gold-primary md:px-8 md:pt-8">
+          {label}
+        </div>
+        <div className="flex min-h-0 flex-1 items-center justify-center p-2 md:p-4">
+          {/* eslint-disable-next-line @next/next/no-img-element -- TipTap image
+              node renders raw URLs (including proxied download URLs); the Next
+              <Image> component would need a known-host allowlist and width/
+              height attrs, which we don't have at this layer. */}
+          <img
+            src={imageOnly.src}
+            alt={imageOnly.alt}
+            className="max-h-full max-w-full rounded-md object-contain"
+          />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div
       className="absolute inset-0 flex flex-col rounded-lg p-5 md:p-8"
