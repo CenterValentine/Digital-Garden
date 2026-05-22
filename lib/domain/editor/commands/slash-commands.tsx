@@ -185,6 +185,34 @@ export function getSlashCommands(): SlashCommand[] {
       aliases: ["blockquote"],
     },
     {
+      title: "Flashcards",
+      description:
+        "Embed a flashcard deck — tap to flip, Play opens the FSRS review overlay",
+      icon: "🃏",
+      command: ({ editor, range }) => {
+        // Insert with deckId=null; the NodeView shows a "pick a deck"
+        // affordance until the user attaches one via block properties
+        // (Session 5 will add an inline deck-picker dialog here).
+        editor
+          .chain()
+          .focus()
+          .deleteRange(range)
+          .insertContent({ type: "flashcardEmbed", attrs: {} })
+          .run();
+      },
+      aliases: [
+        "flashcard",
+        "flashcards",
+        "deck",
+        "review",
+        "study",
+        "anki",
+        "fsrs",
+        "spaced",
+        "repetition",
+      ],
+    },
+    {
       title: "Pull Quote",
       description: "Styled quote block — 7 visual variants (bordered, card, featured…)",
       icon: "❝",
