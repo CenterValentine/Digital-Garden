@@ -188,20 +188,63 @@ export async function GET(
           { layer: "content", name: "payload" },
           { attrs: { content_id: id }, summary: id },
           async (span) => {
-            const result = await prisma.contentNode.findUnique({
-              where: { id },
-              include: {
-                ...CONTENT_WITH_PAYLOADS,
-                // Path A: include the owning note (if any) so the standalone
-                // viewer can render read-only and link back. Kept inline to
-                // avoid widening CONTENT_WITH_PAYLOADS for every caller.
-                ownedByNote: { select: { id: true, title: true } },
-              },
-            });
+            // Sub-span the SQL roundtrip so we can separate Prisma/network
+            // cost from the spanPayload sidecar write and any other JS
+            // work in the parent. Folders show ~600-800ms in this phase
+            // despite having no large JSON column — that's a strong hint
+            // the SQL/include shape is the cost, not deserialization,
+            // but we want measured proof, not vibes.
+            const result = await withSpan(
+              { layer: "content", name: "payload_query" },
+              { summary: `findUnique ${id}` },
+              async () => prisma.contentNode.findUnique({
+                where: { id },
+                include: {
+                  ...CONTENT_WITH_PAYLOADS,
+                  // Path A: include the owning note (if any) so the standalone
+                  // viewer can render read-only and link back. Kept inline to
+                  // avoid widening CONTENT_WITH_PAYLOADS for every caller.
+                  ownedByNote: { select: { id: true, title: true } },
+                },
+              }),
+            );
             if (result) {
+              // Tag the span with payload shape so we can slice traces by
+              // content type AND by how many payload tables actually have
+              // rows. CONTENT_WITH_PAYLOADS LEFT JOINs 11 payload tables;
+              // for a folder, 10 of those return NULL. payload_joins_hit
+              // tells us the gap between the join cost we pay and the
+              // data we actually use.
+              const payloadKinds = [
+                "notePayload",
+                "filePayload",
+                "htmlPayload",
+                "codePayload",
+                "folderPayload",
+                "externalPayload",
+                "chatPayload",
+                "visualizationPayload",
+                "dataPayload",
+                "hopePayload",
+                "workflowPayload",
+              ] as const;
+              const present = payloadKinds.filter(
+                (k) => (result as unknown as Record<string, unknown>)[k] != null,
+              );
               span
                 .attr("kind", result.contentType)
+                .attr("payload_joins_hit", present.length)
+                .attr("payload_joins_total", payloadKinds.length)
                 .summary(`${id} ${result.contentType}`);
+              // Surface tiptapJson size for notes — confirms whether the
+              // JSON column is contributing meaningfully or whether the
+              // query structure is the whole cost.
+              if (result.notePayload?.tiptapJson) {
+                const tiptapChars = JSON.stringify(
+                  result.notePayload.tiptapJson,
+                ).length;
+                span.attr("tiptap_chars", tiptapChars);
+              }
               await spanPayload(span, "content_response", result);
             } else {
               span.attr("found", false).summary(`${id} not found`);
