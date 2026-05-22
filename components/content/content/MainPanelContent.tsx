@@ -173,7 +173,43 @@ interface ShareGrantsResponse {
 
 interface MainPanelContentProps {
   paneId: WorkspacePaneId;
+  // Server-side pre-fetched content for the URL-named selection on cold
+  // page render. When the active tab's id matches initialContent.id on
+  // first effect run, we hydrate state from it without a fetch — see
+  // the consumedInitialContentRef gate inside the load effect.
+  initialContent?: ContentDetailResponseLike | null;
 }
+
+// Loosely typed alias for the SSR-passed payload. Dates over the RSC wire
+// arrive as Date objects (RSC supports Date serialization), but downstream
+// code already coerces via `new Date(...)`, so we accept either shape.
+type ContentDetailResponseLike = {
+  id: string;
+  title: string;
+  slug: string;
+  parentId: string | null;
+  contentType: string;
+  isPublished: boolean;
+  customIcon?: string | null;
+  iconColor?: string | null;
+  createdAt?: string | Date;
+  updatedAt?: string | Date;
+  deletedAt?: string | Date | null;
+  ownedByNote?: { id: string; title: string } | null;
+  note?: {
+    tiptapJson: unknown;
+    searchText: string;
+    metadata: Record<string, unknown>;
+    bodyHash?: string;
+  };
+  folder?: unknown;
+  external?: unknown;
+  chat?: unknown;
+  visualization?: unknown;
+  data?: unknown;
+  hope?: unknown;
+  workflow?: unknown;
+};
 
 interface PageTemplateResponse {
   id: string;
@@ -192,7 +228,7 @@ interface PageTemplateResponse {
   error?: string;
 }
 
-export function MainPanelContent({ paneId }: MainPanelContentProps) {
+export function MainPanelContent({ paneId, initialContent = null }: MainPanelContentProps) {
   const pathname = usePathname();
   const isEmbedMode = pathname?.startsWith("/embed/") ?? false;
   const { activeView, setActiveView } = useLeftPanelViewStore();
@@ -284,6 +320,12 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
   // a different document, we abort any pending fetch to prevent Doc A's content
   // from being written to Doc B's API endpoint.
   const saveAbortControllerRef = useRef<AbortController | null>(null);
+
+  // SSR initial-content gate: when the page server-rendered with a
+  // pre-fetched ContentDetailResponse matching the current selection, we
+  // hydrate from it once instead of fetching. Re-selection or refresh
+  // afterwards goes through the normal fetch path so writes are observed.
+  const consumedInitialContentRef = useRef(false);
 
   // Cancel in-flight saves whenever selectedContentId changes
   useEffect(() => {
@@ -420,33 +462,51 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
           return;
         }
 
-        const response = await tracedFetch(`/api/content/content/${selectedContentId}`, {
-          credentials: "include",
-        });
-
-        if (response.status === 404) {
-          clientLogger.warn({
-            layer: "ui",
-            event: "content_selection:stale_cleared",
-            summary: "content not found (404), clearing stale selection",
-            attrs: { content_id: selectedContentId },
+        // SSR fast path: if the page server-rendered with pre-fetched
+        // content matching the current selection, synthesize the result
+        // from initialContent and skip the network call. Downstream
+        // setX cascade is identical, so no behavior diverges by source.
+        let result: ContentResponse;
+        if (
+          initialContent &&
+          initialContent.id === selectedContentId &&
+          !consumedInitialContentRef.current &&
+          !isPageTemplateTab
+        ) {
+          consumedInitialContentRef.current = true;
+          result = {
+            success: true,
+            data: initialContent as unknown as ContentResponse["data"],
+          };
+        } else {
+          const response = await tracedFetch(`/api/content/content/${selectedContentId}`, {
+            credentials: "include",
           });
-          toast.error("Note not found. It may have been deleted.");
-          closeContentTabs([selectedContentId]);
-          return;
-        }
 
-        const result: ContentResponse = await response.json();
+          if (response.status === 404) {
+            clientLogger.warn({
+              layer: "ui",
+              event: "content_selection:stale_cleared",
+              summary: "content not found (404), clearing stale selection",
+              attrs: { content_id: selectedContentId },
+            });
+            toast.error("Note not found. It may have been deleted.");
+            closeContentTabs([selectedContentId]);
+            return;
+          }
 
-        if (!response.ok || !result.success) {
-          const errorMsg = result.error?.message || "Failed to fetch note";
-          clientLogger.error({
-            layer: "fetch",
-            event: "content_fetch:failed",
-            summary: errorMsg,
-            attrs: { content_id: selectedContentId, status: response.status },
-          });
-          throw new Error(errorMsg);
+          result = await response.json();
+
+          if (!response.ok || !result.success) {
+            const errorMsg = result.error?.message || "Failed to fetch note";
+            clientLogger.error({
+              layer: "fetch",
+              event: "content_fetch:failed",
+              summary: errorMsg,
+              attrs: { content_id: selectedContentId, status: response.status },
+            });
+            throw new Error(errorMsg);
+          }
         }
 
         setNoteTitle(result.data.title);
@@ -594,6 +654,7 @@ export function MainPanelContent({ paneId }: MainPanelContentProps) {
     isPageTemplateTab,
     setOutline,
     updateContentTab,
+    initialContent,
   ]);
 
   useEffect(() => {
