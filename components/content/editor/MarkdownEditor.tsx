@@ -519,6 +519,32 @@ export function MarkdownEditor({
       }
       // ─────────────────────────────────────────────────────────────────────
 
+      // Hard gate: REST autosave persists user intent. Non-user transactions
+      // (programmatic setContent, collab y-sync arrival, extension mutations,
+      // undo/redo replays) trigger onUpdate but represent no unsaved work —
+      // the doc is either still in its persisted state, or its real
+      // persistence path is the Y.Doc on Hocuspocus.
+      //
+      // Discovered via [editor:autosave:scheduled] diagnostic (PR #43): every
+      // tab switch on a collab-active doc fired a y-sync$ transaction that
+      // scheduled an unnecessary PATCH ~1s of pure server work. The earlier
+      // gate (`collaborationState?.provider`) sat in stale closure state and
+      // missed the case where collab connects after onUpdate's closure was
+      // captured. Checking is_user_origin directly is the stronger condition.
+      if (!isUserOrigin) {
+        clientLogger.debug({
+          layer: "editor",
+          event: "autosave:skipped_non_user_origin",
+          summary: "autosave dropped — transaction not user-driven",
+          attrs: {
+            content_id: contentIdRef.current ?? "unknown",
+            doc_changed: transaction.docChanged,
+            steps_count: transaction.steps.length,
+          },
+        });
+        return;
+      }
+
       // Mark as unsaved
       setHasUnsavedChanges(true);
 
