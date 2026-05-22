@@ -241,8 +241,32 @@ async function main() {
   const args = parseArgs(process.argv);
   console.log(`Flashcard deck backfill — ${args.dryRun ? "DRY RUN" : "WRITE"}${args.ownerFilter ? ` (owner=${args.ownerFilter})` : ""}`);
 
-  // Distinct owners with cards needing backfill. Filtering up front avoids
-  // doing work for owners who already migrated (idempotency).
+  // Migration C probe — has the legacy schema been collapsed already?
+  // After Migration C runs, Flashcard.category / Flashcard.deckId-nullable
+  // are gone. The backfill is then a no-op: every card already has a
+  // deckId (NOT NULL enforced by Migration C). Detect this state via
+  // information_schema and exit cleanly so the script is safe to run
+  // as part of a pre-flight checklist regardless of migration state.
+  const legacyCheck = await prisma.$queryRaw<Array<{ exists: boolean }>>`
+    SELECT EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_name = 'Flashcard' AND column_name = 'category'
+    ) AS exists
+  `;
+  const hasLegacyColumns = legacyCheck[0]?.exists === true;
+  if (!hasLegacyColumns) {
+    console.log(
+      "Nothing to do — Migration C has already run, the legacy " +
+        "category/subcategory columns are gone, and every Flashcard " +
+        "carries a non-null deckId by schema constraint.",
+    );
+    await prisma.$disconnect();
+    return;
+  }
+
+  // Pre-Migration-C path: distinct owners with cards needing backfill.
+  // Filtering up front avoids doing work for owners who already migrated
+  // (idempotency).
   const owners = await prisma.flashcard.findMany({
     where: {
       deckId: null,
