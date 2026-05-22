@@ -34,7 +34,13 @@ import { ensureWebResourceForExternalContent } from "@/lib/domain/browser-extens
 import type { JSONContent } from "@tiptap/core";
 import { getServerExtensions } from "@/lib/domain/editor/extensions-server";
 import { sanitizeTipTapJsonWithExtensions } from "@/lib/domain/editor/unsupported-content";
-import { logger, spanPayload, withRouteTrace, withSpan } from "@/lib/core/logger";
+import {
+  forkTraceContext,
+  logger,
+  spanPayload,
+  withRouteTrace,
+  withSpan,
+} from "@/lib/core/logger";
 import crypto from "node:crypto";
 
 /**
@@ -163,15 +169,22 @@ export async function GET(
       // access check below, and the payload query keys on `id` from params.
       // Running them in parallel saves the smaller of the two phases on
       // every request (~150ms avg, per the baseline traces measured before
-      // this change). Both spans nest under route:request via
-      // AsyncLocalStorage, so the trace replay still shows the full tree.
+      // this change).
+      //
+      // forkTraceContext wraps each branch so its spans get an isolated
+      // AsyncLocalStorage scope. Without that, Promise.all's two synchronous
+      // startSpan calls would both modify the same spanStack — the second
+      // span would be recorded as the first's child, and sub-spans inside
+      // either branch could see the sibling branch's span as their parent.
+      // Wall-clock parallelism still works without the fork, but the trace
+      // replay would misleadingly nest the two siblings.
       const [userId, content] = await Promise.all([
-        withSpan(
+        forkTraceContext(() => withSpan(
           { layer: "auth", name: "session" },
           { summary: "session lookup" },
           async () => getRequestUserId(request),
-        ),
-        withSpan(
+        )),
+        forkTraceContext(() => withSpan(
           { layer: "content", name: "payload" },
           { attrs: { content_id: id }, summary: id },
           async (span) => {
@@ -195,7 +208,7 @@ export async function GET(
             }
             return result;
           },
-        ),
+        )),
       ]);
 
       if (!content) {
