@@ -533,7 +533,7 @@ export function FlashcardReviewOverlay({
             {passiveLayers.map((layer) => (
               <div
                 key={layer}
-                className="absolute h-[min(70dvh,620px)] w-[calc(100vw-128px)] rounded-lg border border-black/10 dark:border-white/10 bg-black/[0.025] dark:bg-white/[0.035] md:h-[min(52vh,520px)] md:w-[min(52vw,760px)]"
+                className="absolute h-[min(60dvh,540px)] w-[calc(100vw-128px)] rounded-lg border border-black/10 dark:border-white/10 bg-black/[0.025] dark:bg-white/[0.035] md:h-[min(40vh,440px)] md:w-[min(52vw,760px)]"
                 style={{
                   transform: `translateY(${layer * 10}px) scale(${1 - layer * 0.035})`,
                   opacity: 1 - layer * 0.2,
@@ -577,7 +577,7 @@ export function FlashcardReviewOverlay({
                   role={editing ? undefined : "button"}
                   tabIndex={editing ? undefined : 0}
                   aria-label={editing ? "Editing flashcard" : "Flip flashcard"}
-                  className={`relative h-[min(70dvh,620px)] w-[calc(100vw-128px)] rounded-lg border border-gold-primary/30 bg-gray-50 dark:bg-[#202935] text-left shadow-2xl outline-none md:h-[min(52vh,520px)] md:w-[min(52vw,760px)] ${
+                  className={`relative h-[min(60dvh,540px)] w-[calc(100vw-128px)] rounded-lg border border-gold-primary/30 bg-gray-50 dark:bg-[#202935] text-left shadow-2xl outline-none md:h-[min(40vh,440px)] md:w-[min(52vw,760px)] ${
                     editing ? "cursor-default" : "cursor-pointer"
                   }`}
                   style={{
@@ -748,7 +748,7 @@ function SideNavButton({
       disabled={disabled}
       title={label}
       aria-label={label}
-      className="flex h-[min(70dvh,620px)] w-10 shrink-0 items-center justify-center rounded-md text-gray-700 dark:text-gray-300 transition-colors hover:bg-black/[0.04] dark:hover:bg-white/[0.04] hover:text-gold-primary disabled:cursor-not-allowed disabled:opacity-35 md:h-[min(52vh,520px)] md:w-12"
+      className="flex h-[min(60dvh,540px)] w-10 shrink-0 items-center justify-center rounded-md text-gray-700 dark:text-gray-300 transition-colors hover:bg-black/[0.04] dark:hover:bg-white/[0.04] hover:text-gold-primary disabled:cursor-not-allowed disabled:opacity-35 md:h-[min(40vh,440px)] md:w-12"
     >
       {children}
     </button>
