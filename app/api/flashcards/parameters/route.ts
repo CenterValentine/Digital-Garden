@@ -33,8 +33,6 @@ export async function GET() {
       stored !== null && typeof stored === "object" && Array.isArray(stored.w);
     const optimizedAt =
       hasOptimized && typeof stored.optimizedAt === "string" ? stored.optimizedAt : null;
-    const reviewsUsed =
-      hasOptimized && typeof stored.reviewsUsed === "number" ? stored.reviewsUsed : 0;
 
     const data: FlashcardSettingsDto = {
       desiredRetention: user.desiredRetention,
@@ -42,10 +40,12 @@ export async function GET() {
       defaultFlashcardDeckId: user.defaultFlashcardDeckId,
       hasOptimizedParameters: hasOptimized,
       parametersOptimizedAt: optimizedAt,
-      // Distinct from `reviewsUsed` in the blob: that's reviews used at
-      // last optimization. The count here is total scored reviews to
-      // date — useful for "you have 87/100 reviews towards your first
-      // optimization" UI affordances.
+      // Running count of scored reviews to date. Distinct from the
+      // `reviewsUsed` field embedded in the optimizer's stored blob,
+      // which captures "reviews used at the last optimization." The
+      // running count powers "47/100 reviews towards your first
+      // optimization" progress UI; we can surface the blob's
+      // historical count later if a comparison view is needed.
       reviewsUsedForOptimization: reviewsWithRatingCount,
     };
 

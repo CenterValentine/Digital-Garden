@@ -5,7 +5,6 @@ import type { ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import {
-  Check,
   ChevronLeft,
   ChevronRight,
   Pencil,
@@ -17,22 +16,98 @@ import {
 import { extractPlainTextFromTiptap } from "@/lib/domain/flashcards";
 import type {
   FlashcardDto,
+  FlashcardRating,
   FlashcardReviewMode,
-  FlashcardReviewOutcome,
   FlashcardShownSide,
 } from "@/lib/domain/flashcards";
+// Deep imports into the fsrs subpath keep the client bundle from
+// pulling in lib/domain/flashcards/api.ts (which value-imports Prisma).
+import { previewIntervals } from "@/lib/domain/flashcards/fsrs/scheduler";
+import { getDefaultParameters } from "@/lib/domain/flashcards/fsrs/parameters";
 import { AdaptiveFlashcardEditor } from "./AdaptiveFlashcardEditor";
 import { FlashcardInlineEditor } from "./FlashcardInlineEditor";
 
+// FSRS queue filter. When `deckId` is set, the queue fetches cards in
+// that deck and its descendants (per /api/flashcards/queue). When
+// `cardIds` is set, only those specific cards are returned. Used by
+// the editor block's Play overlay so a block embedding a card subset
+// can "play just these" without disturbing the user's main queue.
+export interface FlashcardReviewFilter {
+  deckId?: string;
+  cardIds?: string[];
+  // When true, omit new-state cards from the queue (review-only session).
+  includeNew?: boolean;
+  // Max cards to pull. Defaults to 20.
+  limit?: number;
+}
+
+// Format a day-count as a compact human label for the rating button
+// captions. <1m / 12m / 4h / 2d / 3mo / 1y — matches Anki's hints.
+function formatInterval(days: number): string {
+  if (!Number.isFinite(days) || days < 0) return "—";
+  if (days < 1 / 1440) return "<1m";
+  if (days < 1 / 24) return `${Math.max(1, Math.round(days * 1440))}m`;
+  if (days < 1) return `${Math.max(1, Math.round(days * 24))}h`;
+  if (days < 30) return `${Math.max(1, Math.round(days))}d`;
+  if (days < 365) return `${Math.max(1, Math.round(days / 30))}mo`;
+  return `${Math.max(1, Math.round(days / 365))}y`;
+}
+
 interface FlashcardReviewOverlayProps {
-  cards: FlashcardDto[];
+  // Pre-loaded card list. Used by legacy callers (FlashcardsPanel) that
+  // already have a string-deck queue in hand. Ignored when `filter` is
+  // provided — the overlay then refetches from /api/flashcards/queue.
+  cards?: FlashcardDto[];
+  // FSRS queue filter (Session 3). When set, the overlay loads its own
+  // queue on open. Editor blocks pass this; legacy callers omit it.
+  filter?: FlashcardReviewFilter;
   mode: FlashcardReviewMode;
   open: boolean;
   onClose: () => void;
   onCardUpdated: (card: FlashcardDto) => void;
 }
 
-type SlideIntent = "next" | "previous" | "mastered" | "review";
+// Rating-driven slide intents. The four FSRS ratings + nav directions.
+type SlideIntent = "next" | "previous" | "again" | "hard" | "good" | "easy";
+
+// Visual config for each rating button. Color intensity escalates from
+// Again (red) → Easy (green) so the user's eye lands on the destructive
+// vs growth-positive choices immediately.
+const RATING_BUTTONS: ReadonlyArray<{
+  rating: FlashcardRating;
+  label: string;
+  shortcut: string;
+  className: string;
+}> = [
+  {
+    rating: "again",
+    label: "Again",
+    shortcut: "1",
+    className:
+      "border-red-500/40 bg-red-500/10 text-red-700 dark:text-red-200 hover:bg-red-500/20",
+  },
+  {
+    rating: "hard",
+    label: "Hard",
+    shortcut: "2",
+    className:
+      "border-orange-500/40 bg-orange-500/10 text-orange-700 dark:text-orange-200 hover:bg-orange-500/20",
+  },
+  {
+    rating: "good",
+    label: "Good",
+    shortcut: "3",
+    className:
+      "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-200 hover:bg-emerald-500/20",
+  },
+  {
+    rating: "easy",
+    label: "Easy",
+    shortcut: "4",
+    className:
+      "border-blue-500/40 bg-blue-500/10 text-blue-700 dark:text-blue-200 hover:bg-blue-500/20",
+  },
+];
 
 function getInitialSide(mode: FlashcardReviewMode): FlashcardShownSide {
   if (mode === "back_to_front") return "back";
@@ -43,13 +118,20 @@ function getInitialSide(mode: FlashcardReviewMode): FlashcardShownSide {
 function getExit(intent: SlideIntent | null, reduced: boolean) {
   if (reduced || !intent) return { opacity: 0 };
   if (intent === "previous") return { x: 900, opacity: 0, rotateZ: 6 };
-  if (intent === "mastered") return { y: -700, opacity: 0, rotateX: -10 };
-  if (intent === "review") return { y: 700, opacity: 0, rotateX: 10 };
+  // Rating exits map roughly to "moving down the priority list" (again/
+  // hard slide down — "back to the queue") vs. "moving forward / out"
+  // (good/easy slide left/up — "graduated this round").
+  if (intent === "again") return { y: 700, opacity: 0, rotateX: 12 };
+  if (intent === "hard") return { y: 500, opacity: 0, rotateX: 8 };
+  if (intent === "good") return { x: -900, opacity: 0, rotateZ: -6 };
+  if (intent === "easy") return { y: -700, opacity: 0, rotateX: -10 };
+  // "next" intent — the default forward slide.
   return { x: -900, opacity: 0, rotateZ: -6 };
 }
 
 export function FlashcardReviewOverlay({
   cards,
+  filter,
   mode,
   open,
   onClose,
@@ -60,14 +142,26 @@ export function FlashcardReviewOverlay({
   const [shownSide, setShownSide] = useState<FlashcardShownSide>(() =>
     getInitialSide(mode)
   );
-  const [sessionCards, setSessionCards] = useState<FlashcardDto[]>(cards);
+  const [sessionCards, setSessionCards] = useState<FlashcardDto[]>(cards ?? []);
   const [intent, setIntent] = useState<SlideIntent | null>(null);
   const [editing, setEditing] = useState(false);
   const [startedAt, setStartedAt] = useState(Date.now());
+  // Loading state for the filter-driven queue fetch. UI shows a small
+  // "Loading…" affordance instead of empty card area.
+  const [queueLoading, setQueueLoading] = useState(false);
+  const [queueError, setQueueError] = useState<string | null>(null);
   const wasOpenRef = useRef(false);
   const viewedCardIdsRef = useRef<Set<string>>(new Set());
   const reducedMotion = useReducedMotion();
   const current = sessionCards[index] ?? null;
+
+  // Stable JSON serialization of the filter so React can compare it as
+  // a dep without spurious re-fetches when callers pass a freshly-built
+  // object on each render.
+  const filterKey = useMemo(
+    () => (filter ? JSON.stringify(filter) : null),
+    [filter],
+  );
 
   useEffect(() => {
     if (!open) {
@@ -77,14 +171,61 @@ export function FlashcardReviewOverlay({
     if (wasOpenRef.current) return;
     wasOpenRef.current = true;
     viewedCardIdsRef.current.clear();
-    setSessionCards(cards);
     setIndex(0);
     const side = getInitialSide(mode);
     setShownSide(side);
     setFlipped(side === "back");
     setEditing(false);
     setStartedAt(Date.now());
-  }, [cards, mode, open]);
+    setQueueError(null);
+
+    if (filter) {
+      // Fetch from /api/flashcards/queue with the filter. The route
+      // returns due cards in FSRS priority order (overdue review →
+      // learning → new, capped).
+      setQueueLoading(true);
+      const params = new URLSearchParams();
+      if (filter.deckId) params.set("deckId", filter.deckId);
+      if (filter.cardIds && filter.cardIds.length > 0) {
+        params.set("cardIds", filter.cardIds.join(","));
+      }
+      if (filter.includeNew === false) params.set("includeNew", "false");
+      if (typeof filter.limit === "number") {
+        params.set("limit", String(filter.limit));
+      }
+      const url = `/api/flashcards/queue${params.toString() ? `?${params.toString()}` : ""}`;
+      void (async () => {
+        try {
+          const response = await fetch(url, { credentials: "include" });
+          // Raw json + manual shape check. The discriminated-union `as`
+          // cast looks tidier but TS's narrowing through it has been
+          // flaky here — being explicit is more robust.
+          const raw = (await response.json()) as Record<string, unknown>;
+          const success = raw?.success === true;
+          if (success && Array.isArray(raw.data)) {
+            setSessionCards(raw.data as FlashcardDto[]);
+          } else {
+            const err = raw?.error as { message?: string } | undefined;
+            setQueueError(err?.message ?? "Failed to load queue.");
+            setSessionCards([]);
+          }
+        } catch (err) {
+          setQueueError(err instanceof Error ? err.message : "Failed to load queue.");
+          setSessionCards([]);
+        } finally {
+          setQueueLoading(false);
+        }
+      })();
+    } else {
+      // Legacy caller — use the pre-loaded cards prop verbatim.
+      setSessionCards(cards ?? []);
+    }
+    // We intentionally key on filterKey (not the raw `filter` ref) so a
+    // caller re-rendering with an equivalent filter object doesn't
+    // refetch. The exhaustive-deps lint would suggest `filter` itself,
+    // but that triggers the spurious refetch.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cards, mode, open, filterKey]);
 
   const resetSide = useCallback(() => {
     const side = getInitialSide(mode);
@@ -151,23 +292,38 @@ export function FlashcardReviewOverlay({
   }, [current, index, reducedMotion, resetSide, sessionCards.length]);
 
   const submitReview = useCallback(
-    async (outcome: FlashcardReviewOutcome) => {
+    async (rating: FlashcardRating) => {
       if (!current) return;
-      setIntent(outcome);
+      setIntent(rating);
       try {
-        const response = await fetch(`/api/flashcards/${current.id}/review`, {
+        // Session 3 endpoint: POST /api/flashcards/review with cardId in
+        // body + 4-button rating. Server runs FSRS scheduler, writes
+        // audit row, returns updated card + (optional) next card id.
+        const response = await fetch(`/api/flashcards/review`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           credentials: "include",
           body: JSON.stringify({
-            outcome,
+            cardId: current.id,
+            rating,
             reviewMode: mode,
             shownSide,
             responseTimeMs: Date.now() - startedAt,
           }),
         });
-        const result = await response.json();
-        if (result?.success) onCardUpdated(result.data as FlashcardDto);
+        // Same defensive shape check as the queue fetch above — manual
+        // narrowing because TS's discriminated-union `as` cast has been
+        // flaky here.
+        const raw = (await response.json()) as Record<string, unknown>;
+        if (raw?.success === true) {
+          const data = raw.data as { card: FlashcardDto; nextCardId: string | null };
+          onCardUpdated(data.card);
+          // Patch the card in-place so any subsequent display in this
+          // session reflects the new FSRS state (due/state/etc.).
+          setSessionCards((existing) =>
+            existing.map((c) => (c.id === data.card.id ? data.card : c)),
+          );
+        }
       } finally {
         window.setTimeout(() => {
           const nextIndex = index + 1;
@@ -195,6 +351,31 @@ export function FlashcardReviewOverlay({
     ]
   );
 
+  // Compute the predicted next interval for each of the 4 rating
+  // buttons. v1 uses default FSRS parameters — until the optimizer
+  // ships in v1.1, this is exactly what the server uses too, so the
+  // preview matches the actual scheduled outcome.
+  const defaultParams = useMemo(() => getDefaultParameters(), []);
+  const previews = useMemo(() => {
+    if (!current) return null;
+    return previewIntervals(
+      {
+        state: current.state ?? "new",
+        due: current.due ? new Date(current.due) : new Date(),
+        stability: current.stability ?? 0,
+        difficulty: current.difficulty ?? 0,
+        elapsedDays: 0,
+        scheduledDays: 0,
+        reps: current.reps ?? 0,
+        lapses: current.lapses ?? 0,
+        learningSteps: current.learningSteps ?? 0,
+        lastReviewedAt: null,
+      },
+      defaultParams,
+      new Date(),
+    );
+  }, [current, defaultParams]);
+
   useEffect(() => {
     if (!open) return;
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -206,8 +387,16 @@ export function FlashcardReviewOverlay({
       }
       if (event.key === "ArrowRight") goNext();
       if (event.key === "ArrowLeft") goToIndex(index - 1, "previous");
-      if (event.key === "ArrowUp") void submitReview("mastered");
-      if (event.key === "ArrowDown") void submitReview("review");
+      // FSRS 4-button rating shortcuts (Anki-compatible). Only fire
+      // when the card is showing its answer side — rating before
+      // flipping is a usability hazard (you'd be guessing on the
+      // question alone).
+      if (flipped) {
+        if (event.key === "1") void submitReview("again");
+        if (event.key === "2") void submitReview("hard");
+        if (event.key === "3") void submitReview("good");
+        if (event.key === "4") void submitReview("easy");
+      }
       if (event.key.toLowerCase() === "s") skipCard();
       if (event.key.toLowerCase() === "r") recycleCard();
     };
@@ -215,6 +404,7 @@ export function FlashcardReviewOverlay({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [
     flipCard,
+    flipped,
     goNext,
     goToIndex,
     index,
@@ -262,7 +452,58 @@ export function FlashcardReviewOverlay({
     void recordView();
   }, [current, open, updateCurrentCard]);
 
-  if (!open || typeof document === "undefined" || !current) return null;
+  if (!open || typeof document === "undefined") return null;
+
+  // Three states where we render the shell but not the card stack:
+  //   queueLoading — filter fetch in flight
+  //   queueError   — fetch failed (network, 4xx)
+  //   sessionCards.length === 0 — nothing due / nothing matched
+  // Each gets a distinct copy so the user knows what to do next.
+  const emptyState: { title: string; body: string } | null = queueLoading
+    ? { title: "Loading…", body: "Pulling your due queue." }
+    : queueError
+      ? { title: "Couldn't load cards", body: queueError }
+      : sessionCards.length === 0
+        ? {
+            title: "All caught up",
+            body: filter
+              ? "No cards in this deck are due right now."
+              : "No cards to review.",
+          }
+        : null;
+
+  if (emptyState) {
+    return createPortal(
+      <div className="fixed inset-0 z-[220] flex items-center justify-center bg-black/60 p-3 backdrop-blur-sm md:p-6">
+        <div className="relative flex h-[100dvh] w-full flex-col overflow-hidden bg-white text-gray-900 dark:bg-[#1a2530] dark:text-white md:h-[min(72vh,760px)] md:w-[min(66vw,960px)] md:rounded-lg md:border md:border-black/10 dark:md:border-black/10 dark:border-white/10">
+          <div className="flex shrink-0 items-center justify-between border-b border-black/10 dark:border-white/10 px-4 py-3">
+            <div>
+              <h2 className="text-sm font-semibold">Review Flashcards</h2>
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex h-11 w-11 items-center justify-center rounded-md text-gray-700 dark:text-gray-300 hover:bg-black/[0.05] dark:hover:bg-white/10"
+              aria-label="Close review"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+          <div className="flex flex-1 items-center justify-center p-8 text-center">
+            <div>
+              <p className="text-xl font-semibold">{emptyState.title}</p>
+              <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+                {emptyState.body}
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>,
+      document.body,
+    );
+  }
+
+  if (!current) return null;
 
   return createPortal(
     <div className="fixed inset-0 z-[220] flex items-center justify-center bg-black/60 p-3 backdrop-blur-sm md:p-6">
@@ -431,26 +672,57 @@ export function FlashcardReviewOverlay({
           </div>
         </div>
 
-        <div className="grid shrink-0 grid-cols-4 gap-2 border-t border-black/10 dark:border-white/10 bg-white/95 dark:bg-[#1a2530]/95 p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] md:p-4">
-          <ReviewIconButton
-            label="Mark for review"
-            onClick={() => void submitReview("review")}
-          >
-            <X className="h-5 w-5" />
-          </ReviewIconButton>
-          <ReviewIconButton label="Recycle randomly" onClick={recycleCard}>
-            <Recycle className="h-5 w-5" />
-          </ReviewIconButton>
-          <ReviewIconButton label="Skip card" onClick={skipCard}>
-            <RotateCcwSquare className="h-5 w-5" />
-          </ReviewIconButton>
-          <ReviewIconButton
-            label="Mark correct"
-            onClick={() => void submitReview("mastered")}
-            primary
-          >
-            <Check className="h-5 w-5" />
-          </ReviewIconButton>
+        {/* FSRS 4-button rating row. Predicted next-interval label
+            sits under each button (Anki convention) so the user has
+            calibration on how aggressive each rating is. Buttons are
+            disabled until the user flips to the answer side — rating
+            blind before seeing the back is a usability hazard. */}
+        <div className="shrink-0 border-t border-black/10 dark:border-white/10 bg-white/95 dark:bg-[#1a2530]/95 px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 md:px-4 md:pt-4">
+          {/* Secondary action strip: skip + recycle. These don't update
+              the FSRS schedule — they're session-flow helpers. Kept
+              small to give visual primacy to the rating row below. */}
+          <div className="mb-2 flex items-center justify-end gap-2 text-xs text-gray-600 dark:text-gray-400">
+            <button
+              type="button"
+              onClick={skipCard}
+              className="inline-flex items-center gap-1 rounded-md px-2 py-1 hover:bg-black/[0.04] dark:hover:bg-white/[0.06]"
+              title="Skip without rating (S)"
+            >
+              <RotateCcwSquare className="h-3.5 w-3.5" />
+              Skip
+            </button>
+            <button
+              type="button"
+              onClick={recycleCard}
+              className="inline-flex items-center gap-1 rounded-md px-2 py-1 hover:bg-black/[0.04] dark:hover:bg-white/[0.06]"
+              title="Shuffle this card back into the session (R)"
+            >
+              <Recycle className="h-3.5 w-3.5" />
+              Recycle
+            </button>
+          </div>
+          <div className="grid grid-cols-4 gap-2">
+            {RATING_BUTTONS.map((btn) => {
+              const intervalDays = previews ? previews[btn.rating].intervalDays : 0;
+              const intervalLabel = previews ? formatInterval(intervalDays) : "—";
+              return (
+                <RatingButton
+                  key={btn.rating}
+                  label={btn.label}
+                  shortcut={btn.shortcut}
+                  intervalLabel={intervalLabel}
+                  disabled={!flipped}
+                  className={btn.className}
+                  onClick={() => void submitReview(btn.rating)}
+                />
+              );
+            })}
+          </div>
+          {!flipped && (
+            <p className="mt-2 text-center text-xs text-gray-500 dark:text-gray-500">
+              Flip the card (space) to see the answer before rating.
+            </p>
+          )}
         </div>
       </div>
     </div>,
@@ -483,37 +755,37 @@ function SideNavButton({
   );
 }
 
-function ReviewIconButton({
+// FSRS 4-button rating button. Renders the rating label + keyboard
+// shortcut hint + predicted next interval underneath. Color comes from
+// the parent's per-rating className (red/orange/green/blue gradient).
+function RatingButton({
   label,
+  shortcut,
+  intervalLabel,
   onClick,
-  children,
+  className,
   disabled = false,
-  emphasized = false,
-  primary = false,
 }: {
   label: string;
+  shortcut: string;
+  intervalLabel: string;
   onClick: () => void;
-  children: ReactNode;
+  className: string;
   disabled?: boolean;
-  emphasized?: boolean;
-  primary?: boolean;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
       disabled={disabled}
-      title={label}
-      aria-label={label}
-      className={`flex min-h-11 items-center justify-center rounded-md border transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
-        primary
-          ? "border-gold-primary bg-gold-primary text-black hover:bg-gold-light"
-          : emphasized
-            ? "border-gold-primary/40 text-gold-primary hover:bg-gold-primary/10"
-            : "border-black/10 dark:border-white/10 text-gray-800 dark:text-gray-200 hover:bg-black/[0.05] dark:hover:bg-white/10 hover:text-gold-primary"
-      }`}
+      aria-label={`${label} — predicted next interval ${intervalLabel}`}
+      className={`flex min-h-14 flex-col items-center justify-center rounded-md border px-2 py-1.5 transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${className}`}
     >
-      {children}
+      <span className="flex items-baseline gap-1.5">
+        <span className="text-sm font-semibold">{label}</span>
+        <span className="text-[10px] opacity-60">{shortcut}</span>
+      </span>
+      <span className="text-[11px] font-mono opacity-75">{intervalLabel}</span>
     </button>
   );
 }
