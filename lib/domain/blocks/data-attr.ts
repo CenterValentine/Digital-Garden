@@ -1,0 +1,132 @@
+/**
+ * Shared TipTap attribute spec builder for publishing blocks.
+ *
+ * Encapsulates the (default + parseHTML + renderHTML) triple that every
+ * publishing block declares for each of its string-typed attrs. Pre-R2,
+ * each block reinvented this inline — hero-image had a local `str()`
+ * helper, others repeated the boilerplate per-attr.
+ *
+ * Critically, this version fixes a key-naming bug present in hero-image's
+ * local helper: TipTap attrs are camelCase (e.g. `ctaText`), but the data
+ * attribute is kebab (e.g. `data-cta-text`). The old helper accessed
+ * `attrs[kebabKey]` which silently returned `undefined` for multi-word
+ * attrs — the data attribute never got emitted, so server-side renderHTML
+ * found nothing in HTMLAttributes and dropped the CTA. (Single-word attrs
+ * like `headline` coincidentally worked because camel == kebab.)
+ *
+ * Usage:
+ *   addAttributes: () => ({
+ *     blockId: blockIdAttr,
+ *     blockType: { default: "heroImage" },
+ *     ctaText: dataAttr("ctaText"),
+ *     ctaUrl: dataAttr("ctaUrl"),
+ *     headline: dataAttr("headline"),
+ *     overlay: dataAttr("overlay", { default: 40, parseAs: "number" }),
+ *   })
+ */
+
+interface DataAttrOptions<T> {
+  /** Initial value for the TipTap attr. Defaults to "". */
+  default?: T;
+  /** Optional parser for non-string fallback values. */
+  parseAs?: "string" | "number" | "boolean";
+  /**
+   * Override the kebab-cased data attribute name. Defaults to
+   * `data-${camelToKebab(camelKey)}`. Use this when the on-disk attribute
+   * name has historically diverged from the camelCase JS name (e.g.
+   * `gapSize` → `data-gap`, `showBackground` → `data-col-bg`).
+   */
+  dataKey?: string;
+  /**
+   * When true, only emit the data attribute for "truthy" values: skip
+   * `false`, `0`, `""`, and the option's default value. Useful when
+   * legacy CSS uses `[data-foo="true"]` matching and treats absence as
+   * the default — emitting the literal `false`/default would not change
+   * styling but would clutter the serialized HTML. Defaults to false
+   * (publishing-block convention is to always emit).
+   */
+  skipDefault?: boolean;
+}
+
+interface TipTapAttrSpec<T> {
+  default: T;
+  parseHTML: (el: Element) => T;
+  renderHTML: (attrs: Record<string, unknown>) => Record<string, unknown>;
+}
+
+function camelToKebab(camelKey: string): string {
+  return camelKey.replace(/[A-Z]/g, (m) => `-${m.toLowerCase()}`);
+}
+
+function coerceValue<T>(raw: string | null, fallback: T, parseAs: "string" | "number" | "boolean"): T {
+  if (raw === null) return fallback;
+  if (parseAs === "number") {
+    const n = Number(raw);
+    return (Number.isFinite(n) ? n : fallback) as T;
+  }
+  if (parseAs === "boolean") {
+    return (raw === "true") as T;
+  }
+  return raw as T;
+}
+
+/**
+ * Build a TipTap attribute spec that round-trips through a kebab-case
+ * data attribute. The `camelKey` is the JS-side attr name (what TipTap
+ * stores it as in `attrs`); the data attribute is derived as
+ * `data-${camelToKebab(camelKey)}`.
+ *
+ * For string attrs (the default), the renderHTML emits the data attribute
+ * only when the value is truthy — so empty strings don't pollute the
+ * serialized HTML. Override behavior by passing a non-string `parseAs`.
+ */
+/**
+ * Shared TipTap attr spec for the `blockId` attribute that every block
+ * carries on its base schema. Round-trips through `data-block-id` so
+ * the publisher's renderHTML emits the same id that the editor's
+ * NodeView already stamps onto its outer wrapper.
+ *
+ * Why this matters: prior to R5 Track 2, only the editor's NodeView
+ * added `data-block-id`. Publisher pages had no id on block outers, so
+ * deep links, analytics, and inline anchor targeting all had nothing
+ * to grab. Wiring the attr through `mergeAttributes(HTMLAttributes,
+ * ...)` (which every block's renderHTML already does for class +
+ * data-block-type) propagates the id automatically.
+ *
+ * Default is `null` — when blockId is unset (e.g. legacy content
+ * before the schema added it), no attribute is emitted.
+ */
+export const blockIdAttr = {
+  default: null as string | null,
+  parseHTML: (el: Element): string | null => el.getAttribute("data-block-id") || null,
+  renderHTML: (attrs: Record<string, unknown>): Record<string, unknown> =>
+    attrs.blockId ? { "data-block-id": attrs.blockId } : {},
+};
+
+export function dataAttr<T = string>(
+  camelKey: string,
+  options: DataAttrOptions<T> = {},
+): TipTapAttrSpec<T> {
+  const dataKey = options.dataKey ?? `data-${camelToKebab(camelKey)}`;
+  const fallback = (options.default ?? ("" as unknown as T)) as T;
+  const parseAs = options.parseAs ?? "string";
+  const skipDefault = options.skipDefault ?? false;
+
+  return {
+    default: fallback,
+    parseHTML: (el: Element) => coerceValue(el.getAttribute(dataKey), fallback, parseAs),
+    renderHTML: (attrs: Record<string, unknown>) => {
+      const value = attrs[camelKey];
+      // Skip undefined/null/empty-string, but DO emit `0` and `false` —
+      // those are valid explicit values (e.g. overlay=0 means no overlay).
+      if (value === undefined || value === null) return {};
+      if (typeof value === "string" && value === "") return {};
+      // Opt-in: drop falsy/default values when caller wants minimal HTML.
+      if (skipDefault) {
+        if (value === false) return {};
+        if (value === fallback) return {};
+      }
+      return { [dataKey]: value };
+    },
+  };
+}

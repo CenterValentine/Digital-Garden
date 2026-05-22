@@ -1,0 +1,24 @@
+{
+  "type": "doc",
+  "content": [
+    {
+      "type": "paragraph",
+      "content": [{ "type": "text", "text": "Section above the divider." }]
+    },
+    {
+      "type": "blockDivider",
+      "attrs": {
+        "blockId": "fixture-divider-001",
+        "style": "solid",
+        "spacing": "normal",
+        "label": "",
+        "variant": "stars",
+        "showContainer": false
+      }
+    },
+    {
+      "type": "paragraph",
+      "content": [{ "type": "text", "text": "Section below the divider." }]
+    }
+  ]
+}

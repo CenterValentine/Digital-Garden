@@ -45,3 +45,38 @@ export function popSpan(): ActiveSpan | undefined {
   if (!ctx) return undefined;
   return ctx.spanStack.pop();
 }
+
+/**
+ * Fork the trace context for a parallel branch.
+ *
+ * Why this exists: `Promise.all([withSpan(A), withSpan(B)])` puts both
+ * spans on the same `ctx.spanStack` because Promise.all does not isolate
+ * AsyncLocalStorage between its branches. The synchronous `startSpan`
+ * calls both run before either await resumes, so B sees A on top of the
+ * stack and gets recorded as A's child. Wall-clock duration is still
+ * correct (both run in parallel), but the parent_span_id and stack
+ * ordering are wrong — sub-spans inside fnA might see B as their parent.
+ *
+ * `forkTraceContext` runs its callback inside a new ALS scope whose
+ * spanStack is a *snapshot* of the parent's stack at fork time. Push/pop
+ * inside the branch don't touch the parent's stack or sibling branches.
+ * Trace_id is preserved so all events still land in the same trace file.
+ *
+ * Usage:
+ *   const [a, b] = await Promise.all([
+ *     forkTraceContext(() => withSpan("auth:session", ..., () => fnA())),
+ *     forkTraceContext(() => withSpan("content:payload", ..., () => fnB())),
+ *   ]);
+ *
+ * Outside a trace context, this is a no-op (just invokes fn).
+ */
+export function forkTraceContext<T>(
+  fn: () => T | Promise<T>,
+): T | Promise<T> {
+  const ctx = als.getStore();
+  if (!ctx) return fn();
+  return als.run(
+    { trace_id: ctx.trace_id, spanStack: [...ctx.spanStack] },
+    fn,
+  );
+}

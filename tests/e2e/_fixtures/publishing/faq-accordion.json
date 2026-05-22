@@ -1,0 +1,14 @@
+{
+  "type": "doc",
+  "content": [
+    {
+      "type": "faqAccordion",
+      "attrs": {
+        "blockType": "faqAccordion",
+        "items": "[{\"question\":\"How long does setup take?\",\"answer\":\"Most users get started in under 5 minutes. We provide guided onboarding and templates to help you hit the ground running.\"},{\"question\":\"Can I integrate with my existing tools?\",\"answer\":\"Yes, we support integrations with 500+ popular platforms including Slack, GitHub, Zapier, and more.\"},{\"question\":\"What happens if I exceed my plan limit?\",\"answer\":\"Your account won't be suspended. We'll notify you and you can upgrade anytime. Pay only for what you use.\"},{\"question\":\"Is my data secure?\",\"answer\":\"We use enterprise-grade encryption, SOC 2 compliance, and regular security audits. All data is backed up automatically.\"}]",
+        "variant": "default",
+        "openAll": false
+      }
+    }
+  ]
+}

@@ -12,6 +12,7 @@ import { TextSelection } from "@tiptap/pm/state";
 import { z } from "zod";
 import { createBlockSchema } from "@/lib/domain/blocks/schema";
 import { registerBlock } from "@/lib/domain/blocks/registry";
+import { blockIdAttr } from "@/lib/domain/blocks/data-attr";
 import { useBlockStore } from "@/state/block-store";
 import { useRightPanelCollapseStore } from "@/state/right-panel-collapse-store";
 import { openBlockInsertMenu, syncAttrsToPanel } from "@/lib/domain/blocks/node-view-factory";
@@ -87,7 +88,7 @@ export const Columns = Node.create({
 
   addAttributes() {
     return {
-      blockId: { default: null },
+      blockId: blockIdAttr,
       blockType: { default: "columns" },
       columnCount: {
         default: 2,
@@ -121,6 +122,10 @@ export const Columns = Node.create({
     return [{ tag: 'div[data-block-type="columns"]' }];
   },
 
+  // Wrap children in `.block-columns-grid` to match the editor NodeView's
+  // DOM structure. Without this, the CSS grid layout rules
+  // (`:is(.ProseMirror, .public-prose) .block-columns-grid { display: grid }`)
+  // have nothing to bind to and columns render stacked.
   renderHTML({ HTMLAttributes }) {
     return [
       "div",
@@ -128,7 +133,7 @@ export const Columns = Node.create({
         class: "block-columns",
         "data-block-type": "columns",
       }),
-      0,
+      ["div", { class: "block-columns-grid" }, 0],
     ];
   },
 
@@ -376,7 +381,7 @@ export const ServerColumns = Node.create({
 
   addAttributes() {
     return {
-      blockId: { default: null },
+      blockId: blockIdAttr,
       blockType: { default: "columns" },
       columnCount: {
         default: 2,
@@ -410,6 +415,10 @@ export const ServerColumns = Node.create({
     return [{ tag: 'div[data-block-type="columns"]' }];
   },
 
+  // Wrap children in `.block-columns-grid` to match the editor NodeView's
+  // DOM structure. Without this, the CSS grid layout rules
+  // (`:is(.ProseMirror, .public-prose) .block-columns-grid { display: grid }`)
+  // have nothing to bind to and columns render stacked.
   renderHTML({ HTMLAttributes }) {
     return [
       "div",
@@ -417,7 +426,7 @@ export const ServerColumns = Node.create({
         class: "block-columns",
         "data-block-type": "columns",
       }),
-      0,
+      ["div", { class: "block-columns-grid" }, 0],
     ];
   },
 });

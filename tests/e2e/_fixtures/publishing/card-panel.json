@@ -1,0 +1,24 @@
+{
+  "type": "doc",
+  "content": [
+    {
+      "type": "cardPanel",
+      "attrs": {
+        "headerText": "Important Notice",
+        "cardBorder": "subtle",
+        "showBackground": true
+      },
+      "content": [
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "This is a card panel containing block content. It provides a bordered container for related information that should stand out from the surrounding flow."
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

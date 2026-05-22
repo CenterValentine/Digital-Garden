@@ -1,0 +1,13 @@
+{
+  "type": "doc",
+  "content": [
+    {
+      "type": "processSteps",
+      "attrs": {
+        "blockType": "processSteps",
+        "steps": "[{\"number\":1,\"title\":\"Create Your Account\",\"description\":\"Sign up in 30 seconds with email or GitHub\"},{\"number\":2,\"title\":\"Configure Integrations\",\"description\":\"Connect your tools and set up webhooks\"},{\"number\":3,\"title\":\"Deploy Your First App\",\"description\":\"Push code and see it live in seconds\"},{\"number\":4,\"title\":\"Monitor and Scale\",\"description\":\"Built-in analytics and auto-scaling out of the box\"}]",
+        "variant": "numbered"
+      }
+    }
+  ]
+}

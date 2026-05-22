@@ -1,0 +1,18 @@
+{
+  "type": "doc",
+  "content": [
+    {
+      "type": "gallery",
+      "attrs": {
+        "blockType": "gallery",
+        "items": "[{\"src\":\"data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20viewBox%3D%270%200%20400%20300%27%3E%3Crect%20width%3D%27400%27%20height%3D%27300%27%20fill%3D%27%2306b6d4%27%2F%3E%3C%2Fsvg%3E\",\"alt\":\"Dashboard screenshot\",\"caption\":\"Real-time analytics dashboard\"},{\"src\":\"data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20viewBox%3D%270%200%20400%20300%27%3E%3Crect%20width%3D%27400%27%20height%3D%27300%27%20fill%3D%27%2310b981%27%2F%3E%3C%2Fsvg%3E\",\"alt\":\"Mobile app\",\"caption\":\"Mobile-first design\"},{\"src\":\"data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20viewBox%3D%270%200%20400%20300%27%3E%3Crect%20width%3D%27400%27%20height%3D%27300%27%20fill%3D%27%23f59e0b%27%2F%3E%3C%2Fsvg%3E\",\"alt\":\"Team collaboration\",\"caption\":\"Built for teams\"}]",
+        "layout": "grid",
+        "columns": 3,
+        "gap": "md",
+        "hoverEffect": "zoom",
+        "autoScroll": false,
+        "fullWidth": false
+      }
+    }
+  ]
+}

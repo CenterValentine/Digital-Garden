@@ -8,9 +8,11 @@
  */
 
 import { Node, mergeAttributes } from "@tiptap/core";
+import type { DOMOutputSpec } from "@tiptap/pm/model";
 import { z } from "zod";
 import { createBlockSchema } from "@/lib/domain/blocks/schema";
 import { registerBlock } from "@/lib/domain/blocks/registry";
+import { blockIdAttr } from "@/lib/domain/blocks/data-attr";
 import { createBlockNodeView } from "@/lib/domain/blocks/node-view-factory";
 
 const { schema: dateInputSchema, defaults: dateInputDefaults } =
@@ -103,7 +105,7 @@ export const DateInput = Node.create({
 
   addAttributes() {
     return {
-      blockId: { default: null },
+      blockId: blockIdAttr,
       blockType: { default: "dateInput" },
       label: { default: "", parseHTML: (el) => el.getAttribute("data-label") || "", renderHTML: (attrs) => attrs.label ? { "data-label": attrs.label } : {} },
       value: { default: "", parseHTML: (el) => el.getAttribute("data-value") || "", renderHTML: (attrs) => attrs.value ? { "data-value": attrs.value } : {} },
@@ -142,7 +144,7 @@ export const ServerDateInput = Node.create({
 
   addAttributes() {
     return {
-      blockId: { default: null },
+      blockId: blockIdAttr,
       blockType: { default: "dateInput" },
       label: { default: "", parseHTML: (el) => el.getAttribute("data-label") || "", renderHTML: (attrs) => attrs.label ? { "data-label": attrs.label } : {} },
       value: { default: "", parseHTML: (el) => el.getAttribute("data-value") || "", renderHTML: (attrs) => attrs.value ? { "data-value": attrs.value } : {} },
@@ -152,5 +154,17 @@ export const ServerDateInput = Node.create({
   },
 
   parseHTML() { return [{ tag: 'div[data-block-type="dateInput"]' }]; },
-  renderHTML({ HTMLAttributes }) { return ["div", mergeAttributes(HTMLAttributes, { class: "block-date-input", "data-block-type": "dateInput" })]; },
+  renderHTML({ node, HTMLAttributes }) {
+    const value = String(node.attrs.value ?? "");
+    const label = String(node.attrs.label ?? "");
+    const includeTime = Boolean(node.attrs.includeTime);
+    if (!value) {
+      return ["div", mergeAttributes(HTMLAttributes, { class: "block-date-input", "data-block-type": "dateInput", "data-form-empty": "true" })];
+    }
+    const inputEl: DOMOutputSpec = ["input", { class: "block-form-control", type: includeTime ? "datetime-local" : "date", value }];
+    const outerAttrs = mergeAttributes(HTMLAttributes, { class: "block-date-input block-form-rendered", "data-block-type": "dateInput" });
+    return label
+      ? ["div", outerAttrs, ["label", { class: "block-form-label" }, label], inputEl]
+      : ["div", outerAttrs, inputEl];
+  },
 });

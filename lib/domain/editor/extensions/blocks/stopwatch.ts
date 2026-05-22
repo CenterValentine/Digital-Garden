@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import { createBlockSchema } from "@/lib/domain/blocks/schema";
 import { registerBlock } from "@/lib/domain/blocks/registry";
+import { blockIdAttr } from "@/lib/domain/blocks/data-attr";
 import {
   createBlockNodeView,
   syncAttrsToPanel,
@@ -423,7 +424,7 @@ function buildStaticStopwatchContent(attrs: StopwatchAttrs): DOMOutputSpec[] {
 
 function getSharedAttributes() {
   return {
-    blockId: { default: null },
+    blockId: blockIdAttr,
     blockType: { default: "stopwatch" },
     title: {
       default: "Stopwatch",

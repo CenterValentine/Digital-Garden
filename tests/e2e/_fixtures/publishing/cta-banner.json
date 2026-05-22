@@ -1,0 +1,21 @@
+{
+  "type": "doc",
+  "content": [
+    {
+      "type": "ctaBanner",
+      "attrs": {
+        "blockType": "ctaBanner",
+        "headline": "Ready to ship faster?",
+        "subheadline": "Join thousands of teams already building with our platform.",
+        "primaryLabel": "Start free trial",
+        "primaryUrl": "https://example.com/trial",
+        "secondaryLabel": "Watch demo",
+        "secondaryUrl": "https://example.com/demo",
+        "align": "center",
+        "variant": "default",
+        "bgColor": "",
+        "bgGradient": ""
+      }
+    }
+  ]
+}

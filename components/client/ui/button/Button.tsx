@@ -33,9 +33,12 @@ const buttonVariants = cva(
           "rounded-none bg-gradient-to-b from-leaf-bright via-leaf-light to-leaf-primary text-white hover:from-leaf-light hover:via-leaf-primary hover:to-leaf-primary shadow-glow-leaf",
         "gradient-mixed":
           "rounded-none bg-gradient-to-b from-gold-light via-shale-mid to-shale-dark text-gold-light hover:from-gold-primary hover:via-shale-dark hover:to-shale-dark",
-        // NavBar variant - white background, gold gradient on hover, max height for 2:1 aspect
+        // NavBar variant — transparent so the parent <nav>'s bg-card surface
+        // shows through (avoids a lighter bg-background tile painting on top
+        // of bg-card in dark mode, which surfaces as a visibly different
+        // colored block). Gold gradient on hover; max-h-12 for 2:1 aspect.
         "nav-item":
-          "rounded-none bg-background text-foreground hover:bg-gradient-to-b hover:from-gold-light hover:via-gold-primary hover:to-gold-dark hover:text-white transition-all duration-300 max-h-12 my-auto",
+          "rounded-none bg-transparent text-foreground hover:bg-gradient-to-b hover:from-gold-light hover:via-gold-primary hover:to-gold-dark hover:text-white transition-all duration-300 max-h-12 my-auto",
         // Soft gold gradient - muted, elegant
         "gradient-gold-soft":
           "bg-gradient-to-b from-gold-light/80 via-gold-primary/70 to-gold-dark/60 text-shale-dark hover:from-gold-light hover:via-gold-primary hover:to-gold-dark transition-all duration-300",

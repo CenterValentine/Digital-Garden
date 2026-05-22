@@ -12,6 +12,88 @@
   display: none;
 }
 
+/* ────────────────────────────────────────────────────────────────────────
+ * Global scrollbars — thin, themed, semi-transparent.
+ *
+ * Tokens live in :root and .dark below. The * selector applies to every
+ * scroll surface; surfaces that need fade-on-idle add the .fade-scroll
+ * class plus the useFadeScrollbar hook (sets data-scrolling="true" on
+ * scroll, removed ~800ms after the last event).
+ *
+ * Firefox honors scrollbar-width/color but ignores ::-webkit-scrollbar.
+ * Chrome/Safari/Edge honor both — the webkit rules win on those because
+ * they're more specific (pseudo-element).
+ * ──────────────────────────────────────────────────────────────────── */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+}
+*::-webkit-scrollbar {
+  width: var(--scrollbar-size);
+  height: var(--scrollbar-size);
+}
+*::-webkit-scrollbar-track,
+*::-webkit-scrollbar-corner {
+  background: var(--scrollbar-track);
+}
+*::-webkit-scrollbar-thumb {
+  background-color: var(--scrollbar-thumb);
+  border-radius: var(--scrollbar-radius);
+  transition: background-color 200ms ease-out;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background-color: var(--scrollbar-thumb-hover);
+}
+*::-webkit-scrollbar-thumb:active {
+  background-color: var(--scrollbar-thumb-active);
+}
+
+/* Opt-in fade-on-idle: surfaces wrapped with useFadeScrollbar.
+ * Default state is transparent; when scrolling OR the container is
+ * hovered, the thumb fades in to the full tokenized color. */
+.fade-scroll {
+  scrollbar-color: transparent var(--scrollbar-track);
+}
+.fade-scroll::-webkit-scrollbar-thumb {
+  background-color: transparent;
+}
+.fade-scroll:hover,
+.fade-scroll[data-scrolling="true"] {
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+}
+.fade-scroll:hover::-webkit-scrollbar-thumb,
+.fade-scroll[data-scrolling="true"]::-webkit-scrollbar-thumb {
+  background-color: var(--scrollbar-thumb);
+}
+.fade-scroll:hover::-webkit-scrollbar-thumb:hover,
+.fade-scroll[data-scrolling="true"]::-webkit-scrollbar-thumb:hover {
+  background-color: var(--scrollbar-thumb-hover);
+}
+
+/* ────────────────────────────────────────────────────────────────────────
+ * Excalidraw mobile bottom toolbar — allow horizontal scroll.
+ *
+ * Excalidraw sets `max-width: 98vw` + `overflow: visible` on its mobile
+ * tool strip. On narrow phones the natural width of the icons exceeds
+ * 98vw and the leftmost tools get clipped off-screen with no way to
+ * reach them. Override overflow-x to auto so the user can swipe to
+ * the cut-off tools, force tool icons to keep their natural size, and
+ * hide the scrollbar chrome (the strip is too short to host one cleanly).
+ * ──────────────────────────────────────────────────────────────────── */
+.excalidraw .App-toolbar--mobile,
+.excalidraw .App-toolbar-content {
+  overflow-x: auto !important;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.excalidraw .App-toolbar--mobile::-webkit-scrollbar,
+.excalidraw .App-toolbar-content::-webkit-scrollbar {
+  display: none;
+}
+.excalidraw .App-toolbar-content > * {
+  flex-shrink: 0;
+}
+
 /* Hide default navbar on notes routes (uses its own NotesNavBar) */
 body[data-notes-route] .notes-route-hides-default-nav {
   display: none !important;
@@ -145,6 +227,14 @@ body:has(.notes-layout-page) .toaster {
   --surface-glass-2-border: 1px solid rgba(15, 23, 42, 0.12);
   --surface-glass-2-shadow: 0 10px 15px -3px rgba(15, 23, 42, 0.08);
 
+  /* Scrollbar tokens (light). Mirrored in lib/design/system/scrollbars.ts. */
+  --scrollbar-thumb: rgba(70, 94, 115, 0.28);
+  --scrollbar-thumb-hover: rgba(70, 94, 115, 0.5);
+  --scrollbar-thumb-active: rgba(70, 94, 115, 0.65);
+  --scrollbar-track: transparent;
+  --scrollbar-size: 8px;
+  --scrollbar-radius: 999px;
+
   /* ProseMirror Table Settings — keep low so colgroup doesn't fight width:100% */
   --default-cell-min-width: 25px;
 
@@ -213,6 +303,11 @@ body:has(.notes-layout-page) .toaster {
   --surface-glass-2-bg: rgba(0, 0, 0, 0.5);
   --surface-glass-2-border: 1px solid rgba(255, 255, 255, 0.12);
   --surface-glass-2-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.6);
+
+  /* Scrollbar tokens (dark) — warm beige tint matches foreground palette. */
+  --scrollbar-thumb: rgba(229, 212, 176, 0.22);
+  --scrollbar-thumb-hover: rgba(229, 212, 176, 0.42);
+  --scrollbar-thumb-active: rgba(229, 212, 176, 0.58);
 }
 
 @theme inline {
@@ -1923,7 +2018,7 @@ mark {
 
 /* ─── Section Header (Sprint 44) ─── */
 
-.ProseMirror .block-section-header-content {
+:is(.ProseMirror, .public-prose) .block-section-header-content {
   font-weight: 600;
   color: var(--text-primary);
   padding-bottom: 0.5rem;
@@ -1931,71 +2026,71 @@ mark {
   cursor: text;
 }
 
-.ProseMirror .block-section-header-content:empty::before,
-.ProseMirror .block-section-header-content > .is-empty::before {
+:is(.ProseMirror, .public-prose) .block-section-header-content:empty::before,
+:is(.ProseMirror, .public-prose) .block-section-header-content > .is-empty::before {
   content: none;
 }
 
-.ProseMirror .block-section-header-content[data-level="1"] {
+:is(.ProseMirror, .public-prose) .block-section-header-content[data-level="1"] {
   font-size: 1.5rem;
   line-height: 1.3;
 }
 
-.ProseMirror .block-section-header-content[data-level="2"] {
+:is(.ProseMirror, .public-prose) .block-section-header-content[data-level="2"] {
   font-size: 1.25rem;
   line-height: 1.35;
 }
 
-.ProseMirror .block-section-header-content[data-level="3"] {
+:is(.ProseMirror, .public-prose) .block-section-header-content[data-level="3"] {
   font-size: 1.1rem;
   line-height: 1.4;
 }
 
-.ProseMirror .block-section-header-content[data-show-divider="true"] {
+:is(.ProseMirror, .public-prose) .block-section-header-content[data-show-divider="true"] {
   border-bottom: 1px solid var(--border-secondary);
 }
 
-.ProseMirror .block-section-header-content[data-show-divider="true"][data-divider-style="dashed"] {
+:is(.ProseMirror, .public-prose) .block-section-header-content[data-show-divider="true"][data-divider-style="dashed"] {
   border-bottom-style: dashed;
 }
 
-.ProseMirror .block-section-header-content[data-show-divider="true"][data-divider-style="dotted"] {
+:is(.ProseMirror, .public-prose) .block-section-header-content[data-show-divider="true"][data-divider-style="dotted"] {
   border-bottom-style: dotted;
 }
 
 /* ─── Card / Panel (Sprint 44) ─── */
 
-.ProseMirror .block-card-panel-content {
+:is(.ProseMirror, .public-prose) .block-card-panel-content {
   padding: 0.75rem;
   border-radius: 6px;
   background: var(--surface-secondary);
 }
 
 /* Card border styles */
-.ProseMirror .block-card-panel-content[data-card-border="none"] {
+:is(.ProseMirror, .public-prose) .block-card-panel-content[data-card-border="none"] {
   border: 1px solid transparent;
 }
-.ProseMirror .block-card-panel-content[data-card-border="subtle"] {
+:is(.ProseMirror, .public-prose) .block-card-panel-content[data-card-border="subtle"] {
   border: 1px solid var(--border-secondary);
 }
-.ProseMirror .block-card-panel-content[data-card-border="solid"] {
+:is(.ProseMirror, .public-prose) .block-card-panel-content[data-card-border="solid"] {
   border: 1px solid color-mix(in srgb, var(--border-secondary) 180%, transparent);
 }
-.ProseMirror .block-card-panel-content[data-card-border="dashed"] {
+:is(.ProseMirror, .public-prose) .block-card-panel-content[data-card-border="dashed"] {
   border: 1px dashed color-mix(in srgb, var(--border-secondary) 150%, transparent);
 }
 
 /* Hover guide when border is "none" */
-.ProseMirror .block-card-panel-content[data-card-border="none"]:hover {
+:is(.ProseMirror, .public-prose) .block-card-panel-content[data-card-border="none"]:hover {
   border-color: color-mix(in srgb, var(--border-secondary) 60%, transparent);
 }
 
 /* Card background hidden */
-.ProseMirror .block-card-panel-content[data-card-bg="hidden"] {
+:is(.ProseMirror, .public-prose) .block-card-panel-content[data-card-bg="hidden"] {
   background: transparent;
 }
 
-.ProseMirror .block-card-header {
+:is(.ProseMirror, .public-prose) .block-card-header {
   font-size: 0.85rem;
   font-weight: 600;
   color: var(--text-primary);
@@ -2315,7 +2410,7 @@ mark {
 
 /* ─── Accordion (Sprint 44) ─── */
 
-.ProseMirror .block-accordion-summary {
+:is(.ProseMirror, .public-prose) .block-accordion-summary {
   display: flex;
   align-items: center;
   gap: 0.5rem;
@@ -2327,11 +2422,11 @@ mark {
   border-bottom: 1px solid var(--border-secondary);
 }
 
-.ProseMirror .block-accordion-summary.block-accordion-no-divider {
+:is(.ProseMirror, .public-prose) .block-accordion-summary.block-accordion-no-divider {
   border-bottom: none;
 }
 
-.ProseMirror .block-accordion-title {
+:is(.ProseMirror, .public-prose) .block-accordion-title {
   flex: 1;
   outline: none;
   cursor: text;
@@ -2343,23 +2438,23 @@ mark {
 }
 
 /* Header level sizing — matches TipTap heading sizes */
-.ProseMirror .block-accordion-title[data-header-level="1"] {
+:is(.ProseMirror, .public-prose) .block-accordion-title[data-header-level="1"] {
   font-size: 1.75rem;
 }
-.ProseMirror .block-accordion-title[data-header-level="2"] {
+:is(.ProseMirror, .public-prose) .block-accordion-title[data-header-level="2"] {
   font-size: 1.35rem;
 }
-.ProseMirror .block-accordion-title[data-header-level="3"] {
+:is(.ProseMirror, .public-prose) .block-accordion-title[data-header-level="3"] {
   font-size: 1.1rem;
 }
 
-.ProseMirror .block-accordion-title:empty::before {
+:is(.ProseMirror, .public-prose) .block-accordion-title:empty::before {
   content: attr(data-placeholder);
   color: var(--text-tertiary);
   pointer-events: none;
 }
 
-.ProseMirror .block-accordion-chevron {
+:is(.ProseMirror, .public-prose) .block-accordion-chevron {
   font-size: 0.75rem;
   transition: transform 0.2s ease;
   color: var(--text-tertiary);
@@ -2372,70 +2467,70 @@ mark {
   border-radius: 3px;
 }
 
-.ProseMirror .block-accordion-chevron:hover {
+:is(.ProseMirror, .public-prose) .block-accordion-chevron:hover {
   background: var(--surface-secondary);
   color: var(--text-secondary);
 }
 
-.ProseMirror .block-accordion-chevron-open {
+:is(.ProseMirror, .public-prose) .block-accordion-chevron-open {
   transform: rotate(90deg);
 }
 
-.ProseMirror .block-accordion-body.block-accordion-closed {
+:is(.ProseMirror, .public-prose) .block-accordion-body.block-accordion-closed {
   display: none;
 }
 
-.ProseMirror .block-accordion-body.block-accordion-open {
+:is(.ProseMirror, .public-prose) .block-accordion-body.block-accordion-open {
   display: block;
   padding-top: 0.25rem;
 }
 
-.ProseMirror .block-accordion-summary.block-accordion-no-divider + .block-accordion-body.block-accordion-open {
+:is(.ProseMirror, .public-prose) .block-accordion-summary.block-accordion-no-divider + .block-accordion-body.block-accordion-open {
   padding-top: 0;
 }
 
 /* ─── Columns (Sprint 44) ─── */
 
-.ProseMirror .block-columns-grid {
+:is(.ProseMirror, .public-prose) .block-columns-grid {
   display: grid;
   min-height: 3rem;
   grid-template-columns: repeat(var(--col-count, 2), 1fr);
 }
 
-.ProseMirror .block-columns[data-columns="2"] .block-columns-grid {
+:is(.ProseMirror, .public-prose) .block-columns[data-columns="2"] .block-columns-grid {
   --col-count: 2;
 }
 
-.ProseMirror .block-columns[data-columns="3"] .block-columns-grid {
+:is(.ProseMirror, .public-prose) .block-columns[data-columns="3"] .block-columns-grid {
   --col-count: 3;
 }
 
-.ProseMirror .block-columns[data-columns="4"] .block-columns-grid {
+:is(.ProseMirror, .public-prose) .block-columns[data-columns="4"] .block-columns-grid {
   --col-count: 4;
 }
 
-.ProseMirror .block-columns[data-gap="none"] .block-columns-grid {
+:is(.ProseMirror, .public-prose) .block-columns[data-gap="none"] .block-columns-grid {
   gap: 0;
 }
 
-.ProseMirror .block-columns[data-gap="small"] .block-columns-grid {
+:is(.ProseMirror, .public-prose) .block-columns[data-gap="small"] .block-columns-grid {
   gap: 0.5rem;
 }
 
-.ProseMirror .block-columns[data-gap="medium"] .block-columns-grid {
+:is(.ProseMirror, .public-prose) .block-columns[data-gap="medium"] .block-columns-grid {
   gap: 1rem;
 }
 
-.ProseMirror .block-columns[data-gap="large"] .block-columns-grid {
+:is(.ProseMirror, .public-prose) .block-columns[data-gap="large"] .block-columns-grid {
   gap: 1.5rem;
 }
 
-.ProseMirror .block-columns {
+:is(.ProseMirror, .public-prose) .block-columns {
   position: relative;
 }
 
 /* Column inner cells — border style controlled by data-col-border on parent */
-.ProseMirror .block-column {
+:is(.ProseMirror, .public-prose) .block-column {
   min-height: 2rem;
   min-width: 0;
   padding: 0.5rem;
@@ -2446,43 +2541,43 @@ mark {
   transition: border-color 0.15s ease, background 0.15s ease;
 }
 
-.ProseMirror .block-columns[data-col-border="subtle"] .block-column {
+:is(.ProseMirror, .public-prose) .block-columns[data-col-border="subtle"] .block-column {
   border-color: rgba(0, 0, 0, 0.1);
   background: rgba(0, 0, 0, 0.015);
 }
-.ProseMirror .block-columns[data-col-border="subtle"] .block-column:hover {
+:is(.ProseMirror, .public-prose) .block-columns[data-col-border="subtle"] .block-column:hover {
   border-color: rgba(0, 0, 0, 0.18);
 }
 
-.ProseMirror .block-columns[data-col-border="solid"] .block-column {
+:is(.ProseMirror, .public-prose) .block-columns[data-col-border="solid"] .block-column {
   border-color: rgba(0, 0, 0, 0.2);
 }
-.ProseMirror .block-columns[data-col-border="solid"] .block-column:hover {
+:is(.ProseMirror, .public-prose) .block-columns[data-col-border="solid"] .block-column:hover {
   border-color: rgba(0, 0, 0, 0.3);
 }
 
-.ProseMirror .block-columns[data-col-border="dashed"] .block-column {
+:is(.ProseMirror, .public-prose) .block-columns[data-col-border="dashed"] .block-column {
   border-style: dashed;
   border-color: rgba(0, 0, 0, 0.15);
 }
-.ProseMirror .block-columns[data-col-border="dashed"] .block-column:hover {
+:is(.ProseMirror, .public-prose) .block-columns[data-col-border="dashed"] .block-column:hover {
   border-color: rgba(0, 0, 0, 0.25);
 }
 
-.ProseMirror .block-columns[data-col-border="none"] .block-column {
+:is(.ProseMirror, .public-prose) .block-columns[data-col-border="none"] .block-column {
   border-color: transparent;
   background: transparent;
 }
-.ProseMirror .block-columns[data-col-border="none"]:hover .block-column {
+:is(.ProseMirror, .public-prose) .block-columns[data-col-border="none"]:hover .block-column {
   border-color: rgba(0, 0, 0, 0.06);
   border-style: dashed;
 }
 
-.ProseMirror .block-column p {
+:is(.ProseMirror, .public-prose) .block-column p {
   min-height: 1.5em;
 }
 
-.ProseMirror .block-column > p.is-empty:first-child:last-child::before {
+:is(.ProseMirror, .public-prose) .block-column > p.is-empty:first-child:last-child::before {
   content: "Type here...";
   color: rgba(0, 0, 0, 0.3);
   pointer-events: none;
@@ -2490,7 +2585,7 @@ mark {
 }
 
 /* Column background visibility */
-.ProseMirror .block-columns[data-col-bg="hidden"] .block-column {
+:is(.ProseMirror, .public-prose) .block-columns[data-col-bg="hidden"] .block-column {
   background: transparent !important;
 }
 
@@ -2530,16 +2625,16 @@ mark {
   border-color: transparent;
 }
 
-.ProseMirror .block-column .block-calendarViewBlock > .block-insert-btn,
-.ProseMirror .block-column-cell .block-calendarViewBlock > .block-insert-btn,
-.ProseMirror .block-tab-panel-content .block-calendarViewBlock > .block-insert-btn,
-.ProseMirror .block-accordion-body .block-calendarViewBlock > .block-insert-btn {
+:is(.ProseMirror, .public-prose) .block-column .block-calendarViewBlock > .block-insert-btn,
+:is(.ProseMirror, .public-prose) .block-column-cell .block-calendarViewBlock > .block-insert-btn,
+:is(.ProseMirror, .public-prose) .block-tab-panel-content .block-calendarViewBlock > .block-insert-btn,
+:is(.ProseMirror, .public-prose) .block-accordion-body .block-calendarViewBlock > .block-insert-btn {
   display: none !important;
 }
 
 /* ─── Tabs (Sprint 44) ─── */
 
-.ProseMirror .block-tabs-bar {
+:is(.ProseMirror, .public-prose) .block-tabs-bar {
   display: flex;
   flex-wrap: nowrap;
   gap: 0;
@@ -2550,11 +2645,11 @@ mark {
   scrollbar-width: none; /* Firefox */
 }
 
-.ProseMirror .block-tabs-bar::-webkit-scrollbar {
+:is(.ProseMirror, .public-prose) .block-tabs-bar::-webkit-scrollbar {
   display: none; /* Chrome/Safari */
 }
 
-.ProseMirror .block-tab-btn {
+:is(.ProseMirror, .public-prose) .block-tab-btn {
   display: flex;
   align-items: center;
   gap: 2px;
@@ -2567,13 +2662,16 @@ mark {
   transition: color 0.15s ease;
   position: relative;
 }
+.dark :is(.ProseMirror, .public-prose) .block-tab-btn {
+  color: rgba(255, 255, 255, 0.55);
+}
 
 /* Tab label (editable on double-click) */
-.ProseMirror .block-tab-label {
+:is(.ProseMirror, .public-prose) .block-tab-label {
   outline: none;
   cursor: inherit;
 }
-.ProseMirror .block-tab-label[contenteditable="true"] {
+:is(.ProseMirror, .public-prose) .block-tab-label[contenteditable="true"] {
   cursor: text;
   background: rgba(0, 0, 0, 0.05);
   border-radius: 2px;
@@ -2582,7 +2680,7 @@ mark {
 }
 
 /* Tab delete button */
-.ProseMirror .block-tab-delete {
+:is(.ProseMirror, .public-prose) .block-tab-delete {
   font-size: 0.7rem;
   line-height: 1;
   color: rgba(0, 0, 0, 0.25);
@@ -2593,24 +2691,30 @@ mark {
   opacity: 0;
   transition: opacity 0.15s ease, color 0.15s ease;
 }
-.ProseMirror .block-tab-btn:hover .block-tab-delete {
+:is(.ProseMirror, .public-prose) .block-tab-btn:hover .block-tab-delete {
   opacity: 1;
 }
-.ProseMirror .block-tab-delete:hover {
+:is(.ProseMirror, .public-prose) .block-tab-delete:hover {
   color: rgba(220, 38, 38, 0.7);
   background: rgba(220, 38, 38, 0.08);
 }
 
-.ProseMirror .block-tab-btn:hover {
+:is(.ProseMirror, .public-prose) .block-tab-btn:hover {
   color: rgba(0, 0, 0, 0.75);
 }
+.dark :is(.ProseMirror, .public-prose) .block-tab-btn:hover {
+  color: rgba(255, 255, 255, 0.85);
+}
 
-.ProseMirror .block-tab-active {
+:is(.ProseMirror, .public-prose) .block-tab-active {
   color: rgba(0, 0, 0, 0.9);
+}
+.dark :is(.ProseMirror, .public-prose) .block-tab-active {
+  color: rgba(255, 255, 255, 0.95);
 }
 
 /* Underline style (default) */
-.ProseMirror .block-tabs[data-tab-style="underline"] .block-tab-active::after {
+:is(.ProseMirror, .public-prose) .block-tabs[data-tab-style="underline"] .block-tab-active::after {
   content: '';
   position: absolute;
   bottom: -1px;
@@ -2622,26 +2726,26 @@ mark {
 }
 
 /* Pills style */
-.ProseMirror .block-tabs[data-tab-style="pills"] .block-tab-active {
+:is(.ProseMirror, .public-prose) .block-tabs[data-tab-style="pills"] .block-tab-active {
   background: rgba(59, 130, 246, 0.15);
   border-radius: 4px;
 }
 
 /* Boxed style */
-.ProseMirror .block-tabs[data-tab-style="boxed"] .block-tab-btn {
+:is(.ProseMirror, .public-prose) .block-tabs[data-tab-style="boxed"] .block-tab-btn {
   border: 1px solid transparent;
   border-bottom: none;
   margin-bottom: -1px;
 }
 
-.ProseMirror .block-tabs[data-tab-style="boxed"] .block-tab-active {
+:is(.ProseMirror, .public-prose) .block-tabs[data-tab-style="boxed"] .block-tab-active {
   border-color: rgba(0, 0, 0, 0.12);
   background: rgba(0, 0, 0, 0.03);
   border-radius: 4px 4px 0 0;
 }
 
 /* Add tab button */
-.ProseMirror .block-tab-add-btn {
+:is(.ProseMirror, .public-prose) .block-tab-add-btn {
   padding: 0.375rem 0.5rem;
   font-size: 0.85rem;
   background: none;
@@ -2652,7 +2756,7 @@ mark {
   line-height: 1;
 }
 
-.ProseMirror .block-tab-add-btn:hover {
+:is(.ProseMirror, .public-prose) .block-tab-add-btn:hover {
   color: rgba(59, 130, 246, 0.7);
 }
 
@@ -2702,12 +2806,12 @@ mark {
   color: var(--gold-primary);
 }
 
-.ProseMirror .block-tabs-content {
+:is(.ProseMirror, .public-prose) .block-tabs-content {
   min-height: 2rem;
   padding: 0.25rem;
 }
 
-.ProseMirror .block-tab-panel {
+:is(.ProseMirror, .public-prose) .block-tab-panel {
   min-height: 2rem;
 }
 
@@ -2715,16 +2819,16 @@ mark {
    Hidden panels are removed from layout entirely. A cursor-jump ProseMirror plugin
    prevents selection from landing inside hidden panels, so coordsAtPos() is never
    called on them. This eliminates all overlap/bleed issues. */
-.ProseMirror .block-tab-panel-hidden {
+:is(.ProseMirror, .public-prose) .block-tab-panel-hidden {
   display: none;
 }
 
-.ProseMirror .block-tab-panel-active {
+:is(.ProseMirror, .public-prose) .block-tab-panel-active {
   display: block;
 }
 
 /* No placeholder inside tab panels — cursor is sufficient */
-.ProseMirror .block-tab-panel > p.is-empty:first-child:last-child::before {
+:is(.ProseMirror, .public-prose) .block-tab-panel > p.is-empty:first-child:last-child::before {
   content: none !important;
 }
 
@@ -2986,6 +3090,264 @@ mark {
   padding: 0.25rem 0;
 }
 
+/* ─── Public theme toggle (visitor-facing) ────────────────────────────────
+   A small floating control that lets visitors cycle the publisher's
+   theme (light → system → dark). Reads + writes localStorage's
+   notes:settings key so the choice persists across page loads. */
+
+.public-theme-toggle {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  z-index: 30;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.75rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+  font-family: inherit;
+  border-radius: 9999px;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  background: rgba(255, 255, 255, 0.85);
+  color: rgba(0, 0, 0, 0.75);
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+.public-theme-toggle:hover {
+  background: rgba(255, 255, 255, 0.95);
+  color: rgba(0, 0, 0, 0.9);
+}
+.dark .public-theme-toggle {
+  border-color: rgba(255, 255, 255, 0.15);
+  background: rgba(20, 20, 20, 0.7);
+  color: rgba(255, 255, 255, 0.75);
+}
+.dark .public-theme-toggle:hover {
+  background: rgba(30, 30, 30, 0.85);
+  color: rgba(255, 255, 255, 0.95);
+}
+.public-theme-toggle-label {
+  letter-spacing: 0.02em;
+}
+
+/* ─── Publisher visualization render (mermaid + excalidraw) ───────────────
+   Mermaid: <pre class="mermaid">{source}</pre> is injected by
+   TipTapContent.postProcessDom Pass 6; MermaidHydrate (client) replaces
+   it with an inline SVG on visitor's browser. These rules style the
+   source-display before hydration AND the unrendered fallback.
+   Excalidraw: cached SVG injected inline when populated by editor save
+   flow; placeholder shown otherwise. */
+
+.public-prose .block-mermaid {
+  margin: 1rem 0;
+}
+.public-prose .block-mermaid pre.mermaid {
+  background: rgba(0, 0, 0, 0.03);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+  padding: 1rem;
+  overflow-x: auto;
+  font-family: monospace;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: rgba(0, 0, 0, 0.75);
+  text-align: center;
+}
+.dark .public-prose .block-mermaid pre.mermaid {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.85);
+}
+.public-prose .block-mermaid pre.mermaid[data-processed="true"] {
+  background: transparent;
+  border: none;
+  padding: 0;
+}
+.public-prose .block-mermaid-empty {
+  min-height: 2.5rem;
+  border: 1px dashed rgba(0, 0, 0, 0.15);
+  border-radius: 8px;
+  padding: 1rem;
+  color: rgba(0, 0, 0, 0.4);
+  font-size: 0.85rem;
+  font-style: italic;
+  text-align: center;
+}
+.public-prose .block-mermaid-empty::before {
+  content: "Mermaid diagram — source not available";
+}
+.dark .public-prose .block-mermaid-empty {
+  border-color: rgba(255, 255, 255, 0.15);
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.public-prose .block-excalidraw {
+  margin: 1rem 0;
+}
+.public-prose .block-excalidraw-rendered svg {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 0 auto;
+}
+.public-prose .block-excalidraw-placeholder-inner {
+  min-height: 4rem;
+  border: 1px dashed rgba(0, 0, 0, 0.15);
+  border-radius: 8px;
+  padding: 1.25rem;
+  color: rgba(0, 0, 0, 0.5);
+  font-size: 0.9rem;
+  font-style: italic;
+  text-align: center;
+}
+.dark .public-prose .block-excalidraw-placeholder-inner {
+  border-color: rgba(255, 255, 255, 0.15);
+  color: rgba(255, 255, 255, 0.45);
+}
+
+/* ─── Publisher form-input rendering ─────────────────────────────────────
+   Form-input blocks (text/date/number/rating/select/checkbox/prompt) emit
+   functional pre-filled controls on the publisher (.block-form-rendered)
+   when their value is set. These rules style that publisher render with
+   parity for the editor, so authors see a faithful preview.
+   See feat(blocks): editor-only form inputs render on publisher (3834670). */
+
+:is(.ProseMirror, .public-prose) .block-form-rendered {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin: 0.75rem 0;
+  align-items: stretch;
+}
+
+:is(.ProseMirror, .public-prose) .block-form-label {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: rgba(0, 0, 0, 0.82);
+  line-height: 1.4;
+}
+.dark :is(.ProseMirror, .public-prose) .block-form-label {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+:is(.ProseMirror, .public-prose) .block-form-control {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.9);
+  color: rgba(0, 0, 0, 0.85);
+  font-size: 0.9rem;
+  font-family: inherit;
+  line-height: 1.4;
+  width: 100%;
+  max-width: 360px;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+:is(.ProseMirror, .public-prose) .block-form-control:focus {
+  outline: none;
+  border-color: rgba(59, 130, 246, 0.6);
+  background: #fff;
+}
+.dark :is(.ProseMirror, .public-prose) .block-form-control {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.15);
+  color: rgba(255, 255, 255, 0.92);
+}
+.dark :is(.ProseMirror, .public-prose) .block-form-control:focus {
+  border-color: rgba(96, 165, 250, 0.7);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+:is(.ProseMirror, .public-prose) textarea.block-form-control {
+  min-height: 4.5em;
+  resize: vertical;
+}
+
+:is(.ProseMirror, .public-prose) .block-number-input.block-form-rendered {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+:is(.ProseMirror, .public-prose) .block-number-input .block-form-label {
+  flex: 0 0 auto;
+}
+:is(.ProseMirror, .public-prose) .block-number-input .block-form-control {
+  max-width: 8rem;
+}
+:is(.ProseMirror, .public-prose) .block-form-unit {
+  font-size: 0.85rem;
+  color: rgba(0, 0, 0, 0.55);
+}
+.dark :is(.ProseMirror, .public-prose) .block-form-unit {
+  color: rgba(255, 255, 255, 0.55);
+}
+
+:is(.ProseMirror, .public-prose) .block-rating-input.block-form-rendered {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.6rem;
+}
+:is(.ProseMirror, .public-prose) .block-rating-display {
+  font-size: 1.1rem;
+  letter-spacing: 0.1em;
+  color: rgba(245, 158, 11, 0.95);
+}
+.dark :is(.ProseMirror, .public-prose) .block-rating-display {
+  color: rgba(251, 191, 36, 0.95);
+}
+
+:is(.ProseMirror, .public-prose) .block-checkbox-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+:is(.ProseMirror, .public-prose) .block-form-checkbox-item,
+:is(.ProseMirror, .public-prose) .block-form-checkbox-single {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+:is(.ProseMirror, .public-prose) .block-form-checkbox-item input[type="checkbox"],
+:is(.ProseMirror, .public-prose) .block-form-checkbox-single input[type="checkbox"] {
+  width: 1rem;
+  height: 1rem;
+  accent-color: var(--intent-primary, #3b82f6);
+  cursor: pointer;
+}
+
+:is(.ProseMirror, .public-prose) .block-prompt-input.block-form-rendered {
+  gap: 0.6rem;
+  max-width: 720px;
+}
+:is(.ProseMirror, .public-prose) .block-prompt-input-prompt {
+  font-size: 0.85rem;
+  color: rgba(0, 0, 0, 0.6);
+  font-style: italic;
+  padding-left: 0.75rem;
+  border-left: 3px solid rgba(0, 0, 0, 0.15);
+}
+.dark :is(.ProseMirror, .public-prose) .block-prompt-input-prompt {
+  color: rgba(255, 255, 255, 0.6);
+  border-left-color: rgba(255, 255, 255, 0.18);
+}
+:is(.ProseMirror, .public-prose) .block-prompt-input-response {
+  font-size: 0.95rem;
+  color: rgba(0, 0, 0, 0.85);
+  line-height: 1.55;
+  padding: 0.6rem 0.85rem;
+  background: rgba(0, 0, 0, 0.03);
+  border-radius: 6px;
+}
+.dark :is(.ProseMirror, .public-prose) .block-prompt-input-response {
+  color: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.05);
+}
+
 /* ─── Date Input format row ─── */
 
 .ProseMirror .input-block-date-row {
@@ -3045,7 +3407,7 @@ mark {
 /* ─── Habit Tracker Block ─── */
 
 .ProseMirror .block-habitTracker,
-.ProseMirror .block-habit-tracker {
+:is(.ProseMirror, .public-prose) .block-habit-tracker {
   width: 100%;
   min-width: 0;
   max-width: 100%;
@@ -3053,7 +3415,7 @@ mark {
   overflow: hidden;
 }
 
-.ProseMirror .habit-tracker-content {
+:is(.ProseMirror, .public-prose) .habit-tracker-content {
   --habit-cell-size: clamp(1.45rem, 1.7vw, 1.8rem);
   --habit-cell-height: clamp(1.45rem, 1.7vw, 1.8rem);
   --habit-habit-col-width: clamp(14rem, 17vw, 18rem);
@@ -3067,17 +3429,17 @@ mark {
   min-width: 0;
 }
 
-.ProseMirror .habit-tracker-content[data-preset="monthly-grid"] {
+:is(.ProseMirror, .public-prose) .habit-tracker-content[data-preset="monthly-grid"] {
   --habit-cell-size: clamp(1.35rem, 1.55vw, 1.65rem);
   --habit-cell-height: clamp(1.35rem, 1.55vw, 1.65rem);
 }
 
-.ProseMirror .habit-tracker-content[data-preset="weekly-grid"] {
+:is(.ProseMirror, .public-prose) .habit-tracker-content[data-preset="weekly-grid"] {
   --habit-cell-size: clamp(1.6rem, 1.9vw, 2rem);
   --habit-cell-height: clamp(1.6rem, 1.9vw, 2rem);
 }
 
-.ProseMirror .habit-tracker-content[data-background="visible"] {
+:is(.ProseMirror, .public-prose) .habit-tracker-content[data-background="visible"] {
   border-radius: 16px;
   padding: 0.9rem;
   background:
@@ -3085,24 +3447,24 @@ mark {
     rgba(15, 23, 42, 0.03);
 }
 
-.ProseMirror .habit-tracker-header {
+:is(.ProseMirror, .public-prose) .habit-tracker-header {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 1rem;
 }
 
-.ProseMirror .habit-tracker-title-wrap {
+:is(.ProseMirror, .public-prose) .habit-tracker-title-wrap {
   min-width: 0;
 }
 
-.ProseMirror .habit-tracker-title {
+:is(.ProseMirror, .public-prose) .habit-tracker-title {
   font-size: 1rem;
   font-weight: 700;
   color: var(--text-primary, #1f2937);
 }
 
-.ProseMirror .habit-tracker-subtitle {
+:is(.ProseMirror, .public-prose) .habit-tracker-subtitle {
   margin-top: 0.2rem;
   font-size: 0.72rem;
   font-weight: 700;
@@ -3111,14 +3473,14 @@ mark {
   color: var(--text-secondary, #64748b);
 }
 
-.ProseMirror .habit-tracker-period-label {
+:is(.ProseMirror, .public-prose) .habit-tracker-period-label {
   margin-top: 0.18rem;
   font-size: 1.05rem;
   font-weight: 800;
   color: var(--text-primary);
 }
 
-.ProseMirror .habit-tracker-header-actions {
+:is(.ProseMirror, .public-prose) .habit-tracker-header-actions {
   display: flex;
   align-items: center;
   gap: 0.4rem;
@@ -3126,9 +3488,9 @@ mark {
   justify-content: flex-end;
 }
 
-.ProseMirror .habit-tracker-nav-btn,
-.ProseMirror .habit-tracker-settings-btn,
-.ProseMirror .habit-tracker-empty-btn {
+:is(.ProseMirror, .public-prose) .habit-tracker-nav-btn,
+:is(.ProseMirror, .public-prose) .habit-tracker-settings-btn,
+:is(.ProseMirror, .public-prose) .habit-tracker-empty-btn {
   border: 1px solid var(--border-secondary, rgba(0, 0, 0, 0.12));
   border-radius: 9999px;
   background: rgba(255, 255, 255, 0.58);
@@ -3139,25 +3501,25 @@ mark {
   transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
 }
 
-.ProseMirror .habit-tracker-nav-btn,
-.ProseMirror .habit-tracker-settings-btn {
+:is(.ProseMirror, .public-prose) .habit-tracker-nav-btn,
+:is(.ProseMirror, .public-prose) .habit-tracker-settings-btn {
   min-height: 2rem;
   padding: 0.35rem 0.7rem;
 }
 
-.ProseMirror .habit-tracker-empty-btn {
+:is(.ProseMirror, .public-prose) .habit-tracker-empty-btn {
   padding: 0.55rem 0.9rem;
 }
 
-.ProseMirror .habit-tracker-nav-btn:hover,
-.ProseMirror .habit-tracker-settings-btn:hover,
-.ProseMirror .habit-tracker-empty-btn:hover {
+:is(.ProseMirror, .public-prose) .habit-tracker-nav-btn:hover,
+:is(.ProseMirror, .public-prose) .habit-tracker-settings-btn:hover,
+:is(.ProseMirror, .public-prose) .habit-tracker-empty-btn:hover {
   background: rgba(255, 255, 255, 0.82);
   border-color: rgba(59, 130, 246, 0.28);
   transform: translateY(-1px);
 }
 
-.ProseMirror .habit-tracker-empty {
+:is(.ProseMirror, .public-prose) .habit-tracker-empty {
   display: flex;
   flex-direction: column;
   gap: 0.55rem;
@@ -3168,45 +3530,45 @@ mark {
   background: rgba(255, 255, 255, 0.4);
 }
 
-.ProseMirror .habit-tracker-empty-title {
+:is(.ProseMirror, .public-prose) .habit-tracker-empty-title {
   font-weight: 700;
   color: var(--text-primary, #1f2937);
 }
 
-.ProseMirror .habit-tracker-empty-copy {
+:is(.ProseMirror, .public-prose) .habit-tracker-empty-copy {
   margin: 0;
   font-size: 0.9rem;
   color: var(--text-secondary, #6b7280);
 }
 
-.ProseMirror .habit-tracker-grid-scroll {
+:is(.ProseMirror, .public-prose) .habit-tracker-grid-scroll {
   overflow-x: auto;
   overflow-y: hidden;
   padding-bottom: 0.1rem;
   max-width: 100%;
 }
 
-.ProseMirror .habit-tracker-stats-wrap {
+:is(.ProseMirror, .public-prose) .habit-tracker-stats-wrap {
   overflow-x: auto;
   overflow-y: hidden;
   max-width: 100%;
   margin-bottom: 0.15rem;
 }
 
-.ProseMirror .habit-tracker-stats-table {
+:is(.ProseMirror, .public-prose) .habit-tracker-stats-table {
   width: 100%;
   min-width: 32rem;
   border-collapse: separate;
   border-spacing: 0;
 }
 
-.ProseMirror .habit-tracker-stats-table th,
-.ProseMirror .habit-tracker-stats-table td {
+:is(.ProseMirror, .public-prose) .habit-tracker-stats-table th,
+:is(.ProseMirror, .public-prose) .habit-tracker-stats-table td {
   padding: 0.3rem 0.45rem;
   text-align: left;
 }
 
-.ProseMirror .habit-tracker-stats-header {
+:is(.ProseMirror, .public-prose) .habit-tracker-stats-header {
   font-size: 0.68rem;
   font-weight: 700;
   letter-spacing: 0.04em;
@@ -3215,36 +3577,36 @@ mark {
   white-space: nowrap;
 }
 
-.ProseMirror .habit-tracker-stats-row th,
-.ProseMirror .habit-tracker-stats-row td {
+:is(.ProseMirror, .public-prose) .habit-tracker-stats-row th,
+:is(.ProseMirror, .public-prose) .habit-tracker-stats-row td {
   border-top: 1px solid rgba(148, 163, 184, 0.14);
 }
 
-.ProseMirror .habit-tracker-stats-habit {
+:is(.ProseMirror, .public-prose) .habit-tracker-stats-habit {
   min-width: var(--habit-habit-col-width);
   width: var(--habit-habit-col-width);
 }
 
-.ProseMirror .habit-tracker-stats-value {
+:is(.ProseMirror, .public-prose) .habit-tracker-stats-value {
   font-size: 0.78rem;
   font-weight: 600;
   color: var(--text-secondary);
   white-space: nowrap;
 }
 
-.ProseMirror .habit-tracker-grid {
+:is(.ProseMirror, .public-prose) .habit-tracker-grid {
   width: max-content;
   min-width: 100%;
   border-collapse: separate;
   border-spacing: 0;
 }
 
-.ProseMirror .habit-tracker-grid th,
-.ProseMirror .habit-tracker-grid td {
+:is(.ProseMirror, .public-prose) .habit-tracker-grid th,
+:is(.ProseMirror, .public-prose) .habit-tracker-grid td {
   padding: 0.18rem;
 }
 
-.ProseMirror .habit-tracker-grid-header {
+:is(.ProseMirror, .public-prose) .habit-tracker-grid-header {
   position: sticky;
   top: 0;
   z-index: 1;
@@ -3259,7 +3621,7 @@ mark {
   width: var(--habit-cell-size);
 }
 
-.ProseMirror .habit-tracker-grid-header-habit {
+:is(.ProseMirror, .public-prose) .habit-tracker-grid-header-habit {
   position: sticky;
   left: 0;
   z-index: 3;
@@ -3269,7 +3631,7 @@ mark {
   background: rgba(241, 245, 249, 0.98);
 }
 
-.ProseMirror .habit-tracker-grid-header-interval {
+:is(.ProseMirror, .public-prose) .habit-tracker-grid-header-interval {
   position: sticky;
   left: var(--habit-habit-col-width);
   z-index: 2;
@@ -3278,29 +3640,29 @@ mark {
   padding-inline: 0.2rem;
 }
 
-.ProseMirror .habit-tracker-time-header-icon {
+:is(.ProseMirror, .public-prose) .habit-tracker-time-header-icon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
 }
 
-.ProseMirror .habit-tracker-time-header-icon svg,
-.ProseMirror .habit-tracker-time-header-icon-svg {
+:is(.ProseMirror, .public-prose) .habit-tracker-time-header-icon svg,
+:is(.ProseMirror, .public-prose) .habit-tracker-time-header-icon-svg {
   width: 0.82rem;
   height: 0.82rem;
   stroke: currentColor;
 }
 
-.ProseMirror .habit-tracker-grid-weekday,
-.ProseMirror .habit-tracker-grid-day {
+:is(.ProseMirror, .public-prose) .habit-tracker-grid-weekday,
+:is(.ProseMirror, .public-prose) .habit-tracker-grid-day {
   display: block;
 }
 
-.ProseMirror .habit-tracker-grid-day {
+:is(.ProseMirror, .public-prose) .habit-tracker-grid-day {
   color: var(--text-primary, #334155);
 }
 
-.ProseMirror .habit-tracker-habit-cell {
+:is(.ProseMirror, .public-prose) .habit-tracker-habit-cell {
   position: sticky;
   left: 0;
   z-index: 2;
@@ -3312,7 +3674,7 @@ mark {
   vertical-align: top;
 }
 
-.ProseMirror .habit-tracker-interval-cell {
+:is(.ProseMirror, .public-prose) .habit-tracker-interval-cell {
   position: sticky;
   left: var(--habit-habit-col-width);
   z-index: 1;
@@ -3328,7 +3690,7 @@ mark {
   vertical-align: middle;
 }
 
-.ProseMirror .habit-tracker-habit-chip {
+:is(.ProseMirror, .public-prose) .habit-tracker-habit-chip {
   display: flex;
   align-items: center;
   gap: 0.7rem;
@@ -3336,7 +3698,7 @@ mark {
   padding-right: 0.45rem;
 }
 
-.ProseMirror .habit-tracker-habit-icon {
+:is(.ProseMirror, .public-prose) .habit-tracker-habit-icon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -3348,21 +3710,21 @@ mark {
   flex-shrink: 0;
 }
 
-.ProseMirror .habit-tracker-habit-icon svg,
-.ProseMirror .habit-tracker-icon-svg {
+:is(.ProseMirror, .public-prose) .habit-tracker-habit-icon svg,
+:is(.ProseMirror, .public-prose) .habit-tracker-icon-svg {
   width: 1rem;
   height: 1rem;
   stroke: currentColor;
 }
 
-.ProseMirror .habit-tracker-habit-text {
+:is(.ProseMirror, .public-prose) .habit-tracker-habit-text {
   min-width: 0;
   padding-top: 0;
   white-space: nowrap;
   overflow: hidden;
 }
 
-.ProseMirror .habit-tracker-habit-name {
+:is(.ProseMirror, .public-prose) .habit-tracker-habit-name {
   display: block;
   font-size: 0.98rem;
   line-height: 1.3;
@@ -3373,21 +3735,21 @@ mark {
   text-overflow: ellipsis;
 }
 
-.ProseMirror .habit-tracker-habit-target {
+:is(.ProseMirror, .public-prose) .habit-tracker-habit-target {
   display: block;
   margin-top: 0.2rem;
   font-size: 0.72rem;
   color: var(--text-secondary, #64748b);
 }
 
-.ProseMirror .habit-tracker-grid-cell {
+:is(.ProseMirror, .public-prose) .habit-tracker-grid-cell {
   text-align: center;
   min-width: var(--habit-cell-size);
   width: var(--habit-cell-size);
   vertical-align: middle;
 }
 
-.ProseMirror .habit-tracker-cell {
+:is(.ProseMirror, .public-prose) .habit-tracker-cell {
   width: var(--habit-cell-size);
   min-width: var(--habit-cell-size);
   min-height: var(--habit-cell-height);
@@ -3404,47 +3766,47 @@ mark {
   transition: transform 0.12s ease, border-color 0.12s ease, background 0.12s ease;
 }
 
-.ProseMirror .habit-tracker-cell svg,
-.ProseMirror .habit-tracker-cell-icon {
+:is(.ProseMirror, .public-prose) .habit-tracker-cell svg,
+:is(.ProseMirror, .public-prose) .habit-tracker-cell-icon {
   width: clamp(0.7rem, 0.78vw, 0.88rem);
   height: clamp(0.7rem, 0.78vw, 0.88rem);
   stroke: currentColor;
   stroke-width: 2.1;
 }
 
-.ProseMirror .habit-tracker-cell:hover {
+:is(.ProseMirror, .public-prose) .habit-tracker-cell:hover {
   transform: translateY(-1px);
   border-color: rgba(59, 130, 246, 0.35);
 }
 
-.ProseMirror .habit-tracker-cell[data-complete="true"] {
+:is(.ProseMirror, .public-prose) .habit-tracker-cell[data-complete="true"] {
   border-color: rgba(34, 197, 94, 0.32);
   background: rgba(34, 197, 94, 0.16);
 }
 
-.ProseMirror .habit-tracker-cell[data-status="missed"] {
+:is(.ProseMirror, .public-prose) .habit-tracker-cell[data-status="missed"] {
   border-color: rgba(239, 68, 68, 0.26);
   background: rgba(239, 68, 68, 0.12);
   color: #b91c1c;
 }
 
-.ProseMirror .habit-tracker-cell[data-status="thinking"] {
+:is(.ProseMirror, .public-prose) .habit-tracker-cell[data-status="thinking"] {
   border-color: rgba(59, 130, 246, 0.24);
   background: rgba(59, 130, 246, 0.1);
   color: #1d4ed8;
 }
 
-.ProseMirror .habit-tracker-cell-count {
+:is(.ProseMirror, .public-prose) .habit-tracker-cell-count {
   padding: 0.12rem;
 }
 
-.ProseMirror .habit-tracker-count-stepper {
+:is(.ProseMirror, .public-prose) .habit-tracker-count-stepper {
   display: inline-flex;
   align-items: center;
   gap: 0.1rem;
 }
 
-.ProseMirror .habit-tracker-stepper-btn {
+:is(.ProseMirror, .public-prose) .habit-tracker-stepper-btn {
   width: clamp(0.82rem, 0.95vw, 1.05rem);
   height: clamp(0.82rem, 0.95vw, 1.05rem);
   display: inline-flex;
@@ -3459,32 +3821,32 @@ mark {
   line-height: 1;
 }
 
-.ProseMirror .habit-tracker-stepper-btn:hover {
+:is(.ProseMirror, .public-prose) .habit-tracker-stepper-btn:hover {
   background: rgba(15, 23, 42, 0.14);
 }
 
-.ProseMirror .habit-tracker-count-value {
+:is(.ProseMirror, .public-prose) .habit-tracker-count-value {
   min-width: 0.8rem;
   font-size: clamp(0.58rem, 0.62vw, 0.72rem);
   font-weight: 700;
   text-align: center;
 }
 
-.ProseMirror .habit-tracker-grid-row-split .habit-tracker-grid-cell,
-.ProseMirror .habit-tracker-grid-row-split .habit-tracker-interval-cell {
+:is(.ProseMirror, .public-prose) .habit-tracker-grid-row-split .habit-tracker-grid-cell,
+:is(.ProseMirror, .public-prose) .habit-tracker-grid-row-split .habit-tracker-interval-cell {
   padding-top: 0.08rem;
   padding-bottom: 0.08rem;
 }
 
-.ProseMirror .habit-tracker-stat-badges,
-.ProseMirror .habit-tracker-card-top {
+:is(.ProseMirror, .public-prose) .habit-tracker-stat-badges,
+:is(.ProseMirror, .public-prose) .habit-tracker-card-top {
   display: flex;
   flex-wrap: nowrap;
   gap: 0.35rem;
   align-items: center;
 }
 
-.ProseMirror .habit-tracker-stat {
+:is(.ProseMirror, .public-prose) .habit-tracker-stat {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -3497,27 +3859,27 @@ mark {
   font-weight: 600;
 }
 
-.ProseMirror .habit-tracker-cards {
+:is(.ProseMirror, .public-prose) .habit-tracker-cards {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 0.8rem;
 }
 
-.ProseMirror .habit-tracker-card {
+:is(.ProseMirror, .public-prose) .habit-tracker-card {
   border: 1px solid rgba(148, 163, 184, 0.14);
   border-radius: 16px;
   padding: 0.85rem;
   background: rgba(255, 255, 255, 0.62);
 }
 
-.ProseMirror .habit-tracker-card-top {
+:is(.ProseMirror, .public-prose) .habit-tracker-card-top {
   justify-content: space-between;
   align-items: flex-start;
   gap: 0.7rem;
   margin-bottom: 0.75rem;
 }
 
-.ProseMirror .habit-tracker-card-identity {
+:is(.ProseMirror, .public-prose) .habit-tracker-card-identity {
   display: flex;
   align-items: center;
   gap: 0.7rem;
@@ -3525,7 +3887,7 @@ mark {
   flex: 1 1 auto;
 }
 
-.ProseMirror .habit-tracker-stat-badges {
+:is(.ProseMirror, .public-prose) .habit-tracker-stat-badges {
   min-width: 0;
   flex: 0 1 auto;
   overflow-x: auto;
@@ -3533,17 +3895,17 @@ mark {
   scrollbar-width: none;
 }
 
-.ProseMirror .habit-tracker-stat-badges::-webkit-scrollbar {
+:is(.ProseMirror, .public-prose) .habit-tracker-stat-badges::-webkit-scrollbar {
   display: none;
 }
 
-.ProseMirror .habit-tracker-card-strip {
+:is(.ProseMirror, .public-prose) .habit-tracker-card-strip {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: 0.35rem;
 }
 
-.ProseMirror .habit-tracker-card-day {
+:is(.ProseMirror, .public-prose) .habit-tracker-card-day {
   display: flex;
   flex-direction: column;
   gap: 0.1rem;
@@ -3555,17 +3917,17 @@ mark {
   background: rgba(255, 255, 255, 0.68);
 }
 
-.ProseMirror .habit-tracker-card-day[data-complete="true"] {
+:is(.ProseMirror, .public-prose) .habit-tracker-card-day[data-complete="true"] {
   border-color: rgba(34, 197, 94, 0.32);
   background: rgba(34, 197, 94, 0.14);
 }
 
-.ProseMirror .habit-tracker-card-day-label {
+:is(.ProseMirror, .public-prose) .habit-tracker-card-day-label {
   font-size: 0.65rem;
   color: var(--text-secondary, #64748b);
 }
 
-.ProseMirror .habit-tracker-card-day-value {
+:is(.ProseMirror, .public-prose) .habit-tracker-card-day-value {
   font-size: 0.78rem;
   font-weight: 700;
   color: var(--text-primary, #0f172a);
@@ -3573,13 +3935,13 @@ mark {
 
 /* ─── Stopwatch Block ─── */
 
-.ProseMirror .block-stopwatch {
+:is(.ProseMirror, .public-prose) .block-stopwatch {
   width: 100%;
   min-width: 0;
   max-width: 100%;
 }
 
-.ProseMirror .stopwatch-content {
+:is(.ProseMirror, .public-prose) .stopwatch-content {
   --stopwatch-accent: #ff6b57;
   display: flex;
   flex-direction: column;
@@ -3589,7 +3951,7 @@ mark {
   padding: 0.2rem 0;
 }
 
-.ProseMirror .stopwatch-content[data-background="visible"] {
+:is(.ProseMirror, .public-prose) .stopwatch-content[data-background="visible"] {
   border-radius: 18px;
   padding: 1rem;
   background:
@@ -3597,24 +3959,24 @@ mark {
     rgba(15, 23, 42, 0.03);
 }
 
-.ProseMirror .stopwatch-header {
+:is(.ProseMirror, .public-prose) .stopwatch-header {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 1rem;
 }
 
-.ProseMirror .stopwatch-title-wrap {
+:is(.ProseMirror, .public-prose) .stopwatch-title-wrap {
   min-width: 0;
 }
 
-.ProseMirror .stopwatch-title {
+:is(.ProseMirror, .public-prose) .stopwatch-title {
   font-size: 0.95rem;
   font-weight: 700;
   color: var(--text-primary);
 }
 
-.ProseMirror .stopwatch-status {
+:is(.ProseMirror, .public-prose) .stopwatch-status {
   margin-top: 0.12rem;
   font-size: 0.72rem;
   font-weight: 700;
@@ -3623,7 +3985,7 @@ mark {
   color: var(--text-secondary);
 }
 
-.ProseMirror .stopwatch-edit-btn {
+:is(.ProseMirror, .public-prose) .stopwatch-edit-btn {
   min-height: 2rem;
   padding: 0.35rem 0.8rem;
   border: 1px solid rgba(148, 163, 184, 0.25);
@@ -3635,7 +3997,7 @@ mark {
   cursor: pointer;
 }
 
-.ProseMirror .stopwatch-display {
+:is(.ProseMirror, .public-prose) .stopwatch-display {
   display: flex;
   flex-wrap: nowrap;
   align-items: flex-end;
@@ -3645,11 +4007,11 @@ mark {
   scrollbar-width: none;
 }
 
-.ProseMirror .stopwatch-display::-webkit-scrollbar {
+:is(.ProseMirror, .public-prose) .stopwatch-display::-webkit-scrollbar {
   display: none;
 }
 
-.ProseMirror .stopwatch-segment {
+:is(.ProseMirror, .public-prose) .stopwatch-segment {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
@@ -3657,7 +4019,7 @@ mark {
   flex-shrink: 0;
 }
 
-.ProseMirror .stopwatch-separator {
+:is(.ProseMirror, .public-prose) .stopwatch-separator {
   align-self: center;
   font-variant-numeric: tabular-nums;
   color: var(--text-primary);
@@ -3668,49 +4030,49 @@ mark {
   transform: translateY(var(--stopwatch-separator-offset, -0.28em));
 }
 
-.ProseMirror .stopwatch-segment-value {
+:is(.ProseMirror, .public-prose) .stopwatch-segment-value {
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.04em;
   color: var(--text-primary);
 }
 
-.ProseMirror .stopwatch-content[data-variant="ios"] .stopwatch-segment-value {
+:is(.ProseMirror, .public-prose) .stopwatch-content[data-variant="ios"] .stopwatch-segment-value {
   font-size: clamp(2.4rem, 5vw, 4.4rem);
   font-weight: 300;
   line-height: 0.95;
 }
 
-.ProseMirror .stopwatch-content[data-variant="ios"] .stopwatch-separator {
+:is(.ProseMirror, .public-prose) .stopwatch-content[data-variant="ios"] .stopwatch-separator {
   font-size: clamp(2.2rem, 4.5vw, 4rem);
   font-weight: 300;
   --stopwatch-separator-offset: -0.3em;
 }
 
-.ProseMirror .stopwatch-content[data-variant="minimal"] .stopwatch-segment-value {
+:is(.ProseMirror, .public-prose) .stopwatch-content[data-variant="minimal"] .stopwatch-segment-value {
   font-size: clamp(2rem, 4vw, 3.4rem);
   font-weight: 600;
   line-height: 1;
 }
 
-.ProseMirror .stopwatch-content[data-variant="minimal"] .stopwatch-separator {
+:is(.ProseMirror, .public-prose) .stopwatch-content[data-variant="minimal"] .stopwatch-separator {
   font-size: clamp(1.85rem, 3.6vw, 3rem);
   font-weight: 600;
   --stopwatch-separator-offset: -0.24em;
 }
 
-.ProseMirror .stopwatch-content[data-variant="panel"] .stopwatch-segment-value {
+:is(.ProseMirror, .public-prose) .stopwatch-content[data-variant="panel"] .stopwatch-segment-value {
   font-size: clamp(1.9rem, 3.4vw, 3rem);
   font-weight: 700;
   line-height: 1;
 }
 
-.ProseMirror .stopwatch-content[data-variant="panel"] .stopwatch-separator {
+:is(.ProseMirror, .public-prose) .stopwatch-content[data-variant="panel"] .stopwatch-separator {
   font-size: clamp(1.7rem, 3vw, 2.7rem);
   font-weight: 700;
   --stopwatch-separator-offset: -0.22em;
 }
 
-.ProseMirror .stopwatch-segment-label {
+:is(.ProseMirror, .public-prose) .stopwatch-segment-label {
   font-size: 0.62rem;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -3718,19 +4080,19 @@ mark {
   color: var(--text-secondary);
 }
 
-.ProseMirror .stopwatch-meta {
+:is(.ProseMirror, .public-prose) .stopwatch-meta {
   font-size: 0.76rem;
   color: var(--text-secondary);
 }
 
-.ProseMirror .stopwatch-controls {
+:is(.ProseMirror, .public-prose) .stopwatch-controls {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
 }
 
-.ProseMirror .stopwatch-control {
+:is(.ProseMirror, .public-prose) .stopwatch-control {
   min-width: 6.25rem;
   min-height: 2.9rem;
   padding: 0.4rem 1rem;
@@ -3742,47 +4104,47 @@ mark {
   transition: transform 0.12s ease, opacity 0.12s ease, background 0.12s ease;
 }
 
-.ProseMirror .stopwatch-control:hover:not(:disabled) {
+:is(.ProseMirror, .public-prose) .stopwatch-control:hover:not(:disabled) {
   transform: translateY(-1px);
 }
 
-.ProseMirror .stopwatch-control-secondary,
-.ProseMirror .stopwatch-control-ghost {
+:is(.ProseMirror, .public-prose) .stopwatch-control-secondary,
+:is(.ProseMirror, .public-prose) .stopwatch-control-ghost {
   background: rgba(15, 23, 42, 0.06);
   color: var(--text-secondary);
 }
 
-.ProseMirror .stopwatch-control-start {
+:is(.ProseMirror, .public-prose) .stopwatch-control-start {
   background: color-mix(in srgb, var(--stopwatch-accent) 18%, white);
   color: color-mix(in srgb, var(--stopwatch-accent) 78%, black);
   border-color: color-mix(in srgb, var(--stopwatch-accent) 26%, white);
 }
 
-.ProseMirror .stopwatch-control-stop {
+:is(.ProseMirror, .public-prose) .stopwatch-control-stop {
   background: color-mix(in srgb, var(--stopwatch-accent) 16%, white);
   color: color-mix(in srgb, var(--stopwatch-accent) 82%, black);
   border-color: color-mix(in srgb, var(--stopwatch-accent) 24%, white);
 }
 
-.ProseMirror .stopwatch-control:disabled {
+:is(.ProseMirror, .public-prose) .stopwatch-control:disabled {
   opacity: 0.35;
   cursor: default;
 }
 
-.ProseMirror .stopwatch-laps {
+:is(.ProseMirror, .public-prose) .stopwatch-laps {
   border-top: 1px solid rgba(148, 163, 184, 0.14);
   padding-top: 0.8rem;
 }
 
-.ProseMirror .stopwatch-laps-header,
-.ProseMirror .stopwatch-lap-row {
+:is(.ProseMirror, .public-prose) .stopwatch-laps-header,
+:is(.ProseMirror, .public-prose) .stopwatch-lap-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr);
   gap: 0.75rem;
   align-items: center;
 }
 
-.ProseMirror .stopwatch-laps-header {
+:is(.ProseMirror, .public-prose) .stopwatch-laps-header {
   margin-bottom: 0.45rem;
   font-size: 0.66rem;
   font-weight: 700;
@@ -3791,83 +4153,83 @@ mark {
   color: var(--text-secondary);
 }
 
-.ProseMirror .stopwatch-laps-list {
+:is(.ProseMirror, .public-prose) .stopwatch-laps-list {
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
 }
 
-.ProseMirror .stopwatch-lap-row {
+:is(.ProseMirror, .public-prose) .stopwatch-lap-row {
   padding: 0.45rem 0.2rem;
   border-top: 1px solid rgba(148, 163, 184, 0.12);
   font-variant-numeric: tabular-nums;
 }
 
-.ProseMirror .stopwatch-lap-index {
+:is(.ProseMirror, .public-prose) .stopwatch-lap-index {
   font-size: 0.8rem;
   font-weight: 600;
   color: var(--text-primary);
 }
 
-.ProseMirror .stopwatch-lap-value,
-.ProseMirror .stopwatch-lap-split {
+:is(.ProseMirror, .public-prose) .stopwatch-lap-value,
+:is(.ProseMirror, .public-prose) .stopwatch-lap-split {
   font-size: 0.8rem;
   font-weight: 600;
   color: var(--text-secondary);
   text-align: right;
 }
 
-.ProseMirror .stopwatch-laps-empty {
+:is(.ProseMirror, .public-prose) .stopwatch-laps-empty {
   font-size: 0.78rem;
   color: var(--text-secondary);
 }
 
-.ProseMirror .stopwatch-content[data-variant="minimal"] .stopwatch-laps,
-.ProseMirror .stopwatch-content[data-variant="minimal"] .stopwatch-controls {
+:is(.ProseMirror, .public-prose) .stopwatch-content[data-variant="minimal"] .stopwatch-laps,
+:is(.ProseMirror, .public-prose) .stopwatch-content[data-variant="minimal"] .stopwatch-controls {
   border-top-color: rgba(148, 163, 184, 0.1);
 }
 
-.ProseMirror .stopwatch-content[data-variant="panel"] {
+:is(.ProseMirror, .public-prose) .stopwatch-content[data-variant="panel"] {
   gap: 0.75rem;
 }
 
-.ProseMirror .stopwatch-content[data-variant="panel"][data-background="visible"] {
+:is(.ProseMirror, .public-prose) .stopwatch-content[data-variant="panel"][data-background="visible"] {
   background:
     linear-gradient(180deg, rgba(15, 23, 42, 0.04), rgba(15, 23, 42, 0.02)),
     rgba(248, 250, 252, 0.92);
 }
 
 @media (max-width: 768px) {
-  .ProseMirror .habit-tracker-header {
+  :is(.ProseMirror, .public-prose) .habit-tracker-header {
     flex-direction: column;
     align-items: stretch;
   }
 
-  .ProseMirror .habit-tracker-header-actions {
+  :is(.ProseMirror, .public-prose) .habit-tracker-header-actions {
     justify-content: flex-start;
   }
 
-  .ProseMirror .habit-tracker-grid {
+  :is(.ProseMirror, .public-prose) .habit-tracker-grid {
     min-width: 640px;
   }
 
   .ProseMirror .block-habitTracker,
-  .ProseMirror .block-habit-tracker {
+  :is(.ProseMirror, .public-prose) .block-habit-tracker {
     width: 100%;
     max-width: 100%;
   }
 
-  .ProseMirror .habit-tracker-card-strip {
+  :is(.ProseMirror, .public-prose) .habit-tracker-card-strip {
     grid-template-columns: repeat(7, minmax(0, 1fr));
   }
 
-  .ProseMirror .stopwatch-header,
-  .ProseMirror .stopwatch-controls {
+  :is(.ProseMirror, .public-prose) .stopwatch-header,
+  :is(.ProseMirror, .public-prose) .stopwatch-controls {
     flex-direction: column;
     align-items: stretch;
   }
 
-  .ProseMirror .stopwatch-control {
+  :is(.ProseMirror, .public-prose) .stopwatch-control {
     width: 100%;
   }
 }
@@ -3875,58 +4237,58 @@ mark {
 /* ─── Habit Tracker + Stopwatch — dark mode (slate parchment surfaces) ─── */
 
 /* Outer card background — replace white-on-slate gradient with subtle beige sheen on darker slate. */
-.dark .ProseMirror .habit-tracker-content[data-background="visible"],
-.dark .ProseMirror .stopwatch-content[data-background="visible"] {
+.dark :is(.ProseMirror, .public-prose) .habit-tracker-content[data-background="visible"],
+.dark :is(.ProseMirror, .public-prose) .stopwatch-content[data-background="visible"] {
   background:
     linear-gradient(180deg, rgba(229, 212, 176, 0.05), rgba(229, 212, 176, 0.02)),
     rgba(15, 25, 35, 0.4);
 }
 
 /* Pill buttons (nav, settings, empty-action, edit) — beige-tinted dark pill. */
-.dark .ProseMirror .habit-tracker-nav-btn,
-.dark .ProseMirror .habit-tracker-settings-btn,
-.dark .ProseMirror .habit-tracker-empty-btn,
-.dark .ProseMirror .stopwatch-edit-btn {
+.dark :is(.ProseMirror, .public-prose) .habit-tracker-nav-btn,
+.dark :is(.ProseMirror, .public-prose) .habit-tracker-settings-btn,
+.dark :is(.ProseMirror, .public-prose) .habit-tracker-empty-btn,
+.dark :is(.ProseMirror, .public-prose) .stopwatch-edit-btn {
   background: rgba(229, 212, 176, 0.06);
   border-color: rgba(229, 212, 176, 0.18);
 }
 
-.dark .ProseMirror .habit-tracker-nav-btn:hover,
-.dark .ProseMirror .habit-tracker-settings-btn:hover,
-.dark .ProseMirror .habit-tracker-empty-btn:hover {
+.dark :is(.ProseMirror, .public-prose) .habit-tracker-nav-btn:hover,
+.dark :is(.ProseMirror, .public-prose) .habit-tracker-settings-btn:hover,
+.dark :is(.ProseMirror, .public-prose) .habit-tracker-empty-btn:hover {
   background: rgba(229, 212, 176, 0.1);
   border-color: rgba(201, 168, 108, 0.45);
 }
 
 /* Empty-state dashed card. */
-.dark .ProseMirror .habit-tracker-empty {
+.dark :is(.ProseMirror, .public-prose) .habit-tracker-empty {
   background: rgba(15, 25, 35, 0.3);
 }
 
 /* Habit icon avatars — beige-tinted background. */
-.dark .ProseMirror .habit-tracker-habit-icon {
+.dark :is(.ProseMirror, .public-prose) .habit-tracker-habit-icon {
   background: rgba(229, 212, 176, 0.1);
 }
 
 /* Day cells (interval grid). */
-.dark .ProseMirror .habit-tracker-day-cell {
+.dark :is(.ProseMirror, .public-prose) .habit-tracker-day-cell {
   background: rgba(15, 25, 35, 0.45);
   border-color: rgba(229, 212, 176, 0.16);
 }
 
 /* Period toggle pill in header. */
-.dark .ProseMirror .habit-tracker-period-toggle {
+.dark :is(.ProseMirror, .public-prose) .habit-tracker-period-toggle {
   background: rgba(229, 212, 176, 0.06);
   border-color: rgba(229, 212, 176, 0.18);
 }
 
 /* Habit cards (monthly-grid preset). */
-.dark .ProseMirror .habit-tracker-card {
+.dark :is(.ProseMirror, .public-prose) .habit-tracker-card {
   background: rgba(15, 25, 35, 0.5);
   border-color: rgba(229, 212, 176, 0.14);
 }
 
-.dark .ProseMirror .habit-tracker-card-day {
+.dark :is(.ProseMirror, .public-prose) .habit-tracker-card-day {
   background: rgba(15, 25, 35, 0.4);
   border-color: rgba(229, 212, 176, 0.16);
 }
@@ -3934,30 +4296,30 @@ mark {
 /* ─── Block Columns (Sprint 47) ─── */
 
 /* Parent wrapper — mirrors .block-columns for data-columns / gap / col-border */
-.ProseMirror .block-block-columns {
+:is(.ProseMirror, .public-prose) .block-block-columns {
   position: relative;
 }
 
 /* The CSS Grid inside block columns reuses .block-columns-grid */
-.ProseMirror .block-block-columns[data-columns="2"] .block-columns-grid {
+:is(.ProseMirror, .public-prose) .block-block-columns[data-columns="2"] .block-columns-grid {
   --col-count: 2;
 }
 
-.ProseMirror .block-block-columns[data-columns="3"] .block-columns-grid {
+:is(.ProseMirror, .public-prose) .block-block-columns[data-columns="3"] .block-columns-grid {
   --col-count: 3;
 }
 
-.ProseMirror .block-block-columns[data-columns="4"] .block-columns-grid {
+:is(.ProseMirror, .public-prose) .block-block-columns[data-columns="4"] .block-columns-grid {
   --col-count: 4;
 }
 
-.ProseMirror .block-block-columns[data-gap="none"] .block-columns-grid { gap: 0; }
-.ProseMirror .block-block-columns[data-gap="small"] .block-columns-grid { gap: 0.5rem; }
-.ProseMirror .block-block-columns[data-gap="medium"] .block-columns-grid { gap: 1rem; }
-.ProseMirror .block-block-columns[data-gap="large"] .block-columns-grid { gap: 1.5rem; }
+:is(.ProseMirror, .public-prose) .block-block-columns[data-gap="none"] .block-columns-grid { gap: 0; }
+:is(.ProseMirror, .public-prose) .block-block-columns[data-gap="small"] .block-columns-grid { gap: 0.5rem; }
+:is(.ProseMirror, .public-prose) .block-block-columns[data-gap="medium"] .block-columns-grid { gap: 1rem; }
+:is(.ProseMirror, .public-prose) .block-block-columns[data-gap="large"] .block-columns-grid { gap: 1.5rem; }
 
 /* Column cell — block column counterpart to .block-column */
-.ProseMirror .block-column-cell {
+:is(.ProseMirror, .public-prose) .block-column-cell {
   min-height: 3rem;
   min-width: 0;
   border-radius: 6px;
@@ -3969,45 +4331,45 @@ mark {
   transition: border-color 0.15s ease;
 }
 
-.ProseMirror .block-block-columns[data-col-border="subtle"] .block-column-cell {
+:is(.ProseMirror, .public-prose) .block-block-columns[data-col-border="subtle"] .block-column-cell {
   border-color: rgba(0, 0, 0, 0.1);
   background: rgba(0, 0, 0, 0.015);
 }
-.ProseMirror .block-block-columns[data-col-border="subtle"] .block-column-cell:hover {
+:is(.ProseMirror, .public-prose) .block-block-columns[data-col-border="subtle"] .block-column-cell:hover {
   border-color: rgba(0, 0, 0, 0.18);
 }
 
-.ProseMirror .block-block-columns[data-col-border="solid"] .block-column-cell {
+:is(.ProseMirror, .public-prose) .block-block-columns[data-col-border="solid"] .block-column-cell {
   border-color: rgba(0, 0, 0, 0.2);
 }
-.ProseMirror .block-block-columns[data-col-border="solid"] .block-column-cell:hover {
+:is(.ProseMirror, .public-prose) .block-block-columns[data-col-border="solid"] .block-column-cell:hover {
   border-color: rgba(0, 0, 0, 0.3);
 }
 
-.ProseMirror .block-block-columns[data-col-border="dashed"] .block-column-cell {
+:is(.ProseMirror, .public-prose) .block-block-columns[data-col-border="dashed"] .block-column-cell {
   border-style: dashed;
   border-color: rgba(0, 0, 0, 0.15);
 }
-.ProseMirror .block-block-columns[data-col-border="dashed"] .block-column-cell:hover {
+:is(.ProseMirror, .public-prose) .block-block-columns[data-col-border="dashed"] .block-column-cell:hover {
   border-color: rgba(0, 0, 0, 0.25);
 }
 
-.ProseMirror .block-block-columns[data-col-border="none"] .block-column-cell {
+:is(.ProseMirror, .public-prose) .block-block-columns[data-col-border="none"] .block-column-cell {
   border-color: transparent;
   background: transparent;
 }
-.ProseMirror .block-block-columns[data-col-border="none"]:hover .block-column-cell {
+:is(.ProseMirror, .public-prose) .block-block-columns[data-col-border="none"]:hover .block-column-cell {
   border-color: rgba(0, 0, 0, 0.06);
   border-style: dashed;
 }
 
 /* ProseMirror content area inside a block column */
-.ProseMirror .block-column-cell-content {
+:is(.ProseMirror, .public-prose) .block-column-cell-content {
   flex: 1;
   min-height: 2rem;
 }
 
-.ProseMirror .block-column-cell-content > p.is-empty:first-child:last-child::before {
+:is(.ProseMirror, .public-prose) .block-column-cell-content > p.is-empty:first-child:last-child::before {
   content: "Drop a block or type /";
   color: rgba(0, 0, 0, 0.3);
   font-style: italic;
@@ -4015,7 +4377,7 @@ mark {
 }
 
 /* In-column "+" insert button — only shown when column is empty (data-empty="true") */
-.ProseMirror .block-column-insert-btn {
+:is(.ProseMirror, .public-prose) .block-column-insert-btn {
   position: absolute;
   top: 50%;
   left: 50%;
@@ -4039,14 +4401,17 @@ mark {
 }
 
 /* Only show the button when the column is empty */
-.ProseMirror .block-column-cell[data-empty="true"] .block-column-insert-btn {
+:is(.ProseMirror, .public-prose) .block-column-cell[data-empty="true"] .block-column-insert-btn {
   pointer-events: auto;
 }
 
-.ProseMirror .block-column-cell[data-empty="true"]:hover .block-column-insert-btn {
+:is(.ProseMirror, .public-prose) .block-column-cell[data-empty="true"]:hover .block-column-insert-btn {
   opacity: 1;
 }
 
+/* Editor-only affordance: ServerBlockColumn doesn't render the insert
+   button, so this rule is scoped to .ProseMirror only (and avoids
+   flagging the audit for a non-issue on the publisher). */
 .ProseMirror .block-column-insert-btn:hover {
   background: var(--intent-primary, #3b82f6);
   border-color: var(--intent-primary, #3b82f6);
@@ -4055,7 +4420,7 @@ mark {
 }
 
 /* Empty column: center vertically (flex, align center) */
-.ProseMirror .block-column-cell[data-empty="true"] {
+:is(.ProseMirror, .public-prose) .block-column-cell[data-empty="true"] {
   justify-content: center;
 }
 
@@ -4605,10 +4970,19 @@ mark {
 
 /* ─── Public Prose ───────────────────────────────────────── */
 
+/* Light-mode prose defaults; .dark overrides re-establish the dark-mode
+   tones the foundation was originally authored with. Pre-fix the entire
+   `.public-prose` root rule set was dark-mode-first, making any block
+   that relied on inherited text color invisible on light pages — layout
+   blocks (columns, tabs, accordion, card-panel, section-header) showed
+   as 100% blank in light mode for this reason. */
 .public-prose {
-  color: rgba(255, 255, 255, 0.82);
+  color: rgba(0, 0, 0, 0.82);
   line-height: 1.75;
   font-size: 1rem;
+}
+.dark .public-prose {
+  color: rgba(255, 255, 255, 0.82);
 }
 .public-prose--lg {
   font-size: 1.125rem;
@@ -4618,11 +4992,17 @@ mark {
 .public-prose h2,
 .public-prose h3,
 .public-prose h4 {
-  color: #fff;
+  color: #111827;
   font-weight: 700;
   margin-top: 2em;
   margin-bottom: 0.5em;
   line-height: 1.25;
+}
+.dark .public-prose h1,
+.dark .public-prose h2,
+.dark .public-prose h3,
+.dark .public-prose h4 {
+  color: #fff;
 }
 .public-prose h1 { font-size: 2em; }
 .public-prose h2 { font-size: 1.5em; }
@@ -4635,27 +5015,39 @@ mark {
 .public-prose ul { list-style-type: disc; }
 .public-prose ol { list-style-type: decimal; }
 .public-prose blockquote {
-  border-left: 3px solid rgba(255,255,255,0.15);
+  border-left: 3px solid rgba(0,0,0,0.15);
   padding-left: 1.25em;
-  color: rgba(255,255,255,0.55);
+  color: rgba(0,0,0,0.65);
   font-style: italic;
   margin: 1.5em 0;
+}
+.dark .public-prose blockquote {
+  border-left-color: rgba(255,255,255,0.15);
+  color: rgba(255,255,255,0.55);
 }
 .public-prose code {
   font-family: ui-monospace, 'Cascadia Code', monospace;
   font-size: 0.875em;
-  background: rgba(255,255,255,0.06);
+  background: rgba(0,0,0,0.06);
   border-radius: 4px;
   padding: 0.15em 0.35em;
+  color: rgba(0,0,0,0.85);
+}
+.dark .public-prose code {
+  background: rgba(255,255,255,0.06);
   color: rgba(255,255,255,0.9);
 }
 .public-prose pre {
-  background: rgba(255,255,255,0.05);
-  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(0,0,0,0.04);
+  border: 1px solid rgba(0,0,0,0.08);
   border-radius: 8px;
   padding: 1.25em;
   overflow-x: auto;
   margin: 1.5em 0;
+}
+.dark .public-prose pre {
+  background: rgba(255,255,255,0.05);
+  border-color: rgba(255,255,255,0.08);
 }
 .public-prose pre code {
   background: none;
@@ -4663,15 +5055,22 @@ mark {
   font-size: 0.875em;
 }
 .public-prose a {
-  color: rgba(147, 197, 253, 0.9);
+  color: #2563eb;
   text-decoration: underline;
   text-underline-offset: 3px;
 }
-.public-prose a:hover { color: rgba(147, 197, 253, 1); }
+.public-prose a:hover { color: #1d4ed8; }
+.dark .public-prose a {
+  color: rgba(147, 197, 253, 0.9);
+}
+.dark .public-prose a:hover { color: rgba(147, 197, 253, 1); }
 .public-prose hr {
   border: none;
-  border-top: 1px solid rgba(255,255,255,0.1);
+  border-top: 1px solid rgba(0,0,0,0.1);
   margin: 2em 0;
+}
+.dark .public-prose hr {
+  border-top-color: rgba(255,255,255,0.1);
 }
 .public-prose table {
   width: 100%;
@@ -4699,44 +5098,70 @@ mark {
 .public-prose .block-pull-quote {
   margin: 2em 0;
 }
+/* Pull-quote variants — light-mode defaults + .dark overrides.
+   Previously dark-mode-first (color: rgba(255,255,255,...)) which
+   rendered invisible on the light surface. Fixed 2026-05-20. */
 .public-prose .block-pull-quote--bordered,
 .public-prose blockquote[data-block-type="pullQuote"][data-variant="bordered"] {
-  border-left: 3px solid rgba(255,255,255,0.3);
+  border-left: 3px solid rgba(0,0,0,0.2);
   padding-left: 1.5em;
   font-size: 1.15em;
-  color: rgba(255,255,255,0.7);
+  color: rgba(0,0,0,0.7);
   font-style: italic;
 }
+.dark .public-prose .block-pull-quote--bordered,
+.dark .public-prose blockquote[data-block-type="pullQuote"][data-variant="bordered"] {
+  border-left-color: rgba(255,255,255,0.3);
+  color: rgba(255,255,255,0.7);
+}
+
 .public-prose blockquote[data-block-type="pullQuote"][data-variant="pullquote"] {
   text-align: center;
   font-size: 1.5em;
-  color: #fff;
+  color: rgba(0,0,0,0.9);
   font-weight: 600;
   font-style: normal;
   border: none;
   padding: 0.5em 1em;
 }
+.dark .public-prose blockquote[data-block-type="pullQuote"][data-variant="pullquote"] {
+  color: #fff;
+}
+
 .public-prose blockquote[data-block-type="pullQuote"][data-variant="card"] {
-  background: rgba(255,255,255,0.04);
-  border: 1px solid rgba(255,255,255,0.1);
+  background: rgba(0,0,0,0.03);
+  border: 1px solid rgba(0,0,0,0.1);
   border-radius: 12px;
   padding: 1.5em;
   font-style: italic;
+  color: rgba(0,0,0,0.75);
+}
+.dark .public-prose blockquote[data-block-type="pullQuote"][data-variant="card"] {
+  background: rgba(255,255,255,0.04);
+  border-color: rgba(255,255,255,0.1);
   color: rgba(255,255,255,0.75);
 }
+
 .public-prose blockquote[data-block-type="pullQuote"][data-variant="featured"] {
   background: rgba(99,102,241,0.08);
   border: 1px solid rgba(99,102,241,0.2);
   border-radius: 12px;
   padding: 1.5em;
   font-size: 1.15em;
+  color: rgba(0,0,0,0.82);
+}
+.dark .public-prose blockquote[data-block-type="pullQuote"][data-variant="featured"] {
   color: rgba(255,255,255,0.85);
 }
+
 .public-prose .block-pull-quote-attribution {
   display: block;
   margin-top: 0.75em;
   font-size: 0.8em;
   font-style: normal;
+  color: rgba(0,0,0,0.5);
+}
+.dark .public-prose .block-pull-quote-attribution {
   color: rgba(255,255,255,0.4);
 }
 
@@ -4991,8 +5416,11 @@ mark {
 .public-prose .block-gallery-caption {
   margin: 4px 0 0;
   font-size: 0.75rem;
-  color: rgba(255,255,255,0.4);
+  color: rgba(0,0,0,0.55);
   text-align: center;
+}
+.dark .public-prose .block-gallery-caption {
+  color: rgba(255,255,255,0.4);
 }
 /* ─ Gallery hover effect variants ─ */
 .public-prose .block-gallery-item--hover-zoom:hover img {
@@ -5022,15 +5450,23 @@ mark {
 .public-prose .block-post-card {
   display: block;
   margin: 1.5em 0;
-  border: 1px solid rgba(255,255,255,0.1);
+  border: 1px solid rgba(0,0,0,0.1);
   border-radius: 12px;
   overflow: hidden;
-  background: rgba(255,255,255,0.03);
+  background: rgba(0,0,0,0.02);
   text-decoration: none;
   color: inherit;
   transition: border-color 0.15s, background 0.15s;
 }
+.dark .public-prose .block-post-card {
+  border-color: rgba(255,255,255,0.1);
+  background: rgba(255,255,255,0.03);
+}
 .public-prose a.block-post-card:hover {
+  border-color: rgba(0,0,0,0.2);
+  background: rgba(0,0,0,0.04);
+}
+.dark .public-prose a.block-post-card:hover {
   border-color: rgba(255,255,255,0.2);
   background: rgba(255,255,255,0.05);
 }
@@ -5054,18 +5490,22 @@ mark {
   margin: 0 0 6px;
   font-size: 1rem;
   font-weight: 600;
-  color: #fff;
+  color: #111827;
   line-height: 1.3;
 }
+.dark .public-prose .block-post-card-title { color: #fff; }
 .public-prose .block-post-card-excerpt {
   margin: 0 0 12px;
   font-size: 0.875rem;
-  color: rgba(255,255,255,0.55);
+  color: rgba(0,0,0,0.6);
   line-height: 1.5;
   display: -webkit-box;
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+.dark .public-prose .block-post-card-excerpt {
+  color: rgba(255,255,255,0.55);
 }
 .public-prose .block-post-card-meta {
   display: flex;
@@ -5075,8 +5515,9 @@ mark {
 }
 .public-prose .block-post-card-date {
   font-size: 0.75rem;
-  color: rgba(255,255,255,0.35);
+  color: rgba(0,0,0,0.5);
 }
+.dark .public-prose .block-post-card-date { color: rgba(255,255,255,0.6); }
 .public-prose .block-post-card-tags {
   display: flex;
   gap: 4px;
@@ -5089,8 +5530,12 @@ mark {
   font-size: 0.7rem;
   padding: 1px 7px;
   border-radius: 999px;
-  background: rgba(255,255,255,0.07);
-  color: rgba(255,255,255,0.5);
+  background: rgba(0,0,0,0.05);
+  color: rgba(0,0,0,0.6);
+}
+.dark .public-prose .block-post-card-tag {
+  background: rgba(255,255,255,0.12);
+  color: rgba(255,255,255,0.75);
 }
 .public-prose .block-post-card--horizontal {
   display: grid;
@@ -5103,16 +5548,23 @@ mark {
   border: none;
   background: none;
   padding: 8px 0;
-  border-bottom: 1px solid rgba(255,255,255,0.06);
+  border-bottom: 1px solid rgba(0,0,0,0.08);
   border-radius: 0;
+}
+.dark .public-prose .block-post-card--minimal {
+  border-bottom-color: rgba(255,255,255,0.06);
 }
 
 /* ─── Project Card ───────────────────────────────────────────────────────── */
 .public-prose .block-project-card {
   margin: 1.5em 0;
-  border: 1px solid rgba(255,255,255,0.1);
+  border: 1px solid rgba(0,0,0,0.1);
   border-radius: 12px;
   overflow: hidden;
+  background: rgba(0,0,0,0.02);
+}
+.dark .public-prose .block-project-card {
+  border-color: rgba(255,255,255,0.1);
   background: rgba(255,255,255,0.03);
 }
 .public-prose .block-project-card-cover {
@@ -5135,8 +5587,9 @@ mark {
   margin: 0;
   font-size: 1rem;
   font-weight: 600;
-  color: #fff;
+  color: #111827;
 }
+.dark .public-prose .block-project-card-title { color: #fff; }
 .public-prose .block-project-card-status {
   font-size: 0.7rem;
   padding: 2px 8px;
@@ -5144,14 +5597,20 @@ mark {
   font-weight: 500;
   white-space: nowrap;
 }
-.public-prose .block-project-card-status--active  { background: rgba(34,197,94,0.15); color: #4ade80; }
-.public-prose .block-project-card-status--wip      { background: rgba(251,191,36,0.15); color: #fbbf24; }
-.public-prose .block-project-card-status--archived { background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.4); }
+.public-prose .block-project-card-status--active  { background: rgba(34,197,94,0.15); color: #15803d; }
+.public-prose .block-project-card-status--wip      { background: rgba(251,191,36,0.15); color: #b45309; }
+.public-prose .block-project-card-status--archived { background: rgba(0,0,0,0.06); color: rgba(0,0,0,0.5); }
+.dark .public-prose .block-project-card-status--active  { color: #4ade80; }
+.dark .public-prose .block-project-card-status--wip      { color: #fbbf24; }
+.dark .public-prose .block-project-card-status--archived { background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.4); }
 .public-prose .block-project-card-description {
   margin: 0 0 12px;
   font-size: 0.875rem;
-  color: rgba(255,255,255,0.55);
+  color: rgba(0,0,0,0.6);
   line-height: 1.5;
+}
+.dark .public-prose .block-project-card-description {
+  color: rgba(255,255,255,0.55);
 }
 .public-prose .block-project-card-tech {
   display: flex;
@@ -5165,9 +5624,13 @@ mark {
   font-size: 0.7rem;
   padding: 2px 8px;
   border-radius: 5px;
-  background: rgba(99,102,241,0.12);
-  color: rgba(165,180,252,0.9);
+  background: rgba(99,102,241,0.15);
+  color: #4f46e5;
   font-family: ui-monospace, monospace;
+}
+.dark .public-prose .block-project-card-tech-item {
+  background: rgba(99,102,241,0.22);
+  color: #c7d2fe;
 }
 .public-prose .block-project-card-links {
   display: flex;
@@ -5187,10 +5650,15 @@ mark {
 }
 .public-prose .block-project-card-link--live:hover { background: rgba(99,102,241,0.25); }
 .public-prose .block-project-card-link--repo {
+  background: rgba(0,0,0,0.05);
+  color: rgba(0,0,0,0.7);
+}
+.public-prose .block-project-card-link--repo:hover { background: rgba(0,0,0,0.08); }
+.dark .public-prose .block-project-card-link--repo {
   background: rgba(255,255,255,0.06);
   color: rgba(255,255,255,0.6);
 }
-.public-prose .block-project-card-link--repo:hover { background: rgba(255,255,255,0.1); }
+.dark .public-prose .block-project-card-link--repo:hover { background: rgba(255,255,255,0.1); }
 
 /* ─── Stat Block ─────────────────────────────────────────────────────────── */
 .public-prose .block-stat {
@@ -5201,7 +5669,12 @@ mark {
 .public-prose .block-stat--featured {
   padding: 28px;
   border-radius: 12px;
-  border: 1px solid rgba(255,255,255,0.1);
+  border: 1px solid rgba(0,0,0,0.1);
+  background: rgba(0,0,0,0.02);
+}
+.dark .public-prose .block-stat--card,
+.dark .public-prose .block-stat--featured {
+  border-color: rgba(255,255,255,0.1);
   background: rgba(255,255,255,0.03);
 }
 .public-prose .block-stat--featured {
@@ -5213,12 +5686,18 @@ mark {
   font-size: clamp(2.5rem, 6vw, 4rem);
   font-weight: 700;
   line-height: 1;
-  color: #fff;
+  color: #111827;
 }
-.public-prose .block-stat--featured .block-stat-value { color: #a5b4fc; }
+.dark .public-prose .block-stat-value { color: #fff; }
+.public-prose .block-stat--featured .block-stat-value { color: #4f46e5; }
+.dark .public-prose .block-stat--featured .block-stat-value { color: #a5b4fc; }
 .public-prose .block-stat-prefix,
 .public-prose .block-stat-suffix {
   font-size: 0.5em;
+  color: rgba(0,0,0,0.45);
+}
+.dark .public-prose .block-stat-prefix,
+.dark .public-prose .block-stat-suffix {
   color: rgba(255,255,255,0.45);
 }
 .public-prose .block-stat-label {
@@ -5227,21 +5706,35 @@ mark {
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.06em;
+  color: rgba(0,0,0,0.6);
+}
+.dark .public-prose .block-stat-label {
   color: rgba(255,255,255,0.45);
 }
 .public-prose .block-stat-description {
   margin: 4px 0 0;
   font-size: 0.825rem;
-  color: rgba(255,255,255,0.3);
+  color: rgba(0,0,0,0.5);
+}
+.dark .public-prose .block-stat-description {
+  color: rgba(255,255,255,0.6);
 }
 
 /* ─── Metrics Strip ──────────────────────────────────────────────────────── */
+/* Light-mode defaults; .dark overrides below for dark-mode tones.
+   Pre-fix the rules used rgba(255,255,255,...) and color:#fff
+   unconditionally, which made the entire block invisible on a
+   light-mode white page. */
 .public-prose .block-metrics-strip {
   display: flex;
   margin: 2em 0;
   border-radius: 12px;
   overflow: hidden;
-  border: 1px solid rgba(255,255,255,0.1);
+  border: 1px solid rgba(0,0,0,0.1);
+  background: rgba(0,0,0,0.02);
+}
+.dark .public-prose .block-metrics-strip {
+  border-color: rgba(255,255,255,0.1);
   background: rgba(255,255,255,0.03);
 }
 .public-prose .block-metrics-strip--inline {
@@ -5260,7 +5753,10 @@ mark {
   flex: 1;
   padding: 20px 16px;
   text-align: center;
-  border-right: 1px solid rgba(255,255,255,0.07);
+  border-right: 1px solid rgba(0,0,0,0.06);
+}
+.dark .public-prose .block-metrics-strip-item {
+  border-right-color: rgba(255,255,255,0.07);
 }
 .public-prose .block-metrics-strip-item:last-child { border-right: none; }
 .public-prose .block-metrics-strip--inline .block-metrics-strip-item,
@@ -5272,18 +5768,34 @@ mark {
   display: block;
   font-size: 1.75rem;
   font-weight: 700;
-  color: #fff;
+  color: #111827;
   line-height: 1;
+}
+.dark .public-prose .block-metrics-strip-value {
+  color: #fff;
 }
 .public-prose .block-metrics-strip-number { font-variant-numeric: tabular-nums; }
 .public-prose .block-metrics-strip-prefix,
-.public-prose .block-metrics-strip-suffix { font-size: 0.6em; color: rgba(255,255,255,0.45); }
-.public-prose .block-metrics-strip-trend--up   { color: #4ade80; }
-.public-prose .block-metrics-strip-trend--down { color: #f87171; }
-.public-prose .block-metrics-strip-trend--flat { color: rgba(255,255,255,0.35); }
+.public-prose .block-metrics-strip-suffix {
+  font-size: 0.6em;
+  color: rgba(0,0,0,0.45);
+}
+.dark .public-prose .block-metrics-strip-prefix,
+.dark .public-prose .block-metrics-strip-suffix {
+  color: rgba(255,255,255,0.45);
+}
+.public-prose .block-metrics-strip-trend--up   { color: #16a34a; }
+.public-prose .block-metrics-strip-trend--down { color: #dc2626; }
+.public-prose .block-metrics-strip-trend--flat { color: rgba(0,0,0,0.35); }
+.dark .public-prose .block-metrics-strip-trend--up   { color: #4ade80; }
+.dark .public-prose .block-metrics-strip-trend--down { color: #f87171; }
+.dark .public-prose .block-metrics-strip-trend--flat { color: rgba(255,255,255,0.35); }
 .public-prose .block-metrics-strip-label {
   margin: 6px 0 0;
   font-size: 0.75rem;
+  color: rgba(0,0,0,0.55);
+}
+.dark .public-prose .block-metrics-strip-label {
   color: rgba(255,255,255,0.4);
 }
 
@@ -5297,8 +5809,9 @@ mark {
   padding: 0;
   position: relative;
   padding-left: 28px;
-  border-left: 2px solid rgba(255,255,255,0.1);
+  border-left: 2px solid rgba(0,0,0,0.1);
 }
+.dark .public-prose .block-timeline-list { border-left-color: rgba(255,255,255,0.1); }
 .public-prose .block-timeline-item {
   position: relative;
   padding-left: 20px;
@@ -5313,27 +5826,41 @@ mark {
   width: 10px;
   height: 10px;
   border-radius: 50%;
+  background: rgba(0,0,0,0.4);
+  border: 2px solid #ffffff;
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.15);
+}
+.dark .public-prose .block-timeline-item::before {
   background: rgba(255,255,255,0.5);
-  border: 2px solid #0d0d0d;
+  border-color: #0d0d0d;
   box-shadow: 0 0 0 1px rgba(255,255,255,0.15);
 }
 .public-prose .block-timeline-date {
   display: block;
   font-size: 0.75rem;
-  color: rgba(255,255,255,0.35);
+  color: rgba(0,0,0,0.5);
   margin-bottom: 3px;
+}
+.dark .public-prose .block-timeline-date {
+  color: rgba(255,255,255,0.35);
 }
 .public-prose .block-timeline-title {
   margin: 0 0 4px;
   font-size: 0.95rem;
   font-weight: 600;
+  color: #111827;
+}
+.dark .public-prose .block-timeline-title {
   color: rgba(255,255,255,0.9);
 }
 .public-prose .block-timeline-body {
   margin: 0;
   font-size: 0.875rem;
-  color: rgba(255,255,255,0.5);
+  color: rgba(0,0,0,0.6);
   line-height: 1.5;
+}
+.dark .public-prose .block-timeline-body {
+  color: rgba(255,255,255,0.5);
 }
 .public-prose .block-timeline--compact .block-timeline-item { padding-bottom: 12px; }
 .public-prose .block-timeline--numbered .block-timeline-item::before {
@@ -5369,33 +5896,63 @@ mark {
   width: 28px;
   height: 28px;
   border-radius: 50%;
-  background: rgba(99,102,241,0.12);
-  border: 1.5px solid rgba(99,102,241,0.3);
+  background: rgba(99,102,241,0.15);
+  border: 1.5px solid rgba(99,102,241,0.5);
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 0.75rem;
   font-weight: 700;
-  color: #a5b4fc;
+  color: #4f46e5;
   margin-top: 2px;
+}
+.dark .public-prose .block-process-steps-number {
+  background: rgba(99,102,241,0.22);
+  border-color: rgba(165,180,252,0.6);
+  color: #c7d2fe;
 }
 .public-prose .block-process-steps-content { flex: 1; }
 .public-prose .block-process-steps-title {
   margin: 0 0 3px;
   font-size: 0.95rem;
   font-weight: 600;
+  color: #111827;
+}
+.dark .public-prose .block-process-steps-title {
   color: rgba(255,255,255,0.9);
 }
 .public-prose .block-process-steps-description {
   margin: 0;
   font-size: 0.85rem;
-  color: rgba(255,255,255,0.5);
+  color: rgba(0,0,0,0.6);
   line-height: 1.5;
 }
+.dark .public-prose .block-process-steps-description {
+  color: rgba(255,255,255,0.5);
+}
 
-/* ─── Recent Posts (placeholder — filled by post-processor) ─────────────── */
-.public-prose .block-recent-posts--placeholder {
-  display: none;
+/* ─── Recent Posts ──────────────────────────────────────────────────────── */
+/* The placeholder renders a visible empty state until a server post-
+   processor populates real items. Pre-fix: display:none here made
+   every recent-posts block invisible on every published page, since
+   no post-processor existed. */
+.public-prose .block-recent-posts {
+  margin: 1.5rem 0;
+}
+.public-prose .block-recent-posts-empty {
+  margin: 0;
+  padding: 2rem 1.5rem;
+  text-align: center;
+  color: #6b7280;
+  font-size: 0.875rem;
+  border: 1px dashed rgba(0, 0, 0, 0.12);
+  border-radius: 0.5rem;
+  background: rgba(0, 0, 0, 0.015);
+}
+.dark .public-prose .block-recent-posts-empty {
+  color: rgba(255, 255, 255, 0.5);
+  border-color: rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.02);
 }
 
 /* ─── W5: TestimonialCard ────────────────────────────────────────────────── */
@@ -5541,9 +6098,18 @@ mark {
   background: #4f46e5;
   color: #fff;
 }
+/* The cta-banner's default surface (#f3f4f6) is theme-stable — it stays
+   light gray on both light and dark pages. So the secondary button
+   text needs to stay dark in both themes; the .dark page-level override
+   would invert it to white-on-light-gray (invisible). The variant
+   overrides below handle the genuinely-dark banner surfaces. */
 .public-prose .block-cta-btn--secondary {
   border: 2px solid currentColor;
-  color: inherit;
+  color: #111827;
+}
+.public-prose .block-cta--dark .block-cta-btn--secondary,
+.public-prose .block-cta--brand .block-cta-btn--secondary {
+  color: rgba(255,255,255,0.9);
 }
 
 /* ─── W6: VideoEmbed ─────────────────────────────────────────────────────── */
@@ -5571,6 +6137,7 @@ mark {
   color: #6b7280;
   text-align: center;
 }
+.dark .public-prose .block-video-caption { color: rgba(255,255,255,0.7); }
 .public-prose .block-video-error {
   padding: 16px;
   background: #fef2f2;
@@ -5663,6 +6230,8 @@ mark {
   list-style: none;
   gap: 12px;
 }
+.dark .public-prose .block-faq-question { color: rgba(255,255,255,0.92); }
+.dark .public-prose .block-faq-question::after { color: rgba(255,255,255,0.5); }
 .public-prose .block-faq--bordered .block-faq-question,
 .public-prose .block-faq--card .block-faq-question { padding: 14px 16px; }
 .public-prose .block-faq-question::-webkit-details-marker { display: none; }
@@ -5681,6 +6250,7 @@ mark {
   line-height: 1.65;
   font-size: 0.9375rem;
 }
+.dark .public-prose .block-faq-answer { color: rgba(255,255,255,0.72); }
 .public-prose .block-faq--bordered .block-faq-answer,
 .public-prose .block-faq--card .block-faq-answer { padding: 0 16px 16px; }
 .public-prose .block-faq-answer p { margin: 0; }
@@ -5730,12 +6300,14 @@ mark {
   font-weight: 600;
   color: #111827;
 }
+.dark .public-prose .block-feature-title { color: rgba(255,255,255,0.92); }
 .public-prose .block-feature-desc {
   margin: 0;
   font-size: 0.875rem;
   color: #6b7280;
   line-height: 1.55;
 }
+.dark .public-prose .block-feature-desc { color: rgba(255,255,255,0.65); }
 .public-prose .block-feature-empty {
   color: #9ca3af;
   font-size: 0.875rem;
@@ -6060,6 +6632,7 @@ mark {
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
+.dark .public-prose .block-skill-badges-label { color: rgba(255,255,255,0.75); }
 .public-prose .block-skill-badges-grid {
   display: flex;
   flex-wrap: wrap;
@@ -6163,6 +6736,7 @@ mark {
   font-weight: 600;
   color: #374151;
 }
+.dark .public-prose .block-tag-cloud-label { color: rgba(255,255,255,0.75); }
 .public-prose .block-tag-cloud-items {
   display: flex;
   flex-wrap: wrap;
@@ -6208,10 +6782,14 @@ mark {
   from { opacity: 0; transform: translateX(-28px); }
   to   { opacity: 1; transform: translateX(0); }
 }
-/* Initial state: blocks start invisible, JS adds .block-revealed */
+/* Pre-fix: this selector had `opacity: 0` unconditionally, gating block
+   visibility on client JS that toggled `.block-revealed`. No-JS users,
+   reduced-motion users, and snapshot tools saw every published block
+   as invisible. The fix makes blocks visible at rest; the entrance
+   animation now ENHANCES first paint rather than GATING it. */
 .public-prose [data-block-type] {
-  opacity: 0;
   animation: none;
+  animation-delay: var(--reveal-delay, 0ms);
 }
 .public-prose [data-block-type].block-revealed {
   animation: blockFadeUp 0.55s cubic-bezier(0.4, 0, 0.2, 1) forwards;
@@ -6222,8 +6800,16 @@ mark {
 .public-prose [data-block-type].block-revealed--slide {
   animation: blockSlideRight 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
 }
-/* Stagger via CSS custom property set by JS */
-.public-prose [data-block-type] { animation-delay: var(--reveal-delay, 0ms); }
+/* Respect motion preferences: skip the reveal animation entirely for
+   users who prefer reduced motion. Blocks remain visible (no opacity:0
+   default), they just appear instantly. */
+@media (prefers-reduced-motion: reduce) {
+  .public-prose [data-block-type].block-revealed,
+  .public-prose [data-block-type].block-revealed--swing,
+  .public-prose [data-block-type].block-revealed--slide {
+    animation: none;
+  }
+}
 
 /* ─── Responsive tweaks ──────────────────────────────────────────────────── */
 @media (max-width: 640px) {
@@ -6231,7 +6817,8 @@ mark {
   .public-prose .block-gallery--masonry { columns: 2; }
   .public-prose .block-post-card--horizontal { grid-template-columns: 1fr; }
   .public-prose .block-metrics-strip { flex-wrap: wrap; }
-  .public-prose .block-metrics-strip-item { flex: 0 0 50%; border-right: none; border-bottom: 1px solid rgba(255,255,255,0.07); }
+  .public-prose .block-metrics-strip-item { flex: 0 0 50%; border-right: none; border-bottom: 1px solid rgba(0,0,0,0.06); }
+  .dark .public-prose .block-metrics-strip-item { border-bottom-color: rgba(255,255,255,0.07); }
   .public-prose .block-feature-grid { grid-template-columns: repeat(2, 1fr); }
   .public-prose .block-feature-list--cols-4 .block-feature-grid { grid-template-columns: repeat(2, 1fr); }
   .public-prose .block-person--horizontal { flex-direction: column; align-items: center; text-align: center; }

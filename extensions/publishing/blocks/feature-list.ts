@@ -14,6 +14,11 @@ import { Node, mergeAttributes } from "@tiptap/core";
 import { z } from "zod";
 import { createBlockSchema } from "@/lib/domain/blocks/schema";
 import { registerBlock } from "@/lib/domain/blocks/registry";
+import { blockIdAttr } from "@/lib/domain/blocks/data-attr";
+import {
+  BACKGROUND_SCHEMA_SHAPE,
+  backgroundAttrs,
+} from "../lib/background-attrs";
 import { createBlockNodeView } from "@/lib/domain/blocks/node-view-factory";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -57,8 +62,7 @@ const { schema: featureSchema, defaults: featureDefaults } = createBlockSchema(
       .default(3)
       .describe("Number of columns (1–4)"),
     variant: z.enum(VARIANTS).default("default"),
-    bgColor: z.string().default("").describe("Custom background color (any CSS color value)"),
-    bgGradient: z.string().default("").describe("CSS gradient — e.g. linear-gradient(135deg, #667eea 0%, #764ba2 100%)"),
+    ...BACKGROUND_SCHEMA_SHAPE,
   }
 );
 
@@ -81,7 +85,7 @@ registerBlock({
 
 function featureAttrs() {
   return {
-    blockId: { default: null },
+    blockId: blockIdAttr,
     blockType: { default: "featureList" },
     items: {
       default: "[]",
@@ -98,16 +102,7 @@ function featureAttrs() {
       parseHTML: (el: Element) => el.getAttribute("data-variant") ?? "default",
       renderHTML: (attrs: Record<string, unknown>) => ({ "data-variant": attrs.variant }),
     },
-    bgColor: {
-      default: "",
-      parseHTML: (el: Element) => el.getAttribute("data-bg-color") ?? "",
-      renderHTML: (attrs: Record<string, unknown>) => attrs.bgColor ? { "data-bg-color": attrs.bgColor } : {},
-    },
-    bgGradient: {
-      default: "",
-      parseHTML: (el: Element) => el.getAttribute("data-bg-gradient") ?? "",
-      renderHTML: (attrs: Record<string, unknown>) => attrs.bgGradient ? { "data-bg-gradient": attrs.bgGradient } : {},
-    },
+    ...backgroundAttrs(),
   };
 }
 

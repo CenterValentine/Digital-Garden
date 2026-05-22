@@ -1,0 +1,19 @@
+{
+  "type": "doc",
+  "content": [
+    {
+      "type": "stopwatch",
+      "attrs": {
+        "blockId": "fixture-stopwatch-001",
+        "title": "Deep work session",
+        "showLaps": true,
+        "showBackground": true,
+        "showBorder": true,
+        "running": false,
+        "startedAt": null,
+        "accumulatedMs": 5400000,
+        "laps": []
+      }
+    }
+  ]
+}

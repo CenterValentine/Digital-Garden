@@ -12,6 +12,7 @@ import { Node, mergeAttributes, type RawCommands } from "@tiptap/core";
 import { z } from "zod";
 import { createBlockSchema } from "@/lib/domain/blocks/schema";
 import { registerBlock } from "@/lib/domain/blocks/registry";
+import { blockIdAttr } from "@/lib/domain/blocks/data-attr";
 import { createBlockNodeView } from "@/lib/domain/blocks/node-view-factory";
 
 const FORMAT_PRESETS = [
@@ -102,7 +103,7 @@ export const Timestamp = Node.create({
 
   addAttributes() {
     return {
-      blockId: { default: null },
+      blockId: blockIdAttr,
       blockType: { default: "timestamp" },
       isoDate: {
         default: "",
@@ -212,7 +213,7 @@ export const ServerTimestamp = Node.create({
 
   addAttributes() {
     return {
-      blockId: { default: null },
+      blockId: blockIdAttr,
       blockType: { default: "timestamp" },
       isoDate: {
         default: "",

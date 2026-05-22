@@ -1,0 +1,15 @@
+{
+  "type": "doc",
+  "content": [
+    {
+      "type": "ratingInput",
+      "attrs": {
+        "blockId": "fixture-rating-input-001",
+        "label": "Energy today",
+        "value": 4,
+        "maxRating": 5,
+        "style": "stars"
+      }
+    }
+  ]
+}

@@ -18,6 +18,7 @@ import { createPortal } from "react-dom";
 import * as LucideIcons from "lucide-react";
 import { X, Search } from "lucide-react";
 import { calculateMenuPosition } from "@/lib/core/menu-positioning";
+import { useFadeScrollbar } from "@/components/common/useFadeScrollbar";
 
 interface IconSelectorProps {
   isOpen: boolean;
@@ -75,6 +76,7 @@ export function IconSelector({
   const [searchQuery, setSearchQuery] = useState("");
   const [menuPosition, setMenuPosition] = useState<{ x: number; y: number } | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useFadeScrollbar<HTMLDivElement>();
 
   // Filter icons based on search query (fuzzy/substring match)
   const filteredIcons = useMemo(() => {
@@ -251,7 +253,7 @@ export function IconSelector({
       )}
 
       {/* Content Area */}
-      <div className="flex-1 overflow-y-auto p-3">
+      <div ref={scrollRef} className="fade-scroll flex-1 overflow-y-auto p-3">
         {activeTab === "icons" ? (
           <div className="grid grid-cols-6 gap-1">
             {filteredIcons.length > 0 ? (

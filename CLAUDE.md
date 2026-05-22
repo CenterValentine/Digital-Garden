@@ -19,6 +19,9 @@ pnpm lint             # ESLint with --max-warnings 175 ratchet (fails if count g
 pnpm build:tokens     # Regenerate CSS variables from design tokens
 pnpm db:seed          # Seed database with test ContentNode data
 pnpm collab:schema:check  # CI gate: validate collaboration schema covers all editor extensions
+pnpm publishing:schema:check  # CI gate: validate every publishing block has Server* variant + correct registerBlock type
+pnpm publishing:audit:defaults  # Static drift detector: Zod defaults vs renderHTML fallbacks across publishing blocks
+pnpm publishing:audit:themes  # Static theme-coverage audit: flags `.public-prose .block-*` rules with extreme colors (white-ish / dark-ish) that lack a `.dark` companion. Triage required — theme-stable surfaces (pricing, testimonial, etc.) are intentional false positives.
 pnpm test:e2e         # Playwright visual regression (assumes pnpm dev is running)
 pnpm test:e2e:update  # Regenerate baseline screenshots
 pnpm test:e2e:report  # Open last HTML run report
@@ -33,9 +36,18 @@ npx prisma studio     # Database GUI (http://localhost:5555)
 
 **Vercel build** skips the `tsc --noEmit` and `lint` steps (`vercel-build` script). Those gates are enforced locally and in CI; Vercel stays minimal for fast deploys. Local dev uses Turbopack (no webpack flag). Migrations are run manually via `npx prisma migrate deploy`.
 
+**Heap size for local `pnpm build`** — Node's default V8 heap (~4 GB) is no longer enough on this codebase; full builds can abort with `Abort trap: 6` during the type-emit or compilation phase. Local builds need `NODE_OPTIONS='--max-old-space-size=8192'`:
+
+```bash
+NODE_OPTIONS='--max-old-space-size=8192' pnpm build
+```
+
+CI runners (GitHub Actions, Vercel) have larger heaps by default and don't need this. Add it to your shell rc or build-script alias if you're on a machine with <16 GB RAM.
+
 **CI gates** (`.github/workflows/`):
 - **quality.yml** — runs `pnpm lint` (with the `--max-warnings 175` ratchet) and `pnpm typecheck` on every PR. Lint failures or warning count growth block merge.
 - **collaboration-hardening.yml** — runs `pnpm collab:schema:check` on collab-touching PRs. Scans all TipTap extension source files for `Node.create`/`Mark.create` and asserts every discovered node/mark is covered in `getCollaborationServerExtensions()`. Every new TipTap Node/Mark **must** export a `Server*` variant and be registered in `lib/domain/collaboration/extensions.ts`.
+- **publishing-visual.yml** — runs on PRs touching the publishing surface (`extensions/publishing/`, `components/public/`, `app/(public)/`, `app/(test)/test/publishing-fixtures/`, `app/globals.css`, the publishing fixtures/spec/schema scripts). Two jobs: `schema` (typecheck + `publishing:schema:check` + `publishing:audit:defaults`) and `visual` (Playwright per-block snapshot suite against the synthetic fixture route). Visual job uploads diff PNGs as an artifact on failure. Hard-gate; failures block merge. Can be temporarily skipped via repo var `PUBLISHING_VISUAL_GATE=skip`.
 
 ## Visual Regression Testing (Playwright)
 

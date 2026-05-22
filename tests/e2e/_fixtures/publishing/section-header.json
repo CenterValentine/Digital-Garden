@@ -1,0 +1,15 @@
+{
+  "type": "doc",
+  "content": [
+    {
+      "type": "sectionHeader",
+      "attrs": {
+        "level": 2,
+        "label": "About the Product",
+        "dividerStyle": "solid",
+        "showContainer": false
+      },
+      "content": [{ "type": "text", "text": "About the Product" }]
+    }
+  ]
+}

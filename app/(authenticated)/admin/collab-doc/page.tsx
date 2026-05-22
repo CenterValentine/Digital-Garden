@@ -29,7 +29,6 @@ export default function CollabDocPage() {
   const [confirmId, setConfirmId] = useState<string | null>(null);
 
   const glass0 = getSurfaceStyles("glass-0");
-  const glass1 = getSurfaceStyles("glass-1");
 
   const fetchDocs = useCallback(async () => {
     setLoading(true);

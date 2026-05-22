@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { X, Loader2, ChevronDown, Plus, Check, Trash2 } from "lucide-react";
+import { Loader2, ChevronDown, Plus, Check, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/core/utils";
 import {
@@ -9,8 +9,10 @@ import {
   createPublicItem,
   type PublicPathSummary,
 } from "../../lib/client-api";
-import { slugify, isValidSlug } from "../../lib/slug";
+import { slugify } from "../../lib/slug";
+import { useAutoSlug } from "../../lib/use-auto-slug";
 import { usePublishStore, type ContentTypeEntry } from "../../state/publish-store";
+import { PublishingDialog } from "./PublishingDialog";
 
 interface CreatePublicItemDialogProps {
   contentNodeId: string;
@@ -32,16 +34,18 @@ export function CreatePublicItemDialog({
   const { contentTypes, addContentType, removeContentType } = usePublishStore();
   const [payloadType, setPayloadType] = useState<string>(contentTypes[0]?.value ?? "blog_post");
   const [pathId, setPathId] = useState<string>("");
-  const [slug, setSlug] = useState(() => slugify(contentTitle ?? ""));
   const [publicTitle, setPublicTitle] = useState(contentTitle ?? "");
-  const [slugTouched, setSlugTouched] = useState(false);
+  const {
+    slug,
+    setSlug,
+    syncFromTitle: syncSlugFromTitle,
+    error: slugError,
+  } = useAutoSlug(slugify(contentTitle ?? ""));
 
-  // Auto-slug from public title unless manually edited
+  // Auto-slug from public title unless manually edited.
   useEffect(() => {
-    if (!slugTouched && publicTitle) {
-      setSlug(slugify(publicTitle));
-    }
-  }, [publicTitle, slugTouched]);
+    if (publicTitle) syncSlugFromTitle(publicTitle);
+  }, [publicTitle, syncSlugFromTitle]);
 
   useEffect(() => {
     setIsLoadingPaths(true);
@@ -54,7 +58,6 @@ export function CreatePublicItemDialog({
       .finally(() => setIsLoadingPaths(false));
   }, []);
 
-  const slugError = slug && !isValidSlug(slug) ? "Slug can only contain a-z, 0-9, and hyphens" : null;
   const canSubmit = pathId && slug && !slugError && !isSubmitting;
 
   async function handleSubmit(e: React.FormEvent) {
@@ -81,30 +84,12 @@ export function CreatePublicItemDialog({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      {/* Backdrop */}
-      <div
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-        onClick={onClose}
-      />
-
-      {/* Panel */}
-      <form
-        onSubmit={handleSubmit}
-        className="relative z-10 w-full max-w-md mx-4 rounded-xl bg-card border border-white/10 shadow-2xl"
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-white/5">
-          <span className="text-sm font-medium text-white">Add to publishing</span>
-          <button
-            type="button"
-            onClick={onClose}
-            className="p-1 rounded-md text-white/30 hover:text-white/70 transition-colors"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-
+    <PublishingDialog
+      title="Add to publishing"
+      onClose={onClose}
+      size="md"
+      onSubmit={handleSubmit}
+    >
         <div className="px-4 py-4 space-y-4">
           {/* Public title */}
           <label className="block">
@@ -163,10 +148,7 @@ export function CreatePublicItemDialog({
             <input
               type="text"
               value={slug}
-              onChange={(e) => {
-                setSlugTouched(true);
-                setSlug(e.target.value);
-              }}
+              onChange={(e) => setSlug(e.target.value)}
               placeholder="url-slug"
               className={cn(
                 "w-full rounded-md border bg-white/5 px-3 py-2 text-sm text-white placeholder:text-white/20 focus:outline-none",
@@ -198,8 +180,7 @@ export function CreatePublicItemDialog({
             {isSubmitting ? "Creating…" : "Add as draft"}
           </button>
         </div>
-      </form>
-    </div>
+    </PublishingDialog>
   );
 }
 

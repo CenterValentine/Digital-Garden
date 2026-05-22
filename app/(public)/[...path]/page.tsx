@@ -1,5 +1,6 @@
 import { notFound, permanentRedirect } from "next/navigation";
 import { prisma } from "@/lib/database/client";
+import { withPageTrace } from "@/lib/core/logger";
 import { getCurrentTenant } from "@/lib/domain/tenancy";
 
 interface Params {
@@ -14,6 +15,13 @@ export default async function PublicCatchAll({
   const { path: segments } = await params;
   const fullPath = "/" + segments.join("/");
 
+  return withPageTrace(
+    { route: "/(public)/[...path]", attrs: { path: fullPath } },
+    () => renderPublic(fullPath, segments),
+  );
+}
+
+async function renderPublic(fullPath: string, segments: string[]) {
   // Tenant resolution: header (multi-tenant) → SITE_OWNER_ID fallback
   // (legacy single-tenant). When neither resolves the public surface
   // is unconfigured for this host → show nothing.

@@ -9,9 +9,11 @@
  */
 
 import { Node, mergeAttributes } from "@tiptap/core";
+import type { DOMOutputSpec } from "@tiptap/pm/model";
 import { z } from "zod";
 import { createBlockSchema } from "@/lib/domain/blocks/schema";
 import { registerBlock } from "@/lib/domain/blocks/registry";
+import { blockIdAttr } from "@/lib/domain/blocks/data-attr";
 import { createBlockNodeView } from "@/lib/domain/blocks/node-view-factory";
 
 const { schema: promptInputSchema, defaults: promptInputDefaults } =
@@ -180,7 +182,7 @@ export const PromptInput = Node.create({
 
   addAttributes() {
     return {
-      blockId: { default: null },
+      blockId: blockIdAttr,
       blockType: { default: "promptInput" },
       label: { default: "", parseHTML: (el) => el.getAttribute("data-label") || "", renderHTML: (attrs) => attrs.label ? { "data-label": attrs.label } : {} },
       prompt: { default: "", parseHTML: (el) => el.getAttribute("data-prompt") || "", renderHTML: (attrs) => attrs.prompt ? { "data-prompt": attrs.prompt } : {} },
@@ -220,7 +222,7 @@ export const ServerPromptInput = Node.create({
 
   addAttributes() {
     return {
-      blockId: { default: null },
+      blockId: blockIdAttr,
       blockType: { default: "promptInput" },
       label: { default: "", parseHTML: (el) => el.getAttribute("data-label") || "", renderHTML: (attrs) => attrs.label ? { "data-label": attrs.label } : {} },
       prompt: { default: "", parseHTML: (el) => el.getAttribute("data-prompt") || "", renderHTML: (attrs) => attrs.prompt ? { "data-prompt": attrs.prompt } : {} },
@@ -234,5 +236,22 @@ export const ServerPromptInput = Node.create({
   },
 
   parseHTML() { return [{ tag: 'div[data-block-type="promptInput"]' }]; },
-  renderHTML({ HTMLAttributes }) { return ["div", mergeAttributes(HTMLAttributes, { class: "block-prompt-input", "data-block-type": "promptInput" })]; },
+  renderHTML({ node, HTMLAttributes }) {
+    const label = String(node.attrs.label ?? "");
+    const prompt = String(node.attrs.prompt ?? "");
+    const response = String(node.attrs.response ?? "");
+    // Unlike other form-inputs, prompt-input is a saved AI Q&A snapshot —
+    // re-running the prompt isn't a visitor-side concern. The publisher
+    // emits the prompt+response as static styled text. If the response
+    // is empty (the AI never returned), omit the block entirely.
+    if (!response) {
+      return ["div", mergeAttributes(HTMLAttributes, { class: "block-prompt-input", "data-block-type": "promptInput", "data-form-empty": "true" })];
+    }
+    const outerAttrs = mergeAttributes(HTMLAttributes, { class: "block-prompt-input block-form-rendered", "data-block-type": "promptInput" });
+    const children: DOMOutputSpec[] = [];
+    if (label) children.push(["div", { class: "block-form-label" }, label]);
+    if (prompt) children.push(["div", { class: "block-prompt-input-prompt" }, prompt]);
+    children.push(["div", { class: "block-prompt-input-response" }, response]);
+    return ["div", outerAttrs, ...children] as DOMOutputSpec;
+  },
 });

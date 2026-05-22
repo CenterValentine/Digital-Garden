@@ -8,9 +8,11 @@
  */
 
 import { Node, mergeAttributes } from "@tiptap/core";
+import type { DOMOutputSpec } from "@tiptap/pm/model";
 import { z } from "zod";
 import { createBlockSchema } from "@/lib/domain/blocks/schema";
 import { registerBlock } from "@/lib/domain/blocks/registry";
+import { blockIdAttr } from "@/lib/domain/blocks/data-attr";
 import { createBlockNodeView } from "@/lib/domain/blocks/node-view-factory";
 
 const { schema: selectInputSchema, defaults: selectInputDefaults } =
@@ -140,7 +142,7 @@ export const SelectInput = Node.create({
 
   addAttributes() {
     return {
-      blockId: { default: null },
+      blockId: blockIdAttr,
       blockType: { default: "selectInput" },
       label: {
         default: "",
@@ -224,7 +226,7 @@ export const ServerSelectInput = Node.create({
 
   addAttributes() {
     return {
-      blockId: { default: null },
+      blockId: blockIdAttr,
       blockType: { default: "selectInput" },
       label: { default: "", parseHTML: (el) => el.getAttribute("data-label") || "", renderHTML: (attrs) => attrs.label ? { "data-label": attrs.label } : {} },
       placeholder: { default: "Select an option...", parseHTML: (el) => el.getAttribute("data-placeholder") || "Select an option...", renderHTML: (attrs) => ({ "data-placeholder": attrs.placeholder }) },
@@ -238,5 +240,26 @@ export const ServerSelectInput = Node.create({
   },
 
   parseHTML() { return [{ tag: 'div[data-block-type="selectInput"]' }]; },
-  renderHTML({ HTMLAttributes }) { return ["div", mergeAttributes(HTMLAttributes, { class: "block-select-input", "data-block-type": "selectInput" })]; },
+  renderHTML({ node, HTMLAttributes }) {
+    const label = String(node.attrs.label ?? "");
+    const options = Array.isArray(node.attrs.options) ? (node.attrs.options as string[]) : [];
+    const allowMultiple = Boolean(node.attrs.allowMultiple);
+    const selectedValue = String(node.attrs.selectedValue ?? "");
+    const selectedValues = Array.isArray(node.attrs.selectedValues) ? (node.attrs.selectedValues as string[]) : [];
+    const hasSelection = allowMultiple ? selectedValues.length > 0 : selectedValue.length > 0;
+    if (!hasSelection) {
+      return ["div", mergeAttributes(HTMLAttributes, { class: "block-select-input", "data-block-type": "selectInput", "data-form-empty": "true" })];
+    }
+    const optionEls: DOMOutputSpec[] = options.map((opt) => {
+      const isSelected = allowMultiple ? selectedValues.includes(opt) : opt === selectedValue;
+      return ["option", isSelected ? { value: opt, selected: "true" } : { value: opt }, opt];
+    });
+    const selectAttrs: Record<string, string> = { class: "block-form-control" };
+    if (allowMultiple) selectAttrs.multiple = "true";
+    const outerAttrs = mergeAttributes(HTMLAttributes, { class: "block-select-input block-form-rendered", "data-block-type": "selectInput" });
+    const selectEl: DOMOutputSpec = ["select", selectAttrs, ...optionEls] as DOMOutputSpec;
+    return label
+      ? ["div", outerAttrs, ["label", { class: "block-form-label" }, label], selectEl]
+      : ["div", outerAttrs, selectEl];
+  },
 });

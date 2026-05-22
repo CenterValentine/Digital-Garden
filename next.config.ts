@@ -14,6 +14,17 @@ const nextConfig: NextConfig = {
     'canvas',
     // Sharp (image processing)
     'sharp',
+    // JSDOM (used by components/public/TipTapContent.tsx to server-render
+    // TipTap JSON via ProseMirror's DOMSerializer). Large dep, no benefit
+    // to bundling. Note: jsdom is also pinned to ^26.1.0 in package.json
+    // because jsdom@27+ pulls in @exodus/bytes (ESM-only) which crashes
+    // with ERR_REQUIRE_ESM on Vercel's Rust runtime loader regardless of
+    // bundler externalization (the first attempt at 8c6eca8 just added
+    // these entries and it kept failing — see davidvalentine.org/blog/*
+    // page_render:failed traces on 2026-05-21). Keep the version pin in
+    // place; revisit when @exodus/bytes ships a CJS shim or Vercel's
+    // loader supports require(esm) for top-level-await-free modules.
+    'jsdom',
   ],
   // Webpack configuration for production builds (Vercel uses --webpack flag)
   webpack: (config, { isServer }) => {
@@ -25,6 +36,7 @@ const nextConfig: NextConfig = {
         '@ffmpeg-installer/ffmpeg',
         'canvas',
         'sharp',
+        'jsdom',
       ];
     }
     return config;

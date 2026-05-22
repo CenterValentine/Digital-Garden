@@ -8,9 +8,11 @@
  */
 
 import { Node, mergeAttributes } from "@tiptap/core";
+import type { DOMOutputSpec } from "@tiptap/pm/model";
 import { z } from "zod";
 import { createBlockSchema } from "@/lib/domain/blocks/schema";
 import { registerBlock } from "@/lib/domain/blocks/registry";
+import { blockIdAttr } from "@/lib/domain/blocks/data-attr";
 import { createBlockNodeView } from "@/lib/domain/blocks/node-view-factory";
 
 const { schema: ratingInputSchema, defaults: ratingInputDefaults } =
@@ -111,7 +113,7 @@ export const RatingInput = Node.create({
 
   addAttributes() {
     return {
-      blockId: { default: null },
+      blockId: blockIdAttr,
       blockType: { default: "ratingInput" },
       label: { default: "", parseHTML: (el) => el.getAttribute("data-label") || "", renderHTML: (attrs) => attrs.label ? { "data-label": attrs.label } : {} },
       value: { default: 0, parseHTML: (el) => parseInt(el.getAttribute("data-value") || "0", 10), renderHTML: (attrs) => ({ "data-value": String(attrs.value) }) },
@@ -148,7 +150,7 @@ export const ServerRatingInput = Node.create({
 
   addAttributes() {
     return {
-      blockId: { default: null },
+      blockId: blockIdAttr,
       blockType: { default: "ratingInput" },
       label: { default: "", parseHTML: (el) => el.getAttribute("data-label") || "", renderHTML: (attrs) => attrs.label ? { "data-label": attrs.label } : {} },
       value: { default: 0, parseHTML: (el) => parseInt(el.getAttribute("data-value") || "0", 10), renderHTML: (attrs) => ({ "data-value": String(attrs.value) }) },
@@ -158,5 +160,31 @@ export const ServerRatingInput = Node.create({
   },
 
   parseHTML() { return [{ tag: 'div[data-block-type="ratingInput"]' }]; },
-  renderHTML({ HTMLAttributes }) { return ["div", mergeAttributes(HTMLAttributes, { class: "block-rating-input", "data-block-type": "ratingInput" })]; },
+  renderHTML({ node, HTMLAttributes }) {
+    const value = Number(node.attrs.value ?? 0);
+    const label = String(node.attrs.label ?? "");
+    const maxRating = Number(node.attrs.maxRating ?? 5);
+    const style = String(node.attrs.style ?? "stars");
+    // value=0 = "no rating yet" per the block's UX → omit on publisher
+    if (value <= 0) {
+      return ["div", mergeAttributes(HTMLAttributes, { class: "block-rating-input", "data-block-type": "ratingInput", "data-form-empty": "true" })];
+    }
+    // Static read-only display: filled glyphs up to value, empty after.
+    const filled = style === "hearts" ? "♥" : style === "numbers" ? null : "★";
+    const empty = style === "hearts" ? "♡" : style === "numbers" ? null : "☆";
+    const outerAttrs = mergeAttributes(HTMLAttributes, {
+      class: "block-rating-input block-form-rendered",
+      "data-block-type": "ratingInput",
+      "data-value": String(value),
+      "data-max-rating": String(maxRating),
+      "data-style": style,
+    });
+    const display: DOMOutputSpec =
+      filled !== null
+        ? ["span", { class: "block-rating-display" }, filled.repeat(value) + (empty ?? "").repeat(Math.max(0, maxRating - value))]
+        : ["span", { class: "block-rating-display" }, `${value} / ${maxRating}`];
+    return label
+      ? ["div", outerAttrs, ["label", { class: "block-form-label" }, label], display]
+      : ["div", outerAttrs, display];
+  },
 });

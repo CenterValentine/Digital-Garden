@@ -9,7 +9,9 @@ import { Node, mergeAttributes } from "@tiptap/core";
 import { z } from "zod";
 import { createBlockSchema } from "@/lib/domain/blocks/schema";
 import { registerBlock } from "@/lib/domain/blocks/registry";
+import { blockIdAttr } from "@/lib/domain/blocks/data-attr";
 import { createBlockNodeView } from "@/lib/domain/blocks/node-view-factory";
+import { dataAttr } from "@/lib/domain/blocks/data-attr";
 import { makeWrapAttrs } from "@/lib/domain/blocks/wrap-size";
 import { makeEditableField, syncEditableField } from "@/lib/domain/blocks/inline-edit";
 
@@ -56,43 +58,15 @@ registerBlock({
 
 function postCardAttrs() {
   return {
-    blockId: { default: null },
+    blockId: blockIdAttr,
     blockType: { default: "postCard" },
-    title: {
-      default: "",
-      parseHTML: (el: Element) => el.getAttribute("data-title") ?? "",
-      renderHTML: (attrs: Record<string, unknown>) => attrs.title ? { "data-title": attrs.title } : {},
-    },
-    excerpt: {
-      default: "",
-      parseHTML: (el: Element) => el.getAttribute("data-excerpt") ?? "",
-      renderHTML: (attrs: Record<string, unknown>) => attrs.excerpt ? { "data-excerpt": attrs.excerpt } : {},
-    },
-    publishedAt: {
-      default: "",
-      parseHTML: (el: Element) => el.getAttribute("data-published-at") ?? "",
-      renderHTML: (attrs: Record<string, unknown>) => attrs.publishedAt ? { "data-published-at": attrs.publishedAt } : {},
-    },
-    tags: {
-      default: "[]",
-      parseHTML: (el: Element) => el.getAttribute("data-tags") ?? "[]",
-      renderHTML: (attrs: Record<string, unknown>) => ({ "data-tags": attrs.tags }),
-    },
-    coverUrl: {
-      default: "",
-      parseHTML: (el: Element) => el.getAttribute("data-cover-url") ?? "",
-      renderHTML: (attrs: Record<string, unknown>) => attrs.coverUrl ? { "data-cover-url": attrs.coverUrl } : {},
-    },
-    href: {
-      default: "",
-      parseHTML: (el: Element) => el.getAttribute("data-href") ?? "",
-      renderHTML: (attrs: Record<string, unknown>) => attrs.href ? { "data-href": attrs.href } : {},
-    },
-    variant: {
-      default: "default",
-      parseHTML: (el: Element) => el.getAttribute("data-variant") ?? "default",
-      renderHTML: (attrs: Record<string, unknown>) => ({ "data-variant": attrs.variant }),
-    },
+    title: dataAttr("title"),
+    excerpt: dataAttr("excerpt"),
+    publishedAt: dataAttr("publishedAt"),
+    tags: dataAttr("tags", { default: "[]" }),
+    coverUrl: dataAttr("coverUrl"),
+    href: dataAttr("href"),
+    variant: dataAttr("variant", { default: "default" }),
     ...makeWrapAttrs(),
   };
 }

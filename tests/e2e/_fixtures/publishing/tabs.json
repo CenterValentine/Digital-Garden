@@ -1,0 +1,60 @@
+{
+  "type": "doc",
+  "content": [
+    {
+      "type": "tabs",
+      "attrs": {
+        "activeTab": 0,
+        "tabStyle": "underline",
+        "showContainer": false
+      },
+      "content": [
+        {
+          "type": "tabPanel",
+          "attrs": { "label": "Overview" },
+          "content": [
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Overview tab content. The first tab is shown by default. Click any tab header to switch panels."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "tabPanel",
+          "attrs": { "label": "Details" },
+          "content": [
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Details tab content. Hidden panels use display:none; only the active panel is visible at a time."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "tabPanel",
+          "attrs": { "label": "Pricing" },
+          "content": [
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Pricing tab content. Tab order is preserved from the document, and the active index is stored as an attribute."
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

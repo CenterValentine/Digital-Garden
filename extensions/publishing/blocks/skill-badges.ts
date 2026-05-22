@@ -14,7 +14,9 @@ import { Node, mergeAttributes } from "@tiptap/core";
 import { z } from "zod";
 import { createBlockSchema } from "@/lib/domain/blocks/schema";
 import { registerBlock } from "@/lib/domain/blocks/registry";
+import { blockIdAttr } from "@/lib/domain/blocks/data-attr";
 import { createBlockNodeView } from "@/lib/domain/blocks/node-view-factory";
+import { dataAttr } from "@/lib/domain/blocks/data-attr";
 
 export interface SkillItem {
   label: string;
@@ -65,23 +67,11 @@ registerBlock({
 
 function skillAttrs() {
   return {
-    blockId: { default: null },
+    blockId: blockIdAttr,
     blockType: { default: "skillBadges" },
-    items: {
-      default: "[]",
-      parseHTML: (el: Element) => el.getAttribute("data-items") ?? "[]",
-      renderHTML: (attrs: Record<string, unknown>) => ({ "data-items": attrs.items }),
-    },
-    label: {
-      default: "",
-      parseHTML: (el: Element) => el.getAttribute("data-label") ?? "",
-      renderHTML: (attrs: Record<string, unknown>) => ({ "data-label": attrs.label }),
-    },
-    variant: {
-      default: "pills",
-      parseHTML: (el: Element) => el.getAttribute("data-variant") ?? "pills",
-      renderHTML: (attrs: Record<string, unknown>) => ({ "data-variant": attrs.variant }),
-    },
+    items: dataAttr("items", { default: "[]" }),
+    label: dataAttr("label"),
+    variant: dataAttr("variant", { default: "pills" }),
   };
 }
 

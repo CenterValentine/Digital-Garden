@@ -9,7 +9,9 @@ import { Node, mergeAttributes } from "@tiptap/core";
 import { z } from "zod";
 import { createBlockSchema } from "@/lib/domain/blocks/schema";
 import { registerBlock } from "@/lib/domain/blocks/registry";
+import { blockIdAttr } from "@/lib/domain/blocks/data-attr";
 import { createBlockNodeView } from "@/lib/domain/blocks/node-view-factory";
+import { dataAttr } from "@/lib/domain/blocks/data-attr";
 import { makeWrapAttrs } from "@/lib/domain/blocks/wrap-size";
 import { makeEditableField, syncEditableField } from "@/lib/domain/blocks/inline-edit";
 
@@ -49,48 +51,16 @@ registerBlock({
 
 function projectCardAttrs() {
   return {
-    blockId: { default: null },
+    blockId: blockIdAttr,
     blockType: { default: "projectCard" },
-    title: {
-      default: "",
-      parseHTML: (el: Element) => el.getAttribute("data-title") ?? "",
-      renderHTML: (attrs: Record<string, unknown>) => attrs.title ? { "data-title": attrs.title } : {},
-    },
-    description: {
-      default: "",
-      parseHTML: (el: Element) => el.getAttribute("data-description") ?? "",
-      renderHTML: (attrs: Record<string, unknown>) => attrs.description ? { "data-description": attrs.description } : {},
-    },
-    tech: {
-      default: "[]",
-      parseHTML: (el: Element) => el.getAttribute("data-tech") ?? "[]",
-      renderHTML: (attrs: Record<string, unknown>) => ({ "data-tech": attrs.tech }),
-    },
-    coverUrl: {
-      default: "",
-      parseHTML: (el: Element) => el.getAttribute("data-cover-url") ?? "",
-      renderHTML: (attrs: Record<string, unknown>) => attrs.coverUrl ? { "data-cover-url": attrs.coverUrl } : {},
-    },
-    liveUrl: {
-      default: "",
-      parseHTML: (el: Element) => el.getAttribute("data-live-url") ?? "",
-      renderHTML: (attrs: Record<string, unknown>) => attrs.liveUrl ? { "data-live-url": attrs.liveUrl } : {},
-    },
-    repoUrl: {
-      default: "",
-      parseHTML: (el: Element) => el.getAttribute("data-repo-url") ?? "",
-      renderHTML: (attrs: Record<string, unknown>) => attrs.repoUrl ? { "data-repo-url": attrs.repoUrl } : {},
-    },
-    status: {
-      default: "active",
-      parseHTML: (el: Element) => el.getAttribute("data-status") ?? "active",
-      renderHTML: (attrs: Record<string, unknown>) => ({ "data-status": attrs.status }),
-    },
-    variant: {
-      default: "default",
-      parseHTML: (el: Element) => el.getAttribute("data-variant") ?? "default",
-      renderHTML: (attrs: Record<string, unknown>) => ({ "data-variant": attrs.variant }),
-    },
+    title: dataAttr("title"),
+    description: dataAttr("description"),
+    tech: dataAttr("tech", { default: "[]" }),
+    coverUrl: dataAttr("coverUrl"),
+    liveUrl: dataAttr("liveUrl"),
+    repoUrl: dataAttr("repoUrl"),
+    status: dataAttr("status", { default: "active" }),
+    variant: dataAttr("variant", { default: "default" }),
     ...makeWrapAttrs(),
   };
 }

@@ -1,0 +1,12 @@
+{
+  "type": "doc",
+  "content": [
+    {
+      "type": "spacer",
+      "attrs": {
+        "blockType": "spacer",
+        "height": "md"
+      }
+    }
+  ]
+}
