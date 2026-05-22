@@ -26,12 +26,26 @@ import { normalizeUrl } from "@/lib/domain/content/external-validation";
 import { syncContentTags } from "@/lib/domain/content/tag-sync";
 import { syncImageReferences } from "@/lib/domain/content/image-refs";
 import { syncPersonMentions } from "@/lib/domain/content/person-mention-sync";
-import { resolveContentAccess } from "@/lib/domain/collaboration/access";
+import {
+  resolveContentAccess,
+  resolveContentAccessFromNode,
+} from "@/lib/domain/collaboration/access";
+import {
+  getCachedContent,
+  invalidateCachedContent,
+  setCachedContent,
+} from "@/lib/domain/content/content-cache";
 import { ensureWebResourceForExternalContent } from "@/lib/domain/browser-extension";
 import type { JSONContent } from "@tiptap/core";
 import { getServerExtensions } from "@/lib/domain/editor/extensions-server";
 import { sanitizeTipTapJsonWithExtensions } from "@/lib/domain/editor/unsupported-content";
-import { logger, spanPayload, withRouteTrace, withSpan } from "@/lib/core/logger";
+import {
+  forkTraceContext,
+  logger,
+  spanPayload,
+  withRouteTrace,
+  withSpan,
+} from "@/lib/core/logger";
 import crypto from "node:crypto";
 
 /**
@@ -58,13 +72,46 @@ type Params = Promise<{ id: string }>;
 
 const ROUTE_PATH = "/api/content/content/[id]";
 
+// Shared Prisma query for content-by-id with all payload relations. Extracted
+// so the GET handler can call it cleanly from inside withSpan without
+// duplicating the include shape.
+function fetchContentRow(id: string) {
+  return prisma.contentNode.findUnique({
+    where: { id },
+    include: {
+      ...CONTENT_WITH_PAYLOADS,
+      // Path A: include the owning note (if any) so the standalone viewer
+      // can render read-only and link back. Kept inline to avoid widening
+      // CONTENT_WITH_PAYLOADS for every caller.
+      ownedByNote: { select: { id: true, title: true } },
+    },
+  });
+}
+
 async function getRequestUserId(request: NextRequest) {
-  const extensionAuth = await getOptionalBrowserExtensionBearerAuth(request);
+  // The bearer check is fast when no Authorization header is present (the
+  // common path for browser requests); we still wrap it so a slow token
+  // validation in extension-driven traffic is visible. session_lookup is
+  // the expected hot phase — sub-spanning it separates the cookie-only
+  // auth class from extension-token auth in trace replays.
+  const extensionAuth = await withSpan(
+    { layer: "auth", name: "bearer_check" },
+    { summary: "extension bearer token" },
+    async (span) => {
+      const result = await getOptionalBrowserExtensionBearerAuth(request);
+      span.attr("present", result?.user?.id ? true : false);
+      return result;
+    },
+  );
   if (extensionAuth?.user?.id) {
     return extensionAuth.user.id;
   }
 
-  const session = await requireAuth();
+  const session = await withSpan(
+    { layer: "auth", name: "session_lookup" },
+    { summary: "session cookie + user row" },
+    async () => requireAuth(),
+  );
   return session.user.id;
 }
 
@@ -139,38 +186,135 @@ export async function GET(
     try {
       const { id } = await params;
 
-      const userId = await withSpan(
-        { layer: "auth", name: "session" },
-        { summary: "session lookup" },
-        async () => getRequestUserId(request),
-      );
+      // Auth and payload don't share data — userId is only consumed by the
+      // access check below, and the payload query keys on `id` from params.
+      // Running them in parallel saves the smaller of the two phases on
+      // every request (~150ms avg, per the baseline traces measured before
+      // this change).
+      //
+      // forkTraceContext wraps each branch so its spans get an isolated
+      // AsyncLocalStorage scope. Without that, Promise.all's two synchronous
+      // startSpan calls would both modify the same spanStack — the second
+      // span would be recorded as the first's child, and sub-spans inside
+      // either branch could see the sibling branch's span as their parent.
+      // Wall-clock parallelism still works without the fork, but the trace
+      // replay would misleadingly nest the two siblings.
+      const [userId, payloadResult] = await Promise.all([
+        forkTraceContext(() => withSpan(
+          { layer: "auth", name: "session" },
+          { summary: "session lookup" },
+          async () => getRequestUserId(request),
+        )),
+        forkTraceContext(() => withSpan(
+          { layer: "content", name: "payload" },
+          { attrs: { content_id: id }, summary: id },
+          async (span): Promise<
+            | { kind: "cached"; response: ContentDetailResponse }
+            | { kind: "fresh"; row: Awaited<ReturnType<typeof fetchContentRow>> }
+          > => {
+            // Server-side content cache — bypasses Prisma + Neon RTT entirely
+            // on warm hits. Sub-span timings showed the SQL roundtrip is
+            // dominated by network (us-west-2) and serverless compute warm-up
+            // rather than query execution; caching is the highest-leverage
+            // intervention.
+            const cached = getCachedContent(id);
+            if (cached) {
+              span
+                .attr("cache", "hit")
+                .attr("kind", cached.contentType)
+                .summary(`${id} ${cached.contentType} (cached)`);
+              return { kind: "cached", response: cached };
+            }
+            span.attr("cache", "miss");
 
-      const content = await withSpan(
-        { layer: "content", name: "payload" },
-        { attrs: { content_id: id }, summary: id },
-        async (span) => {
-          const result = await prisma.contentNode.findUnique({
-            where: { id },
-            include: {
-              ...CONTENT_WITH_PAYLOADS,
-              // Path A: include the owning note (if any) so the standalone viewer
-              // can render read-only and link back. Kept inline to avoid widening
-              // CONTENT_WITH_PAYLOADS for every caller.
-              ownedByNote: { select: { id: true, title: true } },
+            // Sub-span the SQL roundtrip so we can separate Prisma/network
+            // cost from the spanPayload sidecar write and any other JS
+            // work in the parent.
+            const result = await withSpan(
+              { layer: "content", name: "payload_query" },
+              { summary: `findUnique ${id}` },
+              () => fetchContentRow(id),
+            );
+            if (result) {
+              const payloadKinds = [
+                "notePayload",
+                "filePayload",
+                "htmlPayload",
+                "codePayload",
+                "folderPayload",
+                "externalPayload",
+                "chatPayload",
+                "visualizationPayload",
+                "dataPayload",
+                "hopePayload",
+                "workflowPayload",
+              ] as const;
+              const present = payloadKinds.filter(
+                (k) => (result as unknown as Record<string, unknown>)[k] != null,
+              );
+              span
+                .attr("kind", result.contentType)
+                .attr("payload_joins_hit", present.length)
+                .attr("payload_joins_total", payloadKinds.length)
+                .summary(`${id} ${result.contentType}`);
+              if (result.notePayload?.tiptapJson) {
+                const tiptapChars = JSON.stringify(
+                  result.notePayload.tiptapJson,
+                ).length;
+                span.attr("tiptap_chars", tiptapChars);
+              }
+              await spanPayload(span, "content_response", result);
+            } else {
+              span.attr("found", false).summary(`${id} not found`);
+            }
+            return { kind: "fresh", row: result };
+          },
+        )),
+      ]);
+
+      // Cache-hit path: skip response building, run access on cached metadata,
+      // return the stored response. Saves Prisma query + response assembly.
+      if (payloadResult.kind === "cached") {
+        const cached = payloadResult.response;
+        const cachedAccessGranted = await withSpan(
+          { layer: "content", name: "access" },
+          { attrs: { content_id: id, require: "view", cache: "hit" } },
+          async (span) => {
+            try {
+              await resolveContentAccessFromNode(prisma, {
+                content: {
+                  id: cached.id,
+                  ownerId: cached.ownerId,
+                  contentType: cached.contentType,
+                  deletedAt: cached.deletedAt,
+                },
+                userId,
+                require: "view",
+              });
+              span.attr("granted", true);
+              return true;
+            } catch {
+              span.attr("granted", false).summary("denied");
+              return false;
+            }
+          },
+        );
+        if (!cachedAccessGranted) {
+          return NextResponse.json(
+            {
+              success: false,
+              error: { code: "FORBIDDEN", message: "Access denied" },
             },
-          });
-          if (result) {
-            span
-              .attr("kind", result.contentType)
-              .summary(`${id} ${result.contentType}`);
-            await spanPayload(span, "content_response", result);
-          } else {
-            span.attr("found", false).summary(`${id} not found`);
-          }
-          return result;
-        },
-      );
+            { status: 403 }
+          );
+        }
+        return NextResponse.json({ success: true, data: cached });
+      }
 
+      // Fresh path: existing build-response + cache-populate flow. We alias
+      // the row back to `content` so the response-building code below reads
+      // unchanged from the pre-cache shape.
+      const content = payloadResult.row;
       if (!content) {
         return NextResponse.json(
           {
@@ -189,8 +333,17 @@ export async function GET(
         { attrs: { content_id: id, require: "view" } },
         async (span) => {
           try {
-            await resolveContentAccess(prisma, {
-              contentId: id,
+            // resolveContentAccessFromNode skips the duplicate findFirst
+            // that the original resolveContentAccess would issue — we
+            // already have the content row from the payload span above.
+            // Saves one DB round trip per request.
+            await resolveContentAccessFromNode(prisma, {
+              content: {
+                id: content.id,
+                ownerId: content.ownerId,
+                contentType: content.contentType,
+                deletedAt: content.deletedAt,
+              },
               userId,
               require: "view",
             });
@@ -316,6 +469,10 @@ export async function GET(
           metadata: (content.chatPayload.metadata ?? {}) as Record<string, unknown>,
         };
       }
+
+      // Populate the cache for the next read. Soft-deleted content is
+      // skipped inside setCachedContent so a delete+re-fetch always wins.
+      setCachedContent(id, response);
 
       return NextResponse.json({
         success: true,
@@ -1136,6 +1293,12 @@ export async function PATCH(
         };
       }
 
+      // Invalidate the local cache so subsequent GETs see the fresh state.
+      // Other process instances catch up via the cache's TTL. Order: AFTER
+      // the DB write commits so a concurrent reader on this instance can't
+      // re-populate the cache from stale data between invalidate and write.
+      invalidateCachedContent(id);
+
       return NextResponse.json({
         success: true,
         data: response,
@@ -1266,6 +1429,11 @@ export async function DELETE(
           ]);
         },
       );
+
+      // Drop the cache entry so the next GET observes the soft-delete
+      // instead of returning a stale cached copy. The setCachedContent
+      // guard for deletedAt prevents re-population from in-flight reads.
+      invalidateCachedContent(id);
 
       return NextResponse.json({
         success: true,

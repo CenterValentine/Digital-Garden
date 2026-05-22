@@ -10,7 +10,12 @@
 export { logger } from "./emit";
 export { startSpan, withSpan } from "./span";
 export type { SpanHandle, SpanOptions } from "./span";
-export { getActiveSpan, getActiveTrace, withTrace } from "./context";
+export {
+  forkTraceContext,
+  getActiveSpan,
+  getActiveTrace,
+  withTrace,
+} from "./context";
 export { withRouteTrace } from "./route-trace";
 export type { RouteTraceOptions } from "./route-trace";
 export { withPageTrace } from "./page-trace";

@@ -519,6 +519,32 @@ export function MarkdownEditor({
       }
       // ─────────────────────────────────────────────────────────────────────
 
+      // Hard gate: REST autosave persists user intent. Non-user transactions
+      // (programmatic setContent, collab y-sync arrival, extension mutations,
+      // undo/redo replays) trigger onUpdate but represent no unsaved work —
+      // the doc is either still in its persisted state, or its real
+      // persistence path is the Y.Doc on Hocuspocus.
+      //
+      // Discovered via [editor:autosave:scheduled] diagnostic (PR #43): every
+      // tab switch on a collab-active doc fired a y-sync$ transaction that
+      // scheduled an unnecessary PATCH ~1s of pure server work. The earlier
+      // gate (`collaborationState?.provider`) sat in stale closure state and
+      // missed the case where collab connects after onUpdate's closure was
+      // captured. Checking is_user_origin directly is the stronger condition.
+      if (!isUserOrigin) {
+        clientLogger.debug({
+          layer: "editor",
+          event: "autosave:skipped_non_user_origin",
+          summary: "autosave dropped — transaction not user-driven",
+          attrs: {
+            content_id: contentIdRef.current ?? "unknown",
+            doc_changed: transaction.docChanged,
+            steps_count: transaction.steps.length,
+          },
+        });
+        return;
+      }
+
       // Mark as unsaved
       setHasUnsavedChanges(true);
 
@@ -540,9 +566,48 @@ export function MarkdownEditor({
       const snapshotSave = onSaveRef.current;
       const snapshotContentId = contentIdRef.current;
       if (snapshotSave) {
+        // Diagnosis: record what kind of transaction is scheduling this
+        // autosave. Phase A of the autosave-on-tab-switch investigation —
+        // we want to confirm whether tab activation is triggering saves
+        // via programmatic setContent (the prime suspect), extension
+        // mutation, collab sync, or genuine user input. Step kinds and
+        // meta keys identify each class without requiring source diving
+        // in DevTools.
+        const stepKinds = transaction.steps
+          .slice(0, 4)
+          .map((s) => s.constructor?.name ?? "Unknown")
+          .join(",");
+        // ProseMirror Transaction.meta is a private field but the only
+        // way to enumerate which keys were tagged on this tx without
+        // calling getMeta(key) for every possible key.
+        const txWithMeta = transaction as unknown as { meta?: Record<string, unknown> };
+        const metaKeys =
+          txWithMeta.meta && typeof txWithMeta.meta === "object"
+            ? Object.keys(txWithMeta.meta).slice(0, 6).join(",")
+            : "";
+        clientLogger.info({
+          layer: "editor",
+          event: "autosave:scheduled",
+          summary: `autosave queued (${isUserOrigin ? "user" : "programmatic"})`,
+          attrs: {
+            content_id: snapshotContentId ?? "unknown",
+            is_user_origin: isUserOrigin,
+            doc_changed: transaction.docChanged,
+            steps_count: transaction.steps.length,
+            step_kinds: stepKinds || "none",
+            meta_keys: metaKeys || "none",
+            delay_ms: autoSaveDelay,
+          },
+        });
         saveTimeoutRef.current = setTimeout(async () => {
           // Guard: if contentId changed since the edit, discard this save
           if (snapshotContentId && contentIdRef.current !== snapshotContentId) {
+            clientLogger.info({
+              layer: "editor",
+              event: "autosave:skipped_navigated",
+              summary: "autosave dropped — pane navigated during debounce",
+              attrs: { content_id: snapshotContentId },
+            });
             return;
           }
           setIsSaving(true);
@@ -563,6 +628,17 @@ export function MarkdownEditor({
                 : null;
             const userInitiated =
               lastInputAt !== null && Date.now() - lastInputAt < USER_INPUT_RECENCY_MS;
+            clientLogger.info({
+              layer: "editor",
+              event: "autosave:executed",
+              summary: `autosave PATCH firing (${userInitiated ? "user-initiated" : "programmatic"})`,
+              attrs: {
+                content_id: snapshotContentId ?? "unknown",
+                user_initiated: userInitiated,
+                seconds_since_input:
+                  secondsSinceInput !== null ? secondsSinceInput : -1,
+              },
+            });
             await snapshotSave(json, {
               userInitiated,
               secondsSinceInput: secondsSinceInput ?? undefined,

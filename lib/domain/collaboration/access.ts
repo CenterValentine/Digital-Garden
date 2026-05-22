@@ -15,27 +15,36 @@ export interface ContentAccessResult {
 const EDIT_LEVELS = new Set(["edit", "write", "owner"]);
 const VIEW_LEVELS = new Set(["view", "read", ...EDIT_LEVELS]);
 
-export async function resolveContentAccess(
+export type PrefetchedAccessNode = {
+  id: string;
+  ownerId: string;
+  contentType: string;
+  deletedAt?: Date | null;
+};
+
+/**
+ * Resolve access when the caller already has the content node in hand.
+ *
+ * Use this from API routes that fetched the content for other reasons
+ * (payload includes, ownership-derived response shape, etc.) — passing it
+ * here skips the duplicate `findFirst` that `resolveContentAccess` would
+ * otherwise issue. Saves one DB round trip per request.
+ *
+ * The caller must guarantee `content` came from a query with the same
+ * tombstone semantics as the original helper (`deletedAt: null`); if
+ * `content.deletedAt` is set, this throws the same "Content not found"
+ * error the original helper would.
+ */
+export async function resolveContentAccessFromNode(
   prisma: PrismaClient,
   input: {
-    contentId: string;
+    content: PrefetchedAccessNode;
     userId: string;
     require?: "view" | "edit";
   }
 ): Promise<ContentAccessResult> {
-  const content = await prisma.contentNode.findFirst({
-    where: {
-      id: input.contentId,
-      deletedAt: null,
-    },
-    select: {
-      id: true,
-      ownerId: true,
-      contentType: true,
-    },
-  });
-
-  if (!content) {
+  const content = input.content;
+  if (content.deletedAt) {
     throw new Error("Content not found");
   }
 
@@ -46,7 +55,7 @@ export async function resolveContentAccess(
     const grant = await prisma.viewGrant.findUnique({
       where: {
         contentId_userId: {
-          contentId: input.contentId,
+          contentId: content.id,
           userId: input.userId,
         },
       },
@@ -86,3 +95,37 @@ export async function resolveContentAccess(
     readOnly: !canEdit,
   };
 }
+
+export async function resolveContentAccess(
+  prisma: PrismaClient,
+  input: {
+    contentId: string;
+    userId: string;
+    require?: "view" | "edit";
+  }
+): Promise<ContentAccessResult> {
+  const content = await prisma.contentNode.findFirst({
+    where: {
+      id: input.contentId,
+      deletedAt: null,
+    },
+    select: {
+      id: true,
+      ownerId: true,
+      contentType: true,
+    },
+  });
+
+  if (!content) {
+    throw new Error("Content not found");
+  }
+
+  // Delegate to the prefetched variant — kept as one implementation so the
+  // grant-lookup and EDIT/VIEW level mapping live in a single place.
+  return resolveContentAccessFromNode(prisma, {
+    content,
+    userId: input.userId,
+    require: input.require,
+  });
+}
+

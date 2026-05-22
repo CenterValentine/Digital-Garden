@@ -217,18 +217,25 @@ function openInBrowser(path: string) {
 
 function buildTree(events: LogEvent[]): Node[] {
   const roots: Node[] = [];
-  const stack: Node[] = []; // active spans (top is innermost)
   const spanIndex = new Map<string, Extract<Node, { kind: "span" }>>();
 
   const isStarted = (e: LogEvent) => e.event.endsWith(":started");
   const isTerminal = (e: LogEvent) =>
     e.event.endsWith(":completed") || e.event.endsWith(":failed");
 
-  for (const ev of events) {
-    const parent = stack[stack.length - 1];
-    const siblings =
-      parent && parent.kind === "span" ? parent.children : roots;
+  // Resolve which span should own a new node. parent_span_id is captured by
+  // the emitter at the moment of emit (via AsyncLocalStorage's getActiveSpan)
+  // and is authoritative. If unset, the event is a true root — multiple
+  // concurrent requests sharing one trace_id each emit their own root
+  // route:request span, and they must render as siblings, not as a stack
+  // pretending one is the parent of the next.
+  const resolveContainer = (ev: LogEvent): Node[] => {
+    if (!ev.parent_span_id) return roots;
+    const parent = spanIndex.get(ev.parent_span_id);
+    return parent ? parent.children : roots;
+  };
 
+  for (const ev of events) {
     if (isStarted(ev) && ev.span_id) {
       const span: Extract<Node, { kind: "span" }> = {
         kind: "span",
@@ -241,9 +248,8 @@ function buildTree(events: LogEvent[]): Node[] {
         span_id: ev.span_id,
         children: [],
       };
-      siblings.push(span);
+      resolveContainer(ev).push(span);
       spanIndex.set(ev.span_id, span);
-      stack.push(span);
       continue;
     }
 
@@ -266,15 +272,11 @@ function buildTree(events: LogEvent[]): Node[] {
           span.level = ev.level;
         }
       }
-      // Pop only if the innermost active span matches.
-      if (parent?.kind === "span" && parent.span_id === ev.span_id) {
-        stack.pop();
-      }
       continue;
     }
 
     // Leaf event (e.g., content:db:query, an info breadcrumb, an error).
-    siblings.push({
+    resolveContainer(ev).push({
       kind: "event",
       layer: ev.layer,
       event: ev.event,
