@@ -65,6 +65,7 @@ import { HabitTracker } from "./extensions/blocks/habit-tracker";
 import { Stopwatch } from "./extensions/blocks/stopwatch";
 import { PullQuote } from "./extensions/blocks/pull-quote";
 import { TableOfContents } from "./extensions/blocks/table-of-contents";
+import { FlashcardEmbed } from "./extensions/blocks/flashcard-embed";
 import {
   UnsupportedBlock,
   UnsupportedInline,
@@ -297,6 +298,7 @@ export function getEditorExtensions(options?: EditorExtensionsOptions): Extensio
     Stopwatch,
     PullQuote,
     TableOfContents,
+    FlashcardEmbed,
     UnsupportedBlock,
     UnsupportedInline,
     ...getExtensionClientEditorExtensions(),
