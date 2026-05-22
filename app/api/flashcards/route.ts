@@ -9,7 +9,6 @@ import {
   createTextTiptapDoc,
   isTiptapDoc,
   normalizeTiptapDoc,
-  resolveLegacyDeckId,
   sanitizeFlashcardCategory,
   sanitizeFlashcardLabel,
   sanitizeFlashcardSubcategory,
@@ -20,6 +19,9 @@ import type {
   FlashcardReviewStatus,
   FlashcardState,
 } from "@/lib/domain/flashcards";
+// Deep import — legacy-compat has a Prisma value import and is NOT
+// re-exported through the barrel (see legacy-compat.ts header).
+import { resolveLegacyDeckId } from "@/lib/domain/flashcards/legacy-compat";
 
 // Sprint 6 changes:
 //  - POST: deckId is the source of truth. If the request only carries

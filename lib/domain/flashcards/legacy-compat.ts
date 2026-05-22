@@ -1,77 +1,27 @@
 import type { Prisma } from "@/lib/database/generated/prisma";
 import { prisma as defaultPrisma } from "@/lib/database/client";
 import { slugifyDeckName } from "./api";
-import type {
-  FlashcardReviewStatus,
-  FlashcardState,
-} from "./types";
 
-// Compatibility helpers (Epoch 19, Sprint 6 — Legacy column sunset).
+// SERVER-ONLY helpers (Epoch 19, Sprint 6 — Legacy column sunset).
 //
-// The legacy flashcards UI (FlashcardsPanel, FlashcardQuickAddForm) +
-// the original API surface used category/subcategory strings to bucket
-// cards. Migration C drops those columns. This file is the shim that
-// lets the unchanged UI keep working: legacy DTOs are derived from the
-// FK paradigm (FlashcardDeck) at the server boundary, and legacy
-// request payloads (`{ category, subcategory }`) are translated to
-// deckId lookups before they hit Prisma.
+// CRITICAL: this file has a Prisma value import. It is NOT re-exported
+// through the barrel `lib/domain/flashcards/index.ts` because any
+// client-side consumer importing the barrel would transitively drag
+// the pg driver into the client bundle and break the Turbopack build
+// with `Module not found: dns/net/tls/fs`.
 //
-// All helpers are server-only — they import Prisma directly.
-
-// ─── DTO derivation (read path) ──────────────────────────────────
-
-// Deck shape returned by the queries below — minimal subset needed
-// to compute the legacy strings.
-export interface LegacyDeckSource {
-  name: string;
-  parentDeckId: string | null;
-  parent: { name: string } | null;
-}
-
-// Derive the legacy { category, subcategory } pair from a deck.
-//   Root deck (no parent):   category = deck.name, subcategory = ""
-//   Child deck (has parent): category = parent.name, subcategory = deck.name
+// Server callers import directly:
+//   import { resolveLegacyDeckId } from "@/lib/domain/flashcards/legacy-compat";
 //
-// Two-level only — matches the original schema's two-string bucketing.
-// Decks deeper than two levels still classify as `category = root, subcategory = leaf.name`
-// (we use the leaf's parent for the subcategory string; deeper structure
-// is lost in the legacy shape but preserved in the FK paradigm).
-export function deriveLegacyCategoryAndSubcategory(
-  deck: LegacyDeckSource | null,
-): { category: string; subcategory: string } {
-  if (!deck) return { category: "General", subcategory: "" };
-  if (deck.parent) {
-    return { category: deck.parent.name, subcategory: deck.name };
-  }
-  return { category: deck.name, subcategory: "" };
-}
+// The pure (client-safe) derivation helpers — deriveLegacyCategoryAndSubcategory,
+// deriveLegacyReviewStatus, deriveStateFromLegacyStatus — live in the
+// sibling `legacy-derive.ts` and ARE re-exported through the barrel.
+//
+// Re-export the client-safe helpers from here too so server callers
+// have a single import path for all the legacy-compat surface.
+export * from "./legacy-derive";
 
-// Translate the FSRS state to the legacy 4-value status.
-// "mastered" is no longer a discrete state — we synthesize it from
-// state=review + lapses=0 + reps>=N as a heuristic. Anyone who cares
-// about the legacy "mastered" filter gets a reasonable answer.
-export function deriveLegacyReviewStatus(
-  state: FlashcardState,
-  reps: number,
-  lapses: number,
-): FlashcardReviewStatus {
-  switch (state) {
-    case "archived":
-      return "archived";
-    case "new":
-      return "new";
-    case "review":
-      // Heuristic: 5+ successful reps with zero lapses qualifies as
-      // "mastered" in the legacy UI's sense. Doesn't affect scheduling.
-      return reps >= 5 && lapses === 0 ? "mastered" : "review";
-    case "learning":
-    case "relearning":
-    case "suspended":
-      return "review";
-  }
-}
-
-// ─── Deck resolution (write path) ────────────────────────────────
+// ─── Write-path deck resolution (server only) ────────────────────
 
 // Look-up-or-create the deck implied by a legacy { category, subcategory }
 // pair. Idempotent — multiple calls with the same strings hit the same
@@ -132,26 +82,4 @@ export async function resolveLegacyDeckId(
     select: { id: true },
   });
   return created.id;
-}
-
-// Translate a legacy reviewStatus PATCH into a (state, archivedAt,
-// suspendedAt) tuple. Only "archived" and "new" are actually settable
-// from outside FSRS — "review" and "mastered" are derived from the
-// scheduler. The latter two are no-ops here.
-export function deriveStateFromLegacyStatus(
-  status: FlashcardReviewStatus,
-  now: Date,
-): { state?: FlashcardState; archivedAt?: Date | null; suspendedAt?: Date | null } {
-  switch (status) {
-    case "archived":
-      return { state: "archived", archivedAt: now };
-    case "new":
-      // Un-archive / un-suspend → back to new (resets FSRS scheduling).
-      return { state: "new", archivedAt: null, suspendedAt: null };
-    case "review":
-    case "mastered":
-      // No-op — FSRS state is scheduler-controlled. Caller may still
-      // want to apply other changes; just don't touch state.
-      return {};
-  }
 }

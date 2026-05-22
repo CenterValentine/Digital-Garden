@@ -5,13 +5,15 @@ import { requireAuth } from "@/lib/infrastructure/auth/middleware";
 import {
   FLASHCARD_DECK_SELECT,
   deriveLegacyCategoryAndSubcategory,
-  resolveLegacyDeckId,
   sanitizeFlashcardCategory,
   sanitizeFlashcardSubcategory,
   slugifyDeckName,
   toFlashcardDeckRecordDto,
 } from "@/lib/domain/flashcards";
 import type { FlashcardDeckDto } from "@/lib/domain/flashcards";
+// Deep import — legacy-compat has a Prisma value import and is NOT
+// re-exported through the barrel.
+import { resolveLegacyDeckId } from "@/lib/domain/flashcards/legacy-compat";
 
 export async function GET() {
   try {

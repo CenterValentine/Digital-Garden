@@ -3,10 +3,14 @@ import {
   normalizeTiptapDoc,
   summarizeFlashcardContent,
 } from "./content";
+// Import the pure derive helpers from legacy-derive.ts (client-safe).
+// Avoid importing from legacy-compat.ts here — that file pulls in the
+// Prisma value, which would drag pg into every consumer (including
+// client components that transitively reach this module).
 import {
   deriveLegacyCategoryAndSubcategory,
   deriveLegacyReviewStatus,
-} from "./legacy-compat";
+} from "./legacy-derive";
 import type {
   FlashcardCardType,
   FlashcardDeckRecordDto,

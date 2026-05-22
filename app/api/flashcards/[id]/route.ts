@@ -9,7 +9,6 @@ import {
   deriveStateFromLegacyStatus,
   isTiptapDoc,
   normalizeTiptapDoc,
-  resolveLegacyDeckId,
   sanitizeFlashcardCategory,
   sanitizeFlashcardLabel,
   sanitizeFlashcardSubcategory,
@@ -17,6 +16,9 @@ import {
   toFlashcardDto,
 } from "@/lib/domain/flashcards";
 import type { FlashcardReviewStatus } from "@/lib/domain/flashcards";
+// Deep import — legacy-compat has a Prisma value import and is NOT
+// re-exported through the barrel.
+import { resolveLegacyDeckId } from "@/lib/domain/flashcards/legacy-compat";
 
 // Sprint 6 changes:
 //  - PATCH accepts deckId. If only category/subcategory strings are
