@@ -1,16 +1,21 @@
-import { Node, mergeAttributes, type Editor } from "@tiptap/core";
-import { createElement } from "react";
-import { createRoot, type Root } from "react-dom/client";
+import { Node, mergeAttributes } from "@tiptap/core";
 import { z } from "zod";
 
 import { createBlockSchema } from "@/lib/domain/blocks/schema";
 import { registerBlock } from "@/lib/domain/blocks/registry";
-import { createBlockNodeView } from "@/lib/domain/blocks/node-view-factory";
-import { FlashcardEmbedNodeView } from "@/extensions/flashcards/components/FlashcardEmbedNodeView";
 
-// Block schema (Epoch 19, Sprint 4). Reference-only — card payloads live
-// in the global FlashcardDeck/Flashcard tables. The block stores just
-// enough to look up what to render, plus per-block UX preferences.
+// Server-safe block module (Epoch 19, Sprint 4).
+//
+// This file MUST stay free of React, react-dom, and any DOM imports —
+// `extensions-server.ts` pulls it in for API routes (markdown export,
+// collab schema) and Next.js's server-component check rejects any
+// client-only transitive import. The client-only NodeView mount lives
+// in flashcard-embed-client.tsx; `extensions-client.ts` imports the
+// `FlashcardEmbed` Node from there.
+//
+// Reference-only — card payloads live in the global FlashcardDeck /
+// Flashcard tables. The block stores just enough to look up what to
+// render, plus per-block UX preferences.
 //
 //   deckId            FK reference to a FlashcardDeck (or null while
 //                     the user is mid-picking).
@@ -44,7 +49,12 @@ const { schema: flashcardEmbedSchema, defaults: flashcardEmbedDefaults } =
   });
 
 export type FlashcardEmbedAttrs = z.infer<typeof flashcardEmbedSchema>;
+export { flashcardEmbedSchema, flashcardEmbedDefaults };
 
+// registerBlock is server-safe (the registry is just a Map; the only
+// thing that touches the client-side settings store is `getAllSlashBlocks`,
+// and that's called at lookup time, not registration time). Calling it
+// here means both server and client bundles see the registration.
 registerBlock({
   type: "flashcardEmbed",
   label: "Flashcard Deck",
@@ -70,178 +80,78 @@ registerBlock({
   ],
 });
 
-// ─── Client Node ────────────────────────────────────────────────────────
+// ─── Shared attribute spec ──────────────────────────────────────────────
+//
+// Exported as a function so both the client and server Node.create calls
+// can use exactly the same attrs definitions — drift between client and
+// server schemas is one of the few ways to break TipTap/Y.Doc round-trip.
 
-// Extend the contentDom with React root + cleanup hooks. Same pattern as
-// excalidraw-block — the NodeView factory expects renderContent to mount
-// content into contentDom; we mount a React tree and stash the root for
-// later updateContent / unmount cleanup.
-type BlockContentDom = HTMLElement & {
-  __reactRoot?: Root;
-  __cleanup?: () => void;
-};
-
-function renderFlashcardEmbed(
-  attrs: FlashcardEmbedAttrs,
-  contentDom: HTMLElement,
-  editor: Editor,
-  getPos: () => number | undefined,
-) {
-  const dom = contentDom as BlockContentDom;
-  // Defensive cleanup — updateContent already unmounts before calling us
-  // again, but this guards against a renderContent re-entry.
-  if (dom.__reactRoot) {
-    try {
-      dom.__reactRoot.unmount();
-    } catch {
-      // Ignore unmount errors; React will GC.
-    }
-    delete dom.__reactRoot;
-  }
-  contentDom.innerHTML = "";
-  const mount = document.createElement("div");
-  contentDom.appendChild(mount);
-  const root = createRoot(mount);
-  root.render(
-    createElement(FlashcardEmbedNodeView, {
-      attrs,
-      editor,
-      getPos,
-    }),
-  );
-  dom.__reactRoot = root;
-  dom.__cleanup = () => {
-    if (dom.__reactRoot) {
-      try {
-        dom.__reactRoot.unmount();
-      } catch {
-        // ignore
-      }
-      delete dom.__reactRoot;
-    }
+// TipTap's addAttributes return type is opaque; Record<string, unknown> is
+// the right shape (each attr is { default, parseHTML?, renderHTML? }) and
+// matches what the framework accepts.
+export function flashcardEmbedAttrSpec(): Record<string, unknown> {
+  return {
+    blockId: { default: null },
+    blockType: { default: "flashcardEmbed" },
+    deckId: {
+      default: null,
+      parseHTML: (el: HTMLElement) => el.getAttribute("data-deck-id") || null,
+      renderHTML: (attrs: Record<string, unknown>) =>
+        attrs.deckId ? { "data-deck-id": attrs.deckId as string } : {},
+    },
+    cardIds: {
+      default: null,
+      parseHTML: (el: HTMLElement) => {
+        const raw = el.getAttribute("data-card-ids");
+        if (!raw) return null;
+        const ids = raw.split(",").filter(Boolean);
+        return ids.length > 0 ? ids : null;
+      },
+      renderHTML: (attrs: Record<string, unknown>) =>
+        Array.isArray(attrs.cardIds) && (attrs.cardIds as string[]).length > 0
+          ? { "data-card-ids": (attrs.cardIds as string[]).join(",") }
+          : {},
+    },
+    defaultMode: {
+      default: "study",
+      parseHTML: (el: HTMLElement) =>
+        el.getAttribute("data-default-mode") === "reference"
+          ? "reference"
+          : "study",
+      renderHTML: (attrs: Record<string, unknown>) =>
+        attrs.defaultMode === "reference"
+          ? { "data-default-mode": "reference" }
+          : {},
+    },
+    showRatingButtons: {
+      default: true,
+      parseHTML: (el: HTMLElement) =>
+        el.getAttribute("data-show-rating-buttons") !== "false",
+      renderHTML: (attrs: Record<string, unknown>) =>
+        attrs.showRatingButtons === false
+          ? { "data-show-rating-buttons": "false" }
+          : {},
+    },
+    showBackground: {
+      default: true,
+      parseHTML: (el: HTMLElement) =>
+        el.getAttribute("data-show-background") !== "false",
+      renderHTML: (attrs: Record<string, unknown>) =>
+        attrs.showBackground === false ? { "data-show-background": "false" } : {},
+    },
+    showBorder: {
+      default: true,
+      parseHTML: (el: HTMLElement) =>
+        el.getAttribute("data-show-border") !== "false",
+      renderHTML: (attrs: Record<string, unknown>) =>
+        attrs.showBorder === false ? { "data-show-border": "false" } : {},
+    },
   };
 }
 
-export const FlashcardEmbed = Node.create({
-  name: "flashcardEmbed",
-  group: "block",
-  atom: true,
-  selectable: true,
-  draggable: true,
-
-  addAttributes() {
-    return {
-      blockId: { default: null },
-      blockType: { default: "flashcardEmbed" },
-      deckId: {
-        default: null,
-        parseHTML: (el) => el.getAttribute("data-deck-id") || null,
-        renderHTML: (attrs) =>
-          attrs.deckId ? { "data-deck-id": attrs.deckId } : {},
-      },
-      cardIds: {
-        default: null,
-        parseHTML: (el) => {
-          const raw = el.getAttribute("data-card-ids");
-          if (!raw) return null;
-          const ids = raw.split(",").filter(Boolean);
-          return ids.length > 0 ? ids : null;
-        },
-        renderHTML: (attrs) =>
-          Array.isArray(attrs.cardIds) && attrs.cardIds.length > 0
-            ? { "data-card-ids": attrs.cardIds.join(",") }
-            : {},
-      },
-      defaultMode: {
-        default: "study",
-        parseHTML: (el) =>
-          el.getAttribute("data-default-mode") === "reference"
-            ? "reference"
-            : "study",
-        renderHTML: (attrs) =>
-          attrs.defaultMode === "reference"
-            ? { "data-default-mode": "reference" }
-            : {},
-      },
-      showRatingButtons: {
-        default: true,
-        parseHTML: (el) => el.getAttribute("data-show-rating-buttons") !== "false",
-        renderHTML: (attrs) =>
-          attrs.showRatingButtons === false
-            ? { "data-show-rating-buttons": "false" }
-            : {},
-      },
-      showBackground: {
-        default: true,
-        parseHTML: (el) => el.getAttribute("data-show-background") !== "false",
-        renderHTML: (attrs) =>
-          attrs.showBackground === false ? { "data-show-background": "false" } : {},
-      },
-      showBorder: {
-        default: true,
-        parseHTML: (el) => el.getAttribute("data-show-border") !== "false",
-        renderHTML: (attrs) =>
-          attrs.showBorder === false ? { "data-show-border": "false" } : {},
-      },
-    };
-  },
-
-  parseHTML() {
-    return [{ tag: 'div[data-block-type="flashcardEmbed"]' }];
-  },
-
-  renderHTML({ HTMLAttributes }) {
-    return [
-      "div",
-      mergeAttributes(HTMLAttributes, {
-        class: "block-flashcard-embed",
-        "data-block-type": "flashcardEmbed",
-      }),
-    ];
-  },
-
-  addNodeView() {
-    return createBlockNodeView({
-      blockType: "flashcardEmbed",
-      label: "Flashcards",
-      iconName: "Layers",
-      atom: true,
-      containerAttr: "showBorder",
-      renderContent(node, contentDom, editor, getPos) {
-        renderFlashcardEmbed(node.attrs as FlashcardEmbedAttrs, contentDom, editor, getPos);
-      },
-      updateContent(node, contentDom, editor, getPos) {
-        // Run cleanup before clearing so React's StrictMode / dev double-mount
-        // doesn't leave orphan listeners.
-        const cleanup = (contentDom as BlockContentDom).__cleanup;
-        if (cleanup) {
-          try {
-            cleanup();
-          } catch {
-            // ignore
-          }
-          delete (contentDom as BlockContentDom).__cleanup;
-        }
-        const existingRoot = (contentDom as BlockContentDom).__reactRoot;
-        if (existingRoot) {
-          try {
-            existingRoot.unmount();
-          } catch {
-            // ignore
-          }
-          delete (contentDom as BlockContentDom).__reactRoot;
-        }
-        contentDom.innerHTML = "";
-        renderFlashcardEmbed(node.attrs as FlashcardEmbedAttrs, contentDom, editor, getPos);
-        return true;
-      },
-    });
-  },
-});
-
 // ─── Server-safe Node ───────────────────────────────────────────────────
 //
-// Identical attribute schema, no NodeView. Used by:
+// Used by:
 //   - getServerExtensions() for API routes that need to parse / serialize
 //     TipTap docs (markdown export, search indexing)
 //   - getCollaborationServerExtensions() for the Hocuspocus server's
@@ -257,43 +167,7 @@ export const ServerFlashcardEmbed = Node.create({
   atom: true,
 
   addAttributes() {
-    return {
-      blockId: { default: null },
-      blockType: { default: "flashcardEmbed" },
-      deckId: {
-        default: null,
-        parseHTML: (el) => el.getAttribute("data-deck-id") || null,
-        renderHTML: (attrs) =>
-          attrs.deckId ? { "data-deck-id": attrs.deckId } : {},
-      },
-      cardIds: {
-        default: null,
-        parseHTML: (el) => {
-          const raw = el.getAttribute("data-card-ids");
-          if (!raw) return null;
-          const ids = raw.split(",").filter(Boolean);
-          return ids.length > 0 ? ids : null;
-        },
-        renderHTML: (attrs) =>
-          Array.isArray(attrs.cardIds) && attrs.cardIds.length > 0
-            ? { "data-card-ids": attrs.cardIds.join(",") }
-            : {},
-      },
-      defaultMode: {
-        default: "study",
-        parseHTML: (el) =>
-          el.getAttribute("data-default-mode") === "reference"
-            ? "reference"
-            : "study",
-        renderHTML: (attrs) =>
-          attrs.defaultMode === "reference"
-            ? { "data-default-mode": "reference" }
-            : {},
-      },
-      showRatingButtons: { default: true },
-      showBackground: { default: true },
-      showBorder: { default: true },
-    };
+    return flashcardEmbedAttrSpec();
   },
 
   parseHTML() {
