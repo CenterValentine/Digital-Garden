@@ -5,7 +5,14 @@
  */
 
 import { generateHTML } from "@tiptap/core";
-import { getServerExtensions } from "@/lib/domain/editor";
+// Deep import — the lib/domain/editor barrel re-exports BOTH
+// extensions-client (with React mount bridges for client-only NodeViews
+// like flashcardEmbed-client) AND extensions-server. Importing through
+// the barrel from a server route drags react-dom/client into the
+// server bundle and breaks `next build --webpack` with "You're
+// importing a component that imports react-dom/client." Going direct
+// to extensions-server keeps the server bundle clean.
+import { getServerExtensions } from "@/lib/domain/editor/extensions-server";
 import { sanitizeTipTapJsonWithExtensions } from "@/lib/domain/editor/unsupported-content";
 import type {
   DocumentConverter,
