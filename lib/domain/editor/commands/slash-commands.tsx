@@ -213,6 +213,29 @@ export function getSlashCommands(): SlashCommand[] {
       ],
     },
     {
+      title: "Highlight to Flashcard",
+      description:
+        "Pick a deck, then highlight the FRONT and BACK passages — the highlights persist privately, never published",
+      icon: "✎",
+      command: ({ editor, range }) => {
+        // Remove the slash trigger so the user can immediately start
+        // highlighting without leftover "/" characters in the doc.
+        editor.chain().focus().deleteRange(range).run();
+        // The flashcards extension client owns the deck-picker flow.
+        // Dispatching an event keeps slash-commands free of fetch/UI
+        // concerns and lets the same trigger be reused later (e.g.,
+        // from the editor toolbar or a context menu).
+        window.dispatchEvent(new CustomEvent("dg:flashcard-selection-start"));
+      },
+      aliases: [
+        "fc-mark",
+        "flashcard-select",
+        "highlight-card",
+        "selection-flashcard",
+        "fc-select",
+      ],
+    },
+    {
       title: "Pull Quote",
       description: "Styled quote block — 7 visual variants (bordered, card, featured…)",
       icon: "❝",

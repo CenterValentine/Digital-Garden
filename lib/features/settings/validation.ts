@@ -222,6 +222,12 @@ const flashcardsSettingsSchema = z
     defaultReviewMode: z
       .enum(["front_to_back", "back_to_front", "random"])
       .optional(),
+    // Sprint 8: persisted defaults for the highlight-to-flashcard workflow.
+    // - lastUsedSelectionDeckId: pre-selects the deck picker so the user
+    //   only confirms (and can use Enter for the silent Quick-Fire path).
+    // - quickFireEnabled: gates the Enter-at-idle shortcut.
+    lastUsedSelectionDeckId: z.string().min(1).max(64).optional(),
+    quickFireEnabled: z.boolean().optional(),
   })
   .optional();
 
@@ -483,5 +489,6 @@ export const DEFAULT_SETTINGS: UserSettings = {
     defaultFrontLabel: "Question",
     defaultBackLabel: "Answer",
     defaultReviewMode: "front_to_back",
+    quickFireEnabled: false,
   },
 };

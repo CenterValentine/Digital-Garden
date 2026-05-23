@@ -301,6 +301,21 @@ export const FlashcardSelect = Mark.create({
                     .getState()
                     .commitBackRange({ from, to });
                   if (snapshot) {
+                    // Extract plain text for both sides at dispatch
+                    // time — the editor reference is right here, so
+                    // the listener doesn't need to rediscover it.
+                    const frontText = editor.state.doc.textBetween(
+                      snapshot.frontRange.from,
+                      snapshot.frontRange.to,
+                      " ",
+                      " ",
+                    );
+                    const backText = editor.state.doc.textBetween(
+                      snapshot.backRange.from,
+                      snapshot.backRange.to,
+                      " ",
+                      " ",
+                    );
                     // Card-creation request is dispatched via a custom
                     // browser event so the API call can live in the
                     // flashcards extension client (which has access to
@@ -308,7 +323,17 @@ export const FlashcardSelect = Mark.create({
                     // depending on it.
                     window.dispatchEvent(
                       new CustomEvent("dg:flashcard-selection-commit", {
-                        detail: snapshot,
+                        detail: {
+                          ...snapshot,
+                          frontText: frontText.trim(),
+                          backText: backText.trim(),
+                          // Pass the editor through so the commit
+                          // listener can roll marks back on failure
+                          // without needing to discover the editor
+                          // separately. CustomEvent.detail is typed
+                          // unknown; the listener narrows the shape.
+                          editor,
+                        },
                       }),
                     );
                   }
