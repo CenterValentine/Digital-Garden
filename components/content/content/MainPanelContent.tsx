@@ -35,8 +35,20 @@ import {
 import { useEditorStatsStore } from "@/state/editor-stats-store";
 import { useOutlineStore } from "@/state/outline-store";
 import { useDebugViewStore } from "@/state/debug-view-store";
-import { MarkdownEditor } from "../editor/MarkdownEditor";
-import { ExpandableEditor } from "../editor/ExpandableEditor";
+// Code-split the editor module so its ~200-400KB of JS (TipTap, all extensions,
+// y-prosemirror, lowlight, etc.) downloads in parallel with the content fetch
+// instead of blocking initial paint. ssr:false because the editor is a heavy
+// client component with no useful server render — keeping it out of the RSC
+// payload also shrinks the HTML.
+import dynamic from "next/dynamic";
+const MarkdownEditor = dynamic(
+  () => import("../editor/MarkdownEditor").then((m) => ({ default: m.MarkdownEditor })),
+  { ssr: false },
+);
+const ExpandableEditor = dynamic(
+  () => import("../editor/ExpandableEditor").then((m) => ({ default: m.ExpandableEditor })),
+  { ssr: false },
+);
 import { FileViewer } from "../viewer/FileViewer";
 import { FolderViewer } from "../viewer/FolderViewer";
 import { ExternalViewer } from "../viewer/ExternalViewer";
