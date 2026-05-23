@@ -20,6 +20,7 @@
 // setTimeout fallback covers Safari (still no rIC in 2026).
 
 import { useEffect } from "react";
+import { clientLogger } from "@/lib/core/logger/client";
 import { useExtensionsUiStore } from "@/state/extensions-ui-store";
 import { useNavigationHistoryStore } from "@/state/navigation-history-store";
 import { useNotesPanelStore } from "@/state/notes-panel-store";
@@ -41,19 +42,37 @@ let didHydrate = false;
 function hydrateDeferredStores() {
   if (didHydrate) return;
   didHydrate = true;
+  const startedAt = typeof performance !== "undefined" ? performance.now() : Date.now();
   // Each rehydrate() is independent — fire them all without awaiting so
   // a slow JSON.parse on one doesn't gate the rest. Persist middleware
   // handles internal subscription re-renders.
+  let hydrated = 0;
+  let failed = 0;
   for (const store of deferredStores) {
     try {
       void store.persist.rehydrate();
+      hydrated += 1;
     } catch {
+      failed += 1;
       // Hydration failures (corrupted localStorage, schema-version
       // migration error, etc.) leave the store at default state. The
       // user keeps a working app; the next interaction either saves a
       // fresh entry or fails gracefully.
     }
   }
+  const durationMs = Math.round(
+    (typeof performance !== "undefined" ? performance.now() : Date.now()) - startedAt,
+  );
+  // Emit at info level so it's visible in the default console filter —
+  // makes the deferred hydration easy to confirm in dev without flipping
+  // to Verbose. Fires once per page lifecycle.
+  clientLogger.info({
+    layer: "store",
+    event: "deferred_rehydrate:completed",
+    summary: `${hydrated}/${deferredStores.length} stores rehydrated`,
+    duration_ms: durationMs,
+    attrs: { hydrated, failed, total: deferredStores.length },
+  });
 }
 
 export function DeferredStoreHydrator() {
