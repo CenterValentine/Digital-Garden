@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Music, Upload, X, Loader2 } from "lucide-react";
+import { Music, Upload, X, Loader2, Zap } from "lucide-react";
 import type { Editor } from "@tiptap/core";
 
 import type { AudioEmbedAttrs } from "@/lib/domain/editor/extensions/blocks/audio-embed";
@@ -266,6 +266,39 @@ export function AudioPlayer({ attrs, editor, getPos }: AudioPlayerProps) {
             .filter(Boolean)
             .join(" · ")}
         </span>
+        <button
+          type="button"
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => updateAttrs({ autoplayOnFlip: !attrs.autoplayOnFlip })}
+          title={
+            attrs.autoplayOnFlip
+              ? "Auto-plays when revealed on a flashcard — click to disable"
+              : "Click to auto-play when revealed on a flashcard"
+          }
+          aria-label="Toggle auto-play on flashcard flip"
+          aria-pressed={attrs.autoplayOnFlip}
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            width: "24px",
+            height: "24px",
+            background: attrs.autoplayOnFlip
+              ? "rgba(234, 179, 8, 0.18)"
+              : "transparent",
+            border: "none",
+            borderRadius: "0.375rem",
+            color: attrs.autoplayOnFlip ? "rgb(234, 179, 8)" : "inherit",
+            opacity: attrs.autoplayOnFlip ? 1 : 0.5,
+            cursor: "pointer",
+            transition: "background 120ms ease, opacity 120ms ease",
+          }}
+        >
+          <Zap
+            size={14}
+            fill={attrs.autoplayOnFlip ? "currentColor" : "none"}
+          />
+        </button>
         <button
           type="button"
           onMouseDown={(e) => e.preventDefault()}
