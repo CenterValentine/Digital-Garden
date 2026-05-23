@@ -178,3 +178,36 @@ With deferral DISABLED (`NEXT_PUBLIC_DEFER_COLLAB_CONNECT=false`):
 
 - Should the deferral also wait for `page:interactive` rather than rIC? rIC can fire during hydration's idle bursts which might still be too early for some scenarios. Postponing to a `useEffect` chained off `page:interactive` is safer but adds complexity.
 - Should the kill switch be a per-user setting (settings-store) rather than env var? Useful for support: "disable this for your session" without redeploying.
+
+## Known oddities (observed during initial verification, 2026-05-23)
+
+These were noted during the pre-merge playbook run. Each is either pre-existing
+or unrelated to the deferral; recorded here so future readers don't re-discover
+them as "regressions."
+
+### O1 — Asymmetric tab presence indicator across two windows
+
+**Observed:** With the same content open in two browser windows, the tab presence
+disc shows on one window's tab but not the other's. The asymmetry persists for
+the duration of the session.
+
+**Suspected unrelated to deferral.** Tab presence renders from REST-polled
+`/api/collaboration/presence` data, not from Y.js awareness. The deferral only
+affects WebSocket connect timing — the REST heartbeat schedule is unaffected.
+
+**Suspected interaction with workspace-tab-sync.** This codebase has a separate
+system that unifies tab open/close state across windows in the same workspace
+(close a tab in window A, it closes in window B). The presence indicator may
+have a dependency on local tab state that desyncs under multi-window
+workspaces.
+
+**To diagnose:**
+1. Run with `NEXT_PUBLIC_DEFER_COLLAB_CONNECT=false` and reproduce the
+   scenario. If the asymmetry persists, the deferral is innocent.
+2. Check `/api/collaboration/presence` response in both windows' Network tab.
+   If both responses contain both sessions, the bug is client-side rendering.
+   If responses differ, the heartbeat isn't reaching the server from one window.
+3. Inspect `TabPresenceDiscs` props at runtime — confirm `sessions` array has
+   the missing entry in the affected window.
+
+**Not blocking the PR** — pre-existing behavior; investigate separately.
