@@ -34,6 +34,7 @@ import { ServerStopwatch } from "@/lib/domain/editor/extensions/blocks/stopwatch
 import { ServerPullQuote } from "@/lib/domain/editor/extensions/blocks/pull-quote";
 import { ServerTableOfContents } from "@/lib/domain/editor/extensions/blocks/table-of-contents";
 import { ServerFlashcardEmbed } from "@/lib/domain/editor/extensions/blocks/flashcard-embed";
+import { ServerAudioEmbed } from "@/lib/domain/editor/extensions/blocks/audio-embed";
 import { ServerFlashcardSelect } from "@/lib/domain/editor/extensions/flashcard-select";
 import { ServerTimestamp } from "@/lib/domain/editor/extensions/blocks/timestamp";
 import {
@@ -108,6 +109,7 @@ export function getCollaborationServerExtensions(): Extensions {
     ServerPullQuote,
     ServerTableOfContents,
     ServerFlashcardEmbed,
+    ServerAudioEmbed,
     ServerFlashcardSelect,
     ServerTimestamp,
     ServerDailySummary,
