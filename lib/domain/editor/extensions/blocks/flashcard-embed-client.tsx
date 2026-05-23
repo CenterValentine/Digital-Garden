@@ -89,14 +89,24 @@ function renderFlashcardEmbed(
     contentDom.appendChild(mount);
     dom.__reactRoot = createRoot(mount);
     dom.__cleanup = () => {
-      if (dom.__reactRoot) {
-        try {
-          dom.__reactRoot.unmount();
-        } catch {
-          // ignore
-        }
-        delete dom.__reactRoot;
-        delete dom.__lastAttrs;
+      // React 18 forbids root.unmount() during a render pass. The
+      // destroy hook fires from inside ProseMirror's transaction
+      // commit, which can coincide with React mid-render (e.g. when
+      // the NodeView destroys as a side effect of a parent re-render
+      // that's still in flight). Defer to a microtask so unmount
+      // lands after the current render completes.
+      const root = dom.__reactRoot;
+      delete dom.__reactRoot;
+      delete dom.__lastAttrs;
+      if (root) {
+        queueMicrotask(() => {
+          try {
+            root.unmount();
+          } catch {
+            // ignore — root may have been GC'd if the host node was
+            // also removed from the document tree
+          }
+        });
       }
     };
   }
