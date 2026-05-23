@@ -55,17 +55,31 @@ export function FlashcardEmbedNodeView({ attrs, editor, getPos }: NodeViewProps)
   const [overlayOpen, setOverlayOpen] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
 
-  // Collab-mode gate (Sprint 8 follow-up): if the editor was instantiated
-  // with the Collaboration extension, the block goes inert for EVERYONE
-  // — including the document owner. Reasoning: flashcards are private
-  // user data with stats that shouldn't be visible to or modifiable by
-  // collaborators, and the simplest correct UX is "if any collaboration
-  // could be happening here, don't let anyone interact with this." The
-  // server-side ownership filter on every flashcards route is the
-  // load-bearing guard; this is the matching UI layer.
+  // Collab-mode gate (Sprint 8 follow-up).
+  //
+  // Why we check for `collaborationCaret`, NOT `collaboration`:
+  //
+  // This app Y.Doc-backs every owner-edited note for the auto-save +
+  // undo/redo behavior — the Collaboration extension is registered
+  // even when you're the only one editing. Locking on its presence
+  // (the previous check) blocked the owner from their own block in
+  // every regular note.
+  //
+  // CollaborationCaret is only registered when the editor was
+  // instantiated with a non-null Hocuspocus provider (see
+  // extensions-client.ts where the conditional spreads only kicks in
+  // when `collaboration.provider` exists). And the editor recreates
+  // when the provider goes null → non-null, per the editorMode-deps
+  // contract in MarkdownEditor.tsx. So Caret presence is the reliable
+  // marker of "this note is actually sharing live state."
+  //
+  // Server-side ownership filters on /api/flashcards/* remain the
+  // load-bearing guard — this is the matching UI layer.
   const inCollabMode = useMemo(
     () =>
-      editor.extensionManager.extensions.some((ext) => ext.name === "collaboration"),
+      editor.extensionManager.extensions.some(
+        (ext) => ext.name === "collaborationCaret",
+      ),
     [editor],
   );
 
