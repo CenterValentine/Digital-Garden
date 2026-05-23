@@ -87,9 +87,10 @@ export async function GET(request: NextRequest) {
     const newLimit = includeNew ? Math.min(limit, NEW_PER_QUEUE_CAP) : 0;
     const reviewLimit = limit - newLimit;
 
-    const [dueCards, newCards, debugAllInScope]: [
+    const [dueCards, newCards, debugAllInScope, debugDirectEquality]: [
       SelectedCard[],
       SelectedCard[],
+      Array<{ id: string; state: string; due: Date; deckId: string }>,
       Array<{ id: string; state: string; due: Date; deckId: string }>,
     ] = await Promise.all([
       reviewLimit > 0
@@ -124,6 +125,16 @@ export async function GET(request: NextRequest) {
         select: { id: true, state: true, due: true, deckId: true },
         take: 25,
       }) as unknown as Promise<Array<{ id: string; state: string; due: Date; deckId: string }>>,
+      // ─── DEBUG 2 (temporary) — direct equality fallback. If this
+      // returns cards but debugAllInScope (via `in: [...]`) doesn't,
+      // the descendants logic is producing the wrong filter array.
+      deckId
+        ? (prisma.flashcard.findMany({
+            where: { ownerId, deletedAt: null, deckId },
+            select: { id: true, state: true, due: true, deckId: true },
+            take: 25,
+          }) as unknown as Promise<Array<{ id: string; state: string; due: Date; deckId: string }>>)
+        : Promise.resolve<Array<{ id: string; state: string; due: Date; deckId: string }>>([]),
     ]);
 
     // ─── DEBUG log (temporary) ───────────────────────────────────────
@@ -147,6 +158,18 @@ export async function GET(request: NextRequest) {
         all_cards_in_scope_count: debugAllInScope.length,
         all_cards_in_scope_json: JSON.stringify(
           debugAllInScope.map((c) => ({
+            id: c.id,
+            state: c.state,
+            due: c.due.toISOString(),
+            deckId: c.deckId,
+          })),
+        ),
+        // Direct equality fallback: same deckId, no descendants traversal.
+        // If this finds cards but `all_cards_in_scope` doesn't, the
+        // descendants OR clause is producing the wrong deckIdFilter.
+        direct_equality_count: debugDirectEquality.length,
+        direct_equality_json: JSON.stringify(
+          debugDirectEquality.map((c) => ({
             id: c.id,
             state: c.state,
             due: c.due.toISOString(),

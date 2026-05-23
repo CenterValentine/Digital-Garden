@@ -10,6 +10,7 @@ import type {
 } from "@/lib/domain/flashcards";
 import { FlashcardDeckPickerDialog } from "./FlashcardDeckPickerDialog";
 import { FlashcardReviewOverlay } from "./FlashcardReviewOverlay";
+import { FLASHCARD_QUICK_ADD_EVENT } from "../events";
 import type { FlashcardEmbedAttrs } from "@/lib/domain/editor/extensions/blocks/flashcard-embed";
 
 interface NodeViewProps {
@@ -312,11 +313,14 @@ export function FlashcardEmbedNodeView({ attrs, editor, getPos }: NodeViewProps)
         <button
           type="button"
           onClick={() => {
-            // v1: navigate to the standalone flashcards UI for card
-            // creation. Full inline quick-add inside the block is a
-            // future enhancement (Session 5 polish).
+            // Open the existing FlashcardQuickAddDialog (mounted at the
+            // extension root) via its event contract. Constant lives in
+            // ../events — using the string literal directly here would
+            // silently fail since the listener subscribes to the
+            // canonical name. (Earlier version had a typo; tracked
+            // down as bug-2 of the Sprint 6 follow-up.)
             window.dispatchEvent(
-              new CustomEvent("flashcards:open-quick-add", {
+              new CustomEvent(FLASHCARD_QUICK_ADD_EVENT, {
                 detail: { deckId },
               }),
             );
