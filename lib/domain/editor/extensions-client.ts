@@ -37,6 +37,7 @@ import { WikiLink } from "./extensions/wiki-link";
 import { createWikiLinkSuggestion } from "./extensions/wiki-link-suggestion";
 import { Tag } from "./extensions/tag";
 import { PersonMention } from "./extensions/person-mention";
+import { InlineTimestamp } from "./extensions/inline-timestamp";
 import { EditorImage } from "./extensions/image";
 import { AiHighlight } from "./extensions/ai-highlight";
 import { BlockFocusExtension } from "./extensions/block-focus-ext";
@@ -317,6 +318,13 @@ export function getEditorExtensions(options?: EditorExtensionsOptions): Extensio
       fetchPeople: options?.fetchPeopleMentions || (async () => []),
       onPersonClick: options?.onPersonMentionClick,
     }),
+
+    // Inline timestamp — clickable inline date/time chip inserted by the
+    // slash command. Server and collab arrays already registered the
+    // ServerInlineTimestamp variant; the client array was missing this
+    // one, causing the slash command to fail with "Unknown node type:
+    // inlineTimestamp" when users tried to insert.
+    InlineTimestamp,
   ];
 }
 
