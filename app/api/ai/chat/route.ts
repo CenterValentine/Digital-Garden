@@ -25,14 +25,82 @@ import { streamText, convertToModelMessages, stepCountIs } from "ai";
 import type { UIMessage } from "ai";
 import { requireAuth } from "@/lib/infrastructure/auth";
 import { getUserSettings } from "@/lib/features/settings";
-import { resolveChatModel } from "@/lib/domain/ai/providers/registry";
+import {
+  resolveChatModel,
+  resolveChatModelFromConnection,
+  BYOKRequiredError,
+} from "@/lib/domain/ai/providers/registry";
+import { isGatewayEnabled } from "@/lib/domain/ai/providers/gateway";
+import { PROVIDER_CATALOG } from "@/lib/domain/ai/providers/catalog";
+
+/**
+ * JSON-safe shape compatible with AI SDK's `providerOptions` (whose
+ * underlying type is `Record<string, JSONObject>`). Re-declared locally
+ * because the canonical `SharedV3ProviderOptions` lives in `@ai-sdk/provider`,
+ * which isn't a direct dep — we only need a structural match.
+ */
+type JSONValueLite =
+  | string
+  | number
+  | boolean
+  | null
+  | { [k: string]: JSONValueLite }
+  | JSONValueLite[];
+type ProviderOptionsLite = Record<string, Record<string, JSONValueLite>>;
+
+/**
+ * Build per-provider `providerOptions` for streamText based on the
+ * model's reasoning posture in the catalog. Returns undefined when no
+ * options are needed so we don't pass empty objects through. Session 6.
+ */
+function buildProviderOptions(
+  providerId: string,
+  modelId: string,
+): ProviderOptionsLite | undefined {
+  const model = PROVIDER_CATALOG
+    .find((p) => p.id === providerId)
+    ?.models.find((m) => m.id === modelId);
+  if (!model || model.reasoning !== "enabled") return undefined;
+
+  if (providerId === "anthropic") {
+    return {
+      anthropic: {
+        thinking: {
+          type: "enabled",
+          budgetTokens: model.thinkingBudgetTokens ?? 5_000,
+        },
+      },
+    };
+  }
+  if (providerId === "google") {
+    return {
+      google: {
+        thinkingConfig: { includeThoughts: true },
+      },
+    };
+  }
+  return undefined;
+}
+import {
+  getConnectionWithKey,
+  listConnections,
+  ConnectionNotFoundError,
+} from "@/lib/features/ai-connections";
+import { addAutoAssociation } from "@/lib/features/conversations";
+import { extractContentIdsFromToolCall } from "@/lib/domain/ai/tools/content-id-args";
+import {
+  resolvePrimaryRoute,
+} from "@/lib/domain/ai/features";
+import type {
+  ConnectionView,
+  ConnectionWithKey,
+} from "@/lib/features/ai-connections";
 import {
   applyMiddleware,
   defaultSettingsMiddleware,
 } from "@/lib/domain/ai/middleware";
 import { createBaseTools } from "@/lib/domain/ai/tools";
 import { createEditorTools } from "@/lib/domain/ai/tools";
-import { getProviderKey } from "@/lib/domain/ai/keys";
 import { prisma } from "@/lib/database/client";
 import { logger, spanPayload, startSpan, withRouteTrace, withSpan } from "@/lib/core/logger";
 
@@ -94,53 +162,207 @@ export async function POST(request: Request) {
         );
       }
 
-      // Resolve API key: request body > stored BYOK key > env var (default)
-      let apiKey: string | undefined = body.apiKey;
-      if (!apiKey) {
-        const storedKey = await getProviderKey(session.user.id, providerId);
-        if (storedKey) apiKey = storedKey;
+      // ─── Model resolution — connection-first, with legacy fallback ───
+      //
+      // 1. If the body carries an explicit `connectionId` (new picker path),
+      //    fetch that connection and route through it.
+      // 2. Else look up a user connection whose presetId matches `providerId`
+      //    (transition shim for the old picker until S4 lands the new one).
+      // 3. Else consult the feature router for the "chat" feature's primary
+      //    route (uses the registry default when nothing's configured).
+      // 4. Else fall through to the legacy resolver — which will throw
+      //    BYOKRequiredError if no key is available.
+      const explicitConnectionId =
+        typeof body.connectionId === "string" ? body.connectionId : null;
+
+      let activeConnection: ConnectionWithKey | null = null;
+      let activeModelId: string = modelId;
+      let resolveSource: "explicit" | "preset-match" | "feature-route" | "legacy" =
+        "legacy";
+
+      if (explicitConnectionId) {
+        try {
+          activeConnection = await getConnectionWithKey(
+            session.user.id,
+            explicitConnectionId,
+          );
+          resolveSource = "explicit";
+        } catch (e) {
+          if (!(e instanceof ConnectionNotFoundError)) throw e;
+        }
       }
 
-      // Resolve model from provider registry (counts as setup work)
+      // The user's full Connection list — shared by preset-match AND
+      // namespaced-model-match below, so we only fetch once.
+      const userConns: ConnectionView[] = await listConnections(session.user.id);
+
+      if (!activeConnection) {
+        // Transition shim: pick the first user connection whose presetId
+        // matches the legacy providerId from the body.
+        const presetMatch: ConnectionView | undefined = userConns.find(
+          (c) => c.presetId === providerId,
+        );
+        if (presetMatch) {
+          activeConnection = await getConnectionWithKey(
+            session.user.id,
+            presetMatch.id,
+          );
+          // Try to find an upstream model id matching the canonical id
+          // the legacy picker sent. If not found, send the canonical id
+          // as-is and let the upstream reject if invalid.
+          const matchedModel = activeConnection.models.find(
+            (m) => m.id === modelId,
+          );
+          if (matchedModel) activeModelId = matchedModel.id;
+          resolveSource = "preset-match";
+        }
+      }
+
+      if (!activeConnection) {
+        // Namespaced-model match: gateway Connections (Vercel AI Gateway,
+        // OpenRouter, etc.) carry models as `providerId/modelId` strings
+        // — so a Vercel Gateway with `anthropic/claude-sonnet-4` in its
+        // models list should serve the picker's "claude-sonnet-4" pick.
+        // Without this step the resolver falls through to legacy and
+        // throws BYOK_REQUIRED even though the user *did* set up a
+        // satisfying Connection. Mirrors the client's `isModelAvailable`.
+        const namespaced = `${providerId}/${modelId}`;
+        const modelMatch = userConns.find((c) =>
+          c.models.some((m) => m.id === namespaced),
+        );
+        if (modelMatch) {
+          activeConnection = await getConnectionWithKey(
+            session.user.id,
+            modelMatch.id,
+          );
+          activeModelId = namespaced;
+          resolveSource = "preset-match";
+        }
+      }
+
+      if (!activeConnection) {
+        // Last resort before legacy: ask the feature router.
+        const primary = await resolvePrimaryRoute(session.user.id, "chat");
+        if (primary) {
+          activeConnection = primary.connection;
+          activeModelId = primary.modelId;
+          resolveSource = "feature-route";
+        }
+      }
+
+      // BYOK now flows exclusively through Connections (each carries its
+      // own encrypted key). Request-body `apiKey` remains supported for
+      // explicit one-off overrides; legacy AIProviderKey lookups removed.
+      const apiKey: string | undefined = body.apiKey;
+
+      const transport: "direct" | "gateway" =
+        resolveSource === "legacy" && !apiKey && isGatewayEnabled()
+          ? "gateway"
+          : "direct";
+
       const wrappedModel = await withSpan(
         { layer: "ai", name: "resolve_model" },
         {
           attrs: {
             provider: providerId,
-            model: modelId,
-            byok: apiKey !== undefined,
+            model: activeModelId,
+            byok: activeConnection !== null || apiKey !== undefined,
+            transport,
+            resolve_source: resolveSource,
+            connection_id: activeConnection?.id ?? null,
+            connection_kind: activeConnection?.kind ?? null,
           },
-          summary: `${providerId}:${modelId}`,
+          summary: `${providerId}:${activeModelId} via ${resolveSource}`,
         },
         async () => {
-          const model = await resolveChatModel({
-            providerId,
-            modelId,
-            apiKey,
-          });
+          const model = activeConnection
+            ? await resolveChatModelFromConnection(
+                activeConnection,
+                activeModelId,
+              )
+            : await resolveChatModel({
+                providerId,
+                modelId: activeModelId,
+                apiKey,
+              });
           return applyMiddleware(model, [
             defaultSettingsMiddleware({ temperature, maxTokens }),
           ]);
         },
       );
 
-      // Create tools bound to the authenticated user
-      const toolChoice =
-        (aiSettings as Record<string, unknown>).toolChoice ?? "auto";
-      const toolCtx = { userId: session.user.id, contentId };
-      const tools =
-        toolChoice !== "none"
-          ? {
-              ...createBaseTools(toolCtx),
-              ...(contentId ? createEditorTools(toolCtx) : {}),
-            }
-          : undefined;
+      // When the bound content is itself a chat node, it is NOT an
+      // editable document — skip editor tools + the "you are viewing a
+      // document" context so the model doesn't try to "read" the chat as
+      // a document (which confuses it and ignores actual attachments).
+      let isChatContent = false;
+      if (contentId) {
+        const node = await prisma.contentNode.findFirst({
+          where: { id: contentId, ownerId: session.user.id },
+          select: { contentType: true },
+        });
+        isChatContent = node?.contentType === "chat";
+      }
+      const editableContentId =
+        contentId && !isChatContent ? contentId : undefined;
+
+      // Create tools bound to the authenticated user, then filter by
+      // per-tool `enabled` in settings. Tools default to enabled; only
+      // `enabled === false` entries are dropped. If the result is empty
+      // we pass `undefined` so streamText knows there are no tools at all.
+      const toolCtx = { userId: session.user.id, contentId: editableContentId };
+      const allTools = {
+        ...createBaseTools(toolCtx),
+        ...(editableContentId ? createEditorTools(toolCtx) : {}),
+      };
+      const toolConfig = (aiSettings as { toolConfig?: Record<
+        string,
+        { enabled?: boolean }
+      > }).toolConfig ?? {};
+      const tools = Object.fromEntries(
+        Object.entries(allTools).filter(
+          ([id]) => toolConfig[id]?.enabled !== false,
+        ),
+      );
+      const toolsActive = Object.keys(tools).length > 0;
+
+      // Resolve attachments for the model: keep file parts the active
+      // provider can consume natively (images for vision; PDFs for
+      // Anthropic/Google), and inline the server-extracted text for
+      // everything else — so the displayed/persisted message stays a clean
+      // chip while the model still receives the content.
+      const resolvedMessages = resolveAttachmentsForModel(messages, providerId);
 
       // Convert UIMessages to ModelMessages for streamText
-      const modelMessages = await convertToModelMessages(messages);
+      const modelMessages = await convertToModelMessages(
+        resolvedMessages as Parameters<typeof convertToModelMessages>[0],
+      );
 
       // Fetch mentioned content for @ mentions (max 5 to limit token usage)
       const mentionedContentIds: string[] = body.mentionedContentIds ?? [];
+
+      // Auto-association interceptor (Session 4a):
+      // When this turn is bound to a Conversation entity (sidebar's
+      // multi-conv mode), each @mention writes an `auto` association.
+      // Folder cascade is intentionally not handled — folder mentions
+      // bind to the folder only, per the locked plan decision.
+      const conversationIdForAssoc: string | null =
+        typeof body.conversationId === "string" ? body.conversationId : null;
+      if (conversationIdForAssoc && mentionedContentIds.length > 0) {
+        // Fire-and-forget — failure here shouldn't block the chat call.
+        // Each call is idempotent (upsert) and capped via LRU inside.
+        void Promise.all(
+          mentionedContentIds.slice(0, 5).map((cid) =>
+            addAutoAssociation(
+              session.user.id,
+              conversationIdForAssoc,
+              cid,
+              "mention",
+            ).catch(() => null),
+          ),
+        );
+      }
+
       let mentionedContext = "";
       if (mentionedContentIds.length > 0) {
         const mentionedNodes = await withSpan(
@@ -198,20 +420,28 @@ export async function POST(request: Request) {
         maxTokens,
       });
 
+      const reasoningProviderOptions = buildProviderOptions(providerId, modelId);
+
       const result = streamText({
         model: wrappedModel,
         messages: modelMessages,
-        tools,
-        toolChoice: toolChoice !== "none" ? "auto" : undefined,
+        tools: toolsActive ? tools : undefined,
+        toolChoice: toolsActive ? "auto" : undefined,
+        // Reasoning opt-in for Anthropic + Google (Session 6). Undefined
+        // for OpenAI o-series (reasoning is automatic) and non-reasoning
+        // chat models.
+        ...(reasoningProviderOptions && {
+          providerOptions: reasoningProviderOptions,
+        }),
         // Allow up to 8 model turns for multi-step tool workflows.
         // Editor tools may need: read → plan → diff → diff → diff → finish + final text.
         // Base chat tools typically need 2-3 steps.
-        stopWhen: stepCountIs(contentId ? 8 : 5),
+        stopWhen: stepCountIs(editableContentId ? 8 : 5),
         system: `You are a helpful AI assistant in Digital Garden, a knowledge management application. Help the user with their notes, writing, and research. Be concise and helpful.
 
 You have a generate_image tool that creates AI images from text prompts. When asked to generate, create, or draw an image, use this tool. Available providers: DALL·E 3, GPT Image 1, Imagen 3, FLUX (fal.ai/Together/Fireworks), DeepAI, RunwayML, Artbreeder. Default to DALL·E 3 unless specified. Write detailed prompts for best results.${
-          contentId
-            ? `\n\nThe user is currently viewing a document (ID: ${contentId}). You have editor tools available to read and edit this document.
+          editableContentId
+            ? `\n\nThe user is currently viewing a document (ID: ${editableContentId}). You have editor tools available to read and edit this document.
 
 IMPORTANT EDITING RULES:
 - When the document has existing content, ALWAYS use apply_diff to make targeted changes or APPEND new content. NEVER use replace_document unless the user explicitly asks you overwrite the entire document.
@@ -222,6 +452,35 @@ IMPORTANT EDITING RULES:
 When you generate an image, the user can insert it into the document at their cursor position.`
             : ""
         }${mentionedContext}`,
+        onStepFinish: (step) => {
+          // Tool-call auto-association interceptor (Session 4b).
+          // After each model step, scan the step's tool calls for any
+          // content-id-bearing args (per the CONTENT_ID_TOOL_ARGS
+          // annotation) and upsert an `auto` association. Fire-and-forget,
+          // idempotent, LRU-capped inside the service — a failure here
+          // must never disturb the stream.
+          if (!conversationIdForAssoc) return;
+          const ids = new Set<string>();
+          for (const call of step.toolCalls ?? []) {
+            for (const id of extractContentIdsFromToolCall(
+              call.toolName,
+              call.input,
+            )) {
+              ids.add(id);
+            }
+          }
+          if (ids.size === 0) return;
+          void Promise.all(
+            Array.from(ids).map((cid) =>
+              addAutoAssociation(
+                session.user.id,
+                conversationIdForAssoc,
+                cid,
+                "tool-call",
+              ).catch(() => null),
+            ),
+          );
+        },
         onFinish: async (finishEvent) => {
           // Token usage / finish reason live on the finishEvent shape. The
           // structure varies slightly across AI SDK versions; we read fields
@@ -241,7 +500,11 @@ When you generate an image, the user can insert it into the document at their cu
         },
       });
 
-      return result.toUIMessageStreamResponse();
+      // Forward `reasoning` parts to the client. Without this opt-in,
+      // AI SDK v6 strips them — Anthropic extended thinking, OpenAI
+      // o-series, and Google thinking-* models all emit reasoning that
+      // we want the ReasoningRouter to render. Session 6.
+      return result.toUIMessageStreamResponse({ sendReasoning: true });
     } catch (error) {
       if (
         error instanceof Error &&
@@ -259,6 +522,24 @@ When you generate an image, the user can insert it into the document at their cu
         );
       }
 
+      // Strict BYOK: the resolver throws this when a user lacks a stored
+      // key for the requested provider and Gateway is not opt-in. The
+      // client matches on `code: "BYOK_REQUIRED"` to show a "Set up API
+      // key" call-to-action.
+      if (error instanceof BYOKRequiredError) {
+        return Response.json(
+          {
+            success: false,
+            error: {
+              code: "BYOK_REQUIRED",
+              message: error.message,
+              providerId: error.providerId,
+            },
+          },
+          { status: 402 },
+        );
+      }
+
       logger.error({
         layer: "ai",
         event: "chat:caught",
@@ -273,5 +554,92 @@ When you generate an image, the user can insert it into the document at their cu
         { status: 500 }
       );
     }
+  });
+}
+
+/** Providers whose AI-SDK integration accepts native PDF document parts. */
+const PDF_NATIVE_PROVIDERS = new Set(["anthropic", "google"]);
+
+/**
+ * Resolve attachment file parts for the active model (Session 5b fix).
+ *
+ * The client persists attachments as file parts (a clean chip), stashing
+ * server-extracted text in `providerMetadata.app.text` for non-image
+ * types. Here we adapt each user message for the model:
+ *   - images → kept (vision providers consume them);
+ *   - PDFs → kept for Anthropic/Google (native document parts), else the
+ *     extracted text is inlined and the part dropped;
+ *   - other files (txt/md/csv/json) → always inlined as text.
+ *
+ * The `app` provider-metadata is stripped from kept parts so it never
+ * reaches the upstream provider. The original (displayed/persisted)
+ * messages are untouched — only this model-bound copy is rewritten.
+ */
+function resolveAttachmentsForModel(
+  messages: unknown[],
+  providerId: string,
+): unknown[] {
+  const nativePdf = PDF_NATIVE_PROVIDERS.has(providerId);
+
+  const stripAppMeta = (part: Record<string, unknown>) => {
+    if (!part.providerMetadata) return part;
+    const { app: _app, ...rest } = part.providerMetadata as Record<
+      string,
+      unknown
+    >;
+    return Object.keys(rest).length > 0
+      ? { ...part, providerMetadata: rest }
+      : (() => {
+          const { providerMetadata: _pm, ...partRest } = part;
+          return partRest;
+        })();
+  };
+
+  return messages.map((raw) => {
+    const m = raw as { role?: string; parts?: unknown };
+    if (m.role !== "user" || !Array.isArray(m.parts)) return raw;
+
+    const kept: unknown[] = [];
+    const inlined: string[] = [];
+
+    for (const p of m.parts as Array<Record<string, unknown>>) {
+      if (p?.type !== "file") {
+        kept.push(p);
+        continue;
+      }
+      const mediaType = typeof p.mediaType === "string" ? p.mediaType : "";
+      const filename = typeof p.filename === "string" ? p.filename : "file";
+      const appText = (
+        (p.providerMetadata as Record<string, Record<string, unknown>>)?.app
+          ?.text as string | undefined
+      )?.toString();
+
+      const isImage = mediaType.startsWith("image/");
+      const isPdf = mediaType === "application/pdf";
+
+      if (isImage || (isPdf && nativePdf)) {
+        kept.push(stripAppMeta(p));
+      } else {
+        inlined.push(
+          appText
+            ? `[Attached file: ${filename}]\n${appText}`
+            : `[Attached file: ${filename} — content unavailable]`,
+        );
+      }
+    }
+
+    if (inlined.length === 0) return { ...m, parts: kept };
+
+    const suffix = inlined.join("\n\n");
+    const merged = [...kept];
+    const textPart = merged.find(
+      (x) => (x as Record<string, unknown>)?.type === "text",
+    ) as { text?: string } | undefined;
+    if (textPart) {
+      textPart.text = `${textPart.text ?? ""}\n\n${suffix}`.trim();
+    } else {
+      merged.unshift({ type: "text", text: suffix });
+    }
+    return { ...m, parts: merged };
   });
 }

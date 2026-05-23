@@ -20,7 +20,55 @@ import {
 import { generateImage } from "@/lib/domain/ai/image/generate";
 import { IMAGE_PROVIDER_CATALOG } from "@/lib/domain/ai/image/catalog";
 import type { ImageProviderId, ImageModelId, ImageSize } from "@/lib/domain/ai/image/types";
+import { getUserSettings } from "@/lib/features/settings";
+import {
+  listConnections,
+  getConnectionWithKey,
+} from "@/lib/features/ai-connections";
 import type { ToolExecuteContext } from "./types";
+
+/**
+ * Resolve the active image-gen route + key for this user.
+ *
+ * Priority:
+ *   1. User's settings.ai.toolConfig.generate_image.routeOverride →
+ *      look up the Connection by presetId, decrypt its key, override
+ *      the AI-supplied (providerId, modelId).
+ *   2. Fall back to whatever the chat AI passed in the tool args.
+ *      The image generator then resolves the key via env vars only
+ *      (legacy AIProviderKey was removed).
+ */
+async function resolveImageGenRoute(
+  userId: string,
+  aiArgs: { providerId: ImageProviderId; modelId: ImageModelId },
+): Promise<{
+  providerId: ImageProviderId;
+  modelId: ImageModelId;
+  apiKey?: string;
+}> {
+  try {
+    const settings = await getUserSettings(userId);
+    const override = (settings.ai as { toolConfig?: Record<string, {
+      routeOverride?: { presetId: string; modelId: string };
+    }> } | undefined)?.toolConfig?.generate_image?.routeOverride;
+    if (!override) return aiArgs;
+
+    const conns = await listConnections(userId);
+    const match = conns.find((c) => c.presetId === override.presetId);
+    if (!match) return aiArgs;
+    const withKey = await getConnectionWithKey(userId, match.id);
+
+    return {
+      providerId: override.presetId as ImageProviderId,
+      modelId: override.modelId as ImageModelId,
+      apiKey: withKey.apiKey,
+    };
+  } catch {
+    // Override lookup is best-effort — never break image gen because
+    // settings couldn't be read.
+    return aiArgs;
+  }
+}
 
 /**
  * Create the base AI tools, bound to a specific user's context.
@@ -196,14 +244,19 @@ export function createBaseTools(ctx: ToolExecuteContext) {
       }),
       execute: async ({ prompt, providerId, modelId, size, quality, style }) => {
         try {
+          const resolved = await resolveImageGenRoute(ctx.userId, {
+            providerId: providerId as ImageProviderId,
+            modelId: modelId as ImageModelId,
+          });
           const result = await generateImage(
             {
               prompt,
-              providerId: providerId as ImageProviderId,
-              modelId: modelId as ImageModelId,
+              providerId: resolved.providerId,
+              modelId: resolved.modelId,
               size: size as ImageSize,
               quality,
               style,
+              apiKey: resolved.apiKey,
             },
             ctx.userId
           );

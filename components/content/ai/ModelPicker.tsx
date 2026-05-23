@@ -16,6 +16,7 @@ import { ChevronUp, Sparkles } from "lucide-react";
 import { cn } from "@/lib/core/utils";
 import { PROVIDER_CATALOG } from "@/lib/domain/ai/providers/catalog";
 import { useSettingsStore } from "@/state/settings-store";
+import { useAIChatStore } from "@/state/ai-chat-store";
 
 interface ModelPickerProps {
   providerId: string;
@@ -136,24 +137,43 @@ export function ModelPicker({
   );
 }
 
-/** Hook to initialize model selection from user settings */
+/**
+ * Hook to initialize model selection from user settings.
+ *
+ * Reads/writes a session-scoped Zustand slice in `useAIChatStore` so
+ * the active selection is shared between the make/model picker and
+ * the sidebar tab strip (which needs the active provider to tint the
+ * active tab in real time). Falls back to the user's stored default
+ * from `useSettingsStore` on first use.
+ */
 export function useModelSelection() {
   const storedProviderId = useSettingsStore((s) => s.ai?.providerId);
   const storedModelId = useSettingsStore((s) => s.ai?.modelId);
+  const sessionProviderId = useAIChatStore((s) => s.activeProviderId);
+  const sessionModelId = useAIChatStore((s) => s.activeModelId);
+  const setActive = useAIChatStore((s) => s.setActiveModelSelection);
 
-  const [providerId, setProviderId] = useState<string>(
-    storedProviderId ?? "anthropic"
-  );
-  const [modelId, setModelId] = useState<string>(
-    storedModelId ?? "claude-sonnet-3-5"
-  );
+  const providerId =
+    sessionProviderId ?? storedProviderId ?? "anthropic";
+  const modelId = sessionModelId ?? storedModelId ?? "claude-sonnet-3-5";
+
+  // Hydrate the session store from settings on first render if empty
+  // — `useState` lazy init would also work but using an effect keeps
+  // the hook safely callable across many surfaces.
+  useEffect(() => {
+    if (sessionProviderId === null || sessionModelId === null) {
+      setActive(providerId, modelId);
+    }
+    // We intentionally depend only on the storedX inputs; rerunning on
+    // every render would loop.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storedProviderId, storedModelId]);
 
   const handleChange = useCallback(
     (newProviderId: string, newModelId: string) => {
-      setProviderId(newProviderId);
-      setModelId(newModelId);
+      setActive(newProviderId, newModelId);
     },
-    []
+    [setActive],
   );
 
   return { providerId, modelId, handleChange };
