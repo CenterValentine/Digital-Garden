@@ -1,5 +1,6 @@
 import type { ExtensionRuntime } from "@/lib/extensions/types";
 import { FlashcardQuickAddDialog } from "./components/FlashcardQuickAddDialog";
+import { FlashcardSelectionOverlay } from "./components/FlashcardSelectionOverlay";
 import { FlashcardsPanel } from "./components/FlashcardsPanel";
 import FlashcardsSettingsDialog from "./settings/FlashcardsSettingsDialog";
 import { FLASHCARDS_EXTENSION_ID } from "./manifest";
@@ -7,6 +8,6 @@ import { FLASHCARDS_EXTENSION_ID } from "./manifest";
 export const flashcardsExtensionRuntime: ExtensionRuntime = {
   id: FLASHCARDS_EXTENSION_ID,
   leftSidebarPanel: FlashcardsPanel,
-  globalDialogs: [FlashcardQuickAddDialog],
+  globalDialogs: [FlashcardQuickAddDialog, FlashcardSelectionOverlay],
   settingsDialog: FlashcardsSettingsDialog,
 };

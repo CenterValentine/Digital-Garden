@@ -1,4 +1,6 @@
-import { Mark, mergeAttributes } from "@tiptap/core";
+import { Mark, mergeAttributes, type Editor } from "@tiptap/core";
+import { Plugin, PluginKey } from "@tiptap/pm/state";
+import { useFlashcardSelectionStore } from "@/state/flashcard-selection-store";
 
 // Flashcard Selection Mark (Epoch 19, Sprint 8).
 //
@@ -121,6 +123,37 @@ function flashcardSelectAttrSpec(): Record<string, unknown> {
   };
 }
 
+/**
+ * Walk the doc and remove every flashcardSelect mark whose cardSetId
+ * matches the given id. Used by the abandon path: when the user cancels
+ * the workflow before completing the back side, the front-side mark
+ * already in the document needs to disappear cleanly.
+ *
+ * We can't just call `unsetMark("flashcardSelect")` on the current
+ * selection — by the time Esc fires, the user has likely moved the
+ * cursor away from the front-range. So we scan the entire document and
+ * surgically remove only the marks belonging to this card set.
+ */
+export function removeMarksByCardSetId(editor: Editor, cardSetId: string): void {
+  const markType = editor.schema.marks.flashcardSelect;
+  if (!markType) return;
+
+  const tr = editor.state.tr;
+  editor.state.doc.descendants((node, pos) => {
+    if (!node.isText) return;
+    for (const mark of node.marks) {
+      if (
+        mark.type.name === "flashcardSelect" &&
+        mark.attrs.cardSetId === cardSetId
+      ) {
+        tr.removeMark(pos, pos + node.nodeSize, mark.type);
+      }
+    }
+  });
+
+  editor.view.dispatch(tr);
+}
+
 // ─── Client mark ────────────────────────────────────────────────────────
 //
 // Wraps the selected text in a styled <span>. The class list encodes the
@@ -179,6 +212,114 @@ export const FlashcardSelect = Mark.create({
         ({ commands }) =>
           commands.unsetMark(this.name),
     };
+  },
+
+  addKeyboardShortcuts() {
+    return {
+      // Esc cancels an in-flight selection workflow at any phase.
+      // Returns true only when we actually consumed the key so editor
+      // default behavior (deselect / blur) still works when idle.
+      Escape: () => {
+        const store = useFlashcardSelectionStore.getState();
+        if (store.phase === "idle") return false;
+        const result = store.cancel();
+        if (result?.cardSetId) {
+          removeMarksByCardSetId(this.editor, result.cardSetId);
+        }
+        return true;
+      },
+    };
+  },
+
+  addProseMirrorPlugins() {
+    const editor = this.editor;
+    return [
+      new Plugin({
+        key: new PluginKey("flashcardSelectWorkflow"),
+        props: {
+          // Listen for mouseup *inside the editor view*. When the user
+          // releases the mouse after dragging a selection, if we're in
+          // awaiting-front / awaiting-back AND the selection is
+          // non-empty, treat that as the commit signal for that side.
+          //
+          // Mouseup is the right event for this: it fires after the
+          // ProseMirror selection has already updated, so reading the
+          // editor's selection here gives us the user's final range.
+          handleDOMEvents: {
+            mouseup: () => {
+              const store = useFlashcardSelectionStore.getState();
+              if (
+                store.phase !== "awaiting-front" &&
+                store.phase !== "awaiting-back"
+              ) {
+                return false;
+              }
+              // Defer to next frame so any in-flight ProseMirror
+              // transaction lands before we read selection state.
+              requestAnimationFrame(() => {
+                const { state } = editor;
+                const { from, to, empty } = state.selection;
+                if (empty || from === to) return;
+
+                const phase = useFlashcardSelectionStore.getState().phase;
+                if (phase === "awaiting-front") {
+                  const { cardSetId, paletteIndex, deckId } =
+                    useFlashcardSelectionStore.getState();
+                  if (!cardSetId || !deckId) return;
+                  editor
+                    .chain()
+                    .setTextSelection({ from, to })
+                    .setFlashcardSelect({
+                      cardSetId,
+                      side: "front",
+                      deckId,
+                      paletteIndex,
+                      flashcardId: null,
+                    })
+                    .setTextSelection(to)
+                    .run();
+                  useFlashcardSelectionStore
+                    .getState()
+                    .commitFrontRange({ from, to });
+                } else if (phase === "awaiting-back") {
+                  const { cardSetId, paletteIndex, deckId } =
+                    useFlashcardSelectionStore.getState();
+                  if (!cardSetId || !deckId) return;
+                  editor
+                    .chain()
+                    .setTextSelection({ from, to })
+                    .setFlashcardSelect({
+                      cardSetId,
+                      side: "back",
+                      deckId,
+                      paletteIndex,
+                      flashcardId: null,
+                    })
+                    .setTextSelection(to)
+                    .run();
+                  const snapshot = useFlashcardSelectionStore
+                    .getState()
+                    .commitBackRange({ from, to });
+                  if (snapshot) {
+                    // Card-creation request is dispatched via a custom
+                    // browser event so the API call can live in the
+                    // flashcards extension client (which has access to
+                    // toast, fetcher, etc.) without this mark module
+                    // depending on it.
+                    window.dispatchEvent(
+                      new CustomEvent("dg:flashcard-selection-commit", {
+                        detail: snapshot,
+                      }),
+                    );
+                  }
+                }
+              });
+              return false;
+            },
+          },
+        },
+      }),
+    ];
   },
 });
 
