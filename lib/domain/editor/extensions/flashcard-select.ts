@@ -196,6 +196,10 @@ export const FlashcardSelect = Mark.create({
       mergeAttributes(HTMLAttributes, {
         "data-flashcard-select": "",
         class: `flashcard-select flashcard-select--side-${side} flashcard-select--p${paletteIndex}`,
+        title:
+          side === "front"
+            ? "Flashcard (front) — Ctrl/Cmd+Click to study"
+            : "Flashcard (back) — Ctrl/Cmd+Click to study",
       }),
       0,
     ];
@@ -237,6 +241,34 @@ export const FlashcardSelect = Mark.create({
       new Plugin({
         key: new PluginKey("flashcardSelectWorkflow"),
         props: {
+          // Ctrl/Cmd + click on a flashcardSelect mark launches the
+          // FlashcardReviewOverlay for that deck (and that specific
+          // card when flashcardId is set). We dispatch a CustomEvent
+          // so the launch UI lives in the flashcards extension —
+          // this mark module stays free of overlay/UI imports.
+          handleClick: (_view, _pos, event) => {
+            if (!(event.ctrlKey || event.metaKey)) return false;
+            const target = event.target as HTMLElement | null;
+            // Walk up from the actual clicked node to find the mark
+            // wrapper. Using DOM traversal is more reliable than
+            // doc.resolve(pos).marks() here because mark boundaries
+            // and DOM positions sometimes disagree for cross-line
+            // marks; the data attr is the source of truth we emitted.
+            const wrapper = target?.closest?.(
+              "[data-flashcard-select]",
+            ) as HTMLElement | null;
+            if (!wrapper) return false;
+            const deckId = wrapper.getAttribute("data-deck-id");
+            if (!deckId) return false;
+            const flashcardId = wrapper.getAttribute("data-flashcard-id");
+            event.preventDefault();
+            window.dispatchEvent(
+              new CustomEvent("dg:flashcard-launch", {
+                detail: { deckId, flashcardId: flashcardId || null },
+              }),
+            );
+            return true;
+          },
           // Listen for mouseup *inside the editor view*. When the user
           // releases the mouse after dragging a selection, if we're in
           // awaiting-front / awaiting-back AND the selection is

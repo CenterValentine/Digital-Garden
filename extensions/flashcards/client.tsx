@@ -1,6 +1,7 @@
 import type { ExtensionRuntime } from "@/lib/extensions/types";
 import { FlashcardQuickAddDialog } from "./components/FlashcardQuickAddDialog";
 import { FlashcardSelectionCommit } from "./components/FlashcardSelectionCommit";
+import { FlashcardSelectionLauncher } from "./components/FlashcardSelectionLauncher";
 import { FlashcardSelectionOverlay } from "./components/FlashcardSelectionOverlay";
 import { FlashcardSelectionStarter } from "./components/FlashcardSelectionStarter";
 import { FlashcardsPanel } from "./components/FlashcardsPanel";
@@ -15,6 +16,7 @@ export const flashcardsExtensionRuntime: ExtensionRuntime = {
     FlashcardSelectionOverlay,
     FlashcardSelectionStarter,
     FlashcardSelectionCommit,
+    FlashcardSelectionLauncher,
   ],
   settingsDialog: FlashcardsSettingsDialog,
 };
