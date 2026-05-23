@@ -139,8 +139,16 @@ export function AudioPlayer({ attrs, editor, getPos }: AudioPlayerProps) {
     return () => audio.removeEventListener("loadedmetadata", onLoaded);
   }, [attrs.src, attrs.durationSeconds, updateAttrs]);
 
+  // Read-only context (e.g. FlashcardReviewOverlay's viewer-mode TipTap):
+  // hide edit affordances and collapse our container chrome so we don't
+  // stack visual layers on top of the host card surface.
+  const isReadOnly = !editor.isEditable;
+
   // ── Empty state ──────────────────────────────────────────────────
+  // In read-only contexts an audio block with no src is broken data —
+  // render nothing rather than a non-functional upload prompt.
   if (!attrs.src) {
+    if (isReadOnly) return null;
     return (
       <div
         className={`audio-empty-state ${dragOver ? "audio-empty-state--drag" : ""}`}
@@ -219,17 +227,20 @@ export function AudioPlayer({ attrs, editor, getPos }: AudioPlayerProps) {
         display: "flex",
         flexDirection: "column",
         gap: "0.5rem",
-        padding: "0.875rem 1rem",
+        padding: isReadOnly ? "0.25rem 0" : "0.875rem 1rem",
         width: "100%",
-        background: attrs.showBackground
-          ? "var(--glass-1-background, rgba(255,255,255,0.06))"
-          : "transparent",
-        backdropFilter: attrs.showBackground
-          ? "var(--glass-1-backdrop-filter, blur(12px))"
-          : "none",
-        border: attrs.showBackground
-          ? "1px solid var(--color-border, rgba(255,255,255,0.1))"
-          : "none",
+        background:
+          isReadOnly || !attrs.showBackground
+            ? "transparent"
+            : "var(--glass-1-background, rgba(255,255,255,0.06))",
+        backdropFilter:
+          isReadOnly || !attrs.showBackground
+            ? "none"
+            : "var(--glass-1-backdrop-filter, blur(12px))",
+        border:
+          isReadOnly || !attrs.showBackground
+            ? "none"
+            : "1px solid var(--color-border, rgba(255,255,255,0.1))",
         borderRadius: "0.75rem",
       }}
     >
@@ -266,6 +277,8 @@ export function AudioPlayer({ attrs, editor, getPos }: AudioPlayerProps) {
             .filter(Boolean)
             .join(" · ")}
         </span>
+        {!isReadOnly && (
+          <>
         <button
           type="button"
           onMouseDown={(e) => e.preventDefault()}
@@ -320,6 +333,8 @@ export function AudioPlayer({ attrs, editor, getPos }: AudioPlayerProps) {
         >
           <X size={14} />
         </button>
+          </>
+        )}
       </div>
       <audio
         ref={audioRef}
