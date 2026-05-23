@@ -242,6 +242,29 @@ export function FlashcardReviewOverlay({
     });
   }, []);
 
+  // Auto-play any audio block on the now-visible side that's marked
+  // `autoplayOnFlip: true`. Both faces are in the DOM concurrently
+  // (only one visible via backface-visibility) — scope the query to
+  // the side matching `shownSide` so the hidden face's audio doesn't
+  // fire too. Delay matches the 3D rotateY transition so the audio
+  // lands with the visual reveal, not the click.
+  useEffect(() => {
+    if (!current) return;
+    const delay = reducedMotion ? 100 : 600;
+    const timer = window.setTimeout(() => {
+      const audio = document.querySelector<HTMLAudioElement>(
+        `[data-card-side="${shownSide}"] audio[data-autoplay-on-flip="true"]`,
+      );
+      if (!audio) return;
+      audio.currentTime = 0;
+      void audio.play().catch(() => {
+        // Browser may block autoplay (no recent user gesture, muted tab,
+        // background tab). Silent — manual play button still works.
+      });
+    }, delay);
+    return () => window.clearTimeout(timer);
+  }, [shownSide, current, reducedMotion]);
+
   const goToIndex = useCallback(
     (nextIndex: number, nextIntent: SlideIntent) => {
       setIntent(nextIntent);
@@ -850,6 +873,7 @@ function CardFace({
     return (
       <div
         className="absolute inset-0 flex flex-col rounded-lg"
+        data-card-side={back ? "back" : "front"}
         style={{
           backfaceVisibility: "hidden",
           transform: back ? "rotateY(180deg)" : undefined,
@@ -876,6 +900,7 @@ function CardFace({
   return (
     <div
       className="absolute inset-0 flex flex-col rounded-lg p-5 md:p-8"
+      data-card-side={back ? "back" : "front"}
       style={{
         backfaceVisibility: "hidden",
         transform: back ? "rotateY(180deg)" : undefined,

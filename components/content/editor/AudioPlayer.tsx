@@ -294,6 +294,9 @@ export function AudioPlayer({ attrs, editor, getPos }: AudioPlayerProps) {
         controls
         preload="metadata"
         aria-label={attrs.filename ?? "audio"}
+        // Marker queried by FlashcardReviewOverlay to auto-play this
+        // audio when the card flips to a side containing it.
+        data-autoplay-on-flip={attrs.autoplayOnFlip ? "true" : undefined}
         style={{ width: "100%" }}
       />
     </div>
