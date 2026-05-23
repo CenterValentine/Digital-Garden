@@ -25,11 +25,47 @@ import {
 
 // Extend the contentDom with React root + cleanup hooks. Same pattern as
 // excalidraw-block — createBlockNodeView gives us a contentDom; we mount
-// a React tree and stash the root for later updateContent / unmount.
+// a React tree and stash the root for later updateContent.
+//
+// Sprint 8 follow-up perf fix: previously updateContent unmounted +
+// remounted the React tree on EVERY ProseMirror update — including
+// focus/selection events that don't actually change node attrs. That
+// triggered a full re-fetch of the deck + queue on every click in/out
+// of the block. Now we:
+//   - Keep the React root alive across updates (no unmount until
+//     ProseMirror destroys the NodeView via the chrome's destroy hook)
+//   - Track the last-rendered attrs and skip the re-render when they're
+//     shallow-equal to the previous ones
+//   - When attrs DO change, call root.render() again — React handles
+//     the prop diff in-place; effects fire only on changed deps
+// Result: focus/blur on the block is essentially free.
 type BlockContentDom = HTMLElement & {
   __reactRoot?: Root;
   __cleanup?: () => void;
+  __lastAttrs?: FlashcardEmbedAttrs;
 };
+
+// Shallow attribute comparison — returns true when every key in the
+// FlashcardEmbedAttrs surface matches between `a` and `b`. cardIds is
+// the only array-valued attr; we compare element-by-element instead of
+// by reference so a fresh array literal with the same contents counts
+// as equal.
+function attrsEqual(a: FlashcardEmbedAttrs, b: FlashcardEmbedAttrs): boolean {
+  if (a.deckId !== b.deckId) return false;
+  if (a.defaultMode !== b.defaultMode) return false;
+  if (a.showRatingButtons !== b.showRatingButtons) return false;
+  if (a.showBackground !== b.showBackground) return false;
+  if (a.showBorder !== b.showBorder) return false;
+  const aIds = a.cardIds ?? null;
+  const bIds = b.cardIds ?? null;
+  if (aIds === null && bIds === null) return true;
+  if (aIds === null || bIds === null) return false;
+  if (aIds.length !== bIds.length) return false;
+  for (let i = 0; i < aIds.length; i += 1) {
+    if (aIds[i] !== bIds[i]) return false;
+  }
+  return true;
+}
 
 function renderFlashcardEmbed(
   attrs: FlashcardEmbedAttrs,
@@ -38,38 +74,43 @@ function renderFlashcardEmbed(
   getPos: () => number | undefined,
 ) {
   const dom = contentDom as BlockContentDom;
-  // Defensive cleanup — updateContent already unmounts before calling us
-  // again, but this guards against a renderContent re-entry.
-  if (dom.__reactRoot) {
-    try {
-      dom.__reactRoot.unmount();
-    } catch {
-      // Ignore unmount errors; React will GC.
-    }
-    delete dom.__reactRoot;
+
+  // Fast path: same attrs as last render → React tree already shows
+  // the right state. This is the hot path on every focus/selection
+  // change; bail before touching the DOM.
+  if (dom.__reactRoot && dom.__lastAttrs && attrsEqual(dom.__lastAttrs, attrs)) {
+    return;
   }
-  contentDom.innerHTML = "";
-  const mount = document.createElement("div");
-  contentDom.appendChild(mount);
-  const root = createRoot(mount);
-  root.render(
+
+  // First mount: create the root + container div once.
+  if (!dom.__reactRoot) {
+    contentDom.innerHTML = "";
+    const mount = document.createElement("div");
+    contentDom.appendChild(mount);
+    dom.__reactRoot = createRoot(mount);
+    dom.__cleanup = () => {
+      if (dom.__reactRoot) {
+        try {
+          dom.__reactRoot.unmount();
+        } catch {
+          // ignore
+        }
+        delete dom.__reactRoot;
+        delete dom.__lastAttrs;
+      }
+    };
+  }
+
+  // Re-render with new props. React diffs the tree; effects that depend
+  // on changed values run, others don't. No unmount, no full re-fetch.
+  dom.__reactRoot.render(
     createElement(FlashcardEmbedNodeView, {
       attrs,
       editor,
       getPos,
     }),
   );
-  dom.__reactRoot = root;
-  dom.__cleanup = () => {
-    if (dom.__reactRoot) {
-      try {
-        dom.__reactRoot.unmount();
-      } catch {
-        // ignore
-      }
-      delete dom.__reactRoot;
-    }
-  };
+  dom.__lastAttrs = attrs;
 }
 
 export const FlashcardEmbed = Node.create({
@@ -108,27 +149,12 @@ export const FlashcardEmbed = Node.create({
         renderFlashcardEmbed(node.attrs as FlashcardEmbedAttrs, contentDom, editor, getPos);
       },
       updateContent(node, contentDom, editor, getPos) {
-        // Run cleanup before clearing so React's StrictMode / dev double-
-        // mount doesn't leave orphan listeners.
-        const cleanup = (contentDom as BlockContentDom).__cleanup;
-        if (cleanup) {
-          try {
-            cleanup();
-          } catch {
-            // ignore
-          }
-          delete (contentDom as BlockContentDom).__cleanup;
-        }
-        const existingRoot = (contentDom as BlockContentDom).__reactRoot;
-        if (existingRoot) {
-          try {
-            existingRoot.unmount();
-          } catch {
-            // ignore
-          }
-          delete (contentDom as BlockContentDom).__reactRoot;
-        }
-        contentDom.innerHTML = "";
+        // Sprint 8 follow-up: NO LONGER UNMOUNTS the React root.
+        // renderFlashcardEmbed handles the diff in-place — keeps the
+        // root alive, re-renders with new props, fast-paths when attrs
+        // are unchanged. The previous unmount+remount on every update
+        // was causing the block to flash a loading state every time the
+        // user clicked in/out of it.
         renderFlashcardEmbed(node.attrs as FlashcardEmbedAttrs, contentDom, editor, getPos);
         return true;
       },

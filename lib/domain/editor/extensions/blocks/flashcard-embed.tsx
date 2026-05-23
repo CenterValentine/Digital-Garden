@@ -184,17 +184,24 @@ export const ServerFlashcardEmbed = Node.create({
   },
 
   renderHTML() {
-    // Generic placeholder — no deckId, no cardIds, no card content.
+    // Sprint 8 follow-up: flashcards are private user data and the
+    // user explicitly does NOT want them visible on published pages.
+    // The earlier "static 'Flashcards' label" emit still leaked the
+    // existence of a flashcard block. Now we emit an empty hidden
+    // div instead — structurally present so ProseMirror's serializer
+    // doesn't choke, but invisible to public readers.
+    //
     // The block is interactive in the authenticated editor; in any
     // server-rendered surface (publishing, markdown export, search
-    // indexing, etc.) it shows up as a single static label.
+    // indexing) it produces zero visible content.
     return [
       "div",
       {
-        class: "block-flashcard-embed",
+        class: "block-flashcard-embed-private",
         "data-block-type": "flashcardEmbed",
+        "aria-hidden": "true",
+        style: "display: none",
       },
-      ["span", { class: "block-flashcard-embed-export-label" }, "Flashcards"],
     ];
   },
 });
