@@ -26,6 +26,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { usePathname } from "next/navigation";
 import { getSurfaceStyles } from "@/lib/design/system";
 import {
   selectionHintFor,
@@ -43,7 +44,9 @@ interface CursorPos {
 
 export function FlashcardSelectionOverlay() {
   const phase = useFlashcardSelectionStore((s) => s.phase);
+  const cancel = useFlashcardSelectionStore((s) => s.cancel);
   const isActive = phase !== "idle";
+  const pathname = usePathname();
 
   // The cursor position writes happen inside a mousemove handler (a
   // browser event callback, not a render effect), so the React
@@ -51,6 +54,15 @@ export function FlashcardSelectionOverlay() {
   // only fires on synchronous in-effect mutations. Browser event
   // handlers are async by definition.
   const [cursor, setCursor] = useState<CursorPos | null>(null);
+
+  // Abandon the workflow on route change. The front-side mark (if
+  // applied) stays in the previous note's doc as an orphan — harmless
+  // until a future "cleanup orphan flashcard highlights" sweep, and
+  // strictly better than letting the state machine carry a stale
+  // deckId/cardSetId into a different note.
+  useEffect(() => {
+    cancel();
+  }, [pathname, cancel]);
 
   // Stash the last-applied body class flag in a ref so the cleanup
   // can run idempotently even if the cleanup function runs twice

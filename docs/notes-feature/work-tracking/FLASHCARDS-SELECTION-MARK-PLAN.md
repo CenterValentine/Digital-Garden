@@ -1,13 +1,29 @@
 ---
-title: Flashcards Selection-Mark Plan (Sprint 8 candidate)
-status: planned
-last_updated: 2026-05-23
+title: Flashcards Selection-Mark Plan (Sprint 8)
+status: shipped — text-side workflow; image-side deferred
+last_updated: 2026-05-22
 owner: centervalentine
 related:
   - extensions/flashcards/
   - lib/domain/editor/extensions/
   - lib/domain/editor/commands/slash-commands.tsx
 ---
+
+## Sprint 8 Status (shipped 2026-05-22)
+
+✅ Sub-task 1 — FlashcardSelect mark + ServerFlashcardSelect + 12-hue palette + schema bump to 1.9.0 (commit 28312d4)
+✅ Sub-task 2 — flashcard-selection-store (Zustand state machine) + FlashcardSelectionOverlay (cursor-following) + Esc + mouseup PM plugin (commit 96fe90f)
+✅ Sub-task 3 — /flashcard-select slash command + FlashcardSelectionStarter (deck picker + Quick-Fire silent skip) + lastUsedSelectionDeckId / quickFireEnabled persisted via /api/user/settings (commit e90f2b2)
+✅ Sub-task 4a — FlashcardSelectionCommit (POST /api/flashcards on back-commit, rolls back marks on failure, wires flashcardId into both marks on success) (commit e90f2b2)
+✅ Sub-task 4b — Abandon path: Esc clears the front mark via removeMarksByCardSetId; route change cancels the workflow (orphan mark left behind for now)
+⏸️ Sub-task 4c — Image-as-side branch DEFERRED (see "Open follow-ups" at bottom)
+
+## Decisions made during the sprint
+
+- **Palette**: hue rotation anchored on existing intent families (primary blue, info cyan, success green, warning amber, plus spread hues like coral, magenta, teal). HSL-based with CSS variables for sat/light/alpha so a future theme switch tunes the whole palette via four knobs. Dark mode adjusts lightness + alpha; hues unchanged.
+- **Quick-Fire**: silent skip into front-selection. The hint bar's deck label is the only confirmation. No flash toast.
+- **Overlay placement**: floats near the cursor with `pointer-events: none` so the hint doesn't intercept the user's drag.
+- **Selection-defaults persistence**: extended `flashcards.lastUsedSelectionDeckId` + `flashcards.quickFireEnabled` in the user settings schema instead of standing up a dedicated `/api/flashcards/selection-defaults` route. Less surface to maintain.
 
 # Text-Selection-to-Flashcard TipTap Mark
 
