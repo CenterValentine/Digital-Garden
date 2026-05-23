@@ -20,6 +20,7 @@ import {
 } from "@/state/content-store";
 import { useExtensionShellTabMenuSections } from "@/lib/extensions/client-registry";
 import { getCollaborationBrowserSessionId } from "@/lib/domain/collaboration/runtime";
+import { prefetchContent } from "@/lib/domain/content/prefetch";
 
 interface TabPresenceSession {
   sessionId: string;
@@ -538,6 +539,14 @@ export function MainPanelHeader({
                 } ${isDragging ? "cursor-grabbing opacity-60" : "cursor-grab"}`}
                 data-pane-id={paneId}
                 draggable
+                onPointerEnter={() => {
+                  // Best-effort prefetch for inactive tabs — the active tab
+                  // is already loaded. Warms the server cache so a click
+                  // hits in <1ms.
+                  if (!isActive && tab.contentId) {
+                    prefetchContent(tab.contentId);
+                  }
+                }}
                 onContextMenu={(event) => {
                   if (shellTabMenuSections.length === 0) return;
                   event.preventDefault();

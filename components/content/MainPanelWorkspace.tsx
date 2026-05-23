@@ -17,6 +17,13 @@ import { MainPanelNavigation } from "./MainPanelNavigation";
 import { MainPanelHeader } from "./headers/MainPanelHeader";
 import { MainPanelContent } from "./content/MainPanelContent";
 import { useExtensionShellControllers } from "@/lib/extensions/client-registry";
+import type { ContentDetailResponse } from "@/lib/domain/content/api-types";
+
+// Initial content from server-side cache hit (page-level SSR). When the URL
+// names a content id that the server already had in its cache, the page
+// pre-fetches and inlines the response so the client mounts with content
+// in props — skipping the post-hydration round trip on warm reloads.
+type InitialContent = ContentDetailResponse | null;
 
 interface TabDropRequest {
   paneId: WorkspacePaneId;
@@ -38,12 +45,14 @@ function WorkspacePane({
   onTabDragStart,
   onTabDragEnd,
   onTabDrop,
+  initialContent,
 }: {
   paneId: WorkspacePaneId;
   draggedTabId: string | null;
   onTabDragStart: (tabId: string, paneId: WorkspacePaneId) => void;
   onTabDragEnd: () => void;
   onTabDrop: (request: TabDropRequest) => void;
+  initialContent: InitialContent;
 }) {
   const layoutMode = useContentStore((state) => state.layoutMode);
   const activePaneId = useContentStore((state) => state.activePaneId);
@@ -93,7 +102,7 @@ function WorkspacePane({
       {isDropTarget && (
         <div className="pointer-events-none absolute inset-0 z-10 shadow-[inset_0_0_0_1px_rgba(201,168,108,0.18)]" />
       )}
-      <MainPanelContent paneId={paneId} />
+      <MainPanelContent paneId={paneId} initialContent={initialContent} />
     </div>
   );
 }
@@ -407,7 +416,9 @@ function WorkspaceReshapeTargets({
   );
 }
 
-export function MainPanelWorkspace() {
+export function MainPanelWorkspace({
+  initialContent = null,
+}: { initialContent?: InitialContent } = {}) {
   const pathname = usePathname();
   const layoutMode = useContentStore((state) => state.layoutMode);
   const activePaneId = useContentStore((state) => state.activePaneId);
@@ -561,6 +572,7 @@ export function MainPanelWorkspace() {
                 onTabDragStart={handleTabDragStart}
                 onTabDragEnd={resetDragState}
                 onTabDrop={handleTabDrop}
+                initialContent={initialContent}
               />
             </Allotment.Pane>
             <Allotment.Pane minSize={220}>
@@ -570,6 +582,7 @@ export function MainPanelWorkspace() {
                 onTabDragStart={handleTabDragStart}
                 onTabDragEnd={resetDragState}
                 onTabDrop={handleTabDrop}
+                initialContent={initialContent}
               />
             </Allotment.Pane>
           </Allotment>
@@ -583,6 +596,7 @@ export function MainPanelWorkspace() {
                 onTabDragStart={handleTabDragStart}
                 onTabDragEnd={resetDragState}
                 onTabDrop={handleTabDrop}
+                initialContent={initialContent}
               />
             </Allotment.Pane>
             <Allotment.Pane minSize={220}>
@@ -592,6 +606,7 @@ export function MainPanelWorkspace() {
                 onTabDragStart={handleTabDragStart}
                 onTabDragEnd={resetDragState}
                 onTabDrop={handleTabDrop}
+                initialContent={initialContent}
               />
             </Allotment.Pane>
           </Allotment>
@@ -608,6 +623,7 @@ export function MainPanelWorkspace() {
             onTabDragStart={handleTabDragStart}
             onTabDragEnd={resetDragState}
             onTabDrop={handleTabDrop}
+            initialContent={initialContent}
           />
         </Allotment.Pane>
         <Allotment.Pane minSize={320}>
@@ -617,6 +633,7 @@ export function MainPanelWorkspace() {
             onTabDragStart={handleTabDragStart}
             onTabDragEnd={resetDragState}
             onTabDrop={handleTabDrop}
+            initialContent={initialContent}
           />
         </Allotment.Pane>
       </Allotment>
@@ -631,6 +648,7 @@ export function MainPanelWorkspace() {
             onTabDragStart={handleTabDragStart}
             onTabDragEnd={resetDragState}
             onTabDrop={handleTabDrop}
+            initialContent={initialContent}
           />
         </Allotment.Pane>
         <Allotment.Pane minSize={220}>
@@ -640,6 +658,7 @@ export function MainPanelWorkspace() {
             onTabDragStart={handleTabDragStart}
             onTabDragEnd={resetDragState}
             onTabDrop={handleTabDrop}
+            initialContent={initialContent}
           />
         </Allotment.Pane>
       </Allotment>
@@ -652,6 +671,7 @@ export function MainPanelWorkspace() {
         onTabDragStart={handleTabDragStart}
         onTabDragEnd={resetDragState}
         onTabDrop={handleTabDrop}
+        initialContent={initialContent}
       />
     );
   }

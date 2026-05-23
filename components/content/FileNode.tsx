@@ -52,6 +52,7 @@ import type { TreeNode } from "@/lib/domain/content/types";
 import { getDisplayExtension, splitFilenameForDisplay } from "@/lib/domain/content/file-extension-utils";
 import { FileNameInput } from "@/components/common/FileNameInput";
 import { clientLogger } from "@/lib/core/logger/client";
+import { prefetchContent } from "@/lib/domain/content/prefetch";
 
 interface FileNodeProps extends NodeRendererProps<TreeNode> {
   onRename?: (id: string, name: string) => Promise<void>;
@@ -518,6 +519,16 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
       onClick={handleClick}
       onDoubleClick={handleDoubleClick}
       onContextMenu={handleContextMenu}
+      onPointerEnter={() => {
+        // Best-effort prefetch — warms the server-side content cache so
+        // the click that follows reads in <1ms. Skipped for synthetic
+        // tree entries (people group / person nodes) that don't have a
+        // corresponding /api/content/content/[id] route, and for
+        // soft-deleted rows where a fresh GET should hit the DB.
+        if (isPeopleNode) return;
+        if (data.deletedAt) return;
+        prefetchContent(node.id);
+      }}
     >
       <div className="flex items-center gap-1">
         {getChevron()}
