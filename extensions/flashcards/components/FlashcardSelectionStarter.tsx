@@ -29,7 +29,10 @@
 import { useCallback, useEffect, useState } from "react";
 import { FlashcardDeckPickerDialog } from "./FlashcardDeckPickerDialog";
 import { useFlashcardSelectionStore } from "@/state/flashcard-selection-store";
-import { logger } from "@/lib/core/logger";
+// Client-safe logger entry. Importing from "@/lib/core/logger" pulls in
+// `next/headers` and `node:async_hooks` transitively — both server-only;
+// the bundler rejects them in a "use client" graph.
+import { clientLogger } from "@/lib/core/logger/client";
 
 interface SelectionDefaults {
   lastUsedSelectionDeckId: string | null;
@@ -57,7 +60,7 @@ async function fetchSelectionDefaults(): Promise<SelectionDefaults> {
       quickFireEnabled: Boolean(fc?.quickFireEnabled),
     };
   } catch (err) {
-    logger.warn({
+    clientLogger.warn({
       layer: "fetch",
       event: "flashcard_selection_defaults_fetch_failed",
       summary: "Could not read selection defaults — falling back to picker",
@@ -80,7 +83,7 @@ async function persistLastUsedDeck(deckId: string): Promise<void> {
   } catch (err) {
     // Best-effort — failure here just means next session won't have
     // the deck pre-selected. Not worth surfacing to the user.
-    logger.warn({
+    clientLogger.warn({
       layer: "fetch",
       event: "flashcard_selection_persist_deck_failed",
       summary: "Could not persist last-used deck (best-effort)",

@@ -18,7 +18,9 @@
 import { useEffect } from "react";
 import { toast } from "sonner";
 import type { Editor } from "@tiptap/react";
-import { logger } from "@/lib/core/logger";
+// Client-safe logger entry — see FlashcardSelectionStarter for context
+// on why the barrel can't be imported from a "use client" graph.
+import { clientLogger } from "@/lib/core/logger/client";
 import { useFlashcardSelectionStore } from "@/state/flashcard-selection-store";
 import { removeMarksByCardSetId } from "@/lib/domain/editor/extensions/flashcard-select";
 
@@ -121,7 +123,7 @@ export function FlashcardSelectionCommit() {
         toast.success("Flashcard added");
         resolveSuccess();
       } catch (err) {
-        logger.warn({
+        clientLogger.warn({
           layer: "fetch",
           event: "flashcard_selection_create_failed",
           summary: "Could not create flashcard from selection",
