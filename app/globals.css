@@ -1172,6 +1172,79 @@ nav[class*="fixed"] {
   border-bottom: none;
 }
 
+/* Sprint 8 (Epoch 19): Flashcard selection mark
+ *
+ * Per-card-set color picked at front-mark creation time from a 12-hue
+ * rotation. Hues are derived from existing intent anchors (primary
+ * blue 222, info cyan 199, success green 142, warning amber 38) and
+ * spread around the wheel to remain distinguishable; pure danger red
+ * is deliberately skipped (coral 18 sits in for it) so highlights
+ * never read as errors.
+ *
+ * Each highlight uses `hsl(var(--fc-hue) S L / A)` so a future theme
+ * switch can override saturation/lightness/alpha globally without
+ * touching the 12 hue tokens. Light vs dark mode just toggles those
+ * three knobs.
+ *
+ * No `.public-prose` rules — the server mark emits a bare <span> with
+ * no class, so published pages never match these selectors.
+ */
+.ProseMirror .flashcard-select {
+  --fc-sat: 70%;
+  --fc-light: 50%;
+  --fc-bg-alpha: 0.12;
+  --fc-line-alpha: 0.5;
+  background-color: hsl(var(--fc-hue, 222) var(--fc-sat) var(--fc-light) / var(--fc-bg-alpha));
+  border-bottom: 1px dashed hsl(var(--fc-hue, 222) var(--fc-sat) 40% / var(--fc-line-alpha));
+  border-radius: 2px;
+  padding: 0 2px;
+  transition: background-color 120ms ease;
+}
+
+.ProseMirror .flashcard-select:hover {
+  --fc-bg-alpha: 0.20;
+}
+
+.ProseMirror .flashcard-select--side-back {
+  border-bottom-style: solid;
+}
+
+.dark .ProseMirror .flashcard-select {
+  --fc-light: 65%;
+  --fc-bg-alpha: 0.22;
+  --fc-line-alpha: 0.65;
+}
+
+.dark .ProseMirror .flashcard-select:hover {
+  --fc-bg-alpha: 0.32;
+}
+
+/* 12-slot hue rotation. The order matches the JS palette index — slot
+ * 0 must stay primary-blue so the default (paletteIndex: 0 attr
+ * fallback) is theme-aligned. */
+.flashcard-select--p0  { --fc-hue: 222; } /* primary blue */
+.flashcard-select--p1  { --fc-hue: 199; } /* info cyan */
+.flashcard-select--p2  { --fc-hue: 142; } /* success green */
+.flashcard-select--p3  { --fc-hue: 38;  } /* warning amber */
+.flashcard-select--p4  { --fc-hue: 18;  } /* coral (soft red) */
+.flashcard-select--p5  { --fc-hue: 320; } /* magenta */
+.flashcard-select--p6  { --fc-hue: 265; } /* purple */
+.flashcard-select--p7  { --fc-hue: 240; } /* indigo */
+.flashcard-select--p8  { --fc-hue: 162; } /* teal */
+.flashcard-select--p9  { --fc-hue: 90;  } /* lime */
+.flashcard-select--p10 { --fc-hue: 280; } /* violet */
+.flashcard-select--p11 { --fc-hue: 60;  } /* yellow */
+
+/* Selection-mode cursor cue — applied to the .ProseMirror element
+ * while the flashcard selection store is in awaiting-front /
+ * awaiting-back. Drives both the editor cursor and the body cursor
+ * (so the cue persists when the user mouses over chrome). */
+.ProseMirror.flashcard-select-cursor,
+body.flashcard-select-cursor,
+body.flashcard-select-cursor * {
+  cursor: crosshair !important;
+}
+
 /* Sprint 41: Chat outline scroll-to flash animation */
 @keyframes chat-outline-flash {
   0% { background-color: rgba(255, 215, 0, 0.15); }

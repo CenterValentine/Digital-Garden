@@ -66,6 +66,7 @@ import { Stopwatch } from "./extensions/blocks/stopwatch";
 import { PullQuote } from "./extensions/blocks/pull-quote";
 import { TableOfContents } from "./extensions/blocks/table-of-contents";
 import { FlashcardEmbed } from "./extensions/blocks/flashcard-embed-client";
+import { FlashcardSelect } from "./extensions/flashcard-select";
 import {
   UnsupportedBlock,
   UnsupportedInline,
@@ -299,6 +300,7 @@ export function getEditorExtensions(options?: EditorExtensionsOptions): Extensio
     PullQuote,
     TableOfContents,
     FlashcardEmbed,
+    FlashcardSelect,
     UnsupportedBlock,
     UnsupportedInline,
     ...getExtensionClientEditorExtensions(),
