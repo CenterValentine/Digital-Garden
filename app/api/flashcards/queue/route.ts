@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@/lib/database/generated/prisma";
 import { prisma } from "@/lib/database/client";
-import { logger } from "@/lib/core/logger";
 import { requireAuth } from "@/lib/infrastructure/auth/middleware";
 import {
   FLASHCARD_SELECT,
@@ -79,107 +78,55 @@ export async function GET(request: NextRequest) {
       ...(cardIds ? { id: { in: cardIds } } : {}),
     };
 
-    // Pull due (state != new, due <= now) and new cards separately so we
-    // can apply a sensible cap on new cards even when many are eligible.
-    // 20 new per session is a reasonable default — matches Anki's
-    // out-of-box "new cards per day" setting.
+    // Per-session budgets (Anki convention):
+    //   - new cards are CAPPED per session (NEW_PER_QUEUE_CAP) so the
+    //     queue never drowns the user in fresh material
+    //   - review cards (state in learning/review/relearning AND due ≤ now)
+    //     get the FULL session budget — forgetting an old card hurts
+    //     more than not learning a new one, so reviews have priority
+    //   - we concat [dueCards, newCards] (review-first) and slice to
+    //     `limit` so the final queue never exceeds the requested size
+    //
+    // Earlier math was `reviewLimit = limit - newLimit` which gave
+    // ALL the budget to new cards when newLimit reached the cap. With
+    // NEW_PER_QUEUE_CAP=20 and default limit=20, reviewLimit always
+    // computed to 0 — the due-cards query was effectively disabled.
+    // Sprint 6 follow-up diagnostic surfaced this directly.
     const NEW_PER_QUEUE_CAP = 20;
     const newLimit = includeNew ? Math.min(limit, NEW_PER_QUEUE_CAP) : 0;
-    const reviewLimit = limit - newLimit;
+    const reviewLimit = limit;
 
-    const [dueCards, newCards, debugAllInScope, debugDirectEquality]: [
-      SelectedCard[],
-      SelectedCard[],
-      Array<{ id: string; state: string; due: Date; deckId: string }>,
-      Array<{ id: string; state: string; due: Date; deckId: string }>,
-    ] = await Promise.all([
-      reviewLimit > 0
-        ? prisma.flashcard.findMany({
-            where: {
-              ...baseWhere,
-              state: { in: ["learning", "review", "relearning"] },
-              due: { lte: now },
-            },
-            select: FLASHCARD_SELECT,
-            // Overdue first (smallest due first), then by last-reviewed
-            // so the same card isn't shown twice in quick succession.
-            orderBy: [{ due: "asc" }, { lastReviewedAt: "asc" }],
-            take: reviewLimit,
-          })
-        : Promise.resolve<SelectedCard[]>([]),
-      includeNew && newLimit > 0
-        ? prisma.flashcard.findMany({
-            where: { ...baseWhere, state: "new" },
-            select: FLASHCARD_SELECT,
-            // FIFO on new cards — the order they were added.
-            orderBy: [{ createdAt: "asc" }],
-            take: newLimit,
-          })
-        : Promise.resolve<SelectedCard[]>([]),
-      // ─── DEBUG (temporary) — Sprint 6 follow-up bug: dueCount and
-      // queue disagree on card visibility for the same deckId. Surface
-      // every card in scope so we can see what state/due/deckId they
-      // actually have. Remove this diagnostic once root cause is fixed.
-      prisma.flashcard.findMany({
-        where: { ownerId, deletedAt: null, ...(deckIdFilter ? { deckId: { in: deckIdFilter } } : {}) },
-        select: { id: true, state: true, due: true, deckId: true },
-        take: 25,
-      }) as unknown as Promise<Array<{ id: string; state: string; due: Date; deckId: string }>>,
-      // ─── DEBUG 2 (temporary) — direct equality fallback. If this
-      // returns cards but debugAllInScope (via `in: [...]`) doesn't,
-      // the descendants logic is producing the wrong filter array.
-      deckId
-        ? (prisma.flashcard.findMany({
-            where: { ownerId, deletedAt: null, deckId },
-            select: { id: true, state: true, due: true, deckId: true },
-            take: 25,
-          }) as unknown as Promise<Array<{ id: string; state: string; due: Date; deckId: string }>>)
-        : Promise.resolve<Array<{ id: string; state: string; due: Date; deckId: string }>>([]),
-    ]);
+    const [dueCards, newCards]: [SelectedCard[], SelectedCard[]] =
+      await Promise.all([
+        prisma.flashcard.findMany({
+          where: {
+            ...baseWhere,
+            state: { in: ["learning", "review", "relearning"] },
+            due: { lte: now },
+          },
+          select: FLASHCARD_SELECT,
+          // Overdue first (smallest due first), then by last-reviewed
+          // so the same card isn't shown twice in quick succession.
+          orderBy: [{ due: "asc" }, { lastReviewedAt: "asc" }],
+          take: reviewLimit,
+        }),
+        newLimit > 0
+          ? prisma.flashcard.findMany({
+              where: { ...baseWhere, state: "new" },
+              select: FLASHCARD_SELECT,
+              // FIFO on new cards — the order they were added.
+              orderBy: [{ createdAt: "asc" }],
+              take: newLimit,
+            })
+          : Promise.resolve<SelectedCard[]>([]),
+      ]);
 
-    // ─── DEBUG log (temporary) ───────────────────────────────────────
-    // Uses logger.warn (no-console lint rule). attrs are scalars only
-    // per the PII firewall; the card-list array is serialized as a
-    // single JSON-string attr for visibility.
-    logger.warn({
-      layer: "editor",
-      event: "flashcards_queue:diagnostic",
-      summary: "deck-count vs queue mismatch — scope dump",
-      attrs: {
-        requested_deck_id: deckId ?? "",
-        resolved_deck_id_filter: (deckIdFilter ?? []).join(","),
-        include_new: includeNew,
-        limit,
-        new_limit: newLimit,
-        review_limit: reviewLimit,
-        now_iso: now.toISOString(),
-        due_cards_returned: dueCards.length,
-        new_cards_returned: newCards.length,
-        all_cards_in_scope_count: debugAllInScope.length,
-        all_cards_in_scope_json: JSON.stringify(
-          debugAllInScope.map((c) => ({
-            id: c.id,
-            state: c.state,
-            due: c.due.toISOString(),
-            deckId: c.deckId,
-          })),
-        ),
-        // Direct equality fallback: same deckId, no descendants traversal.
-        // If this finds cards but `all_cards_in_scope` doesn't, the
-        // descendants OR clause is producing the wrong deckIdFilter.
-        direct_equality_count: debugDirectEquality.length,
-        direct_equality_json: JSON.stringify(
-          debugDirectEquality.map((c) => ({
-            id: c.id,
-            state: c.state,
-            due: c.due.toISOString(),
-            deckId: c.deckId,
-          })),
-        ),
-      },
-    });
-
-    const data = [...dueCards, ...newCards].map((card) => toFlashcardDto(card));
+    // Review-first concat, then slice to the requested session size.
+    // When reviews fill the budget, new cards naturally fall off — the
+    // right behavior for spaced repetition.
+    const data = [...dueCards, ...newCards]
+      .slice(0, limit)
+      .map((card) => toFlashcardDto(card));
 
     return NextResponse.json({
       success: true,
@@ -191,36 +138,6 @@ export async function GET(request: NextRequest) {
         // When a session asks "is there anything due RIGHT NOW," even an
         // empty queue is informative — caller can decide to show "all
         // caught up" UI rather than retry.
-        //
-        // ─── TEMPORARY DIAGNOSTIC (Sprint 6 follow-up) ───────────────
-        // Surfacing the same data the server log emits, here in the
-        // response body, because the pretty logger encoder truncates
-        // attrs in dev terminal output. Reader can grab this from
-        // DevTools → Network → /api/flashcards/queue → Response. Remove
-        // once the deck-count vs queue-empty bug is pinned + fixed.
-        _diagnostic: {
-          requestedDeckId: deckId,
-          resolvedDeckIdFilter: deckIdFilter,
-          includeNew,
-          limit,
-          newLimit,
-          reviewLimit,
-          nowIso: now.toISOString(),
-          dueCardsReturned: dueCards.length,
-          newCardsReturned: newCards.length,
-          allCardsInScope: debugAllInScope.map((c) => ({
-            id: c.id,
-            state: c.state,
-            due: c.due.toISOString(),
-            deckId: c.deckId,
-          })),
-          directEquality: debugDirectEquality.map((c) => ({
-            id: c.id,
-            state: c.state,
-            due: c.due.toISOString(),
-            deckId: c.deckId,
-          })),
-        },
       },
     });
   } catch (error) {
