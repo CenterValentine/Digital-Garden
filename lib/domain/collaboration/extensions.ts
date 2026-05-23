@@ -36,6 +36,7 @@ import { ServerTableOfContents } from "@/lib/domain/editor/extensions/blocks/tab
 import { ServerFlashcardEmbed } from "@/lib/domain/editor/extensions/blocks/flashcard-embed";
 import { ServerAudioEmbed } from "@/lib/domain/editor/extensions/blocks/audio-embed";
 import { ServerFlashcardSelect } from "@/lib/domain/editor/extensions/flashcard-select";
+import { ServerClozeDeletion } from "@/lib/domain/editor/extensions/cloze-deletion";
 import { ServerTimestamp } from "@/lib/domain/editor/extensions/blocks/timestamp";
 import {
   ServerDailySummary,
@@ -111,6 +112,7 @@ export function getCollaborationServerExtensions(): Extensions {
     ServerFlashcardEmbed,
     ServerAudioEmbed,
     ServerFlashcardSelect,
+    ServerClozeDeletion,
     ServerTimestamp,
     ServerDailySummary,
     ServerWeeklySummary,

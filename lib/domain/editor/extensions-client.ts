@@ -69,6 +69,7 @@ import { TableOfContents } from "./extensions/blocks/table-of-contents";
 import { FlashcardEmbed } from "./extensions/blocks/flashcard-embed-client";
 import { AudioEmbed } from "./extensions/blocks/audio-embed-client";
 import { FlashcardSelect } from "./extensions/flashcard-select";
+import { ClozeDeletion } from "./extensions/cloze-deletion";
 import {
   UnsupportedBlock,
   UnsupportedInline,
@@ -304,6 +305,7 @@ export function getEditorExtensions(options?: EditorExtensionsOptions): Extensio
     FlashcardEmbed,
     AudioEmbed,
     FlashcardSelect,
+    ClozeDeletion,
     UnsupportedBlock,
     UnsupportedInline,
     ...getExtensionClientEditorExtensions(),

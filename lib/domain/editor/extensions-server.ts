@@ -51,6 +51,7 @@ import { ServerTableOfContents } from "./extensions/blocks/table-of-contents";
 import { ServerFlashcardEmbed } from "./extensions/blocks/flashcard-embed";
 import { ServerAudioEmbed } from "./extensions/blocks/audio-embed";
 import { ServerFlashcardSelect } from "./extensions/flashcard-select";
+import { ServerClozeDeletion } from "./extensions/cloze-deletion";
 import {
   ServerUnsupportedBlock,
   ServerUnsupportedInline,
@@ -177,6 +178,7 @@ export function getServerExtensions(): Extensions {
     ServerFlashcardEmbed,
     ServerAudioEmbed,
     ServerFlashcardSelect,
+    ServerClozeDeletion,
     ServerUnsupportedBlock,
     ServerUnsupportedInline,
     ...getExtensionServerEditorExtensions(),
