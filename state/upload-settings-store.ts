@@ -40,6 +40,10 @@ export const useUploadSettingsStore = create<UploadSettingsStore>()(
     {
       name: 'upload-settings',
       version: 3,
+      // Deferred hydration: only consumed during file uploads. Defaults
+      // are safe for first render; real preferences load after FCP via
+      // lib/features/stores/deferred-store-hydrator.tsx.
+      skipHydration: true,
       migrate: (persistedState: unknown, version: number) => {
         const state = (persistedState as Record<string, unknown>) ?? {};
         if (version === 1) {
