@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { Editor } from "@tiptap/core";
-import { Eye, Layers, Pencil, Play, Plus, Target } from "lucide-react";
+import { Eye, Layers, Play, Plus, Target } from "lucide-react";
 import { extractPlainTextFromTiptap } from "@/lib/domain/flashcards";
 import type {
   FlashcardDeckRecordDto,
@@ -332,29 +332,13 @@ export function FlashcardEmbedNodeView({ attrs, editor, getPos }: NodeViewProps)
           Add card
         </button>
         <div className="flex-1" />
-        <button
-          type="button"
-          onClick={() => {
-            // Surface the block properties panel for deck swap +
-            // mode-default + showRatingButtons toggle. We dispatch the
-            // same event the createBlockNodeView chrome uses so the
-            // panel stays the single source of truth for attr editing.
-            const pos = getPos();
-            if (pos === undefined) return;
-            window.dispatchEvent(
-              new CustomEvent("block-open-properties", {
-                detail: { blockId: attrs.blockId, blockType: "flashcardEmbed" },
-              }),
-            );
-            // Also unset attrs.defaultMode in a way that just nudges the
-            // user — properties panel handles the rest.
-            void pos; // keep getPos in the dep chain so React Compiler doesn't strip it
-          }}
-          className="inline-flex h-7 w-7 items-center justify-center rounded-md text-gray-500 hover:bg-black/[0.04] dark:hover:bg-white/[0.06]"
-          title="Block properties"
-        >
-          <Pencil className="h-3.5 w-3.5" />
-        </button>
+        {/* No custom properties button — the block chrome from
+            createBlockNodeView already exposes the "..." menu that
+            routes to PropertiesPanel via the block-store. Adding our
+            own would be a redundant, second-source-of-truth surface
+            for attr editing (and it never wired up correctly — the
+            previous version dispatched a "block-open-properties"
+            event that has no listener in the codebase). */}
       </div>
 
       {overlayFilter && (

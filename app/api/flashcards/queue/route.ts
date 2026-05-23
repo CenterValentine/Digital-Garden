@@ -191,6 +191,36 @@ export async function GET(request: NextRequest) {
         // When a session asks "is there anything due RIGHT NOW," even an
         // empty queue is informative — caller can decide to show "all
         // caught up" UI rather than retry.
+        //
+        // ─── TEMPORARY DIAGNOSTIC (Sprint 6 follow-up) ───────────────
+        // Surfacing the same data the server log emits, here in the
+        // response body, because the pretty logger encoder truncates
+        // attrs in dev terminal output. Reader can grab this from
+        // DevTools → Network → /api/flashcards/queue → Response. Remove
+        // once the deck-count vs queue-empty bug is pinned + fixed.
+        _diagnostic: {
+          requestedDeckId: deckId,
+          resolvedDeckIdFilter: deckIdFilter,
+          includeNew,
+          limit,
+          newLimit,
+          reviewLimit,
+          nowIso: now.toISOString(),
+          dueCardsReturned: dueCards.length,
+          newCardsReturned: newCards.length,
+          allCardsInScope: debugAllInScope.map((c) => ({
+            id: c.id,
+            state: c.state,
+            due: c.due.toISOString(),
+            deckId: c.deckId,
+          })),
+          directEquality: debugDirectEquality.map((c) => ({
+            id: c.id,
+            state: c.state,
+            due: c.due.toISOString(),
+            deckId: c.deckId,
+          })),
+        },
       },
     });
   } catch (error) {
