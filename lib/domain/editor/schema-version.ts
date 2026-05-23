@@ -81,7 +81,7 @@
  * See: docs/notes-feature/TIPTAP-SCHEMA-EVOLUTION-GUIDE.md
  */
 
-export const TIPTAP_SCHEMA_VERSION = "1.7.0";
+export const TIPTAP_SCHEMA_VERSION = "1.9.0";
 
 export interface SchemaVersion {
   version: string;
@@ -109,6 +109,38 @@ export interface SchemaChange {
  * 4. Run tests: pnpm test lib/domain/export
  */
 export const SCHEMA_HISTORY: SchemaVersion[] = [
+  {
+    version: "1.9.0",
+    date: "2026-05-22",
+    changes: [
+      {
+        type: "add",
+        target: "mark",
+        name: "flashcardSelect",
+        description:
+          "Inline mark applied to a passage that becomes one side of a flashcard. Paired by cardSetId; server variant emits a bare span so the highlight is stripped from public HTML. Drives the text-selection-to-flashcard slash workflow (Epoch 19, Sprint 8).",
+        breaking: false,
+        migrationsAvailable: [],
+      },
+    ],
+    migrationsRequired: false,
+  },
+  {
+    version: "1.8.0",
+    date: "2026-05-21",
+    changes: [
+      {
+        type: "add",
+        target: "node",
+        name: "flashcardEmbed",
+        description:
+          "Reference-only TipTap block embedding a global FlashcardDeck or card subset. Stores { deckId, cardIds?, defaultMode } as attrs; card content stays in the global flashcards DB. Drives in-block flip preview + Play overlay (Epoch 19, Sprint 4).",
+        breaking: false,
+        migrationsAvailable: [],
+      },
+    ],
+    migrationsRequired: false,
+  },
   {
     version: "1.7.0",
     date: "2026-05-03",
@@ -507,6 +539,7 @@ export function getCurrentSchemaSnapshot() {
       "statBlock",
       "metricsStrip",
       "processSteps",
+      "flashcardEmbed",
       "unsupportedBlock",
       "unsupportedInline",
     ],
@@ -518,6 +551,7 @@ export function getCurrentSchemaSnapshot() {
       "code",
       "link",
       "aiHighlight",
+      "flashcardSelect",
     ],
     extensions: [
       "StarterKit",
@@ -554,6 +588,8 @@ export function getCurrentSchemaSnapshot() {
       "DailySummary",
       "WeeklySummary",
       "HabitTracker",
+      "FlashcardEmbed",
+      "FlashcardSelect",
       "UnsupportedBlock",
       "UnsupportedInline",
     ],

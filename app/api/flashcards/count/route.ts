@@ -26,7 +26,11 @@ export async function GET(request: NextRequest) {
       where: {
         ownerId: session.user.id,
         sourceContentId,
-        reviewStatus: { not: "archived" },
+        // Sprint 6: was `reviewStatus: { not: "archived" }`. The legacy
+        // reviewStatus column is gone post-Migration-C; we use the
+        // FSRS state enum, which has the same "archived" value.
+        state: { not: "archived" },
+        deletedAt: null,
       },
     });
 

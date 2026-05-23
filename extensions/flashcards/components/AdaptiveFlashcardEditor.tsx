@@ -6,8 +6,10 @@ import Document from "@tiptap/extension-document";
 import Paragraph from "@tiptap/extension-paragraph";
 import Text from "@tiptap/extension-text";
 import Placeholder from "@tiptap/extension-placeholder";
-import type { JSONContent } from "@tiptap/core";
+import type { Editor, JSONContent } from "@tiptap/core";
+import { ImagePlus } from "lucide-react";
 import { getEditorExtensions } from "@/lib/domain/editor/extensions-client";
+import { useImagePasteHandler } from "@/lib/domain/editor/hooks/use-image-paste";
 import { EMPTY_TIPTAP_DOC, normalizeTiptapDoc } from "@/lib/domain/flashcards";
 
 interface AdaptiveFlashcardEditorProps {
@@ -47,6 +49,17 @@ export function AdaptiveFlashcardEditor({
     return getEditorExtensions();
   }, [mode, placeholder]);
 
+  // Sprint 7: image paste/drop pipeline. The editorRef resolves the
+  // chicken-egg between useEditor and editorProps — useEditor freezes
+  // its editorProps closures at first render (when editor === null);
+  // the hook's handlers read from editorRef.current at event time, so
+  // by the time a paste fires, the ref points at the real editor.
+  const editorRef = useRef<Editor | null>(null);
+  const { handlePaste, handleDrop, insertImageFromFile } = useImagePasteHandler({
+    editorRef,
+    parentId: null, // flashcards live outside the file-tree folder
+  });
+
   const editor = useEditor({
     extensions,
     content: normalizeTiptapDoc(value),
@@ -65,6 +78,10 @@ export function AdaptiveFlashcardEditor({
         event.preventDefault();
         return true;
       },
+      // In rich mode only: wire the paste/drop handlers. Plain mode
+      // doesn't include the image extension, so a pasted image would
+      // be silently dropped — better to skip the handler entirely.
+      ...(mode === "rich" ? { handlePaste, handleDrop } : {}),
     },
     onUpdate: ({ editor }) => {
       const json = normalizeTiptapDoc(editor.getJSON());
@@ -72,6 +89,13 @@ export function AdaptiveFlashcardEditor({
       onChange?.(json);
     },
   });
+
+  // Keep the ref pointed at the latest editor instance for the image
+  // hook's handlers. useEditor returns null then the instance; this
+  // effect bridges the two.
+  useEffect(() => {
+    editorRef.current = editor;
+  }, [editor]);
 
   useEffect(() => {
     if (!editor) return;
@@ -86,6 +110,11 @@ export function AdaptiveFlashcardEditor({
     lastValueRef.current = nextSerialized;
     editor.commands.setContent(next);
   }, [editor, value]);
+
+  // Hidden file input for the "Insert image" toolbar button. Clicking
+  // the button proxies to .click() on this input, which opens the
+  // OS file picker. Same pattern as MarkdownEditor's image upload.
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const isToolbarVisible = mode === "rich" && editable;
 
@@ -118,6 +147,32 @@ export function AdaptiveFlashcardEditor({
           >
             Code
           </button>
+          {/* Sprint 7: image-insert button. Opens the OS file picker;
+              on file pick we hand off to the same insertImageFromFile
+              the paste/drop pipeline uses, so all three paths share
+              upload + placeholder + swap-to-final logic. */}
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            title="Insert image"
+            aria-label="Insert image"
+            className="ml-auto inline-flex min-h-9 items-center gap-1 rounded px-2 text-gray-700 dark:text-gray-300 hover:bg-black/[0.05] dark:hover:bg-white/10"
+          >
+            <ImagePlus className="h-3.5 w-3.5" />
+            Image
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            className="sr-only"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) insertImageFromFile(file);
+              // Reset so picking the same file twice fires onChange.
+              e.target.value = "";
+            }}
+          />
         </div>
       ) : null}
       <div className="px-4 py-3 md:px-5 md:py-4">

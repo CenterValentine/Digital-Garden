@@ -185,6 +185,57 @@ export function getSlashCommands(): SlashCommand[] {
       aliases: ["blockquote"],
     },
     {
+      title: "Flashcards",
+      description:
+        "Embed a flashcard deck — tap to flip, Play opens the FSRS review overlay",
+      icon: "🃏",
+      command: ({ editor, range }) => {
+        // Insert with deckId=null; the NodeView shows a "pick a deck"
+        // affordance until the user attaches one via block properties
+        // (Session 5 will add an inline deck-picker dialog here).
+        editor
+          .chain()
+          .focus()
+          .deleteRange(range)
+          .insertContent({ type: "flashcardEmbed", attrs: {} })
+          .run();
+      },
+      aliases: [
+        "flashcard",
+        "flashcards",
+        "deck",
+        "review",
+        "study",
+        "anki",
+        "fsrs",
+        "spaced",
+        "repetition",
+      ],
+    },
+    {
+      title: "Highlight to Flashcard",
+      description:
+        "Pick a deck, then highlight the FRONT and BACK passages — the highlights persist privately, never published",
+      icon: "✎",
+      command: ({ editor, range }) => {
+        // Remove the slash trigger so the user can immediately start
+        // highlighting without leftover "/" characters in the doc.
+        editor.chain().focus().deleteRange(range).run();
+        // The flashcards extension client owns the deck-picker flow.
+        // Dispatching an event keeps slash-commands free of fetch/UI
+        // concerns and lets the same trigger be reused later (e.g.,
+        // from the editor toolbar or a context menu).
+        window.dispatchEvent(new CustomEvent("dg:flashcard-selection-start"));
+      },
+      aliases: [
+        "fc-mark",
+        "flashcard-select",
+        "highlight-card",
+        "selection-flashcard",
+        "fc-select",
+      ],
+    },
+    {
       title: "Pull Quote",
       description: "Styled quote block — 7 visual variants (bordered, card, featured…)",
       icon: "❝",
