@@ -52,7 +52,9 @@ export async function GET(request: NextRequest) {
     secure: isSecure,
     sameSite: "lax",
     expires: session.expiresAt,
-    path: "/",
+    // Scope to /embed so a short-lived embed session never shadows the
+    // long-lived cookie at path "/" set by regular sign-in.
+    path: "/embed",
   });
 
   return response;
