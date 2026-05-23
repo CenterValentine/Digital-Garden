@@ -114,11 +114,19 @@ export const ClozeDeletion = Mark.create({
 
   addKeyboardShortcuts() {
     return {
+      // Cannot use commands.toggleMark — it only unmarks when the
+      // selection's attrs EXACTLY match what's passed. We pass a fresh
+      // ordinal (max+1), so the existing mark always looks "different"
+      // and gets replaced instead of removed. Branch on isActive
+      // explicitly: presence → unset, absence → set with next ordinal.
       "Mod-Shift-c": () => {
         const editor = this.editor;
         if (!editor) return false;
+        if (editor.isActive(this.name)) {
+          return editor.commands.unsetMark(this.name);
+        }
         const ordinal = nextOrdinal(editor);
-        return editor.commands.toggleMark(this.name, { ordinal, hint: null });
+        return editor.commands.setMark(this.name, { ordinal, hint: null });
       },
     };
   },
@@ -138,11 +146,16 @@ export const ClozeDeletion = Mark.create({
         () =>
         ({ commands }) =>
           commands.unsetMark(this.name),
+      // Same isActive branch as the keyboard shortcut — toggleMark with
+      // attrs replaces rather than removes when attrs differ.
       toggleClozeDeletion:
         (attrs) =>
         ({ commands, editor }) => {
+          if (editor.isActive(this.name)) {
+            return commands.unsetMark(this.name);
+          }
           const ordinal = attrs?.ordinal ?? nextOrdinal(editor);
-          return commands.toggleMark(this.name, {
+          return commands.setMark(this.name, {
             ordinal,
             hint: attrs?.hint ?? null,
           });
