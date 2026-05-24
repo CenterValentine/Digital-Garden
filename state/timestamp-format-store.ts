@@ -37,6 +37,13 @@ export const useTimestampFormatStore = create<TimestampFormatState>()(
       setDefaultFormat: (defaultFormat) => set({ defaultFormat }),
       setDefaultMode: (defaultMode) => set({ defaultMode }),
     }),
-    { name: "timestamp-format", version: 1 }
+    {
+      name: "timestamp-format",
+      version: 1,
+      // Deferred hydration: only consumed when the slash command opens
+      // the timestamp picker. Default value works for first render; real
+      // preference loads after FCP.
+      skipHydration: true,
+    }
   )
 );

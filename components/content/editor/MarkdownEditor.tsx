@@ -50,6 +50,25 @@ interface CollaborationCursorLabel extends RemoteCollaborator {
   top: number;
 }
 
+// Module-load marker so we can verify the next/dynamic code-split is
+// actually deferring editor JS evaluation. This top-level call fires
+// the instant the module is parsed, which differs from "MarkdownEditor
+// component renders" — modules can be parsed eagerly via preload and
+// then sit dormant until first render.
+//
+// Compare ms_since_nav in this event against [page:hydrated]. If this
+// fires AFTER hydration, the dynamic import is doing its job. If
+// BEFORE, the editor module is still in the initial bundle and the
+// split isn't taking effect.
+if (typeof window !== "undefined") {
+  clientLogger.info({
+    layer: "editor",
+    event: "module:evaluated",
+    summary: "MarkdownEditor module evaluated",
+    attrs: { ms_since_nav: Math.round(performance.now()) },
+  });
+}
+
 interface EditorImageAttrs {
   src: string;
   alt?: string;

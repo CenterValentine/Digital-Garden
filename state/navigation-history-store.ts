@@ -198,6 +198,10 @@ export const useNavigationHistoryStore = create<NavigationHistoryStore>()(
     {
       name: "navigation-history",
       version: CURRENT_VERSION,
+      // Deferred hydration: back/forward navigation isn't on the critical
+      // first-paint path. Defaults are empty histories; real values load
+      // after FCP via lib/features/stores/deferred-store-hydrator.tsx.
+      skipHydration: true,
       migrate: (persistedState) => {
         if (!persistedState || typeof persistedState !== "object") {
           return { byPaneId: {} };
