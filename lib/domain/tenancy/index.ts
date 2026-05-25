@@ -13,6 +13,11 @@ export {
 export { getCurrentTenant } from "./get-current-tenant";
 export { resolveWritableTenantId, TenantAuthError } from "./api";
 export { invalidateTenantCache } from "./cache";
+export {
+  createPersonalTenantForUser,
+  slugFromUsername,
+} from "./auto-create-tenant";
+export type { ProvisionedTenant } from "./auto-create-tenant";
 export type {
   ResolvedTenant,
   TenantResolutionSource,
