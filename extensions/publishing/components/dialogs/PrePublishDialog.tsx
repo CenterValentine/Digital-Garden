@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { OctagonAlert, TriangleAlert } from "lucide-react";
+import { Globe, OctagonAlert, TriangleAlert } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/core/utils";
 import { usePublishStore } from "../../state/publish-store";
@@ -97,6 +97,20 @@ export function PrePublishDialog({ onRefresh }: { onRefresh: () => void }) {
             </ul>
           ) : (
             <p className="text-xs text-white/30 italic">No details available.</p>
+          )}
+
+          {/* Destination indicator. Always shown — reinforces *where* the
+              publish lands, especially valuable for multi-site users.
+              The tenant is fixed at PublicItem creation (1:1 model). */}
+          {item.tenant && (
+            <div className="mt-4 pt-3 border-t border-white/5 flex items-center gap-2 text-xs">
+              <Globe className="w-3 h-3 text-white/30" />
+              <span className="text-white/40">Publishing to</span>
+              <span className="text-white/70 font-medium">
+                {item.tenant.displayName}
+              </span>
+              <span className="text-white/30 font-mono">({item.tenant.slug})</span>
+            </div>
           )}
         </div>
 

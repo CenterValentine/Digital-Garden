@@ -20,6 +20,9 @@ export interface PublishItemSummary {
   publishedRevisionId: string | null;
   hasPendingChanges: boolean;
   path: { id: string; slug: string; title: string } | null;
+  // Tenant this item belongs to. Null for pre-Epoch-18 rows that haven't
+  // been backfilled (shouldn't happen in practice; defensive type).
+  tenant: { id: string; slug: string; displayName: string } | null;
 }
 
 export interface ContentTypeEntry {

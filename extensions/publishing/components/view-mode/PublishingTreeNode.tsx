@@ -11,9 +11,17 @@ interface PublishingTreeNodeProps {
   node: PublicPathNode;
   depth: number;
   onRefresh: () => void;
+  /** When true (set by the parent tree when paths span multiple tenants),
+   *  root nodes render a tenant-slug prefix to disambiguate. */
+  showTenantPrefix?: boolean;
 }
 
-export function PublishingTreeNode({ node, depth, onRefresh }: PublishingTreeNodeProps) {
+export function PublishingTreeNode({
+  node,
+  depth,
+  onRefresh,
+  showTenantPrefix = false,
+}: PublishingTreeNodeProps) {
   const { expandedPathIds, togglePathExpanded, selectedPathId, setSelectedPathId } =
     usePublishTreeStore();
 
@@ -64,6 +72,13 @@ export function PublishingTreeNode({ node, depth, onRefresh }: PublishingTreeNod
         {/* Folder/globe icon */}
         <Icon className="w-3.5 h-3.5 shrink-0 opacity-60" />
 
+        {/* Tenant prefix on root nodes when user owns multiple tenants */}
+        {depth === 0 && showTenantPrefix && node.tenantSlug && (
+          <span className="shrink-0 text-[10px] font-mono px-1 py-0 rounded bg-white/5 text-white/40">
+            {node.tenantSlug}
+          </span>
+        )}
+
         {/* Path title */}
         <span className="flex-1 truncate text-xs">{node.title}</span>
 
@@ -77,7 +92,13 @@ export function PublishingTreeNode({ node, depth, onRefresh }: PublishingTreeNod
       {isExpanded && hasChildren && (
         <div>
           {node.children.map((child) => (
-            <PublishingTreeNode key={child.id} node={child} depth={depth + 1} onRefresh={onRefresh} />
+            <PublishingTreeNode
+              key={child.id}
+              node={child}
+              depth={depth + 1}
+              onRefresh={onRefresh}
+              showTenantPrefix={showTenantPrefix}
+            />
           ))}
         </div>
       )}
