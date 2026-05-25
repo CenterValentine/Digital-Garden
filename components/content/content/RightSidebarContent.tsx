@@ -14,7 +14,7 @@ import { BacklinksPanel } from "../BacklinksPanel";
 import { OutlinePanel } from "../OutlinePanel";
 import { ChatOutlinePanel } from "../ChatOutlinePanel";
 import { TagsPanel } from "../TagsPanel";
-import { ChatPanel } from "../ai/ChatPanel";
+import { MultiConversationSidebar } from "../ai/MultiConversationSidebar";
 import { PropertiesPanel } from "../blocks/PropertiesPanel";
 import { useOutlineStore } from "@/state/outline-store";
 import { useContentStore } from "@/state/content-store";
@@ -91,7 +91,7 @@ export function RightSidebarContent({ activeTab }: RightSidebarContentProps) {
           />
         ))}
       {activeTab === "tags" && <TagsPanel contentId={selectedContentId} />}
-      {activeTab === "chat" && <ChatPanel contentId={selectedContentId} />}
+      {activeTab === "chat" && <MultiConversationSidebar contentId={selectedContentId} />}
       {activeTab === "properties" && <PropertiesPanel />}
       {activeTab === "publish" && (
         <PublishTab contentId={selectedContentId} contentTitle={selectedContentTitle} />

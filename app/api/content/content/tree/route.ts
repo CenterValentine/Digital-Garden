@@ -556,11 +556,25 @@ export async function GET(request: NextRequest) {
         stats.byType[node.contentType] = (stats.byType[node.contentType] ?? 0) + 1;
       }
 
+      // When referenced content is hidden, report how many referenced
+      // items exist so the file tree can offer to reveal them.
+      let hiddenReferencedCount = 0;
+      if (!showReferencedContent) {
+        hiddenReferencedCount = await prisma.contentNode.count({
+          where: {
+            ownerId: session.user.id,
+            deletedAt: null,
+            role: "referenced",
+          },
+        });
+      }
+
       return NextResponse.json({
         success: true,
         data: {
           tree: rootNodes,
           stats,
+          hiddenReferencedCount,
         },
       });
     } catch (error) {
