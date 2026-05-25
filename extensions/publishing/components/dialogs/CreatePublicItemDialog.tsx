@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { Loader2, ChevronDown, Plus, Check, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/core/utils";
+import { useUserTenants } from "@/lib/domain/tenancy/use-user-tenants";
 import {
   fetchPublicPaths,
   createPublicItem,
@@ -30,6 +31,19 @@ export function CreatePublicItemDialog({
   const [paths, setPaths] = useState<PublicPathSummary[]>([]);
   const [isLoadingPaths, setIsLoadingPaths] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Tenant resolution. Hook is no-op visually when user owns exactly 1
+  // tenant — the picker stays hidden and we just pass the primary as the
+  // destination. Multi-tenant users see the picker.
+  const { tenants, primaryTenantId, loading: isLoadingTenants } = useUserTenants();
+  const [tenantId, setTenantId] = useState<string>("");
+  useEffect(() => {
+    // When the tenants load, default the selection to the user's primary
+    // (or first tenant if no primary is set — rare edge case).
+    if (!tenantId && tenants.length > 0) {
+      setTenantId(primaryTenantId ?? tenants[0].id);
+    }
+  }, [tenants, primaryTenantId, tenantId]);
 
   const { contentTypes, addContentType, removeContentType } = usePublishStore();
   const [payloadType, setPayloadType] = useState<string>(contentTypes[0]?.value ?? "blog_post");
@@ -72,6 +86,14 @@ export function CreatePublicItemDialog({
         payloadType,
         slug,
         publicTitle: publicTitle || undefined,
+        // Only send tenantId when the user has explicitly chosen a non-primary
+        // destination. For single-tenant users (or when the primary is selected),
+        // the server defaults to primaryTenantId server-side — same result, fewer
+        // hops through the request body.
+        tenantId:
+          tenants.length > 1 && tenantId && tenantId !== primaryTenantId
+            ? tenantId
+            : undefined,
       });
       toast.success("Added to publishing as a draft.");
       onCreated();
@@ -102,6 +124,29 @@ export function CreatePublicItemDialog({
               className="w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-white/20 focus:border-white/20 focus:outline-none"
             />
           </label>
+
+          {/* Tenant picker — hidden when user owns exactly 1 site.
+              For multi-tenant users, lets them choose which site this
+              item goes to. The destination is fixed at create time
+              (1:1 PublicItem/tenant model). Manage sites in
+              Settings → Sites. */}
+          {!isLoadingTenants && tenants.length > 1 && (
+            <label className="block">
+              <span className="text-xs text-white/40 mb-1 block">Publish to site</span>
+              <select
+                value={tenantId}
+                onChange={(e) => setTenantId(e.target.value)}
+                className="w-full rounded-md border border-white/10 bg-muted px-3 py-2 text-sm text-white focus:border-white/20 focus:outline-none"
+              >
+                {tenants.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.displayName}
+                    {t.id === primaryTenantId ? " (primary)" : ""}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
 
           {/* Content type — custom picker */}
           <div>

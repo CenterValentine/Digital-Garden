@@ -120,6 +120,10 @@ export async function createPublicItem(body: {
   payloadType: string;
   slug: string;
   publicTitle?: string;
+  // Optional. When omitted, the server defaults to the session user's
+  // primaryTenantId. Multi-tenant users pick a destination via the
+  // tenant picker in CreatePublicItemDialog.
+  tenantId?: string;
 }): Promise<PublishItemSummary> {
   const res = await fetch("/api/publishing/items", {
     method: "POST",
