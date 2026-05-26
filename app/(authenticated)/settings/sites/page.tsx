@@ -12,7 +12,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { getSurfaceStyles } from "@/lib/design/system";
 import { Button } from "@/components/ui/glass/button";
-import { Check, Pencil, Star, X } from "lucide-react";
+import { Check, Pencil, Star, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 
 type SiteRow = {
@@ -145,6 +145,33 @@ export default function SitesSettingsPage() {
       toast.success("Primary site updated", { icon: <Check className="h-4 w-4" /> });
     } catch (err) {
       toast.error("Failed to set primary", {
+        description: err instanceof Error ? err.message : "Please try again",
+      });
+    }
+  };
+
+  const handleDelete = async (site: SiteRow) => {
+    if (
+      !window.confirm(
+        `Delete site "${site.displayName}"?\n\nThis cannot be undone. The site will be removed permanently.`,
+      )
+    ) {
+      return;
+    }
+    try {
+      const res = await fetch(`/api/user/tenants/${site.id}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) {
+        const err = (await res.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(err?.error ?? `HTTP ${res.status}`);
+      }
+      await loadSites();
+      toast.success(`Deleted ${site.displayName}`, {
+        icon: <Check className="h-4 w-4" />,
+      });
+    } catch (err) {
+      toast.error("Failed to delete site", {
         description: err instanceof Error ? err.message : "Please try again",
       });
     }
@@ -309,6 +336,17 @@ export default function SitesSettingsPage() {
                       >
                         <Pencil className="h-4 w-4" />
                       </button>
+                      {!isPrimary && (
+                        <button
+                          type="button"
+                          onClick={() => void handleDelete(site)}
+                          className="text-white/40 hover:text-rose-400"
+                          aria-label="Delete"
+                          title="Delete site (must have no items, paths, or hosts)"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      )}
                     </div>
                   )}
                 </li>

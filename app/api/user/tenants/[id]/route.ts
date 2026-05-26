@@ -1,7 +1,9 @@
 /**
- * PATCH /api/user/tenants/[id]  — rename, change slug, or set as primary.
+ * PATCH  /api/user/tenants/[id]  — rename, change slug, or set as primary.
+ * DELETE /api/user/tenants/[id]  — delete a site (blocked if it has any
+ *                                  published items, paths, or hosts).
  *
- * Body shape (all fields optional, any combination):
+ * Body shape for PATCH (all fields optional, any combination):
  *   { displayName?: string }    rename
  *   { slug?: string }           change slug (uniqueness checked)
  *   { asPrimary?: true }        set this tenant as the user's primary
@@ -115,6 +117,98 @@ export async function PATCH(
           slug: updated.slug,
           displayName: updated.displayName,
         });
+      },
+    );
+  });
+}
+
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  return withRouteTrace(req, { route: ROUTE_PATH }, async () => {
+    const session = await requireAuth();
+    const { id } = await params;
+
+    return withSpan(
+      { layer: "auth", name: "user_tenant:delete" },
+      { attrs: { tenant_id: id } },
+      async (span) => {
+        // Ownership + existence check, also fetch the dependency counts
+        // we need for the safety gates in a single round-trip.
+        const tenant = await prisma.tenant.findUnique({
+          where: { id },
+          select: {
+            id: true,
+            ownerId: true,
+            slug: true,
+            _count: {
+              select: {
+                publicItems: { where: { deletedAt: null } },
+                publicPaths: true,
+                hosts: true,
+              },
+            },
+          },
+        });
+        if (!tenant || tenant.ownerId !== session.user.id) {
+          logger.warn({
+            layer: "auth",
+            event: "user_tenant_delete:rejected",
+            summary: "tenant not found or not owned",
+            attrs: { tenant_id: id },
+          });
+          return NextResponse.json({ error: "Not found" }, { status: 404 });
+        }
+
+        // Block deletion of the user's primary tenant. They must pick a
+        // different primary first (avoids the "user has zero primary"
+        // state which getCurrentTenant's legacy fallback can't handle).
+        const user = await prisma.user.findUnique({
+          where: { id: session.user.id },
+          select: { primaryTenantId: true },
+        });
+        if (user?.primaryTenantId === id) {
+          return NextResponse.json(
+            {
+              error:
+                "Cannot delete your primary site. Set a different site as primary first.",
+            },
+            { status: 409 },
+          );
+        }
+
+        // Safety gates: block if anything still references this tenant.
+        // The user should explicitly clean up first — no surprise cascades.
+        if (tenant._count.publicItems > 0) {
+          return NextResponse.json(
+            {
+              error: `Cannot delete: this site has ${tenant._count.publicItems} published item${tenant._count.publicItems === 1 ? "" : "s"}. Unpublish or archive them first.`,
+            },
+            { status: 409 },
+          );
+        }
+        if (tenant._count.publicPaths > 0) {
+          return NextResponse.json(
+            {
+              error: `Cannot delete: this site has ${tenant._count.publicPaths} path${tenant._count.publicPaths === 1 ? "" : "s"}. Delete them first.`,
+            },
+            { status: 409 },
+          );
+        }
+        if (tenant._count.hosts > 0) {
+          return NextResponse.json(
+            {
+              error: `Cannot delete: this site has ${tenant._count.hosts} custom hostname${tenant._count.hosts === 1 ? "" : "s"} attached. Remove them first.`,
+            },
+            { status: 409 },
+          );
+        }
+
+        await prisma.tenant.delete({ where: { id } });
+        span.attr("deleted_slug", tenant.slug);
+
+        return new NextResponse(null, { status: 204 });
       },
     );
   });
