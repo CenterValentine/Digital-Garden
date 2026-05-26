@@ -42,6 +42,31 @@ export function normalizeHost(rawHost: string | null | undefined): string | null
   return portIdx === -1 ? trimmed : trimmed.slice(0, portIdx);
 }
 
+// If PLATFORM_DOMAIN is set (e.g. "digital-garden.com") and the request
+// host looks like `<slug>.<PLATFORM_DOMAIN>`, return the slug. Used by
+// the subdomain resolver path so every tenant is reachable at its own
+// subdomain once wildcard DNS is configured for the platform domain.
+// Returns null when no subdomain match (caller falls back to TenantHost
+// exact match).
+export function extractSubdomainSlug(host: string): string | null {
+  const platformDomain = process.env.PLATFORM_DOMAIN?.trim().toLowerCase();
+  if (!platformDomain) return null;
+  // Don't match the platform domain itself (e.g. "digital-garden.com").
+  if (host === platformDomain) return null;
+  // Match `<something>.<platform>`. Conservative slug pattern (no
+  // multi-segment subdomains, no leading hyphens, etc.) to avoid
+  // false positives from typos like `www.platform.com`.
+  const suffix = `.${platformDomain}`;
+  if (!host.endsWith(suffix)) return null;
+  const slug = host.slice(0, host.length - suffix.length);
+  // Slug must be a single label, lowercase alphanumeric + hyphen,
+  // 1–63 chars (DNS label limit).
+  if (!/^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/.test(slug)) return null;
+  // Don't claim conventional non-tenant subdomains.
+  if (slug === "www") return null;
+  return slug;
+}
+
 export async function resolveTenantByHost(
   rawHost: string | null | undefined,
 ): Promise<ResolvedTenant | null> {
@@ -70,6 +95,50 @@ export async function resolveTenantByHost(
       );
 
       if (!row) {
+        // No exact host match. Try subdomain pattern:
+        // if host looks like `<slug>.<PLATFORM_DOMAIN>`, look up
+        // by slug. Enables every tenant to be reachable at its
+        // own subdomain once wildcard DNS is configured.
+        const subdomainSlug = extractSubdomainSlug(host);
+        if (subdomainSlug) {
+          const tenantBySlug = await prisma.tenant.findUnique({
+            where: { slug: subdomainSlug },
+            select: {
+              id: true,
+              ownerId: true,
+              slug: true,
+              displayName: true,
+              isPersonal: true,
+            },
+          });
+          if (tenantBySlug) {
+            const resolved: ResolvedTenant = {
+              tenantId: tenantBySlug.id,
+              ownerId: tenantBySlug.ownerId,
+              slug: tenantBySlug.slug,
+              displayName: tenantBySlug.displayName,
+              isPersonal: tenantBySlug.isPersonal,
+              resolvedFromHost: host,
+            };
+            span.attrs({
+              tenant_id: resolved.tenantId,
+              slug: resolved.slug,
+              source: "db_subdomain",
+            });
+            logger.info({
+              layer: "route",
+              event: "tenancy:host:resolved",
+              attrs: {
+                host,
+                tenant_id: resolved.tenantId,
+                slug: resolved.slug,
+                source: "db_subdomain",
+              },
+            });
+            return resolved;
+          }
+        }
+
         logger.info({
           layer: "route",
           event: "tenancy:host:not_found",
