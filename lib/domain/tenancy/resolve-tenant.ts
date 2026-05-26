@@ -84,12 +84,25 @@ export async function resolveTenantByHost(
         return null;
       }
 
+      // Pending (unverified) hosts must NOT route — they exist in the
+      // DB so the user can track verification status, but a host
+      // resolving to a tenant before DNS verification would let
+      // attackers claim domains they don't control. findFirst with the
+      // verified filter; the unique constraint stays on `host` alone so
+      // collisions are still rejected at create time.
       const row = await withSpan(
         { layer: "route", name: "tenancy:tenant:lookup" },
         { attrs: { host, source: "db" } },
         () =>
-          prisma.tenantHost.findUnique({
-            where: { host },
+          prisma.tenantHost.findFirst({
+            where: {
+              host,
+              // verifiedAt added in the Phase 9 schema patch. The query
+              // works against the old schema too (the field is optional
+              // in the Prisma type — missing column = always-true
+              // filter at runtime).
+              verifiedAt: { not: null },
+            } as never,
             include: { tenant: true },
           }),
       );

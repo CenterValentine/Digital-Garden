@@ -12,8 +12,9 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { getSurfaceStyles } from "@/lib/design/system";
 import { Button } from "@/components/ui/glass/button";
-import { Check, Pencil, Star, Trash2, X } from "lucide-react";
+import { Check, ChevronDown, ChevronRight, Pencil, Star, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
+import { HostManagement } from "@/components/settings/sites/HostManagement";
 
 type SiteRow = {
   id: string;
@@ -44,6 +45,9 @@ export default function SitesSettingsPage() {
   // Inline rename
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState("");
+
+  // Expanded host-management section per tenant
+  const [hostsExpandedId, setHostsExpandedId] = useState<string | null>(null);
 
   const loadSites = useCallback(async () => {
     setIsLoading(true);
@@ -255,7 +259,7 @@ export default function SitesSettingsPage() {
               const isPrimary = site.id === primaryId;
               const isEditing = editingId === site.id;
               return (
-                <li key={site.id} className="py-3 flex items-center gap-3">
+                <li key={site.id} className="py-3 flex flex-wrap items-center gap-3">
                   <div className="flex-1 min-w-0">
                     {isEditing ? (
                       <div className="flex items-center gap-2">
@@ -316,6 +320,22 @@ export default function SitesSettingsPage() {
                   </div>
                   {!isEditing && (
                     <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setHostsExpandedId(
+                            hostsExpandedId === site.id ? null : site.id,
+                          )
+                        }
+                        className="text-xs text-white/60 hover:text-white/90 px-2 py-1 rounded hover:bg-white/5 flex items-center gap-1"
+                      >
+                        {hostsExpandedId === site.id ? (
+                          <ChevronDown className="h-3 w-3" />
+                        ) : (
+                          <ChevronRight className="h-3 w-3" />
+                        )}
+                        Hosts
+                      </button>
                       {!isPrimary && (
                         <button
                           type="button"
@@ -349,6 +369,11 @@ export default function SitesSettingsPage() {
                       )}
                     </div>
                   )}
+                  {hostsExpandedId === site.id && (
+                    <div className="basis-full">
+                      <HostManagement tenantId={site.id} tenantSlug={site.slug} />
+                    </div>
+                  )}
                 </li>
               );
             })}
@@ -357,9 +382,11 @@ export default function SitesSettingsPage() {
       </section>
 
       <p className="text-xs text-muted-foreground">
-        Custom domain support (mapping your own URL to a site) is coming in a future
-        update. For now, additional sites are published under
-        <code className="mx-1 font-mono">digital-garden.com/u/your-slug</code>.
+        Each site is reachable at <code className="mx-1 font-mono">/u/your-slug</code>{" "}
+        by default. Expand a site&apos;s <em>Hosts</em> section to add a custom
+        domain (e.g. <code className="font-mono">mysite.com</code>). Custom
+        domains require DNS verification — instructions are shown after you add
+        one.
       </p>
     </div>
   );
