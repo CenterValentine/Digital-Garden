@@ -18,6 +18,13 @@ export {
   slugFromUsername,
 } from "./auto-create-tenant";
 export type { ProvisionedTenant } from "./auto-create-tenant";
+export {
+  resolveTenantBySlug,
+  resolvePublicItem,
+  resolvePublicPath,
+  buildPublicItemPath,
+  buildSubpathItemUrl,
+} from "./public-render";
 export type {
   ResolvedTenant,
   TenantResolutionSource,

@@ -1,45 +1,62 @@
+/**
+ * Subpath tenant content: /u/<slug>/<...path>
+ *
+ * Mirrors `app/(public)/[...path]/page.tsx` but resolves the tenant
+ * from the URL slug rather than the request host. Shares the
+ * resolvers in lib/domain/tenancy/public-render.ts so render
+ * semantics stay identical between the two route surfaces.
+ *
+ * Difference from the host-based catch-all:
+ *   - Tenant comes from URL `slug` not Host header
+ *   - Redirects within this tenant rewrite to /u/<slug>/<target>
+ *     (preserves the subpath prefix)
+ */
+
 import { notFound, permanentRedirect } from "next/navigation";
 import { prisma } from "@/lib/database/client";
 import { withPageTrace } from "@/lib/core/logger";
 import {
-  getCurrentTenant,
+  resolveTenantBySlug,
   resolvePublicItem,
   resolvePublicPath,
-  buildPublicItemPath,
 } from "@/lib/domain/tenancy";
 
 interface Params {
+  slug: string;
   path: string[];
 }
 
-export default async function PublicCatchAll({
+export const revalidate = 60;
+
+export default async function TenantSubpathCatchAll({
   params,
 }: {
   params: Promise<Params>;
 }) {
-  const { path: segments } = await params;
+  const { slug, path: segments } = await params;
   const fullPath = "/" + segments.join("/");
-
   return withPageTrace(
-    { route: "/(public)/[...path]", attrs: { path: fullPath } },
-    () => renderPublic(fullPath, segments),
+    {
+      route: "/u/[slug]/[...path]",
+      attrs: { slug, path: fullPath },
+    },
+    () => renderSubpathContent(slug, fullPath, segments),
   );
 }
 
-async function renderPublic(fullPath: string, segments: string[]) {
-  // Tenant resolution: header (multi-tenant) → SITE_OWNER_ID fallback
-  // (legacy single-tenant). When neither resolves the public surface
-  // is unconfigured for this host → show nothing.
-  const ctx = await getCurrentTenant();
-  if (!ctx) {
+async function renderSubpathContent(
+  slug: string,
+  fullPath: string,
+  segments: string[],
+) {
+  const tenant = await resolveTenantBySlug(slug);
+  if (!tenant) {
     notFound();
   }
-  const { tenant } = ctx;
 
-  // 1. Check redirects first. Redirects are tenant-scoped so two
-  //    tenants could legitimately use the same /old-url. Using
-  //    findFirst with a tenantId filter; the standalone fromPath
-  //    unique constraint becomes [tenantId, fromPath] in a follow-up.
+  const subpathPrefix = `/u/${tenant.slug}`;
+
+  // 1. Check redirects, tenant-scoped.
   const redirect = await prisma.publicPathRedirect.findFirst({
     where: { tenantId: tenant.tenantId, fromPath: fullPath },
     include: {
@@ -53,30 +70,28 @@ async function renderPublic(fullPath: string, segments: string[]) {
       // Redirect expired — fall through to normal resolution
     } else if (redirect.toPublicItem) {
       const item = redirect.toPublicItem;
-      const targetPath = buildPublicItemPath(item);
-      permanentRedirect(targetPath);
+      permanentRedirect(`${subpathPrefix}/${item.path.slug}/${item.slug}`);
     } else if (redirect.toPath) {
-      permanentRedirect("/" + redirect.toPath.slug);
+      permanentRedirect(`${subpathPrefix}/${redirect.toPath.slug}`);
     }
   }
 
   // 2. Try to resolve as a PublicItem (path + slug)
   if (segments.length >= 1) {
-    const slug = segments[segments.length - 1];
+    const itemSlug = segments[segments.length - 1];
     const pathSlugs = segments.slice(0, -1);
 
-    // Find matching path + item
     const publicItem = await resolvePublicItem(
       tenant.tenantId,
       pathSlugs,
-      slug
+      itemSlug,
     );
 
     if (publicItem) {
       if (publicItem.state !== "published") notFound();
 
       const { PublicItemRenderer } = await import(
-        "../../../components/public/renderers/PublicItemRenderer"
+        "../../../../components/public/renderers/PublicItemRenderer"
       );
       return <PublicItemRenderer item={publicItem} />;
     }
@@ -86,14 +101,10 @@ async function renderPublic(fullPath: string, segments: string[]) {
   const publicPath = await resolvePublicPath(tenant.tenantId, segments);
   if (publicPath) {
     const { PublicPathListing } = await import(
-      "../../../components/public/renderers/PublicPathListing"
+      "../../../../components/public/renderers/PublicPathListing"
     );
     return <PublicPathListing publicPath={publicPath} />;
   }
 
   notFound();
 }
-
-// Resolvers are shared with the subpath route — see lib/domain/tenancy/public-render.ts.
-
-export const revalidate = 60; // ISR: revalidate every minute
