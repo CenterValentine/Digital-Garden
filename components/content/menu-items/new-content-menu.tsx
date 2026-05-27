@@ -26,6 +26,8 @@ import {
   GitBranch,
   Network,
   Pencil,
+  Sparkles,
+  Image as ImageIcon,
 } from "lucide-react";
 import type { ReactNode } from "react";
 
@@ -78,6 +80,9 @@ export interface NewContentCallbacks {
   onCreateData?: (parentId: string | null) => void | Promise<void>;
   onCreateHope?: (parentId: string | null) => void | Promise<void>;
   onCreateWorkflow?: (parentId: string | null) => void | Promise<void>;
+  // AI category — initial entry is image generation; future entries
+  // (audio, video, structured data) will share the same submenu.
+  onCreateAiImage?: (parentId: string | null) => void | Promise<void>;
 }
 
 /**
@@ -205,6 +210,29 @@ export function getNewContentMenuItems(
     });
   }
 
+  // ── Most-used surfaces first ──
+
+  // Chat Conversation
+  items.push({
+    id: "new-chat",
+    label: "Chat Conversation",
+    icon: <MessageSquare className="h-4 w-4" />,
+    onClick: () => callbacks.onCreateChat?.(normalizedParentId),
+    disabled: !callbacks.onCreateChat,
+  });
+
+  // External Link (Bookmark)
+  if (callbacks.onCreateExternal) {
+    items.push({
+      id: "new-external",
+      label: "External Link (Bookmark)",
+      icon: <ExternalLink className="h-4 w-4" />,
+      onClick: () => callbacks.onCreateExternal?.(normalizedParentId),
+      disabled: !callbacks.onCreateExternal,
+    });
+  }
+
+  // File (Upload)
   if (callbacks.onCreateFile) {
     items.push({
       id: "new-file",
@@ -214,6 +242,65 @@ export function getNewContentMenuItems(
       disabled: !callbacks.onCreateFile,
     });
   }
+
+  // Person / Group
+  items.push({
+    id: "add-people-target",
+    label: "Person / Group",
+    icon: <Users className="h-4 w-4" />,
+    onClick: () => callbacks.onAddPeopleTarget?.(normalizedParentId),
+    disabled: !callbacks.onAddPeopleTarget,
+  });
+
+  // Visualization (submenu — engines)
+  items.push({
+    id: "new-visualization",
+    label: "Visualization",
+    icon: <BarChart3 className="h-4 w-4" />,
+    submenu: [
+      {
+        id: "new-visualization-mermaid",
+        label: "Mermaid Diagram",
+        icon: <GitBranch className="h-4 w-4" />,
+        onClick: () => callbacks.onCreateVisualizationMermaid?.(normalizedParentId),
+        disabled: !callbacks.onCreateVisualizationMermaid,
+      },
+      {
+        id: "new-visualization-excalidraw",
+        label: "Excalidraw Drawing",
+        icon: <Pencil className="h-4 w-4" />,
+        onClick: () => callbacks.onCreateVisualizationExcalidraw?.(normalizedParentId),
+        disabled: !callbacks.onCreateVisualizationExcalidraw,
+      },
+      {
+        id: "new-visualization-diagrams-net",
+        label: "Diagrams.net Diagram",
+        icon: <Network className="h-4 w-4" />,
+        onClick: () => callbacks.onCreateVisualizationDiagramsNet?.(normalizedParentId),
+        disabled: !callbacks.onCreateVisualizationDiagramsNet,
+      },
+    ],
+  });
+
+  // AI — submenu houses AI-initiated content types. Image Generation is
+  // the first child; future siblings can sit here without polluting the
+  // top-level list.
+  items.push({
+    id: "new-ai",
+    label: "AI",
+    icon: <Sparkles className="h-4 w-4" />,
+    submenu: [
+      {
+        id: "new-ai-image",
+        label: "Image Generation",
+        icon: <ImageIcon className="h-4 w-4" />,
+        onClick: () => callbacks.onCreateAiImage?.(normalizedParentId),
+        disabled: !callbacks.onCreateAiImage,
+      },
+    ],
+  });
+
+  // ── Less-used / specialized formats ──
 
   if (callbacks.onCreateCode) {
     items.push({
@@ -265,75 +352,14 @@ export function getNewContentMenuItems(
     });
   }
 
-  // Phase 2: New content types
-
-  // External Link - Implemented in M9 Phase 2
-  if (callbacks.onCreateExternal) {
-    items.push({
-      id: "new-external",
-      label: "External Link (Bookmark)",
-      icon: <ExternalLink className="h-4 w-4" />,
-      onClick: () => callbacks.onCreateExternal?.(normalizedParentId),
-      disabled: !callbacks.onCreateExternal,
-    });
-  }
-
-  // Stub payloads - Always show but disabled until implementation
-  // These are defined in M9 Phase 2 plan but not yet implemented
-
-  items.push({
-    id: "new-chat",
-    label: "Chat Conversation",
-    icon: <MessageSquare className="h-4 w-4" />,
-    onClick: () => callbacks.onCreateChat?.(normalizedParentId),
-    disabled: !callbacks.onCreateChat,
-  });
-
-  items.push({
-    id: "add-people-target",
-    label: "Person / Group",
-    icon: <Users className="h-4 w-4" />,
-    onClick: () => callbacks.onAddPeopleTarget?.(normalizedParentId),
-    disabled: !callbacks.onAddPeopleTarget,
-  });
-
-  // Visualization submenu with 3 engine choices
-  items.push({
-    id: "new-visualization",
-    label: "Visualization",
-    icon: <BarChart3 className="h-4 w-4" />,
-    // No onClick - submenu will handle it
-    submenu: [
-      {
-        id: "new-visualization-mermaid",
-        label: "Mermaid Diagram",
-        icon: <GitBranch className="h-4 w-4" />,
-        onClick: () => callbacks.onCreateVisualizationMermaid?.(normalizedParentId),
-        disabled: !callbacks.onCreateVisualizationMermaid, // Enabled when implemented
-      },
-      {
-        id: "new-visualization-excalidraw",
-        label: "Excalidraw Drawing",
-        icon: <Pencil className="h-4 w-4" />,
-        onClick: () => callbacks.onCreateVisualizationExcalidraw?.(normalizedParentId),
-        disabled: !callbacks.onCreateVisualizationExcalidraw, // Enabled when implemented
-      },
-      {
-        id: "new-visualization-diagrams-net",
-        label: "Diagrams.net Diagram",
-        icon: <Network className="h-4 w-4" />,
-        onClick: () => callbacks.onCreateVisualizationDiagramsNet?.(normalizedParentId),
-        disabled: !callbacks.onCreateVisualizationDiagramsNet, // Enabled when implemented
-      },
-    ],
-  });
+  // Stubs — defined but not implemented yet.
 
   items.push({
     id: "new-data",
     label: "Data Table",
     icon: <Table className="h-4 w-4" />,
     onClick: () => callbacks.onCreateData?.(normalizedParentId),
-    disabled: true, // M9 Phase 2: Not implemented yet
+    disabled: true,
   });
 
   items.push({
@@ -341,7 +367,7 @@ export function getNewContentMenuItems(
     label: "Hope/Goal",
     icon: <Target className="h-4 w-4" />,
     onClick: () => callbacks.onCreateHope?.(normalizedParentId),
-    disabled: true, // M9 Phase 2: Not implemented yet
+    disabled: true,
   });
 
   items.push({
@@ -349,7 +375,7 @@ export function getNewContentMenuItems(
     label: "Workflow (Automation)",
     icon: <GitBranch className="h-4 w-4" />,
     onClick: () => callbacks.onCreateWorkflow?.(normalizedParentId),
-    disabled: true, // M9 Phase 2: Not implemented yet
+    disabled: true,
   });
 
   return items;
