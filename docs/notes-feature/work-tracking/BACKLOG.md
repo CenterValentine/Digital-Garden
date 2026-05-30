@@ -10,6 +10,12 @@ last_updated: 2026-05-13
 
 ---
 
+## Dev Infra Followups
+
+- [ ] **Local Postgres (Docker) for development** — reserve cloud Neon for deployed/preview only, so heavy local dev/testing stops burning Neon metered compute (hit the "exceeded compute time quota" wall during AI-chat-revamp dev, 2026-05). Temporary workaround in place: upgraded Vercel (Neon billed through it). Do this **after** the AI chat revamp scope completes. Deliverable: `docker-compose.yml` for Postgres + a dev `DATABASE_URL` swap (keep the Neon URL for deploys); `npx prisma db push` to seed the local schema.
+
+---
+
 ## Dark Mode Followups (from 2026-05-13 epoch completion)
 
 **Dark Mode** epoch shipped on branch `feature/dark-mode` (see [STATUS.md](../STATUS.md) entry). Followups carved out for future sprints:
