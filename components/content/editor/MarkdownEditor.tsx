@@ -17,6 +17,7 @@ import { usePathname } from "next/navigation";
 import { getEditorExtensions, getViewerExtensions } from "@/lib/domain/editor/extensions-client";
 import type { JSONContent } from "@tiptap/core";
 import { LinkDialog } from "./LinkDialog";
+import { AiImageGenDialog } from "@/components/content/ai/AiImageGenDialog";
 import { BubbleMenu } from "./BubbleMenu";
 import { TemplatePicker } from "./TemplatePicker";
 import { SnippetPicker } from "./SnippetPicker";
@@ -208,6 +209,10 @@ export function MarkdownEditor({
   const [, setIsSaving] = useState(false);
   const [, setHasUnsavedChanges] = useState(false);
   const [isLinkDialogOpen, setIsLinkDialogOpen] = useState(false);
+  // In-document AI image gen dialog — opens via the /ai-image slash
+  // command. On creation, fires the existing `insert-ai-image` event
+  // which the editor already handles for chat-tool-generated images.
+  const [aiImageDialogOpen, setAiImageDialogOpen] = useState(false);
   const [remoteCollaborators, setRemoteCollaborators] = useState<RemoteCollaborator[]>([]);
   const [cursorLabels, setCursorLabels] = useState<CollaborationCursorLabel[]>([]);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -869,6 +874,16 @@ export function MarkdownEditor({
     return () => window.removeEventListener("editor-image-upload", handleImageUpload);
   }, []);
 
+  // /ai-image slash command opens the AiImageGenDialog. On success the
+  // dialog calls onCreatedFull, which dispatches the same
+  // `insert-ai-image` event the chat-tool flow uses so the image lands
+  // inline at the cursor.
+  useEffect(() => {
+    const handleOpenAiImage = () => setAiImageDialogOpen(true);
+    window.addEventListener("editor-open-ai-image", handleOpenAiImage);
+    return () => window.removeEventListener("editor-open-ai-image", handleOpenAiImage);
+  }, []);
+
   // Embedded diagram blocks (ExcalidrawBlock, MermaidBlock): when a block
   // without a contentId is clicked, it fires this event so we can create the
   // visualization ContentNode via the API and write the new id back into attrs.
@@ -1334,6 +1349,29 @@ export function MarkdownEditor({
       {/* Template / Snippet pickers — event-driven, no props needed */}
       <TemplatePicker />
       <SnippetPicker />
+
+      {/* /ai-image slash command target — mounted only when triggered.
+          The new image becomes "referenced" (hidden behind the
+          show-referenced toggle) and is auto-inserted inline at the
+          cursor via the existing insert-ai-image event listener. */}
+      {aiImageDialogOpen && (
+        <AiImageGenDialog
+          parentId={null}
+          onClose={() => setAiImageDialogOpen(false)}
+          onCreatedFull={({ contentId: imgId, url, prompt }) => {
+            window.dispatchEvent(
+              new CustomEvent("insert-ai-image", {
+                detail: {
+                  src: url,
+                  alt: prompt || "AI generated image",
+                  contentId: imgId,
+                  source: "ai-generated",
+                },
+              }),
+            );
+          }}
+        />
+      )}
     </div>
   );
 }

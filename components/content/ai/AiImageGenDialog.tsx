@@ -32,12 +32,20 @@ interface AiImageGenDialogProps {
   onClose: () => void;
   /** Fired with the new ContentNode id after a successful save. */
   onCreated?: (contentId: string) => void;
+  /**
+   * Fired with the full result (id + URL + alt) so the caller can do
+   * an inline insertion in addition to (or instead of) the standalone
+   * file. Used by the in-doc slash command path so the image lands
+   * inline in the open document.
+   */
+  onCreatedFull?: (result: { contentId: string; url: string; prompt: string }) => void;
 }
 
 export function AiImageGenDialog({
   parentId,
   onClose,
   onCreated,
+  onCreatedFull,
 }: AiImageGenDialogProps) {
   const glass0 = getSurfaceStyles("glass-0");
 
@@ -98,14 +106,18 @@ export function AiImageGenDialog({
         return;
       }
       const contentId = body.data?.contentId as string | undefined;
+      const url = body.data?.url as string | undefined;
       if (contentId && onCreated) onCreated(contentId);
+      if (contentId && url && onCreatedFull) {
+        onCreatedFull({ contentId, url, prompt: prompt.trim() });
+      }
       onClose();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Network error");
     } finally {
       setSubmitting(false);
     }
-  }, [prompt, submitting, providerId, modelId, size, parentId, onCreated, onClose]);
+  }, [prompt, submitting, providerId, modelId, size, parentId, onCreated, onCreatedFull, onClose]);
 
   // Escape to dismiss; Cmd/Ctrl+Enter to submit.
   useEffect(() => {
