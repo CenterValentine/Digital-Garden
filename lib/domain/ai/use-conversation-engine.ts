@@ -258,6 +258,60 @@ export function useConversationEngine({
   const scrollRef = useRef<HTMLDivElement>(null);
   const [input, setInput] = useState("");
 
+  // ── Sticky drafts ──
+  // Persist the in-progress prompt per chat to localStorage so users
+  // returning to the same conversation (in the same browser) find what
+  // they were typing. Scope:
+  //   - conversationId when bound — finer-grained, supports per-chat
+  //     drafts in multi-conversation notes;
+  //   - contentId in transient mode (pre-Conversation) so a draft typed
+  //     before sending the first message survives a quick reload.
+  // Cleared on send via the existing setInput("") (the persistence
+  // effect deletes the storage key when input is empty).
+  const draftStorageKey = conversationId
+    ? `dg:chat-draft:conv:${conversationId}`
+    : contentId
+      ? `dg:chat-draft:content:${contentId}`
+      : null;
+  const lastHydratedKeyRef = useRef<string | null>(null);
+
+  // Hydrate on key change. Setting input here also primes the
+  // lastHydratedKeyRef so the persistence effect below knows we're now
+  // synced and can start writing for this key.
+  useEffect(() => {
+    if (typeof window === "undefined" || !draftStorageKey) {
+      lastHydratedKeyRef.current = null;
+      return;
+    }
+    try {
+      const saved = window.localStorage.getItem(draftStorageKey);
+      setInput(saved ?? "");
+      lastHydratedKeyRef.current = draftStorageKey;
+    } catch {
+      // localStorage unavailable (private mode / quota / disabled).
+      // Drafts gracefully degrade to in-memory only.
+      lastHydratedKeyRef.current = draftStorageKey;
+    }
+  }, [draftStorageKey]);
+
+  // Persist on input change. The guard prevents writing the previous
+  // key's value into the new key during the brief gap between
+  // draftStorageKey changing and the hydrate effect running.
+  useEffect(() => {
+    if (typeof window === "undefined" || !draftStorageKey) return;
+    if (lastHydratedKeyRef.current !== draftStorageKey) return;
+    try {
+      if (input.length > 0) {
+        window.localStorage.setItem(draftStorageKey, input);
+      } else {
+        window.localStorage.removeItem(draftStorageKey);
+      }
+    } catch {
+      // localStorage write failures are non-blocking — drafts stay
+      // in-memory until next key change or page reload.
+    }
+  }, [input, draftStorageKey]);
+
   const { providerId, modelId, handleChange: handleModelChange } =
     useModelSelection();
 
