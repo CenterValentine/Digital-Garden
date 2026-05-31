@@ -14,6 +14,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/infrastructure/auth/middleware";
 import { generateImage } from "@/lib/domain/ai/image/generate";
+import { generateImageViaGateway } from "@/lib/domain/ai/image/generate-via-gateway";
 import { getUserStorageProvider } from "@/lib/infrastructure/storage";
 import { generateUniqueSlug } from "@/lib/domain/content";
 import {
@@ -95,20 +96,31 @@ export async function POST(request: NextRequest) {
           },
         },
         async (span) => {
-          const generated = await generateImage(
-            {
-              prompt,
-              providerId,
-              modelId,
-              size,
-              quality,
-              style,
-              apiKey: routing?.apiKey,
-              apiBaseURL: routing?.baseURL,
-              upstreamModelId: routing?.upstreamModelId,
-            },
-            session.user.id
-          );
+          // Gateway path: AI SDK knows the gateway's curated catalog
+          // + per-model response shapes. Direct path: our raw-fetch
+          // dispatchers per provider.
+          const generated =
+            routing?.routeKind === "gateway"
+              ? await generateImageViaGateway({
+                  prompt,
+                  modelId: routing.upstreamModelId ?? `${providerId}/${modelId}`,
+                  apiKey: routing.apiKey,
+                  size,
+                  providerId,
+                  canonicalModelId: modelId,
+                })
+              : await generateImage(
+                  {
+                    prompt,
+                    providerId,
+                    modelId,
+                    size,
+                    quality,
+                    style,
+                    apiKey: routing?.apiKey,
+                  },
+                  session.user.id,
+                );
           span
             .attr("mime", generated.mimeType)
             .attr("width", generated.width ?? 0)

@@ -263,23 +263,36 @@ function catalogImageModelsFor(adapterKind: string): FetchedModel[] {
     }));
   }
 
-  // Gateway: emit namespaced entries for providers the gateway proxies.
-  // Vercel AI Gateway covers the full big-three labs; OpenRouter is
-  // chat-only and intentionally excluded.
+  // Vercel AI Gateway: its image-model catalog is curated and does NOT
+  // simply mirror OpenAI's direct list. DALL·E 3 is not proxied (you
+  // get gpt-image-1 instead); Google offers Imagen 4 (not Imagen 3);
+  // and the gateway adds BFL FLUX, Recraft, Bytedance Seedream, and
+  // xAI grok-imagine alongside.
+  //
+  // The ids below come from `@ai-sdk/gateway`'s `GatewayImageModelId`
+  // type (introspected 2026-05-30). Update when the SDK ships an
+  // updated catalog. Emitting bogus ids breaks generation downstream
+  // because the gateway returns "Model not found" — so we only ship
+  // ids the gateway is known to accept.
   if (adapterKind === "vercel-gateway") {
-    const gatewayProxiedProviders = new Set(["openai", "google"]);
-    const out: FetchedModel[] = [];
-    for (const provider of IMAGE_PROVIDER_CATALOG) {
-      if (!gatewayProxiedProviders.has(provider.id)) continue;
-      for (const m of provider.models) {
-        out.push({
-          id: `${provider.id}/${m.id}`,
-          name: m.name,
-          capabilities: ["image-generation"],
-        });
-      }
-    }
-    return out;
+    const VERCEL_GATEWAY_IMAGE_MODELS: Array<{ id: string; name: string }> = [
+      { id: "openai/gpt-image-1", name: "GPT Image 1" },
+      { id: "openai/gpt-image-1-mini", name: "GPT Image 1 Mini" },
+      { id: "google/imagen-4.0-generate-001", name: "Imagen 4" },
+      { id: "google/imagen-4.0-fast-generate-001", name: "Imagen 4 Fast" },
+      { id: "google/imagen-4.0-ultra-generate-001", name: "Imagen 4 Ultra" },
+      { id: "bfl/flux-2-pro", name: "FLUX 2 Pro" },
+      { id: "bfl/flux-2-max", name: "FLUX 2 Max" },
+      { id: "bfl/flux-pro-1.1", name: "FLUX Pro 1.1" },
+      { id: "bfl/flux-pro-1.1-ultra", name: "FLUX Pro 1.1 Ultra" },
+      { id: "bytedance/seedream-4.0", name: "Seedream 4.0" },
+      { id: "recraft/recraft-v3", name: "Recraft v3" },
+      { id: "xai/grok-imagine-image", name: "Grok Imagine" },
+    ];
+    return VERCEL_GATEWAY_IMAGE_MODELS.map((m) => ({
+      ...m,
+      capabilities: ["image-generation"],
+    }));
   }
 
   return [];
