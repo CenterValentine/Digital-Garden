@@ -32,28 +32,75 @@ interface GatewayImageGenInput {
   canonicalModelId: ImageModelId;
 }
 
+/**
+ * Pattern matcher for models the gateway classifies as language models
+ * that happen to *output* images. They live behind `/v1/chat/completions`
+ * (not `/v1/images/generations`), so we have to use generateText and
+ * read result.files instead of experimental_generateImage.
+ *
+ * Currently covers Google's Gemini image-output channels: Nano Banana
+ * (`gemini-2.5-flash-image`), Nano Banana Pro (`gemini-3-pro-image`),
+ * and the various preview channels. xAI's grok-imagine also lives in
+ * this bucket on some routes; we let experimental_generateImage try
+ * first there and fall through on the typed error.
+ */
+function isLanguageAsImageModel(modelId: string): boolean {
+  return /^google\/gemini.*image/i.test(modelId);
+}
+
 export async function generateImageViaGateway(
   input: GatewayImageGenInput,
 ): Promise<ImageGenResult> {
   // Dynamic imports keep the gateway SDK out of the bundle for any
   // caller that doesn't actually hit this path.
-  const [{ createGatewayProvider }, { experimental_generateImage }] =
-    await Promise.all([
-      import("@ai-sdk/gateway"),
-      import("ai"),
-    ]);
+  const [{ createGatewayProvider }, ai] = await Promise.all([
+    import("@ai-sdk/gateway"),
+    import("ai"),
+  ]);
 
   const provider = createGatewayProvider({ apiKey: input.apiKey });
+  const sized = input.size ?? "1024x1024";
+  const [w, h] = sized.split("x").map(Number);
+
+  // ── Language-as-image route (Gemini image channels) ───────────
+  // The gateway rejects these on /v1/images/generations with a typed
+  // error; they only work via /v1/chat/completions. AI SDK's
+  // generateText returns the resulting image binaries on `result.files`.
+  if (isLanguageAsImageModel(input.modelId)) {
+    const model = provider.languageModel(
+      input.modelId as Parameters<typeof provider.languageModel>[0],
+    );
+    const result = await ai.generateText({
+      model,
+      prompt: input.prompt,
+    });
+    const file = result.files?.find((f) =>
+      (f.mediaType ?? "").startsWith("image/"),
+    );
+    if (!file) {
+      throw new Error(
+        `Model ${input.modelId} did not return an image (got ${result.files?.length ?? 0} files, ${result.text?.length ?? 0} text chars).`,
+      );
+    }
+    return {
+      base64: file.base64,
+      url: "",
+      width: w,
+      height: h,
+      mimeType: file.mediaType ?? "image/png",
+      providerId: input.providerId,
+      modelId: input.canonicalModelId,
+    };
+  }
+
+  // ── Standard image-API route ──────────────────────────────────
   // imageModel accepts the gateway's GatewayImageModelId union — we
   // cast because we validate the id existence by storing it via the
   // catalog-augmented fetcher (`catalogImageModelsFor("vercel-gateway")`).
-  // The cast keeps the call site honest about the boundary.
   const model = provider.imageModel(
     input.modelId as Parameters<typeof provider.imageModel>[0],
   );
-
-  const sized = input.size ?? "1024x1024";
-  const result = await experimental_generateImage({
+  const result = await ai.experimental_generateImage({
     model,
     prompt: input.prompt,
     n: 1,
@@ -67,7 +114,6 @@ export async function generateImageViaGateway(
   if (!file) {
     throw new Error("Vercel AI Gateway returned no image data.");
   }
-  const [w, h] = sized.split("x").map(Number);
 
   return {
     base64: file.base64,

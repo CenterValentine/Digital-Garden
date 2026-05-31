@@ -276,6 +276,7 @@ function catalogImageModelsFor(adapterKind: string): FetchedModel[] {
   // ids the gateway is known to accept.
   if (adapterKind === "vercel-gateway") {
     const VERCEL_GATEWAY_IMAGE_MODELS: Array<{ id: string; name: string }> = [
+      // Classical image API (POST /v1/images/generations)
       { id: "openai/gpt-image-1", name: "GPT Image 1" },
       { id: "openai/gpt-image-1-mini", name: "GPT Image 1 Mini" },
       { id: "google/imagen-4.0-generate-001", name: "Imagen 4" },
@@ -288,6 +289,12 @@ function catalogImageModelsFor(adapterKind: string): FetchedModel[] {
       { id: "bytedance/seedream-4.0", name: "Seedream 4.0" },
       { id: "recraft/recraft-v3", name: "Recraft v3" },
       { id: "xai/grok-imagine-image", name: "Grok Imagine" },
+      // Language-as-image: gateway classifies these as language models
+      // but they emit image binaries via /v1/chat/completions. Route
+      // dispatches to `generateText` + `result.files` for these.
+      { id: "google/gemini-2.5-flash-image", name: "Nano Banana (Gemini 2.5 Flash Image)" },
+      { id: "google/gemini-3-pro-image", name: "Nano Banana Pro (Gemini 3 Pro Image)" },
+      { id: "google/gemini-3.1-flash-image-preview", name: "Gemini 3.1 Flash Image (Preview)" },
     ];
     return VERCEL_GATEWAY_IMAGE_MODELS.map((m) => ({
       ...m,
