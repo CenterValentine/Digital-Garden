@@ -1,5 +1,5 @@
 ---
-last_updated: 2026-05-13
+last_updated: 2026-05-31
 ---
 
 # Sprint Backlog
@@ -13,6 +13,15 @@ last_updated: 2026-05-13
 ## Dev Infra Followups
 
 - [ ] **Local Postgres (Docker) for development** — reserve cloud Neon for deployed/preview only, so heavy local dev/testing stops burning Neon metered compute (hit the "exceeded compute time quota" wall during AI-chat-revamp dev, 2026-05). Temporary workaround in place: upgraded Vercel (Neon billed through it). Do this **after** the AI chat revamp scope completes. Deliverable: `docker-compose.yml` for Postgres + a dev `DATABASE_URL` swap (keep the Neon URL for deploys); `npx prisma db push` to seed the local schema.
+
+---
+
+## AI Chat Revamp Followups (from PR #49, 2026-05-31)
+
+PR #49 polish wave shipped on `feature/ai-chat-revamp` and was merged via `abaad12`. Two known issues remain:
+
+- [ ] **Sticky chat drafts don't survive tab switches** — current implementation lands the draft via `useState` lazy init reading localStorage, but in user testing the draft is blank after navigating to another chat and back. Suspected interaction with `ChatPanel`'s `key={activeId}` remount + localStorage write timing. Needs deeper investigation of the mount/persist ordering inside `useConversationEngine`.
+- [ ] **Brief flash between `loading.tsx` and hydrated content** — too short to characterize without instrumentation. Right-sidebar collapse mismatch was fixed in `8293b3e` (loading skeleton no longer paints a 300px right sidebar that collides with the default `isCollapsed: true`), but a residual flash remains. Suspected cause: `MainPanelContent` paints the SSR `initialContent` once, the client store hydrates with empty `selectedContentId`, the empty branch renders for one frame, then the URL→store effect re-selects the content. Needs a DevTools paint capture before changing render paths — that area is race-prone and already absorbed multiple stabilization commits.
 
 ---
 
