@@ -8,7 +8,8 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { useCallback } from "react";
 import { getSurfaceStyles } from "@/lib/design/system";
 import {
   renderExtensionIcon,
@@ -254,6 +255,7 @@ const navItems: NavItem[] = [
 
 export function SettingsSidebar() {
   const pathname = usePathname();
+  const router = useRouter();
   const glass1 = getSurfaceStyles("glass-1");
   const extensionSettingsItems: NavItem[] = useExtensionSettingsEntries().map(
     (entry) => ({
@@ -264,8 +266,44 @@ export function SettingsSidebar() {
   );
   const allItems = [...navItems, ...extensionSettingsItems];
 
+  // Back to wherever the user was before entering settings. Uses the
+  // browser's history stack when available; falls back to `/` when the
+  // settings route was the entry point (direct link, hard refresh).
+  // `window.history.length > 1` is the most reliable signal we can read
+  // in the browser without maintaining our own referrer state.
+  const handleBack = useCallback(() => {
+    if (typeof window !== "undefined" && window.history.length > 1) {
+      router.back();
+    } else {
+      router.push("/");
+    }
+  }, [router]);
+
   return (
     <div className="p-4 space-y-2">
+      <button
+        type="button"
+        onClick={handleBack}
+        title="Back to where you were"
+        aria-label="Back"
+        className="flex w-full items-center gap-2 px-3 py-2 mb-2 rounded-lg text-sm text-gray-400 hover:text-gray-100 hover:bg-white/10 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60"
+      >
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <line x1="19" y1="12" x2="5" y2="12" />
+          <polyline points="12 19 5 12 12 5" />
+        </svg>
+        <span>Back</span>
+      </button>
       <div className="px-3 py-2 mb-4">
         <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wide">
           Settings
