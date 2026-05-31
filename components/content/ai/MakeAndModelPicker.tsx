@@ -39,7 +39,10 @@ interface ConnSummary {
   name: string;
   presetId: string | null;
   adapterKind: string;
-  models: Array<{ id: string }>;
+  // model.name is needed to display user-added models in the picker
+  // dropdown alongside catalog entries — the catalog provides display
+  // names for its models; Connection-added ones bring their own.
+  models: Array<{ id: string; name?: string }>;
 }
 
 /**
@@ -202,8 +205,11 @@ export function MakeAndModelPicker({
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [connections]);
 
-  // Unified provider list — static catalog first, then any dynamic
-  // entries the user's Connections expose.
+  // Unified provider list — static catalog first (rich metadata),
+  // augmented with user-added Connection models the catalog doesn't
+  // know about (e.g. fresh OpenAI releases, snapshot versions, models
+  // accessed via a gateway). Then any fully-dynamic providers (those
+  // whose prefix isn't a catalog entry at all, like Perplexity).
   type PickerProvider = {
     id: string;
     name: string;
@@ -214,17 +220,72 @@ export function MakeAndModelPicker({
     }>;
   };
   const allProviders = useMemo<PickerProvider[]>(() => {
-    const fromCatalog: PickerProvider[] = PROVIDER_CATALOG.map((p) => ({
-      id: p.id,
-      name: p.name,
-      models: p.models.map((m) => ({
-        id: m.id,
-        name: m.name,
-        costTier: m.costTier,
-      })),
-    }));
+    // Index user-added Connection models by provider id. Two storage
+    // shapes both contribute:
+    //   1. Gateway-namespaced: `openai/gpt-5.2` — prefix becomes the
+    //      provider id, bare suffix becomes the displayed model id.
+    //   2. Direct provider: Connection.presetId === provider id and
+    //      Connection.models[] holds bare ids (e.g. `gpt-4o-2024-08-06`
+    //      from a direct OpenAI Connection).
+    const userModelsByProvider = new Map<
+      string,
+      Map<string, { id: string; name: string }>
+    >();
+    const remember = (prov: string, id: string, name: string) => {
+      if (!userModelsByProvider.has(prov)) {
+        userModelsByProvider.set(prov, new Map());
+      }
+      const map = userModelsByProvider.get(prov)!;
+      if (!map.has(id)) map.set(id, { id, name });
+    };
+    for (const c of connections) {
+      for (const m of c.models) {
+        const slash = m.id.indexOf("/");
+        if (slash > 0) {
+          // Gateway namespaced form.
+          const prefix = m.id.slice(0, slash);
+          const bare = m.id.slice(slash + 1);
+          if (prefix && bare) remember(prefix, bare, m.name || bare);
+        } else if (c.presetId) {
+          // Direct form — provider id comes from the Connection preset.
+          remember(c.presetId, m.id, m.name || m.id);
+        }
+      }
+    }
+
+    const fromCatalog: PickerProvider[] = PROVIDER_CATALOG.map((p) => {
+      // Widen to plain string Set so user-added model ids (plain strings)
+      // can dedupe against catalog ids (branded `AIModelId`).
+      const catalogIds = new Set<string>(p.models.map((m) => m.id));
+      const userAdds = userModelsByProvider.get(p.id);
+      const userModelEntries = userAdds
+        ? Array.from(userAdds.values())
+            .filter((m) => !catalogIds.has(m.id))
+            .sort((a, b) => a.id.localeCompare(b.id))
+            .map((m) => ({
+              id: m.id,
+              name: m.name,
+              // User-added models lack rich metadata; "medium" is the
+              // safest default — better than guessing low (would hide
+              // the budget signal) or high (would scare users off).
+              costTier: "medium" as const,
+            }))
+        : [];
+      return {
+        id: p.id,
+        name: p.name,
+        models: [
+          ...p.models.map((m) => ({
+            id: m.id,
+            name: m.name,
+            costTier: m.costTier,
+          })),
+          ...userModelEntries,
+        ],
+      };
+    });
     return [...fromCatalog, ...dynamicProviders];
-  }, [dynamicProviders]);
+  }, [connections, dynamicProviders]);
 
   const activeProvider = allProviders.find((p) => p.id === providerId);
   const activeRouting = useMemo(

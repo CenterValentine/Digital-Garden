@@ -504,7 +504,28 @@ When you generate an image, the user can insert it into the document at their cu
       // AI SDK v6 strips them — Anthropic extended thinking, OpenAI
       // o-series, and Google thinking-* models all emit reasoning that
       // we want the ReasoningRouter to render. Session 6.
-      return result.toUIMessageStreamResponse({ sendReasoning: true });
+      //
+      // Also forward token usage + finish reason via `messageMetadata`,
+      // which AI SDK v6 surfaces on `UIMessage.metadata` on the client.
+      // The client's persist-on-finish path forwards it to the message
+      // row, which the per-Connection usage meters read back for $
+      // figures. Without this hop, telemetry is request-counts-only.
+      return result.toUIMessageStreamResponse({
+        sendReasoning: true,
+        messageMetadata: ({ part }) => {
+          if (part.type === "finish") {
+            return {
+              usage: {
+                inputTokens: part.totalUsage?.inputTokens,
+                outputTokens: part.totalUsage?.outputTokens,
+                totalTokens: part.totalUsage?.totalTokens,
+              },
+              finishReason: part.finishReason,
+            };
+          }
+          return undefined;
+        },
+      });
     } catch (error) {
       if (
         error instanceof Error &&

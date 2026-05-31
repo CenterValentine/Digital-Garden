@@ -18,6 +18,8 @@ import {
 } from "../service";
 import { buildTelemetryReport } from "./telemetry";
 import {
+  fetchAnthropicUsage,
+  fetchGoogleUsage,
   fetchOpenRouterUsage,
   fetchVercelGatewayUsage,
 } from "./gateway";
@@ -66,10 +68,15 @@ export async function getConnectionUsage(
   });
 
   // Best-effort provider-API call for "real" numbers. Returns null on
-  // any failure (including "this adapter doesn't apply").
+  // any failure (including "this adapter doesn't apply"). The
+  // Anthropic + Google stubs always return null — those providers
+  // don't expose per-key usage endpoints — but are listed here as
+  // documentation that we've considered them.
   const provider =
     (await fetchOpenRouterUsage(conn)) ??
     (await fetchVercelGatewayUsage(conn)) ??
+    (await fetchAnthropicUsage(conn)) ??
+    (await fetchGoogleUsage(conn)) ??
     null;
 
   if (!provider) return telemetry;

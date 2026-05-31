@@ -224,17 +224,28 @@ export async function fetchUpstreamModels(
 }
 
 /**
- * Return image-gen model entries from `IMAGE_PROVIDER_CATALOG` whose
- * provider matches this Connection's adapter, normalized to the
- * `FetchedModel` shape with `image-generation` capability set.
+ * Return image-gen model entries from `IMAGE_PROVIDER_CATALOG` for
+ * this Connection's adapter, normalized to `FetchedModel` with
+ * `image-generation` capability set.
  *
- * Returns empty for adapters that don't have a corresponding image
- * provider in the catalog (xai, mistral, groq, openai-compat, etc.).
+ * Two patterns:
+ *
+ *   1. **Direct adapter** (openai, google, together, fireworks): the
+ *      Connection's models[] holds bare ids like `dall-e-3`. The chat
+ *      route's direct-match resolver routes by Connection.presetId.
+ *
+ *   2. **Gateway adapter** (vercel-gateway): the Connection's models[]
+ *      holds namespaced ids like `openai/dall-e-3`. The chat route's
+ *      namespaced-fallback resolver routes by the prefix. Vercel AI
+ *      Gateway proxies image generation for several labs, so we emit
+ *      the cartesian: every catalog provider's models, each prefixed
+ *      with the provider id.
+ *
+ * Returns empty for adapters with no image-gen surface (xai, mistral,
+ * groq, openai-compat, openrouter).
  */
 function catalogImageModelsFor(adapterKind: string): FetchedModel[] {
-  // adapter kind → image catalog provider id. They mostly line up
-  // 1:1; this map exists so we can adjust without re-keying the
-  // catalog.
+  // Direct: 1:1 mapping from adapter → image catalog provider id.
   const adapterToCatalog: Record<string, string> = {
     openai: "openai",
     google: "google",
@@ -242,14 +253,56 @@ function catalogImageModelsFor(adapterKind: string): FetchedModel[] {
     fireworks: "fireworks",
   };
   const catalogId = adapterToCatalog[adapterKind];
-  if (!catalogId) return [];
-  const provider = IMAGE_PROVIDER_CATALOG.find((p) => p.id === catalogId);
-  if (!provider) return [];
-  return provider.models.map((m) => ({
-    id: m.id,
-    name: m.name,
-    capabilities: ["image-generation"],
-  }));
+  if (catalogId) {
+    const provider = IMAGE_PROVIDER_CATALOG.find((p) => p.id === catalogId);
+    if (!provider) return [];
+    return provider.models.map((m) => ({
+      id: m.id,
+      name: m.name,
+      capabilities: ["image-generation"],
+    }));
+  }
+
+  // Vercel AI Gateway: its image-model catalog is curated and does NOT
+  // simply mirror OpenAI's direct list. DALL·E 3 is not proxied (you
+  // get gpt-image-1 instead); Google offers Imagen 4 (not Imagen 3);
+  // and the gateway adds BFL FLUX, Recraft, Bytedance Seedream, and
+  // xAI grok-imagine alongside.
+  //
+  // The ids below come from `@ai-sdk/gateway`'s `GatewayImageModelId`
+  // type (introspected 2026-05-30). Update when the SDK ships an
+  // updated catalog. Emitting bogus ids breaks generation downstream
+  // because the gateway returns "Model not found" — so we only ship
+  // ids the gateway is known to accept.
+  if (adapterKind === "vercel-gateway") {
+    const VERCEL_GATEWAY_IMAGE_MODELS: Array<{ id: string; name: string }> = [
+      // Classical image API (POST /v1/images/generations)
+      { id: "openai/gpt-image-1", name: "GPT Image 1" },
+      { id: "openai/gpt-image-1-mini", name: "GPT Image 1 Mini" },
+      { id: "google/imagen-4.0-generate-001", name: "Imagen 4" },
+      { id: "google/imagen-4.0-fast-generate-001", name: "Imagen 4 Fast" },
+      { id: "google/imagen-4.0-ultra-generate-001", name: "Imagen 4 Ultra" },
+      { id: "bfl/flux-2-pro", name: "FLUX 2 Pro" },
+      { id: "bfl/flux-2-max", name: "FLUX 2 Max" },
+      { id: "bfl/flux-pro-1.1", name: "FLUX Pro 1.1" },
+      { id: "bfl/flux-pro-1.1-ultra", name: "FLUX Pro 1.1 Ultra" },
+      { id: "bytedance/seedream-4.0", name: "Seedream 4.0" },
+      { id: "recraft/recraft-v3", name: "Recraft v3" },
+      { id: "xai/grok-imagine-image", name: "Grok Imagine" },
+      // Language-as-image: gateway classifies these as language models
+      // but they emit image binaries via /v1/chat/completions. Route
+      // dispatches to `generateText` + `result.files` for these.
+      { id: "google/gemini-2.5-flash-image", name: "Nano Banana (Gemini 2.5 Flash Image)" },
+      { id: "google/gemini-3-pro-image", name: "Nano Banana Pro (Gemini 3 Pro Image)" },
+      { id: "google/gemini-3.1-flash-image-preview", name: "Gemini 3.1 Flash Image (Preview)" },
+    ];
+    return VERCEL_GATEWAY_IMAGE_MODELS.map((m) => ({
+      ...m,
+      capabilities: ["image-generation"],
+    }));
+  }
+
+  return [];
 }
 
 /** Parse OpenAI-shaped responses: `{ data: [...] }` or bare `[...]`. */

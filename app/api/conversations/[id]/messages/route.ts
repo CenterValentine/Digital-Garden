@@ -95,6 +95,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
           typeof body.parentId === "string" ? body.parentId : null,
       };
 
+
       const message = await appendMessage(
         session.user.id,
         conversationId,

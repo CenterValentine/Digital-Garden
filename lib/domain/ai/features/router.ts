@@ -106,6 +106,12 @@ export async function resolvePrimaryRoute(
   return all[0] ?? null;
 }
 
+// Capability helpers live in `./capabilities.ts` so client components
+// can import them without dragging server-only deps through this file.
+// Re-export here so existing server-side callers keep working.
+export { inferCapabilities, effectiveCapabilities } from "./capabilities";
+import { effectiveCapabilities } from "./capabilities";
+
 function modelSatisfiesCapabilities(
   connection: ConnectionView,
   modelId: string,
@@ -114,7 +120,7 @@ function modelSatisfiesCapabilities(
   if (required.length === 0) return true;
   const model = connection.models.find((m) => m.id === modelId);
   if (!model) return false;
-  const have = new Set<string>(model.capabilities ?? []);
+  const have = effectiveCapabilities(model);
   return required.every((cap) => have.has(cap));
 }
 
@@ -124,7 +130,7 @@ export function listCompatibleModels(
   required: CapabilityFlag[],
 ): ConnectionModel[] {
   return connection.models.filter((m) => {
-    const have = new Set<string>(m.capabilities ?? []);
+    const have = effectiveCapabilities(m);
     return required.every((cap) => have.has(cap));
   });
 }

@@ -68,6 +68,14 @@ const chatTransport = new DefaultChatTransport({
  */
 export interface ConversationEngineFinishEvent {
   messages: UIMessage[];
+  /**
+   * The fresh final assistant message from the AI SDK's onFinish event.
+   * Carries `metadata` (token usage, finishReason) applied *just before*
+   * onFinish fired — typically not yet reflected in `messages` because
+   * the SDK mutates `state.message.metadata` directly without a
+   * setMessages flush. Use this when you need the latest metadata.
+   */
+  message?: UIMessage;
   finishReason?: string;
 }
 
@@ -248,7 +256,87 @@ export function useConversationEngine({
   pendingUserPartsRef,
 }: UseConversationEngineParams): UseConversationEngineResult {
   const scrollRef = useRef<HTMLDivElement>(null);
-  const [input, setInput] = useState("");
+
+  // ── Sticky drafts ──
+  // Persist the in-progress prompt per chat to localStorage so users
+  // returning to the same conversation (in the same browser) find what
+  // they were typing. Scope:
+  //   - conversationId when bound — finer-grained, supports per-chat
+  //     drafts in multi-conversation notes;
+  //   - contentId in transient mode (pre-Conversation) so a draft typed
+  //     before sending the first message survives a quick reload.
+  // Cleared on send via the existing setInput("") — the persistence
+  // effect deletes the storage key when input is empty.
+  const draftStorageKey = conversationId
+    ? `dg:chat-draft:conv:${conversationId}`
+    : contentId
+      ? `dg:chat-draft:content:${contentId}`
+      : null;
+
+  /**
+   * Hydrate from localStorage at useState init time — NOT in a
+   * post-render useEffect. The useEffect-hydrate approach raced with
+   * the persistence effect on mount: hydrate queued setInput(saved),
+   * but the persistence effect ran in the same commit with input="",
+   * matched the gate (lastHydratedKeyRef was just set), and wrote ""
+   * to localStorage — wiping the draft before the setInput re-render
+   * had a chance to write it back.
+   *
+   * Lazy init runs once per mount BEFORE the first render, so input's
+   * initial value already reflects what's in localStorage. The
+   * persistence effect's first fire sees the correct value.
+   */
+  const [input, setInput] = useState<string>(() => {
+    if (typeof window === "undefined" || !draftStorageKey) return "";
+    try {
+      return window.localStorage.getItem(draftStorageKey) ?? "";
+    } catch {
+      return "";
+    }
+  });
+  // Initialize with the key we just hydrated from so the persistence
+  // effect can write immediately for that key without re-running
+  // hydrate.
+  const lastHydratedKeyRef = useRef<string | null>(draftStorageKey);
+
+  // Re-hydrate when the draft key changes WITHOUT a full remount
+  // (rare — most consumers re-key the surrounding component on chat
+  // switch). Gated to only fire when the key actually differs from
+  // the last hydrated one so the initial mount doesn't trigger this
+  // (useState lazy init already handled mount).
+  useEffect(() => {
+    if (lastHydratedKeyRef.current === draftStorageKey) return;
+    if (typeof window === "undefined" || !draftStorageKey) {
+      lastHydratedKeyRef.current = null;
+      return;
+    }
+    try {
+      const saved = window.localStorage.getItem(draftStorageKey);
+      setInput(saved ?? "");
+      lastHydratedKeyRef.current = draftStorageKey;
+    } catch {
+      lastHydratedKeyRef.current = draftStorageKey;
+    }
+  }, [draftStorageKey]);
+
+  // Persist on input change. Gate prevents writing the previous key's
+  // value into the new key during the brief gap between draftStorageKey
+  // changing and the hydrate effect catching up (in the no-remount
+  // case).
+  useEffect(() => {
+    if (typeof window === "undefined" || !draftStorageKey) return;
+    if (lastHydratedKeyRef.current !== draftStorageKey) return;
+    try {
+      if (input.length > 0) {
+        window.localStorage.setItem(draftStorageKey, input);
+      } else {
+        window.localStorage.removeItem(draftStorageKey);
+      }
+    } catch {
+      // localStorage write failures are non-blocking — drafts stay
+      // in-memory until next key change or page reload.
+    }
+  }, [input, draftStorageKey]);
 
   const { providerId, modelId, handleChange: handleModelChange } =
     useModelSelection();
@@ -363,6 +451,7 @@ export function useConversationEngine({
     },
     onFinish: (event) => {
       const e = event as {
+        message?: UIMessage;
         messages?: UIMessage[];
         finishReason?: string;
       };
@@ -372,6 +461,7 @@ export function useConversationEngine({
       if (onFinish) {
         onFinish({
           messages: finalMessages,
+          message: e.message,
           finishReason: e.finishReason,
         });
       }

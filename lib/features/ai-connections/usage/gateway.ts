@@ -1,7 +1,7 @@
 /**
- * Gateway-specific real-usage adapters.
+ * Provider-specific real-usage adapters.
  *
- * Currently:
+ * **Working adapters (real per-key endpoints):**
  *   - **OpenRouter** — `GET /api/v1/key` returns the gateway's own
  *     accounting: total credits used (USD), remaining limit, label.
  *     Authoritative for cost; we don't need to maintain a price table
@@ -11,9 +11,19 @@
  *     the upstream cooperates; otherwise we throw and fall through to
  *     telemetry.
  *
- * Both adapters return `null` when the upstream call fails — the
- * caller falls through to the telemetry-only path so the user still
- * sees *something*.
+ * **Documented null adapters (no per-key endpoint exists):**
+ *   - **Anthropic** — usage is org-scoped via the Anthropic Console.
+ *     There is no `GET /v1/keys/<key>/usage` style endpoint. Adapter
+ *     returns null unconditionally so the composer falls through to
+ *     telemetry. If Anthropic ships a usage API, replace the body.
+ *   - **Google (Gemini)** — usage flows through Google Cloud billing,
+ *     which is project-scoped, not API-key-scoped. The Generative
+ *     Language API exposes no per-key usage endpoint. Same null
+ *     fallthrough as Anthropic.
+ *
+ * All adapters return `null` when the upstream call fails or when no
+ * endpoint is available — the caller composer falls through to the
+ * telemetry-only path so the user still sees *something*.
  */
 
 import type { ConnectionWithKey } from "../types";
@@ -152,5 +162,37 @@ function pickNumber(
     const v = obj[k];
     if (typeof v === "number" && Number.isFinite(v)) return v;
   }
+  return null;
+}
+
+/**
+ * Anthropic — no public per-API-key usage endpoint exists.
+ *
+ * Usage data is available org-wide in the Anthropic Console UI but is
+ * not exposed via a programmatic API at the key level. This stub
+ * returns null so the composer falls through to telemetry.
+ *
+ * Replace the body if Anthropic ships a per-key usage endpoint.
+ */
+export async function fetchAnthropicUsage(
+  conn: ConnectionWithKey,
+): Promise<UsageReport | null> {
+  void conn;
+  return null;
+}
+
+/**
+ * Google (Gemini) — no per-key usage endpoint.
+ *
+ * Google Cloud billing is project-scoped, not key-scoped. The
+ * Generative Language API doesn't expose per-key usage. This stub
+ * returns null; the composer uses telemetry.
+ *
+ * Replace the body if Google ships a per-key usage endpoint.
+ */
+export async function fetchGoogleUsage(
+  conn: ConnectionWithKey,
+): Promise<UsageReport | null> {
+  void conn;
   return null;
 }

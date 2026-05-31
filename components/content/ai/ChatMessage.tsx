@@ -250,6 +250,18 @@ export const ChatMessage = memo(function ChatMessage({
 
   return (
     <div
+      // Assistant turns get aria-live="polite" so screen-reader users
+      // hear streaming progress without interrupting other speech.
+      // User turns are static (no SR announcement needed). aria-busy
+      // on streaming so SR doesn't try to re-announce on every chunk.
+      role={isAssistant ? "article" : undefined}
+      aria-live={isAssistant && isStreaming ? "polite" : undefined}
+      aria-busy={isAssistant && isStreaming ? true : undefined}
+      aria-label={
+        isAssistant
+          ? `Assistant message${isStreaming ? ", in progress" : ""}`
+          : "Your message"
+      }
       className={cn(
         "group flex gap-3 px-4 py-3",
         isUser && "flex-row-reverse"
@@ -288,8 +300,17 @@ export const ChatMessage = memo(function ChatMessage({
                   setEditing(false);
                 }
               }}
-              rows={Math.min(8, Math.max(2, draft.split("\n").length))}
-              className="w-full resize-y rounded-xl border border-blue-500/30 bg-blue-600/10 px-3.5 py-2.5 text-sm leading-relaxed text-blue-100 outline-none focus:border-blue-400/50"
+              rows={Math.min(8, Math.max(1, draft.split("\n").length))}
+              // Visually mirror the view-mode bubble. Three pieces:
+              //   - matching bg / border / padding / radius (so the
+              //     bubble appears to become editable in place);
+              //   - `field-sizing: content` lets the textarea shrink
+              //     to its text width like the view's `inline-block`
+              //     bubble (Chromium 123+, Firefox 124+); fallback is
+              //     `w-full` which is still legible just wider;
+              //   - `max-w-full` keeps it from overflowing the column.
+              style={{ fieldSizing: "content" } as React.CSSProperties}
+              className="w-full max-w-full resize-y rounded-xl border border-blue-500/20 bg-blue-600/30 px-3.5 py-2.5 text-sm leading-relaxed text-blue-100 outline-none focus:border-blue-400/60 focus:ring-2 focus:ring-blue-400/30 align-top"
             />
             <div className="flex items-center justify-end gap-1.5">
               <button
@@ -474,8 +495,12 @@ export const ChatMessage = memo(function ChatMessage({
             (assistant). Hidden until row hover; suppressed while streaming. */}
         {!isStreaming && messageText && (
           <div
+            // `focus-within` keeps the action bar visible when a button
+            // inside it has keyboard focus — without this, keyboard users
+            // tab into invisible (opacity-0) buttons that they can't
+            // see they've focused.
             className={cn(
-              "flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity text-gray-500",
+              "flex items-center gap-0.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity text-gray-500",
               isUser ? "justify-end" : "justify-start",
             )}
           >
@@ -549,7 +574,7 @@ function MessageActionButton({
       disabled={disabled}
       title={label}
       aria-label={label}
-      className="inline-flex items-center justify-center rounded-md p-1 hover:text-gray-200 hover:bg-white/5 transition-colors disabled:opacity-40 disabled:cursor-default"
+      className="inline-flex items-center justify-center rounded-md p-1 hover:text-gray-200 hover:bg-white/5 transition-colors disabled:opacity-40 disabled:cursor-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60"
     >
       {children}
     </button>

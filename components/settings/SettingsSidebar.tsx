@@ -8,8 +8,10 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { useCallback } from "react";
 import { getSurfaceStyles } from "@/lib/design/system";
+import { LAST_CONTENT_ROUTE_KEY } from "@/components/content/NotesLayoutMarker";
 import {
   renderExtensionIcon,
 } from "@/lib/extensions";
@@ -254,6 +256,7 @@ const navItems: NavItem[] = [
 
 export function SettingsSidebar() {
   const pathname = usePathname();
+  const router = useRouter();
   const glass1 = getSurfaceStyles("glass-1");
   const extensionSettingsItems: NavItem[] = useExtensionSettingsEntries().map(
     (entry) => ({
@@ -264,8 +267,51 @@ export function SettingsSidebar() {
   );
   const allItems = [...navItems, ...extensionSettingsItems];
 
+  // Back to the last content route the user visited, not the previous
+  // settings sub-page. NotesLayoutMarker writes the user's pathname to
+  // sessionStorage on every non-settings render; we read that here so
+  // "Back" jumps cleanly out of settings instead of walking through
+  // internal settings history. Falls back to `/` (direct link / first-
+  // visit / private-browsing edge cases).
+  const handleBack = useCallback(() => {
+    if (typeof window === "undefined") {
+      router.push("/");
+      return;
+    }
+    let target: string | null = null;
+    try {
+      target = window.sessionStorage.getItem(LAST_CONTENT_ROUTE_KEY);
+    } catch {
+      target = null;
+    }
+    router.push(target && !target.startsWith("/settings") ? target : "/");
+  }, [router]);
+
   return (
     <div className="p-4 space-y-2">
+      <button
+        type="button"
+        onClick={handleBack}
+        title="Back to where you were"
+        aria-label="Back"
+        className="flex w-full items-center gap-2 px-3 py-2 mb-2 rounded-lg text-sm text-gray-400 hover:text-gray-100 hover:bg-white/10 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60"
+      >
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <line x1="19" y1="12" x2="5" y2="12" />
+          <polyline points="12 19 5 12 12 5" />
+        </svg>
+        <span>Back</span>
+      </button>
       <div className="px-3 py-2 mb-4">
         <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wide">
           Settings
