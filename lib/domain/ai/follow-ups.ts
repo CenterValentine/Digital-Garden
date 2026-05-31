@@ -16,6 +16,11 @@ import { z } from "zod/v4";
 import { resolveChatModel } from "@/lib/domain/ai/providers/registry";
 import { resolvePrimaryRoute } from "@/lib/domain/ai/features/router";
 import { resolveChatModelFromConnection } from "@/lib/domain/ai/providers/registry";
+import {
+  getConnectionWithKey,
+  listConnections,
+} from "@/lib/features/ai-connections";
+import { logger } from "@/lib/core/logger";
 
 /** Zod schema for the generator's structured output. */
 const FollowUpsSchema = z.object({
@@ -51,18 +56,45 @@ export async function generateFollowUps(
 
   try {
     const route = await resolvePrimaryRoute(userId, "follow-ups");
-    const model = route
-      ? await resolveChatModelFromConnection(route.connection, route.modelId)
-      : await resolveChatModel({
-          providerId: (args.fallbackProviderId ?? "anthropic") as
+    let model;
+    if (route) {
+      // Configured Feature Route wins.
+      model = await resolveChatModelFromConnection(
+        route.connection,
+        route.modelId,
+      );
+    } else {
+      // Try Connection-based fallback first: look up any of the user's
+      // active Connections whose presetId matches the active chat's
+      // provider. This keeps follow-ups working even without an
+      // explicit Feature Route, AND avoids the legacy `resolveChatModel`
+      // path (which still references the deleted AIProviderKey table).
+      const fallbackProvider = args.fallbackProviderId ?? null;
+      const fallbackModel = args.fallbackModelId ?? null;
+      const all = await listConnections(userId);
+      const conn =
+        (fallbackProvider &&
+          all.find((c) => c.presetId === fallbackProvider)) ||
+        all[0];
+      if (conn && fallbackModel) {
+        // resolveChatModelFromConnection needs the decrypted key.
+        const withKey = await getConnectionWithKey(userId, conn.id);
+        model = await resolveChatModelFromConnection(withKey, fallbackModel);
+      } else {
+        // Last-resort legacy path. May throw if the AIProviderKey
+        // table is gone — caller catches and renders no suggestions.
+        model = await resolveChatModel({
+          providerId: (fallbackProvider ?? "anthropic") as
             | "anthropic"
             | "openai"
             | "google"
             | "xai"
             | "mistral"
             | "groq",
-          modelId: args.fallbackModelId ?? "claude-haiku-3-5",
+          modelId: fallbackModel ?? "claude-haiku-3-5",
         });
+      }
+    }
 
     const result = await generateObject({
       // resolveChat* returns the right language-model shape but the
@@ -84,7 +116,19 @@ export async function generateFollowUps(
     });
 
     return result.object.suggestions;
-  } catch {
+  } catch (err) {
+    // Log the actual failure so the silent return-[] doesn't hide
+    // real bugs (e.g. resolver broken, schema validation failing).
+    logger.warn({
+      layer: "ai",
+      event: "follow_ups.generate.failed",
+      summary: "follow-up generation failed; returning empty list",
+      error: err,
+      attrs: {
+        fallback_provider: args.fallbackProviderId ?? null,
+        fallback_model: args.fallbackModelId ?? null,
+      },
+    });
     return [];
   }
 }
