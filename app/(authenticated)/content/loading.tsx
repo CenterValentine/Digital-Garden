@@ -24,7 +24,7 @@ export default function NotesLoading() {
       <div className="flex flex-1 overflow-hidden">
         {/* Left Sidebar */}
         <div
-          className="flex h-full flex-col overflow-hidden border-r border-white/10"
+          className="flex h-full flex-col overflow-hidden border-r border-border"
           style={{
             width: `${leftWidth}px`,
             minWidth: `${leftWidth}px`,
@@ -33,11 +33,11 @@ export default function NotesLoading() {
           }}
         >
           {/* Header */}
-          <div className="flex h-12 shrink-0 items-center justify-between border-b border-white/10 px-4">
+          <div className="flex h-12 shrink-0 items-center justify-between border-b border-border px-4">
             <div className="flex items-center gap-2">
               {/* Folder icon */}
               <svg
-                className="h-4 w-4 text-gray-400"
+                className="h-4 w-4 text-muted-foreground"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -91,45 +91,17 @@ export default function NotesLoading() {
 
         {/* Main Content */}
         <div className="flex h-full flex-1 flex-col overflow-hidden">
-          {/* Tab bar */}
+          {/* Tab bar — neutral skeleton (no fake filename to avoid title flicker on hydrate) */}
           <div
-            className="flex shrink-0 items-center border-b border-white/10"
+            className="flex h-9 shrink-0 items-center border-b border-border"
             style={{
               background: glass1.background,
               backdropFilter: glass1.backdropFilter,
             }}
           >
-            <div className="flex items-center gap-1 border-r border-white/10 px-3 py-2 text-sm">
-              {/* FileText icon */}
-              <svg
-                className="h-4 w-4"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                />
-              </svg>
-              <span>Welcome.md</span>
-              <button className="ml-2 rounded p-0.5">
-                <svg
-                  className="h-3 w-3"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M6 18L18 6M6 6l12 12"
-                  />
-                </svg>
-              </button>
+            <div className="flex items-center gap-2 border-r border-border px-3 py-2">
+              <div className="h-4 w-4 animate-pulse rounded bg-muted" />
+              <div className="h-3 w-24 animate-pulse rounded bg-muted" />
             </div>
           </div>
 
@@ -139,7 +111,7 @@ export default function NotesLoading() {
 
         {/* Right Sidebar */}
         <div
-          className="flex h-full flex-col overflow-hidden border-l border-white/10"
+          className="flex h-full flex-col overflow-hidden border-l border-border"
           style={{
             width: `${rightWidth}px`,
             minWidth: `${rightWidth}px`,
@@ -148,7 +120,7 @@ export default function NotesLoading() {
           }}
         >
           {/* Header */}
-          <div className="flex h-12 shrink-0 items-center justify-between border-b border-white/10 px-4">
+          <div className="flex h-12 shrink-0 items-center justify-between border-b border-border px-4">
             <div className="flex items-center gap-2">
               <button className="rounded p-1">
                 {/* List icon */}
@@ -223,13 +195,13 @@ export default function NotesLoading() {
 
       {/* Status bar */}
       <div
-        className="h-6 border-t border-white/10 px-4 py-1 text-xs"
+        className="h-6 border-t border-border px-4 py-1 text-xs"
         style={{
           background: glass0.background,
           backdropFilter: glass0.backdropFilter,
         }}
       >
-        <div className="flex items-center justify-between text-gray-400">
+        <div className="flex items-center justify-between text-muted-foreground">
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-1">
               <svg
@@ -265,7 +237,7 @@ export default function NotesLoading() {
             </div>
           </div>
           <div className="flex items-center gap-4">
-            <div className="h-3 w-16 animate-pulse rounded bg-white/5" />
+            <div className="h-3 w-16 animate-pulse rounded bg-muted" />
             <div className="flex items-center gap-1">
               <svg
                 className="h-3 w-3"
