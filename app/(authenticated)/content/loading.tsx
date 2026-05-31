@@ -1,22 +1,26 @@
 /**
  * Notes Loading State
  *
- * Shows panel structure with skeletons while page loads.
- * Reads panel widths from localStorage to maintain layout consistency.
+ * Shows panel structure with skeletons while the route segment renders.
+ *
+ * Right-panel intentionally omitted: its default persisted state is
+ * `isCollapsed: true` (see state/right-panel-collapse-store.ts), so
+ * painting a fake 300px right sidebar here would visibly collapse
+ * on hydration. The main panel claims that space; if the user has the
+ * right panel expanded, it slides in once on hydration — a single
+ * one-directional appearance, not a double layout swap.
  */
 
 import { getSurfaceStyles } from "@/lib/design/system";
 import { FileTreeSkeleton } from "@/components/content/skeletons/FileTreeSkeleton";
-import { OutlineSkeleton } from "@/components/content/skeletons/OutlineSkeleton";
 import { EditorSkeleton } from "@/components/content/skeletons/EditorSkeleton";
 
 export default function NotesLoading() {
   const glass0 = getSurfaceStyles("glass-0");
   const glass1 = getSurfaceStyles("glass-1");
 
-  // Default widths (will be overridden by client-side hydration)
+  // Default left width — matches left-panel-collapse-store's "full" default.
   const leftWidth = 200;
-  const rightWidth = 300;
 
   return (
     <div className="flex h-screen flex-col overflow-hidden">
@@ -109,88 +113,7 @@ export default function NotesLoading() {
           <EditorSkeleton />
         </div>
 
-        {/* Right Sidebar */}
-        <div
-          className="flex h-full flex-col overflow-hidden border-l border-border"
-          style={{
-            width: `${rightWidth}px`,
-            minWidth: `${rightWidth}px`,
-            background: glass0.background,
-            backdropFilter: glass0.backdropFilter,
-          }}
-        >
-          {/* Header */}
-          <div className="flex h-12 shrink-0 items-center justify-between border-b border-border px-4">
-            <div className="flex items-center gap-2">
-              <button className="rounded p-1">
-                {/* List icon */}
-                <svg
-                  className="h-4 w-4"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M4 6h16M4 12h16M4 18h16"
-                  />
-                </svg>
-              </button>
-              <button className="rounded p-1">
-                {/* Link icon */}
-                <svg
-                  className="h-4 w-4"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"
-                  />
-                </svg>
-              </button>
-              <button className="rounded p-1">
-                {/* MessageSquare icon */}
-                <svg
-                  className="h-4 w-4"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
-                  />
-                </svg>
-              </button>
-            </div>
-            <button className="rounded p-1">
-              <svg
-                className="h-4 w-4"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M5 12h.01M12 12h.01M19 12h.01M6 12a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0z"
-                />
-              </svg>
-            </button>
-          </div>
-
-          {/* Skeleton */}
-          <OutlineSkeleton />
-        </div>
+        {/* Right sidebar intentionally omitted — see file-level comment. */}
       </div>
 
       {/* Status bar */}
