@@ -72,6 +72,34 @@ export function SidebarChatTabs({
   const overflow = tabs.slice(maxVisible);
   const [overflowOpen, setOverflowOpen] = useState(false);
 
+  // A11y: arrow-key nav across the visible tab strip. Left/Right move
+  // focus *and* activate (chat tabs are inexpensive to switch into);
+  // Home/End jump to the ends. The strip itself carries role="tablist"
+  // so screen readers announce position ("tab 3 of 5"). Per WAI-ARIA's
+  // tab pattern, only the active tab is in the tab order — others are
+  // tabIndex=-1 and focusable only via the arrow keys.
+  const handleStripKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (visible.length === 0) return;
+    const activeIdx = visible.findIndex((t) => t.conversationId === activeConversationId);
+    const move = (next: number) => {
+      const wrapped = ((next % visible.length) + visible.length) % visible.length;
+      onActivate(visible[wrapped].conversationId);
+    };
+    if (e.key === "ArrowRight") {
+      e.preventDefault();
+      move(activeIdx === -1 ? 0 : activeIdx + 1);
+    } else if (e.key === "ArrowLeft") {
+      e.preventDefault();
+      move(activeIdx === -1 ? visible.length - 1 : activeIdx - 1);
+    } else if (e.key === "Home") {
+      e.preventDefault();
+      move(0);
+    } else if (e.key === "End") {
+      e.preventDefault();
+      move(visible.length - 1);
+    }
+  };
+
   return (
     <div className="flex shrink-0 items-end border-b border-black/10 dark:border-white/10 px-2 pt-1.5 gap-2">
       {/* Scrollable tab list — fills available width, scrolls horizontally
@@ -83,6 +111,9 @@ export function SidebarChatTabs({
           wheel/trackpad gestures. */}
       <div
         className="scrollbar-hide flex items-end gap-px flex-1 min-w-0 overflow-x-auto overflow-y-hidden"
+        role="tablist"
+        aria-label="Conversations"
+        onKeyDown={handleStripKeyDown}
       >
         {visible.map((t) => (
           <TabButton
@@ -264,9 +295,15 @@ function TabButton({
   // text input; Enter/blur commits, Escape cancels.
   return (
     <div
+      role="tab"
+      aria-selected={active}
+      tabIndex={active ? 0 : -1}
+      aria-label={`Conversation: ${label}${active ? " (active)" : ""}`}
       className={cn(
         "group/tab relative inline-flex items-center gap-1 px-2.5 py-1.5",
         "rounded-t-md border border-b-0 text-[11px] transition-colors max-w-[180px] shrink-0",
+        // Visible keyboard-focus ring for SR/keyboard users.
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60",
         active
           ? "z-10"
           : "border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-300 hover:bg-white/[0.04]",
