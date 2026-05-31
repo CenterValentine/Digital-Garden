@@ -36,6 +36,15 @@ interface WorkspaceState {
   workspaces: ContentWorkspaceResponse[];
   activeWorkspaceId: string | null;
   isLoading: boolean;
+  /**
+   * True once loadWorkspaces has completed at least once (success or
+   * failure). Use this as a one-shot "store is ready" signal to gate
+   * downstream fetches whose URL depends on activeWorkspaceId — they
+   * would otherwise double-fetch (once for the initial null id, once
+   * after the store hydrates with the real id). Stays true for the
+   * rest of the session.
+   */
+  hasLoadedOnce: boolean;
   conflict: WorkspaceOpenConflict | null;
   pendingOpenIntent: PendingOpenIntent | null;
   loadWorkspaces: (initialWorkspaceId?: string | null) => Promise<void>;
@@ -428,6 +437,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   workspaces: [],
   activeWorkspaceId: null,
   isLoading: false,
+  hasLoadedOnce: false,
   conflict: null,
   pendingOpenIntent: null,
 
@@ -456,6 +466,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
         workspaces,
         activeWorkspaceId: activeWorkspace?.id ?? null,
         isLoading: false,
+        hasLoadedOnce: true,
       });
 
       warmContentSummaryCache(
@@ -472,7 +483,11 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       }
     } catch (error) {
       console.error("[Workspace Store] Failed to load workspaces:", error);
-      set({ isLoading: false });
+      // hasLoadedOnce flips even on failure — the gate is "did we
+      // attempt", not "did we succeed". Downstream fetches that need
+      // workspace context will run with whatever defaults the store
+      // settles on, rather than waiting forever.
+      set({ isLoading: false, hasLoadedOnce: true });
     }
   },
 

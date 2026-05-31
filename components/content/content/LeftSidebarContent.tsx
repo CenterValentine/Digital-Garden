@@ -247,7 +247,14 @@ export function LeftSidebarContent({
   // Search store - conditionally show search panel
   const isSearchOpen = useSearchStore((state) => state.isSearchOpen);
 
-  // Active workspace — used to scope the file tree when workspace is a view
+  // Active workspace — used to scope the file tree when workspace is a view.
+  // `workspaceStoreReady` gates the FIRST fetchTree fire so we don't
+  // burn a request on stale defaults (activeWorkspaceId=null,
+  // activeViewRootContentId=null) only to immediately re-fetch when
+  // the store hydrates from /api/content/workspaces. Pre-hydration the
+  // tree shows skeleton; post-hydration it fetches once with the right
+  // workspace context. Tracked via the store's hasLoadedOnce flag.
+  const workspaceStoreReady = useWorkspaceStore((state) => state.hasLoadedOnce);
   const activeWorkspaceId = useWorkspaceStore((state) => state.activeWorkspaceId);
   const activeWorkspaceIsView = useWorkspaceStore((state) => {
     const ws = state.workspaces.find((w) => w.id === state.activeWorkspaceId);
@@ -315,10 +322,15 @@ export function LeftSidebarContent({
     }
   }, [activeWorkspaceId, activeWorkspaceIsView, activeViewRootContentId, showReferencedContent]);
 
-  // Initial load and refresh when trigger or active workspace changes
+  // Initial load and refresh when trigger or active workspace changes.
+  // Gated on `workspaceStoreReady` so we don't double-fetch (once for
+  // the pre-hydration null workspace, once for the real one). The tree
+  // skeleton stays up while we wait for hydration, which is typically
+  // <500ms and overlaps with other in-flight requests.
   useEffect(() => {
+    if (!workspaceStoreReady) return;
     fetchTree();
-  }, [fetchTree, refreshTrigger]);
+  }, [fetchTree, refreshTrigger, workspaceStoreReady]);
 
   // Check if user has Google authentication
   useEffect(() => {
