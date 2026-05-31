@@ -514,11 +514,26 @@ When you generate an image, the user can insert it into the document at their cu
         sendReasoning: true,
         messageMetadata: ({ part }) => {
           if (part.type === "finish") {
+            // TEMP DIAGNOSTIC (A1-DEBUG): log totalUsage shape per turn
+            // so we can see whether the gateway-routed path is actually
+            // returning usage. Remove once Phase 2 is verified working.
+            logger.info({
+              layer: "ai",
+              event: "chat.message_metadata",
+              summary: `[A1-DEBUG] finish part usage`,
+              attrs: {
+                input_tokens: part.totalUsage?.inputTokens ?? null,
+                output_tokens: part.totalUsage?.outputTokens ?? null,
+                total_tokens: part.totalUsage?.totalTokens ?? null,
+                finish_reason: part.finishReason,
+                has_total_usage: part.totalUsage != null,
+              },
+            });
             return {
               usage: {
-                inputTokens: part.totalUsage.inputTokens,
-                outputTokens: part.totalUsage.outputTokens,
-                totalTokens: part.totalUsage.totalTokens,
+                inputTokens: part.totalUsage?.inputTokens,
+                outputTokens: part.totalUsage?.outputTokens,
+                totalTokens: part.totalUsage?.totalTokens,
               },
               finishReason: part.finishReason,
             };

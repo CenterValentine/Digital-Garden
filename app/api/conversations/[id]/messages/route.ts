@@ -95,6 +95,24 @@ export async function POST(request: NextRequest, context: RouteContext) {
           typeof body.parentId === "string" ? body.parentId : null,
       };
 
+      // TEMP DIAGNOSTIC (A1-DEBUG): log what the client sent so we can
+      // verify the chain. Remove once token capture is confirmed.
+      const dbgUsage = (input.metadata as { usage?: Record<string, unknown> } | null)?.usage;
+      logger.info({
+        layer: "ai",
+        event: "conversation.message.append",
+        summary: `[A1-DEBUG] persist ${input.role}`,
+        attrs: {
+          role: input.role,
+          provider: input.providerId ?? null,
+          model: input.modelId ?? null,
+          has_metadata: input.metadata != null,
+          has_usage: dbgUsage != null,
+          input_tokens: (dbgUsage as { inputTokens?: number } | undefined)?.inputTokens ?? null,
+          output_tokens: (dbgUsage as { outputTokens?: number } | undefined)?.outputTokens ?? null,
+        },
+      });
+
       const message = await appendMessage(
         session.user.id,
         conversationId,
