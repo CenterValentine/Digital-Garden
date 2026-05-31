@@ -224,17 +224,28 @@ export async function fetchUpstreamModels(
 }
 
 /**
- * Return image-gen model entries from `IMAGE_PROVIDER_CATALOG` whose
- * provider matches this Connection's adapter, normalized to the
- * `FetchedModel` shape with `image-generation` capability set.
+ * Return image-gen model entries from `IMAGE_PROVIDER_CATALOG` for
+ * this Connection's adapter, normalized to `FetchedModel` with
+ * `image-generation` capability set.
  *
- * Returns empty for adapters that don't have a corresponding image
- * provider in the catalog (xai, mistral, groq, openai-compat, etc.).
+ * Two patterns:
+ *
+ *   1. **Direct adapter** (openai, google, together, fireworks): the
+ *      Connection's models[] holds bare ids like `dall-e-3`. The chat
+ *      route's direct-match resolver routes by Connection.presetId.
+ *
+ *   2. **Gateway adapter** (vercel-gateway): the Connection's models[]
+ *      holds namespaced ids like `openai/dall-e-3`. The chat route's
+ *      namespaced-fallback resolver routes by the prefix. Vercel AI
+ *      Gateway proxies image generation for several labs, so we emit
+ *      the cartesian: every catalog provider's models, each prefixed
+ *      with the provider id.
+ *
+ * Returns empty for adapters with no image-gen surface (xai, mistral,
+ * groq, openai-compat, openrouter).
  */
 function catalogImageModelsFor(adapterKind: string): FetchedModel[] {
-  // adapter kind → image catalog provider id. They mostly line up
-  // 1:1; this map exists so we can adjust without re-keying the
-  // catalog.
+  // Direct: 1:1 mapping from adapter → image catalog provider id.
   const adapterToCatalog: Record<string, string> = {
     openai: "openai",
     google: "google",
@@ -242,14 +253,36 @@ function catalogImageModelsFor(adapterKind: string): FetchedModel[] {
     fireworks: "fireworks",
   };
   const catalogId = adapterToCatalog[adapterKind];
-  if (!catalogId) return [];
-  const provider = IMAGE_PROVIDER_CATALOG.find((p) => p.id === catalogId);
-  if (!provider) return [];
-  return provider.models.map((m) => ({
-    id: m.id,
-    name: m.name,
-    capabilities: ["image-generation"],
-  }));
+  if (catalogId) {
+    const provider = IMAGE_PROVIDER_CATALOG.find((p) => p.id === catalogId);
+    if (!provider) return [];
+    return provider.models.map((m) => ({
+      id: m.id,
+      name: m.name,
+      capabilities: ["image-generation"],
+    }));
+  }
+
+  // Gateway: emit namespaced entries for providers the gateway proxies.
+  // Vercel AI Gateway covers the full big-three labs; OpenRouter is
+  // chat-only and intentionally excluded.
+  if (adapterKind === "vercel-gateway") {
+    const gatewayProxiedProviders = new Set(["openai", "google"]);
+    const out: FetchedModel[] = [];
+    for (const provider of IMAGE_PROVIDER_CATALOG) {
+      if (!gatewayProxiedProviders.has(provider.id)) continue;
+      for (const m of provider.models) {
+        out.push({
+          id: `${provider.id}/${m.id}`,
+          name: m.name,
+          capabilities: ["image-generation"],
+        });
+      }
+    }
+    return out;
+  }
+
+  return [];
 }
 
 /** Parse OpenAI-shaped responses: `{ data: [...] }` or bare `[...]`. */
