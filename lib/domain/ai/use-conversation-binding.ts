@@ -263,6 +263,12 @@ export function useConversationBinding({
         partsToSave = pendingUserPartsRef.current;
         pendingUserPartsRef.current = null;
       }
+      // Forward UIMessage.metadata when present. The chat route's
+      // `messageMetadata` callback in toUIMessageStreamResponse populates
+      // `metadata.usage` (input/output/total tokens) + `finishReason` on
+      // the assistant message — the meter adapter reads those back for
+      // per-Connection $ figures.
+      const metadata = (m as { metadata?: Record<string, unknown> | undefined }).metadata;
       try {
         const res = await fetch(
           `/api/conversations/${encodeURIComponent(conversationId)}/messages`,
@@ -276,6 +282,7 @@ export function useConversationBinding({
               providerId: stamp.providerId,
               modelId: stamp.modelId,
               parts: partsToSave,
+              metadata: metadata ?? undefined,
             }),
           },
         );
