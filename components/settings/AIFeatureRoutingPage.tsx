@@ -19,7 +19,7 @@ import { Button } from "@/components/ui/glass/button";
 import { getSurfaceStyles } from "@/lib/design/system";
 import { ProviderIcon } from "@/components/content/ai/ProviderIcon";
 import { FEATURE_REGISTRY, type FeatureSpec, type CapabilityFlag } from "@/lib/domain/ai/features/registry";
-import { effectiveCapabilities } from "@/lib/domain/ai/features/router";
+import { effectiveCapabilities } from "@/lib/domain/ai/features/capabilities";
 import type { ConnectionView } from "@/lib/features/ai-connections/types";
 
 interface RouteEntry {
