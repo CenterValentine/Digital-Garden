@@ -301,7 +301,11 @@ export const ChatMessage = memo(function ChatMessage({
                 }
               }}
               rows={Math.min(8, Math.max(2, draft.split("\n").length))}
-              className="w-full resize-y rounded-xl border border-blue-500/30 bg-blue-600/10 px-3.5 py-2.5 text-sm leading-relaxed text-blue-100 outline-none focus:border-blue-400/50"
+              // Visually mirror the view-mode bubble (same bg/border)
+              // so the bubble appears to become editable in place
+              // rather than turning into a different-looking control.
+              // Focus-ring still distinguishes editing state.
+              className="w-full resize-y rounded-xl border border-blue-500/20 bg-blue-600/30 px-3.5 py-2.5 text-sm leading-relaxed text-blue-100 outline-none focus:border-blue-400/60 focus:ring-2 focus:ring-blue-400/30"
             />
             <div className="flex items-center justify-end gap-1.5">
               <button
