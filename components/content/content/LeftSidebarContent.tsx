@@ -24,6 +24,7 @@ import { useTreeStateStore } from "@/state/tree-state-store";
 import { useWorkspaceStore } from "@/extensions/workplaces/state/workspace-store";
 import { useContextMenuStore } from "@/state/context-menu-store";
 import { usePageTemplateStore } from "@/state/page-template-store";
+import { useFileTreeFilterStore } from "@/state/file-tree-filter-store";
 import type { TreeNode, ContentType } from "@/lib/domain/content/types";
 import { clientLogger } from "@/lib/core/logger/client";
 
@@ -37,6 +38,7 @@ interface TreeApiResponse {
       maxDepth: number;
       byType: Record<string, number>;
     };
+    hiddenReferencedCount?: number;
   };
   error?: {
     code: string;
@@ -54,6 +56,8 @@ interface LeftSidebarContentProps {
   onSelectionChange?: (hasMultipleSelections: boolean) => void;
   onFileDrop?: (files: File[]) => void;
   onAddPeopleTarget?: (parentId: string | null) => void;
+  /** Opens the AI image generation dialog targeting the given parent folder. */
+  onCreateAiImage?: (parentId: string | null) => void;
 }
 
 type CreateTarget = {
@@ -164,8 +168,17 @@ export function LeftSidebarContent({
   onSelectionChange,
   onFileDrop,
   onAddPeopleTarget,
+  onCreateAiImage,
 }: LeftSidebarContentProps) {
   const [treeData, setTreeData] = useState<TreeNode[] | null>(null);
+  // Referenced-content visibility + the hidden-count hint (Session 5b).
+  const showReferencedContent = useFileTreeFilterStore(
+    (s) => s.showReferencedContent,
+  );
+  const setShowReferencedContent = useFileTreeFilterStore(
+    (s) => s.setShowReferencedContent,
+  );
+  const [hiddenReferencedCount, setHiddenReferencedCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedCount, setSelectedCount] = useState(0);
@@ -259,6 +272,9 @@ export function LeftSidebarContent({
       if (activeWorkspaceIsView && activeViewRootContentId) {
         url.searchParams.set("viewRootContentId", activeViewRootContentId);
       }
+      if (showReferencedContent) {
+        url.searchParams.set("showReferencedContent", "true");
+      }
 
       const response = await fetch(url.toString(), {
         credentials: "include",
@@ -284,6 +300,7 @@ export function LeftSidebarContent({
       }
 
       setTreeData(result.data.tree);
+      setHiddenReferencedCount(result.data.hiddenReferencedCount ?? 0);
     } catch (err) {
       clientLogger.error({
         layer: "ui",
@@ -296,7 +313,7 @@ export function LeftSidebarContent({
     } finally {
       setIsLoading(false);
     }
-  }, [activeWorkspaceId, activeWorkspaceIsView, activeViewRootContentId]);
+  }, [activeWorkspaceId, activeWorkspaceIsView, activeViewRootContentId, showReferencedContent]);
 
   // Initial load and refresh when trigger or active workspace changes
   useEffect(() => {
@@ -2288,6 +2305,7 @@ export function LeftSidebarContent({
             onCreateVisualizationMermaid={handleCreateVisualizationMermaid}
             onCreateVisualizationExcalidraw={handleCreateVisualizationExcalidraw}
             onCreateVisualizationDiagramsNet={handleCreateVisualizationDiagramsNet}
+            onCreateAiImage={onCreateAiImage ? async (parentId) => onCreateAiImage(parentId) : undefined}
             onAddPeopleTarget={onAddPeopleTarget ? async (parentId) => onAddPeopleTarget(parentId) : undefined}
             height={Math.max(treeHeight - 36, 100)}
             editingNodeId={creatingItem?.tempId}
@@ -2296,6 +2314,24 @@ export function LeftSidebarContent({
             onFileDrop={onFileDrop}
           />
         </div>
+
+        {/* Referenced-content hint — surfaces when hidden referenced
+            content exists, so the user can reveal it (also toggleable via
+            the file-tree right-click menu). */}
+        {!showReferencedContent && hiddenReferencedCount > 0 && (
+          <button
+            type="button"
+            onClick={() => setShowReferencedContent(true)}
+            className="flex w-full items-center gap-1.5 border-t border-black/5 dark:border-white/5 px-3 py-1.5 text-[11px] text-gray-500 hover:text-gray-300 hover:bg-white/5 transition-colors"
+            title="Show referenced content (attachments, linked files)"
+          >
+            <span className="opacity-70">
+              {hiddenReferencedCount} referenced item
+              {hiddenReferencedCount === 1 ? "" : "s"} hidden
+            </span>
+            <span className="ml-auto font-medium">Show</span>
+          </button>
+        )}
 
         {/* Status bar */}
         {/* <LeftSidebarStatusBar

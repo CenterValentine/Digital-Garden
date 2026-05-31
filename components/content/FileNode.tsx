@@ -47,6 +47,7 @@ import {
 } from "lucide-react";
 import { useContextMenuStore } from "@/state/context-menu-store";
 import { useContentStore } from "@/state/content-store";
+import { useTreeDragStore } from "@/state/tree-drag-store";
 import { toast } from "sonner";
 import type { TreeNode } from "@/lib/domain/content/types";
 import { getDisplayExtension, splitFilenameForDisplay } from "@/lib/domain/content/file-extension-utils";
@@ -72,13 +73,20 @@ interface FileNodeProps extends NodeRendererProps<TreeNode> {
   onCreateVisualizationMermaid?: (parentId: string | null) => Promise<void>;
   onCreateVisualizationExcalidraw?: (parentId: string | null) => Promise<void>;
   onCreateVisualizationDiagramsNet?: (parentId: string | null) => Promise<void>;
+  /**
+   * Image generation via the AI image dialog. Opens a modal seeded with
+   * the given parentId — does not directly create a file (the dialog
+   * does that on submit), so this is wired alongside the visualization
+   * creators rather than the generic `onCreate(parentId, type)`.
+   */
+  onCreateAiImage?: (parentId: string | null) => Promise<void>;
   onAddPeopleTarget?: (parentId: string | null) => Promise<void>;
   editingValue?: string;
   onEditingValueChange?: (id: string, value: string) => void;
   onEditingValueClear?: (id: string) => void;
 }
 
-export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete, onDuplicate, onDownload, onChangeIcon, onSetFolderView, onToggleReferencedContent, onCreateVisualizationMermaid, onCreateVisualizationExcalidraw, onCreateVisualizationDiagramsNet, onAddPeopleTarget, editingValue, onEditingValueChange, onEditingValueClear }: FileNodeProps) {
+export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete, onDuplicate, onDownload, onChangeIcon, onSetFolderView, onToggleReferencedContent, onCreateVisualizationMermaid, onCreateVisualizationExcalidraw, onCreateVisualizationDiagramsNet, onCreateAiImage, onAddPeopleTarget, editingValue, onEditingValueChange, onEditingValueClear }: FileNodeProps) {
   const { data } = node;
   const isFolder = data.contentType === "folder";
   const isPeopleNode = data.treeNodeKind === "peopleGroup" || data.treeNodeKind === "person";
@@ -432,6 +440,9 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
         onCreateChat: onCreate && !isPeopleNode ? async (parentId: string | null) => {
           await onCreate(parentId, "chat");
         } : undefined,
+        onCreateAiImage: onCreateAiImage && !isPeopleNode ? async (parentId: string | null) => {
+          await onCreateAiImage(parentId);
+        } : undefined,
         onAddPeopleTarget: onAddPeopleTarget && !isPeopleNode ? async (parentId: string | null) => {
           await onAddPeopleTarget(parentId);
         } : undefined,
@@ -519,6 +530,18 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
       onClick={handleClick}
       onDoubleClick={handleDoubleClick}
       onContextMenu={handleContextMenu}
+      onDragStart={() => {
+        // Record the dragged node so out-of-tree drop targets (the chat
+        // composer) can attach it as context. People nodes are synthetic
+        // and have no content id, so skip them.
+        if (isPeopleNode) return;
+        useTreeDragStore.getState().setDraggingNode({
+          id: node.id,
+          title: data.title,
+          contentType: data.contentType,
+        });
+      }}
+      onDragEnd={() => useTreeDragStore.getState().setDraggingNode(null)}
       onPointerEnter={() => {
         // Best-effort prefetch — warms the server-side content cache so
         // the click that follows reads in <1ms. Skipped for synthetic

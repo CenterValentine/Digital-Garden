@@ -16,6 +16,10 @@ import { requireAuth } from "@/lib/infrastructure/auth/middleware";
 import { generateImage } from "@/lib/domain/ai/image/generate";
 import { getUserStorageProvider } from "@/lib/infrastructure/storage";
 import { generateUniqueSlug } from "@/lib/domain/content";
+import {
+  getConnectionWithKey,
+  listConnections,
+} from "@/lib/features/ai-connections";
 import { prisma } from "@/lib/database/client";
 import crypto from "crypto";
 import type { ImageProviderId, ImageModelId, ImageSize } from "@/lib/domain/ai/image/types";
@@ -41,6 +45,14 @@ export async function POST(request: NextRequest) {
       const quality = body.quality as "standard" | "hd" | undefined;
       const style = body.style as "natural" | "vivid" | undefined;
       const parentId: string | undefined = body.parentId;
+      // `role` controls visibility in the file tree.
+      //   "referenced" (default) — hidden behind the show-referenced
+      //     toggle. Right for chat-tool-generated images that are
+      //     auxiliary to a conversation.
+      //   "primary" — first-class user-created surface. Right for the
+      //     standalone "+ AI → Image Generation" flow.
+      const role: "primary" | "referenced" =
+        body.role === "primary" ? "primary" : "referenced";
 
       if (!prompt || !providerId || !modelId) {
         return NextResponse.json(
@@ -55,16 +67,26 @@ export async function POST(request: NextRequest) {
         );
       }
 
+      // ─── Resolve BYOK key via Connection ─────────────────────
+      // Match the requested image-gen provider against the user's
+      // Connections by presetId. First direct match wins. If no
+      // Connection covers this provider, generateImage falls through to
+      // the env-var fallback.
+      const apiKey = await resolveImageProviderKey(
+        session.user.id,
+        providerId,
+      );
+
       // ─── Generate Image ──────────────────────────────────────
       // Prompt is NOT logged in attrs — user-authored, may contain PII or
       // creative content they don't want telemetered. Only metadata about
       // the request appears in spans.
       const result = await withSpan(
         { layer: "ai", name: "generate_image" },
-        { attrs: { provider: providerId, model: modelId } },
+        { attrs: { provider: providerId, model: modelId, byok: apiKey ? "connection" : "env" } },
         async (span) => {
           const generated = await generateImage(
-            { prompt, providerId, modelId, size, quality, style },
+            { prompt, providerId, modelId, size, quality, style, apiKey },
             session.user.id
           );
           span
@@ -133,7 +155,7 @@ export async function POST(request: NextRequest) {
               slug,
               contentType: "file",
               parentId: parentId || null,
-              role: "referenced",
+              role,
               displayOrder: 0,
               filePayload: {
                 create: {
@@ -216,4 +238,33 @@ export async function POST(request: NextRequest) {
       );
     }
   });
+}
+
+/**
+ * Resolve a BYOK key for an image-gen provider from the user's
+ * Connections. We match by `presetId` only (image generation has no
+ * gateway routing concept like chat does) and skip Connections without
+ * a usable preset. Returns `undefined` so callers fall through to the
+ * env-var resolver in `generateImage`.
+ */
+async function resolveImageProviderKey(
+  userId: string,
+  providerId: ImageProviderId,
+): Promise<string | undefined> {
+  try {
+    const all = await listConnections(userId);
+    const match = all.find((c) => c.presetId === providerId);
+    if (!match) return undefined;
+    const withKey = await getConnectionWithKey(userId, match.id);
+    return withKey.apiKey;
+  } catch (err) {
+    logger.warn({
+      layer: "ai",
+      event: "image.byok_lookup_failed",
+      summary: "image BYOK lookup failed; falling back to env",
+      error: err,
+      attrs: { provider: providerId },
+    });
+    return undefined;
+  }
 }

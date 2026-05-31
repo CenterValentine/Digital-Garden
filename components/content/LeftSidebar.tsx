@@ -15,6 +15,8 @@ import { LeftSidebarCollapsed } from "./LeftSidebarCollapsed";
 import { LeftSidebarExtensions } from "./content/LeftSidebarExtensions";
 import { PeopleMountPickerDialog } from "./people/PeopleMountPickerDialog";
 import { FileUploadDialog } from "./dialogs/FileUploadDialog";
+import { AiImageGenDialog } from "./ai/AiImageGenDialog";
+import { useContentStore } from "@/state/content-store";
 import { PEOPLE_VIEW_KEY } from "@/extensions/people/manifest";
 import { useLeftPanelCollapseStore } from "@/state/left-panel-collapse-store";
 import { useLeftPanelViewStore } from "@/state/left-panel-view-store";
@@ -53,6 +55,9 @@ export function LeftSidebar() {
   const [fileUploadParentId, setFileUploadParentId] = useState<string | null>(null);
   const [draggedFiles, setDraggedFiles] = useState<File[] | null>(null);
   const [peopleMountParentId, setPeopleMountParentId] = useState<string | null | undefined>(undefined);
+  // AI image-gen dialog state — open from "+ AI → Image Generation".
+  const [aiImageDialogOpen, setAiImageDialogOpen] = useState(false);
+  const [aiImageDialogParentId, setAiImageDialogParentId] = useState<string | null>(null);
   const [hasGoogleAuth, setHasGoogleAuth] = useState(false);
 
   // Check if user has Google authentication
@@ -143,6 +148,14 @@ export function LeftSidebar() {
   // Chat creation — now active (Sprint 34)
   const handleCreateChat = useCallback(() => {
     setCreateTrigger({ type: "chat", timestamp: Date.now() });
+  }, []);
+
+  // AI image generation — opens the modal dialog. parentId stays
+  // `null` (root) when triggered from the header; the file-tree
+  // context-menu wiring passes a folder id explicitly.
+  const handleCreateAiImage = useCallback((parentId: string | null = null) => {
+    setAiImageDialogParentId(parentId);
+    setAiImageDialogOpen(true);
   }, []);
 
   const handleAddPeopleTarget = useCallback((parentId: string | null = null) => {
@@ -240,6 +253,7 @@ export function LeftSidebar() {
           onCreateVisualizationExcalidraw={activeView === PEOPLE_VIEW_KEY ? undefined : handleCreateVisualizationExcalidraw}
           onCreateVisualizationDiagramsNet={activeView === PEOPLE_VIEW_KEY ? undefined : handleCreateVisualizationDiagramsNet}
           onCreateChat={activeView === PEOPLE_VIEW_KEY ? undefined : handleCreateChat}
+          onCreateAiImage={activeView === PEOPLE_VIEW_KEY ? undefined : () => handleCreateAiImage(null)}
           onAddPeopleTarget={activeView === PEOPLE_VIEW_KEY ? handleCreatePeopleContact : () => handleAddPeopleTarget(null)}
           isCreateDisabled={activeView === PEOPLE_VIEW_KEY ? false : isCreateDisabled}
         />
@@ -252,6 +266,7 @@ export function LeftSidebar() {
             onSelectionChange={handleSelectionChange}
             onFileDrop={handleFileDrop}
             onAddPeopleTarget={handleAddPeopleTarget}
+            onCreateAiImage={handleCreateAiImage}
           />
         )}
 
@@ -267,6 +282,7 @@ export function LeftSidebar() {
             onSelectionChange={handleSelectionChange}
             onFileDrop={handleFileDrop}
             onAddPeopleTarget={handleAddPeopleTarget}
+            onCreateAiImage={handleCreateAiImage}
           />
         )}
       </div>
@@ -287,6 +303,19 @@ export function LeftSidebar() {
           parentId={peopleMountParentId}
           onClose={() => setPeopleMountParentId(undefined)}
           onMounted={() => setRefreshTrigger((prev) => prev + 1)}
+        />,
+        document.body
+      )}
+
+      {/* AI image-gen dialog — opened from "+ AI → Image Generation". */}
+      {aiImageDialogOpen && typeof document !== "undefined" && createPortal(
+        <AiImageGenDialog
+          parentId={aiImageDialogParentId}
+          onClose={() => setAiImageDialogOpen(false)}
+          onCreated={(contentId) => {
+            setRefreshTrigger((prev) => prev + 1);
+            useContentStore.getState().setSelectedContentId(contentId);
+          }}
         />,
         document.body
       )}

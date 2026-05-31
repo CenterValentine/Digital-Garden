@@ -22,7 +22,6 @@ import type {
   ImageProviderId,
   ImageSize,
 } from "./types";
-import { getProviderKey } from "@/lib/domain/ai/keys";
 
 // ─── Size Helpers ──────────────────────────────────────────────
 
@@ -37,9 +36,10 @@ function parseDimensions(size: ImageSize): { width: number; height: number } {
  * Generate an image using the specified provider and model.
  *
  * Resolves API keys in priority order:
- *   1. Explicit apiKey in request
- *   2. Stored BYOK key for the provider
- *   3. Environment variable fallback
+ *   1. Explicit `apiKey` in request — callers (e.g. the image route)
+ *      pass the user's BYOK Connection key here.
+ *   2. Environment variable fallback — used when no Connection covers
+ *      this provider yet.
  *
  * @throws Error if API key is missing or generation fails
  */
@@ -47,16 +47,14 @@ export async function generateImage(
   request: ImageGenRequest,
   userId: string
 ): Promise<ImageGenResult> {
-  // Resolve API key
-  const apiKey =
-    request.apiKey ??
-    (await getProviderKey(userId, request.providerId)) ??
-    getEnvKey(request.providerId);
+  // userId reserved for the planned Connections-based key lookup.
+  void userId;
+  const apiKey = request.apiKey ?? getEnvKey(request.providerId);
 
   if (!apiKey) {
     throw new Error(
       `No API key configured for image provider "${request.providerId}". ` +
-        `Add one in Settings → AI → API Keys.`
+        `Set the matching environment variable or pass an apiKey in the request.`
     );
   }
 

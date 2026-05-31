@@ -5,135 +5,143 @@
  * the user switches to a different content node.
  * "Save conversation" creates a persistent chat ContentNode.
  *
- * Uses AI SDK v6 `useChat()` for streaming transport.
- * v6 API: sendMessage({ text }) replaces the old input/setInput/handleSubmit pattern.
+ * Engine boilerplate (useChat setup, mention search, command items,
+ * input state, auto-scroll) lives in `useConversationEngine`. This file
+ * owns sidebar-specific concerns: AI editor orchestration, tool-result
+ * interception for edit payloads, content-switch reset, save-to-node.
  */
 
 "use client";
 
-import { useState, useRef, useEffect, useCallback, useMemo } from "react";
-import { useChat } from "@ai-sdk/react";
-import { DefaultChatTransport } from "ai";
-import { Save, Trash2, AlertCircle, Bot, Pencil } from "lucide-react";
+import { useRef, useEffect, useCallback, useState, useMemo } from "react";
+import { Trash2, Bot, Pencil, Maximize2 } from "lucide-react";
+import { PROVIDER_CATALOG } from "@/lib/domain/ai/providers/catalog";
+import { getProviderTheme } from "@/lib/design/system/ai-providers";
+import { ProviderIcon } from "./ProviderIcon";
 import { toast } from "sonner";
-import { useContentStore } from "@/state/content-store";
 import { useEditorInstanceStore } from "@/state/editor-instance-store";
 import { AiEditOrchestrator, parseEditPayload } from "@/lib/domain/editor/ai";
 import { ChatMessage } from "./ChatMessage";
 import { ChatInput } from "./ChatInput";
-import { ModelPicker, useModelSelection } from "./ModelPicker";
-import { BASE_TOOL_METADATA, BASE_TOOL_IDS } from "@/lib/domain/ai/tools/metadata";
-import type { SuggestionItem } from "./ChatSuggestionMenu";
-
-/** Extract plain text from a UIMessage's parts array */
-function getMessageText(message: { parts: Array<{ type: string; text?: string }> }): string {
-  return message.parts
-    .filter((p): p is { type: "text"; text: string } => p.type === "text" && !!p.text)
-    .map((p) => p.text)
-    .join(" ")
-    .trim();
-}
+import { FollowUpsStrip } from "./FollowUpsStrip";
+import { ChatErrorBanner } from "./ChatErrorBanner";
+import { MakeAndModelPicker } from "./MakeAndModelPicker";
+import { useConversationEngine } from "@/lib/domain/ai/use-conversation-engine";
+import { useConversationBinding } from "@/lib/domain/ai/use-conversation-binding";
+import { useContentStore } from "@/state/content-store";
+import { detectMixedProvider } from "@/lib/design/system/ai-providers";
+import type { AIProviderId } from "@/lib/domain/ai/types";
+import type { UIMessage } from "ai";
 
 interface ChatPanelProps {
   contentId?: string | null;
+  /**
+   * When set, the panel is bound to this Conversation entity:
+   *   - Messages load from `/api/conversations/[id]` on mount
+   *   - New turns persist to `/api/conversations/[id]/messages` via onFinish
+   *   - The conversationId is forwarded to the chat route in the body
+   *     so the mention interceptor can write auto-associations
+   *
+   * Without it, the panel is transient (existing behavior).
+   */
+  conversationId?: string | null;
+  /**
+   * Called when the user confirms deletion of the bound conversation.
+   * The parent (`MultiConversationSidebar`) issues the DELETE API call
+   * and refreshes its tab list. Without this prop, the trash button
+   * just clears the local message view (transient-mode semantics).
+   */
+  onDeleteConversation?: (conversationId: string) => Promise<void> | void;
+  /**
+   * Called after a successful auto-title generation so the parent can
+   * refresh its tab list (the tab label reflects the new title).
+   */
+  onTitleChanged?: (conversationId: string) => void;
+  /**
+   * Called after a branch/fork creates a new conversation, so the parent
+   * (`MultiConversationSidebar`) can refresh its tabs and activate it.
+   */
+  onForked?: (newConversationId: string) => void;
 }
 
-export function ChatPanel({ contentId }: ChatPanelProps) {
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const [input, setInput] = useState("");
+export function ChatPanel({
+  contentId,
+  conversationId,
+  onDeleteConversation,
+  onTitleChanged,
+  onForked,
+}: ChatPanelProps) {
+  // Distinct useChat key per conversation so message arrays don't bleed
+  // across tabs. Falls back to contentId for transient mode.
+  const conversationKey = conversationId
+    ? `sidebar-chat:conv:${conversationId}`
+    : contentId
+    ? `sidebar-chat:${contentId}`
+    : "sidebar-chat";
 
-  // Model selection — defaults from user settings, overridable per-session
-  const { providerId, modelId, handleChange: handleModelChange } = useModelSelection();
-  const providerIdRef = useRef(providerId);
-  providerIdRef.current = providerId;
-  const modelIdRef = useRef(modelId);
-  modelIdRef.current = modelId;
-
-  // Keep refs for the memoized transport closure
-  const contentIdRef = useRef(contentId);
-  contentIdRef.current = contentId;
-  const mentionedIdsRef = useRef<string[]>([]);
-
-  const transport = useMemo(
-    () =>
-      new DefaultChatTransport({
-        api: "/api/ai/chat",
-        body: () => ({
-          contentId: contentIdRef.current,
-          providerId: providerIdRef.current,
-          modelId: modelIdRef.current,
-          mentionedContentIds: mentionedIdsRef.current,
-        }),
-      }),
-    []
+  // Persist-on-finish for conversation-bound mode (ChatViewer-pattern).
+  const persistRef = useRef<() => void>(() => {});
+  // Edit/regenerate supersession — populated by the binding hook.
+  const truncateRef = useRef<(clientId: string, inclusive: boolean) => Promise<void>>(
+    async () => {},
   );
-
-  // ─── @ Mention search ───
-  const [mentionResults, setMentionResults] = useState<SuggestionItem[]>([]);
-  const mentionTimerRef = useRef<ReturnType<typeof setTimeout>>(null);
-
-  const handleMentionSearch = useCallback((query: string) => {
-    if (mentionTimerRef.current) clearTimeout(mentionTimerRef.current);
-    mentionTimerRef.current = setTimeout(async () => {
-      try {
-        const res = await fetch(
-          `/api/content/content?search=${encodeURIComponent(query)}&limit=8`,
-          { credentials: "include" }
-        );
-        if (!res.ok) return;
-        const data = await res.json();
-        const items: SuggestionItem[] = (data.data?.items || []).map(
-          (item: { id: string; title: string; contentType: string }) => ({
-            id: item.id,
-            label: item.title,
-            contentType: item.contentType,
-            description: item.contentType,
-          })
-        );
-        setMentionResults(items);
-      } catch {
-        /* silently fail */
-      }
-    }, 150);
-  }, []);
-
-  // Cleanup mention timer
-  useEffect(() => {
-    return () => {
-      if (mentionTimerRef.current) clearTimeout(mentionTimerRef.current);
-    };
-  }, []);
-
-  // ─── / Command items (static) ───
-  const commandItems = useMemo<SuggestionItem[]>(() => {
-    const promptHints: Record<string, string> = {
-      searchNotes: "Search my notes for ",
-      getCurrentNote: "Read the current note",
-      createNote: "Create a new note titled ",
-    };
-    return BASE_TOOL_IDS.map((id) => ({
-      id,
-      label: BASE_TOOL_METADATA[id].name,
-      description: BASE_TOOL_METADATA[id].description,
-      insertText: promptHints[id] ?? BASE_TOOL_METADATA[id].name,
-    }));
-  }, []);
+  // Exact parts of the just-sent user turn (engine → binding) so
+  // attachments persist reliably.
+  const pendingUserPartsRef = useRef<UIMessage["parts"] | null>(null);
 
   const {
     messages,
-    sendMessage,
     status,
     stop,
     error,
     setMessages,
-  } = useChat({
-    transport,
-    id: contentId ? `sidebar-chat:${contentId}` : "sidebar-chat",
-    // Batch UI updates every 100ms for smooth, readable streaming
-    experimental_throttle: 100,
-    onError: (err) => {
-      toast.error(err.message || "Chat request failed");
-    },
+    isActive,
+    input,
+    setInput,
+    handleSend,
+    attachments,
+    addAttachmentFiles,
+    removeAttachment,
+    attachmentsUploading,
+    supportsImageAttachments,
+    editMessage,
+    regenerateMessage,
+    providerId,
+    modelId,
+    handleModelChange,
+    mentionResults,
+    handleMentionSearch,
+    commandItems,
+    followUps,
+    clearFollowUps,
+    scrollRef,
+    getMessageStamp,
+    seedMessageStamps,
+  } = useConversationEngine({
+    conversationKey,
+    contentId,
+    conversationId,
+    onFinish: conversationId ? () => persistRef.current() : undefined,
+    truncateRef,
+    pendingUserPartsRef,
+  });
+
+  // ─── Conversation binding (load + persist + auto-title + provider
+  // memory) — shared with the full-page ChatViewer via this hook so both
+  // surfaces operate on the SAME Conversation store. `persistRef` is the
+  // ref the engine's onFinish closes over; the hook populates it.
+  const { loadingInitial } = useConversationBinding({
+    conversationId: conversationId ?? null,
+    messages,
+    setMessages: setMessages as (messages: unknown) => void,
+    getMessageStamp,
+    seedMessageStamps,
+    providerId,
+    modelId,
+    persistRef,
+    truncateRef,
+    pendingUserPartsRef,
+    onTitleChanged,
   });
 
   // ─── AI Edit Orchestrator ───
@@ -142,6 +150,10 @@ export function ChatPanel({ contentId }: ChatPanelProps) {
   );
 
   const orchestratorRef = useRef<AiEditOrchestrator | null>(null);
+  const contentIdRef = useRef(contentId);
+  useEffect(() => {
+    contentIdRef.current = contentId;
+  }, [contentId]);
 
   // Create orchestrator on mount, destroy on unmount
   useEffect(() => {
@@ -220,156 +232,81 @@ export function ChatPanel({ contentId }: ChatPanelProps) {
       setMessages([]);
       setInput("");
     }
-  }, [contentId, setMessages]);
+  }, [contentId, setMessages, setInput]);
 
-  // Auto-scroll to bottom on new messages
-  useEffect(() => {
-    const el = scrollRef.current;
-    if (el) {
-      el.scrollTop = el.scrollHeight;
-    }
-  }, [messages]);
-
-  // Track mentions inserted via @ suggestion (ChatInput shows clean @Title)
-  const trackedMentionsRef = useRef<Array<{ id: string; label: string }>>([]);
-
-  const handleMentionInserted = useCallback((item: SuggestionItem) => {
-    trackedMentionsRef.current.push({ id: item.id, label: item.label });
-  }, []);
-
-  // Send message — reconstructs @[Title](id) tokens from tracked mentions
-  const handleSend = useCallback(() => {
-    let text = input.trim();
-    if (!text) return;
-
-    // Reconstruct full mention tokens so ChatMessage can render pills
-    const ids: string[] = [];
-    for (const mention of trackedMentionsRef.current) {
-      const clean = `@${mention.label}`;
-      if (text.includes(clean)) {
-        text = text.replace(clean, `@[${mention.label}](${mention.id})`);
-        ids.push(mention.id);
-      }
-    }
-    mentionedIdsRef.current = ids;
-    trackedMentionsRef.current = [];
-
-    setInput("");
-    sendMessage({ text });
-  }, [input, sendMessage]);
-
-  // Save conversation — creates a chat ContentNode
-  const handleSaveConversation = useCallback(async () => {
-    if (messages.length === 0) {
-      toast.error("No messages to save");
+  // Trash button semantics:
+  //   - Transient mode (no conversationId): clear local messages
+  //   - Conversation-bound: delete the Conversation entirely and let
+  //     the parent (MultiConversationSidebar) refresh its tab list
+  const handleClearOrDelete = useCallback(async () => {
+    if (conversationId && onDeleteConversation) {
+      await onDeleteConversation(conversationId);
       return;
     }
-
-    try {
-      // Derive title from first user message
-      const firstUserMsg = messages.find((m) => m.role === "user");
-      const rawText = firstUserMsg ? getMessageText(firstUserMsg) : "";
-      const titleBase = rawText || "Chat conversation";
-      const title =
-        titleBase.length > 50 ? titleBase.slice(0, 50) + "..." : titleBase;
-      const dateSuffix = new Date().toLocaleDateString("en-US", {
-        month: "short",
-        day: "numeric",
-      });
-      const fullTitle = `${title} — ${dateSuffix}`;
-
-      // Convert UIMessages to StoredChatMessage format
-      const storedMessages = messages
-        .filter((m) => m.role === "user" || m.role === "assistant")
-        .map((m) => {
-          // Preserve image payloads so they survive when saved to a chat node
-          const imagePayloads: unknown[] = [];
-          for (const part of m.parts) {
-            // AI SDK v6: static tool parts have type "tool-{name}" (no toolName prop).
-            // Check for toolCallId (present on both static and dynamic parts).
-            const p = part as Record<string, unknown>;
-            if (
-              "toolCallId" in p &&
-              (p.state as string) === "output-available" &&
-              "output" in p
-            ) {
-              const output = p.output;
-              const str = typeof output === "string" ? output : JSON.stringify(output);
-              if (str.includes('"__imagePayload"')) {
-                try {
-                  const parsed = typeof output === "string" ? JSON.parse(output) : output;
-                  if (parsed?.__imagePayload) imagePayloads.push(parsed);
-                } catch { /* skip */ }
-              }
-            }
-          }
-
-          return {
-            id: m.id,
-            role: m.role,
-            content: getMessageText(m),
-            createdAt: new Date().toISOString(),
-            ...(imagePayloads.length > 0 ? { parts: imagePayloads } : {}),
-          };
-        })
-        .filter((m) => m.content || (m.parts && (m.parts as unknown[]).length > 0)); // Keep messages with content or image payloads
-
-      const res = await fetch("/api/content/content", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: fullTitle,
-          contentType: "chat",
-          chatMessages: storedMessages,
-          chatMetadata: {
-            providerId,
-            modelId,
-            savedFrom: "sidebar",
-            savedAt: new Date().toISOString(),
-            messageCount: storedMessages.length,
-          },
-          parentId: null,
-        }),
-      });
-
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error?.message || "Failed to save conversation");
-      }
-
-      const data = await res.json();
-
-      // Refresh the file tree so the new chat node appears
-      window.dispatchEvent(new CustomEvent("dg:tree-refresh"));
-
-      toast.success("Conversation saved", {
-        description: `Created "${title}"`,
-        action: {
-          label: "Open",
-          onClick: () => {
-            useContentStore.getState().setSelectedContentId(data.data.id, {
-              title: data.data.title,
-              contentType: "chat",
-              pin: true,
-            });
-          },
-        },
-      });
-    } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : "Failed to save conversation"
-      );
-    }
-  }, [messages, providerId, modelId]);
-
-  // Clear chat
-  const handleClear = useCallback(() => {
     setMessages([]);
-  }, [setMessages]);
+  }, [conversationId, onDeleteConversation, setMessages]);
+
+  // Branch: fork the conversation up to a message, then let the parent
+  // activate the new tab.
+  const handleBranch = useCallback(
+    async (messageId: string) => {
+      if (!conversationId) return;
+      try {
+        const res = await fetch(
+          `/api/conversations/${encodeURIComponent(conversationId)}/fork`,
+          {
+            method: "POST",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ uptoMessageId: messageId }),
+          },
+        );
+        if (!res.ok) throw new Error("Branch failed");
+        const body = await res.json();
+        const newId: string | undefined = body?.data?.conversationId;
+        if (newId) {
+          toast.success("Branched into a new chat");
+          onForked?.(newId);
+        }
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "Branch failed");
+      }
+    },
+    [conversationId, onForked],
+  );
+
+  // Open this chat in the full-page viewer: ensure a backing content node
+  // exists, then soft-navigate to it.
+  const handleOpenInPage = useCallback(async () => {
+    if (!conversationId) return;
+    try {
+      const res = await fetch(
+        `/api/conversations/${encodeURIComponent(conversationId)}/open-in-page`,
+        { method: "POST", credentials: "include" },
+      );
+      if (!res.ok) throw new Error("Could not open in full view");
+      const body = await res.json();
+      const nodeId: string | undefined = body?.data?.contentNodeId;
+      if (nodeId) {
+        useContentStore.getState().setSelectedContentId(nodeId);
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not open in full view");
+    }
+  }, [conversationId]);
 
   const hasMessages = messages.length > 0;
-  const isActive = status === "streaming" || status === "submitted";
 
+  // Surface follows the *active* provider — selecting OpenAI tints
+  // immediately even if previous messages were from Claude. Per-message
+  // stamps drive bubble identity; the Mixed chip surfaces actual
+  // conversation contributors. This split keeps the picker reactive.
+  const mixed = detectMixedProvider(
+    messages.map((m) => ({
+      role: m.role,
+      providerId: getMessageStamp(m.id, { providerId, modelId }).providerId,
+    })),
+  );
   if (!contentId) {
     return (
       <div className="flex h-full items-center justify-center p-4 text-center">
@@ -380,43 +317,41 @@ export function ChatPanel({ contentId }: ChatPanelProps) {
     );
   }
 
+  // The provider surface gradient lives on the MultiConversationSidebar
+  // wrapper (so the tab strip and chat content share one painted
+  // surface). This root paints transparent and inherits the wrapper's bg.
   return (
     <div className="flex h-full flex-col">
-      {/* Header */}
+      {/* Header — shows active provider/model. Save button removed:
+          chats auto-save to the bound Conversation. Delete is protected
+          by a two-step confirm. */}
       <div className="flex shrink-0 items-center justify-between border-b border-black/10 dark:border-white/10 px-3 py-2">
-        <div className="flex items-center gap-2 text-sm text-gray-300">
-          <Bot className="h-4 w-4 text-green-400" />
-          <span className="font-medium">AI Chat</span>
-        </div>
+        <HeaderTitle providerId={providerId} modelId={modelId} />
         <div className="flex items-center gap-1">
+          {conversationId && (
+            <button
+              onClick={() => void handleOpenInPage()}
+              title="Open in full view"
+              className="rounded p-1.5 text-gray-600 dark:text-gray-400 hover:bg-black/[0.05] dark:hover:bg-white/10 hover:text-gray-200 transition-colors"
+            >
+              <Maximize2 className="h-3.5 w-3.5" />
+            </button>
+          )}
           {hasMessages && (
             <>
-              <button
-                onClick={handleSaveConversation}
-                title="Save conversation"
-                className="rounded p-1.5 text-gray-600 dark:text-gray-400 hover:bg-black/[0.05] dark:hover:bg-white/10 hover:text-gray-900 dark:hover:text-white transition-colors"
-              >
-                <Save className="h-3.5 w-3.5" />
-              </button>
-              <button
-                onClick={handleClear}
-                title="Clear chat"
-                className="rounded p-1.5 text-gray-600 dark:text-gray-400 hover:bg-black/[0.05] dark:hover:bg-white/10 hover:text-red-400 transition-colors"
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-              </button>
+              <DeleteWithConfirm
+                onConfirm={() => void handleClearOrDelete()}
+                destructive={Boolean(conversationId && onDeleteConversation)}
+              />
             </>
           )}
         </div>
       </div>
 
-      {/* Error banner */}
-      {error && (
-        <div className="mx-3 mt-2 flex items-center gap-2 rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs text-red-300">
-          <AlertCircle className="h-3.5 w-3.5 shrink-0" />
-          <span className="truncate">{error.message}</span>
-        </div>
-      )}
+      {/* Error banner — parses the structured chat-route error JSON
+          (raw blob otherwise; AI SDK passes the body through verbatim)
+          and surfaces a CTA when the cause is missing BYOK setup. */}
+      {error && <ChatErrorBanner message={error.message} />}
 
       {/* AI editing indicator */}
       {isAiEditing && (
@@ -426,49 +361,191 @@ export function ChatPanel({ contentId }: ChatPanelProps) {
         </div>
       )}
 
-      {/* Messages */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto">
-        {hasMessages ? (
+      {/* Messages — loading state takes precedence so the user can't
+          accidentally type into a fresh useChat session that's about to
+          be overwritten by the historical load. */}
+      <div ref={scrollRef} className="scrollbar-hide flex-1 overflow-y-auto">
+        {loadingInitial ? (
+          <LoadingMessages />
+        ) : hasMessages ? (
           <div className="space-y-1 py-2">
-            {messages.map((message, i) => (
-              <ChatMessage
-                key={message.id}
-                message={message}
-                isStreaming={
-                  isActive &&
-                  i === messages.length - 1 &&
-                  message.role === "assistant"
-                }
-              />
-            ))}
+            {messages.map((message, i) => {
+              const stamp = getMessageStamp(message.id, { providerId, modelId });
+              return (
+                <ChatMessage
+                  key={message.id}
+                  message={message}
+                  providerId={stamp.providerId}
+                  modelId={stamp.modelId}
+                  isStreaming={
+                    isActive &&
+                    i === messages.length - 1 &&
+                    message.role === "assistant"
+                  }
+                  onEdit={(id, text) => void editMessage(id, text)}
+                  onRegenerate={(id) => void regenerateMessage(id)}
+                  onBranch={(id) => void handleBranch(id)}
+                  actionsDisabled={isActive}
+                />
+              );
+            })}
           </div>
         ) : (
           <EmptyState />
         )}
       </div>
 
-      {/* Input */}
+      {/* Suggested follow-ups (Session 7) — appears between the
+          messages list and the composer when the engine returns
+          chips for the latest assistant turn. */}
+      <FollowUpsStrip
+        followUps={followUps}
+        onPick={(text) => setInput(text)}
+        onDismiss={clearFollowUps}
+      />
+
+      {/* Input — make/model picker lives inside the input frame footer.
+          Disabled while initial messages are loading so typed input
+          can't be overwritten by setMessages mid-stream. */}
       <ChatInput
         value={input}
         onChange={setInput}
         onSubmit={handleSend}
         onStop={stop}
         status={status}
+        disabled={loadingInitial}
         onMentionSearch={handleMentionSearch}
         mentionResults={mentionResults}
         commandItems={commandItems}
-        onMentionInserted={handleMentionInserted}
+        attachments={attachments}
+        onAddFiles={addAttachmentFiles}
+        onRemoveAttachment={removeAttachment}
+        attachmentsUploading={attachmentsUploading}
+        supportsImages={supportsImageAttachments}
+        footerLeading={
+          <MakeAndModelPicker
+            providerId={providerId}
+            modelId={modelId}
+            onChange={handleModelChange}
+            disabled={isActive}
+            contributors={mixed.contributors as AIProviderId[]}
+          />
+        }
       />
+    </div>
+  );
+}
 
-      {/* Model picker — compact, below input */}
-      <div className="border-t border-white/5">
-        <ModelPicker
-          providerId={providerId}
-          modelId={modelId}
-          onChange={handleModelChange}
-          disabled={isActive}
-        />
+/**
+ * Header title — shows the active provider's brand icon + the model
+ * display name. Replaces the generic "AI Chat" so users see which model
+ * is answering them, à la ChatGPT/Claude.
+ */
+function HeaderTitle({
+  providerId,
+  modelId,
+}: {
+  providerId: string;
+  modelId: string;
+}) {
+  const theme = getProviderTheme(providerId);
+  const provider = useMemo(
+    () => PROVIDER_CATALOG.find((p) => p.id === providerId),
+    [providerId],
+  );
+  const modelName = useMemo(
+    () => provider?.models.find((m) => m.id === modelId)?.name ?? modelId,
+    [provider, modelId],
+  );
+  return (
+    <div className="flex items-center gap-2 text-sm text-gray-300 min-w-0">
+      <span
+        className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full"
+        style={{
+          background: theme.bubbleTint,
+          color: theme.brandColor,
+        }}
+      >
+        <ProviderIcon providerId={providerId} className="h-3 w-3" />
+      </span>
+      <span className="font-medium truncate" style={{ color: theme.brandColor }}>
+        {modelName}
+      </span>
+    </div>
+  );
+}
+
+/**
+ * Two-step delete: first click arms the action and shows an
+ * "Are you sure?" confirm button; second click clears messages. A
+ * 3-second timeout auto-disarms so the user doesn't end up with a
+ * permanently-armed dangerous button.
+ */
+function DeleteWithConfirm({
+  onConfirm,
+  destructive,
+}: {
+  onConfirm: () => void;
+  /**
+   * When true, the confirm pill says "Delete chat" — the action will
+   * remove the Conversation entirely. When false, it says "Clear" —
+   * the action only resets the local message view.
+   */
+  destructive: boolean;
+}) {
+  const [armed, setArmed] = useState(false);
+  useEffect(() => {
+    if (!armed) return;
+    const t = setTimeout(() => setArmed(false), 3000);
+    return () => clearTimeout(t);
+  }, [armed]);
+  if (!armed) {
+    return (
+      <button
+        onClick={() => setArmed(true)}
+        title={destructive ? "Delete chat" : "Clear chat"}
+        className="rounded p-1.5 text-gray-600 dark:text-gray-400 hover:bg-black/[0.05] dark:hover:bg-white/10 hover:text-red-400 transition-colors"
+      >
+        <Trash2 className="h-3.5 w-3.5" />
+      </button>
+    );
+  }
+  return (
+    <button
+      onClick={() => {
+        setArmed(false);
+        onConfirm();
+      }}
+      title={
+        destructive
+          ? "Confirm delete (click again, auto-cancels in 3s)"
+          : "Confirm clear (click again, auto-cancels in 3s)"
+      }
+      className="inline-flex items-center gap-1 rounded px-1.5 py-1 text-[10px] font-medium bg-red-500/20 text-red-300 border border-red-500/30 hover:bg-red-500/30 transition-colors"
+    >
+      <Trash2 className="h-3 w-3" />
+      {destructive ? "Delete" : "Confirm"}
+    </button>
+  );
+}
+
+/**
+ * Skeleton placeholder shown while initial chat history is loading
+ * from the API. Two-bubble pattern (user-tinted right, assistant-tinted
+ * left) approximates what the real messages will look like, so the
+ * panel doesn't "pop" when content arrives.
+ */
+function LoadingMessages() {
+  return (
+    <div className="flex h-full flex-col items-center justify-center gap-3 px-4">
+      <div className="flex w-full max-w-[280px] flex-col gap-2 opacity-50 animate-pulse">
+        <div className="ml-auto h-7 w-2/3 rounded-xl bg-blue-500/20" />
+        <div className="h-8 w-3/4 rounded-xl bg-white/10" />
+        <div className="ml-auto h-7 w-1/2 rounded-xl bg-blue-500/20" />
       </div>
+      <p className="text-[10px] uppercase tracking-wider text-gray-500">
+        Loading chat…
+      </p>
     </div>
   );
 }

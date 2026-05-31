@@ -52,6 +52,7 @@ import {
   type WorkspacePaneId,
 } from "@/state/content-store";
 import { usePageTemplateStore } from "@/state/page-template-store";
+import { useFileTreeFilterStore } from "@/state/file-tree-filter-store";
 
 /**
  * Context passed to file tree action provider
@@ -103,6 +104,7 @@ export interface FileTreeContext {
   /** Phase 2: New content type creators */
   onCreateExternal?: (parentId: string | null) => Promise<void>;
   onCreateChat?: (parentId: string | null) => Promise<void>;
+  onCreateAiImage?: (parentId: string | null) => Promise<void>;
   onAddPeopleTarget?: (parentId: string | null) => Promise<void>;
   /** Visualization engine-specific creators */
   onCreateVisualizationMermaid?: (parentId: string | null) => Promise<void>;
@@ -153,6 +155,7 @@ export const fileTreeActionProvider: ContextMenuActionProvider = (ctx) => {
     onCreateSpreadsheet,
     onCreateExternal,
     onCreateChat,
+    onCreateAiImage,
     onAddPeopleTarget,
     onCreateVisualizationMermaid,
     onCreateVisualizationExcalidraw,
@@ -202,6 +205,7 @@ export const fileTreeActionProvider: ContextMenuActionProvider = (ctx) => {
       onCreateSpreadsheet: isPeopleMount ? undefined : onCreateSpreadsheet,
       onCreateExternal: isPeopleMount ? undefined : onCreateExternal,
       onCreateChat: isPeopleMount ? undefined : onCreateChat,
+      onCreateAiImage: isPeopleMount ? undefined : onCreateAiImage,
       onAddPeopleTarget: isPeopleMount ? undefined : onAddPeopleTarget,
       onCreateVisualizationMermaid: isPeopleMount ? undefined : onCreateVisualizationMermaid,
       onCreateVisualizationExcalidraw: isPeopleMount ? undefined : onCreateVisualizationExcalidraw,
@@ -557,18 +561,34 @@ export const fileTreeActionProvider: ContextMenuActionProvider = (ctx) => {
     });
   }
 
-  // Section 8: Refresh (always available, no shortcut to avoid browser reload conflict)
-  sections.push({
-    actions: [
-      {
-        id: "refresh",
-        label: "Refresh Tree",
-        icon: <RefreshCw className="h-4 w-4" />,
-        onClick: async () => await onRefresh?.(),
-        disabled: !onRefresh,
-      },
-    ],
-  });
+  // Section 8: View options + Refresh (always available)
+  {
+    const { showReferencedContent, toggleShowReferencedContent } =
+      useFileTreeFilterStore.getState();
+    sections.push({
+      actions: [
+        {
+          id: "toggle-referenced-content",
+          label: showReferencedContent
+            ? "Hide referenced content"
+            : "Show referenced content",
+          icon: showReferencedContent ? (
+            <EyeOff className="h-4 w-4" />
+          ) : (
+            <Eye className="h-4 w-4" />
+          ),
+          onClick: () => toggleShowReferencedContent(),
+        },
+        {
+          id: "refresh",
+          label: "Refresh Tree",
+          icon: <RefreshCw className="h-4 w-4" />,
+          onClick: async () => await onRefresh?.(),
+          disabled: !onRefresh,
+        },
+      ],
+    });
+  }
 
   return sections;
 };
