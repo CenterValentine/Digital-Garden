@@ -2,6 +2,20 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   /* config options here */
+  // Skip Next.js's built-in TypeScript + ESLint passes during `next build`.
+  // Both are redundant with the project's own gates:
+  //   - `pnpm typecheck` (tsc --noEmit) runs locally and in CI (quality.yml)
+  //   - `pnpm lint` runs locally and in CI with the --max-warnings 175 ratchet
+  // Next's in-build passes load the entire project graph + the ~40k-LOC
+  // generated Prisma client into memory on top of the just-freed webpack
+  // heap, which OOM-SIGKILLs Vercel's 8GB build container. The standalone
+  // gates already catch the same issues without that memory cost.
+  typescript: {
+    ignoreBuildErrors: true,
+  },
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
   // Exclude native modules from server component bundling (Next.js 16+)
   serverExternalPackages: [
     // FFmpeg packages (video processing)
