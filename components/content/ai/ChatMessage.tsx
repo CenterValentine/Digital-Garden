@@ -300,12 +300,17 @@ export const ChatMessage = memo(function ChatMessage({
                   setEditing(false);
                 }
               }}
-              rows={Math.min(8, Math.max(2, draft.split("\n").length))}
-              // Visually mirror the view-mode bubble (same bg/border)
-              // so the bubble appears to become editable in place
-              // rather than turning into a different-looking control.
-              // Focus-ring still distinguishes editing state.
-              className="w-full resize-y rounded-xl border border-blue-500/20 bg-blue-600/30 px-3.5 py-2.5 text-sm leading-relaxed text-blue-100 outline-none focus:border-blue-400/60 focus:ring-2 focus:ring-blue-400/30"
+              rows={Math.min(8, Math.max(1, draft.split("\n").length))}
+              // Visually mirror the view-mode bubble. Three pieces:
+              //   - matching bg / border / padding / radius (so the
+              //     bubble appears to become editable in place);
+              //   - `field-sizing: content` lets the textarea shrink
+              //     to its text width like the view's `inline-block`
+              //     bubble (Chromium 123+, Firefox 124+); fallback is
+              //     `w-full` which is still legible just wider;
+              //   - `max-w-full` keeps it from overflowing the column.
+              style={{ fieldSizing: "content" } as React.CSSProperties}
+              className="w-full max-w-full resize-y rounded-xl border border-blue-500/20 bg-blue-600/30 px-3.5 py-2.5 text-sm leading-relaxed text-blue-100 outline-none focus:border-blue-400/60 focus:ring-2 focus:ring-blue-400/30 align-top"
             />
             <div className="flex items-center justify-end gap-1.5">
               <button
