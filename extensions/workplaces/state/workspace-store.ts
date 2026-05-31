@@ -253,6 +253,12 @@ function isWorkspaceNotFoundError(error: unknown) {
   );
 }
 
+function readContentIdFromUrl(): string | null {
+  if (typeof window === "undefined") return null;
+  const value = new URLSearchParams(window.location.search).get("content");
+  return value && value.length > 0 ? value : null;
+}
+
 function restoreContentWorkspace(workspace: ContentWorkspaceResponse) {
   const paneTabContentIds = Object.fromEntries(
     Object.entries(workspace.paneState.paneTabContentIds).map(
@@ -260,10 +266,26 @@ function restoreContentWorkspace(workspace: ContentWorkspaceResponse) {
     ),
   );
 
+  // Cold-load race: the workspace API can resolve before
+  // MainPanelWorkspace's URL parser runs. If the URL specifies a
+  // content id that belongs to this workspace, it must win as the
+  // active tab — otherwise the user deep-links to a tab but watches
+  // it load LAST while the persisted active tab loads first. Gating
+  // on workspace membership avoids regressing the manual workspace
+  // switch path, where `syncWorkspaceUrl` leaves a stale `content=`
+  // in the URL from the previous workspace.
+  const contentIdFromUrl = readContentIdFromUrl();
+  const urlContentBelongsToWorkspace =
+    contentIdFromUrl !== null &&
+    workspace.items.some((item) => item.contentId === contentIdFromUrl);
+  const activeContentId = urlContentBelongsToWorkspace
+    ? contentIdFromUrl
+    : workspace.paneState.activeContentId;
+
   isBypassingWorkspaceGuard = true;
   try {
     useContentStore.getState().restoreWorkspace({
-      activeContentId: workspace.paneState.activeContentId,
+      activeContentId,
       activePaneId: workspace.paneState.activePaneId,
       layoutMode: workspace.paneState.layoutMode,
       paneTabContentIds,
