@@ -514,19 +514,7 @@ When you generate an image, the user can insert it into the document at their cu
         sendReasoning: true,
         messageMetadata: ({ part }) => {
           if (part.type === "finish") {
-            // TEMP DIAGNOSTIC (A1-DEBUG): plain console so attrs print
-            // unambiguously to stdout regardless of the structured
-            // logger's formatting. Remove once Phase 2 verified.
-            // eslint-disable-next-line no-console -- TODO(A1-debug): remove with diagnostic
-            console.log("[A1-DEBUG-SERVER] finish part", {
-              has_total_usage: part.totalUsage != null,
-              input_tokens: part.totalUsage?.inputTokens ?? null,
-              output_tokens: part.totalUsage?.outputTokens ?? null,
-              total_tokens: part.totalUsage?.totalTokens ?? null,
-              finish_reason: part.finishReason,
-              raw_totalUsage: part.totalUsage,
-            });
-            const out = {
+            return {
               usage: {
                 inputTokens: part.totalUsage?.inputTokens,
                 outputTokens: part.totalUsage?.outputTokens,
@@ -534,9 +522,6 @@ When you generate an image, the user can insert it into the document at their cu
               },
               finishReason: part.finishReason,
             };
-            // eslint-disable-next-line no-console -- TODO(A1-debug): remove with diagnostic
-            console.log("[A1-DEBUG-SERVER] returning messageMetadata", out);
-            return out;
           }
           return undefined;
         },

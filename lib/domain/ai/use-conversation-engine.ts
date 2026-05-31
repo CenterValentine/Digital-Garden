@@ -377,24 +377,6 @@ export function useConversationEngine({
       };
       const finalMessages = e.messages ?? [];
 
-      // TEMP DIAGNOSTIC (A1-DEBUG): mirror what the SDK hands us so we
-      // can see whether the fresh assistant message has metadata at
-      // this seam. Remove once Phase 2 verified.
-      if (typeof window !== "undefined") {
-        const m = e.message as { id?: string; role?: string; metadata?: unknown } | undefined;
-        // eslint-disable-next-line no-console -- TODO(A1-debug): remove with diagnostic
-        console.log("[A1-DEBUG-CLIENT-ENGINE] onFinish", {
-          has_event_message: m != null,
-          event_message_id: m?.id ?? null,
-          event_message_metadata: m?.metadata ?? null,
-          messages_count: finalMessages.length,
-          last_message_metadata:
-            finalMessages.length > 0
-              ? (finalMessages[finalMessages.length - 1] as { metadata?: unknown }).metadata ?? null
-              : null,
-        });
-      }
-
       // Forward to the consumer's onFinish (persistence, etc.) first.
       if (onFinish) {
         onFinish({
