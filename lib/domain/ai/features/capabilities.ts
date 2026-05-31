@@ -30,14 +30,27 @@ export function inferCapabilities(modelId: string): string[] {
   const bare = slash >= 0 ? modelId.slice(slash + 1) : modelId;
   const out: string[] = [];
 
-  // Image generation models. These ids are stable across providers and
-  // gateways — DALL·E + GPT Image (OpenAI), Imagen (Google), FLUX
-  // (fal.ai / Together / Fireworks), Stable Diffusion variants.
+  // Image generation models. Patterns cover canonical id stems across
+  // providers and gateways:
+  //   - DALL·E + GPT Image families (OpenAI direct + via gateway)
+  //   - Imagen series (Google direct)
+  //   - Google's image-output Gemini variants — Nano Banana
+  //     (`gemini-2.5-flash-image`), Nano Banana Pro
+  //     (`gemini-3-pro-image`), and preview channels — all end in
+  //     `-image` or `-image-preview`. Caught by the suffix rule.
+  //   - FLUX (BFL direct + via gateway, fal.ai, Together, Fireworks)
+  //   - Recraft + Seedream (gateway only as of writing)
+  //   - xAI's grok-imagine
+  //   - Stable Diffusion / SDXL variants
   if (
     /^dall-e/i.test(bare) ||
     /^gpt-image/i.test(bare) ||
     /^imagen/i.test(bare) ||
+    /-image(-preview)?$/i.test(bare) ||
     /\bflux\b/i.test(bare) ||
+    /^recraft/i.test(bare) ||
+    /^seedream/i.test(bare) ||
+    /\bgrok-imagine\b/i.test(bare) ||
     /^stable-diffusion/i.test(bare) ||
     /^sdxl/i.test(bare)
   ) {
