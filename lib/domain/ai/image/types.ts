@@ -64,6 +64,24 @@ export interface ImageGenRequest {
   size?: ImageSize;
   /** BYOK API key (optional — falls back to stored key or env var) */
   apiKey?: string;
+  /**
+   * Optional base URL override. When set, the OpenAI dispatcher sends
+   * the request to `${apiBaseURL}/images/generations` instead of the
+   * provider's default endpoint. Used when routing image generation
+   * through a gateway (e.g. Vercel AI Gateway) whose API is
+   * OpenAI-compatible but lives at a different URL.
+   *
+   * The caller is responsible for ensuring `modelId` is the right
+   * form for the destination (`dall-e-3` for direct, `openai/dall-e-3`
+   * for namespaced gateway routing).
+   */
+  apiBaseURL?: string;
+  /**
+   * Resolved model id to send in the upstream request body. When
+   * gateway routing is active this differs from the request's
+   * canonical `modelId`. Defaults to `modelId` when omitted.
+   */
+  upstreamModelId?: string;
   /** Quality setting (provider-dependent) */
   quality?: "standard" | "hd";
   /** Style hint (provider-dependent) */

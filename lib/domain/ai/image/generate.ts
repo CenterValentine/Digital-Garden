@@ -131,28 +131,42 @@ async function dispatchToProvider(
 // ─── OpenAI (DALL-E 3 / GPT Image 1) ──────────────────────────
 
 async function generateOpenAI(req: ResolvedRequest): Promise<ImageGenResult> {
+  // Gateway routing path: `upstreamModelId` is the namespaced form
+  // (e.g. `openai/dall-e-3`) that the gateway expects. Direct path:
+  // fall back to canonical model id via the bare-id map. The
+  // `bareModelId` is used for capability flag decisions (quality /
+  // style apply to dall-e-3 regardless of namespace).
   const modelMap: Record<string, string> = {
     "dall-e-3": "dall-e-3",
     "gpt-image-1": "gpt-image-1",
   };
-  const model = modelMap[req.modelId] ?? "dall-e-3";
+  const upstreamModel =
+    req.upstreamModelId ?? modelMap[req.modelId] ?? "dall-e-3";
+  const bareModelId = upstreamModel.includes("/")
+    ? upstreamModel.slice(upstreamModel.indexOf("/") + 1)
+    : upstreamModel;
 
   const body: Record<string, unknown> = {
-    model,
+    model: upstreamModel,
     prompt: req.prompt,
     n: 1,
     size: req.size,
   };
 
-  if (req.quality && model === "dall-e-3") body.quality = req.quality;
-  if (req.style && model === "dall-e-3") body.style = req.style;
+  if (req.quality && bareModelId === "dall-e-3") body.quality = req.quality;
+  if (req.style && bareModelId === "dall-e-3") body.style = req.style;
 
   // gpt-image-1 returns base64 by default
-  if (model === "gpt-image-1") {
+  if (bareModelId === "gpt-image-1") {
     body.output_format = "png";
   }
 
-  const res = await fetch("https://api.openai.com/v1/images/generations", {
+  // Endpoint: direct OpenAI by default, override when routing through a
+  // gateway (Vercel AI Gateway uses the same path under its own host).
+  const baseURL = req.apiBaseURL ?? "https://api.openai.com/v1";
+  const url = `${baseURL.replace(/\/$/, "")}/images/generations`;
+
+  const res = await fetch(url, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${req.apiKey}`,
