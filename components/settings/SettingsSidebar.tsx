@@ -11,6 +11,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback } from "react";
 import { getSurfaceStyles } from "@/lib/design/system";
+import { LAST_CONTENT_ROUTE_KEY } from "@/components/content/NotesLayoutMarker";
 import {
   renderExtensionIcon,
 } from "@/lib/extensions";
@@ -266,17 +267,24 @@ export function SettingsSidebar() {
   );
   const allItems = [...navItems, ...extensionSettingsItems];
 
-  // Back to wherever the user was before entering settings. Uses the
-  // browser's history stack when available; falls back to `/` when the
-  // settings route was the entry point (direct link, hard refresh).
-  // `window.history.length > 1` is the most reliable signal we can read
-  // in the browser without maintaining our own referrer state.
+  // Back to the last content route the user visited, not the previous
+  // settings sub-page. NotesLayoutMarker writes the user's pathname to
+  // sessionStorage on every non-settings render; we read that here so
+  // "Back" jumps cleanly out of settings instead of walking through
+  // internal settings history. Falls back to `/` (direct link / first-
+  // visit / private-browsing edge cases).
   const handleBack = useCallback(() => {
-    if (typeof window !== "undefined" && window.history.length > 1) {
-      router.back();
-    } else {
+    if (typeof window === "undefined") {
       router.push("/");
+      return;
     }
+    let target: string | null = null;
+    try {
+      target = window.sessionStorage.getItem(LAST_CONTENT_ROUTE_KEY);
+    } catch {
+      target = null;
+    }
+    router.push(target && !target.startsWith("/settings") ? target : "/");
   }, [router]);
 
   return (
