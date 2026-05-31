@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/glass/button";
 import { getSurfaceStyles } from "@/lib/design/system";
 import { ProviderIcon } from "@/components/content/ai/ProviderIcon";
 import { FEATURE_REGISTRY, type FeatureSpec, type CapabilityFlag } from "@/lib/domain/ai/features/registry";
+import { effectiveCapabilities } from "@/lib/domain/ai/features/router";
 import type { ConnectionView } from "@/lib/features/ai-connections/types";
 
 interface RouteEntry {
@@ -161,11 +162,15 @@ function FeatureRow({
   const dirty = localKey !== entriesKey;
 
   // Connection+model pairs that satisfy the required capabilities.
+  // Uses `effectiveCapabilities` (explicit + inferred from id pattern)
+  // so older entries saved without the explicit `image-generation`
+  // flag — e.g. dall-e-3 added before catalog augmentation existed —
+  // still surface as compatible pairs.
   const compatibleOptions = useMemo(() => {
     const opts: Array<{ connectionId: string; modelId: string; label: string }> = [];
     for (const c of connections) {
       for (const m of c.models) {
-        const have = new Set<string>(m.capabilities ?? []);
+        const have = effectiveCapabilities(m);
         const ok = feature.requiredCapabilities.every((cap) => have.has(cap));
         if (ok) opts.push({ connectionId: c.id, modelId: m.id, label: `${c.label} • ${m.name}` });
       }
