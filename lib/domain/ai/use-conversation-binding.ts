@@ -30,6 +30,22 @@ import { clientLogger } from "@/lib/core/logger/client";
 import { useAIChatStore } from "@/state/ai-chat-store";
 import { useSettingsStore } from "@/state/settings-store";
 
+/**
+ * Optional payload that flows through `persistRef.current(...)` to
+ * give persistTurns access to the SDK's onFinish snapshot — specifically
+ * the fresh assistant message with its `metadata` already populated.
+ * React's useCallback closure for persistTurns can capture a stale
+ * `messages` array when the SDK fires onFinish before React commits
+ * its metadata update; reading from this payload bypasses that race.
+ */
+export interface PersistFinishPayload {
+  /** Fresh assistant UIMessage from the AI SDK's onFinish event. */
+  freshAssistant?: {
+    id: string;
+    metadata?: Record<string, unknown> | unknown;
+  };
+}
+
 interface MessageLike {
   id: string;
   role: string;
@@ -57,7 +73,7 @@ interface UseConversationBindingParams {
   providerId: string;
   modelId: string;
   /** Stable ref the engine's onFinish closes over; we populate `.current`. */
-  persistRef: RefObject<() => void>;
+  persistRef: RefObject<(payload?: PersistFinishPayload) => void>;
   /**
    * Stable ref the engine's edit/regenerate handlers call to supersede
    * messages server-side (reconcile model). We populate `.current` with
@@ -249,7 +265,7 @@ export function useConversationBinding({
   }, [conversationId, setMessages, setActiveModelSelection, seedMessageStamps]);
 
   // ─── Persist-on-finish ───
-  const persistTurns = useCallback(async () => {
+  const persistTurns = useCallback(async (payload?: PersistFinishPayload) => {
     if (!conversationId || messages.length === 0) return;
     for (const m of messages) {
       if (m.role !== "user" && m.role !== "assistant") continue;
@@ -268,7 +284,25 @@ export function useConversationBinding({
       // `metadata.usage` (input/output/total tokens) + `finishReason` on
       // the assistant message — the meter adapter reads those back for
       // per-Connection $ figures.
-      const metadata = (m as { metadata?: Record<string, unknown> | undefined }).metadata;
+      //
+      // Read order:
+      //   1. The fresh assistant from the SDK's onFinish event (when
+      //      this is the assistant turn AND payload.freshAssistant
+      //      matches by id). The SDK applies metadata to its internal
+      //      state object just before firing onFinish, but the React
+      //      `messages` array we close over may not have flushed the
+      //      change yet. The event payload is fresher.
+      //   2. The closure UIMessage's own metadata field as a fallback.
+      let metadata =
+        (m as { metadata?: Record<string, unknown> | undefined }).metadata;
+      if (
+        m.role === "assistant" &&
+        payload?.freshAssistant &&
+        payload.freshAssistant.id === m.id &&
+        payload.freshAssistant.metadata != null
+      ) {
+        metadata = payload.freshAssistant.metadata as Record<string, unknown>;
+      }
       try {
         const res = await fetch(
           `/api/conversations/${encodeURIComponent(conversationId)}/messages`,

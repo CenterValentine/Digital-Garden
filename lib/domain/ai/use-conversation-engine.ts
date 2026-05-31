@@ -68,6 +68,14 @@ const chatTransport = new DefaultChatTransport({
  */
 export interface ConversationEngineFinishEvent {
   messages: UIMessage[];
+  /**
+   * The fresh final assistant message from the AI SDK's onFinish event.
+   * Carries `metadata` (token usage, finishReason) applied *just before*
+   * onFinish fired — typically not yet reflected in `messages` because
+   * the SDK mutates `state.message.metadata` directly without a
+   * setMessages flush. Use this when you need the latest metadata.
+   */
+  message?: UIMessage;
   finishReason?: string;
 }
 
@@ -363,15 +371,35 @@ export function useConversationEngine({
     },
     onFinish: (event) => {
       const e = event as {
+        message?: UIMessage;
         messages?: UIMessage[];
         finishReason?: string;
       };
       const finalMessages = e.messages ?? [];
 
+      // TEMP DIAGNOSTIC (A1-DEBUG): mirror what the SDK hands us so we
+      // can see whether the fresh assistant message has metadata at
+      // this seam. Remove once Phase 2 verified.
+      if (typeof window !== "undefined") {
+        const m = e.message as { id?: string; role?: string; metadata?: unknown } | undefined;
+        // eslint-disable-next-line no-console -- TODO(A1-debug): remove with diagnostic
+        console.log("[A1-DEBUG-CLIENT-ENGINE] onFinish", {
+          has_event_message: m != null,
+          event_message_id: m?.id ?? null,
+          event_message_metadata: m?.metadata ?? null,
+          messages_count: finalMessages.length,
+          last_message_metadata:
+            finalMessages.length > 0
+              ? (finalMessages[finalMessages.length - 1] as { metadata?: unknown }).metadata ?? null
+              : null,
+        });
+      }
+
       // Forward to the consumer's onFinish (persistence, etc.) first.
       if (onFinish) {
         onFinish({
           messages: finalMessages,
+          message: e.message,
           finishReason: e.finishReason,
         });
       }

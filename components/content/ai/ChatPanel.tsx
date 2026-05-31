@@ -27,7 +27,10 @@ import { FollowUpsStrip } from "./FollowUpsStrip";
 import { ChatErrorBanner } from "./ChatErrorBanner";
 import { MakeAndModelPicker } from "./MakeAndModelPicker";
 import { useConversationEngine } from "@/lib/domain/ai/use-conversation-engine";
-import { useConversationBinding } from "@/lib/domain/ai/use-conversation-binding";
+import {
+  useConversationBinding,
+  type PersistFinishPayload,
+} from "@/lib/domain/ai/use-conversation-binding";
 import { useContentStore } from "@/state/content-store";
 import { detectMixedProvider } from "@/lib/design/system/ai-providers";
 import type { AIProviderId } from "@/lib/domain/ai/types";
@@ -80,7 +83,7 @@ export function ChatPanel({
     : "sidebar-chat";
 
   // Persist-on-finish for conversation-bound mode (ChatViewer-pattern).
-  const persistRef = useRef<() => void>(() => {});
+  const persistRef = useRef<(payload?: PersistFinishPayload) => void>(() => {});
   // Edit/regenerate supersession — populated by the binding hook.
   const truncateRef = useRef<(clientId: string, inclusive: boolean) => Promise<void>>(
     async () => {},
@@ -121,7 +124,22 @@ export function ChatPanel({
     conversationKey,
     contentId,
     conversationId,
-    onFinish: conversationId ? () => persistRef.current() : undefined,
+    onFinish: conversationId
+      ? (event) => {
+          // Forward the SDK's fresh assistant message so persistTurns
+          // can read its metadata directly (bypasses React closure
+          // staleness — the SDK mutates state.message.metadata just
+          // before this fires, but our `messages` array may not have
+          // flushed yet).
+          const fresh = event.message
+            ? {
+                id: event.message.id,
+                metadata: (event.message as { metadata?: unknown }).metadata,
+              }
+            : undefined;
+          persistRef.current({ freshAssistant: fresh });
+        }
+      : undefined,
     truncateRef,
     pendingUserPartsRef,
   });

@@ -19,7 +19,10 @@ import { ChatErrorBanner } from "../ai/ChatErrorBanner";
 import { MakeAndModelPicker } from "../ai/MakeAndModelPicker";
 import { AssociatedContentChips } from "../ai/AssociatedContentChips";
 import { useConversationEngine } from "@/lib/domain/ai/use-conversation-engine";
-import { useConversationBinding } from "@/lib/domain/ai/use-conversation-binding";
+import {
+  useConversationBinding,
+  type PersistFinishPayload,
+} from "@/lib/domain/ai/use-conversation-binding";
 import { useContentStore } from "@/state/content-store";
 import { toast } from "sonner";
 import {
@@ -184,7 +187,7 @@ function ChatViewerInner({
   // Stable onFinish that delegates to the ref-tracked persist function.
   // Bound mode → the binding hook claims this ref (Conversation persist).
   // Legacy mode → the ChatPayload debounced persist claims it below.
-  const persistRef = useRef<() => void>(() => {});
+  const persistRef = useRef<(payload?: PersistFinishPayload) => void>(() => {});
   // Edit/regenerate supersession — populated by the binding hook in bound
   // mode; a no-op in legacy mode (edits there just re-save the ChatPayload).
   const truncateRef = useRef<(clientId: string, inclusive: boolean) => Promise<void>>(
@@ -227,7 +230,20 @@ function ChatViewerInner({
     contentId,
     conversationId: conversationId ?? undefined,
     initialMessages,
-    onFinish: () => persistRef.current(),
+    onFinish: (event) => {
+      // Forward the SDK's fresh assistant message (with metadata) so
+      // persistTurns can read it directly rather than from a stale
+      // React closure. The SDK mutates state.message.metadata just
+      // before firing onFinish; our `messages` array may not have
+      // flushed yet at this synchronous call site.
+      const fresh = event.message
+        ? {
+            id: event.message.id,
+            metadata: (event.message as { metadata?: unknown }).metadata,
+          }
+        : undefined;
+      persistRef.current({ freshAssistant: fresh });
+    },
     truncateRef,
     pendingUserPartsRef,
   });
