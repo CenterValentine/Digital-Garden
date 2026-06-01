@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { toast } from "sonner";
 import { useAutoSlug } from "../../lib/use-auto-slug";
+import { useUserTenants } from "@/lib/domain/tenancy/use-user-tenants";
 import { PublishingDialog } from "./PublishingDialog";
 
 interface PathNode {
@@ -11,12 +12,14 @@ interface PathNode {
   slug: string;
   parentId: string | null;
   children: PathNode[];
+  tenantId: string | null;
 }
 
 interface FlatPathOption {
   id: string;
   label: string; // indented display label
   slug: string;
+  tenantId: string | null;
 }
 
 function flattenPaths(nodes: PathNode[], depth = 0): FlatPathOption[] {
@@ -26,6 +29,7 @@ function flattenPaths(nodes: PathNode[], depth = 0): FlatPathOption[] {
       id: node.id,
       label: `${"— ".repeat(depth)}${node.title}`,
       slug: node.slug,
+      tenantId: node.tenantId,
     });
     result.push(...flattenPaths(node.children, depth + 1));
   }
@@ -45,6 +49,31 @@ export function CreatePublicPathDialog({ onClose, onCreated, defaultParentId }: 
   const [parentId, setParentId] = useState<string>(defaultParentId ?? "");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [pathOptions, setPathOptions] = useState<FlatPathOption[]>([]);
+
+  // Tenant resolution — same pattern as CreatePublicItemDialog.
+  // Picker hidden when user owns exactly 1 site.
+  const { tenants, primaryTenantId, loading: isLoadingTenants } = useUserTenants();
+  const [tenantId, setTenantId] = useState<string>("");
+  useEffect(() => {
+    if (!tenantId && tenants.length > 0) {
+      setTenantId(primaryTenantId ?? tenants[0].id);
+    }
+  }, [tenants, primaryTenantId, tenantId]);
+
+  // Filter parent-path options to the chosen tenant — a path's parent
+  // must be on the same site (cross-tenant parenting would be a data
+  // integrity bug).
+  const tenantScopedPathOptions = useMemo(
+    () => pathOptions.filter((p) => !tenantId || p.tenantId === tenantId),
+    [pathOptions, tenantId],
+  );
+
+  // Reset parent when tenant changes (the chosen parent may no longer be valid)
+  useEffect(() => {
+    if (parentId && !tenantScopedPathOptions.some((p) => p.id === parentId)) {
+      setParentId("");
+    }
+  }, [tenantId, tenantScopedPathOptions, parentId]);
 
   useEffect(() => {
     fetch("/api/publishing/paths")
@@ -73,6 +102,12 @@ export function CreatePublicPathDialog({ onClose, onCreated, defaultParentId }: 
           slug,
           description: description.trim() || undefined,
           parentId: parentId || undefined,
+          // Only send tenantId when explicitly choosing a non-primary
+          // destination. Server defaults to primary when omitted.
+          tenantId:
+            tenants.length > 1 && tenantId && tenantId !== primaryTenantId
+              ? tenantId
+              : undefined,
         }),
       });
       if (!res.ok) {
@@ -88,7 +123,7 @@ export function CreatePublicPathDialog({ onClose, onCreated, defaultParentId }: 
     }
   }
 
-  const selectedParent = pathOptions.find((p) => p.id === parentId);
+  const selectedParent = tenantScopedPathOptions.find((p) => p.id === parentId);
   const slugPrefix = selectedParent ? `/${selectedParent.slug}/` : "/";
 
   return (
@@ -110,7 +145,26 @@ export function CreatePublicPathDialog({ onClose, onCreated, defaultParentId }: 
             />
           </label>
 
-          {pathOptions.length > 0 && (
+          {/* Tenant picker — hidden when user owns exactly 1 site. */}
+          {!isLoadingTenants && tenants.length > 1 && (
+            <label className="block">
+              <span className="text-xs text-white/40 mb-1 block">Create on site</span>
+              <select
+                value={tenantId}
+                onChange={(e) => setTenantId(e.target.value)}
+                className="w-full rounded-md border border-white/10 bg-zinc-800 px-3 py-2 text-sm text-white focus:border-white/20 focus:outline-none"
+              >
+                {tenants.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.displayName}
+                    {t.id === primaryTenantId ? " (primary)" : ""}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+
+          {tenantScopedPathOptions.length > 0 && (
             <label className="block">
               <span className="text-xs text-white/40 mb-1 block">Parent path (optional)</span>
               <select
@@ -119,7 +173,7 @@ export function CreatePublicPathDialog({ onClose, onCreated, defaultParentId }: 
                 className="w-full rounded-md border border-white/10 bg-zinc-800 px-3 py-2 text-sm text-white focus:border-white/20 focus:outline-none"
               >
                 <option value="">— Root (no parent)</option>
-                {pathOptions.map((opt) => (
+                {tenantScopedPathOptions.map((opt) => (
                   <option key={opt.id} value={opt.id}>
                     {opt.label}
                   </option>

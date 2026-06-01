@@ -3,6 +3,7 @@ import type { User, Account, OAuthProvider } from "./types";
 
 import { prisma } from "@/lib/database/client";
 import { logger } from "@/lib/core/logger";
+import { createPersonalTenantForUser } from "@/lib/domain/tenancy";
 
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
@@ -172,6 +173,21 @@ export async function findOrCreateOAuthUser(
         passwordHash: null, // OAuth users don't have passwords
       },
     });
+
+    // Auto-provision personal tenant so publishing works on first use.
+    // Non-fatal — admin can re-run scripts/backfill-tenants.ts to repair
+    // orphans. Only runs for new users (not on re-login or token refresh).
+    try {
+      await createPersonalTenantForUser(user.id, user.username);
+    } catch (err) {
+      logger.error({
+        layer: "auth",
+        event: "tenancy:personal_tenant:provision_failed",
+        summary: "could not auto-create tenant on OAuth signup (non-fatal)",
+        attrs: { user_id: user.id, provider },
+        error: err,
+      });
+    }
   }
 
   // Create account link with tokens

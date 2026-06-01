@@ -12,6 +12,7 @@ import {
 
 import { prisma } from "@/lib/database/client";
 import { logger, withRouteTrace, withSpan } from "@/lib/core/logger";
+import { createPersonalTenantForUser } from "@/lib/domain/tenancy";
 
 const ROUTE_PATH = "/api/auth/sign-up";
 
@@ -125,6 +126,21 @@ export async function POST(request: NextRequest) {
               role: true,
             },
           });
+
+          // Auto-provision personal tenant so publishing works on first use.
+          // Non-fatal if it throws — admin can re-run scripts/backfill-tenants.ts
+          // to repair the orphan. The user can still sign in either way.
+          try {
+            await createPersonalTenantForUser(user.id, user.username);
+          } catch (err) {
+            logger.error({
+              layer: "auth",
+              event: "tenancy:personal_tenant:provision_failed",
+              summary: "could not auto-create tenant on signup (non-fatal)",
+              attrs: { user_id: user.id },
+              error: err,
+            });
+          }
 
           const session = await createSession(user.id);
           span.attr("created", true).summary("user + session created");

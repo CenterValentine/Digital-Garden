@@ -28,6 +28,7 @@
 // below must stay first so ESM evaluates it before client.js.
 import "./_load-env.js";
 import { prisma } from "../lib/database/client.js";
+import { slugFromUsername } from "../lib/domain/tenancy/auto-create-tenant.js";
 
 const SITE_OWNER_ID = process.env.SITE_OWNER_ID ?? "";
 const DAVID_HOSTS = ["davidvalentine.org", "www.davidvalentine.org"] as const;
@@ -41,16 +42,8 @@ type RunStats = {
   publicPathRedirectsBackfilled: number;
 };
 
-function slugFromUsername(username: string): string {
-  // Lowercase, replace anything that's not [a-z0-9-] with '-', collapse,
-  // trim, max 120 chars to fit the column.
-  const cleaned = username
-    .toLowerCase()
-    .replace(/[^a-z0-9-]+/g, "-")
-    .replace(/-+/g, "-")
-    .replace(/^-|-$/g, "");
-  return cleaned.slice(0, 120) || "user";
-}
+// slugFromUsername is imported from lib/domain/tenancy/auto-create-tenant.ts
+// (single source of truth — signup auto-tenant uses the same function).
 
 async function ensureUniqueSlug(baseSlug: string): Promise<string> {
   // If the base slug is taken, append a numeric suffix until we find one

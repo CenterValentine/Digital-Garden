@@ -12,7 +12,24 @@ export {
 } from "./resolve-tenant";
 export { getCurrentTenant } from "./get-current-tenant";
 export { resolveWritableTenantId, TenantAuthError } from "./api";
+export {
+  canClaimCustomHosts,
+  CUSTOM_HOST_DENIED_MESSAGE,
+} from "./permissions";
+export type { PermissionUser } from "./permissions";
 export { invalidateTenantCache } from "./cache";
+export {
+  createPersonalTenantForUser,
+  slugFromUsername,
+} from "./auto-create-tenant";
+export type { ProvisionedTenant } from "./auto-create-tenant";
+export {
+  resolveTenantBySlug,
+  resolvePublicItem,
+  resolvePublicPath,
+  buildPublicItemPath,
+  buildSubpathItemUrl,
+} from "./public-render";
 export type {
   ResolvedTenant,
   TenantResolutionSource,

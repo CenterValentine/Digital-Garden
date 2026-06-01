@@ -14,6 +14,11 @@ export interface PublicPathNode {
   icon: string | null;
   children: PublicPathNode[];
   itemCount: number;
+  // Tenant this path belongs to. Used to render a tenant-slug prefix on
+  // root nodes when the user owns multiple tenants. Null defensively for
+  // any path not yet backfilled — shouldn't happen in practice.
+  tenantId: string | null;
+  tenantSlug: string | null;
 }
 
 interface PublishTreeState {

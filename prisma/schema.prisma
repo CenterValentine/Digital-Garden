@@ -497,6 +497,7 @@ model User {
   passwordHash         String?                 @db.Char(60)
   email                String                  @unique @db.VarChar(255)
   role                 UserRole                @default(guest)
+  canClaimCustomHosts  Boolean                 @default(false)
   createdAt            DateTime                @default(now()) @db.Timestamptz(6)
   updatedAt            DateTime                @updatedAt @db.Timestamptz(6)
   settings             Json?
@@ -1669,7 +1670,6 @@ model TenantHost {
 
   @@index([tenantId])
 }
-
 
 
 

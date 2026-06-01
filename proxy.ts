@@ -29,12 +29,13 @@ import { randomUUID } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { logger } from "@/lib/core/logger/emit";
 import { withTrace } from "@/lib/core/logger/context";
-import { resolveTenantByHost } from "@/lib/domain/tenancy";
+import { normalizeHost, resolveTenantByHost } from "@/lib/domain/tenancy";
 
 /** Routes that require an active session */
 const PROTECTED_PREFIXES = ["/content", "/settings", "/admin"];
 
 const MULTITENANT_ENABLED = process.env.MULTITENANT_ENABLED === "true";
+const PLATFORM_DOMAIN = process.env.PLATFORM_DOMAIN?.trim().toLowerCase();
 const TRACE_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
 
 /**
@@ -66,6 +67,19 @@ async function resolveTenantHeaders(
   if (!MULTITENANT_ENABLED) return null;
 
   const host = request.headers.get("host");
+
+  // Platform domain (e.g. notetrellis.com) is reserved for the platform's
+  // own marketing surfaces — it is NOT a tenant. Even if a TenantHost row
+  // exists for it (e.g. a leftover from custom-host testing), skip tenant
+  // injection so that downstream routes don't accidentally render some
+  // tenant's content at platform paths. The home dispatcher (app/page.tsx)
+  // short-circuits to PlatformHome by inspecting the host directly.
+  // Subdomains of the platform (e.g. yourname.notetrellis.com) still
+  // resolve normally via resolveTenantByHost's subdomain path.
+  if (PLATFORM_DOMAIN && normalizeHost(host) === PLATFORM_DOMAIN) {
+    return null;
+  }
+
   const traceId = deriveTraceId(request);
 
   return withTrace(traceId, async () => {

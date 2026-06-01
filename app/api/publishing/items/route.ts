@@ -48,6 +48,7 @@ export async function GET(req: NextRequest) {
             path: { select: { id: true, slug: true, title: true } },
             workingRevision: { select: { id: true, bodyHash: true, metadataHash: true } },
             publishedRevision: { select: { id: true, bodyHash: true, metadataHash: true } },
+            tenant: { select: { id: true, slug: true, displayName: true } },
           },
           orderBy: { createdAt: "asc" },
         });
@@ -72,6 +73,7 @@ export async function GET(req: NextRequest) {
             item.publishedRevision !== null &&
             item.workingRevision.bodyHash !== item.publishedRevision.bodyHash,
           path: item.path,
+          tenant: item.tenant,
         }));
 
         span.attr("item_count", result.length);

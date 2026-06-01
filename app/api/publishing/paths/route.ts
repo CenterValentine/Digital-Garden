@@ -29,6 +29,7 @@ export async function GET(req: NextRequest) {
           orderBy: [{ parentId: "asc" }, { displayOrder: "asc" }],
           include: {
             _count: { select: { items: { where: { deletedAt: null } } } },
+            tenant: { select: { id: true, slug: true } },
           },
         });
 
@@ -43,6 +44,8 @@ export async function GET(req: NextRequest) {
           icon: string | null;
           children: PathNode[];
           itemCount: number;
+          tenantId: string | null;
+          tenantSlug: string | null;
         }
 
         const nodeMap = new Map<string, PathNode>();
@@ -59,6 +62,8 @@ export async function GET(req: NextRequest) {
             icon: p.icon,
             children: [],
             itemCount: p._count.items,
+            tenantId: p.tenant?.id ?? null,
+            tenantSlug: p.tenant?.slug ?? null,
           };
           nodeMap.set(p.id, node);
         }
