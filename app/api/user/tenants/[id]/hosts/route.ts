@@ -28,6 +28,10 @@ import {
   VercelDomainsUnavailableError,
   type VercelDomain,
 } from "@/lib/infrastructure/vercel/domains";
+import {
+  canClaimCustomHosts,
+  CUSTOM_HOST_DENIED_MESSAGE,
+} from "@/lib/domain/tenancy";
 
 const ROUTE_PATH = "/api/user/tenants/[id]/hosts";
 
@@ -62,10 +66,27 @@ export async function GET(
           return NextResponse.json({ error: "Not found" }, { status: 404 });
         }
 
-        const hosts = await prisma.tenantHost.findMany({
-          where: { tenantId: id },
-          orderBy: { createdAt: "asc" },
-        });
+        // Fetch hosts + the current user's permission flag in parallel.
+        // The flag drives whether the UI renders the "Add hostname" form
+        // (server-side enforcement still happens in POST below).
+        // No `select` clause for the user — fetching the full record
+        // and casting at field-access lets the canClaimCustomHosts column
+        // be read even before the Phase 12 schema patch lands (column
+        // absent → undefined → treated as false).
+        const [hosts, user] = await Promise.all([
+          prisma.tenantHost.findMany({
+            where: { tenantId: id },
+            orderBy: { createdAt: "asc" },
+          }),
+          prisma.user.findUnique({ where: { id: session.user.id } }),
+        ]);
+
+        const userForPermission = {
+          role: user?.role ?? "guest",
+          canClaimCustomHosts:
+            (user as unknown as { canClaimCustomHosts: boolean | null } | null)
+              ?.canClaimCustomHosts === true,
+        };
 
         return NextResponse.json({
           hosts: hosts.map((h) => ({
@@ -83,6 +104,9 @@ export async function GET(
               (h as unknown as { vercelConfigData: unknown }).vercelConfigData ??
               null,
           })),
+          canClaimCustomHosts: canClaimCustomHosts(userForPermission),
+          tenantSlug: tenant.slug,
+          platformDomain: process.env.PLATFORM_DOMAIN?.trim().toLowerCase() ?? null,
         });
       },
     );
@@ -120,6 +144,38 @@ export async function POST(
         const tenant = await requireOwnedTenant(session.user.id, id);
         if (!tenant) {
           return NextResponse.json({ error: "Not found" }, { status: 404 });
+        }
+
+        // Permission gate: most signups can't claim arbitrary hostnames.
+        // The platform owner is always allowed; everyone else needs the
+        // explicit canClaimCustomHosts flag flipped by the owner. The
+        // GET endpoint mirrors this so the UI can hide the form, but
+        // this server-side check is the authoritative gate (UI hiding
+        // alone is theater — anyone could replay the POST).
+        const user = await prisma.user.findUnique({
+          where: { id: session.user.id },
+        });
+        const userForPermission = {
+          role: user?.role ?? "guest",
+          canClaimCustomHosts:
+            (user as unknown as { canClaimCustomHosts: boolean | null } | null)
+              ?.canClaimCustomHosts === true,
+        };
+        if (!canClaimCustomHosts(userForPermission)) {
+          logger.warn({
+            layer: "auth",
+            event: "user_tenant_host_add:permission_denied",
+            summary: "user lacks canClaimCustomHosts grant",
+            attrs: {
+              user_id: session.user.id,
+              role: userForPermission.role,
+              requested_host: requestedHost,
+            },
+          });
+          return NextResponse.json(
+            { error: CUSTOM_HOST_DENIED_MESSAGE },
+            { status: 403 },
+          );
         }
 
         // Reject if already claimed (by any tenant).

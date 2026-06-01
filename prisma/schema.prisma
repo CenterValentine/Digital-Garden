@@ -97,6 +97,7 @@ enum FlashcardRating {
 // choice can land without a second migration.
 enum FlashcardCardType {
   basic
+  cloze
 }
 
 enum ExternalReadingStatus {
@@ -494,6 +495,7 @@ model User {
   passwordHash         String?                 @db.Char(60)
   email                String                  @unique @db.VarChar(255)
   role                 UserRole                @default(guest)
+  canClaimCustomHosts  Boolean                 @default(false)
   createdAt            DateTime                @default(now()) @db.Timestamptz(6)
   updatedAt            DateTime                @updatedAt @db.Timestamptz(6)
   settings             Json?
@@ -1463,16 +1465,17 @@ model Tenant {
 }
 
 model TenantHost {
-  host      String   @id @db.VarChar(253)
-  tenantId  String   @db.Uuid
-  isPrimary Boolean  @default(false)
-  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  host             String   @id @db.VarChar(253)
+  tenantId         String   @db.Uuid
+  isPrimary        Boolean  @default(false)
+  createdAt        DateTime @default(now()) @db.Timestamptz(6)
+  verifiedAt       DateTime? @db.Timestamptz(6)
+  vercelConfigData Json?
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@index([tenantId])
 }
-
 
 
 

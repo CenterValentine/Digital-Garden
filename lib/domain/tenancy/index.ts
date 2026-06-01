@@ -12,6 +12,11 @@ export {
 } from "./resolve-tenant";
 export { getCurrentTenant } from "./get-current-tenant";
 export { resolveWritableTenantId, TenantAuthError } from "./api";
+export {
+  canClaimCustomHosts,
+  CUSTOM_HOST_DENIED_MESSAGE,
+} from "./permissions";
+export type { PermissionUser } from "./permissions";
 export { invalidateTenantCache } from "./cache";
 export {
   createPersonalTenantForUser,

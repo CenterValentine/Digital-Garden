@@ -14,7 +14,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Check, Copy, Globe, Loader2, RefreshCw, Trash2, X } from "lucide-react";
+import { Check, Copy, Globe, Loader2, RefreshCw, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 type DnsInstruction = {
@@ -37,7 +37,14 @@ export type HostRow = {
   vercelConfigData: VercelConfigData | null;
 };
 
-type HostsResponse = { hosts: HostRow[] };
+type HostsResponse = {
+  hosts: HostRow[];
+  // Phase 12 fields. Always present after the backend ships; defaulted
+  // for forward-compat if the response is somehow truncated.
+  canClaimCustomHosts?: boolean;
+  tenantSlug?: string;
+  platformDomain?: string | null;
+};
 
 interface HostManagementProps {
   tenantId: string;
@@ -51,6 +58,10 @@ export function HostManagement({ tenantId, tenantSlug }: HostManagementProps) {
   const [isAdding, setIsAdding] = useState(false);
   const isAddingRef = useRef(false);
   const [verifyingHost, setVerifyingHost] = useState<string | null>(null);
+  // Phase 12 permission state. Default to false so the form stays hidden
+  // until the server confirms permission — fails-closed during loading.
+  const [canClaim, setCanClaim] = useState(false);
+  const [platformDomain, setPlatformDomain] = useState<string | null>(null);
 
   const loadHosts = useCallback(async () => {
     setIsLoading(true);
@@ -59,6 +70,8 @@ export function HostManagement({ tenantId, tenantSlug }: HostManagementProps) {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = (await res.json()) as HostsResponse;
       setHosts(data.hosts);
+      setCanClaim(data.canClaimCustomHosts === true);
+      setPlatformDomain(data.platformDomain ?? null);
     } catch (err) {
       toast.error("Failed to load hosts", {
         description: err instanceof Error ? err.message : "Please try again",
@@ -170,12 +183,27 @@ export function HostManagement({ tenantId, tenantSlug }: HostManagementProps) {
 
   return (
     <div className="mt-4 pl-6 border-l border-white/5 space-y-3">
-      <div className="text-xs text-white/40">
-        Custom hostnames for{" "}
-        <span className="font-mono text-white/60">{tenantSlug}</span>. Each
-        hostname routes directly to this site once DNS is configured. Even
-        without custom hostnames, visitors can reach it at{" "}
-        <code className="font-mono text-white/60">/u/{tenantSlug}</code>.
+      {/* Always-shown info card: where this site is reachable for free. */}
+      <div className="rounded-md border border-white/8 bg-white/3 p-3 space-y-1.5">
+        <div className="text-[11px] uppercase tracking-wider text-white/40">
+          Your site is reachable at
+        </div>
+        {platformDomain && (
+          <div className="flex items-center gap-2 text-xs">
+            <Globe className="h-3 w-3 text-white/30 shrink-0" />
+            <code className="font-mono text-white/80">
+              {tenantSlug}.{platformDomain}
+            </code>
+            <span className="text-white/30">— subdomain (free, no setup)</span>
+          </div>
+        )}
+        <div className="flex items-center gap-2 text-xs">
+          <Globe className="h-3 w-3 text-white/30 shrink-0" />
+          <code className="font-mono text-white/80">
+            {platformDomain ?? "this site"}/u/{tenantSlug}
+          </code>
+          <span className="text-white/30">— subpath (free, no setup)</span>
+        </div>
       </div>
 
       {/* Existing hosts list */}
@@ -277,23 +305,38 @@ export function HostManagement({ tenantId, tenantSlug }: HostManagementProps) {
         </ul>
       )}
 
-      {/* Add new */}
-      <form onSubmit={handleAdd} className="flex gap-2 pt-2">
-        <input
-          type="text"
-          placeholder="mysite.com"
-          value={newHost}
-          onChange={(e) => setNewHost(e.target.value)}
-          className="flex-1 rounded-md border border-white/10 bg-white/5 px-3 py-1.5 text-sm font-mono placeholder:text-white/20"
-        />
-        <button
-          type="submit"
-          disabled={isAdding || !newHost.trim()}
-          className="px-3 py-1.5 rounded-md text-xs font-medium bg-sky-500/20 text-sky-300 hover:bg-sky-500/30 disabled:opacity-40"
-        >
-          {isAdding ? "Adding…" : "Add hostname"}
-        </button>
-      </form>
+      {/* Custom domain section — gated by canClaimCustomHosts. */}
+      <div className="pt-2 space-y-2">
+        <div className="text-[11px] uppercase tracking-wider text-white/40">
+          Custom domain
+        </div>
+        {canClaim ? (
+          <form onSubmit={handleAdd} className="flex gap-2">
+            <input
+              type="text"
+              placeholder="mysite.com"
+              value={newHost}
+              onChange={(e) => setNewHost(e.target.value)}
+              className="flex-1 rounded-md border border-white/10 bg-white/5 px-3 py-1.5 text-sm font-mono placeholder:text-white/20"
+            />
+            <button
+              type="submit"
+              disabled={isAdding || !newHost.trim()}
+              className="px-3 py-1.5 rounded-md text-xs font-medium bg-sky-500/20 text-sky-300 hover:bg-sky-500/30 disabled:opacity-40"
+            >
+              {isAdding ? "Adding…" : "Add hostname"}
+            </button>
+          </form>
+        ) : (
+          <p className="text-xs text-white/40 leading-relaxed">
+            Custom domains aren&apos;t enabled for your account. Your site
+            works fine at the subdomain and subpath URLs above — those are
+            permanent and don&apos;t require any DNS setup. Ask the platform
+            owner to enable custom domains for your account if you want to
+            connect a domain you already own.
+          </p>
+        )}
+      </div>
     </div>
   );
 }
