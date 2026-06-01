@@ -195,22 +195,11 @@ export default function SitesSettingsPage() {
         </p>
         {platformDomain && (
           <div className="mt-4 rounded-md border border-sky-500/30 bg-sky-500/5 p-3 text-xs text-sky-100/80">
-            <div className="font-medium text-sky-200 mb-1">
-              Every site you create is reachable at two URLs automatically:
-            </div>
-            <ul className="list-disc list-inside space-y-0.5">
-              <li>
-                <code className="font-mono">your-slug.{platformDomain}</code>{" "}
-                (subdomain)
-              </li>
-              <li>
-                <code className="font-mono">{platformDomain}/u/your-slug</code>{" "}
-                (subpath, works as a fallback)
-              </li>
-            </ul>
-            <div className="mt-2 text-sky-100/60">
-              To use a domain you already own (e.g.{" "}
-              <code className="font-mono">yoursite.com</code>), expand a site
+            <div className="text-sky-200">
+              Every site is reachable at{" "}
+              <code className="font-mono">your-slug.{platformDomain}</code>{" "}
+              automatically. Want to use a domain you already own (e.g.{" "}
+              <code className="font-mono">yoursite.com</code>)? Expand a site
               below and open its <em>Hosts</em> section.
             </div>
           </div>
@@ -341,10 +330,8 @@ export default function SitesSettingsPage() {
                           {site.slug}
                         </div>
                         {platformDomain && (
-                          <div className="text-[11px] text-white/30 font-mono mt-1 space-x-2">
-                            <span>{site.slug}.{platformDomain}</span>
-                            <span className="text-white/15">·</span>
-                            <span>{platformDomain}/u/{site.slug}</span>
+                          <div className="text-[11px] text-white/30 font-mono mt-1">
+                            {site.slug}.{platformDomain}
                           </div>
                         )}
                       </>
