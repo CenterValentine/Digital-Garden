@@ -95,28 +95,50 @@ const aiSettingsSchema = z
       .enum(["anthropic", "openai", "google", "xai", "mistral", "groq"])
       .optional(),
     modelId: z.string().optional(),
-    // Legacy field (kept for backward compat, prefer providerId + modelId)
-    model: z
-      .enum(["claude-opus-4", "claude-sonnet-3-5", "gpt-4"])
-      .optional(),
     // Generation parameters
     temperature: z.number().min(0).max(2).optional(),
     maxTokens: z.number().min(1).max(200_000).optional(),
     streamingEnabled: z.boolean().optional(),
+    // Subtle typewriter reveal of streaming responses. Default on.
+    typingEffect: z.boolean().optional(),
     // Conversation behavior
     conversationHistory: z.boolean().optional(),
-    contextWindow: z.number().optional(),
     // Usage tracking
     monthlyTokenQuota: z.number().optional(),
     tokensUsedThisMonth: z.number().optional(),
     // Feature toggles
     autoSuggest: z.boolean().optional(),
     privacyMode: z.enum(["full", "minimal", "none"]).optional(),
-    // Tool settings (Sprint 34)
-    toolChoice: z.enum(["auto", "none"]).optional(),
-    enabledTools: z.array(z.string()).optional(),
+    // Per-tool config — replaces the older toolChoice + enabledTools.
+    // `{ [toolId]: { enabled?, routeOverride? } }`. Tools that themselves
+    // call a remote AI (e.g. generate_image) honor routeOverride at
+    // execution time; deterministic tools ignore it.
+    toolConfig: z
+      .record(
+        z.string(),
+        z
+          .object({
+            enabled: z.boolean().optional(),
+            routeOverride: z
+              .object({
+                presetId: z.string(),
+                modelId: z.string(),
+              })
+              .optional(),
+          })
+          .optional(),
+      )
+      .optional(),
     // AI content highlighting (Sprint 40)
     showAiHighlight: z.boolean().optional(),
+    // Reasoning surface (Session 6) — show "thinking" blocks when the
+    // active provider emits them (Anthropic extended thinking, OpenAI
+    // o-series, Google thinking-*). Default on.
+    showReasoning: z.boolean().optional(),
+    // Suggested follow-ups (Session 7) — fire a small structured-output
+    // call after each assistant reply and render 2-3 next-prompt chips.
+    // The chosen model lives in Feature Routing under "follow-ups".
+    showFollowUps: z.boolean().optional(),
   })
   .optional();
 
@@ -408,19 +430,19 @@ export const DEFAULT_SETTINGS: UserSettings = {
     enabled: true,
     providerId: "anthropic",
     modelId: "claude-sonnet-3-5",
-    model: "claude-sonnet-3-5", // Legacy
     temperature: 0.7,
     maxTokens: 4096,
     streamingEnabled: true,
+    typingEffect: true,
     conversationHistory: true,
-    contextWindow: 4096,
     monthlyTokenQuota: 100000,
     tokensUsedThisMonth: 0,
     autoSuggest: true,
     privacyMode: "full",
-    toolChoice: "auto",
-    enabledTools: ["searchNotes", "getCurrentNote", "createNote"],
+    toolConfig: {},
     showAiHighlight: true,
+    showReasoning: true,
+    showFollowUps: true,
   },
   exportBackup: {
     defaultFormat: "markdown",

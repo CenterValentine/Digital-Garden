@@ -1,5 +1,5 @@
 ---
-last_updated: 2026-05-18
+last_updated: 2026-05-31
 current_epoch: 13
 current_sprint: 58
 sprint_status: planned
@@ -52,6 +52,26 @@ before planning and executing. There may be additions or modifications.
 **Detailed Plan**: `docs/notes-feature/work-tracking/epochs/epoch-13-people-and-collaboration.md`
 
 ## Recent Completions (Last 30 Days)
+
+**May 31, 2026**: AI Chat Revamp follow-up polish merged via PR #49 (commit `abaad12`)
+
+- Branch `feature/ai-chat-revamp`, 30 commits, +1450/-648 across the loading skeleton, workspace store, right sidebar, AI chat engine, and Vercel build config.
+- **Token-capture meters (Phase 2)** fixed: `useChat`'s `onFinish` was capturing a stale `messages` array because the SDK mutates `message.metadata` in place. Fix threads the SDK's `event.message` (fresh assistant with metadata) through `persistRef({ freshAssistant })` so `persistTurns` reads metadata directly instead of via the closure. Token + $ figures now persist on every new turn.
+- **Image generation routing** for Vercel AI Gateway: route via `@ai-sdk/gateway` + `experimental_generateImage` instead of raw fetch; detect Gemini image variants (Nano Banana / Nano Banana Pro) and route them through `generateText` with `result.files` since they're language-as-image, not image-API. Capability inference patterns added for Gemini-`*-image*`, Recraft, Seedream, Grok Imagine. Client-safe split of capability helpers (`lib/domain/ai/features/capabilities.ts`) to avoid `next/headers` leaking into client components. `/ai-image` slash command for inline doc image generation.
+- **Cold-load hydration races** fixed across three independent surfaces:
+  - File-tree double-fetch (`5984435`): tree fetch gated on `useWorkspaceStore.hasLoadedOnce` so the first cold-load request runs once with workspace context, not twice.
+  - Right-sidebar tab clobber (`d473777`): auto-correct + block-select effects in `RightSidebar.tsx` gated on `useRightSidebarStateStore.persist.hasHydrated()` to prevent pre-hydration writes from corrupting the persisted saved tab. `useRightSidebarStoreHydrated()` hook added.
+  - Workspace active-tab race (`9567695`): `restoreContentWorkspace` honors URL `?content=` when that ID belongs to the workspace's items, so deep-linking to tab 3 loads tab 3 first instead of last. Membership gating preserves the manual workspace-switch path.
+- **Loading skeleton flicker** fixed in two commits after a user slow-mo recording: theme-aware tokens replace hardcoded `border-white/10` / `text-gray-400` / `bg-white/5` and drop the fake "Welcome.md" tab title (`635bc9b`); right sidebar omitted from the skeleton entirely (`8293b3e`) since `useRightPanelCollapseStore` defaults to collapsed but the skeleton was painting a 300px sidebar that visibly slid out on hydration.
+- **Settings UX**: back button in settings sidebar that returns to the last content route rather than stepping through internal settings history (sessionStorage tracker in `NotesLayoutMarker`).
+- **Vercel build OOM** fixed: heap cap lowered from 6144→5120MB in `vercel-build` (`ffe7e31`). `NODE_OPTIONS` is inherited by every Next.js subprocess (page-data worker, static-page generator, trace collector); 6144 was tipping the 8 GB build container into SIGKILL during "Collecting build traces" on two consecutive preview deploys. 5120 still leaves 1 GB above the original 4 GB default and gives ~3 GB headroom for parallel subprocesses.
+- Known followups (now logged in BACKLOG): sticky chat drafts don't fully survive tab switches; an additional brief flash between `loading.tsx` and hydrated content remains (likely main-panel SSR/hydration paint sequence — needs DevTools paint capture to characterize).
+
+**May 30, 2026**: AI Chat Revamp epic merged via PR #48 (commit `1801568`)
+
+- Per-conversation persistence (`Conversation` Prisma entity), shared `useConversationEngine` hook + `useConversationBinding`, per-provider theming via `lib/design/system/ai-providers.ts`, sidebar tabbed strip with multi-conversation switching, edit / regenerate flows, attachments + image generation, reasoning-block UX (ChatGPT / Claude / Gemini / generic routers), follow-up prompts, AI Connections + Feature Routing settings pages replacing legacy AIKeyManager, per-Connection usage meters with source provenance pill.
+- Plan + session notes in [`work-tracking/AI-CHAT-REVAMP-PLAN.md`](work-tracking/AI-CHAT-REVAMP-PLAN.md) and [`AI-CHAT-REVAMP-SESSION-1-NOTES.md`](work-tracking/AI-CHAT-REVAMP-SESSION-1-NOTES.md).
+- Followup polish wave covered in PR #49 entry above.
 
 **May 18, 2026**: Epoch 18 (Multi-Tenancy Foundation) started — plan promoted from Claude scratchpad to canonical doc; foundation worktree provisioned
 

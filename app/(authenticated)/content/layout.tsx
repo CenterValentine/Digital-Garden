@@ -10,6 +10,7 @@ import { getSurfaceStyles } from "@/lib/design/system";
 import { ConditionalNotesLayout } from "@/components/content/ConditionalNotesLayout";
 import { NotesLayoutMarker } from "@/components/content/NotesLayoutMarker";
 import { PageLifecycle, WebVitalsReporter } from "@/lib/features/observability";
+import { DeferredStoreHydrator } from "@/lib/features/stores/deferred-store-hydrator";
 
 export default function NotesLayout({
   children,
@@ -35,6 +36,9 @@ export default function NotesLayout({
         {/* Observability — page lifecycle markers and Core Web Vitals */}
         <PageLifecycle route="/content" />
         <WebVitalsReporter route="/content" />
+
+        {/* Hydrate non-critical persisted zustand stores after first paint */}
+        <DeferredStoreHydrator />
 
         {/* Conditional layout: full panels or just children (fullscreen) */}
         <ConditionalNotesLayout glass0={glass0}>

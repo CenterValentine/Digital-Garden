@@ -20,6 +20,10 @@ export const PROVIDER_CATALOG: ProviderMeta[] = [
         maxOutput: 64_000,
         capabilities: ["text", "vision", "tools", "streaming"],
         costTier: "medium",
+        // Extended thinking is opt-in per call; chat route reads this
+        // and passes providerOptions.anthropic.thinking with the budget.
+        reasoning: "enabled",
+        thinkingBudgetTokens: 5_000,
       },
       {
         id: "claude-sonnet-3-5",
@@ -76,6 +80,18 @@ export const PROVIDER_CATALOG: ProviderMeta[] = [
         capabilities: ["text", "tools", "streaming"],
         costTier: "high",
       },
+      {
+        // OpenAI o-series reasoning model — auto-emits reasoning parts
+        // through the AI Gateway without any provider-options config.
+        // Cheapest reasoning option in the family. No vision support.
+        id: "o3-mini",
+        name: "o3-mini",
+        contextWindow: 200_000,
+        maxOutput: 100_000,
+        capabilities: ["text", "tools", "streaming"],
+        costTier: "medium",
+        reasoning: "auto",
+      },
     ],
   },
   {
@@ -90,6 +106,9 @@ export const PROVIDER_CATALOG: ProviderMeta[] = [
         maxOutput: 65_536,
         capabilities: ["text", "vision", "tools", "streaming"],
         costTier: "high",
+        // Gemini 2.5 Pro thinks by default; surfacing thoughts to the
+        // client requires providerOptions.google.thinkingConfig.includeThoughts.
+        reasoning: "enabled",
       },
       {
         id: "gemini-2.0-flash",

@@ -25,6 +25,10 @@ export const useExtensionsUiStore = create<ExtensionsUiState>()(
     {
       name: "extensions-ui-state",
       version: 2,
+      // Deferred hydration: dialog state isn't open on first render, so
+      // we paint with defaults and rehydrate after FCP via
+      // lib/features/stores/deferred-store-hydrator.tsx.
+      skipHydration: true,
     }
   )
 );

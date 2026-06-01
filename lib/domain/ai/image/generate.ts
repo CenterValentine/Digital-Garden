@@ -22,7 +22,6 @@ import type {
   ImageProviderId,
   ImageSize,
 } from "./types";
-import { getProviderKey } from "@/lib/domain/ai/keys";
 
 // ─── Size Helpers ──────────────────────────────────────────────
 
@@ -37,9 +36,10 @@ function parseDimensions(size: ImageSize): { width: number; height: number } {
  * Generate an image using the specified provider and model.
  *
  * Resolves API keys in priority order:
- *   1. Explicit apiKey in request
- *   2. Stored BYOK key for the provider
- *   3. Environment variable fallback
+ *   1. Explicit `apiKey` in request — callers (e.g. the image route)
+ *      pass the user's BYOK Connection key here.
+ *   2. Environment variable fallback — used when no Connection covers
+ *      this provider yet.
  *
  * @throws Error if API key is missing or generation fails
  */
@@ -47,16 +47,14 @@ export async function generateImage(
   request: ImageGenRequest,
   userId: string
 ): Promise<ImageGenResult> {
-  // Resolve API key
-  const apiKey =
-    request.apiKey ??
-    (await getProviderKey(userId, request.providerId)) ??
-    getEnvKey(request.providerId);
+  // userId reserved for the planned Connections-based key lookup.
+  void userId;
+  const apiKey = request.apiKey ?? getEnvKey(request.providerId);
 
   if (!apiKey) {
     throw new Error(
       `No API key configured for image provider "${request.providerId}". ` +
-        `Add one in Settings → AI → API Keys.`
+        `Set the matching environment variable or pass an apiKey in the request.`
     );
   }
 
@@ -133,28 +131,42 @@ async function dispatchToProvider(
 // ─── OpenAI (DALL-E 3 / GPT Image 1) ──────────────────────────
 
 async function generateOpenAI(req: ResolvedRequest): Promise<ImageGenResult> {
+  // Gateway routing path: `upstreamModelId` is the namespaced form
+  // (e.g. `openai/dall-e-3`) that the gateway expects. Direct path:
+  // fall back to canonical model id via the bare-id map. The
+  // `bareModelId` is used for capability flag decisions (quality /
+  // style apply to dall-e-3 regardless of namespace).
   const modelMap: Record<string, string> = {
     "dall-e-3": "dall-e-3",
     "gpt-image-1": "gpt-image-1",
   };
-  const model = modelMap[req.modelId] ?? "dall-e-3";
+  const upstreamModel =
+    req.upstreamModelId ?? modelMap[req.modelId] ?? "dall-e-3";
+  const bareModelId = upstreamModel.includes("/")
+    ? upstreamModel.slice(upstreamModel.indexOf("/") + 1)
+    : upstreamModel;
 
   const body: Record<string, unknown> = {
-    model,
+    model: upstreamModel,
     prompt: req.prompt,
     n: 1,
     size: req.size,
   };
 
-  if (req.quality && model === "dall-e-3") body.quality = req.quality;
-  if (req.style && model === "dall-e-3") body.style = req.style;
+  if (req.quality && bareModelId === "dall-e-3") body.quality = req.quality;
+  if (req.style && bareModelId === "dall-e-3") body.style = req.style;
 
   // gpt-image-1 returns base64 by default
-  if (model === "gpt-image-1") {
+  if (bareModelId === "gpt-image-1") {
     body.output_format = "png";
   }
 
-  const res = await fetch("https://api.openai.com/v1/images/generations", {
+  // Endpoint: direct OpenAI by default, override when routing through a
+  // gateway (Vercel AI Gateway uses the same path under its own host).
+  const baseURL = req.apiBaseURL ?? "https://api.openai.com/v1";
+  const url = `${baseURL.replace(/\/$/, "")}/images/generations`;
+
+  const res = await fetch(url, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${req.apiKey}`,

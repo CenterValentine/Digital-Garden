@@ -37,6 +37,10 @@ export const useNotesPanelStore = create<NotesPanelStore>()(
     {
       name: "dg-notes-panel",
       version: 1,
+      // Deferred hydration: notes panel state isn't visible on first
+      // paint. Defaults work for cold render; real values load after
+      // FCP via lib/features/stores/deferred-store-hydrator.tsx.
+      skipHydration: true,
     }
   )
 );

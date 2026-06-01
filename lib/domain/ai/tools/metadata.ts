@@ -22,11 +22,24 @@ export const BASE_TOOL_IDS = [
 
 export type BaseToolId = (typeof BASE_TOOL_IDS)[number];
 
-/** Tool metadata for the settings UI */
-export const BASE_TOOL_METADATA: Record<
-  BaseToolId,
-  { name: string; description: string }
-> = {
+/**
+ * Tool metadata for the settings UI.
+ *
+ * - `callsAi: true` means the tool itself invokes a remote AI provider
+ *   as part of its execution (currently only `generate_image`). Tools
+ *   with this flag get an optional provider override in settings so the
+ *   user can pin which Connection's key serves that tool.
+ * - `requiredCapabilities` constrains the override picker — only
+ *   Connections whose models satisfy these flags can serve as overrides.
+ */
+export interface BaseToolMeta {
+  name: string;
+  description: string;
+  callsAi?: boolean;
+  requiredCapabilities?: ReadonlyArray<string>;
+}
+
+export const BASE_TOOL_METADATA: Record<BaseToolId, BaseToolMeta> = {
   searchNotes: {
     name: "Search Notes",
     description: "Search through your notes by title or content",
@@ -43,6 +56,8 @@ export const BASE_TOOL_METADATA: Record<
     name: "Generate Image",
     description:
       "Generate an AI image from a text prompt using DALL·E, Imagen, FLUX, and other providers",
+    callsAi: true,
+    requiredCapabilities: ["image-generation"],
   },
 };
 

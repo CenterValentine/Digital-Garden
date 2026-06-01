@@ -10,7 +10,7 @@
     "start:collab": "tsx server/hocuspocus/bootstrap.ts",
     "typecheck": "tsc --noEmit",
     "build": "prisma generate && pnpm build:tokens && tsc --noEmit && pnpm collab:schema:check && pnpm lint && next build --webpack",
-    "vercel-build": "prisma generate && pnpm build:tokens && next build --webpack",
+    "vercel-build": "prisma generate && pnpm build:tokens && NODE_OPTIONS='--max-old-space-size=5120' next build --webpack",
     "start": "next start",
     "lint": "eslint --max-warnings 159",
     "lint:publishing": "eslint extensions/publishing/ lib/domain/blocks/ app/api/publishing/ components/public/ lib/domain/editor/commands/slash-commands-menu.tsx lib/domain/editor/commands/slash-commands.tsx lib/domain/editor/extensions/blocks/pull-quote.ts lib/domain/editor/extensions/blocks/table-of-contents.ts components/content/blocks/JsonArrayEditor.tsx components/content/editor/ImageBubbleMenu.tsx",
@@ -35,11 +35,12 @@
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.49",
+    "@ai-sdk/gateway": "^3.0.120",
     "@ai-sdk/google": "^3.0.43",
     "@ai-sdk/groq": "^3.0.29",
     "@ai-sdk/mistral": "^3.0.24",
     "@ai-sdk/openai": "^3.0.36",
-    "@ai-sdk/react": "^3.0.106",
+    "@ai-sdk/react": "^3.0.193",
     "@ai-sdk/xai": "^3.0.67",
     "@aws-sdk/client-s3": "^3.972.0",
     "@aws-sdk/s3-request-presigner": "^3.972.0",
@@ -60,6 +61,7 @@
     "@hocuspocus/server": "^3.4.4",
     "@hocuspocus/transformer": "^3.4.4",
     "@hookform/resolvers": "^5.2.2",
+    "@lobehub/icons": "^5.10.0",
     "@onlyoffice/document-editor-react": "^2.1.1",
     "@prisma/adapter-pg": "^7.2.0",
     "@prisma/client": "7.2.0",
@@ -113,7 +115,7 @@
     "@tiptap/suggestion": "^3.15.3",
     "@types/jsdom": "^28.0.1",
     "@vercel/blob": "^2.0.0",
-    "ai": "^6.0.104",
+    "ai": "^6.0.191",
     "allotment": "^1.20.3",
     "bcryptjs": "^3.0.3",
     "canvas": "^3.2.1",
@@ -192,5 +194,13 @@
     "tailwindcss-animate": "^1.0.7",
     "tsx": "^4.19.2",
     "typescript": "^5"
+  },
+  "pnpm": {
+    "peerDependencyRules": {
+      "allowedVersions": {
+        "react": "19",
+        "react-dom": "19"
+      }
+    }
   }
 }

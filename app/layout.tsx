@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import React from "react";
 import localFont from "next/font/local";
+import { Source_Serif_4, Inter, Roboto } from "next/font/google";
 import "./globals.css";
 
 import Head from "./layout/head";
@@ -18,6 +19,27 @@ const geistSans = localFont({
 const geistMono = localFont({
   src: "../public/fonts/cascadia-code-regular.woff2",
   variable: "--font-geist-mono",
+  display: "swap",
+});
+
+// Per-provider chat fonts approximating each brand's typography. Exposed
+// as CSS variables consumed by the AI provider themes
+// (`lib/design/system/ai-providers.ts`): Claude → a refined serif,
+// ChatGPT → a neutral grotesque (Inter ≈ Söhne), Gemini → Google's Roboto.
+const claudeSerif = Source_Serif_4({
+  subsets: ["latin"],
+  variable: "--font-claude",
+  display: "swap",
+});
+const gptSans = Inter({
+  subsets: ["latin"],
+  variable: "--font-gpt",
+  display: "swap",
+});
+const geminiSans = Roboto({
+  subsets: ["latin"],
+  weight: ["400", "500", "700"],
+  variable: "--font-gemini",
   display: "swap",
 });
 
@@ -94,7 +116,7 @@ export default function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
         <Head />
       </head>
-      <body className={`min-h-screen w-full relative ${geistSans.variable} ${geistMono.variable}`}>
+      <body className={`min-h-screen w-full relative ${geistSans.variable} ${geistMono.variable} ${claudeSerif.variable} ${gptSans.variable} ${geminiSans.variable}`}>
         {/* Initialize user settings on mount */}
         <SettingsInitializer />
         {/* Keep <html class="dark"> in sync as preference or OS scheme changes */}

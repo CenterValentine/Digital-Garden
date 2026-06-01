@@ -23,6 +23,7 @@ export type AIModelId =
   | "gpt-4o"
   | "gpt-4o-mini"
   | "gpt-4"
+  | "o3-mini"
   | "gemini-2.5-pro"
   | "gemini-2.0-flash"
   | "grok-3"

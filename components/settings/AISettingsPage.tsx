@@ -1,62 +1,77 @@
 /**
- * AI Settings Page — Sprint 33
+ * AI Settings Page — unified surface.
  *
- * Four sections for Sprint 33:
- *   1. Provider & Model selection (uses PROVIDER_CATALOG)
- *   2. Generation Parameters (temperature, maxTokens, streaming)
- *   3. AI Feature Toggles (enabled, conversation history, auto-suggest, privacy)
- *   4. Usage (read-only token quota display)
+ * Sections, top to bottom:
+ *   1. Connections (embedded `<AIConnectionsPage>`) — provider/gateway config
+ *   2. Feature Routing (embedded `<AIFeatureRoutingPage>`) — per-feature
+ *      primary + backup routes for app-initiated AI calls
+ *   3. Generation Parameters (temperature, maxTokens, typing effect, reasoning)
+ *   4. Features (master switch, AI content highlight)
+ *   5. AI Tools — per-tool enable/disable for the chat's tool-belt; tools
+ *      that themselves call AI (currently just `generate_image`) get an
+ *      optional Connection→Model override
  *
- * Future sprints add: Tool Choice (34), BYOK + Speech (35), RAG (36).
- * All settings persist via PATCH /api/user/settings → User.settings.ai JSONB.
+ * Removed from UI (fields kept in schema for last-resort fallback):
+ *   - Global provider/model picker — superseded by Connections + Feature
+ *     Routing. The chat route's `resolveSource` priority is explicit →
+ *     preset-match → feature-route → legacy, so the flat settings only
+ *     fire when nothing else resolves.
+ *   - Legacy provider-key manager (AIKeyManager) — pre-Connections BYOK
+ *     surface. Connections superseded it; the storage, routes, and Prisma
+ *     model have all been removed.
+ *   - Decorative toggles (streaming flag, conversation history, autoSuggest,
+ *     privacy mode, monthly quota, per-tool enable list) — schema fields
+ *     stay so a future wire-up can re-render them without losing user data.
+ *
+ * Standalone routes `/settings/ai/connections` and `/settings/ai/feature-routing`
+ * are now 308-redirects to this page. All flat AI settings persist via
+ * PATCH /api/user/settings → User.settings.ai JSONB.
  */
 
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 import { getSurfaceStyles } from "@/lib/design/system";
-import { PROVIDER_CATALOG, getModelMeta } from "@/lib/domain/ai";
-import type { AIProviderId } from "@/lib/domain/ai";
 import { Button } from "@/components/ui/glass/button";
-import { Check, AlertCircle, Wrench, Key } from "lucide-react";
+import { Check, Wrench } from "lucide-react";
 import { toast } from "sonner";
-import { ALL_TOOL_IDS, ALL_TOOL_METADATA } from "@/lib/domain/ai/tools/metadata";
-import { AIKeyManager } from "@/components/settings/AIKeyManager";
+import AIConnectionsPage from "@/components/settings/AIConnectionsPage";
+import AIFeatureRoutingPage from "@/components/settings/AIFeatureRoutingPage";
+import {
+  ALL_TOOL_IDS,
+  ALL_TOOL_METADATA,
+  BASE_TOOL_METADATA,
+} from "@/lib/domain/ai/tools/metadata";
+import { IMAGE_PROVIDER_CATALOG } from "@/lib/domain/ai/image/catalog";
 import { clientLogger } from "@/lib/core/logger/client";
 
 /** Shape of ai settings as stored in User.settings.ai */
 interface AISettings {
   enabled?: boolean;
-  providerId?: AIProviderId;
-  modelId?: string;
   temperature?: number;
   maxTokens?: number;
-  streamingEnabled?: boolean;
-  conversationHistory?: boolean;
-  autoSuggest?: boolean;
-  privacyMode?: "full" | "minimal" | "none";
-  monthlyTokenQuota?: number;
-  tokensUsedThisMonth?: number;
-  toolChoice?: "auto" | "none";
-  enabledTools?: string[];
+  typingEffect?: boolean;
+  toolConfig?: Record<
+    string,
+    {
+      enabled?: boolean;
+      routeOverride?: { presetId: string; modelId: string };
+    }
+  >;
   showAiHighlight?: boolean;
+  showReasoning?: boolean;
+  showFollowUps?: boolean;
 }
 
 const DEFAULTS: Required<AISettings> = {
   enabled: true,
-  providerId: "anthropic",
-  modelId: "claude-sonnet-3-5",
   temperature: 0.7,
   maxTokens: 4096,
-  streamingEnabled: true,
-  conversationHistory: true,
-  autoSuggest: true,
-  privacyMode: "full",
-  monthlyTokenQuota: 100_000,
-  tokensUsedThisMonth: 0,
-  toolChoice: "auto",
-  enabledTools: [...ALL_TOOL_IDS],
+  typingEffect: true,
+  toolConfig: {},
   showAiHighlight: true,
+  showReasoning: true,
+  showFollowUps: true,
 };
 
 export default function AISettingsPage() {
@@ -64,19 +79,18 @@ export default function AISettingsPage() {
 
   // Form state
   const [enabled, setEnabled] = useState(DEFAULTS.enabled);
-  const [providerId, setProviderId] = useState<AIProviderId>(DEFAULTS.providerId);
-  const [modelId, setModelId] = useState(DEFAULTS.modelId);
   const [temperature, setTemperature] = useState(DEFAULTS.temperature);
   const [maxTokens, setMaxTokens] = useState(DEFAULTS.maxTokens);
-  const [streamingEnabled, setStreamingEnabled] = useState(DEFAULTS.streamingEnabled);
-  const [conversationHistory, setConversationHistory] = useState(DEFAULTS.conversationHistory);
-  const [autoSuggest, setAutoSuggest] = useState(DEFAULTS.autoSuggest);
-  const [privacyMode, setPrivacyMode] = useState<"full" | "minimal" | "none">(DEFAULTS.privacyMode);
-  const [monthlyTokenQuota, setMonthlyTokenQuota] = useState(DEFAULTS.monthlyTokenQuota);
-  const [tokensUsedThisMonth, setTokensUsedThisMonth] = useState(DEFAULTS.tokensUsedThisMonth);
-  const [toolChoice, setToolChoice] = useState<"auto" | "none">(DEFAULTS.toolChoice);
-  const [enabledTools, setEnabledTools] = useState<string[]>(DEFAULTS.enabledTools);
+  const [typingEffect, setTypingEffect] = useState(DEFAULTS.typingEffect);
+  const [toolConfig, setToolConfig] = useState<NonNullable<AISettings["toolConfig"]>>(
+    DEFAULTS.toolConfig,
+  );
+  const [connections, setConnections] = useState<
+    Array<{ id: string; name: string; presetId: string | null }>
+  >([]);
   const [showAiHighlight, setShowAiHighlight] = useState(DEFAULTS.showAiHighlight);
+  const [showReasoning, setShowReasoning] = useState(DEFAULTS.showReasoning);
+  const [showFollowUps, setShowFollowUps] = useState(DEFAULTS.showFollowUps);
 
   // UI state
   const [isLoading, setIsLoading] = useState(true);
@@ -93,19 +107,13 @@ export default function AISettingsPage() {
         if (data.success && data.data?.ai) {
           const ai: AISettings = data.data.ai;
           if (ai.enabled !== undefined) setEnabled(ai.enabled);
-          if (ai.providerId) setProviderId(ai.providerId);
-          if (ai.modelId) setModelId(ai.modelId);
           if (ai.temperature !== undefined) setTemperature(ai.temperature);
           if (ai.maxTokens !== undefined) setMaxTokens(ai.maxTokens);
-          if (ai.streamingEnabled !== undefined) setStreamingEnabled(ai.streamingEnabled);
-          if (ai.conversationHistory !== undefined) setConversationHistory(ai.conversationHistory);
-          if (ai.autoSuggest !== undefined) setAutoSuggest(ai.autoSuggest);
-          if (ai.privacyMode) setPrivacyMode(ai.privacyMode);
-          if (ai.monthlyTokenQuota !== undefined) setMonthlyTokenQuota(ai.monthlyTokenQuota);
-          if (ai.tokensUsedThisMonth !== undefined) setTokensUsedThisMonth(ai.tokensUsedThisMonth);
-          if (ai.toolChoice) setToolChoice(ai.toolChoice);
-          if (ai.enabledTools) setEnabledTools(ai.enabledTools);
+          if (ai.typingEffect !== undefined) setTypingEffect(ai.typingEffect);
+          if (ai.toolConfig) setToolConfig(ai.toolConfig);
           if (ai.showAiHighlight !== undefined) setShowAiHighlight(ai.showAiHighlight);
+          if (ai.showReasoning !== undefined) setShowReasoning(ai.showReasoning);
+          if (ai.showFollowUps !== undefined) setShowFollowUps(ai.showFollowUps);
         }
       } catch (err) {
         clientLogger.error({
@@ -122,17 +130,32 @@ export default function AISettingsPage() {
     loadSettings();
   }, []);
 
-  // When provider changes, pick first model of that provider
-  const handleProviderChange = useCallback(
-    (newProviderId: AIProviderId) => {
-      setProviderId(newProviderId);
-      const provider = PROVIDER_CATALOG.find((p) => p.id === newProviderId);
-      if (provider && provider.models.length > 0) {
-        setModelId(provider.models[0].id);
-      }
-    },
-    []
-  );
+  // Load connections for the tool override picker (cheap; ~1 row per
+  // configured provider). Failure is non-fatal — empty list = override
+  // simply has no compatible options to show.
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/ai/connections", { credentials: "include" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((body) => {
+        if (cancelled || !body?.data?.items) return;
+        setConnections(
+          (body.data.items as Array<{
+            id: string;
+            name: string;
+            presetId: string | null;
+          }>).map((c) => ({
+            id: c.id,
+            name: c.name,
+            presetId: c.presetId,
+          })),
+        );
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Save settings
   const saveSettings = async () => {
@@ -147,19 +170,13 @@ export default function AISettingsPage() {
         body: JSON.stringify({
           ai: {
             enabled,
-            providerId,
-            modelId,
             temperature,
             maxTokens,
-            streamingEnabled,
-            conversationHistory,
-            autoSuggest,
-            privacyMode,
-            monthlyTokenQuota,
-            tokensUsedThisMonth,
-            toolChoice,
-            enabledTools,
+            typingEffect,
+            toolConfig,
             showAiHighlight,
+            showReasoning,
+            showFollowUps,
           },
         }),
       });
@@ -185,27 +202,6 @@ export default function AISettingsPage() {
     }
   };
 
-  // Derived data
-  const selectedProvider = PROVIDER_CATALOG.find((p) => p.id === providerId);
-  const selectedModelMeta = getModelMeta(modelId);
-  const usagePercent =
-    monthlyTokenQuota > 0
-      ? Math.round((tokensUsedThisMonth / monthlyTokenQuota) * 100)
-      : 0;
-
-  const usageColor =
-    usagePercent >= 90
-      ? "bg-red-500"
-      : usagePercent >= 70
-        ? "bg-yellow-500"
-        : "bg-green-500";
-
-  const usageDotColor =
-    usagePercent >= 90
-      ? "text-red-400"
-      : usagePercent >= 70
-        ? "text-yellow-400"
-        : "text-green-400";
 
   if (isLoading) {
     return (
@@ -231,107 +227,19 @@ export default function AISettingsPage() {
         <p className="text-muted-foreground mt-2">Provider, model, and generation settings</p>
       </div>
 
-      {/* ─── Section 1: Provider & Model ─── */}
-      <div
-        className="border border-white/10 rounded-lg p-6"
-        style={{ background: glass0.background, backdropFilter: glass0.backdropFilter }}
-      >
-        <h3 className="text-lg font-semibold mb-4">Provider & Model</h3>
+      {/* ─── Connections + Feature Routing ───
+          These two embedded sub-pages already render their own card-
+          per-entry chrome. An outer glass card would just double-nest
+          everything (the original symptom that motivated this polish
+          pass). We give each an `<section>` wrapper for semantics +
+          spacing and let the embedded page handle its own visuals. */}
+      <section className="space-y-1">
+        <AIConnectionsPage embedded />
+      </section>
 
-        {/* Provider Selection */}
-        <div className="mb-6">
-          <label className="block text-sm font-medium text-gray-300 mb-3">Provider</label>
-          <div className="space-y-2">
-            {PROVIDER_CATALOG.map((provider) => (
-              <label
-                key={provider.id}
-                className={`flex items-start gap-3 p-2.5 rounded-lg border cursor-pointer transition-colors ${
-                  providerId === provider.id
-                    ? "border-primary/40 bg-primary/5"
-                    : "border-white/10 hover:bg-white/5"
-                }`}
-              >
-                <input
-                  type="radio"
-                  name="providerId"
-                  value={provider.id}
-                  checked={providerId === provider.id}
-                  onChange={() => handleProviderChange(provider.id as AIProviderId)}
-                  className="mt-0.5"
-                />
-                <div className="flex-1">
-                  <div className="font-medium text-sm">{provider.name}</div>
-                  <div className="text-sm text-gray-400">
-                    {provider.models.length} model{provider.models.length !== 1 ? "s" : ""} available
-                  </div>
-                </div>
-              </label>
-            ))}
-          </div>
-        </div>
-
-        {/* Model Selection */}
-        <div>
-          <label className="block text-sm font-medium text-gray-300 mb-3">Model</label>
-          {selectedProvider && (
-            <div className="space-y-2">
-              {selectedProvider.models.map((model) => (
-                <label
-                  key={model.id}
-                  className={`flex items-start gap-3 p-2.5 rounded-lg border cursor-pointer transition-colors ${
-                    modelId === model.id
-                      ? "border-primary/40 bg-primary/5"
-                      : "border-white/10 hover:bg-white/5"
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="modelId"
-                    value={model.id}
-                    checked={modelId === model.id}
-                    onChange={() => setModelId(model.id)}
-                    className="mt-0.5"
-                  />
-                  <div className="flex-1">
-                    <div className="font-medium text-sm flex items-center gap-2">
-                      {model.name}
-                      <span
-                        className={`px-1.5 py-0.5 text-xs rounded ${
-                          model.costTier === "low"
-                            ? "bg-green-500/20 text-green-400"
-                            : model.costTier === "medium"
-                              ? "bg-blue-500/20 text-blue-400"
-                              : "bg-purple-500/20 text-purple-400"
-                        }`}
-                      >
-                        {model.costTier}
-                      </span>
-                    </div>
-                    <div className="text-xs text-gray-500 mt-1">
-                      {(model.contextWindow / 1000).toFixed(0)}K context
-                      {" · "}
-                      {(model.maxOutput / 1000).toFixed(0)}K max output
-                      {model.capabilities.includes("vision") && " · Vision"}
-                      {model.capabilities.includes("tools") && " · Tools"}
-                    </div>
-                  </div>
-                </label>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Model Info */}
-        {selectedModelMeta && (
-          <div className="mt-4 pt-4 border-t border-white/10">
-            <div className="text-xs text-gray-400">
-              <span className="inline-block w-2 h-2 rounded-full bg-green-500 mr-2" />
-              Using <span className="text-gray-300">{selectedModelMeta.model.name}</span> via{" "}
-              <span className="text-gray-300">{selectedModelMeta.provider.name}</span>
-            </div>
-          </div>
-        )}
-      </div>
+      <section className="space-y-1">
+        <AIFeatureRoutingPage embedded />
+      </section>
 
       {/* ─── Section 2: Generation Parameters ─── */}
       <div
@@ -390,28 +298,62 @@ export default function AISettingsPage() {
               }}
               className="w-full px-3 py-2 bg-black/20 border border-white/10 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
             />
-            {selectedModelMeta && maxTokens > selectedModelMeta.model.maxOutput && (
-              <p className="text-xs text-yellow-400 mt-2 flex items-center gap-1">
-                <AlertCircle className="h-3 w-3" />
-                Exceeds {selectedModelMeta.model.name}&apos;s max output of{" "}
-                {selectedModelMeta.model.maxOutput.toLocaleString()} tokens. The model will cap
-                output at its own limit.
-              </p>
-            )}
           </div>
 
-          {/* Streaming Toggle */}
+          {/* Typing Effect Toggle */}
           <div>
             <label className="flex items-center gap-3 p-2.5 rounded-lg border border-white/10 hover:bg-white/5 cursor-pointer transition-colors">
               <input
                 type="checkbox"
-                checked={streamingEnabled}
-                onChange={(e) => setStreamingEnabled(e.target.checked)}
+                checked={typingEffect}
+                onChange={(e) => setTypingEffect(e.target.checked)}
               />
               <div className="flex-1">
-                <div className="font-medium text-sm">Enable Streaming</div>
+                <div className="font-medium text-sm">Typing Effect</div>
                 <div className="text-sm text-gray-400">
-                  See responses appear token-by-token instead of waiting for the full response.
+                  Reveal streaming responses with a subtle typewriter
+                  animation instead of appearing all at once.
+                </div>
+              </div>
+            </label>
+          </div>
+
+          {/* Reasoning Toggle (Session 6) */}
+          <div>
+            <label className="flex items-center gap-3 p-2.5 rounded-lg border border-white/10 hover:bg-white/5 cursor-pointer transition-colors">
+              <input
+                type="checkbox"
+                checked={showReasoning}
+                onChange={(e) => setShowReasoning(e.target.checked)}
+              />
+              <div className="flex-1">
+                <div className="font-medium text-sm">Show reasoning when available</div>
+                <div className="text-sm text-gray-400">
+                  Display the model&apos;s &ldquo;thinking&rdquo; trace
+                  (Anthropic extended thinking, OpenAI o-series, Google
+                  thinking-*) above the answer. Doesn&apos;t enable the
+                  capability itself &mdash; only renders what the model emits.
+                </div>
+              </div>
+            </label>
+          </div>
+
+          {/* Follow-ups Toggle (Session 7) */}
+          <div>
+            <label className="flex items-center gap-3 p-2.5 rounded-lg border border-white/10 hover:bg-white/5 cursor-pointer transition-colors">
+              <input
+                type="checkbox"
+                checked={showFollowUps}
+                onChange={(e) => setShowFollowUps(e.target.checked)}
+              />
+              <div className="flex-1">
+                <div className="font-medium text-sm">Show suggested follow-ups</div>
+                <div className="text-sm text-gray-400">
+                  After each assistant reply, render 2&ndash;3 chip
+                  suggestions for the next prompt. Click a chip to load it
+                  into the composer. The model used lives in{" "}
+                  <span className="text-gray-300">Feature Routing</span> under
+                  &ldquo;Suggested Follow-ups.&rdquo;
                 </div>
               </div>
             </label>
@@ -452,36 +394,6 @@ export default function AISettingsPage() {
             </div>
           </label>
 
-          {/* Conversation History */}
-          <label className="flex items-center gap-3 p-2.5 rounded-lg border border-white/10 hover:bg-white/5 cursor-pointer transition-colors">
-            <input
-              type="checkbox"
-              checked={conversationHistory}
-              onChange={(e) => setConversationHistory(e.target.checked)}
-            />
-            <div className="flex-1">
-              <div className="font-medium text-sm">Conversation History</div>
-              <div className="text-sm text-gray-400">
-                Include previous messages as context for follow-up questions.
-              </div>
-            </div>
-          </label>
-
-          {/* Auto-Suggest */}
-          <label className="flex items-center gap-3 p-2.5 rounded-lg border border-white/10 hover:bg-white/5 cursor-pointer transition-colors">
-            <input
-              type="checkbox"
-              checked={autoSuggest}
-              onChange={(e) => setAutoSuggest(e.target.checked)}
-            />
-            <div className="flex-1">
-              <div className="font-medium text-sm">Auto-Suggest</div>
-              <div className="text-sm text-gray-400">
-                Show AI-powered suggestions while editing notes.
-              </div>
-            </div>
-          </label>
-
           {/* AI Content Highlighting */}
           <label className="flex items-center gap-3 p-2.5 rounded-lg border border-white/10 hover:bg-white/5 cursor-pointer transition-colors">
             <input
@@ -497,229 +409,50 @@ export default function AISettingsPage() {
             </div>
           </label>
 
-          {/* Privacy Mode */}
-          <div className="pt-2">
-            <label className="block text-sm font-medium text-gray-300 mb-3">Privacy Mode</label>
-            <p className="text-xs text-gray-500 mb-3">
-              Controls how much note content is sent to the AI provider.
-            </p>
-            <div className="space-y-2">
-              {[
-                {
-                  value: "full" as const,
-                  label: "Full Context",
-                  description: "Send complete note content for the best AI responses.",
-                },
-                {
-                  value: "minimal" as const,
-                  label: "Minimal Context",
-                  description: "Send only the selected text or current paragraph.",
-                },
-                {
-                  value: "none" as const,
-                  label: "No Context",
-                  description: "Never send note content. Chat-only mode with no document awareness.",
-                },
-              ].map((mode) => (
-                <label
-                  key={mode.value}
-                  className={`flex items-start gap-3 p-2.5 rounded-lg border cursor-pointer transition-colors ${
-                    privacyMode === mode.value
-                      ? "border-primary/40 bg-primary/5"
-                      : "border-white/10 hover:bg-white/5"
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="privacyMode"
-                    value={mode.value}
-                    checked={privacyMode === mode.value}
-                    onChange={() => setPrivacyMode(mode.value)}
-                    className="mt-0.5"
-                  />
-                  <div className="flex-1">
-                    <div className="font-medium text-sm">{mode.label}</div>
-                    <div className="text-sm text-gray-400">{mode.description}</div>
-                  </div>
-                </label>
-              ))}
-            </div>
-          </div>
         </div>
       </div>
 
-      {/* ─── Section 5: AI Tools ─── */}
+      {/* ─── AI Tools — per-tool enable + override ─── */}
       <div
         className="border border-white/10 rounded-lg p-6"
         style={{ background: glass0.background, backdropFilter: glass0.backdropFilter }}
       >
-        <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+        <h3 className="text-lg font-semibold mb-2 flex items-center gap-2">
           <Wrench className="h-5 w-5 text-gray-400" />
           AI Tools
         </h3>
-
-        <div className="space-y-4">
-          {/* Tool Choice */}
-          <div>
-            <label className="block text-sm font-medium text-gray-300 mb-3">
-              Tool Choice
-            </label>
-            <p className="text-xs text-gray-500 mb-3">
-              Controls whether the AI can use tools to search, read, and create notes.
-            </p>
-            <div className="space-y-2">
-              {[
-                {
-                  value: "auto" as const,
-                  label: "Auto",
-                  description: "Let the AI decide when to use tools based on the conversation.",
-                },
-                {
-                  value: "none" as const,
-                  label: "None",
-                  description: "Disable all tools. The AI will only respond with text.",
-                },
-              ].map((mode) => (
-                <label
-                  key={mode.value}
-                  className={`flex items-start gap-3 p-2.5 rounded-lg border cursor-pointer transition-colors ${
-                    toolChoice === mode.value
-                      ? "border-primary/40 bg-primary/5"
-                      : "border-white/10 hover:bg-white/5"
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="toolChoice"
-                    value={mode.value}
-                    checked={toolChoice === mode.value}
-                    onChange={() => setToolChoice(mode.value)}
-                    className="mt-0.5"
-                  />
-                  <div className="flex-1">
-                    <div className="font-medium text-sm">{mode.label}</div>
-                    <div className="text-sm text-gray-400">{mode.description}</div>
-                  </div>
-                </label>
-              ))}
-            </div>
-          </div>
-
-          {/* Individual Tool Toggles */}
-          {toolChoice === "auto" && (
-            <div className="pt-4 border-t border-white/10">
-              <label className="block text-sm font-medium text-gray-300 mb-3">
-                Available Tools
-              </label>
-              <div className="space-y-2">
-                {ALL_TOOL_IDS.map((toolId) => {
-                  const meta = ALL_TOOL_METADATA[toolId];
-                  const isEnabled = enabledTools.includes(toolId);
-                  return (
-                    <label
-                      key={toolId}
-                      className={`flex items-center gap-3 p-2.5 rounded-lg border cursor-pointer transition-colors ${
-                        isEnabled
-                          ? "border-green-500/20 bg-green-500/5 hover:bg-green-500/10"
-                          : "border-white/10 hover:bg-white/5"
-                      }`}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={isEnabled}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setEnabledTools([...enabledTools, toolId]);
-                          } else {
-                            setEnabledTools(enabledTools.filter((t) => t !== toolId));
-                          }
-                        }}
-                      />
-                      <div className="flex-1">
-                        <div className="font-medium text-sm">{meta.name}</div>
-                        <div className="text-sm text-gray-400">{meta.description}</div>
-                      </div>
-                    </label>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* ─── Section: API Keys (BYOK) ─── */}
-      <div
-        className="border border-white/10 rounded-lg p-6"
-        style={{ background: glass0.background, backdropFilter: glass0.backdropFilter }}
-      >
-        <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-          <Key className="h-5 w-5 text-gray-400" />
-          API Keys
-        </h3>
         <p className="text-sm text-gray-400 mb-4">
-          Bring your own API keys to use your provider accounts directly.
-          Keys are encrypted at rest and never leave the server.
+          Tools the chat AI can invoke during a turn. Disable any tool to
+          remove it from the assistant&apos;s tool-belt. Tools that themselves
+          call a remote AI provider (currently just{" "}
+          <span className="text-gray-300">Generate Image</span>) can be pinned
+          to a specific Connection so they always route through your key for
+          that provider.
         </p>
-        <AIKeyManager />
-      </div>
 
-      {/* ─── Section 4: Usage (read-only) ─── */}
-      <div
-        className="border border-white/10 rounded-lg p-6"
-        style={{ background: glass0.background, backdropFilter: glass0.backdropFilter }}
-      >
-        <h3 className="text-lg font-semibold mb-4">Usage</h3>
-
-        <div className="space-y-4">
-          {/* Token Quota Bar */}
-          <div>
-            <div className="flex justify-between text-sm mb-2">
-              <span className="text-gray-300">
-                {tokensUsedThisMonth.toLocaleString()} / {monthlyTokenQuota.toLocaleString()} tokens
-              </span>
-              <span className={usageDotColor}>{usagePercent}% used</span>
-            </div>
-            <div className="w-full h-2 bg-white/10 rounded-full overflow-hidden">
-              <div
-                className={`h-full ${usageColor} rounded-full transition-all duration-300`}
-                style={{ width: `${Math.min(usagePercent, 100)}%` }}
-              />
-            </div>
-          </div>
-
-          {/* Status */}
-          <div className="pt-2 border-t border-white/10">
-            <div className="text-xs text-gray-400">
-              <span className={`inline-block w-2 h-2 rounded-full ${usageColor} mr-2`} />
-              {usagePercent >= 90
-                ? "Approaching quota limit. Consider increasing your monthly quota."
-                : usagePercent >= 70
-                  ? "Usage is moderate. Plenty of tokens remaining."
-                  : "Usage is healthy. Token budget is on track."}
-            </div>
-          </div>
-
-          {/* Monthly Quota Setting */}
-          <div className="pt-4 border-t border-white/10">
-            <label className="block text-sm font-medium text-gray-300 mb-2">
-              Monthly Token Quota
-            </label>
-            <p className="text-xs text-gray-500 mb-3">
-              Set a soft limit for monthly token usage.
-            </p>
-            <input
-              type="number"
-              min={1000}
-              step={10000}
-              value={monthlyTokenQuota}
-              onChange={(e) => {
-                const val = parseInt(e.target.value, 10);
-                if (!isNaN(val) && val >= 1000) setMonthlyTokenQuota(val);
-              }}
-              className="w-full px-3 py-2 bg-black/20 border border-white/10 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+        <div className="space-y-2">
+          {ALL_TOOL_IDS.map((toolId) => (
+            <ToolConfigRow
+              key={toolId}
+              toolId={toolId}
+              meta={ALL_TOOL_METADATA[toolId]}
+              callsAi={BASE_TOOL_METADATA[toolId as keyof typeof BASE_TOOL_METADATA]?.callsAi}
+              config={toolConfig[toolId] ?? {}}
+              connections={connections}
+              onChange={(next) =>
+                setToolConfig((prev) => {
+                  // Strip the entry when it returns to all-defaults so the
+                  // JSON doesn't accumulate noise.
+                  const isDefault =
+                    next.enabled === undefined && next.routeOverride === undefined;
+                  const out = { ...prev };
+                  if (isDefault) delete out[toolId];
+                  else out[toolId] = next;
+                  return out;
+                })
+              }
             />
-          </div>
+          ))}
         </div>
       </div>
 
@@ -729,6 +462,167 @@ export default function AISettingsPage() {
           {isSaving ? "Saving..." : "Save AI Settings"}
         </Button>
       </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Tool row — handles enable/disable, plus a Connection→Model cascade for
+// tools that themselves call a remote AI provider (`callsAi`).
+//
+// For generate_image, the model dropdown is sourced from
+// `IMAGE_PROVIDER_CATALOG` (the image-gen-specific model list) keyed by
+// the chosen Connection’\s `presetId`. Other future `callsAi` tools would
+// need their own resolver; for now this row only encodes the one case.
+// ─────────────────────────────────────────────────────────────────────────
+
+interface ToolConfigEntry {
+  enabled?: boolean;
+  routeOverride?: { presetId: string; modelId: string };
+}
+
+interface ToolConfigRowProps {
+  toolId: string;
+  meta: { name: string; description: string };
+  callsAi?: boolean;
+  config: ToolConfigEntry;
+  connections: Array<{ id: string; name: string; presetId: string | null }>;
+  onChange: (next: ToolConfigEntry) => void;
+}
+
+function ToolConfigRow({
+  toolId,
+  meta,
+  callsAi,
+  config,
+  connections,
+  onChange,
+}: ToolConfigRowProps) {
+  const enabled = config.enabled ?? true;
+  const override = config.routeOverride;
+
+  // Compatible connections = those whose presetId appears in the image
+  // provider catalog (only relevant when callsAi). Empty = no override
+  // available, so the picker shows a disabled hint.
+  const imagePresetIds: ReadonlySet<string> = new Set(
+    IMAGE_PROVIDER_CATALOG.map((p) => p.id as string),
+  );
+  const compatibleConnections = connections.filter(
+    (c) => c.presetId !== null && imagePresetIds.has(c.presetId),
+  );
+
+  const modelsForPreset = (presetId: string | null) => {
+    if (!presetId) return [];
+    return IMAGE_PROVIDER_CATALOG.find((p) => p.id === presetId)?.models ?? [];
+  };
+
+  return (
+    <div
+      className={`rounded-lg border p-3 transition-colors ${
+        enabled ? "border-white/10 bg-white/[0.02]" : "border-white/5 bg-black/10"
+      }`}
+    >
+      <label className="flex items-start gap-3 cursor-pointer">
+        <input
+          type="checkbox"
+          checked={enabled}
+          onChange={(e) => {
+            // Default-on, so only persist when off OR when an override
+            // is set; otherwise clear back to defaults.
+            const nextEnabled = e.target.checked;
+            onChange({
+              ...config,
+              enabled: nextEnabled ? undefined : false,
+            });
+          }}
+          className="mt-1"
+        />
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium text-gray-200">{meta.name}</span>
+            <code className="text-[10px] text-gray-500 bg-black/20 px-1 py-px rounded">
+              {toolId}
+            </code>
+            {callsAi && (
+              <span className="text-[10px] px-1.5 py-px rounded bg-amber-500/20 text-amber-300 font-medium uppercase tracking-wide">
+                Calls AI
+              </span>
+            )}
+          </div>
+          <p className="text-xs text-gray-500 mt-0.5">{meta.description}</p>
+        </div>
+      </label>
+
+      {callsAi && enabled && (
+        <div className="mt-3 pl-7 border-l border-white/10 ml-1.5 space-y-2">
+          <div className="text-xs text-gray-400">
+            Override: always route this tool through a specific Connection.
+          </div>
+          {compatibleConnections.length === 0 ? (
+            <div className="text-xs text-gray-500 italic">
+              No Connections support image generation yet. Add an OpenAI or
+              Google Connection above to enable an override.
+            </div>
+          ) : (
+            <div className="flex flex-wrap gap-2 items-center">
+              <select
+                value={
+                  override
+                    ? connections.find(
+                        (c) => c.presetId === override.presetId,
+                      )?.id ?? ""
+                    : ""
+                }
+                onChange={(e) => {
+                  const conn = connections.find((c) => c.id === e.target.value);
+                  if (!conn || !conn.presetId) {
+                    onChange({ ...config, routeOverride: undefined });
+                    return;
+                  }
+                  const firstModel = modelsForPreset(conn.presetId)[0];
+                  if (!firstModel) {
+                    onChange({ ...config, routeOverride: undefined });
+                    return;
+                  }
+                  onChange({
+                    ...config,
+                    routeOverride: { presetId: conn.presetId, modelId: firstModel.id },
+                  });
+                }}
+                className="bg-black/20 border border-white/10 rounded-md px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-primary/40"
+              >
+                <option value="">Use feature routing / env vars</option>
+                {compatibleConnections.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name} ({c.presetId})
+                  </option>
+                ))}
+              </select>
+              {override && (
+                <select
+                  value={override.modelId}
+                  onChange={(e) =>
+                    onChange({
+                      ...config,
+                      routeOverride: {
+                        presetId: override.presetId,
+                        modelId: e.target.value,
+                      },
+                    })
+                  }
+                  className="bg-black/20 border border-white/10 rounded-md px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-primary/40"
+                >
+                  {modelsForPreset(override.presetId).map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.name}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

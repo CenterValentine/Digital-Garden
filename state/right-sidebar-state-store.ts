@@ -65,6 +65,12 @@ export const useRightSidebarStateStore = create<RightSidebarState>()(
     {
       name: "right-sidebar-state",
       version: 1,
+      // Deferred hydration: the right sidebar's active-tab-per-content
+      // mapping affects an inert sidebar that isn't load-bearing on
+      // first paint. Defaults to "backlinks" tab on cold render; real
+      // last-active tab loads after FCP via
+      // lib/features/stores/deferred-store-hydrator.tsx.
+      skipHydration: true,
     }
   )
 );

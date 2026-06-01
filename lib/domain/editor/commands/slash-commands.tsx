@@ -634,6 +634,20 @@ export function getSlashCommands(): SlashCommand[] {
       },
       aliases: ["img", "picture", "photo"],
     },
+    // AI image generation — opens the same AiImageGenDialog used by the
+    // file-tree right-click flow, but on success dispatches the existing
+    // `insert-ai-image` event so the image lands inline at the cursor.
+    // MarkdownEditor mounts the dialog in response to this event.
+    {
+      title: "AI Image",
+      description: "Generate an image with AI and insert at cursor",
+      icon: "✨",
+      command: ({ editor, range }) => {
+        editor.chain().focus().deleteRange(range).run();
+        window.dispatchEvent(new CustomEvent("editor-open-ai-image"));
+      },
+      aliases: ["ai-image", "generate image", "dalle", "imagen", "ai picture"],
+    },
     // M6: Tag insertion
     {
       title: "Tag",

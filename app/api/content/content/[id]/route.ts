@@ -67,6 +67,7 @@ import type {
   UpdateContentRequest,
 } from "@/lib/domain/content/api-types";
 import type { StoredChatMessage } from "@/lib/domain/ai/types";
+import { softDeleteConversation } from "@/lib/features/conversations";
 
 type Params = Promise<{ id: string }>;
 
@@ -1434,6 +1435,30 @@ export async function DELETE(
       // instead of returning a stale cached copy. The setCachedContent
       // guard for deletedAt prevents re-population from in-flight reads.
       invalidateCachedContent(id);
+
+      // Chat nodes are Conversation-backed (ContentNode = shell,
+      // Conversation = live data). Deleting the node deletes the chat, so
+      // cascade the soft-delete to the backing Conversation — otherwise it
+      // lingers in sidebar tabs and the picker. softDeleteConversation also
+      // publishes the `conversation.deleted` SSE so open surfaces drop it
+      // live.
+      if (existing.contentType === "chat") {
+        const backing = await prisma.conversation.findFirst({
+          where: {
+            archivedToContentNodeId: id,
+            ownerId: session.user.id,
+            deletedAt: null,
+          },
+          select: { id: true },
+        });
+        if (backing) {
+          await softDeleteConversation(session.user.id, backing.id).catch(
+            () => {
+              /* best-effort cascade — node delete already succeeded */
+            },
+          );
+        }
+      }
 
       return NextResponse.json({
         success: true,

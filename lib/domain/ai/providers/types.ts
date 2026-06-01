@@ -12,6 +12,17 @@ export type ModelCapability = "text" | "vision" | "tools" | "streaming" | "image
 /** Cost tier for display in settings */
 export type CostTier = "low" | "medium" | "high";
 
+/**
+ * Reasoning posture (Session 6):
+ *   - `auto`    — provider emits reasoning unprompted (OpenAI o-series).
+ *   - `enabled` — provider needs `providerOptions` opt-in per call.
+ *                 The chat route looks at this flag and synthesizes the
+ *                 right per-provider config (Anthropic thinking, Google
+ *                 thinkingConfig.includeThoughts).
+ *   - omitted   — model does not emit reasoning.
+ */
+export type ReasoningMode = "auto" | "enabled";
+
 /** Static metadata about a single model */
 export interface ModelMeta {
   id: AIModelId;
@@ -20,6 +31,13 @@ export interface ModelMeta {
   maxOutput: number;
   capabilities: ModelCapability[];
   costTier: CostTier;
+  /** Reasoning emission posture; absent = no reasoning. */
+  reasoning?: ReasoningMode;
+  /**
+   * Token budget for `enabled`-mode providers that gate thinking by an
+   * explicit budget (Anthropic extended thinking). Ignored otherwise.
+   */
+  thinkingBudgetTokens?: number;
 }
 
 /** Static metadata about a provider and its models */

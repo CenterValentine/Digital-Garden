@@ -36,6 +36,15 @@ interface WorkspaceState {
   workspaces: ContentWorkspaceResponse[];
   activeWorkspaceId: string | null;
   isLoading: boolean;
+  /**
+   * True once loadWorkspaces has completed at least once (success or
+   * failure). Use this as a one-shot "store is ready" signal to gate
+   * downstream fetches whose URL depends on activeWorkspaceId — they
+   * would otherwise double-fetch (once for the initial null id, once
+   * after the store hydrates with the real id). Stays true for the
+   * rest of the session.
+   */
+  hasLoadedOnce: boolean;
   conflict: WorkspaceOpenConflict | null;
   pendingOpenIntent: PendingOpenIntent | null;
   loadWorkspaces: (initialWorkspaceId?: string | null) => Promise<void>;
@@ -244,6 +253,12 @@ function isWorkspaceNotFoundError(error: unknown) {
   );
 }
 
+function readContentIdFromUrl(): string | null {
+  if (typeof window === "undefined") return null;
+  const value = new URLSearchParams(window.location.search).get("content");
+  return value && value.length > 0 ? value : null;
+}
+
 function restoreContentWorkspace(workspace: ContentWorkspaceResponse) {
   const paneTabContentIds = Object.fromEntries(
     Object.entries(workspace.paneState.paneTabContentIds).map(
@@ -251,10 +266,26 @@ function restoreContentWorkspace(workspace: ContentWorkspaceResponse) {
     ),
   );
 
+  // Cold-load race: the workspace API can resolve before
+  // MainPanelWorkspace's URL parser runs. If the URL specifies a
+  // content id that belongs to this workspace, it must win as the
+  // active tab — otherwise the user deep-links to a tab but watches
+  // it load LAST while the persisted active tab loads first. Gating
+  // on workspace membership avoids regressing the manual workspace
+  // switch path, where `syncWorkspaceUrl` leaves a stale `content=`
+  // in the URL from the previous workspace.
+  const contentIdFromUrl = readContentIdFromUrl();
+  const urlContentBelongsToWorkspace =
+    contentIdFromUrl !== null &&
+    workspace.items.some((item) => item.contentId === contentIdFromUrl);
+  const activeContentId = urlContentBelongsToWorkspace
+    ? contentIdFromUrl
+    : workspace.paneState.activeContentId;
+
   isBypassingWorkspaceGuard = true;
   try {
     useContentStore.getState().restoreWorkspace({
-      activeContentId: workspace.paneState.activeContentId,
+      activeContentId,
       activePaneId: workspace.paneState.activePaneId,
       layoutMode: workspace.paneState.layoutMode,
       paneTabContentIds,
@@ -428,6 +459,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   workspaces: [],
   activeWorkspaceId: null,
   isLoading: false,
+  hasLoadedOnce: false,
   conflict: null,
   pendingOpenIntent: null,
 
@@ -456,6 +488,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
         workspaces,
         activeWorkspaceId: activeWorkspace?.id ?? null,
         isLoading: false,
+        hasLoadedOnce: true,
       });
 
       warmContentSummaryCache(
@@ -472,7 +505,11 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       }
     } catch (error) {
       console.error("[Workspace Store] Failed to load workspaces:", error);
-      set({ isLoading: false });
+      // hasLoadedOnce flips even on failure — the gate is "did we
+      // attempt", not "did we succeed". Downstream fetches that need
+      // workspace context will run with whatever defaults the store
+      // settles on, rather than waiting forever.
+      set({ isLoading: false, hasLoadedOnce: true });
     }
   },
 

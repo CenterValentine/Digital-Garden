@@ -14,6 +14,57 @@ import {
 } from "@/lib/domain/collaboration/content-safety";
 import { getCollaborationServerExtensions } from "@/lib/domain/collaboration/extensions";
 import { sanitizeTipTapJsonWithExtensions } from "@/lib/domain/editor/unsupported-content";
+import { clientLogger } from "@/lib/core/logger/client";
+
+// Initial-promote deferral.
+//
+// First-time collaboration promotion fires a token fetch + WebSocket
+// handshake during the page's critical hydration window. Deferring the
+// FIRST promote per entry until after FCP keeps the cold-load main
+// thread less contested and frees a connection slot during initial
+// asset downloads. Subsequent promotes (reconnect, late escalation)
+// bypass this — they're triggered by user action or recovery, not
+// initial mount, so latency matters more than freeing the critical
+// path.
+//
+// Kill switch: NEXT_PUBLIC_DEFER_COLLAB_CONNECT="false" disables the
+// deferral for A/B comparison or rollback. Default is "true" (defer).
+const DEFER_INITIAL_PROMOTE =
+  typeof process !== "undefined" &&
+  process.env?.NEXT_PUBLIC_DEFER_COLLAB_CONNECT !== "false";
+
+// Roughly the "user finished looking at first paint" window. rIC will
+// usually fire well before this; the timeout ensures we don't sit idle
+// indefinitely on a busy main thread (mobile devices, throttled tabs).
+const INITIAL_PROMOTE_DEFERRAL_TIMEOUT_MS = 1500;
+
+function schedulePostPaint(callback: () => void): { cancel: () => void } {
+  if (typeof window === "undefined") {
+    // SSR/test environment — execute synchronously so no behavior diverges.
+    callback();
+    return { cancel: () => {} };
+  }
+  const win = window as unknown as {
+    requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number;
+    cancelIdleCallback?: (handle: number) => void;
+  };
+  if (typeof win.requestIdleCallback === "function") {
+    const handle = win.requestIdleCallback(callback, {
+      timeout: INITIAL_PROMOTE_DEFERRAL_TIMEOUT_MS,
+    });
+    return {
+      cancel: () => {
+        if (typeof win.cancelIdleCallback === "function") {
+          win.cancelIdleCallback(handle);
+        }
+      },
+    };
+  }
+  // Safari fallback — pick a delay long enough to clear FCP but short
+  // enough that the connect feels immediate to the user.
+  const handle = window.setTimeout(callback, 300);
+  return { cancel: () => window.clearTimeout(handle) };
+}
 
 export type LocalSurfaceTopology = "singleSurface" | "multiSurface";
 export type BrowserSessionTopology = "singleSession" | "multiSession";
@@ -241,6 +292,12 @@ interface DocumentRuntimeEntry {
   lastActivityAt: number;
   reconnectTimer: ReturnType<typeof setTimeout> | null;
   reconnectAttempts: number;
+  // First-promote deferral state. Tracks whether a post-paint idle
+  // callback is scheduled to fire the initial promote, and a cancel
+  // handle so we can abort if the entry is evicted before the callback
+  // runs.
+  initialPromoteScheduled: boolean;
+  initialPromoteCancel: (() => void) | null;
 }
 
 interface UseCollaborationRuntimeOptions {
@@ -609,6 +666,8 @@ class CollaborationRuntimeManager {
       lastActivityAt: Date.now(),
       reconnectTimer: null,
       reconnectAttempts: 0,
+      initialPromoteScheduled: false,
+      initialPromoteCancel: null,
       state: {
         contentId,
         documentName: `content:${contentId}`,
@@ -1374,8 +1433,63 @@ class CollaborationRuntimeManager {
       entry.state.reconnectIntent ||
       entry.state.liveConsumerCount > 0
     ) {
-      void this.promote(entry, "browser-multi-session");
+      this.queueInitialOrImmediatePromote(entry, "browser-multi-session");
     }
+  }
+
+  // Initial promotion (first time we'd open a HocuspocusProvider for this
+  // entry) is deferred to after FCP via requestIdleCallback. Subsequent
+  // promotions — reconnect attempts, late "live workflow" escalations,
+  // any path where a provider already exists — fire immediately because
+  // they're triggered by user state changes or recovery and need fast
+  // re-attachment.
+  //
+  // Gate by both DEFER_INITIAL_PROMOTE flag AND "is this the first
+  // promote for this entry" check. We use `entry.initialPromoteScheduled`
+  // (added below) to avoid double-scheduling under rapid acquire churn.
+  private queueInitialOrImmediatePromote(
+    entry: DocumentRuntimeEntry,
+    reason: PromotionReason,
+  ) {
+    const isFirstPromote =
+      !entry.hocuspocusProvider &&
+      !entry.promotionPromise &&
+      !entry.initialPromoteScheduled;
+
+    if (!DEFER_INITIAL_PROMOTE || !isFirstPromote) {
+      void this.promote(entry, reason);
+      return;
+    }
+
+    entry.initialPromoteScheduled = true;
+    clientLogger.info({
+      layer: "editor",
+      event: "initial_promote:scheduled",
+      summary: "deferring initial collab promote to post-paint",
+      attrs: {
+        content_id: entry.contentId,
+        ms_since_nav:
+          typeof performance !== "undefined" ? Math.round(performance.now()) : 0,
+      },
+    });
+    const scheduled = schedulePostPaint(() => {
+      entry.initialPromoteScheduled = false;
+      clientLogger.info({
+        layer: "editor",
+        event: "initial_promote:firing",
+        summary: "firing deferred initial collab promote",
+        attrs: {
+          content_id: entry.contentId,
+          ms_since_nav:
+            typeof performance !== "undefined" ? Math.round(performance.now()) : 0,
+        },
+      });
+      void this.promote(entry, reason);
+    });
+    entry.initialPromoteCancel = () => {
+      scheduled.cancel();
+      entry.initialPromoteScheduled = false;
+    };
   }
 
   private async promote(entry: DocumentRuntimeEntry, reason: PromotionReason) {
@@ -1872,6 +1986,12 @@ class CollaborationRuntimeManager {
     document.removeEventListener("visibilitychange", entry.visibilityChangeHandler);
     window.removeEventListener("pagehide", entry.pageHideHandler);
     if (entry.cooldownTimer) clearTimeout(entry.cooldownTimer);
+    // Abort any pending deferred initial promote so its callback doesn't
+    // fire against a destroyed entry. Safe to call even if not scheduled.
+    if (entry.initialPromoteCancel) {
+      entry.initialPromoteCancel();
+      entry.initialPromoteCancel = null;
+    }
     this.clearProviderReconnect(entry);
     this.entries.delete(contentId);
   }

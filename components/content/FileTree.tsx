@@ -43,6 +43,7 @@ interface FileTreeProps {
   onCreateVisualizationMermaid?: (parentId: string | null) => Promise<void>;
   onCreateVisualizationExcalidraw?: (parentId: string | null) => Promise<void>;
   onCreateVisualizationDiagramsNet?: (parentId: string | null) => Promise<void>;
+  onCreateAiImage?: (parentId: string | null) => Promise<void>;
   onAddPeopleTarget?: (parentId: string | null) => Promise<void>;
   height?: number;
   editingNodeId?: string; // If set, automatically triggers edit mode on this node
@@ -66,6 +67,7 @@ export function FileTree({
   onCreateVisualizationMermaid,
   onCreateVisualizationExcalidraw,
   onCreateVisualizationDiagramsNet,
+  onCreateAiImage,
   onAddPeopleTarget,
   height = 600,
   editingNodeId,
@@ -257,6 +259,7 @@ export function FileTree({
         onCreateVisualizationMermaid={onCreateVisualizationMermaid}
         onCreateVisualizationExcalidraw={onCreateVisualizationExcalidraw}
         onCreateVisualizationDiagramsNet={onCreateVisualizationDiagramsNet}
+        onCreateAiImage={onCreateAiImage}
         onAddPeopleTarget={onAddPeopleTarget}
         editingValue={editingDrafts[nodeId]}
         onEditingValueChange={handleEditingValueChange}

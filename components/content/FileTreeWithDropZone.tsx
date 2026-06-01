@@ -29,6 +29,7 @@ interface FileTreeWithDropZoneProps {
   onCreateVisualizationMermaid?: (parentId: string | null) => Promise<void>;
   onCreateVisualizationExcalidraw?: (parentId: string | null) => Promise<void>;
   onCreateVisualizationDiagramsNet?: (parentId: string | null) => Promise<void>;
+  onCreateAiImage?: (parentId: string | null) => Promise<void>;
   onAddPeopleTarget?: (parentId: string | null) => Promise<void>;
   height?: number;
   editingNodeId?: string;

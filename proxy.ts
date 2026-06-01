@@ -144,7 +144,11 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
         sameSite: "lax",
-        path: "/",
+        // Scope to /embed so this short-lived (30 min) embed session does NOT
+        // shadow the long-lived (7 day) cookie at path "/" set by sign-in.
+        // Both cookies coexist; browsers send the /embed one for embed routes
+        // and the / one everywhere else.
+        path: "/embed",
         maxAge: 30 * 60, // 30 min — matches embed session lifetime
       });
       return response;

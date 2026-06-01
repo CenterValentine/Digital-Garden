@@ -24,6 +24,7 @@ import { useTreeStateStore } from "@/state/tree-state-store";
 import { useWorkspaceStore } from "@/extensions/workplaces/state/workspace-store";
 import { useContextMenuStore } from "@/state/context-menu-store";
 import { usePageTemplateStore } from "@/state/page-template-store";
+import { useFileTreeFilterStore } from "@/state/file-tree-filter-store";
 import type { TreeNode, ContentType } from "@/lib/domain/content/types";
 import { clientLogger } from "@/lib/core/logger/client";
 
@@ -37,6 +38,7 @@ interface TreeApiResponse {
       maxDepth: number;
       byType: Record<string, number>;
     };
+    hiddenReferencedCount?: number;
   };
   error?: {
     code: string;
@@ -54,6 +56,8 @@ interface LeftSidebarContentProps {
   onSelectionChange?: (hasMultipleSelections: boolean) => void;
   onFileDrop?: (files: File[]) => void;
   onAddPeopleTarget?: (parentId: string | null) => void;
+  /** Opens the AI image generation dialog targeting the given parent folder. */
+  onCreateAiImage?: (parentId: string | null) => void;
 }
 
 type CreateTarget = {
@@ -164,8 +168,17 @@ export function LeftSidebarContent({
   onSelectionChange,
   onFileDrop,
   onAddPeopleTarget,
+  onCreateAiImage,
 }: LeftSidebarContentProps) {
   const [treeData, setTreeData] = useState<TreeNode[] | null>(null);
+  // Referenced-content visibility + the hidden-count hint (Session 5b).
+  const showReferencedContent = useFileTreeFilterStore(
+    (s) => s.showReferencedContent,
+  );
+  const setShowReferencedContent = useFileTreeFilterStore(
+    (s) => s.setShowReferencedContent,
+  );
+  const [hiddenReferencedCount, setHiddenReferencedCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedCount, setSelectedCount] = useState(0);
@@ -234,7 +247,14 @@ export function LeftSidebarContent({
   // Search store - conditionally show search panel
   const isSearchOpen = useSearchStore((state) => state.isSearchOpen);
 
-  // Active workspace — used to scope the file tree when workspace is a view
+  // Active workspace — used to scope the file tree when workspace is a view.
+  // `workspaceStoreReady` gates the FIRST fetchTree fire so we don't
+  // burn a request on stale defaults (activeWorkspaceId=null,
+  // activeViewRootContentId=null) only to immediately re-fetch when
+  // the store hydrates from /api/content/workspaces. Pre-hydration the
+  // tree shows skeleton; post-hydration it fetches once with the right
+  // workspace context. Tracked via the store's hasLoadedOnce flag.
+  const workspaceStoreReady = useWorkspaceStore((state) => state.hasLoadedOnce);
   const activeWorkspaceId = useWorkspaceStore((state) => state.activeWorkspaceId);
   const activeWorkspaceIsView = useWorkspaceStore((state) => {
     const ws = state.workspaces.find((w) => w.id === state.activeWorkspaceId);
@@ -258,6 +278,9 @@ export function LeftSidebarContent({
       const url = new URL("/api/content/content/tree", window.location.origin);
       if (activeWorkspaceIsView && activeViewRootContentId) {
         url.searchParams.set("viewRootContentId", activeViewRootContentId);
+      }
+      if (showReferencedContent) {
+        url.searchParams.set("showReferencedContent", "true");
       }
 
       const response = await fetch(url.toString(), {
@@ -284,6 +307,7 @@ export function LeftSidebarContent({
       }
 
       setTreeData(result.data.tree);
+      setHiddenReferencedCount(result.data.hiddenReferencedCount ?? 0);
     } catch (err) {
       clientLogger.error({
         layer: "ui",
@@ -296,12 +320,17 @@ export function LeftSidebarContent({
     } finally {
       setIsLoading(false);
     }
-  }, [activeWorkspaceId, activeWorkspaceIsView, activeViewRootContentId]);
+  }, [activeWorkspaceId, activeWorkspaceIsView, activeViewRootContentId, showReferencedContent]);
 
-  // Initial load and refresh when trigger or active workspace changes
+  // Initial load and refresh when trigger or active workspace changes.
+  // Gated on `workspaceStoreReady` so we don't double-fetch (once for
+  // the pre-hydration null workspace, once for the real one). The tree
+  // skeleton stays up while we wait for hydration, which is typically
+  // <500ms and overlaps with other in-flight requests.
   useEffect(() => {
+    if (!workspaceStoreReady) return;
     fetchTree();
-  }, [fetchTree, refreshTrigger]);
+  }, [fetchTree, refreshTrigger, workspaceStoreReady]);
 
   // Check if user has Google authentication
   useEffect(() => {
@@ -2288,6 +2317,7 @@ export function LeftSidebarContent({
             onCreateVisualizationMermaid={handleCreateVisualizationMermaid}
             onCreateVisualizationExcalidraw={handleCreateVisualizationExcalidraw}
             onCreateVisualizationDiagramsNet={handleCreateVisualizationDiagramsNet}
+            onCreateAiImage={onCreateAiImage ? async (parentId) => onCreateAiImage(parentId) : undefined}
             onAddPeopleTarget={onAddPeopleTarget ? async (parentId) => onAddPeopleTarget(parentId) : undefined}
             height={Math.max(treeHeight - 36, 100)}
             editingNodeId={creatingItem?.tempId}
@@ -2296,6 +2326,24 @@ export function LeftSidebarContent({
             onFileDrop={onFileDrop}
           />
         </div>
+
+        {/* Referenced-content hint — surfaces when hidden referenced
+            content exists, so the user can reveal it (also toggleable via
+            the file-tree right-click menu). */}
+        {!showReferencedContent && hiddenReferencedCount > 0 && (
+          <button
+            type="button"
+            onClick={() => setShowReferencedContent(true)}
+            className="flex w-full items-center gap-1.5 border-t border-black/5 dark:border-white/5 px-3 py-1.5 text-[11px] text-gray-500 hover:text-gray-300 hover:bg-white/5 transition-colors"
+            title="Show referenced content (attachments, linked files)"
+          >
+            <span className="opacity-70">
+              {hiddenReferencedCount} referenced item
+              {hiddenReferencedCount === 1 ? "" : "s"} hidden
+            </span>
+            <span className="ml-auto font-medium">Show</span>
+          </button>
+        )}
 
         {/* Status bar */}
         {/* <LeftSidebarStatusBar
