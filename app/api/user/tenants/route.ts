@@ -12,7 +12,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/infrastructure/auth/middleware";
 import { prisma } from "@/lib/database/client";
 import { logger, withRouteTrace, withSpan } from "@/lib/core/logger";
-import { slugFromUsername } from "@/lib/domain/tenancy";
+import {
+  isReservedSlug,
+  RESERVED_SLUG_MESSAGE,
+  slugFromUsername,
+} from "@/lib/domain/tenancy";
 
 const ROUTE_PATH = "/api/user/tenants";
 
@@ -99,6 +103,22 @@ export async function POST(req: NextRequest) {
           error:
             "Slug must be lowercase alphanumeric and hyphens, 1–120 chars, no leading/trailing hyphen.",
         },
+        { status: 400 },
+      );
+    }
+
+    // Block reserved subdomains (admin, api, www, blog, etc.) — slugs
+    // become subdomains under PLATFORM_DOMAIN automatically, so user-owned
+    // tenants must not shadow system/brand surfaces.
+    if (isReservedSlug(baseSlug)) {
+      logger.warn({
+        layer: "auth",
+        event: "user_tenant_create:rejected",
+        summary: "reserved slug",
+        attrs: { reason: "reserved_slug", slug: baseSlug },
+      });
+      return NextResponse.json(
+        { error: RESERVED_SLUG_MESSAGE },
         { status: 400 },
       );
     }

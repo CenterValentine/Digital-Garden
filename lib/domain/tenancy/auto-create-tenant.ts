@@ -14,6 +14,7 @@
 import { prisma } from "@/lib/database/client";
 import { logger } from "@/lib/core/logger";
 import type { Prisma } from "@/lib/database/generated/prisma";
+import { isReservedSlug } from "./reserved-slugs";
 
 /**
  * Derive a URL-safe slug from a username. Lowercase, alphanumeric + hyphens,
@@ -32,8 +33,11 @@ export function slugFromUsername(username: string): string {
   return cleaned.slice(0, 120) || "user";
 }
 
-// Find a slug not yet taken in the Tenant table. Uses the transaction
-// client so the existence check + create happen in one atomic op.
+// Find a slug not yet taken in the Tenant table AND not on the reserved
+// list. Uses the transaction client so the existence check + create
+// happen in one atomic op. Reserved slugs are treated as collisions — a
+// signup with username "admin" gets slug "admin-2" (or higher if also
+// taken), not an error, so signup never fails on a name conflict.
 async function ensureUniqueSlug(
   tx: Prisma.TransactionClient,
   baseSlug: string,
@@ -41,10 +45,11 @@ async function ensureUniqueSlug(
   let candidate = baseSlug;
   let suffix = 2;
   while (
-    await tx.tenant.findUnique({
+    isReservedSlug(candidate) ||
+    (await tx.tenant.findUnique({
       where: { slug: candidate },
       select: { id: true },
-    })
+    }))
   ) {
     candidate = `${baseSlug}-${suffix}`;
     suffix += 1;

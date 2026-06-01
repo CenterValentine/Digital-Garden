@@ -18,6 +18,11 @@ export {
 } from "./permissions";
 export type { PermissionUser } from "./permissions";
 export { assertPlatformHost } from "./host-gate";
+export {
+  isReservedSlug,
+  listReservedSlugs,
+  RESERVED_SLUG_MESSAGE,
+} from "./reserved-slugs";
 export { invalidateTenantCache } from "./cache";
 export {
   createPersonalTenantForUser,
