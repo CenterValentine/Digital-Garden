@@ -267,12 +267,18 @@ export function describeDnsRequirements(domain: VercelDomain): {
 }[] {
   const isApex = domain.name === domain.apexName;
   // Apex domains need A records; subdomains use CNAME.
+  // IP value reflects Vercel's current recommended range (216.198.79.1)
+  // following their 2026 IP expansion. The legacy IP (76.76.21.21)
+  // still resolves but their config-check API may report it as
+  // misconfigured. Future improvement: fetch the actual required
+  // records from Vercel's API (`getDomainConfig` / domain.verification)
+  // rather than hardcoding, so we automatically pick up future changes.
   if (isApex) {
     return [
       {
         recordType: "A",
         recordName: "@",
-        recordValue: "76.76.21.21",
+        recordValue: "216.198.79.1",
         rationale:
           "Point your apex domain at Vercel via an A record. (Apex domains can't use CNAME.)",
       },
