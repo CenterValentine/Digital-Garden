@@ -11,6 +11,7 @@ import { requireAuth } from "@/lib/infrastructure/auth/middleware";
 import { prisma } from "@/lib/database/client";
 import { logger, withRouteTrace, withSpan } from "@/lib/core/logger";
 import {
+  checkDomainReadiness,
   describeDnsRequirements,
   removeDomain,
   verifyDomain,
@@ -120,8 +121,17 @@ export async function POST(
         }
 
         let vercelDomain;
+        let isReady: boolean;
         try {
+          // verifyDomain triggers Vercel to re-check ownership; we
+          // additionally call checkDomainReadiness to confirm DNS is
+          // ALSO routing correctly. Marking verifiedAt only when both
+          // pass — see lib/infrastructure/vercel/domains.ts comment
+          // for why `verified` alone is misleading.
           vercelDomain = await verifyDomain(result.decodedHost);
+          const readiness = await checkDomainReadiness(result.decodedHost);
+          isReady = readiness.isReady;
+          vercelDomain = readiness.domain;
         } catch (err) {
           if (err instanceof VercelDomainsUnavailableError) {
             return NextResponse.json(
@@ -145,7 +155,7 @@ export async function POST(
         const updated = await prisma.tenantHost.update({
           where: { host: result.decodedHost },
           data: {
-            verifiedAt: vercelDomain.verified ? new Date() : null,
+            verifiedAt: isReady ? new Date() : null,
             vercelConfigData: {
               verification: vercelDomain.verification,
               dnsInstructions,
@@ -153,7 +163,7 @@ export async function POST(
           } as never,
         });
 
-        span.attr("verified", vercelDomain.verified);
+        span.attr("verified", vercelDomain.verified).attr("is_ready", isReady);
 
         return NextResponse.json({
           host: updated.host,

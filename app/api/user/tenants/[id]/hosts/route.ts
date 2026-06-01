@@ -22,8 +22,8 @@ import { prisma } from "@/lib/database/client";
 import { logger, withRouteTrace, withSpan } from "@/lib/core/logger";
 import {
   addDomain,
+  checkDomainReadiness,
   describeDnsRequirements,
-  getDomain,
   VercelDomainsApiError,
   VercelDomainsUnavailableError,
   type VercelDomain,
@@ -43,10 +43,6 @@ async function requireOwnedTenant(userId: string, tenantId: string) {
   });
   if (!tenant || tenant.ownerId !== userId) return null;
   return tenant;
-}
-
-function hostStatus(domain: VercelDomain | null): "verified" | "pending" {
-  return domain?.verified ? "verified" : "pending";
 }
 
 export async function GET(
@@ -145,9 +141,19 @@ export async function POST(
         }
 
         // Register with Vercel — returns DNS verification details.
+        // Then call checkDomainReadiness which combines the ownership
+        // check (`verified`) with the DNS config check (`misconfigured`).
+        // Only when BOTH pass is the domain actually routable; using
+        // just `verified` would mislead users since Vercel marks
+        // newly-added domains as `verified: true` immediately (you
+        // "verifiably" own it in your account) even before DNS resolves.
         let vercelDomain: VercelDomain;
+        let isReady: boolean;
         try {
           vercelDomain = await addDomain(requestedHost);
+          const readiness = await checkDomainReadiness(requestedHost);
+          isReady = readiness.isReady;
+          vercelDomain = readiness.domain; // refresh with latest state
         } catch (err) {
           if (err instanceof VercelDomainsUnavailableError) {
             return NextResponse.json(
@@ -184,7 +190,7 @@ export async function POST(
             host: requestedHost,
             tenantId: id,
             isPrimary: false,
-            verifiedAt: vercelDomain.verified ? new Date() : null,
+            verifiedAt: isReady ? new Date() : null,
             vercelConfigData: {
               verification: vercelDomain.verification,
               dnsInstructions,
@@ -192,7 +198,7 @@ export async function POST(
           } as never,
         });
 
-        span.attr("verified", vercelDomain.verified);
+        span.attr("verified", vercelDomain.verified).attr("is_ready", isReady);
 
         return NextResponse.json(
           {

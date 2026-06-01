@@ -225,6 +225,37 @@ export async function verifyDomain(host: string): Promise<VercelDomain> {
 }
 
 /**
+ * Combined readiness check. Vercel splits this signal into two API
+ * calls: `domain.verified` (ownership) and `domainConfig.misconfigured`
+ * (DNS-actually-pointing-at-us). A domain is genuinely ready to route
+ * only when BOTH ownership is confirmed AND DNS is configured. Marking
+ * `verifiedAt` based on just `verified` (the original bug) misleads
+ * users into thinking DNS is set when it isn't.
+ */
+export async function checkDomainReadiness(host: string): Promise<{
+  domain: VercelDomain;
+  config: VercelDomainConfig;
+  /** True iff the domain is owned AND DNS resolves to Vercel. */
+  isReady: boolean;
+}> {
+  const [domain, config] = await Promise.all([
+    getDomain(host),
+    getDomainConfig(host).catch(
+      (): VercelDomainConfig => ({
+        configuredBy: null,
+        acceptedChallenges: null,
+        misconfigured: true,
+      }),
+    ),
+  ]);
+  return {
+    domain,
+    config,
+    isReady: domain.verified && !config.misconfigured,
+  };
+}
+
+/**
  * Build user-facing DNS instructions from a Vercel domain record.
  * Returns a small structured description the UI can render.
  */
