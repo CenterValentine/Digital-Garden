@@ -17,6 +17,7 @@ export {
   CUSTOM_HOST_DENIED_MESSAGE,
 } from "./permissions";
 export type { PermissionUser } from "./permissions";
+export { assertPlatformHost } from "./host-gate";
 export { invalidateTenantCache } from "./cache";
 export {
   createPersonalTenantForUser,

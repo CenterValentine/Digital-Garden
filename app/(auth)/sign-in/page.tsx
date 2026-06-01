@@ -85,8 +85,30 @@ export default function SignInPage() {
         </div>
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
           {error && (
-            <div className="rounded-md bg-red-50 dark:bg-red-500/10 p-4">
-              <div className="text-sm text-red-800 dark:text-red-300">{error}</div>
+            <div
+              role="alert"
+              aria-live="polite"
+              className="rounded-md border border-red-400 dark:border-red-500/50 bg-red-50 dark:bg-red-500/15 p-4"
+            >
+              <div className="flex items-start gap-2">
+                <svg
+                  className="w-4 h-4 mt-0.5 shrink-0 text-red-700 dark:text-red-300"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <circle cx="12" cy="12" r="10" />
+                  <line x1="12" y1="8" x2="12" y2="12" />
+                  <line x1="12" y1="16" x2="12.01" y2="16" />
+                </svg>
+                <div className="text-sm font-medium text-red-900 dark:text-red-200">
+                  {error}
+                </div>
+              </div>
             </div>
           )}
           <div className="space-y-4 rounded-md shadow-sm">

@@ -27,6 +27,7 @@ type SiteRow = {
 type SitesResponse = {
   tenants: SiteRow[];
   primaryTenantId: string | null;
+  platformDomain: string | null;
 };
 
 export default function SitesSettingsPage() {
@@ -34,6 +35,7 @@ export default function SitesSettingsPage() {
 
   const [sites, setSites] = useState<SiteRow[]>([]);
   const [primaryId, setPrimaryId] = useState<string | null>(null);
+  const [platformDomain, setPlatformDomain] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   // Create form
@@ -57,6 +59,7 @@ export default function SitesSettingsPage() {
       const data = (await res.json()) as SitesResponse;
       setSites(data.tenants);
       setPrimaryId(data.primaryTenantId);
+      setPlatformDomain(data.platformDomain);
     } catch (err) {
       toast.error("Failed to load sites", {
         description: err instanceof Error ? err.message : "Please try again",
@@ -190,6 +193,28 @@ export default function SitesSettingsPage() {
           project you publish belongs to one site. New items default to your
           primary site.
         </p>
+        {platformDomain && (
+          <div className="mt-4 rounded-md border border-sky-500/30 bg-sky-500/5 p-3 text-xs text-sky-100/80">
+            <div className="font-medium text-sky-200 mb-1">
+              Every site you create is reachable at two URLs automatically:
+            </div>
+            <ul className="list-disc list-inside space-y-0.5">
+              <li>
+                <code className="font-mono">your-slug.{platformDomain}</code>{" "}
+                (subdomain)
+              </li>
+              <li>
+                <code className="font-mono">{platformDomain}/u/your-slug</code>{" "}
+                (subpath, works as a fallback)
+              </li>
+            </ul>
+            <div className="mt-2 text-sky-100/60">
+              To use a domain you already own (e.g.{" "}
+              <code className="font-mono">yoursite.com</code>), expand a site
+              below and open its <em>Hosts</em> section.
+            </div>
+          </div>
+        )}
       </div>
 
       <section
@@ -315,6 +340,13 @@ export default function SitesSettingsPage() {
                         <div className="text-xs text-muted-foreground font-mono mt-0.5">
                           {site.slug}
                         </div>
+                        {platformDomain && (
+                          <div className="text-[11px] text-white/30 font-mono mt-1 space-x-2">
+                            <span>{site.slug}.{platformDomain}</span>
+                            <span className="text-white/15">·</span>
+                            <span>{platformDomain}/u/{site.slug}</span>
+                          </div>
+                        )}
                       </>
                     )}
                   </div>
@@ -382,11 +414,10 @@ export default function SitesSettingsPage() {
       </section>
 
       <p className="text-xs text-muted-foreground">
-        Each site is reachable at <code className="mx-1 font-mono">/u/your-slug</code>{" "}
-        by default. Expand a site&apos;s <em>Hosts</em> section to add a custom
-        domain (e.g. <code className="font-mono">mysite.com</code>). Custom
-        domains require DNS verification — instructions are shown after you add
-        one.
+        Need a custom domain (e.g.{" "}
+        <code className="font-mono">mysite.com</code>)? Expand a site&apos;s{" "}
+        <em>Hosts</em> section to add one. Custom domains require DNS
+        verification — instructions appear after you add one.
       </p>
     </div>
   );

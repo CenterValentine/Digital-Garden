@@ -49,6 +49,12 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({
           tenants,
           primaryTenantId: user?.primaryTenantId ?? null,
+          // Phase 13: the UI uses this to show "your sites are reachable at
+          // <slug>.<platformDomain>" affordances. Null when the env var
+          // isn't set (legacy single-tenant deployments). The bare value
+          // is non-secret — same info as the public host.
+          platformDomain:
+            process.env.PLATFORM_DOMAIN?.trim().toLowerCase() ?? null,
         });
       },
     );
