@@ -10,6 +10,48 @@ last_updated: 2026-05-31
 
 ---
 
+## Context-Menu Unification (2026-06-01)
+
+Three menu surfaces in the publishing UI were restyled in Phase 19 to visually match the file-tree ContextMenu and the People panel header — establishing one consistent affordance pattern across the IDE. The work was cosmetic-only; the underlying components are still three separate implementations:
+
+- **`components/content/context-menu/ContextMenu.tsx`** — file-tree's right-click menu. Tightly coupled to `useContextMenuStore` (global, single-instance). Action-provider pattern with `ContextMenuSection[]`.
+- **`extensions/publishing/components/view-mode/PublishingPathContextMenu.tsx`** — custom positioned menu via `createPortal`. Local state for dialogs.
+- **`extensions/publishing/components/sidebar/PublishItemMenu.tsx`** — Radix `DropdownMenu` with classNames overridden to match.
+
+Followups:
+- [ ] **Extract a shared `MenuPrimitive`** that all three can use — same button/item/divider/section-label classes in one place. Today, if file-tree's visual style changes, the publishing menus drift.
+- [ ] **Decide whether `useContextMenuStore` should generalize** to support transient menus from any source (3-dot dropdowns, popovers), or whether Radix-based dropdowns remain the right tool for click-anchored menus while `ContextMenu` stays for right-click. Probably the latter — they have different positioning semantics.
+
+### Preserved "premium" 3-dot styling
+
+Phases 16-17 originally shipped a different styling for `PublishItemMenu` — gold-tinted text on a deep-glass surface, more design-system "premium" feel than the current file-tree match. The user liked it but chose consistency for now. The pattern is documented here for potential future adoption as the *new* platform-wide context-menu look:
+
+- Container: `rounded-xl border border-amber-200/15 bg-zinc-900/95 shadow-2xl`
+- Item: `text-amber-100/85 hover:bg-white/5 hover:text-amber-50`
+- Destructive: `text-rose-400 hover:bg-rose-500/10`
+- Icon: `opacity-65`
+
+If the design system later moves toward a more distinctive (less generic-shadcn) look for menus, recover this from the git history at commit `d5578cf` and apply it as the new shared primitive.
+
+---
+
+## Publishing Card Slice C (deferred from 2026-06-01 multi-tenancy work)
+
+Three more 3-dot menu actions on the right-sidebar publishing card. Slice A (breadcrumb + relative time) and Slice B (Copy URL, Edit metadata, Move path, Archive, Delete) shipped in PR #50. Slice C remaining:
+
+- [ ] **Move to a different site** — adds a tenant picker to the move flow. Only visible when the user owns >1 tenant. Backend already supports it via `PATCH /api/publishing/items/[id]` accepting a `tenantId` field (would need to add this field if not present yet — currently only accepts `pathId`). UX consideration: paths are tenant-scoped, so changing the tenant requires also re-picking a path. Probably a two-step flow: pick site → pick path within that site.
+
+- [ ] **Schedule expire (auto-unpublish at a future date)** — datetime picker that sets a `publishedUntil` (or similar). Requires:
+  - New nullable column on `PublicItem`: `publishedUntil DateTime?`
+  - The scheduled-publish cron extended to also check `publishedUntil < now` and transition published → unpublished
+  - UI: show the expire date on the card if set, with a "cancel expire" affordance
+
+- [ ] **Cancel scheduled publish** — visible only when `scheduledFor` is set. One-click clears the schedule. Tiny addition once the menu has somewhere to put it; current Slice B menu doesn't conditionally show items based on item state, so this needs a small refactor to support conditional menu items.
+
+Total estimated effort: ~150 lines + 1 schema field + cron extension.
+
+---
+
 ## Dev Infra Followups
 
 - [ ] **Local Postgres (Docker) for development** — reserve cloud Neon for deployed/preview only, so heavy local dev/testing stops burning Neon metered compute (hit the "exceeded compute time quota" wall during AI-chat-revamp dev, 2026-05). Temporary workaround in place: upgraded Vercel (Neon billed through it). Do this **after** the AI chat revamp scope completes. Deliverable: `docker-compose.yml` for Postgres + a dev `DATABASE_URL` swap (keep the Neon URL for deploys); `npx prisma db push` to seed the local schema.

@@ -101,74 +101,83 @@ export function PublishingPathContextMenu({
   const menu = (
     <div
       ref={menuRef}
-      className="fixed z-[200] w-52 rounded-lg border border-white/10 bg-zinc-900 shadow-2xl py-1 text-sm"
+      data-context-menu
+      className="fixed z-[200] min-w-[200px] rounded-md border border-white/20 bg-white/95 shadow-lg backdrop-blur-sm dark:bg-gray-900/95 overflow-hidden"
       style={{ left: adjustedPos.x, top: adjustedPos.y }}
     >
-      {/* Path label */}
-      <div className="px-3 py-1.5 text-[11px] text-white/30 truncate border-b border-white/5 mb-1">
+      {/* Path label (subtle title on top, matches file-tree section-label vibe) */}
+      <div className="px-2.5 pt-1.5 pb-1 text-[10px] font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400 truncate border-b border-gray-200/60 dark:border-gray-700/60">
         {node.title}
       </div>
 
-      <MenuItem icon={<FolderPlus className="w-3.5 h-3.5" />} onClick={() => setDialog("create-child")}>
-        New child path
-      </MenuItem>
-
-      <MenuItem icon={<Pencil className="w-3.5 h-3.5" />} onClick={() => setDialog("edit")}>
-        Rename / edit
-      </MenuItem>
-
-      <MenuItem icon={<Copy className="w-3.5 h-3.5" />} onClick={copyUrl}>
-        Copy path URL
-      </MenuItem>
-
-      <MenuItem
-        icon={<ExternalLink className="w-3.5 h-3.5" />}
-        onClick={() => {
-          window.open(`/${node.slug}`, "_blank");
-          onClose();
-        }}
-      >
-        Open in browser
-      </MenuItem>
-
-      <div className="my-1 border-t border-white/5" />
-
-      {dialog === "confirm-delete" ? (
-        <div className="px-3 py-2 space-y-2">
-          <p className="text-[11px] text-white/60 leading-snug">
-            Delete <span className="text-white/90 font-medium">{node.title}</span>? This cannot be undone.
-          </p>
-          <div className="flex gap-2">
-            <button
-              onClick={() => setDialog(null)}
-              className="flex-1 py-1 rounded text-[11px] text-white/50 hover:text-white/80 border border-white/10 transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleDelete}
-              disabled={isDeleting}
-              className="flex-1 py-1 rounded text-[11px] font-medium bg-rose-500/20 text-rose-400 hover:bg-rose-500/30 border border-rose-500/20 transition-colors disabled:opacity-50"
-            >
-              {isDeleting ? "Deleting…" : "Delete"}
-            </button>
-          </div>
-        </div>
-      ) : (
-        <MenuItem
-          icon={<Trash2 className="w-3.5 h-3.5" />}
-          onClick={() => setDialog("confirm-delete")}
-          destructive
-        >
-          Delete path
+      <div className="px-1.5 py-1">
+        <MenuItem icon={<FolderPlus className="h-4 w-4" />} onClick={() => setDialog("create-child")}>
+          New child path
         </MenuItem>
-      )}
+
+        <MenuItem icon={<Pencil className="h-4 w-4" />} onClick={() => setDialog("edit")}>
+          Rename / edit
+        </MenuItem>
+
+        <MenuItem icon={<Copy className="h-4 w-4" />} onClick={copyUrl}>
+          Copy path URL
+        </MenuItem>
+
+        <MenuItem
+          icon={<ExternalLink className="h-4 w-4" />}
+          onClick={() => {
+            window.open(`/${node.slug}`, "_blank");
+            onClose();
+          }}
+        >
+          Open in browser
+        </MenuItem>
+
+        <div className="my-1 mx-1 border-t border-gray-200 dark:border-gray-700" />
+
+        {dialog === "confirm-delete" ? (
+          <div className="px-2 py-2 space-y-2">
+            <p className="text-xs text-gray-600 dark:text-gray-300 leading-snug">
+              Delete <span className="text-gray-900 dark:text-gray-100 font-medium">{node.title}</span>? This cannot be undone.
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setDialog(null)}
+                className="flex-1 py-1 rounded text-xs text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white border border-gray-200 dark:border-gray-700 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDelete}
+                disabled={isDeleting}
+                className="flex-1 py-1 rounded text-xs font-medium bg-red-500/15 text-red-600 dark:text-red-400 hover:bg-red-500/25 border border-red-500/30 transition-colors disabled:opacity-50"
+              >
+                {isDeleting ? "Deleting…" : "Delete"}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <MenuItem
+            icon={<Trash2 className="h-4 w-4" />}
+            onClick={() => setDialog("confirm-delete")}
+            destructive
+          >
+            Delete path
+          </MenuItem>
+        )}
+      </div>
     </div>
   );
 
   return createPortal(menu, document.body);
 }
 
+/**
+ * Item styling mirrors the file-tree ContextMenu in
+ * components/content/context-menu/ContextMenu.tsx so the two surfaces
+ * feel like the same affordance. Future: extract into a shared
+ * MenuItem primitive used by both (see BACKLOG: context-menu unification).
+ */
 function MenuItem({
   icon,
   children,
@@ -184,14 +193,16 @@ function MenuItem({
     <button
       type="button"
       onClick={onClick}
-      className={`w-full flex items-center gap-2.5 px-3 py-1.5 text-left text-xs transition-colors ${
+      className={`w-full flex items-center gap-2 px-2.5 py-1 text-left text-sm rounded-sm transition-colors ${
         destructive
-          ? "text-rose-400 hover:bg-rose-500/10"
-          : "text-white/70 hover:bg-white/5 hover:text-white"
+          ? "text-gray-900 hover:bg-red-500/10 hover:text-red-600 dark:text-gray-100 dark:hover:text-red-400"
+          : "text-gray-900 hover:bg-primary/10 hover:text-primary dark:text-gray-100"
       }`}
     >
-      <span className="shrink-0 opacity-70">{icon}</span>
-      {children}
+      <span className="shrink-0 text-current opacity-70">{icon}</span>
+      <span className={`truncate ${destructive ? "text-red-600 dark:text-red-400" : ""}`}>
+        {children}
+      </span>
     </button>
   );
 }

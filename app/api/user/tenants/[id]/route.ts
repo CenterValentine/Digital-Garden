@@ -15,6 +15,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/infrastructure/auth/middleware";
 import { prisma } from "@/lib/database/client";
 import { logger, withRouteTrace, withSpan } from "@/lib/core/logger";
+import { isReservedSlug, RESERVED_SLUG_MESSAGE } from "@/lib/domain/tenancy";
 
 const ROUTE_PATH = "/api/user/tenants/[id]";
 const SLUG_PATTERN = /^[a-z0-9][a-z0-9-]{0,118}[a-z0-9]$|^[a-z0-9]$/;
@@ -73,6 +74,21 @@ export async function PATCH(
                 error:
                   "Slug must be lowercase alphanumeric and hyphens, 1–120 chars, no leading/trailing hyphen.",
               },
+              { status: 400 },
+            );
+          }
+          // Block rename-into-reserved (mirrors creation gate). Existing
+          // tenants whose current slug happens to BE reserved are not
+          // forced to rename — see reserved-slugs.ts module doc.
+          if (newSlug !== tenant.slug && isReservedSlug(newSlug)) {
+            logger.warn({
+              layer: "auth",
+              event: "user_tenant_update:rejected",
+              summary: "reserved slug",
+              attrs: { tenant_id: id, reason: "reserved_slug", slug: newSlug },
+            });
+            return NextResponse.json(
+              { error: RESERVED_SLUG_MESSAGE },
               { status: 400 },
             );
           }

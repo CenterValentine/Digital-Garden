@@ -184,27 +184,20 @@ export function HostManagement({ tenantId, tenantSlug }: HostManagementProps) {
   return (
     <div className="mt-4 pl-6 border-l border-white/5 space-y-3">
       {/* Always-shown info card: where this site is reachable for free. */}
-      <div className="rounded-md border border-white/8 bg-white/3 p-3 space-y-1.5">
-        <div className="text-[11px] uppercase tracking-wider text-white/40">
-          Your site is reachable at
-        </div>
-        {platformDomain && (
+      {platformDomain && (
+        <div className="rounded-md border border-white/8 bg-white/3 p-3 space-y-1.5">
+          <div className="text-[11px] uppercase tracking-wider text-white/40">
+            Your site is reachable at
+          </div>
           <div className="flex items-center gap-2 text-xs">
             <Globe className="h-3 w-3 text-white/30 shrink-0" />
             <code className="font-mono text-white/80">
               {tenantSlug}.{platformDomain}
             </code>
-            <span className="text-white/30">— subdomain (free, no setup)</span>
+            <span className="text-white/30">— free, no setup required</span>
           </div>
-        )}
-        <div className="flex items-center gap-2 text-xs">
-          <Globe className="h-3 w-3 text-white/30 shrink-0" />
-          <code className="font-mono text-white/80">
-            {platformDomain ?? "this site"}/u/{tenantSlug}
-          </code>
-          <span className="text-white/30">— subpath (free, no setup)</span>
         </div>
-      </div>
+      )}
 
       {/* Existing hosts list */}
       {isLoading ? (

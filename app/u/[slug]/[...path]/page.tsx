@@ -16,6 +16,7 @@ import { notFound, permanentRedirect } from "next/navigation";
 import { prisma } from "@/lib/database/client";
 import { withPageTrace } from "@/lib/core/logger";
 import {
+  assertPlatformHost,
   resolveTenantBySlug,
   resolvePublicItem,
   resolvePublicPath,
@@ -49,6 +50,11 @@ async function renderSubpathContent(
   fullPath: string,
   segments: string[],
 ) {
+  // /u/ routes are platform-only — 404 if called on a custom-host tenant
+  // (e.g. davidvalentine.org/u/anyone/some-path). See app/u/[slug]/page.tsx
+  // for rationale.
+  await assertPlatformHost();
+
   const tenant = await resolveTenantBySlug(slug);
   if (!tenant) {
     notFound();

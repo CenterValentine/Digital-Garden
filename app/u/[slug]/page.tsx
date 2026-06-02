@@ -15,7 +15,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/database/client";
 import { withPageTrace } from "@/lib/core/logger";
-import { resolveTenantBySlug } from "@/lib/domain/tenancy";
+import { assertPlatformHost, resolveTenantBySlug } from "@/lib/domain/tenancy";
 
 interface Params {
   slug: string;
@@ -36,6 +36,11 @@ export default async function TenantSubpathHome({
 }
 
 async function renderTenantHome(slug: string) {
+  // /u/ routes are platform-only — 404 if called on a custom-host tenant
+  // (e.g. davidvalentine.org/u/anyone). Prevents subpath URLs from
+  // accidentally exposing arbitrary tenants under the wrong domain.
+  await assertPlatformHost();
+
   const tenant = await resolveTenantBySlug(slug);
   if (!tenant) {
     notFound();

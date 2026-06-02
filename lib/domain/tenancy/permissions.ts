@@ -6,15 +6,17 @@
  * endpoint and squat on unclaimed domains by routing them through Vercel.
  *
  * Two paths to "yes":
- *   1. UserRole.owner is implicitly granted (the platform operator can
- *      always do this — no DB flag needed, baked into the helper).
- *   2. UserRole.admin and below need an explicit `canClaimCustomHosts`
+ *   1. UserRole.owner and UserRole.admin are implicitly granted — both
+ *      are platform-trust roles. A custom-host claim grafts a domain
+ *      onto the platform's Vercel project, which carries operational
+ *      responsibility; admin and owner are the "trusted enough" tiers.
+ *   2. UserRole.member and below need an explicit `canClaimCustomHosts`
  *      flag flipped to true. Owner controls who gets this — for now via
  *      Prisma Studio, eventually via an admin UI.
  *
- * Why NOT auto-grant admin: admin is a broad capability (user management,
- * audit log access). Custom-host claiming is a narrower trust signal —
- * users should be able to be one without being the other.
+ * The narrower flag stays useful: it lets the owner grant individual
+ * members the capability without promoting them to admin (which carries
+ * broader user-management and audit-log responsibilities).
  */
 
 export type PermissionUser = {
@@ -23,7 +25,7 @@ export type PermissionUser = {
 };
 
 export function canClaimCustomHosts(user: PermissionUser): boolean {
-  if (user.role === "owner") return true;
+  if (user.role === "owner" || user.role === "admin") return true;
   return user.canClaimCustomHosts === true;
 }
 

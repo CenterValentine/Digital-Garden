@@ -71,19 +71,32 @@ export function PublishTab({ contentId, contentTitle }: PublishTabProps) {
         />
       )}
 
-      {/* Header */}
-      <div className="flex items-center justify-between px-3 py-2 border-b border-gray-100 shrink-0">
-        <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">
-          {linkedItems.length > 0 ? "Published as" : "Publish"}
-        </span>
-        <button
-          onClick={() => setShowCreateDialog(true)}
-          className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600 transition-colors"
-          title="Add to publishing"
-        >
-          <Plus className="w-3.5 h-3.5" />
-          Add
-        </button>
+      {/* Header — structure mirrors the People companion panel
+          (components/content/people/PeoplePanel.tsx) so the right-sidebar
+          surfaces feel like siblings. Heading + subtitle on the left,
+          action buttons on the right. */}
+      <div className="border-b border-gray-200/60 dark:border-white/10 px-3 py-3 shrink-0">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h3 className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-700 dark:text-gray-200">
+              {linkedItems.length > 0 ? "Published as" : "Publish"}
+            </h3>
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              {linkedItems.length > 0
+                ? "Where this content lives publicly"
+                : "Publish this content to a site"}
+            </p>
+          </div>
+          <div className="flex shrink-0 items-center gap-1">
+            <button
+              onClick={() => setShowCreateDialog(true)}
+              className="rounded p-1.5 text-gray-500 dark:text-gray-400 transition-colors hover:bg-gray-100 dark:hover:bg-white/10 hover:text-gray-900 dark:hover:text-white"
+              title="Add to publishing"
+            >
+              <Plus className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* Body */}
@@ -129,7 +142,7 @@ export function PublishTab({ contentId, contentTitle }: PublishTabProps) {
             className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-600 transition-colors"
           >
             <ExternalLink className="w-3 h-3" />
-            Open publishing view
+            Open publishing workspace
           </button>
         </div>
       )}
