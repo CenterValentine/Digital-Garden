@@ -128,13 +128,13 @@ export function CreatePublicPathDialog({ onClose, onCreated, defaultParentId }: 
 
   return (
     <PublishingDialog
-      title="New publishing path"
+      title="New path"
       onClose={onClose}
       onSubmit={handleSubmit}
     >
         <div className="px-4 py-4 space-y-4">
           <label className="block">
-            <span className="text-xs text-white/40 mb-1 block">Title</span>
+            <span className="text-xs text-white/40 mb-1 block">Name</span>
             <input
               type="text"
               value={title}
@@ -148,7 +148,7 @@ export function CreatePublicPathDialog({ onClose, onCreated, defaultParentId }: 
           {/* Tenant picker — hidden when user owns exactly 1 site. */}
           {!isLoadingTenants && tenants.length > 1 && (
             <label className="block">
-              <span className="text-xs text-white/40 mb-1 block">Create on site</span>
+              <span className="text-xs text-white/40 mb-1 block">Site</span>
               <select
                 value={tenantId}
                 onChange={(e) => setTenantId(e.target.value)}
@@ -166,13 +166,13 @@ export function CreatePublicPathDialog({ onClose, onCreated, defaultParentId }: 
 
           {tenantScopedPathOptions.length > 0 && (
             <label className="block">
-              <span className="text-xs text-white/40 mb-1 block">Parent path (optional)</span>
+              <span className="text-xs text-white/40 mb-1 block">Inside</span>
               <select
                 value={parentId}
                 onChange={(e) => setParentId(e.target.value)}
                 className="w-full rounded-md border border-white/10 bg-zinc-800 px-3 py-2 text-sm text-white focus:border-white/20 focus:outline-none"
               >
-                <option value="">— Root (no parent)</option>
+                <option value="">(top level)</option>
                 {tenantScopedPathOptions.map((opt) => (
                   <option key={opt.id} value={opt.id}>
                     {opt.label}
@@ -183,7 +183,7 @@ export function CreatePublicPathDialog({ onClose, onCreated, defaultParentId }: 
           )}
 
           <label className="block">
-            <span className="text-xs text-white/40 mb-1 block">Slug (URL segment)</span>
+            <span className="text-xs text-white/40 mb-1 block">Slug</span>
             <div className="flex items-center rounded-md border bg-white/5 focus-within:border-white/20 overflow-hidden"
               style={{ borderColor: slugError ? "rgba(239,68,68,.5)" : "rgba(255,255,255,.1)" }}>
               <span className="pl-3 pr-1 text-sm text-white/30 whitespace-nowrap">{slugPrefix}</span>
@@ -199,12 +199,12 @@ export function CreatePublicPathDialog({ onClose, onCreated, defaultParentId }: 
           </label>
 
           <label className="block">
-            <span className="text-xs text-white/40 mb-1 block">Description (optional)</span>
+            <span className="text-xs text-white/40 mb-1 block">Description</span>
             <input
               type="text"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Short description"
+              placeholder="Optional"
               className="w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-white/20 focus:border-white/20 focus:outline-none"
             />
           </label>
@@ -219,7 +219,7 @@ export function CreatePublicPathDialog({ onClose, onCreated, defaultParentId }: 
             disabled={!canSubmit}
             className="px-3 py-1.5 rounded-md text-xs font-medium bg-sky-500/20 text-sky-300 hover:bg-sky-500/30 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            {isSubmitting ? "Creating…" : "Create path"}
+            {isSubmitting ? "Creating…" : "Create"}
           </button>
         </div>
     </PublishingDialog>

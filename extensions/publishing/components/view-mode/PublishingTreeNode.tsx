@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronRight, Folder, Globe } from "lucide-react";
+import { ChevronRight, Globe } from "lucide-react";
 import { cn } from "@/lib/core/utils";
 import { usePublishTreeStore, type PublicPathNode } from "../../state/publish-tree-store";
 import { PublishingTreeNodeBadge } from "./PublishingTreeNodeBadge";
@@ -31,7 +31,10 @@ export function PublishingTreeNode({
 
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
 
-  const Icon = depth === 0 ? Globe : Folder;
+  // Top-level paths get a Globe (this site's root); nested paths render
+  // a slash glyph instead of a folder icon. Paths are URL path segments,
+  // not filesystem folders — "/" reinforces the right mental model.
+  const isRoot = depth === 0;
 
   // React Compiler memoizes this automatically; no need for useCallback
   const handleContextMenu = (e: React.MouseEvent) => {
@@ -69,8 +72,17 @@ export function PublishingTreeNode({
           ) : null}
         </span>
 
-        {/* Folder/globe icon */}
-        <Icon className="w-3.5 h-3.5 shrink-0 opacity-60" />
+        {/* Globe for top-level, "/" glyph for nested paths */}
+        {isRoot ? (
+          <Globe className="w-3.5 h-3.5 shrink-0 opacity-60" />
+        ) : (
+          <span
+            className="w-3.5 h-3.5 shrink-0 flex items-center justify-center font-mono text-sm opacity-40 leading-none"
+            aria-hidden="true"
+          >
+            /
+          </span>
+        )}
 
         {/* Tenant prefix on root nodes when user owns multiple tenants */}
         {depth === 0 && showTenantPrefix && node.tenantSlug && (

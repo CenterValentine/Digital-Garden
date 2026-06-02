@@ -129,7 +129,7 @@ export function PublishTab({ contentId, contentTitle }: PublishTabProps) {
             className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-600 transition-colors"
           >
             <ExternalLink className="w-3 h-3" />
-            Open publishing view
+            Open publishing workspace
           </button>
         </div>
       )}
