@@ -10,6 +10,31 @@ last_updated: 2026-05-31
 
 ---
 
+## Context-Menu Unification (2026-06-01)
+
+Three menu surfaces in the publishing UI were restyled in Phase 19 to visually match the file-tree ContextMenu and the People panel header — establishing one consistent affordance pattern across the IDE. The work was cosmetic-only; the underlying components are still three separate implementations:
+
+- **`components/content/context-menu/ContextMenu.tsx`** — file-tree's right-click menu. Tightly coupled to `useContextMenuStore` (global, single-instance). Action-provider pattern with `ContextMenuSection[]`.
+- **`extensions/publishing/components/view-mode/PublishingPathContextMenu.tsx`** — custom positioned menu via `createPortal`. Local state for dialogs.
+- **`extensions/publishing/components/sidebar/PublishItemMenu.tsx`** — Radix `DropdownMenu` with classNames overridden to match.
+
+Followups:
+- [ ] **Extract a shared `MenuPrimitive`** that all three can use — same button/item/divider/section-label classes in one place. Today, if file-tree's visual style changes, the publishing menus drift.
+- [ ] **Decide whether `useContextMenuStore` should generalize** to support transient menus from any source (3-dot dropdowns, popovers), or whether Radix-based dropdowns remain the right tool for click-anchored menus while `ContextMenu` stays for right-click. Probably the latter — they have different positioning semantics.
+
+### Preserved "premium" 3-dot styling
+
+Phases 16-17 originally shipped a different styling for `PublishItemMenu` — gold-tinted text on a deep-glass surface, more design-system "premium" feel than the current file-tree match. The user liked it but chose consistency for now. The pattern is documented here for potential future adoption as the *new* platform-wide context-menu look:
+
+- Container: `rounded-xl border border-amber-200/15 bg-zinc-900/95 shadow-2xl`
+- Item: `text-amber-100/85 hover:bg-white/5 hover:text-amber-50`
+- Destructive: `text-rose-400 hover:bg-rose-500/10`
+- Icon: `opacity-65`
+
+If the design system later moves toward a more distinctive (less generic-shadcn) look for menus, recover this from the git history at commit `d5578cf` and apply it as the new shared primitive.
+
+---
+
 ## Publishing Card Slice C (deferred from 2026-06-01 multi-tenancy work)
 
 Three more 3-dot menu actions on the right-sidebar publishing card. Slice A (breadcrumb + relative time) and Slice B (Copy URL, Edit metadata, Move path, Archive, Delete) shipped in PR #50. Slice C remaining:

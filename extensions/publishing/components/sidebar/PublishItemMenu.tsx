@@ -60,6 +60,14 @@ export function PublishItemMenu({ item, onRefresh }: PublishItemMenuProps) {
 
   return (
     <>
+      {/*
+        Visual style mirrors the file-tree ContextMenu in
+        components/content/context-menu/ContextMenu.tsx so all the IDE's
+        actionable menus feel like one affordance. Item styling, container
+        backdrop, icon opacity, and destructive hover colors are all from
+        that source. See BACKLOG: context-menu unification for the
+        long-term plan to share a single Menu primitive.
+       */}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <button
@@ -69,25 +77,45 @@ export function PublishItemMenu({ item, onRefresh }: PublishItemMenuProps) {
             <MoreHorizontal className="w-3.5 h-3.5" />
           </button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-52">
-          <DropdownMenuItem onSelect={() => handleCopyUrl(item)}>
-            <LinkIcon className="w-3.5 h-3.5 mr-2" /> Copy public URL
+        <DropdownMenuContent
+          align="end"
+          className="min-w-[200px] rounded-md border border-white/20 bg-white/95 shadow-lg backdrop-blur-sm dark:bg-gray-900/95 p-1"
+        >
+          <DropdownMenuItem
+            onSelect={() => handleCopyUrl(item)}
+            className="flex items-center gap-2 px-2.5 py-1 text-sm rounded-sm text-gray-900 dark:text-gray-100 hover:bg-primary/10 hover:text-primary focus:bg-primary/10 focus:text-primary cursor-pointer"
+          >
+            <LinkIcon className="h-4 w-4 shrink-0 opacity-70" />
+            <span className="truncate">Copy public URL</span>
           </DropdownMenuItem>
-          <DropdownMenuItem onSelect={() => setDialog("edit")}>
-            <Pencil className="w-3.5 h-3.5 mr-2" /> Edit title &amp; slug
+          <DropdownMenuItem
+            onSelect={() => setDialog("edit")}
+            className="flex items-center gap-2 px-2.5 py-1 text-sm rounded-sm text-gray-900 dark:text-gray-100 hover:bg-primary/10 hover:text-primary focus:bg-primary/10 focus:text-primary cursor-pointer"
+          >
+            <Pencil className="h-4 w-4 shrink-0 opacity-70" />
+            <span className="truncate">Edit title &amp; slug</span>
           </DropdownMenuItem>
-          <DropdownMenuItem onSelect={() => setDialog("move")}>
-            <FolderInput className="w-3.5 h-3.5 mr-2" /> Move to another path
+          <DropdownMenuItem
+            onSelect={() => setDialog("move")}
+            className="flex items-center gap-2 px-2.5 py-1 text-sm rounded-sm text-gray-900 dark:text-gray-100 hover:bg-primary/10 hover:text-primary focus:bg-primary/10 focus:text-primary cursor-pointer"
+          >
+            <FolderInput className="h-4 w-4 shrink-0 opacity-70" />
+            <span className="truncate">Move to another path</span>
           </DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem onSelect={() => setDialog("archive")}>
-            <Archive className="w-3.5 h-3.5 mr-2" /> Archive
+          <DropdownMenuSeparator className="my-1 mx-1 h-px bg-gray-200 dark:bg-gray-700" />
+          <DropdownMenuItem
+            onSelect={() => setDialog("archive")}
+            className="flex items-center gap-2 px-2.5 py-1 text-sm rounded-sm text-gray-900 dark:text-gray-100 hover:bg-primary/10 hover:text-primary focus:bg-primary/10 focus:text-primary cursor-pointer"
+          >
+            <Archive className="h-4 w-4 shrink-0 opacity-70" />
+            <span className="truncate">Archive</span>
           </DropdownMenuItem>
           <DropdownMenuItem
             onSelect={() => setDialog("delete")}
-            className="text-red-600 dark:text-red-400 focus:text-red-700 dark:focus:text-red-300"
+            className="flex items-center gap-2 px-2.5 py-1 text-sm rounded-sm text-gray-900 dark:text-gray-100 hover:bg-red-500/10 hover:text-red-600 dark:hover:text-red-400 focus:bg-red-500/10 focus:text-red-600 dark:focus:text-red-400 cursor-pointer"
           >
-            <Trash2 className="w-3.5 h-3.5 mr-2" /> Delete permanently
+            <Trash2 className="h-4 w-4 shrink-0 opacity-70" />
+            <span className="truncate text-red-600 dark:text-red-400">Delete permanently</span>
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
