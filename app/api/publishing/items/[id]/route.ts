@@ -160,3 +160,57 @@ export async function PATCH(
     );
   });
 }
+
+/**
+ * DELETE /api/publishing/items/[id]
+ *
+ * Soft-delete: sets deletedAt. Stronger than archive — archived items can
+ * be re-published; deleted items disappear from the IDE entirely. The row
+ * stays in the DB so referential integrity is preserved (revisions,
+ * audit trail). A future "permanently purge" cron could hard-delete rows
+ * with deletedAt older than N days.
+ */
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  return withRouteTrace(req, { route: "/api/publishing/items/[id]" }, async () => {
+    const session = await requireAuth();
+    const { id } = await params;
+
+    return withSpan(
+      { layer: "content", name: "publishing:delete" },
+      { summary: "publishing item delete", attrs: { public_item_id: id } },
+      async (span) => {
+        const item = await prisma.publicItem.findFirst({
+          where: { id, tenant: { ownerId: session.user.id }, deletedAt: null },
+        });
+
+        if (!item) {
+          logger.warn({
+            layer: "content",
+            event: "publishing_delete:rejected",
+            summary: "public item not found",
+            attrs: { public_item_id: id },
+          });
+          return NextResponse.json({ error: "Not found" }, { status: 404 });
+        }
+
+        await prisma.publicItem.update({
+          where: { id },
+          data: { deletedAt: new Date(), state: "archived" },
+        });
+
+        span.attr("prev_state", item.state).attr("was_published",
+          item.state === "published");
+
+        // If it was public, the URL just stopped working. Invalidate.
+        if (item.state === "published") {
+          await invalidateTenantCache({ type: "item", itemId: id });
+        }
+
+        return NextResponse.json({ ok: true });
+      },
+    );
+  });
+}

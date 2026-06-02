@@ -53,6 +53,36 @@ export async function archiveItem(publicItemId: string): Promise<void> {
   if (!res.ok) throw new Error(`Archive failed: ${res.status}`);
 }
 
+export async function deleteItem(publicItemId: string): Promise<void> {
+  const res = await fetch(`/api/publishing/items/${publicItemId}`, {
+    method: "DELETE",
+  });
+  if (!res.ok) throw new Error(`Delete failed: ${res.status}`);
+}
+
+/**
+ * Patch publicTitle, slug, and/or pathId on a PublicItem. Backend
+ * validates ownership + slug uniqueness + path ownership. Returns the
+ * updated item summary.
+ */
+export async function updatePublicItem(
+  publicItemId: string,
+  body: { publicTitle?: string; slug?: string; pathId?: string },
+): Promise<PublishItemSummary> {
+  const res = await fetch(`/api/publishing/items/${publicItemId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(
+      (err as { error?: string }).error ?? `Update failed: ${res.status}`,
+    );
+  }
+  return res.json();
+}
+
 export async function validateItem(
   publicItemId: string
 ): Promise<{ status: string; issues: unknown[] }> {

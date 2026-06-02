@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { ExternalLink, MoreHorizontal, Loader2, CalendarClock, X } from "lucide-react";
+import { ExternalLink, Loader2, CalendarClock, X } from "lucide-react";
+import { PublishItemMenu } from "./PublishItemMenu";
 import { toast } from "sonner";
 import { cn } from "@/lib/core/utils";
 import {
@@ -16,6 +17,32 @@ import { usePublishStore, type PublishItemSummary } from "../../state/publish-st
 interface PublishItemRowProps {
   item: PublishItemSummary;
   onRefresh: () => void;
+}
+
+/**
+ * Compact "x ago" formatter. Inlined here because we have one callsite
+ * and don't yet have a relative-time utility in lib/core/. If a second
+ * caller needs this, extract to lib/core/relative-time.ts.
+ */
+function relativeTime(iso: string | null): string | null {
+  if (!iso) return null;
+  const then = new Date(iso).getTime();
+  const now = Date.now();
+  const diffMs = now - then;
+  if (diffMs < 0) return null; // future date — caller's job to handle
+  const sec = Math.floor(diffMs / 1000);
+  if (sec < 60) return "just now";
+  const min = Math.floor(sec / 60);
+  if (min < 60) return `${min}m ago`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr}h ago`;
+  const day = Math.floor(hr / 24);
+  if (day < 7) return `${day}d ago`;
+  // For older items show the date — "ago" stops being useful past a week.
+  return new Date(iso).toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+  });
 }
 
 export function PublishItemRow({ item, onRefresh }: PublishItemRowProps) {
@@ -115,23 +142,54 @@ export function PublishItemRow({ item, onRefresh }: PublishItemRowProps) {
           {isActing ? (
             <Loader2 className="w-3 h-3 animate-spin text-gray-300 dark:text-gray-500 shrink-0" />
           ) : (
-            <button
-              className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 rounded text-gray-300 dark:text-gray-500 hover:text-gray-500 dark:hover:text-gray-300"
-              title="More options"
-              onClick={() => toast.info("Item options — coming soon")}
-            >
-              <MoreHorizontal className="w-3.5 h-3.5" />
-            </button>
+            <PublishItemMenu item={item} onRefresh={onRefresh} />
           )}
         </div>
 
-        {/* State label + validation icons */}
+        {/* Destination breadcrumb: <site> / <path> / <slug> — answers
+            "where does this publication live" at a glance. */}
+        {(item.tenant || item.path) && (
+          <div
+            className="text-[10px] text-gray-400 dark:text-gray-500 truncate mt-0.5 font-mono"
+            title={
+              item.tenant && item.path
+                ? `${item.tenant.slug}/${item.path.slug}/${item.slug}`
+                : undefined
+            }
+          >
+            {item.tenant && (
+              <span className="text-gray-500 dark:text-gray-400">
+                {item.tenant.slug}
+              </span>
+            )}
+            {item.tenant && item.path && (
+              <span className="text-gray-300 dark:text-gray-600">{" / "}</span>
+            )}
+            {item.path && <span>{item.path.slug}</span>}
+            {item.path && (
+              <span className="text-gray-300 dark:text-gray-600">{" / "}</span>
+            )}
+            <span className="text-gray-500 dark:text-gray-400">
+              {item.slug}
+            </span>
+          </div>
+        )}
+
+        {/* State label + validation icons + relative time */}
         <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
           <span className={cn("text-[10px]", stateIcon.color)}>
             {pendingChanges && item.state === "published"
               ? "Changes pending"
               : stateIcon.label}
           </span>
+          {item.state === "published" && item.lastPublishedAt && (
+            <span
+              className="text-[10px] text-gray-400 dark:text-gray-500"
+              title={new Date(item.lastPublishedAt).toLocaleString()}
+            >
+              · {relativeTime(item.lastPublishedAt)}
+            </span>
+          )}
           {item.scheduledFor && (
             <span className="text-[10px] text-sky-500">
               · {new Date(item.scheduledFor).toLocaleDateString()}

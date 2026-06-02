@@ -10,6 +10,23 @@ last_updated: 2026-05-31
 
 ---
 
+## Publishing Card Slice C (deferred from 2026-06-01 multi-tenancy work)
+
+Three more 3-dot menu actions on the right-sidebar publishing card. Slice A (breadcrumb + relative time) and Slice B (Copy URL, Edit metadata, Move path, Archive, Delete) shipped in PR #50. Slice C remaining:
+
+- [ ] **Move to a different site** — adds a tenant picker to the move flow. Only visible when the user owns >1 tenant. Backend already supports it via `PATCH /api/publishing/items/[id]` accepting a `tenantId` field (would need to add this field if not present yet — currently only accepts `pathId`). UX consideration: paths are tenant-scoped, so changing the tenant requires also re-picking a path. Probably a two-step flow: pick site → pick path within that site.
+
+- [ ] **Schedule expire (auto-unpublish at a future date)** — datetime picker that sets a `publishedUntil` (or similar). Requires:
+  - New nullable column on `PublicItem`: `publishedUntil DateTime?`
+  - The scheduled-publish cron extended to also check `publishedUntil < now` and transition published → unpublished
+  - UI: show the expire date on the card if set, with a "cancel expire" affordance
+
+- [ ] **Cancel scheduled publish** — visible only when `scheduledFor` is set. One-click clears the schedule. Tiny addition once the menu has somewhere to put it; current Slice B menu doesn't conditionally show items based on item state, so this needs a small refactor to support conditional menu items.
+
+Total estimated effort: ~150 lines + 1 schema field + cron extension.
+
+---
+
 ## Dev Infra Followups
 
 - [ ] **Local Postgres (Docker) for development** — reserve cloud Neon for deployed/preview only, so heavy local dev/testing stops burning Neon metered compute (hit the "exceeded compute time quota" wall during AI-chat-revamp dev, 2026-05). Temporary workaround in place: upgraded Vercel (Neon billed through it). Do this **after** the AI chat revamp scope completes. Deliverable: `docker-compose.yml` for Postgres + a dev `DATABASE_URL` swap (keep the Neon URL for deploys); `npx prisma db push` to seed the local schema.

@@ -79,7 +79,9 @@ yarn-error.log*
 **/* [0-9].txt
 
 # ── archived apps (not in build) ────────────────────────────────────────────
-archive/
+# Root-scoped — applies only to the top-level /archive directory, not
+# subdirectories named "archive" elsewhere in the tree (e.g. API routes).
+/archive/
 
 # git worktrees (local-only dev artifact)
 .worktrees/
