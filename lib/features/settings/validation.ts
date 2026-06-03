@@ -139,6 +139,11 @@ const aiSettingsSchema = z
     // call after each assistant reply and render 2-3 next-prompt chips.
     // The chosen model lives in Feature Routing under "follow-ups".
     showFollowUps: z.boolean().optional(),
+    // Optional free-form guidance appended to the follow-up generator's
+    // system prompt. Lets users steer suggestions toward their domain
+    // (e.g. "Focus on next experiments / pitfalls to watch for / cite
+    // sources"). Capped at 600 chars to keep the prompt manageable.
+    followUpsPrompt: z.string().max(600).optional(),
   })
   .optional();
 

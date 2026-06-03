@@ -37,16 +37,32 @@ export default function AIFeatureRoutingPage({ embedded }: AIFeatureRoutingPageP
   const [connections, setConnections] = useState<ConnectionView[]>([]);
   const [routes, setRoutes] = useState<Record<string, RouteEntry[]>>({});
   const [loading, setLoading] = useState(true);
+  // Free-form steering for the follow-up generator. Persisted as
+  // `settings.ai.followUpsPrompt`; appended to the generator's default
+  // prompt server-side. Kept here (not inside FeatureRow) because the
+  // value lives in user settings, not in feature-route entries.
+  const [followUpsPrompt, setFollowUpsPrompt] = useState("");
+  const [savedFollowUpsPrompt, setSavedFollowUpsPrompt] = useState("");
+  const [savingFollowUpsPrompt, setSavingFollowUpsPrompt] = useState(false);
+  const followUpsPromptDirty = followUpsPrompt !== savedFollowUpsPrompt;
 
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
-      const [connsRes, routesRes] = await Promise.all([
+      const [connsRes, routesRes, settingsRes] = await Promise.all([
         fetch("/api/ai/connections", { credentials: "include" }),
         fetch("/api/ai/feature-routes", { credentials: "include" }),
+        fetch("/api/user/settings", { credentials: "include" }),
       ]);
       const connsBody = await connsRes.json();
       const routesBody = await routesRes.json();
+      const settingsBody = await settingsRes.json().catch(() => null);
+      const raw =
+        (settingsBody?.data?.settings?.ai as
+          | { followUpsPrompt?: string }
+          | undefined)?.followUpsPrompt ?? "";
+      setFollowUpsPrompt(raw);
+      setSavedFollowUpsPrompt(raw);
       setConnections(connsBody?.data?.items ?? []);
       const byFeature = routesBody?.data?.byFeature ?? {};
       const normalized: Record<string, RouteEntry[]> = {};
@@ -87,6 +103,27 @@ export default function AIFeatureRoutingPage({ embedded }: AIFeatureRoutingPageP
     [],
   );
 
+  const saveFollowUpsPrompt = useCallback(async () => {
+    setSavingFollowUpsPrompt(true);
+    try {
+      const next = followUpsPrompt.trim().slice(0, 600);
+      const res = await fetch("/api/user/settings", {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ai: { followUpsPrompt: next } }),
+      });
+      if (!res.ok) throw new Error("Failed to save follow-up prompt");
+      setSavedFollowUpsPrompt(next);
+      setFollowUpsPrompt(next);
+      toast.success("Follow-up steering saved");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Save failed");
+    } finally {
+      setSavingFollowUpsPrompt(false);
+    }
+  }, [followUpsPrompt]);
+
   return (
     <div className={embedded ? "space-y-6" : "max-w-4xl mx-auto p-6 space-y-6"}>
       <header>
@@ -116,25 +153,73 @@ export default function AIFeatureRoutingPage({ embedded }: AIFeatureRoutingPageP
           </Link>
         </div>
       ) : (
-        <ul className="space-y-3">
-          {FEATURE_REGISTRY.map((feature) => {
-            const entries = routes[feature.id] ?? [];
-            // Remount on entries-change rather than useEffect-syncing
-            // local state — avoids the React Compiler's setState-in-
-            // effect cascade rule.
-            const remountKey = `${feature.id}::${JSON.stringify(entries)}`;
-            return (
-              <FeatureRow
-                key={remountKey}
-                feature={feature}
-                connections={connections}
-                entries={entries}
-                onSave={(next) => void handleSetRoutes(feature.id, next)}
-                glass0={glass0}
-              />
-            );
-          })}
-        </ul>
+        <>
+          <ul className="space-y-3">
+            {FEATURE_REGISTRY.map((feature) => {
+              const entries = routes[feature.id] ?? [];
+              // Remount on entries-change rather than useEffect-syncing
+              // local state — avoids the React Compiler's setState-in-
+              // effect cascade rule.
+              const remountKey = `${feature.id}::${JSON.stringify(entries)}`;
+              return (
+                <FeatureRow
+                  key={remountKey}
+                  feature={feature}
+                  connections={connections}
+                  entries={entries}
+                  onSave={(next) => void handleSetRoutes(feature.id, next)}
+                  glass0={glass0}
+                />
+              );
+            })}
+          </ul>
+
+          {/* Follow-ups steering — free-form prompt appended to the
+              generator's system instructions. Sits alongside the
+              follow-ups feature row above because the model lives there
+              but the prompt's value belongs in user settings. */}
+          <section
+            className="rounded-xl border border-white/10 p-4 space-y-3"
+            style={{ background: glass0.background }}
+          >
+            <div>
+              <h3 className="text-sm font-medium text-white">
+                Follow-up steering
+              </h3>
+              <p className="mt-1 text-xs text-gray-500">
+                Optional free-form guidance appended to the follow-up
+                generator&apos;s prompt. Example: &ldquo;Focus on next
+                experiments and pitfalls to watch for. Skip rephrasings of
+                the last assistant turn.&rdquo;
+              </p>
+            </div>
+            <textarea
+              value={followUpsPrompt}
+              onChange={(e) =>
+                setFollowUpsPrompt(e.target.value.slice(0, 600))
+              }
+              rows={3}
+              maxLength={600}
+              placeholder="What should the follow-up suggestions focus on?"
+              className="w-full resize-y rounded-md border border-white/10 bg-black/20 px-3 py-2 text-sm text-white placeholder:text-gray-500 focus:border-blue-400/40 focus:outline-none"
+            />
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-[11px] text-gray-500">
+                {followUpsPrompt.length}/600 characters
+              </span>
+              {followUpsPromptDirty && (
+                <Button
+                  size="sm"
+                  onClick={() => void saveFollowUpsPrompt()}
+                  disabled={savingFollowUpsPrompt}
+                >
+                  <Check className="h-3.5 w-3.5 mr-1" />
+                  {savingFollowUpsPrompt ? "Saving…" : "Save"}
+                </Button>
+              )}
+            </div>
+          </section>
+        </>
       )}
     </div>
   );
