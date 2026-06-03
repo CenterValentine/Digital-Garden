@@ -18,6 +18,15 @@ import { logger, spanPayload, withRouteTrace, withSpan } from "@/lib/core/logger
 
 const ROUTE_PATH = "/api/content/content/create-document";
 
+/**
+ * Permissive UUID regex (v1-v5). Used to short-circuit obviously-bad
+ * parentId values before they reach Prisma — specifically the
+ * `temp-{ts}-{rand}` placeholder ids the file-tree's optimistic-insert
+ * flow uses for not-yet-persisted parents.
+ */
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 export async function POST(request: NextRequest) {
   return withRouteTrace(request, { route: ROUTE_PATH }, async () => {
     try {
@@ -135,6 +144,25 @@ export async function POST(request: NextRequest) {
       }
 
       if (parentId) {
+        // Guard against the optimistic-create race in the file tree: when
+        // a child is requested while the parent's row hasn't been created
+        // yet, the client still has a "temp-{timestamp}-{rand}" placeholder
+        // id for the parent. Without this guard, Prisma would dispatch the
+        // string to PostgreSQL and the user sees a raw "invalid input
+        // syntax for type uuid" dialog. Return a tractable 400 instead.
+        if (!UUID_RE.test(parentId)) {
+          return NextResponse.json(
+            {
+              success: false,
+              error: {
+                code: "PARENT_NOT_READY",
+                message:
+                  "Parent folder is still being created — try again in a moment.",
+              },
+            },
+            { status: 400 },
+          );
+        }
         const parent = await prisma.contentNode.findUnique({
           where: { id: parentId },
           select: {

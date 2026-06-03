@@ -68,6 +68,7 @@ import type {
 } from "@/lib/domain/content/api-types";
 import type { StoredChatMessage } from "@/lib/domain/ai/types";
 import { softDeleteConversation } from "@/lib/features/conversations";
+import { publishConversationEvent } from "@/lib/features/conversations/events";
 
 type Params = Promise<{ id: string }>;
 
@@ -1227,6 +1228,51 @@ export async function PATCH(
               }
             },
           );
+        }
+      }
+
+      // Chat-content title cascade. A chat lives in TWO tables: ContentNode
+      // (what the file tree / tab read) and Conversation (what ChatViewer
+      // reads via useConversationBinding). Renaming from the file tree only
+      // touched ContentNode.title, leaving the conversation header showing
+      // the stale name. Mirror the title to the backing Conversation when
+      // it really changed, then publish `conversation.updated` so any open
+      // ChatViewer instance refreshes via SSE. Best-effort: a sync failure
+      // does not undo the successful content update.
+      if (
+        title !== undefined &&
+        title !== existing.title &&
+        existing.contentType === "chat"
+      ) {
+        try {
+          const backing = await prisma.conversation.findFirst({
+            where: {
+              archivedToContentNodeId: id,
+              ownerId: userId,
+              deletedAt: null,
+            },
+            select: { id: true },
+          });
+          if (backing) {
+            await prisma.conversation.update({
+              where: { id: backing.id },
+              data: { title: updated.title },
+            });
+            publishConversationEvent(userId, {
+              type: "conversation.updated",
+              conversationId: backing.id,
+              title: updated.title,
+              at: new Date().toISOString(),
+            });
+          }
+        } catch (error) {
+          logger.warn({
+            layer: "route",
+            event: "content.rename.conversation_sync_failed",
+            summary: `failed to mirror title to backing Conversation for ${id}`,
+            attrs: { content_id: id },
+            error,
+          });
         }
       }
 

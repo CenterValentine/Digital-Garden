@@ -705,6 +705,52 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
     };
   }, [selectedContentId, updateContentTab]);
 
+  // Targeted notes-only refresh — fired by `use-conversation-engine`'s
+  // onFinish when the AI's updateNote tool writes new note content.
+  // Why a separate path from `content-updated`: that listener triggers
+  // `refreshTrigger++`, which re-runs `fetchNote`, which resets loading
+  // state, re-extracts the outline, syncs the tab title, and reloads
+  // ALL content. The user only sees the note panel change, but every
+  // surface flickers. This handler does the minimum work — a small GET
+  // on the content endpoint, then a single `setNoteContent` — so only
+  // the editor's content updates. Pane scoping is automatic because the
+  // listener gates on `selectedContentId === detail.contentId`; in a
+  // multi-pane layout, every pane that has this content open reacts
+  // (including non-focused panes — the user expects them to stay in
+  // sync even when they're not the active one).
+  useEffect(() => {
+    const handler = async (event: Event) => {
+      const detail = (event as CustomEvent<{ contentId: string }>).detail;
+      if (!detail?.contentId) return;
+      if (detail.contentId !== selectedContentId) return;
+      try {
+        const res = await fetch(
+          `/api/content/content/${encodeURIComponent(detail.contentId)}`,
+          { credentials: "include" },
+        );
+        if (!res.ok) return;
+        // ContentDetailResponse exposes the NotePayload as `data.note`
+        // (not `data.notePayload`). Read site has to match the route's
+        // formatter at app/api/content/content/[id]/route.ts:397.
+        const body = (await res.json()) as {
+          data?: {
+            note?: { tiptapJson?: JSONContent };
+          };
+        };
+        const json = body?.data?.note?.tiptapJson;
+        if (json) {
+          setNoteContent(json);
+        }
+      } catch {
+        /* silent — user can always trigger a full refresh manually */
+      }
+    };
+    window.addEventListener("dg:notes-refresh", handler);
+    return () => {
+      window.removeEventListener("dg:notes-refresh", handler);
+    };
+  }, [selectedContentId]);
+
   // Stats change handler
   const handleStatsChange = useCallback(
     (stats: EditorStats) => {

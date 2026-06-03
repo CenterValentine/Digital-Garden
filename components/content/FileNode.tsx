@@ -372,14 +372,19 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
     e.preventDefault();
     e.stopPropagation();
 
-    // If right-clicking on a non-selected node, select it first
-    if (!node.isSelected) {
-      node.select();
-    }
-
-    // Get currently selected node IDs from the tree
+    // Previously this called `node.select()` when right-clicking a
+    // non-selected node — which routed through the tree's `onSelect`,
+    // which calls `setSelectedContentId`, which (for folders) navigates
+    // the main panel and triggers `FolderView` to fetch the folder's
+    // children. Right-clicking a folder shouldn't navigate to it; the
+    // user expects ONLY the context menu. We now scope the menu via
+    // `clickedId` instead — multi-select menus still work because we
+    // honor the EXISTING selection when the click is inside it.
     const tree = node.tree;
-    const selectedIds = tree.selectedNodes?.map((n: NodeApi<TreeNode>) => n.id) || [data.id];
+    const isInExistingSelection = node.isSelected;
+    const selectedIds = isInExistingSelection
+      ? tree.selectedNodes?.map((n: NodeApi<TreeNode>) => n.id) || [data.id]
+      : [data.id];
 
     openMenu(
       "file-tree",

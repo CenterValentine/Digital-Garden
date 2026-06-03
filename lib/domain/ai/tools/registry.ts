@@ -12,6 +12,7 @@
 import { tool } from "ai";
 import { z } from "zod/v4";
 import { prisma } from "@/lib/database/client";
+import type { Prisma } from "@/lib/database/generated/prisma";
 import {
   generateUniqueSlug,
   extractSearchTextFromTipTap,
@@ -68,6 +69,39 @@ async function resolveImageGenRoute(
     // settings couldn't be read.
     return aiArgs;
   }
+}
+
+/**
+ * Detect markdownToTiptap's silent fallback. The fallback wraps the
+ * entire markdown string as a SINGLE plain-text paragraph — so the user
+ * sees raw `### Heading` / `- **Bold**` text in the rendered note
+ * instead of structured TipTap nodes (Bug G). When this happens we
+ * upgrade to a paragraph-per-blank-line split so at least newline
+ * structure survives.
+ */
+function isMarkdownFallback(
+  json: { content?: Array<{ type?: string; content?: Array<{ type?: string; text?: string }> }> },
+  source: string,
+): boolean {
+  const doc = json.content;
+  if (!doc || doc.length !== 1) return false;
+  const p = doc[0];
+  if (!p || p.type !== "paragraph") return false;
+  const text = p.content?.[0]?.text;
+  return typeof text === "string" && text.trim() === source.trim();
+}
+
+function paragraphSplitFallback(source: string) {
+  const blocks = source.split(/\n\s*\n/).map((s) => s.trim()).filter(Boolean);
+  return {
+    type: "doc" as const,
+    content: blocks.length
+      ? blocks.map((block) => ({
+          type: "paragraph" as const,
+          content: [{ type: "text" as const, text: block }],
+        }))
+      : [{ type: "paragraph" as const }],
+  };
 }
 
 /**
@@ -163,7 +197,10 @@ export function createBaseTools(ctx: ToolExecuteContext) {
 
     createNote: tool({
       description:
-        "Create a new note in the user's Digital Garden. Returns the new note's ID and title.",
+        "Create a NEW note in the user's Digital Garden. Use this only when the user EXPLICITLY asks for a new file. " +
+        "Ambiguous phrasings to watch for: 'update the note in this chat', 'add to this conversation's notes', 'put X in the note' — these do NOT mean 'create a new note'. They typically refer to an existing note. When the phrasing is ambiguous, ASK the user whether to create a new note or update an existing one before calling this tool. " +
+        "If they confirm a new note, this is the right tool. If they name an existing note, use `searchNotes` to find its id then use `updateNote`. " +
+        "By default the new note is placed in the same folder as the active chat (when the user is chatting from a chat content page). Pass `parentId` to override.",
       inputSchema: z.object({
         title: z
           .string()
@@ -173,13 +210,57 @@ export function createBaseTools(ctx: ToolExecuteContext) {
         content: z
           .string()
           .optional()
-          .describe("Markdown content for the note (optional)"),
+          .describe(
+            "Markdown content for the note (optional). Use standard markdown: # headings, **bold**, *italic*, `code`, bulleted/numbered lists, tables, blockquotes, links, images. The system converts it to rich text.",
+          ),
+        parentId: z
+          .string()
+          .uuid()
+          .optional()
+          .describe(
+            "Optional UUID of a folder to create the note in. Defaults to the active chat's parent folder. Omit unless the user names a specific folder.",
+          ),
       }),
-      execute: async ({ title, content = "" }) => {
+      execute: async ({ title, content = "", parentId }) => {
+        // Resolve the parent folder. Priority:
+        //   1. AI-supplied parentId (validated to exist + belong to user)
+        //   2. Chat's own parent folder (when in a chat context)
+        //   3. null (vault root)
+        let resolvedParentId: string | null = null;
+        if (parentId) {
+          const candidate = await prisma.contentNode.findFirst({
+            where: {
+              id: parentId,
+              ownerId: ctx.userId,
+              deletedAt: null,
+              contentType: "folder",
+            },
+            select: { id: true },
+          });
+          if (candidate) resolvedParentId = candidate.id;
+        }
+        if (!resolvedParentId && ctx.chatContentId) {
+          const chatNode = await prisma.contentNode.findFirst({
+            where: { id: ctx.chatContentId, ownerId: ctx.userId },
+            select: { parentId: true },
+          });
+          resolvedParentId = chatNode?.parentId ?? null;
+        }
+
         const slug = await generateUniqueSlug(title, ctx.userId);
-        const tiptapJson = content
+        // markdownToTiptap → marked → generateJSON pipeline. If it throws,
+        // the internal fallback wraps raw markdown as plain text — which
+        // produces the "raw ### headings showing in the note" bug. Detect
+        // that fallback (single paragraph whose text equals the input) and
+        // upgrade to a paragraph-per-blank-line split so at least line
+        // breaks survive. The full markdown features depend on the
+        // pipeline succeeding upstream.
+        let tiptapJson = content
           ? markdownToTiptap(content)
           : { type: "doc", content: [{ type: "paragraph" }] };
+        if (content && isMarkdownFallback(tiptapJson, content)) {
+          tiptapJson = paragraphSplitFallback(content);
+        }
         const searchText = extractSearchTextFromTipTap(tiptapJson);
         const wordCount = searchText.split(/\s+/).filter(Boolean).length;
 
@@ -189,6 +270,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
             title,
             slug,
             contentType: "note",
+            parentId: resolvedParentId,
             notePayload: {
               create: {
                 tiptapJson,
@@ -203,7 +285,121 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           },
         });
 
-        return `Created note "${title}" (id: ${node.id}). ${content ? `Contains ${wordCount} words.` : "Empty note created."}`;
+        // Structured payload so ChatMessage renders a clickable link to the
+        // new note + a signal the client uses to refresh the file tree
+        // without a full page reload. Mirrors the __imagePayload pattern.
+        return JSON.stringify({
+          __notePayload: true,
+          kind: "created",
+          contentId: node.id,
+          title,
+          parentId: resolvedParentId,
+          wordCount,
+        });
+      },
+    }),
+
+    updateNote: tool({
+      description:
+        "Update the markdown/TipTap notes attached to a content item. " +
+        "WORKS ON ANY CONTENT TYPE: notes (full-page editor), chats (the 'Add notes' panel below the chat), folders, files, externals, etc. — every content type has an optional sidecar NotePayload keyed by its contentId. " +
+        "Common phrasings: 'update this conversation's notes', 'add to my Sourdough note', 'put X in the notes for this chat'. " +
+        "If the user is chatting in a full-page chat and asks to update 'the note in this chat' or 'this chat's notes', pass the CHAT's contentId here — that updates the notes panel attached to the chat itself, not a separate file. " +
+        "Do NOT use this to create new top-level notes — use `createNote` for that. " +
+        "RENAME RULE: do NOT set the `title` argument unless the user EXPLICITLY asks to rename (e.g. 'rename this to X'). Mentioning a topic or theme is NOT a rename request. NEVER set `title` when the target is the user's open chat — renaming a chat while updating its notes is wrong.",
+      inputSchema: z.object({
+        contentId: z
+          .string()
+          .uuid()
+          .describe(
+            "UUID of the content whose notes to update. For 'this chat's notes' this is the CHAT's contentId, not a separate note.",
+          ),
+        content: z
+          .string()
+          .min(1)
+          .describe(
+            "Full new markdown content for the notes. This replaces the current notes; if the user wants to append, include the existing content in this string.",
+          ),
+        title: z
+          .string()
+          .min(1)
+          .max(255)
+          .optional()
+          .describe(
+            "New title for the content. ONLY set this if the user explicitly asked to rename. NEVER set when updating a chat's notes.",
+          ),
+      }),
+      execute: async ({ contentId, content, title }) => {
+        // Allow updateNote against ANY content type the user owns —
+        // notes, chats (their 'Add notes' sidecar), folders, files, etc.
+        // The legacy filter of `contentType: "note"` was the cause of the
+        // "you can't update this chat's notes" behavior the user reported.
+        const existing = await prisma.contentNode.findFirst({
+          where: {
+            id: contentId,
+            ownerId: ctx.userId,
+            deletedAt: null,
+          },
+          select: { id: true, title: true, contentType: true },
+        });
+        if (!existing) {
+          return `Content "${contentId}" not found or deleted. Use searchNotes to find the right id.`;
+        }
+
+        // Hard rename-guard: never rename when the target IS the active
+        // chat. This protects against the AI inferring a title from the
+        // user's update prompt and silently rewriting the chat's name.
+        const isUpdatingActiveChat =
+          ctx.chatContentId !== undefined && contentId === ctx.chatContentId;
+        const titleToApply = isUpdatingActiveChat ? undefined : title;
+
+        let tiptapJson = markdownToTiptap(content);
+        if (isMarkdownFallback(tiptapJson, content)) {
+          tiptapJson = paragraphSplitFallback(content);
+        }
+        const searchText = extractSearchTextFromTipTap(tiptapJson);
+        const wordCount = searchText.split(/\s+/).filter(Boolean).length;
+
+        // Upsert (not nested update) because non-note content types may
+        // not have a NotePayload row yet. Mirrors the PATCH route's
+        // unified write path.
+        await prisma.notePayload.upsert({
+          where: { contentId },
+          update: {
+            tiptapJson: tiptapJson as unknown as Prisma.InputJsonValue,
+            searchText,
+            metadata: {
+              wordCount,
+              characterCount: searchText.length,
+              readingTime: Math.ceil(wordCount / 200),
+            },
+          },
+          create: {
+            contentId,
+            tiptapJson: tiptapJson as unknown as Prisma.InputJsonValue,
+            searchText,
+            metadata: {
+              wordCount,
+              characterCount: searchText.length,
+              readingTime: Math.ceil(wordCount / 200),
+            },
+          },
+        });
+        if (titleToApply) {
+          await prisma.contentNode.update({
+            where: { id: contentId },
+            data: { title: titleToApply },
+          });
+        }
+
+        return JSON.stringify({
+          __notePayload: true,
+          kind: "updated",
+          contentId: existing.id,
+          title: titleToApply ?? existing.title,
+          wordCount,
+          targetKind: existing.contentType,
+        });
       },
     }),
 

@@ -12,6 +12,7 @@
 "use client";
 
 import { memo, useState, useCallback, useEffect, useMemo, useRef } from "react";
+import { createPortal } from "react-dom";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { common, createLowlight } from "lowlight";
@@ -19,6 +20,7 @@ import { Bot, User, Wrench, Loader2, Copy, Check, ImagePlus, GripVertical, Brain
 import { cn } from "@/lib/core/utils";
 import { useContentStore } from "@/state/content-store";
 import { useSettingsStore } from "@/state/settings-store";
+import { useNotesPanelStore } from "@/state/notes-panel-store";
 import { useTypewriter } from "@/lib/domain/ai/use-typewriter";
 import type { UIMessage } from "ai";
 import type { Components } from "react-markdown";
@@ -72,6 +74,16 @@ function detectToolPart(part: unknown): DetectedToolPart | null {
     input: p.input,
     output: p.output,
   };
+}
+
+/** Shape of the note payload returned by createNote / updateNote tools. */
+interface NotePayload {
+  __notePayload: true;
+  kind: "created" | "updated";
+  contentId: string;
+  title: string;
+  parentId?: string | null;
+  wordCount?: number;
 }
 
 /** Shape of the image payload returned by generate_image tool */
@@ -220,13 +232,15 @@ export const ChatMessage = memo(function ChatMessage({
     onEdit?.(message.id, next);
   }, [draft, messageText, onEdit, message.id]);
 
-  // Pre-scan: extract image payloads from ALL tool parts at message level.
-  // This is more reliable than detecting inside the parts loop because it
+  // Pre-scan: extract image + note payloads from ALL tool parts at message
+  // level. More reliable than detecting inside the parts loop because it
   // handles streaming state transitions and part type variations.
-  const { imagePayloads, hasRunningTools } = useMemo(() => {
-    const payloads: ImagePayload[] = [];
+  const { imagePayloads, notePayloads, hasRunningTools } = useMemo(() => {
+    const images: ImagePayload[] = [];
+    const notes: NotePayload[] = [];
     let running = false;
-    const seenIds = new Set<string>();
+    const seenImageIds = new Set<string>();
+    const seenNoteIds = new Set<string>();
 
     for (const part of message.parts) {
       const tp = detectToolPart(part);
@@ -237,16 +251,32 @@ export const ChatMessage = memo(function ChatMessage({
       }
 
       if (tp.state === "output-available" && tp.output !== undefined) {
-        const payload = parseImagePayload(tp.output);
-        if (payload && !seenIds.has(payload.contentId)) {
-          seenIds.add(payload.contentId);
-          payloads.push(payload);
+        const image = parseImagePayload(tp.output);
+        if (image && !seenImageIds.has(image.contentId)) {
+          seenImageIds.add(image.contentId);
+          images.push(image);
+          continue;
+        }
+        const note = parseNotePayload(tp.output);
+        if (note && !seenNoteIds.has(note.contentId)) {
+          seenNoteIds.add(note.contentId);
+          notes.push(note);
         }
       }
     }
 
-    return { imagePayloads: payloads, hasRunningTools: running };
+    return {
+      imagePayloads: images,
+      notePayloads: notes,
+      hasRunningTools: running,
+    };
   }, [message.parts]);
+
+  // NOTE: tree-refresh + content-updated dispatch for AI note writes
+  // lives in `use-conversation-engine.ts` `onFinish` — fires exactly
+  // once per AI completion. Putting that logic here (in the render
+  // path) re-fired every time a historical assistant message mounted,
+  // which caused a refetch loop on page open. Do NOT move it back.
 
   return (
     <div
@@ -273,15 +303,24 @@ export const ChatMessage = memo(function ChatMessage({
           <User className="h-4 w-4" />
         </div>
       ) : (
-        <AssistantAvatar providerId={providerId} modelId={modelId} />
+        <AssistantAvatar
+          providerId={providerId}
+          modelId={modelId}
+          metadata={
+            (message as { metadata?: Record<string, unknown> }).metadata
+          }
+        />
       )}
 
-      {/* Message content */}
+      {/* Message content. User bubbles are positioned right via flex-row-reverse
+          (line ~267) and the action row uses its own justify-end, so we do NOT
+          add text-right here — keeping text-left makes line-wrapped bullet
+          lists / multi-line prompts read left-to-right while the bubble still
+          sits on the right side of the column. */}
       <div
         className={cn(
           "min-w-0 space-y-2",
           theme.bubble.columnClassName,
-          isUser && "text-right",
         )}
       >
         {/* Inline editor for user messages (Session 5a) */}
@@ -451,12 +490,12 @@ export const ChatMessage = memo(function ChatMessage({
 
           // Tool parts: detect via detectToolPart helper (handles both static and dynamic)
           // Image generation tool results render as GeneratedImageCard at message level below.
+          // Note creation/update tool results render as NotePayloadCard at message level below.
           const toolPart = detectToolPart(part);
           if (toolPart) {
-            // Skip image tool results — they render at message level
             if (toolPart.state === "output-available") {
-              const isImageResult = parseImagePayload(toolPart.output) !== null;
-              if (isImageResult) return null;
+              if (parseImagePayload(toolPart.output) !== null) return null;
+              if (parseNotePayload(toolPart.output) !== null) return null;
             }
 
             return (
@@ -476,6 +515,11 @@ export const ChatMessage = memo(function ChatMessage({
         {/* Image cards — rendered at message level for reliability */}
         {imagePayloads.map((payload) => (
           <GeneratedImageCard key={payload.contentId} payload={payload} />
+        ))}
+
+        {/* Note cards — clickable link affordance for createNote / updateNote */}
+        {notePayloads.map((payload) => (
+          <NotePayloadCard key={payload.contentId} payload={payload} />
         ))}
 
         {/* Thinking indicator — shows during tool execution */}
@@ -954,37 +998,89 @@ function renderHastNode(node: HastNode, key: number): React.ReactNode {
 // ─── Existing Sub-Components ─────────────────────────────────
 
 /**
- * Assistant avatar with provider/model tooltip.
+ * Assistant avatar with provider/model/usage tooltip.
  *
- * Tooltip shows after a 1-second deliberate hover — short hovers from
- * cursor passes don't trigger it. Background tints to the producing
- * provider's brand color so the avatar itself is an at-a-glance
- * provider indicator.
+ * Tooltip:
+ *   - shows after a 1-second deliberate hover (cursor-pass-through guard)
+ *   - rendered in a body-level portal anchored to the avatar's
+ *     getBoundingClientRect, so message-bubble overflow:hidden / rounded
+ *     corners can't clip or reflow it
+ *   - displays provider name + model name + this turn's input/output
+ *     tokens when present in message.metadata.usage
+ *
+ * Background tints to the producing provider's brand color so the
+ * avatar itself is an at-a-glance provider indicator.
  */
+type UsageShape = {
+  inputTokens?: number;
+  outputTokens?: number;
+  totalTokens?: number;
+} | undefined;
+
+function extractUsage(metadata: Record<string, unknown> | undefined): UsageShape {
+  if (!metadata || typeof metadata !== "object") return undefined;
+  const usage = (metadata as { usage?: unknown }).usage;
+  if (!usage || typeof usage !== "object") return undefined;
+  const u = usage as Record<string, unknown>;
+  const num = (v: unknown): number | undefined =>
+    typeof v === "number" && Number.isFinite(v) ? v : undefined;
+  return {
+    inputTokens: num(u.inputTokens),
+    outputTokens: num(u.outputTokens),
+    totalTokens: num(u.totalTokens),
+  };
+}
+
 function AssistantAvatar({
   providerId,
   modelId,
+  metadata,
 }: {
   providerId?: string | null;
   modelId?: string | null;
+  metadata?: Record<string, unknown>;
 }) {
-  const [showTooltip, setShowTooltip] = useState(false);
+  const [tooltipAnchor, setTooltipAnchor] = useState<{
+    top: number;
+    left: number;
+  } | null>(null);
+  const anchorRef = useRef<HTMLDivElement | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [portalReady, setPortalReady] = useState(false);
 
   const theme = getProviderTheme(providerId);
   const provider = PROVIDER_CATALOG.find((p) => p.id === providerId);
   const model = provider?.models.find((m) => m.id === modelId);
   const providerName = provider?.name ?? "AI assistant";
   const modelName = model?.name ?? modelId ?? null;
+  const usage = useMemo(() => extractUsage(metadata), [metadata]);
+
+  useEffect(() => {
+    // One-shot SSR/hydration boundary marker so we only render the
+    // portal once `document.body` is present. The React Compiler flags
+    // "setState in effect" defensively here; this is the same one-shot
+    // pattern used by the right-sidebar hydration hook, not a render-
+    // synchronization bug.
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-shot post-mount marker
+    setPortalReady(typeof document !== "undefined");
+  }, []);
 
   const handleEnter = useCallback(() => {
     if (timerRef.current) clearTimeout(timerRef.current);
-    timerRef.current = setTimeout(() => setShowTooltip(true), 1000);
+    timerRef.current = setTimeout(() => {
+      const rect = anchorRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      // Anchor to the right edge of the avatar, vertically centered.
+      setTooltipAnchor({
+        top: rect.top + rect.height / 2,
+        left: rect.right + 8, // 8px gap (matches the prior `ml-2`)
+      });
+    }, 1000);
   }, []);
 
   const handleLeave = useCallback(() => {
     if (timerRef.current) clearTimeout(timerRef.current);
-    setShowTooltip(false);
+    setTooltipAnchor(null);
   }, []);
 
   useEffect(() => {
@@ -995,7 +1091,8 @@ function AssistantAvatar({
 
   return (
     <div
-      className="relative shrink-0"
+      ref={anchorRef}
+      className="shrink-0"
       onMouseEnter={handleEnter}
       onMouseLeave={handleLeave}
     >
@@ -1009,25 +1106,56 @@ function AssistantAvatar({
       >
         <Bot className="h-4 w-4" />
       </div>
-      {showTooltip && (
-        <div
-          role="tooltip"
-          className="absolute left-full top-1/2 ml-2 z-50 -translate-y-1/2 whitespace-nowrap rounded-md border border-white/10 bg-[#1a1a1a] px-2.5 py-1.5 text-[10px] text-gray-200 shadow-xl"
-        >
-          <div className="flex items-center gap-1.5">
-            <span
-              className="h-2 w-2 shrink-0 rounded-full"
-              style={{ background: theme.brandColor }}
-            />
-            <span className="font-medium">{providerName}</span>
-          </div>
-          {modelName && (
-            <div className="mt-0.5 text-gray-500 dark:text-gray-400">
-              {modelName}
+      {portalReady && tooltipAnchor &&
+        createPortal(
+          <div
+            role="tooltip"
+            // Fixed positioning relative to the viewport — no ancestor
+            // overflow / transform can clip or reflow this.
+            style={{
+              position: "fixed",
+              top: tooltipAnchor.top,
+              left: tooltipAnchor.left,
+              transform: "translateY(-50%)",
+              zIndex: 9999,
+            }}
+            className="pointer-events-none whitespace-nowrap rounded-md border border-white/10 bg-[#1a1a1a] px-2.5 py-1.5 text-[10px] text-gray-200 shadow-xl"
+          >
+            <div className="flex items-center gap-1.5">
+              <span
+                className="h-2 w-2 shrink-0 rounded-full"
+                style={{ background: theme.brandColor }}
+              />
+              <span className="font-medium">{providerName}</span>
             </div>
-          )}
-        </div>
-      )}
+            {modelName && (
+              <div className="mt-0.5 text-gray-500 dark:text-gray-400">
+                {modelName}
+              </div>
+            )}
+            {usage && (usage.inputTokens != null || usage.outputTokens != null) && (
+              <div className="mt-1 flex items-center gap-2 border-t border-white/10 pt-1 text-gray-400 dark:text-gray-500">
+                {usage.inputTokens != null && (
+                  <span>
+                    <span className="text-gray-500">in</span>{" "}
+                    <span className="tabular-nums text-gray-300">
+                      {usage.inputTokens.toLocaleString()}
+                    </span>
+                  </span>
+                )}
+                {usage.outputTokens != null && (
+                  <span>
+                    <span className="text-gray-500">out</span>{" "}
+                    <span className="tabular-nums text-gray-300">
+                      {usage.outputTokens.toLocaleString()}
+                    </span>
+                  </span>
+                )}
+              </div>
+            )}
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }
@@ -1057,6 +1185,20 @@ function parseImagePayload(result: unknown): ImagePayload | null {
     if (parsed.__imagePayload) return parsed as ImagePayload;
   } catch {
     // not valid JSON
+  }
+  return null;
+}
+
+/** Parse a note payload (createNote / updateNote) from a tool result. */
+function parseNotePayload(result: unknown): NotePayload | null {
+  if (result === undefined) return null;
+  const str = typeof result === "string" ? result : JSON.stringify(result);
+  if (!str.includes('"__notePayload"')) return null;
+  try {
+    const parsed = JSON.parse(str);
+    if (parsed.__notePayload) return parsed as NotePayload;
+  } catch {
+    /* not valid JSON */
   }
   return null;
 }
@@ -1263,6 +1405,69 @@ function toolActionLabel(toolName: string, isRunning: boolean): string {
  * - Draggable via HTML5 drag with image URL in dataTransfer,
  *   compatible with TipTap's image drop handler.
  */
+/**
+ * Inline card rendered when createNote / updateNote tool returns. Replaces
+ * the raw "Created note (id: …)" string with a clickable affordance that
+ * opens the note in the main panel. Compact so it doesn't dominate the
+ * assistant turn — Bug C target.
+ */
+function NotePayloadCard({ payload }: { payload: NotePayload }) {
+  // Self-edit detection: the AI updated this very chat's own sidecar
+  // notes (same contentId as the open content). In that case clicking
+  // "open" doesn't make sense — you're already here — so instead we
+  // expand + scroll to the Notes editor panel below the chat. For
+  // non-self payloads (a different note got created or updated), the
+  // click navigates to that content as before.
+  const selectedContentId = useContentStore((s) => s.selectedContentId);
+  const isSelfEdit = selectedContentId === payload.contentId;
+
+  const handleClick = useCallback(() => {
+    if (isSelfEdit) {
+      useNotesPanelStore.getState().setExpanded(true);
+      // Defer scroll until React has had a chance to render the
+      // newly-expanded panel.
+      setTimeout(() => {
+        document
+          .getElementById("notes-panel-anchor")
+          ?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 0);
+      return;
+    }
+    useContentStore.getState().setSelectedContentId(payload.contentId);
+  }, [isSelfEdit, payload.contentId]);
+
+  const verb = payload.kind === "updated" ? "Updated" : "Created";
+  const wordCount =
+    typeof payload.wordCount === "number" && payload.wordCount > 0
+      ? ` · ${payload.wordCount.toLocaleString()} word${payload.wordCount === 1 ? "" : "s"}`
+      : "";
+  const subline = isSelfEdit
+    ? `${verb} this chat's notes${wordCount} · click to view`
+    : `${verb} note${wordCount} · click to open`;
+  const tooltipText = isSelfEdit
+    ? "View the updated notes for this chat"
+    : `Open "${payload.title}"`;
+
+  return (
+    <button
+      type="button"
+      onClick={handleClick}
+      className="group inline-flex max-w-full items-center gap-2 rounded-lg border border-black/10 bg-black/[0.03] px-3 py-2 text-left text-sm transition-colors hover:border-blue-400/40 hover:bg-blue-500/5 dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/10"
+      title={tooltipText}
+    >
+      <FileText className="h-4 w-4 shrink-0 text-blue-500 dark:text-blue-400" />
+      <span className="flex min-w-0 flex-col">
+        <span className="truncate font-medium text-gray-900 group-hover:text-blue-700 dark:text-gray-100 dark:group-hover:text-blue-300">
+          {payload.title}
+        </span>
+        <span className="text-[11px] text-gray-500 dark:text-gray-400">
+          {subline}
+        </span>
+      </span>
+    </button>
+  );
+}
+
 function GeneratedImageCard({ payload }: { payload: ImagePayload }) {
   const [inserted, setInserted] = useState(false);
   const selectedContentType = useContentStore((s) => s.selectedContentType);

@@ -20,6 +20,7 @@ import {
   getConnectionWithKey,
   listConnections,
 } from "@/lib/features/ai-connections";
+import { getUserSettings } from "@/lib/features/settings";
 import { logger } from "@/lib/core/logger";
 
 /** Zod schema for the generator's structured output. */
@@ -96,23 +97,50 @@ export async function generateFollowUps(
       }
     }
 
+    // Optional user-supplied steering — appended to the default
+    // instructions so the model can still produce well-formed structured
+    // output. Read defensively: bad/missing settings must not break
+    // generation (we just fall back to the default prompt).
+    let userGuidance = "";
+    try {
+      const settings = await getUserSettings(userId);
+      const raw = (settings.ai as { followUpsPrompt?: unknown } | undefined)
+        ?.followUpsPrompt;
+      if (typeof raw === "string" && raw.trim().length > 0) {
+        userGuidance = raw.trim().slice(0, 600);
+      }
+    } catch {
+      /* settings unavailable — generate with defaults */
+    }
+
+    const promptLines = [
+      "You are helping a user continue an AI chat.",
+      "Given the exchange below, return 2-3 short follow-up prompts the",
+      "user could reasonably send next. Phrase them as questions or",
+      "instructions in the user's voice (first-person, imperative or",
+      "interrogative). Each must stand alone and be under ~120 chars.",
+      "Do not number them. Do not preface with 'You could ask:' etc.",
+    ];
+    if (userGuidance) {
+      promptLines.push(
+        "",
+        "Additional guidance from the user (steers the suggestions):",
+        userGuidance,
+      );
+    }
+    promptLines.push(
+      "",
+      `User: ${truncate(lastUserText, 800)}`,
+      `Assistant: ${truncate(lastAssistantText, 1600)}`,
+    );
+
     const result = await generateObject({
       // resolveChat* returns the right language-model shape but the
       // shared type is wider; cast at the call boundary keeps the helper
       // tolerant to both direct and connection-routed models.
       model,
       schema: FollowUpsSchema,
-      prompt: [
-        "You are helping a user continue an AI chat.",
-        "Given the exchange below, return 2-3 short follow-up prompts the",
-        "user could reasonably send next. Phrase them as questions or",
-        "instructions in the user's voice (first-person, imperative or",
-        "interrogative). Each must stand alone and be under ~120 chars.",
-        "Do not number them. Do not preface with 'You could ask:' etc.",
-        "",
-        `User: ${truncate(lastUserText, 800)}`,
-        `Assistant: ${truncate(lastAssistantText, 1600)}`,
-      ].join("\n"),
+      prompt: promptLines.join("\n"),
     });
 
     return result.object.suggestions;

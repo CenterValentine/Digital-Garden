@@ -337,7 +337,12 @@ export const fileTreeActionProvider: ContextMenuActionProvider = (ctx) => {
         },
         {
           id: "toggle-referenced",
-          label: clickedNode?.includeReferencedContent ? "Hide Referenced Content" : "Show Referenced Content",
+          // Scoped to THIS folder. Distinct from the tree-wide toggle in
+          // Section 8 ("Show all referenced content"). The labels used to
+          // collide as "Show Referenced Content" in both places.
+          label: clickedNode?.includeReferencedContent
+            ? "Hide referenced content in this folder"
+            : "Show referenced content in this folder",
           icon: clickedNode?.includeReferencedContent ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />,
           onClick: async () => {
             if (onToggleReferencedContent) {
@@ -569,9 +574,11 @@ export const fileTreeActionProvider: ContextMenuActionProvider = (ctx) => {
       actions: [
         {
           id: "toggle-referenced-content",
+          // Tree-wide filter. Section 2 has a per-folder variant labeled
+          // "Show referenced content in this folder" — distinct scope.
           label: showReferencedContent
-            ? "Hide referenced content"
-            : "Show referenced content",
+            ? "Hide all referenced content"
+            : "Show all referenced content",
           icon: showReferencedContent ? (
             <EyeOff className="h-4 w-4" />
           ) : (

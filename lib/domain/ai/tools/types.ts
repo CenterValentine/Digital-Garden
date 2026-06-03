@@ -11,4 +11,14 @@ export interface ToolExecuteContext {
   userId: string;
   /** The content node being edited — required for editor tools */
   contentId?: string;
+  /**
+   * The chat content node id when this chat is being viewed as a full-page
+   * ChatViewer (i.e. the chat IS the open content, not the editor). Set
+   * even though `contentId` is intentionally undefined for editor tools.
+   *
+   * Used by createNote to default the parent folder to the chat's own
+   * parent — so "create a note about X" in a chat under /Recipes drops the
+   * note next to the chat instead of at the vault root.
+   */
+  chatContentId?: string;
 }

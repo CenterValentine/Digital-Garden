@@ -17,6 +17,7 @@ export const BASE_TOOL_IDS = [
   "searchNotes",
   "getCurrentNote",
   "createNote",
+  "updateNote",
   "generate_image",
 ] as const;
 
@@ -51,6 +52,10 @@ export const BASE_TOOL_METADATA: Record<BaseToolId, BaseToolMeta> = {
   createNote: {
     name: "Create Note",
     description: "Create a new note with a title and optional content",
+  },
+  updateNote: {
+    name: "Update Note",
+    description: "Update an existing note's content (and optionally its title)",
   },
   generate_image: {
     name: "Generate Image",

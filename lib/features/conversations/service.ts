@@ -668,30 +668,60 @@ export async function forkConversation(
   const forkTitle =
     baseTitle.length > 240 ? baseTitle.slice(0, 240) : baseTitle;
 
-  const created = await prisma.conversation.create({
-    data: {
-      ownerId: userId,
-      title: `${forkTitle} (branch)`.slice(0, 255),
-      messages: {
-        create: sourceMessages.map((m) => ({
-          role: m.role,
-          providerId: m.providerId,
-          modelId: m.modelId,
-          parts: m.parts as unknown as Prisma.InputJsonValue,
-          textCache: m.textCache,
-        })),
+  // Estimated byte size of the parts JSON we're about to write — a useful
+  // signal in error logs when an Insert blows past timeouts (typically
+  // very long conversations with image attachments). Cheap upper bound:
+  // a JSON.stringify cost is paid by Prisma anyway.
+  const partsBytes = sourceMessages.reduce(
+    (sum, m) => sum + JSON.stringify(m.parts ?? "").length,
+    0,
+  );
+
+  let created: { id: string };
+  try {
+    created = await prisma.conversation.create({
+      data: {
+        ownerId: userId,
+        title: `${forkTitle} (branch)`.slice(0, 255),
+        messages: {
+          create: sourceMessages.map((m) => ({
+            role: m.role,
+            providerId: m.providerId,
+            modelId: m.modelId,
+            parts: m.parts as unknown as Prisma.InputJsonValue,
+            textCache: m.textCache,
+          })),
+        },
+        associations: source.associations.length
+          ? {
+              create: source.associations.map((a) => ({
+                contentNodeId: a.contentNodeId,
+                source: "snapshot" as const,
+              })),
+            }
+          : undefined,
       },
-      associations: source.associations.length
-        ? {
-            create: source.associations.map((a) => ({
-              contentNodeId: a.contentNodeId,
-              source: "snapshot" as const,
-            })),
-          }
-        : undefined,
-    },
-    select: { id: true },
-  });
+      select: { id: true },
+    });
+  } catch (error) {
+    // Re-throw after attaching diagnostic attrs so the route handler's
+    // catch sees them in the error log. Without this, prod failures
+    // surface as "Fork failed" with no context about size or shape.
+    logger.warn({
+      layer: "ai",
+      event: "conv.fork.create_failed",
+      summary: `Prisma create threw during fork of ${sourceConversationId}`,
+      attrs: {
+        source_id: sourceConversationId,
+        message_count: sourceMessages.length,
+        parts_bytes_estimate: partsBytes,
+        association_count: source.associations.length,
+        upto: uptoMessageId ?? "none",
+      },
+      error,
+    });
+    throw error;
+  }
 
   logger.info({
     layer: "ai",
@@ -701,7 +731,8 @@ export async function forkConversation(
       source_id: sourceConversationId,
       new_id: created.id,
       message_count: sourceMessages.length,
-      upto: uptoMessageId ?? null,
+      parts_bytes_estimate: partsBytes,
+      upto: uptoMessageId ?? "none",
     },
   });
 
