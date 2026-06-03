@@ -662,58 +662,58 @@ export function LeftSidebarContent({
   }) => {
     const { dragIds, parentId, index } = args;
 
-    // Store original tree state for rollback if move fails
+    // Store original tree state for rollback if any move fails
     const originalTree = treeData;
 
-    if (!originalTree) return;
+    if (!originalTree || dragIds.length === 0) return;
 
-    // Find the dragged node's current position
-    let currentParentId: string | null = null;
-    let currentIndex = -1;
-
-    const findNode = (nodes: TreeNode[], parent: string | null = null): boolean => {
+    // Find each dragged node's current position. Computed up-front so
+    // we don't re-traverse the tree N times in the loop, and so the
+    // displayOrder math below can correctly adjust for each item's
+    // own pre-move location (different items may live in different
+    // parents under a multi-select drag).
+    const positions = new Map<
+      string,
+      { currentParentId: string | null; currentIndex: number }
+    >();
+    const findPositions = (nodes: TreeNode[], parent: string | null = null) => {
       for (let i = 0; i < nodes.length; i++) {
-        if (nodes[i].id === dragIds[0]) {
-          currentParentId = parent;
-          currentIndex = i;
-          return true;
+        if (dragIds.includes(nodes[i].id)) {
+          positions.set(nodes[i].id, { currentParentId: parent, currentIndex: i });
         }
         if (nodes[i].children && nodes[i].children.length > 0) {
-          if (findNode(nodes[i].children, nodes[i].id)) {
-            return true;
-          }
+          findPositions(nodes[i].children, nodes[i].id);
         }
       }
-      return false;
     };
+    findPositions(originalTree);
 
-    findNode(originalTree);
-
-    // Check if this is actually a position change
-    const isSameParent = currentParentId === parentId;
-    const isSamePosition = isSameParent && (currentIndex === index || currentIndex === index - 1);
-    const draggedNode = findTreeNode(originalTree, dragIds[0]);
-
-    if (isSamePosition) {
-      return; // Skip the move - item is being dropped in same position
-    }
-
-    if (!draggedNode) {
+    // Resolve every dragged node. If any can't be found we bail before
+    // touching the optimistic tree.
+    const dragged = dragIds
+      .map((id) => ({ id, node: findTreeNode(originalTree, id) }))
+      .filter((x): x is { id: string; node: TreeNode } => x.node !== null);
+    if (dragged.length !== dragIds.length) {
       toast.error("Failed to move item", {
-        description: "The dragged item could not be found in the current tree.",
+        description: "One or more dragged items could not be found in the current tree.",
       });
       return;
     }
 
-    if (isPeopleTreeNode(draggedNode) && dragIds.length > 1) {
+    // People-mount drags are routed through a different endpoint and
+    // cannot be batched. Reject any multi-drag that includes one.
+    const peopleDragged = dragged.filter((d) => isPeopleTreeNode(d.node));
+    if (peopleDragged.length > 0 && dragged.length > 1) {
       toast.error("Failed to move item", {
         description: "People mounts can only be moved one at a time.",
       });
       return;
     }
 
+    // For the people single-drag path: reject placement into virtual
+    // people parents (only real folders or root are allowed).
     if (
-      isPeopleTreeNode(draggedNode) &&
+      peopleDragged.length === 1 &&
       (parentId?.startsWith("peopleGroup:") || parentId?.startsWith("person:"))
     ) {
       toast.error("Failed to move item", {
@@ -723,67 +723,110 @@ export function LeftSidebarContent({
       return;
     }
 
+    // Skip no-op drops: every dragged item is already at its target
+    // position (same parent, adjacent index). React-arborist sometimes
+    // fires `onMove` even when the user just released without changing
+    // anything.
+    const everyDragIsNoop = dragged.every(({ id }) => {
+      const pos = positions.get(id);
+      if (!pos) return false;
+      const isSameParent = pos.currentParentId === parentId;
+      return (
+        isSameParent &&
+        (pos.currentIndex === index || pos.currentIndex === index - 1)
+      );
+    });
+    if (everyDragIsNoop) return;
+
     try {
-      // OPTIMISTIC UPDATE: Apply the move immediately to the UI
-      const optimisticTree = applyMoveToTree(originalTree, dragIds[0], parentId, index);
+      // OPTIMISTIC UPDATE: walk every dragged id and apply each move to
+      // the working tree, offsetting the index by i so items keep their
+      // drag-order in the destination.
+      let optimisticTree = originalTree;
+      for (let i = 0; i < dragged.length; i++) {
+        optimisticTree = applyMoveToTree(
+          optimisticTree,
+          dragged[i].id,
+          parentId,
+          index + i,
+        );
+      }
       setTreeData(optimisticTree);
 
-      // Calculate the API index: react-arborist gives us insertion point, but server expects final visual position
-      // If moving down within same parent, we need to subtract 1 because server removes item first
-      let apiIndex = index;
-      if (isSameParent && currentIndex < index) {
-        apiIndex = index - 1; // Adjust for removal shifting items left
+      // Fire the moves sequentially. Parallel POSTs against the move
+      // endpoint would race each other on displayOrder slot assignment
+      // (the server computes the final slot from current children).
+      // Sequential keeps the contract simple and yields stable order.
+      const failures: Array<{ id: string; message: string }> = [];
+      for (let i = 0; i < dragged.length; i++) {
+        const { id, node } = dragged[i];
+        const pos = positions.get(id);
+        const isSameParent = pos?.currentParentId === parentId;
+        const insertionIndex = index + i;
+        // react-arborist gives the insertion point; the server expects
+        // the final visual position. When moving DOWN within the same
+        // parent, subtract 1 to account for the item's own removal
+        // shifting everything left.
+        const apiIndex =
+          isSameParent && pos && pos.currentIndex < insertionIndex
+            ? insertionIndex - 1
+            : insertionIndex;
+
+        const response = isPeopleTreeNode(node)
+          ? await fetch("/api/people/mounts", {
+              method: "POST",
+              credentials: "include",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                target: toPeopleMountTarget(node),
+                contentParentId: parentId,
+                displayOrder: apiIndex,
+                allowRemount: true,
+              }),
+            })
+          : await fetch("/api/content/content/move", {
+              method: "POST",
+              credentials: "include",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                contentId: id,
+                targetParentId: parentId,
+                newDisplayOrder: apiIndex,
+              }),
+            });
+
+        const result = await response.json().catch(() => ({}) as { error?: { message?: string; code?: string }; success?: boolean });
+        if (!response.ok || !result.success) {
+          failures.push({
+            id,
+            message: result.error?.message ?? `HTTP ${response.status}`,
+          });
+        }
       }
 
-      const response = isPeopleTreeNode(draggedNode)
-        ? await fetch("/api/people/mounts", {
-            method: "POST",
-            credentials: "include",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              target: toPeopleMountTarget(draggedNode),
-              contentParentId: parentId,
-              displayOrder: apiIndex,
-              allowRemount: true,
-            }),
-          })
-        : await fetch("/api/content/content/move", {
-            method: "POST",
-            credentials: "include",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              contentId: dragIds[0], // Only support single drag for now
-              targetParentId: parentId,
-              newDisplayOrder: apiIndex,
-            }),
-          });
-
-      const result = await response.json();
-
-      if (!response.ok || !result.success) {
+      if (failures.length > 0) {
         clientLogger.error({
           layer: "ui",
           event: "tree_move:failed",
-          summary: "tree move api rejected",
+          summary: `tree move api rejected ${failures.length}/${dragged.length} item(s)`,
           attrs: {
-            content_id: dragIds[0],
             target_parent_id: parentId ?? "root",
-            error_code: result.error?.code ?? "unknown",
+            failure_count: failures.length,
+            total_count: dragged.length,
+            first_failure: failures[0]?.message ?? "unknown",
           },
         });
-        // Rollback to original tree state
+        // Rollback to original tree state so the UI matches truth.
         setTreeData(originalTree);
-        toast.error("Failed to move item", {
-          description: result.error?.message || "Could not move the item to the new location. Please try again.",
-        });
-        throw new Error(result.error?.message || "Failed to move content");
+        const desc =
+          failures.length === dragged.length
+            ? failures[0].message
+            : `${failures.length} of ${dragged.length} items could not be moved (${failures[0].message}).`;
+        toast.error("Failed to move item", { description: desc });
+        throw new Error(desc);
       }
 
-      if (isPeopleTreeNode(draggedNode)) {
+      if (peopleDragged.length > 0) {
         window.dispatchEvent(new CustomEvent("dg:tree-refresh"));
         window.dispatchEvent(new CustomEvent("dg:people-refresh"));
       }
@@ -792,7 +835,10 @@ export function LeftSidebarContent({
         layer: "ui",
         event: "tree_move:caught",
         summary: "tree move handler caught",
-        attrs: { content_id: dragIds[0] ?? "unknown" },
+        attrs: {
+          content_id: dragIds[0] ?? "unknown",
+          drag_count: dragIds.length,
+        },
         error: err,
       });
       // Rollback to original tree state on any error
@@ -996,6 +1042,23 @@ export function LeftSidebarContent({
       requestParentId: parentId,
       ...parsePeopleVirtualParentId(parentId),
     };
+
+    // Race guard: if the resolved server-side parent is still a `temp-…`
+    // placeholder, the parent's optimistic insert hasn't been confirmed
+    // by the server yet. Sending this would surface the raw Prisma
+    // "invalid input syntax for type uuid" error (server now translates
+    // it to PARENT_NOT_READY, but skipping the round-trip is friendlier).
+    // The user can retry in a moment once the parent's real UUID lands.
+    const reqParent = createTarget.requestParentId;
+    if (typeof reqParent === "string" && reqParent.startsWith("temp-")) {
+      setErrorDialog({
+        title: "Parent still being created",
+        message:
+          "The parent folder hasn't finished saving yet. Wait a moment and try again.",
+      });
+      handleCreateCancel();
+      return;
+    }
     const optimisticContentType: ContentType =
       type === "docx" || type === "xlsx" || type === "json"
         ? "file"

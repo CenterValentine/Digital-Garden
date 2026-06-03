@@ -35,6 +35,10 @@ import { logger, withRouteTrace, withSpan } from "@/lib/core/logger";
 
 const ROUTE_PATH = "/api/content/content";
 
+/** Permissive UUID v1-v5 — see create-document/route.ts for the rationale. */
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 function getExternalDomainParts(url: string) {
   try {
     const parsed = new URL(url);
@@ -554,6 +558,24 @@ export async function POST(request: NextRequest) {
 
     // Validate parent exists
     if (parentId) {
+      // See create-document route for the rationale: optimistic file-tree
+      // inserts pass a `temp-{ts}-{rand}` placeholder for parents that
+      // haven't reached the DB yet. Short-circuit those to a clean 400
+      // instead of letting Prisma surface a raw "invalid input syntax for
+      // type uuid" dialog.
+      if (!UUID_RE.test(parentId)) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: {
+              code: "PARENT_NOT_READY",
+              message:
+                "Parent folder is still being created — try again in a moment.",
+            },
+          },
+          { status: 400 },
+        );
+      }
       const parent = await prisma.contentNode.findUnique({
         where: { id: parentId },
       });
