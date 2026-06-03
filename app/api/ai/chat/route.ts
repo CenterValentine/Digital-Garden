@@ -310,7 +310,14 @@ export async function POST(request: Request) {
       // per-tool `enabled` in settings. Tools default to enabled; only
       // `enabled === false` entries are dropped. If the result is empty
       // we pass `undefined` so streamText knows there are no tools at all.
-      const toolCtx = { userId: session.user.id, contentId: editableContentId };
+      const toolCtx = {
+        userId: session.user.id,
+        contentId: editableContentId,
+        // When the user is viewing this conversation in full-page mode the
+        // chat IS the open content. Pass that through so createNote can
+        // default the new note's parent folder to the chat's own parent.
+        chatContentId: isChatContent ? contentId : undefined,
+      };
       const allTools = {
         ...createBaseTools(toolCtx),
         ...(editableContentId ? createEditorTools(toolCtx) : {}),
@@ -450,6 +457,15 @@ IMPORTANT EDITING RULES:
 - Only use replace_document for blank/empty documents or when the user explicitly requests a full rewrite.
 
 When you generate an image, the user can insert it into the document at their cursor position.`
+            : isChatContent
+            ? `\n\nThe user is chatting with you on a full-page chat (ID: ${contentId}). DATA-MODEL FACT YOU MUST KNOW: this chat HAS a notes panel ("Add notes" — a TipTap editor below the conversation) keyed to the chat's own contentId. Writing to it is exactly the same as updating any other content's notes — call \`updateNote\` with the chat's contentId as the \`contentId\` argument. Do NOT create a separate file.
+
+NOTE-TOOL RULES IN CHAT CONTEXT:
+- "add a note to this chat", "create a note on this chat", "put X in the chat notes", "update the note in this chat" all mean: update the notes panel attached to THIS chat. Use \`updateNote({ contentId: "${contentId}", content: "<markdown>" })\`. NEVER set \`title\` — that would rename the chat.
+- For "create a NEW note in a folder" (separate file), use \`createNote\`. It defaults to the chat's parent folder.
+- For "update my Sourdough note" etc. (named other note), use \`searchNotes\` to find the id, then \`updateNote\`.
+- Tooling distinguishes by contentId — same tool, different target.
+- Title-arg rule: never set \`title\` unless the user EXPLICITLY says "rename this to X". Topic-derived titles are a bug. (The tool will hard-ignore \`title\` when the target is this chat, but still follow the rule.)`
             : ""
         }${mentionedContext}`,
         onStepFinish: (step) => {
