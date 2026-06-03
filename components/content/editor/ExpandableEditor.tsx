@@ -117,7 +117,9 @@ export function ExpandableEditor({
   );
 
   return (
-    <div className="border-t border-white/10">
+    // `id` here is the scroll target for the AI's "click to view" link
+    // on self-edit `NotePayloadCard`s — see ChatMessage.tsx.
+    <div id="notes-panel-anchor" className="border-t border-white/10">
       {/* Collapsible Header */}
       <div
         className={cn(

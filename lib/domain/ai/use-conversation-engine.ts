@@ -466,6 +466,51 @@ export function useConversationEngine({
         });
       }
 
+      // Surface AI note writes to any open MainPanelContent so the
+      // chat's notes panel (or any other editor pointed at the same
+      // contentId) reloads without a manual refresh. This MUST live
+      // here (one-shot per real completion) instead of in ChatMessage
+      // — putting it in the render path re-fires the dispatch every
+      // time historical messages mount, which previously caused a
+      // refetch loop on page open.
+      try {
+        const fresh = e.message;
+        if (fresh && typeof window !== "undefined") {
+          for (const part of fresh.parts ?? []) {
+            const output = (part as { output?: unknown }).output;
+            if (output === undefined) continue;
+            const str =
+              typeof output === "string" ? output : JSON.stringify(output);
+            if (!str.includes('"__notePayload"')) continue;
+            try {
+              const parsed = JSON.parse(str) as {
+                __notePayload?: boolean;
+                contentId?: string;
+              };
+              if (parsed.__notePayload && typeof parsed.contentId === "string") {
+                window.dispatchEvent(new CustomEvent("dg:tree-refresh"));
+                // Surgical notes-only refresh — narrower than the
+                // existing `content-updated` event which triggers
+                // MainPanelContent's full `fetchNote` (which resets
+                // loading + outline + tab title + content + clears
+                // error state). Only the pane whose `selectedContentId`
+                // matches this contentId reacts, and only `noteContent`
+                // gets updated. Outline / title / tab unchanged.
+                window.dispatchEvent(
+                  new CustomEvent("dg:notes-refresh", {
+                    detail: { contentId: parsed.contentId },
+                  }),
+                );
+              }
+            } catch {
+              /* unparseable tool output — skip */
+            }
+          }
+        }
+      } catch {
+        /* never let dispatch errors break the chat */
+      }
+
       // Fire suggested follow-ups (Session 7). Decorative, soft-fails
       // to an empty list — never blocks the chat UX.
       try {
