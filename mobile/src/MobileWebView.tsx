@@ -13,7 +13,11 @@ import type {
   WebViewMessageEvent,
   WebViewNavigation,
 } from "react-native-webview";
-import type { ShouldStartLoadRequest } from "react-native-webview/lib/WebViewTypes";
+
+// Structural type for the onShouldStartLoadWithRequest arg. We only read
+// `url`, so a minimal shape avoids a brittle deep import from the library's
+// internal type paths (which move between versions).
+type LoadRequest = { url: string };
 
 import { DEFAULT_WEB_URL, getAppOrigin } from "./config";
 import {
@@ -56,7 +60,7 @@ export function MobileWebView({ url = DEFAULT_WEB_URL }: MobileWebViewProps) {
 
   // Decide whether a navigation stays in the WebView or is handed to the OS.
   const handleShouldStartLoad = useCallback(
-    (request: ShouldStartLoadRequest): boolean => {
+    (request: LoadRequest): boolean => {
       if (shouldOpenExternally(request.url, appOrigin)) {
         // Reuse the same code path as web:open-external-url.
         void handleWebToNativeMessage({
