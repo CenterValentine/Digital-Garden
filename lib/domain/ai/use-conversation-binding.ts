@@ -396,5 +396,48 @@ export function useConversationBinding({
     };
   }, [conversationId, truncateRef]);
 
+  // Live title sync: subscribe to /api/conversations/events for
+  // `conversation.updated` matching THIS conversationId. Without this,
+  // renaming the underlying ContentNode (which now mirrors title to the
+  // Conversation server-side) wouldn't reach an already-open ChatViewer —
+  // it only refetches `/api/conversations/[id]` on mount. The cache store
+  // also subscribes to the same endpoint; the duplicate EventSource is
+  // acceptable here because (a) the work this effect does is tiny, (b) we
+  // need a focused subscription tied to ChatViewer's lifecycle, and (c)
+  // HTTP/2 multiplexes the two streams over one connection in dev/prod.
+  //
+  // NB: the server uses NAMED SSE events (`event: conversation\ndata: …`)
+  // not generic messages, so we must `addEventListener(EVENT_NAME)` —
+  // `es.onmessage` would silently drop every event (and produced the
+  // initial "title doesn't update in the header" report).
+  useEffect(() => {
+    if (!conversationId) return;
+    if (typeof EventSource === "undefined") return;
+    const es = new EventSource("/api/conversations/events", {
+      withCredentials: true,
+    });
+    const handler = (e: MessageEvent) => {
+      try {
+        const event = JSON.parse(e.data) as
+          | { type: string; conversationId?: string; title?: string | null }
+          | null;
+        if (!event) return;
+        if (
+          event.type === "conversation.updated" &&
+          event.conversationId === conversationId
+        ) {
+          setConversationTitle(event.title ?? null);
+        }
+      } catch {
+        /* malformed event — ignore */
+      }
+    };
+    es.addEventListener("conversation", handler as EventListener);
+    return () => {
+      es.removeEventListener("conversation", handler as EventListener);
+      es.close();
+    };
+  }, [conversationId]);
+
   return { loadingInitial, conversationTitle };
 }
