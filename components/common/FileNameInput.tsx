@@ -34,10 +34,16 @@ export function FileNameInput({
 }: FileNameInputProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [isFocused, setIsFocused] = useState(false);
+  // Guard so the initial-position effect runs at most once per mount. Without
+  // this, parent re-renders that flip `focusBehavior` (or re-mount the input
+  // entirely) re-run the effect and snap the cursor back to the end on every
+  // keystroke / click / arrow press — making the input feel "stuck at -1".
+  const hasPositionedRef = useRef(false);
 
   // Auto-focus once on mount. Resumed edit sessions keep the caret at the end
   // instead of re-selecting the entire filename and clobbering the next keypress.
   useEffect(() => {
+    if (hasPositionedRef.current) return;
     if (autoFocus && inputRef.current) {
       inputRef.current.focus();
       if (focusBehavior === "select") {
@@ -46,6 +52,7 @@ export function FileNameInput({
         const { value } = inputRef.current;
         inputRef.current.setSelectionRange(value.length, value.length);
       }
+      hasPositionedRef.current = true;
     }
   }, [autoFocus, focusBehavior]);
 
