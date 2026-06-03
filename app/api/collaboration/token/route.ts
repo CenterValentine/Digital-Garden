@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
+import { logger } from "@/lib/core/logger";
 import { prisma } from "@/lib/database/client";
 import type { ContentType } from "@/lib/database/generated/prisma";
 import { resolveContentAccess } from "@/lib/domain/collaboration/access";
@@ -111,15 +112,27 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Failed to create collaboration token";
-    const status = message.includes("Access") || message.includes("required") ? 403 : 500;
+    const rawMessage =
+      error instanceof Error ? error.message : "Failed to create collaboration token";
+    const isAccessError =
+      rawMessage.includes("Access") || rawMessage.includes("required");
+    const status = isAccessError ? 403 : 500;
+
+    if (!isAccessError) {
+      logger.error({
+        layer: "collab",
+        event: "token_create:caught",
+        summary: "failed to create collaboration token",
+        error,
+      });
+    }
 
     return NextResponse.json(
       {
         success: false,
         error: {
-          code: status === 403 ? "FORBIDDEN" : "SERVER_ERROR",
-          message,
+          code: isAccessError ? "FORBIDDEN" : "SERVER_ERROR",
+          message: isAccessError ? rawMessage : "Failed to create collaboration token",
         },
       },
       { status }
