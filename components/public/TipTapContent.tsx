@@ -18,6 +18,7 @@ import { JSDOM } from "jsdom";
 import { getServerExtensions } from "@/lib/domain/editor/extensions-server";
 import { getActiveTrace, logger, withSpan } from "@/lib/core/logger";
 import { prisma } from "@/lib/database/client";
+import { sanitizeSvg } from "@/lib/domain/content/svg-sanitizer";
 import type { JSONContent } from "@tiptap/core";
 
 interface TipTapContentProps {
@@ -275,8 +276,12 @@ function postProcessDom(
     const contentId = el.getAttribute("data-content-id") ?? "";
     const cachedSvg = visualizationSources.get(contentId)?.cachedSvg;
     if (cachedSvg) {
+      // cachedSvg is attacker-controllable via the Excalidraw collab flush
+      // path — any user with edit access can plant arbitrary SVG. Sanitize
+      // with the DOMPurify SVG profile before innerHTML to strip <script>,
+      // event-handler attrs, and dangerous URI schemes.
       el.classList.add("block-excalidraw-rendered");
-      el.innerHTML = cachedSvg;
+      el.innerHTML = sanitizeSvg(cachedSvg);
       return;
     }
     // No cached SVG → emit a styled placeholder. The editor save flow
