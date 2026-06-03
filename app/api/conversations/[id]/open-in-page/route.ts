@@ -56,14 +56,27 @@ export async function POST(request: NextRequest, context: RouteContext) {
           { status: 404 },
         );
       }
+      const errName = error instanceof Error ? error.name : "Unknown";
+      const errCode =
+        error && typeof error === "object" && "code" in error
+          ? String((error as { code: unknown }).code)
+          : null;
       logger.error({
         layer: "ai",
         event: "conversation_open_in_page:caught",
-        summary: `POST ${ROUTE_PATH} caught — 500`,
+        summary: `POST ${ROUTE_PATH} caught — 500 (${errName}${errCode ? `:${errCode}` : ""})`,
+        attrs: {
+          err_name: errName,
+          err_code: errCode ?? "none",
+        },
         error,
       });
+      const safeError =
+        errCode && errCode.startsWith("P")
+          ? `Open-in-page failed (${errCode})`
+          : `Open-in-page failed (${errName})`;
       return NextResponse.json(
-        { success: false, error: "Open-in-page failed" },
+        { success: false, error: safeError },
         { status: 500 },
       );
     }

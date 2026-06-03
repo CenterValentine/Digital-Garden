@@ -268,6 +268,20 @@ function ChatViewerInner({
   const handleBranch = useCallback(
     async (messageId: string) => {
       if (!conversationId) return;
+      // Helper: pull the most useful error string out of a non-OK response.
+      // The server now returns shape `{ success: false, error: string }`
+      // with a code-bearing tag (e.g. "Fork failed (P2002)"). Falling back
+      // to status text + status code if the body isn't parseable keeps the
+      // toast informative even when the server crashed pre-body.
+      const readErr = async (res: Response, fallback: string) => {
+        try {
+          const body = (await res.json()) as { error?: string };
+          if (body?.error) return body.error;
+        } catch {
+          /* unparseable */
+        }
+        return `${fallback} (${res.status})`;
+      };
       try {
         const forkRes = await fetch(
           `/api/conversations/${encodeURIComponent(conversationId)}/fork`,
@@ -278,22 +292,25 @@ function ChatViewerInner({
             body: JSON.stringify({ uptoMessageId: messageId }),
           },
         );
-        if (!forkRes.ok) throw new Error("Branch failed");
+        if (!forkRes.ok) throw new Error(await readErr(forkRes, "Fork failed"));
         const newId = (await forkRes.json())?.data?.conversationId as
           | string
           | undefined;
-        if (!newId) return;
+        if (!newId) throw new Error("Fork returned no conversation id");
+
         const openRes = await fetch(
           `/api/conversations/${encodeURIComponent(newId)}/open-in-page`,
           { method: "POST", credentials: "include" },
         );
+        if (!openRes.ok)
+          throw new Error(await readErr(openRes, "Open-in-page failed"));
         const nodeId = (await openRes.json())?.data?.contentNodeId as
           | string
           | undefined;
-        if (nodeId) {
-          toast.success("Branched into a new chat");
-          useContentStore.getState().setSelectedContentId(nodeId);
-        }
+        if (!nodeId) throw new Error("Open-in-page returned no content node id");
+
+        toast.success("Branched into a new chat");
+        useContentStore.getState().setSelectedContentId(nodeId);
       } catch (e) {
         toast.error(e instanceof Error ? e.message : "Branch failed");
       }
