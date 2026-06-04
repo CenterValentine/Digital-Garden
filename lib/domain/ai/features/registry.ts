@@ -99,6 +99,18 @@ export const FEATURE_REGISTRY: FeatureSpec[] = [
       modelId: "claude-haiku-3-5",
     },
   },
+  {
+    id: "folder-assistant",
+    label: "Folder Assistant",
+    description:
+      "Places files into folders from a natural-language description (file-tree right-click → Move → Folder assistant). Returns a structured decision; capable low-cost models work well.",
+    requiredCapabilities: ["text"],
+    preferredCapabilities: ["low-cost"],
+    defaultSuggestion: {
+      presetId: "anthropic",
+      modelId: "claude-haiku-3-5",
+    },
+  },
 ];
 
 export const FEATURE_BY_ID: Record<string, FeatureSpec> = Object.fromEntries(

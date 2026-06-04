@@ -144,6 +144,27 @@ const aiSettingsSchema = z
     // (e.g. "Focus on next experiments / pitfalls to watch for / cite
     // sources"). Capped at 600 chars to keep the prompt manageable.
     followUpsPrompt: z.string().max(600).optional(),
+    // Folder Assistant (file-tree right-click → Move → Folder assistant).
+    // NOT a chat tool — a standalone one-shot agent. `recent` is a small
+    // ring buffer of past requests/outcomes used as working memory and to
+    // avoid repeating recently-rejected placements.
+    folderAssistant: z
+      .object({
+        enabled: z.boolean().optional(),
+        recent: z
+          .array(
+            z.object({
+              prompt: z.string(),
+              status: z.enum(["success", "failed"]),
+              targetFolderId: z.string().optional(),
+              targetPath: z.string().optional(),
+              at: z.number(),
+            }),
+          )
+          .max(20)
+          .optional(),
+      })
+      .optional(),
   })
   .optional();
 
@@ -448,6 +469,7 @@ export const DEFAULT_SETTINGS: UserSettings = {
     showAiHighlight: true,
     showReasoning: true,
     showFollowUps: true,
+    folderAssistant: { enabled: true, recent: [] },
   },
   exportBackup: {
     defaultFormat: "markdown",

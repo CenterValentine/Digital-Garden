@@ -18,6 +18,7 @@ import { useRightPanelCollapseStore } from "@/state/right-panel-collapse-store";
 import { ContextMenu } from "./context-menu/ContextMenu";
 import { fileTreeActionProvider } from "./context-menu/file-tree-actions";
 import { editorActionProvider } from "./context-menu/editor-actions";
+import { FolderAssistantDialog } from "./dialogs/FolderAssistantDialog";
 
 interface ResizablePanelsProps {
   children: [
@@ -182,6 +183,9 @@ export function ResizablePanels({ children }: ResizablePanelsProps) {
         "main-editor": editorActionProvider,
       }}
     />
+
+    {/* Folder Assistant dialog (opened from the file-tree Move menu) */}
+    <FolderAssistantDialog />
   </>
   );
 }
