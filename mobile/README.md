@@ -148,13 +148,17 @@ your origin and should stay in-WebView. See the comment block in that file.
   `isNativeShell()` — desktop keeps soft nav. Still verify the session **persists
   across app restarts** (`sharedCookiesEnabled` is on, but WKWebView cookie
   persistence is worth confirming).
-- **Google OAuth does NOT work in the WebView** — Google blocks OAuth inside
-  embedded WebViews (`disallowed_useragent`), and our external-link policy sends
-  `accounts.google.com` to Safari (where the redirect can't return the session
-  cookie to the WebView → blank screen). Use email/password in the shell for
-  now; a real fix needs a **native auth session** (`expo-web-browser`
-  `openAuthSessionAsync` / ASWebAuthenticationSession + deep-link callback) —
-  later phase. Consider hiding the Google button when `isNativeShell()`.
+- **Google OAuth** — **worked in testing inside the shell.** It's a pure
+  server-redirect flow: the button navigates same-origin to `/api/auth/google`,
+  which 302s to `accounts.google.com`. On iOS `onShouldStartLoadWithRequest`
+  does **not** fire for server redirects, so our external-link policy never
+  externalizes it and it stays in the WebView; the callback then sets
+  `session_token` at the document level, which WKWebView persists reliably.
+  Caveat: Google's `disallowed_useragent` block targets *fresh credential
+  entry* — this succeeded with an existing Google session. A user with no live
+  Google session may hit Google's "this browser is not secure" wall, in which
+  case the real fix is a **native auth session** (`expo-web-browser`
+  `openAuthSessionAsync` / ASWebAuthenticationSession + deep-link callback).
 - **TipTap editing on iOS** — verify keyboard, caret visibility, selection,
   slash-menu positioning, and autosave inside the WebView.
 - **AI streaming** — verify the chat stream renders incrementally (no buffering)
