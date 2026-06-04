@@ -5,7 +5,7 @@
 -- already removed manually or via `prisma db push` (e.g. dev).
 
 -- DropForeignKey
-ALTER TABLE "AIProviderKey" DROP CONSTRAINT IF EXISTS "AIProviderKey_userId_fkey";
+ALTER TABLE IF EXISTS "AIProviderKey" DROP CONSTRAINT IF EXISTS "AIProviderKey_userId_fkey";
 
 -- DropTable
 DROP TABLE IF EXISTS "AIProviderKey";
