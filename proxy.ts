@@ -30,6 +30,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { logger } from "@/lib/core/logger/emit";
 import { withTrace } from "@/lib/core/logger/context";
 import { normalizeHost, resolveTenantByHost } from "@/lib/domain/tenancy";
+import { validateSession } from "@/lib/infrastructure/auth/session";
 
 /** Routes that require an active session */
 const PROTECTED_PREFIXES = ["/content", "/settings", "/admin"];
@@ -133,12 +134,57 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
   const injectedHeaders = await resolveTenantHeaders(request);
 
   // Embed iframe: promote URL token to cookie before the page renders.
-  // We don't validate against the DB here (proxy runtime should stay light) —
-  // the page itself re-validates and redirects to /sign-in if the token is bad.
+  //
+  // Two threats this branch defends against:
+  //   1. Garbage tokens — set a junk cookie that wastes a page render before
+  //      bouncing to /sign-in. Validate the URL token before setting.
+  //   2. Cross-user session fixation — an attacker who possesses any valid
+  //      session token crafts /embed/content/...?_t=ATTACKER_TOKEN and sends
+  //      it to a logged-in victim, overriding their cookie. We block this by
+  //      validating the existing cookie too and refusing to overwrite if it
+  //      belongs to a different user.
+  //
+  // What is NOT addressed here (tracked as a follow-up): a logged-out
+  // victim has no existing cookie to compare against, so promotion of any
+  // valid attacker token still succeeds. Fully closing that gap requires a
+  // different token model — single-use, time-bounded, or content-bound —
+  // and is out of scope for this proxy-level patch.
+  //
+  // validateSession is cache-backed (hot tokens <1ms; invalid tokens are
+  // negative-cached), so the added DB cost is paid only on first-touch.
   if (pathname.startsWith("/embed/content/")) {
     const urlToken = searchParams.get("_t");
     const existingCookie = request.cookies.get("session_token")?.value;
     if (urlToken && existingCookie !== urlToken) {
+      const validatedUrl = await validateSession(urlToken);
+      if (!validatedUrl) {
+        logger.warn({
+          layer: "auth",
+          event: "embed_token_promote:rejected",
+          summary: "rejected invalid _t param at proxy",
+        });
+        return nextWithTenantHeaders(injectedHeaders);
+      }
+
+      if (existingCookie) {
+        const validatedCookie = await validateSession(existingCookie);
+        if (
+          validatedCookie &&
+          validatedCookie.user.id !== validatedUrl.user.id
+        ) {
+          logger.warn({
+            layer: "auth",
+            event: "embed_token_promote:cross_user_blocked",
+            summary: "refused to override cookie belonging to a different user",
+            attrs: {
+              existing_user_id: validatedCookie.user.id,
+              incoming_user_id: validatedUrl.user.id,
+            },
+          });
+          return nextWithTenantHeaders(injectedHeaders);
+        }
+      }
+
       const response = nextWithTenantHeaders(injectedHeaders);
       response.cookies.set("session_token", urlToken, {
         httpOnly: true,
