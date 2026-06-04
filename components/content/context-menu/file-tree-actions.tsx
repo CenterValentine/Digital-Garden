@@ -32,6 +32,7 @@ import {
   ExternalLink,
   ArrowDownLeft,
   ArrowDownRight,
+  FolderInput,
 } from "lucide-react";
 import type { ContextMenuActionProvider, ContextMenuSection, ContextMenuAction } from "./types";
 import {
@@ -518,6 +519,31 @@ export const fileTreeActionProvider: ContextMenuActionProvider = (ctx) => {
           onClick: async () => await onToggleStar?.(selectedIds),
           disabled: !onToggleStar,
           divider: true,
+        },
+      ],
+    });
+  }
+
+  // Section 5.5: Move (folder search now; AI folder assistant in Phase 2).
+  // Excludes the items themselves and their current parent as obvious
+  // non-targets; the move API is the hard guard against true cycles.
+  if (selectedIds.length > 0 && !isPeopleMount) {
+    const excludeIds = [
+      ...selectedIds,
+      ...(clickedNode?.parentId ? [clickedNode.parentId] : []),
+    ];
+    sections.push({
+      title: "Move",
+      actions: [
+        {
+          id: "move-folder-search",
+          label: "Folder search",
+          icon: <FolderInput className="h-4 w-4" />,
+          customFlyout: {
+            kind: "folder-search",
+            selectedIds,
+            excludeIds,
+          },
         },
       ],
     });

@@ -24,6 +24,7 @@ import { ChevronRight, Check, X } from "lucide-react";
 import { useContextMenuStore } from "@/state/context-menu-store";
 import type { ContextMenuActionProvider, ContextMenuAction } from "./types";
 import { calculateMenuPosition, calculateSubmenuPosition } from "@/lib/core/menu-positioning";
+import { FolderSearchFlyout } from "./FolderSearchFlyout";
 
 interface ContextMenuProps {
   /** Action providers for each panel type */
@@ -55,13 +56,17 @@ function MenuAction({
 }) {
   const buttonRef = useRef<HTMLButtonElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const hasSubmenu = action.submenu && action.submenu.length > 0;
+  const hasSubmenu = !!(action.submenu && action.submenu.length > 0);
+  const hasFlyout = !!action.customFlyout;
+  // Both a label submenu and a custom flyout are "children" that open to the
+  // side on hover/click and show a chevron.
+  const opensChild = hasSubmenu || hasFlyout;
   const [isInputMode, setIsInputMode] = useState(action.inlineInput?.autoFocus ?? false);
   const [inputValue, setInputValue] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleMouseEnter = () => {
-    if (hasSubmenu && buttonRef.current) {
+    if (opensChild && buttonRef.current) {
       const rect = buttonRef.current.getBoundingClientRect();
       onSubmenuOpen(action.id, rect);
     }
@@ -179,13 +184,18 @@ function MenuAction({
               setIsInputMode(true);
               return;
             }
-            if (!hasSubmenu && action.onClick) {
+            // Click also opens a custom flyout (hover opens it too).
+            if (hasFlyout && buttonRef.current) {
+              onSubmenuOpen(action.id, buttonRef.current.getBoundingClientRect());
+              return;
+            }
+            if (!opensChild && action.onClick) {
               await action.onClick();
               onClose();
             }
           }}
           onMouseEnter={handleMouseEnter}
-          disabled={action.disabled && !hasSubmenu}
+          disabled={action.disabled && !opensChild}
           className={`
             flex flex-1 min-w-0 items-center justify-between gap-3 px-2.5 py-1 text-left text-sm transition-colors
             ${action.disabled && !hasSubmenu
@@ -204,8 +214,8 @@ function MenuAction({
             </span>
           </div>
 
-          {/* Right: Keyboard shortcut or chevron for submenu */}
-          {hasSubmenu ? (
+          {/* Right: Keyboard shortcut or chevron for submenu/flyout */}
+          {opensChild ? (
             <ChevronRight className="h-3 w-3 flex-shrink-0 text-gray-400 dark:text-gray-500" />
           ) : action.shortcut ? (
             <span className="text-[11px] flex-shrink-0 text-gray-400 dark:text-gray-500">
@@ -542,21 +552,31 @@ export function ContextMenu({ actionProviders }: ContextMenuProps) {
     if (!provider) return;
     const sections = provider(context || {});
 
-    // Find the action with submenu
-    let submenuActions: ContextMenuAction[] = [];
+    // Find the opened action — may be a label submenu OR a custom flyout.
+    let foundAction: ContextMenuAction | undefined;
     for (const section of sections) {
       const action = section.actions.find(a => a.id === actionId);
-      if (action && action.submenu) {
-        submenuActions = action.submenu;
+      if (action) {
+        foundAction = action;
         break;
       }
     }
+    if (!foundAction) return;
 
-    if (submenuActions.length === 0) return;
-
-    // Estimate submenu dimensions (will be refined after render)
-    const estimatedHeight = Math.min(submenuActions.length * 32 + 8, 400);
-    const estimatedWidth = 180;
+    // Estimate child dimensions (refined after render by its own layout).
+    let estimatedWidth = 180;
+    let estimatedHeight = 400;
+    if (foundAction.submenu && foundAction.submenu.length > 0) {
+      estimatedHeight = Math.min(foundAction.submenu.length * 32 + 8, 400);
+    } else if (foundAction.customFlyout) {
+      estimatedWidth = 288; // matches the flyout's w-72
+      // Intentionally tiny: keeps the flyout anchored to the item's top (no
+      // upward shift) — the returned maxHeight becomes the space below the
+      // item, so the panel scrolls in place rather than detaching upward.
+      estimatedHeight = 48;
+    } else {
+      return;
+    }
 
     const calculatedPosition = calculateSubmenuPosition({
       parentMenuRect: menuRect,
@@ -645,6 +665,22 @@ export function ContextMenu({ actionProviders }: ContextMenuProps) {
                       onMouseEnter={handleSubmenuMouseEnter}
                       submenuRef={submenuRef}
                       searchable={action.searchable}
+                    />
+                  )}
+
+                {/* Render a custom flyout (e.g. folder search) when open */}
+                {action.customFlyout?.kind === "folder-search" &&
+                  openSubmenu?.id === action.id && (
+                    <FolderSearchFlyout
+                      position={{
+                        x: openSubmenu.position.x,
+                        y: openSubmenu.position.y,
+                        maxHeight: openSubmenu.maxHeight,
+                      }}
+                      selectedIds={action.customFlyout.selectedIds}
+                      excludeIds={action.customFlyout.excludeIds}
+                      onClose={closeMenu}
+                      onMouseEnter={handleSubmenuMouseEnter}
                     />
                   )}
               </div>

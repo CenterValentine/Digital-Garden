@@ -42,6 +42,16 @@ export interface ContextMenuAction {
   };
   /** Whether this action renders a searchable sub-list */
   searchable?: boolean;
+  /**
+   * Renders a custom flyout panel (instead of a label-list submenu) when the
+   * item is opened. Reuses the submenu hover/positioning machinery. Carries
+   * the data the flyout needs so it stays self-contained.
+   */
+  customFlyout?: {
+    kind: "folder-search";
+    selectedIds: string[];
+    excludeIds: string[];
+  };
   /** Secondary icon action (e.g. delete button on the right) */
   secondaryAction?: {
     icon: string;
