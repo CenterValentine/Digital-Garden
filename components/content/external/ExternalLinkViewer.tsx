@@ -7,7 +7,7 @@
 
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { ExternalLink, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { getSurfaceStyles } from "@/lib/design/system";
@@ -81,58 +81,75 @@ export function ExternalLinkViewer({
     setPreviewError(null);
   }, [url, preview.cached]);
 
-  const handleRefreshPreview = async () => {
-    try {
-      setIsRefreshing(true);
-      setPreviewError(null);
+  const handleRefreshPreview = useCallback(
+    async (options: { silent?: boolean } = {}) => {
+      try {
+        setIsRefreshing(true);
+        setPreviewError(null);
 
-      const response = await fetch("/api/content/external/preview", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url }),
-      });
-
-      const result = await response.json();
-
-      if (!response.ok || !result.success) {
-        const errorCode = result.error?.code || "UNKNOWN_ERROR";
-        const errorMessage = result.error?.message || "Failed to fetch preview";
-        const fullError = `${errorMessage} (${errorCode})`;
-
-        clientLogger.error({
-          layer: "ui",
-          event: "external_preview_fetch:failed",
-          summary: "external preview api rejected",
-          attrs: {
-            content_id: contentId,
-            status: response.status,
-            error_code: errorCode,
-          },
+        const response = await fetch("/api/content/external/preview", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ url }),
         });
 
-        setPreviewError(fullError);
-        toast.error(fullError);
-        return;
-      }
+        const result = await response.json();
 
-      setPreviewData(result.data.metadata);
-      toast.success("Preview refreshed");
-    } catch (err) {
-      const errorMessage =
-        err instanceof Error ? err.message : "Failed to fetch preview";
-      clientLogger.error({
-        layer: "ui",
-        event: "external_preview_fetch:caught",
-        summary: "external preview handler caught",
-        attrs: { content_id: contentId },
-        error: err,
-      });
-      setPreviewError(errorMessage);
-      toast.error(errorMessage);
-    } finally {
-      setIsRefreshing(false);
+        if (!response.ok || !result.success) {
+          const errorCode = result.error?.code || "UNKNOWN_ERROR";
+          const errorMessage = result.error?.message || "Failed to fetch preview";
+          const fullError = `${errorMessage} (${errorCode})`;
+
+          clientLogger.error({
+            layer: "ui",
+            event: "external_preview_fetch:failed",
+            summary: "external preview api rejected",
+            attrs: {
+              content_id: contentId,
+              status: response.status,
+              error_code: errorCode,
+              silent: options.silent ?? false,
+            },
+          });
+
+          setPreviewError(fullError);
+          if (!options.silent) toast.error(fullError);
+          return;
+        }
+
+        setPreviewData(result.data.metadata);
+        if (!options.silent) toast.success("Preview refreshed");
+      } catch (err) {
+        const errorMessage =
+          err instanceof Error ? err.message : "Failed to fetch preview";
+        clientLogger.error({
+          layer: "ui",
+          event: "external_preview_fetch:caught",
+          summary: "external preview handler caught",
+          attrs: { content_id: contentId, silent: options.silent ?? false },
+          error: err,
+        });
+        setPreviewError(errorMessage);
+        if (!options.silent) toast.error(errorMessage);
+      } finally {
+        setIsRefreshing(false);
+      }
+    },
+    [url, contentId],
+  );
+
+  // Auto-fetch preview once per URL when there's no cached data. The ref
+  // guard ensures we don't re-fire if isRefreshing flips or React re-runs
+  // the effect for an unrelated reason. Silent mode skips toasts so the
+  // automatic path doesn't pop a green "refreshed" toast on every view —
+  // the inline card/error state is enough signal.
+  const autoFetchedUrlRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (url && autoFetchedUrlRef.current !== url && !preview.cached) {
+      autoFetchedUrlRef.current = url;
+      void handleRefreshPreview({ silent: true });
     }
-  };
+  }, [url, preview.cached, handleRefreshPreview]);
 
   const handleOpenLink = () => {
     window.open(url, "_blank", "noopener,noreferrer");
@@ -341,7 +358,7 @@ export function ExternalLinkViewer({
           Open Link
         </button>
         <button
-          onClick={handleRefreshPreview}
+          onClick={() => handleRefreshPreview()}
           disabled={isRefreshing}
           className="flex items-center gap-2 px-4 py-2 bg-gray-900/10 hover:bg-gray-900/20 border border-gray-900/20 rounded-lg text-sm font-medium text-gray-900 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
