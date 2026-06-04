@@ -168,6 +168,26 @@ function restoreTreeSnapshotForWorkspace(workspaceId: string | null) {
   useTreeStateStore.getState().restoreSnapshot(snapshots[workspaceId]);
 }
 
+// Persist the active workspace id so it survives navigations that drop the
+// `?workspace=` URL param (e.g. visiting Settings then hitting Back). Without
+// this, those round-trips fall back to the Main Workspace even though the
+// last-selected file restores.
+const ACTIVE_WORKSPACE_ID_KEY = "workspace-active-id";
+
+function readPersistedActiveWorkspaceId(): string | null {
+  if (typeof window === "undefined") return null;
+  return window.localStorage.getItem(ACTIVE_WORKSPACE_ID_KEY);
+}
+
+function writePersistedActiveWorkspaceId(workspaceId: string | null) {
+  if (typeof window === "undefined") return;
+  if (workspaceId) {
+    window.localStorage.setItem(ACTIVE_WORKSPACE_ID_KEY, workspaceId);
+  } else {
+    window.localStorage.removeItem(ACTIVE_WORKSPACE_ID_KEY);
+  }
+}
+
 function isOfflineLikePersistenceError(value: unknown) {
   const message = value instanceof Error ? value.message : String(value);
   return (
@@ -474,7 +494,10 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
           workspaces.find(
             (workspace) => workspace.id === initialWorkspaceId,
           )) ||
-        getWorkspace(workspaces, get().activeWorkspaceId);
+        getWorkspace(workspaces, get().activeWorkspaceId) ||
+        // Fall back to the last active workspace persisted across reloads —
+        // covers navigations that drop the `?workspace=` URL param.
+        getWorkspace(workspaces, readPersistedActiveWorkspaceId());
       const activeWorkspace =
         requestedWorkspace ?? getMainWorkspace(workspaces);
 
@@ -490,6 +513,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
         isLoading: false,
         hasLoadedOnce: true,
       });
+      writePersistedActiveWorkspaceId(activeWorkspace?.id ?? null);
 
       warmContentSummaryCache(
         workspaces.flatMap((ws) => ws.items.map((item) => item.content)),
@@ -540,6 +564,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       conflict: null,
       pendingOpenIntent: null,
     });
+    writePersistedActiveWorkspaceId(workspace.id);
     lastAppliedUpdatedAt[workspace.id] = workspace.updatedAt;
     syncWorkspaceUrl(workspace.id);
     restoreContentWorkspace(workspace);
