@@ -101,6 +101,7 @@ import {
 } from "@/lib/domain/ai/middleware";
 import { createBaseTools } from "@/lib/domain/ai/tools";
 import { createEditorTools } from "@/lib/domain/ai/tools";
+import { createFlashcardTools } from "@/lib/domain/ai/tools";
 import { prisma } from "@/lib/database/client";
 import { logger, spanPayload, startSpan, withRouteTrace, withSpan } from "@/lib/core/logger";
 
@@ -320,6 +321,7 @@ export async function POST(request: Request) {
       };
       const allTools = {
         ...createBaseTools(toolCtx),
+        ...createFlashcardTools(toolCtx),
         ...(editableContentId ? createEditorTools(toolCtx) : {}),
       };
       const toolConfig = (aiSettings as { toolConfig?: Record<
@@ -446,7 +448,15 @@ export async function POST(request: Request) {
         stopWhen: stepCountIs(editableContentId ? 8 : 5),
         system: `You are a helpful AI assistant in Digital Garden, a knowledge management application. Help the user with their notes, writing, and research. Be concise and helpful.
 
-You have a generate_image tool that creates AI images from text prompts. When asked to generate, create, or draw an image, use this tool. Available providers: DALL·E 3, GPT Image 1, Imagen 3, FLUX (fal.ai/Together/Fireworks), DeepAI, RunwayML, Artbreeder. Default to DALL·E 3 unless specified. Write detailed prompts for best results.${
+You have a generate_image tool that creates AI images from text prompts. When asked to generate, create, or draw an image, use this tool. Available providers: DALL·E 3, GPT Image 1, Imagen 3, FLUX (fal.ai/Together/Fireworks), DeepAI, RunwayML, Artbreeder. Default to DALL·E 3 unless specified. Write detailed prompts for best results.
+
+You can manage the user's flashcard decks. Rules:
+- ALWAYS call list_decks before proposing a new deck so you can prefer an existing one and populate similarExistingPaths with near-matches.
+- Use propose_deck (never direct creation) for new decks. The user confirms in the chat UI.
+- Use propose_cards (never direct creation) for cards. Hard limit: 10 cards per propose_cards call (enforced by the tool schema).
+  - If the user asks for MORE than 10, propose the first 10, set requestedCount to the true number they asked for, and END YOUR TURN with "Showing first 10 of N requested — accept these and I'll propose the rest." Do NOT chain propose_cards calls unprompted.
+- When the user has a note open, set sourceContentId on proposed cards to that note's id so cards link back to their source.
+- After any propose_* call, STOP and wait. The user clicks a button to commit; you don't loop back automatically.${
           editableContentId
             ? `\n\nThe user is currently viewing a document (ID: ${editableContentId}). You have editor tools available to read and edit this document.
 

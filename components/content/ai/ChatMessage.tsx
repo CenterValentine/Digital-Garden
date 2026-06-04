@@ -16,7 +16,7 @@ import { createPortal } from "react-dom";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { common, createLowlight } from "lowlight";
-import { Bot, User, Wrench, Loader2, Copy, Check, ImagePlus, GripVertical, BrainCircuit, ChevronRight, Pencil, RotateCcw, GitBranch, FileText } from "lucide-react";
+import { Bot, User, Wrench, Loader2, Copy, Check, ImagePlus, GripVertical, BrainCircuit, ChevronRight, Pencil, RotateCcw, GitBranch, FileText, Layers, BookOpen } from "lucide-react";
 import { cn } from "@/lib/core/utils";
 import { useContentStore } from "@/state/content-store";
 import { useSettingsStore } from "@/state/settings-store";
@@ -98,6 +98,44 @@ interface ImagePayload {
   width: number;
   height: number;
   fileName: string;
+}
+
+/**
+ * Shape of the deck proposal payload returned by propose_deck.
+ * Session 1: renders a read-only stub with a DISABLED commit button so
+ * the affordance is visible before Session 2 wires up the POST.
+ */
+interface DeckProposalPayload {
+  __deckProposal: true;
+  name: string;
+  parentDeckPath: string | null;
+  parentDeckId: string | null;
+  parentResolved: boolean;
+  proposedPath: string;
+  rationale: string;
+  similarExistingPaths: string[];
+}
+
+/**
+ * Shape of the card proposal payload returned by propose_cards.
+ * Carries `requestedCount` and `batchLimit` so the rendered card can
+ * display the truncation honestly (e.g. "10 of 15 requested").
+ */
+interface CardProposalPayload {
+  __cardProposal: true;
+  deckPath: string;
+  deckId: string | null;
+  deckName: string | null;
+  deckExists: boolean;
+  cards: Array<{
+    front: string;
+    back: string;
+    frontLabel?: string;
+    backLabel?: string;
+  }>;
+  requestedCount: number;
+  batchLimit: number;
+  sourceContentId: string | null;
 }
 
 // Shared lowlight instance — same config as TipTap editor
@@ -232,12 +270,21 @@ export const ChatMessage = memo(function ChatMessage({
     onEdit?.(message.id, next);
   }, [draft, messageText, onEdit, message.id]);
 
-  // Pre-scan: extract image + note payloads from ALL tool parts at message
-  // level. More reliable than detecting inside the parts loop because it
-  // handles streaming state transitions and part type variations.
-  const { imagePayloads, notePayloads, hasRunningTools } = useMemo(() => {
+  // Pre-scan: extract image + note + flashcard-proposal payloads from ALL
+  // tool parts at message level. More reliable than detecting inside the
+  // parts loop because it handles streaming state transitions and part
+  // type variations.
+  const {
+    imagePayloads,
+    notePayloads,
+    deckProposals,
+    cardProposals,
+    hasRunningTools,
+  } = useMemo(() => {
     const images: ImagePayload[] = [];
     const notes: NotePayload[] = [];
+    const deckProps: DeckProposalPayload[] = [];
+    const cardProps: CardProposalPayload[] = [];
     let running = false;
     const seenImageIds = new Set<string>();
     const seenNoteIds = new Set<string>();
@@ -261,6 +308,16 @@ export const ChatMessage = memo(function ChatMessage({
         if (note && !seenNoteIds.has(note.contentId)) {
           seenNoteIds.add(note.contentId);
           notes.push(note);
+          continue;
+        }
+        const deck = parseDeckProposal(tp.output);
+        if (deck) {
+          deckProps.push(deck);
+          continue;
+        }
+        const cards = parseCardProposal(tp.output);
+        if (cards) {
+          cardProps.push(cards);
         }
       }
     }
@@ -268,6 +325,8 @@ export const ChatMessage = memo(function ChatMessage({
     return {
       imagePayloads: images,
       notePayloads: notes,
+      deckProposals: deckProps,
+      cardProposals: cardProps,
       hasRunningTools: running,
     };
   }, [message.parts]);
@@ -491,11 +550,14 @@ export const ChatMessage = memo(function ChatMessage({
           // Tool parts: detect via detectToolPart helper (handles both static and dynamic)
           // Image generation tool results render as GeneratedImageCard at message level below.
           // Note creation/update tool results render as NotePayloadCard at message level below.
+          // Flashcard proposals render as DeckProposalCard / CardProposalList at message level below.
           const toolPart = detectToolPart(part);
           if (toolPart) {
             if (toolPart.state === "output-available") {
               if (parseImagePayload(toolPart.output) !== null) return null;
               if (parseNotePayload(toolPart.output) !== null) return null;
+              if (parseDeckProposal(toolPart.output) !== null) return null;
+              if (parseCardProposal(toolPart.output) !== null) return null;
             }
 
             return (
@@ -520,6 +582,16 @@ export const ChatMessage = memo(function ChatMessage({
         {/* Note cards — clickable link affordance for createNote / updateNote */}
         {notePayloads.map((payload) => (
           <NotePayloadCard key={payload.contentId} payload={payload} />
+        ))}
+
+        {/* Deck proposal stubs — Session 1: read-only with disabled commit button */}
+        {deckProposals.map((payload, i) => (
+          <DeckProposalCard key={`deck-${i}`} payload={payload} />
+        ))}
+
+        {/* Card proposal stubs — Session 1: read-only list with disabled commit button */}
+        {cardProposals.map((payload, i) => (
+          <CardProposalList key={`cards-${i}`} payload={payload} />
         ))}
 
         {/* Thinking indicator — shows during tool execution */}
@@ -1203,6 +1275,34 @@ function parseNotePayload(result: unknown): NotePayload | null {
   return null;
 }
 
+/** Parse a deck proposal payload from a propose_deck tool result. */
+function parseDeckProposal(result: unknown): DeckProposalPayload | null {
+  if (result === undefined) return null;
+  const str = typeof result === "string" ? result : JSON.stringify(result);
+  if (!str.includes('"__deckProposal"')) return null;
+  try {
+    const parsed = JSON.parse(str);
+    if (parsed.__deckProposal) return parsed as DeckProposalPayload;
+  } catch {
+    /* not valid JSON */
+  }
+  return null;
+}
+
+/** Parse a card proposal payload from a propose_cards tool result. */
+function parseCardProposal(result: unknown): CardProposalPayload | null {
+  if (result === undefined) return null;
+  const str = typeof result === "string" ? result : JSON.stringify(result);
+  if (!str.includes('"__cardProposal"')) return null;
+  try {
+    const parsed = JSON.parse(str);
+    if (parsed.__cardProposal) return parsed as CardProposalPayload;
+  } catch {
+    /* not valid JSON */
+  }
+  return null;
+}
+
 /**
  * Tool call indicator bubble — collapsed-by-default disclosure.
  *
@@ -1583,6 +1683,128 @@ function GeneratedImageCard({ payload }: { payload: ImagePayload }) {
           )}
         </button>
       </div>
+    </div>
+  );
+}
+
+/**
+ * DeckProposalCard — read-only Session 1 stub.
+ *
+ * Renders the deck the model is proposing, with parent path, rationale,
+ * similar existing decks (as static text — chips are Session 2), and a
+ * DISABLED "Create deck (Session 2)" button. The disabled button is
+ * intentional: it previews the affordance so smoke testers see the shape
+ * of the final UX without testing functionality that isn't wired yet.
+ *
+ * Session 2 will replace this with a card that POSTs to
+ * /api/flashcards/decks on click and turns similar-deck paths into
+ * clickable redirects.
+ */
+function DeckProposalCard({ payload }: { payload: DeckProposalPayload }) {
+  const parentLabel = payload.parentDeckPath
+    ? payload.parentResolved
+      ? payload.parentDeckPath
+      : `${payload.parentDeckPath} (not found — will be created)`
+    : "(root)";
+
+  return (
+    <div className="rounded-xl border border-emerald-400/30 bg-emerald-500/[0.04] p-3 text-sm dark:border-emerald-400/20 dark:bg-emerald-500/[0.06] max-w-md space-y-2">
+      <div className="flex items-start gap-2">
+        <Layers className="h-4 w-4 shrink-0 mt-0.5 text-emerald-600 dark:text-emerald-400" />
+        <div className="min-w-0 flex-1">
+          <div className="font-medium text-gray-900 dark:text-gray-100">
+            Proposed deck: {payload.name}
+          </div>
+          <div className="text-[11px] text-gray-500 dark:text-gray-400">
+            Path: {payload.proposedPath} · Parent: {parentLabel}
+          </div>
+        </div>
+      </div>
+
+      <p className="text-[13px] text-gray-700 dark:text-gray-300">
+        {payload.rationale}
+      </p>
+
+      {payload.similarExistingPaths.length > 0 && (
+        <div className="text-[11px] text-gray-500 dark:text-gray-400">
+          Similar existing decks:{" "}
+          {payload.similarExistingPaths.join(", ")}
+        </div>
+      )}
+
+      <button
+        type="button"
+        disabled
+        className="inline-flex items-center gap-1.5 rounded-md border border-gray-300/60 bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-500 cursor-not-allowed dark:border-white/10 dark:bg-white/[0.04] dark:text-gray-500"
+        title="Wiring lands in Session 2"
+      >
+        Create deck (Session 2)
+      </button>
+    </div>
+  );
+}
+
+/**
+ * CardProposalList — read-only Session 1 stub.
+ *
+ * Renders the proposed cards as a numbered list with front/back text,
+ * a header that surfaces the per-batch limit affordance
+ * ("Proposed N of M requested (limit: 10 per batch)"), and a DISABLED
+ * "Add selected (Session 2)" button. Per-card checkboxes and inline
+ * editing land in Session 2 via the FlashcardCardProposalList component
+ * — Session 1 keeps the UI legibly disabled.
+ */
+function CardProposalList({ payload }: { payload: CardProposalPayload }) {
+  const proposedCount = payload.cards.length;
+  const headerLine =
+    payload.requestedCount > proposedCount
+      ? `Proposed ${proposedCount} of ${payload.requestedCount} requested cards (limit: ${payload.batchLimit} per batch)`
+      : `Proposed ${proposedCount} cards (limit: ${payload.batchLimit} per batch)`;
+
+  const deckLabel = payload.deckExists
+    ? payload.deckPath
+    : `${payload.deckPath} (not yet created — propose & create the deck first)`;
+
+  return (
+    <div className="rounded-xl border border-amber-400/30 bg-amber-500/[0.04] p-3 text-sm dark:border-amber-400/20 dark:bg-amber-500/[0.06] max-w-md space-y-2">
+      <div className="flex items-start gap-2">
+        <BookOpen className="h-4 w-4 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
+        <div className="min-w-0 flex-1">
+          <div className="font-medium text-gray-900 dark:text-gray-100">
+            {headerLine}
+          </div>
+          <div className="text-[11px] text-gray-500 dark:text-gray-400">
+            Target deck: {deckLabel}
+          </div>
+          {payload.sourceContentId && (
+            <div className="text-[11px] text-gray-500 dark:text-gray-400">
+              Source: linked to open note
+            </div>
+          )}
+        </div>
+      </div>
+
+      <ol className="list-decimal pl-5 space-y-1.5 text-[13px] text-gray-700 dark:text-gray-300">
+        {payload.cards.map((card, i) => (
+          <li key={i}>
+            <div>
+              <span className="font-medium">Front:</span> {card.front}
+            </div>
+            <div>
+              <span className="font-medium">Back:</span> {card.back}
+            </div>
+          </li>
+        ))}
+      </ol>
+
+      <button
+        type="button"
+        disabled
+        className="inline-flex items-center gap-1.5 rounded-md border border-gray-300/60 bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-500 cursor-not-allowed dark:border-white/10 dark:bg-white/[0.04] dark:text-gray-500"
+        title="Inline editing + commit lands in Session 2"
+      >
+        Add selected (Session 2)
+      </button>
     </div>
   );
 }
