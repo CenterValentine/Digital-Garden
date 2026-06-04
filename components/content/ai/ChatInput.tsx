@@ -102,7 +102,14 @@ export function ChatInput({
   const fileInputRef = useRef<HTMLInputElement>(null);
   // The last value we emitted via onChange. When `value` prop comes back
   // identical, we skip re-rendering the DOM so the caret stays put.
-  const lastEmittedRef = useRef<string>(value);
+  //
+  // Seeded to `null` (not `value`) so the `[value]` effect ALWAYS paints on
+  // mount — including the case where `value` is a rehydrated sticky draft.
+  // If we seeded with `value`, the mount guard `value === lastEmittedRef`
+  // would short-circuit and the contenteditable would render empty while
+  // state still held the draft (invisible-but-sendable text). That was the
+  // root cause of the "drafts don't restore on reload" bug.
+  const lastEmittedRef = useRef<string | null>(null);
   // Range marking the trigger position (start = the `@` or `/` char,
   // end = current caret). Stable across renders because we don't rewrite
   // the DOM during typing.
