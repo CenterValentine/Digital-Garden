@@ -141,10 +141,20 @@ your origin and should stay in-WebView. See the comment block in that file.
 
 ## Known limitations / risks (validate before relying on these)
 
-- **Auth in WebView** — the web app uses a cookie session (`session_token`).
-  `sharedCookiesEnabled` + `thirdPartyCookiesEnabled` are on, but verify login
-  persists across app restarts and that the proxy's `/sign-in` redirect works
-  inside the shell.
+- **Email/password auth** — works in the shell as of the `navigateAfterAuth`
+  fix: WKWebView wouldn't attach a cookie set on a `fetch()` response to the
+  follow-up soft navigation, so login bounced back to `/sign-in`. The sign-in/up
+  pages now force a full document load (`window.location.assign`) when
+  `isNativeShell()` — desktop keeps soft nav. Still verify the session **persists
+  across app restarts** (`sharedCookiesEnabled` is on, but WKWebView cookie
+  persistence is worth confirming).
+- **Google OAuth does NOT work in the WebView** — Google blocks OAuth inside
+  embedded WebViews (`disallowed_useragent`), and our external-link policy sends
+  `accounts.google.com` to Safari (where the redirect can't return the session
+  cookie to the WebView → blank screen). Use email/password in the shell for
+  now; a real fix needs a **native auth session** (`expo-web-browser`
+  `openAuthSessionAsync` / ASWebAuthenticationSession + deep-link callback) —
+  later phase. Consider hiding the Google button when `isNativeShell()`.
 - **TipTap editing on iOS** — verify keyboard, caret visibility, selection,
   slash-menu positioning, and autosave inside the WebView.
 - **AI streaming** — verify the chat stream renders incrementally (no buffering)
