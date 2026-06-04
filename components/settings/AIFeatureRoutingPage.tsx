@@ -239,12 +239,9 @@ function FeatureRow({
   glass0: ReturnType<typeof getSurfaceStyles>;
 }) {
   const [local, setLocal] = useState<RouteEntry[]>(entries);
-  const entriesKey = useMemo(() => JSON.stringify(entries), [entries]);
-  const localKey = useMemo(() => JSON.stringify(local), [local]);
   // Parent remounts this row when `entries` changes (key prop above),
   // so we never need to resync local from props — useState's lazy init
   // captures the latest entries on each mount.
-  const dirty = localKey !== entriesKey;
 
   // Connection+model pairs that satisfy the required capabilities.
   // Uses `effectiveCapabilities` (explicit + inferred from id pattern)
@@ -263,7 +260,18 @@ function FeatureRow({
     return opts;
   }, [connections, feature.requiredCapabilities]);
 
-  const update = useCallback((next: RouteEntry[]) => setLocal(next), []);
+  // Auto-persist on every edit. Routes used to require a separate per-row
+  // "Save" button that was easy to miss (and the page's bottom "Save AI
+  // Settings" button doesn't touch routes), so changes silently appeared to
+  // not stick. The backend replaces the full ordered list per write, so
+  // saving each change is safe.
+  const update = useCallback(
+    (next: RouteEntry[]) => {
+      setLocal(next);
+      onSave(next);
+    },
+    [onSave],
+  );
 
   return (
     <li className="rounded-xl border border-white/10 p-4 space-y-3" style={{ background: glass0.background }}>
@@ -278,12 +286,6 @@ function FeatureRow({
           </div>
           <p className="mt-1 text-xs text-gray-500">{feature.description}</p>
         </div>
-        {dirty && (
-          <Button size="sm" onClick={() => onSave(local)}>
-            <Check className="h-3.5 w-3.5 mr-1" />
-            Save
-          </Button>
-        )}
       </div>
 
       {local.length === 0 ? (
