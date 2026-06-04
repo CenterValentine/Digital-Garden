@@ -48,6 +48,7 @@ import {
 import { useContextMenuStore } from "@/state/context-menu-store";
 import { useContentStore } from "@/state/content-store";
 import { useTreeDragStore } from "@/state/tree-drag-store";
+import { useFileTreeEditStore } from "@/state/file-tree-edit-store";
 import { toast } from "sonner";
 import type { TreeNode } from "@/lib/domain/content/types";
 import { getDisplayExtension, splitFilenameForDisplay } from "@/lib/domain/content/file-extension-utils";
@@ -81,12 +82,9 @@ interface FileNodeProps extends NodeRendererProps<TreeNode> {
    */
   onCreateAiImage?: (parentId: string | null) => Promise<void>;
   onAddPeopleTarget?: (parentId: string | null) => Promise<void>;
-  editingValue?: string;
-  onEditingValueChange?: (id: string, value: string) => void;
-  onEditingValueClear?: (id: string) => void;
 }
 
-export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete, onDuplicate, onDownload, onChangeIcon, onSetFolderView, onToggleReferencedContent, onCreateVisualizationMermaid, onCreateVisualizationExcalidraw, onCreateVisualizationDiagramsNet, onCreateAiImage, onAddPeopleTarget, editingValue, onEditingValueChange, onEditingValueClear }: FileNodeProps) {
+export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete, onDuplicate, onDownload, onChangeIcon, onSetFolderView, onToggleReferencedContent, onCreateVisualizationMermaid, onCreateVisualizationExcalidraw, onCreateVisualizationDiagramsNet, onCreateAiImage, onAddPeopleTarget }: FileNodeProps) {
   const { data } = node;
   const isFolder = data.contentType === "folder";
   const isPeopleNode = data.treeNodeKind === "peopleGroup" || data.treeNodeKind === "person";
@@ -95,6 +93,13 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
   const { openMenu } = useContextMenuStore();
   const selectedContentId = useContentStore((state) => state.selectedContentId);
   const openContentIds = useContentStore((state) => state.openContentIds);
+
+  // Inline-rename draft lives in a store so a keystroke re-renders only THIS
+  // node — not FileTree — keeping the react-arborist renderer stable so the
+  // rename input isn't remounted (which snapped the caret to the end).
+  const editingValue = useFileTreeEditStore((s) => s.drafts[data.id]);
+  const setEditingDraft = useFileTreeEditStore((s) => s.setDraft);
+  const clearEditingDraft = useFileTreeEditStore((s) => s.clearDraft);
 
   // Three-state selection system:
   // 1. Active: This file is open in the editor (brightest)
@@ -114,9 +119,9 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
   // component so react-arborist row recycling doesn't wipe in-progress typing.
   useEffect(() => {
     if (node.isEditing && editingValue === undefined) {
-      onEditingValueChange?.(data.id, basename);
+      setEditingDraft(data.id, basename);
     }
-  }, [basename, data.id, editingValue, node.isEditing, onEditingValueChange]);
+  }, [basename, data.id, editingValue, node.isEditing, setEditingDraft]);
 
   const committedRef = useRef(false);
 
@@ -132,14 +137,14 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
     if (committedRef.current) return;
     committedRef.current = true;
     node.submit(activeEditingValue);
-    onEditingValueClear?.(data.id);
+    clearEditingDraft(data.id);
   };
 
   const cancelEdit = () => {
     if (committedRef.current) return;
     committedRef.current = true;
     node.reset();
-    onEditingValueClear?.(data.id);
+    clearEditingDraft(data.id);
   };
 
   // Get icon based on content type or custom icon
@@ -573,7 +578,7 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
           <FileNameInput
             value={activeEditingValue}
             extension={extension}
-            onChange={(value) => onEditingValueChange?.(data.id, value)}
+            onChange={(value) => setEditingDraft(data.id, value)}
             onBlur={commitEdit}
             onKeyDown={(e) => {
               if (e.key === "Enter") {
