@@ -1,7 +1,6 @@
 import { useCallback, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  RefreshControl,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -41,6 +40,18 @@ interface MobileWebViewProps {
  *   • cookie/session persistence (so the web app's session_token survives)
  *   • external-link handling via the navigation policy in nativeBridge
  */
+
+// Runs before each document loads. Marks the page as living inside the native
+// shell so the web app can hide its desktop chrome (nav, padding) via a CSS
+// rule keyed on `html[data-native-shell]`. The trailing `true;` is required:
+// iOS WKWebView injection must evaluate to a non-object value.
+const MARK_NATIVE_SHELL_JS = `
+  (function () {
+    try { document.documentElement.setAttribute('data-native-shell', 'true'); } catch (e) {}
+  })();
+  true;
+`;
+
 export function MobileWebView({ url = DEFAULT_WEB_URL }: MobileWebViewProps) {
   const insets = useSafeAreaInsets();
   const webViewRef = useRef<WebView>(null);
@@ -48,7 +59,6 @@ export function MobileWebView({ url = DEFAULT_WEB_URL }: MobileWebViewProps) {
 
   const [loading, setLoading] = useState(true);
   const [errored, setErrored] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
   // Bumping this key forces a full remount of the WebView (used by retry).
   const [reloadKey, setReloadKey] = useState(0);
 
@@ -87,14 +97,6 @@ export function MobileWebView({ url = DEFAULT_WEB_URL }: MobileWebViewProps) {
     setReloadKey((k) => k + 1);
   }, []);
 
-  const onRefresh = useCallback(() => {
-    setRefreshing(true);
-    webViewRef.current?.reload();
-    // The WebView's onLoadEnd clears this; guard with a timeout in case the
-    // load never resolves.
-    setTimeout(() => setRefreshing(false), 4000);
-  }, []);
-
   if (errored) {
     return (
       <View style={[styles.center, { paddingTop: insets.top }]}>
@@ -118,16 +120,16 @@ export function MobileWebView({ url = DEFAULT_WEB_URL }: MobileWebViewProps) {
         key={reloadKey}
         ref={webViewRef}
         source={{ uri: url }}
+        // Mark the document as native-shell before content loads, so the web
+        // app hides its desktop nav on every route (not just /mobile).
+        injectedJavaScriptBeforeContentLoaded={MARK_NATIVE_SHELL_JS}
         // Bridge + navigation
         onMessage={handleMessage}
         onShouldStartLoadWithRequest={handleShouldStartLoad}
         onNavigationStateChange={handleNavigationStateChange}
         // Loading / error lifecycle
         onLoadStart={() => setLoading(true)}
-        onLoadEnd={() => {
-          setLoading(false);
-          setRefreshing(false);
-        }}
+        onLoadEnd={() => setLoading(false)}
         onError={() => {
           setLoading(false);
           setErrored(true);
@@ -145,13 +147,9 @@ export function MobileWebView({ url = DEFAULT_WEB_URL }: MobileWebViewProps) {
         // iOS UX niceties
         allowsBackForwardNavigationGestures
         allowsInlineMediaPlayback
-        // Pull-to-refresh via a wrapping ScrollView's RefreshControl.
+        // Native iOS pull-to-refresh (the WebView manages its own
+        // UIRefreshControl — no ScrollView/refreshControl prop needed).
         pullToRefreshEnabled
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }
-        // A bare ScrollView keeps RefreshControl available on iOS.
-        renderLoading={() => <View />}
         startInLoadingState={false}
         style={styles.webview}
       />
