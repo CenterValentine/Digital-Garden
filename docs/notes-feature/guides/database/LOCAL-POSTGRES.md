@@ -113,6 +113,8 @@ You get the Neon cost savings immediately. The convenience scripts (`pnpm db:tar
 
 > **Why this works**: `docker-compose.yml` sets `name: digital-garden-dev`, which pins the container/volume/network names. Multiple worktrees running `docker compose up` all converge on the same container — they don't fight for port 5432.
 
+**Want stricter isolation between worktrees?** By default all worktrees share `digital_garden_dev` — changes in one show up in another. To give each worktree its own isolated database inside the same container, see [PER-WORKTREE-DATABASES.md](./PER-WORKTREE-DATABASES.md).
+
 ## Switching back to Neon
 
 ```bash
@@ -172,6 +174,7 @@ pnpm db:local:reset  # wipes the volume and re-initializes
 
 ## Related docs
 
+- [PER-WORKTREE-DATABASES.md](./PER-WORKTREE-DATABASES.md) — Give each worktree its own isolated database inside the same container
 - [PRISMA-DATABASE-GUIDE.md](./PRISMA-DATABASE-GUIDE.md) — Prisma 7 patterns + driver adapter setup
 - [PRISMA-MIGRATION-GUIDE.md](./PRISMA-MIGRATION-GUIDE.md) — Authoring migrations
 - [DATABASE-CHANGE-CHECKLIST.md](./DATABASE-CHANGE-CHECKLIST.md) — Mandatory checklist for schema changes
