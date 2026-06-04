@@ -25,31 +25,35 @@ You need Docker (Desktop on Mac, or `docker` + `docker compose` on Linux/Codespa
 # 1. Back up your existing .env.local — this is your ticket back to Neon
 cp .env.local .env.local.neon
 
-# 2. Bring up Postgres
-pnpm db:local:up
+# 2. Merge the local-postgres vars into .env.local. You can either:
+#    - Copy the DATABASE_URL + LOCAL_POSTGRES=1 lines from .env.docker.example
+#      into .env.local (replacing the existing DATABASE_URL), OR
+#    - cp .env.docker.example .env.local and paste back your OAuth, AI,
+#      and storage credentials.
 
-# 3. Merge the local-postgres vars into .env.local
-#    (open .env.docker.example and copy the DATABASE_URL + LOCAL_POSTGRES lines
-#     into .env.local, replacing the existing DATABASE_URL)
-
-# 4. Confirm the swap took effect
-pnpm db:target
-# Expect: "🐳 LOCAL POSTGRES" banner
-
-# 5. Apply migrations to the empty local DB
-npx prisma migrate deploy
-
-# 6. Sync the schema for tables that have no migrations yet
-#    (see "Known issue: migration drift" below — this catches ~30 tables
-#     across tenancy, publishing, browser-ext, and web-resources that were
-#     applied to Neon via `db push` without ever being captured as migrations)
-npx prisma db push
-
-# 7. (Optional) seed test data
-pnpm db:seed
+# 3. One-command bootstrap: starts container + migrates + db push + seeds
+pnpm db:local:bootstrap
 ```
 
-You're done. `pnpm dev` will now use the local DB.
+That's it. `pnpm dev` will now use the local DB and auto-start the container if it's stopped.
+
+### What `db:local:bootstrap` does
+
+1. Safety check — refuses to run unless `LOCAL_POSTGRES=1` and `DATABASE_URL` points at `localhost`.
+2. Starts the Postgres container (or confirms it's already healthy).
+3. Runs `npx prisma migrate deploy` to apply the migration history.
+4. Runs `npx prisma db push` to sync schema for the un-migrated tables (see drift section below).
+5. Runs `pnpm db:seed` to populate sample data + an admin user (`admin@example.com` / `changeme123`).
+
+### Auto-start: how `pnpm dev` knows about the container
+
+After the one-time bootstrap, `pnpm dev` automatically:
+
+- Reads `LOCAL_POSTGRES` from `.env.local`.
+- If `LOCAL_POSTGRES=1` and the container isn't running, starts it before Next.js boots.
+- If `LOCAL_POSTGRES` is unset (Neon mode), skips the check entirely.
+
+You should never need to manually `docker compose up` after the first bootstrap.
 
 ## Known issue: migration drift
 
@@ -83,12 +87,31 @@ Useful commands:
 
 | Command | Purpose |
 |---|---|
-| `pnpm db:local:up` | Start (or resume) the Postgres container |
+| `pnpm db:local:bootstrap` | One-command first-time setup (or full re-bootstrap) — starts container, applies migrations, syncs schema, seeds |
+| `pnpm db:local:up` | Start (or resume) the Postgres container (usually unnecessary — `pnpm dev` auto-starts it) |
 | `pnpm db:local:down` | Stop the container (data preserved) |
 | `pnpm db:local:reset` | Wipe data and restart — useful when migrations get tangled |
 | `pnpm db:target` | Print which DB you're pointed at (local vs Neon vs other) |
 | `pnpm db:seed` | Re-seed if you reset |
 | `npx prisma studio` | GUI to browse local DB at http://localhost:5555 |
+
+## Adopting in another worktree (without rebasing)
+
+The Docker container is **host-level**, not per-worktree. Once started from any directory, it's reachable from every worktree on your laptop at `localhost:5432`.
+
+To opt in from a worktree that doesn't yet have this commit merged in:
+
+1. Make sure the container is running somewhere (this worktree's `pnpm db:local:up`, or any other checkout's).
+2. In the OTHER worktree's `.env.local`, add (or replace `DATABASE_URL` with) the two lines from [.env.docker.example](../../../.env.docker.example):
+   ```
+   DATABASE_URL="postgresql://postgres:postgres@localhost:5432/digital_garden_dev?schema=public"
+   LOCAL_POSTGRES=1
+   ```
+3. Run `pnpm dev` in that worktree. It hits the shared local container.
+
+You get the Neon cost savings immediately. The convenience scripts (`pnpm db:target`, `pnpm db:local:bootstrap`, the predev auto-start) become available when that worktree eventually merges main.
+
+> **Why this works**: `docker-compose.yml` sets `name: digital-garden-dev`, which pins the container/volume/network names. Multiple worktrees running `docker compose up` all converge on the same container — they don't fight for port 5432.
 
 ## Switching back to Neon
 
