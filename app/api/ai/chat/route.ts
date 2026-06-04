@@ -25,6 +25,7 @@ import { streamText, convertToModelMessages, stepCountIs } from "ai";
 import type { UIMessage } from "ai";
 import { requireAuth } from "@/lib/infrastructure/auth";
 import { getUserSettings } from "@/lib/features/settings";
+import { getChatContextBody } from "@/lib/features/chat-contexts";
 import {
   resolveChatModel,
   resolveChatModelFromConnection,
@@ -401,6 +402,19 @@ export async function POST(request: Request) {
         }
       }
 
+      // Resolve the selected custom-instruction context, if any. Sent by
+      // the composer's context picker. Ownership-gated; a missing/foreign/
+      // deleted id degrades to the base system prompt (returns null).
+      let userContextSection = "";
+      const contextId: string | null =
+        typeof body.contextId === "string" ? body.contextId : null;
+      if (contextId) {
+        const ctx = await getChatContextBody(session.user.id, contextId);
+        if (ctx) {
+          userContextSection = `\n\nThe user has set a custom context titled "${ctx.name}". Follow these instructions for how you respond — they take precedence over default tone, but never over safety or the editing rules above:\n\n${ctx.body}`;
+        }
+      }
+
       // Open the streaming span manually — it outlives this function via
       // streamText's onFinish callback. span.end() / span.fail() will emit
       // with the captured trace_id even after ALS scope exits.
@@ -467,7 +481,7 @@ NOTE-TOOL RULES IN CHAT CONTEXT:
 - Tooling distinguishes by contentId — same tool, different target.
 - Title-arg rule: never set \`title\` unless the user EXPLICITLY says "rename this to X". Topic-derived titles are a bug. (The tool will hard-ignore \`title\` when the target is this chat, but still follow the rule.)`
             : ""
-        }${mentionedContext}`,
+        }${userContextSection}${mentionedContext}`,
         onStepFinish: (step) => {
           // Tool-call auto-association interceptor (Session 4b).
           // After each model step, scan the step's tool calls for any

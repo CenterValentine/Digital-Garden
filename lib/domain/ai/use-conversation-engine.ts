@@ -100,6 +100,12 @@ export interface UseConversationEngineParams {
    */
   conversationId?: string | null;
   /**
+   * Selected custom-instruction context id, forwarded with each turn so
+   * the chat route can append the context body to the system prompt.
+   * Null/undefined sends no personalization (base prompt).
+   */
+  activeContextId?: string | null;
+  /**
    * Optional initial messages used to seed the chat (e.g. when a full-
    * page chat loads a previously-persisted conversation on mount).
    */
@@ -249,6 +255,7 @@ export function useConversationEngine({
   conversationKey,
   contentId,
   conversationId,
+  activeContextId,
   initialMessages,
   onFinish,
   onError,
@@ -748,6 +755,7 @@ export function useConversationEngine({
         body: {
           contentId,
           conversationId,
+          contextId: activeContextId ?? null,
           providerId,
           modelId,
           mentionedContentIds: ids,
@@ -763,6 +771,7 @@ export function useConversationEngine({
     sendMessage,
     contentId,
     conversationId,
+    activeContextId,
     providerId,
     modelId,
   ]);

@@ -98,6 +98,12 @@ interface UseConversationBindingResult {
   loadingInitial: boolean;
   /** The loaded conversation title (null until loaded / for transient). */
   conversationTitle: string | null;
+  /**
+   * The conversation's persisted custom-instruction context id at load
+   * time (null until loaded / for transient). Consumers seed their local
+   * picker selection from this.
+   */
+  initialActiveContextId: string | null;
 }
 
 export function useConversationBinding({
@@ -126,6 +132,9 @@ export function useConversationBinding({
   const [conversationTitle, setConversationTitle] = useState<string | null>(
     null,
   );
+  const [initialActiveContextId, setInitialActiveContextId] = useState<
+    string | null
+  >(null);
   const triedAutoTitleRef = useRef<string | null>(null);
   const setActiveModelSelection = useAIChatStore(
     (s) => s.setActiveModelSelection,
@@ -138,6 +147,7 @@ export function useConversationBinding({
       dbIdByClientIdRef.current = new Map();
       setLoadingInitial(false);
       setConversationTitle(null);
+      setInitialActiveContextId(null);
       return;
     }
     savedIdsRef.current = new Set();
@@ -184,10 +194,15 @@ export function useConversationBinding({
         }
         if (cancelled) return;
         const data = (body as {
-          data?: { messages?: unknown[]; title?: string | null };
+          data?: {
+            messages?: unknown[];
+            title?: string | null;
+            activeContextId?: string | null;
+          };
         })?.data;
         const stored = data?.messages ?? [];
         setConversationTitle(data?.title ?? null);
+        setInitialActiveContextId(data?.activeContextId ?? null);
 
         clientLogger.info({
           layer: "ui",
@@ -439,5 +454,5 @@ export function useConversationBinding({
     };
   }, [conversationId]);
 
-  return { loadingInitial, conversationTitle };
+  return { loadingInitial, conversationTitle, initialActiveContextId };
 }

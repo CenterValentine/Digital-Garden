@@ -17,6 +17,7 @@ import { ChatInput } from "../ai/ChatInput";
 import { FollowUpsStrip } from "../ai/FollowUpsStrip";
 import { ChatErrorBanner } from "../ai/ChatErrorBanner";
 import { MakeAndModelPicker } from "../ai/MakeAndModelPicker";
+import { ChatContextPicker } from "../ai/ChatContextPicker";
 import { AssociatedContentChips } from "../ai/AssociatedContentChips";
 import { useConversationEngine } from "@/lib/domain/ai/use-conversation-engine";
 import {
@@ -197,6 +198,10 @@ function ChatViewerInner({
   // attachments persist reliably.
   const pendingUserPartsRef = useRef<UIMessage["parts"] | null>(null);
 
+  // Selected custom-instruction context for this chat (seeded from the
+  // bound conversation below, forwarded to the engine per turn).
+  const [activeContextId, setActiveContextId] = useState<string | null>(null);
+
   const {
     messages,
     setMessages,
@@ -229,6 +234,7 @@ function ChatViewerInner({
     conversationKey: conversationId ?? contentId,
     contentId,
     conversationId: conversationId ?? undefined,
+    activeContextId,
     initialMessages,
     onFinish: (event) => {
       // Forward the SDK's fresh assistant message (with metadata) so
@@ -250,18 +256,40 @@ function ChatViewerInner({
 
   // Bound mode: load/persist/title against the Conversation store — the
   // SAME hook the sidebar ChatPanel uses, so the surfaces stay identical.
-  const { loadingInitial, conversationTitle } = useConversationBinding({
-    conversationId: conversationId ?? null,
-    messages,
-    setMessages: setMessages as unknown as (messages: unknown) => void,
-    getMessageStamp,
-    seedMessageStamps,
-    providerId,
-    modelId,
-    persistRef,
-    truncateRef,
-    pendingUserPartsRef,
-  });
+  const { loadingInitial, conversationTitle, initialActiveContextId } =
+    useConversationBinding({
+      conversationId: conversationId ?? null,
+      messages,
+      setMessages: setMessages as unknown as (messages: unknown) => void,
+      getMessageStamp,
+      seedMessageStamps,
+      providerId,
+      modelId,
+      persistRef,
+      truncateRef,
+      pendingUserPartsRef,
+    });
+
+  // Seed local context selection from the bound conversation on (re)load.
+  useEffect(() => {
+    setActiveContextId(initialActiveContextId);
+  }, [initialActiveContextId]);
+
+  // Persist context changes to the conversation when bound; otherwise hold
+  // in-session. Fire-and-forget.
+  const handleContextChange = useCallback(
+    (id: string | null) => {
+      setActiveContextId(id);
+      if (!conversationId) return;
+      void fetch(`/api/conversations/${encodeURIComponent(conversationId)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ activeContextId: id }),
+      }).catch(() => {});
+    },
+    [conversationId],
+  );
 
   // Branch (bound mode only): fork up to the message, materialize the new
   // branch to its own content node, and navigate there.
@@ -668,13 +696,20 @@ function ChatViewerInner({
         attachmentsUploading={attachmentsUploading}
         supportsImages={supportsImageAttachments}
         footerLeading={
-          <MakeAndModelPicker
-            providerId={providerId}
-            modelId={modelId}
-            onChange={handleModelChange}
-            disabled={isActive}
-            contributors={mixed.contributors as AIProviderId[]}
-          />
+          <div className="flex min-w-0 items-center">
+            <MakeAndModelPicker
+              providerId={providerId}
+              modelId={modelId}
+              onChange={handleModelChange}
+              disabled={isActive}
+              contributors={mixed.contributors as AIProviderId[]}
+            />
+            <ChatContextPicker
+              value={activeContextId}
+              onChange={handleContextChange}
+              disabled={isActive}
+            />
+          </div>
         }
       />
     </div>

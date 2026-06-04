@@ -26,6 +26,7 @@ import { ChatInput } from "./ChatInput";
 import { FollowUpsStrip } from "./FollowUpsStrip";
 import { ChatErrorBanner } from "./ChatErrorBanner";
 import { MakeAndModelPicker } from "./MakeAndModelPicker";
+import { ChatContextPicker } from "./ChatContextPicker";
 import { useConversationEngine } from "@/lib/domain/ai/use-conversation-engine";
 import {
   useConversationBinding,
@@ -92,6 +93,11 @@ export function ChatPanel({
   // attachments persist reliably.
   const pendingUserPartsRef = useRef<UIMessage["parts"] | null>(null);
 
+  // Selected custom-instruction context for this chat. Seeded from the
+  // bound conversation's persisted value (below) and forwarded to the
+  // engine so each turn carries it to the chat route.
+  const [activeContextId, setActiveContextId] = useState<string | null>(null);
+
   const {
     messages,
     status,
@@ -124,6 +130,7 @@ export function ChatPanel({
     conversationKey,
     contentId,
     conversationId,
+    activeContextId,
     onFinish: conversationId
       ? (event) => {
           // Forward the SDK's fresh assistant message so persistTurns
@@ -148,7 +155,7 @@ export function ChatPanel({
   // memory) — shared with the full-page ChatViewer via this hook so both
   // surfaces operate on the SAME Conversation store. `persistRef` is the
   // ref the engine's onFinish closes over; the hook populates it.
-  const { loadingInitial } = useConversationBinding({
+  const { loadingInitial, initialActiveContextId } = useConversationBinding({
     conversationId: conversationId ?? null,
     messages,
     setMessages: setMessages as (messages: unknown) => void,
@@ -161,6 +168,31 @@ export function ChatPanel({
     pendingUserPartsRef,
     onTitleChanged,
   });
+
+  // Seed the local context selection from the bound conversation whenever
+  // it (re)loads. Transient mode resolves to null. User changes after load
+  // are owned by `handleContextChange` below.
+  useEffect(() => {
+    setActiveContextId(initialActiveContextId);
+  }, [initialActiveContextId]);
+
+  // Change handler: update local state immediately (drives the engine body)
+  // and, when bound, persist the choice to the conversation so reopening it
+  // restores the context. Fire-and-forget — a failed write only loses
+  // persistence, not the active selection for this session.
+  const handleContextChange = useCallback(
+    (id: string | null) => {
+      setActiveContextId(id);
+      if (!conversationId) return;
+      void fetch(`/api/conversations/${encodeURIComponent(conversationId)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ activeContextId: id }),
+      }).catch(() => {});
+    },
+    [conversationId],
+  );
 
   // ─── AI Edit Orchestrator ───
   const isAiEditing = useEditorInstanceStore((s) =>
@@ -441,13 +473,20 @@ export function ChatPanel({
         attachmentsUploading={attachmentsUploading}
         supportsImages={supportsImageAttachments}
         footerLeading={
-          <MakeAndModelPicker
-            providerId={providerId}
-            modelId={modelId}
-            onChange={handleModelChange}
-            disabled={isActive}
-            contributors={mixed.contributors as AIProviderId[]}
-          />
+          <div className="flex min-w-0 items-center">
+            <MakeAndModelPicker
+              providerId={providerId}
+              modelId={modelId}
+              onChange={handleModelChange}
+              disabled={isActive}
+              contributors={mixed.contributors as AIProviderId[]}
+            />
+            <ChatContextPicker
+              value={activeContextId}
+              onChange={handleContextChange}
+              disabled={isActive}
+            />
+          </div>
         }
       />
     </div>
