@@ -16,6 +16,10 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   scheme: "digitalgarden",
   userInterfaceStyle: "automatic",
   newArchEnabled: true,
+  // Config plugins for the core runtime modules Expo's Metro/asset pipeline
+  // expects. Required here because a dynamic (app.config.ts) config can't be
+  // auto-edited by `expo install`.
+  plugins: ["expo-asset", "expo-font"],
   ios: {
     // iPhone-first per the spike brief.
     bundleIdentifier: "com.centervalentine.digitalgarden",
