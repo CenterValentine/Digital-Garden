@@ -1,4 +1,5 @@
 import { Linking } from "react-native";
+import * as WebBrowser from "expo-web-browser";
 
 import { getAppOrigin } from "../config";
 import type { WebToNativeMessage } from "./messages";
@@ -54,6 +55,14 @@ export async function handleWebToNativeMessage(
       const scheme = getScheme(message.url);
       // Never hand the OS a `javascript:`/`data:`/`file:` URL from page JS.
       if (!scheme || !OPENABLE_SCHEMES.includes(scheme)) return;
+      // http(s) → in-app browser (SFSafariViewController): the user stays inside
+      // the app and returns via a "Done" button, instead of being thrown out to
+      // full Safari. mailto:/tel: have no web page to show, so hand those to the
+      // OS (Mail / Phone) via Linking.
+      if (scheme === "http:" || scheme === "https:") {
+        await WebBrowser.openBrowserAsync(message.url);
+        return;
+      }
       const canOpen = await Linking.canOpenURL(message.url);
       if (canOpen) await Linking.openURL(message.url);
       return;
