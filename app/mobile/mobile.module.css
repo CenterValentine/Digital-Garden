@@ -70,6 +70,76 @@
   gap: 0.75rem;
 }
 
+/* Recent notes — deep links into the mobile reader. */
+.sectionLabel {
+  margin: 0.25rem 0 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #9ca3af;
+}
+
+.recent {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 14px;
+  overflow: hidden;
+  background: #ffffff;
+}
+
+.recentItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.875rem 1rem;
+  text-decoration: none;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.recentItem:last-child {
+  border-bottom: none;
+}
+
+.recentItem:active {
+  background: rgba(0, 0, 0, 0.03);
+}
+
+.recentTitle {
+  font-size: 0.9375rem;
+  font-weight: 500;
+  color: #111827;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.recentMeta {
+  flex-shrink: 0;
+  font-size: 0.8125rem;
+  color: #9ca3af;
+}
+
+:global(.dark) .recent {
+  background: #1f2937;
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+:global(.dark) .recentItem {
+  border-bottom-color: rgba(255, 255, 255, 0.06);
+}
+
+:global(.dark) .recentItem:active {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+:global(.dark) .recentTitle {
+  color: #f9fafb;
+}
+
 .cardTitle {
   font-size: 1.0625rem;
   font-weight: 600;
