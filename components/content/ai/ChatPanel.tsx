@@ -252,6 +252,31 @@ export function ChatPanel({
     }
   }, [contentId, setMessages, setInput]);
 
+  // Flashcard "Ask for next batch" affordance. The CardProposalList
+  // dispatches this event when the model truncated to the per-batch
+  // limit; we pre-fill the chat input so the user can review the
+  // request (and edit it) before sending. Deliberate model-loop-back
+  // pattern for batch pagination — the only place in the flashcard
+  // flow that a card button feeds back into the model.
+  useEffect(() => {
+    function handleNextBatch(e: Event) {
+      const detail = (e as CustomEvent).detail as
+        | { deckPath?: string; batchLimit?: number }
+        | undefined;
+      const deckPath = detail?.deckPath ?? "this deck";
+      const batchLimit = detail?.batchLimit ?? 10;
+      setInput(
+        `Propose the next ${batchLimit} cards for ${deckPath}.`,
+      );
+    }
+    window.addEventListener("flashcard-request-next-batch", handleNextBatch);
+    return () =>
+      window.removeEventListener(
+        "flashcard-request-next-batch",
+        handleNextBatch,
+      );
+  }, [setInput]);
+
   // Trash button semantics:
   //   - Transient mode (no conversationId): clear local messages
   //   - Conversation-bound: delete the Conversation entirely and let

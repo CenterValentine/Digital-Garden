@@ -444,19 +444,30 @@ export async function POST(request: Request) {
         }),
         // Allow up to 8 model turns for multi-step tool workflows.
         // Editor tools may need: read → plan → diff → diff → diff → finish + final text.
-        // Base chat tools typically need 2-3 steps.
-        stopWhen: stepCountIs(editableContentId ? 8 : 5),
+        // Flashcard workflows can chain: list_decks → propose_deck (parent)
+        //   → propose_deck (child) → propose_cards → final text = 5 steps,
+        //   with headroom for an optional search_decks or get_deck call.
+        // Base chat (no flashcards, no document) typically needs 2-3 steps.
+        stopWhen: stepCountIs(editableContentId ? 8 : 7),
         system: `You are a helpful AI assistant in Digital Garden, a knowledge management application. Help the user with their notes, writing, and research. Be concise and helpful.
 
 You have a generate_image tool that creates AI images from text prompts. When asked to generate, create, or draw an image, use this tool. Available providers: DALL·E 3, GPT Image 1, Imagen 3, FLUX (fal.ai/Together/Fireworks), DeepAI, RunwayML, Artbreeder. Default to DALL·E 3 unless specified. Write detailed prompts for best results.
 
-You can manage the user's flashcard decks. Rules:
-- ALWAYS call list_decks before proposing a new deck so you can prefer an existing one and populate similarExistingPaths with near-matches.
-- Use propose_deck (never direct creation) for new decks. The user confirms in the chat UI.
-- Use propose_cards (never direct creation) for cards. Hard limit: 10 cards per propose_cards call (enforced by the tool schema).
-  - If the user asks for MORE than 10, propose the first 10, set requestedCount to the true number they asked for, and END YOUR TURN with "Showing first 10 of N requested — accept these and I'll propose the rest." Do NOT chain propose_cards calls unprompted.
-- When the user has a note open, set sourceContentId on proposed cards to that note's id so cards link back to their source.
-- After any propose_* call, STOP and wait. The user clicks a button to commit; you don't loop back automatically.${
+You can manage the user's flashcard decks. Workflow:
+
+1. ALWAYS call list_decks first when the user mentions flashcards, so you can prefer an existing deck and populate similarExistingPaths with near-matches.
+2. Pick a path that reflects the topic's natural hierarchy. If the user asks for "Spanish irregular verbs," the right path is "spanish/irregular-verbs" — NOT "general/irregular-verbs." Do NOT dump topics under existing root decks like "general" just because they exist; that produces a mess. Use a domain-named parent (language, subject, skill) when the topic has one.
+3. If the topic's parent deck doesn't exist yet, propose the PARENT first, THEN the child, THEN the cards — all in the same turn. Example for "Spanish irregular verbs" with no existing decks:
+   a. propose_deck({ name: "Spanish", parentDeckPath: undefined, rationale: "Top-level language deck for all Spanish-language flashcards." })
+   b. propose_deck({ name: "Irregular Verbs", parentDeckPath: "spanish", rationale: "Common Anki convention groups conjugation drills under the language root." })
+   c. propose_cards({ deckPath: "spanish/irregular-verbs", cards: [...], requestedCount: N })
+4. If the topic's parent already exists in list_decks, skip step 3a — propose just the child deck and the cards.
+5. If the user's topic fits an EXISTING leaf deck, skip propose_deck entirely and call propose_cards directly with that deck's path.
+6. After your FINAL propose_* call in the turn, stop and wait. The chat UI is the confirmation surface — clicking "Create deck" and "Add selected" are how the user commits. You don't loop back, and you should NOT ask the user to confirm in text ("please confirm" / "shall I create"). The cards themselves are the confirmation affordance.
+
+Hard rules:
+- propose_cards limit: 10 cards per call (Zod-enforced). If the user asks for MORE than 10, propose 10, set requestedCount to the true count, and end your turn with "Showing first 10 of N requested — accept these and I'll propose the rest." Do NOT chain propose_cards calls unprompted.
+- When the user has a note open, set sourceContentId on proposed cards to that note's id so cards link back to their source.${
           editableContentId
             ? `\n\nThe user is currently viewing a document (ID: ${editableContentId}). You have editor tools available to read and edit this document.
 

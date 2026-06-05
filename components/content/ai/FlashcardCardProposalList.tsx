@@ -1,0 +1,472 @@
+"use client";
+
+/**
+ * FlashcardCardProposalList — Session 2 interactive list.
+ *
+ * Renders a __cardProposal payload from the propose_cards AI tool.
+ *
+ * Per-card state:
+ *   - Checkbox (default checked) — controls whether the card is in the
+ *     batch when "Add selected" fires.
+ *   - Front + Back are AdaptiveFlashcardEditor in "plain" mode so the
+ *     user can tweak the AI's wording before commit. Plain mode
+ *     restricts to Document/Paragraph/Text — single-paragraph editing,
+ *     which fits the flashcard front/back shape.
+ *   - Status: idle | creating | created | error (per row).
+ *
+ * Commit flow ("Add selected"):
+ *   - Loops POST /api/flashcards for each checked + non-created card.
+ *   - On 201: marks the row as created (✓), stays in the list as a
+ *     visual receipt rather than disappearing — the user can see what
+ *     was actually saved.
+ *   - On failure: marks the row as error with the message inline; the
+ *     row stays in the list so the user can edit + retry.
+ *   - Disabled when deckExists is false (deck must be created first
+ *     via the DeckProposalCard above) or when no rows are checked.
+ *
+ * "Ask for next batch" link (only when requestedCount > batchLimit):
+ *   - Dispatches a CustomEvent("flashcard-request-next-batch") on the
+ *     window with { deckPath, sourceContentId, alreadyProposed }. The
+ *     chat panel listens and sends a synthetic message asking the model
+ *     to propose the next batch. This is the ONE deliberate model-loop-
+ *     back in the design — natural conversational flow for pagination.
+ */
+
+import { useCallback, useEffect, useMemo, useState } from "react";
+import type { JSONContent } from "@tiptap/core";
+import {
+  BookOpen,
+  Check,
+  Loader2,
+  AlertTriangle,
+  ArrowRight,
+  ChevronDown,
+  ChevronRight as ChevronRightIcon,
+} from "lucide-react";
+import { toast } from "sonner";
+import {
+  createTextTiptapDoc,
+  extractPlainTextFromTiptap,
+} from "@/lib/domain/flashcards";
+import { AdaptiveFlashcardEditor } from "@/extensions/flashcards/components/AdaptiveFlashcardEditor";
+
+interface CardProposalPayload {
+  __cardProposal: true;
+  deckPath: string;
+  deckId: string | null;
+  deckName: string | null;
+  deckExists: boolean;
+  cards: Array<{
+    front: string;
+    back: string;
+    frontLabel?: string;
+    backLabel?: string;
+  }>;
+  requestedCount: number;
+  batchLimit: number;
+  sourceContentId: string | null;
+}
+
+type RowStatus =
+  | { status: "idle" }
+  | { status: "creating" }
+  | { status: "created" }
+  | { status: "error"; message: string };
+
+interface RowState {
+  checked: boolean;
+  /**
+   * Whether the row is expanded into its TipTap editors. Default false —
+   * the compact view (front → back as plain text on one line) gives a
+   * scannable bullet list. Click the row's text area to expand for
+   * inline editing. Rows automatically expand when their status flips
+   * to "error" so the user sees what failed without an extra click.
+   */
+  expanded: boolean;
+  frontContent: JSONContent;
+  backContent: JSONContent;
+  frontLabel: string;
+  backLabel: string;
+  status: RowStatus;
+}
+
+export function FlashcardCardProposalList({
+  payload,
+}: {
+  payload: CardProposalPayload;
+}) {
+  // Initialize per-row state from the payload. Plain-text front/back are
+  // converted to single-paragraph TipTap docs via createTextTiptapDoc
+  // (client-safe helper from the flashcards domain).
+  const initialRows = useMemo<RowState[]>(
+    () =>
+      payload.cards.map((card) => ({
+        checked: true,
+        expanded: false,
+        frontContent: createTextTiptapDoc(card.front),
+        backContent: createTextTiptapDoc(card.back),
+        frontLabel: card.frontLabel ?? "Question",
+        backLabel: card.backLabel ?? "Answer",
+        status: { status: "idle" } as RowStatus,
+      })),
+    [payload.cards],
+  );
+  const [rows, setRows] = useState<RowState[]>(initialRows);
+  const [bulkSubmitting, setBulkSubmitting] = useState(false);
+
+  // Local mirrors of payload.deckExists / payload.deckId. When the
+  // sibling FlashcardDeckProposalCard successfully POSTs, it dispatches
+  // `flashcard-deck-created` — we adopt the resolved deckId here so
+  // "Add selected" can fire without the user re-asking the model to
+  // re-propose the cards.
+  const [deckExistsLocal, setDeckExistsLocal] = useState(payload.deckExists);
+  const [deckIdLocal, setDeckIdLocal] = useState<string | null>(
+    payload.deckId,
+  );
+
+  useEffect(() => {
+    function handleDeckCreated(e: Event) {
+      const detail = (e as CustomEvent).detail as
+        | { deckPath?: string; deckId?: string | null }
+        | undefined;
+      if (!detail) return;
+      if (detail.deckPath !== payload.deckPath) return;
+      setDeckExistsLocal(true);
+      if (detail.deckId) setDeckIdLocal(detail.deckId);
+    }
+    window.addEventListener("flashcard-deck-created", handleDeckCreated);
+    return () =>
+      window.removeEventListener("flashcard-deck-created", handleDeckCreated);
+  }, [payload.deckPath]);
+
+  const updateRow = useCallback(
+    (index: number, patch: Partial<RowState>) => {
+      setRows((prev) => {
+        const next = [...prev];
+        next[index] = { ...next[index], ...patch };
+        return next;
+      });
+    },
+    [],
+  );
+
+  const proposedCount = rows.length;
+  const checkedCount = rows.filter(
+    (r) => r.checked && r.status.status !== "created",
+  ).length;
+  const createdCount = rows.filter((r) => r.status.status === "created").length;
+  const showTruncationHint =
+    payload.requestedCount > payload.batchLimit && createdCount < proposedCount;
+
+  const headerLine =
+    payload.requestedCount > proposedCount
+      ? `Proposed ${proposedCount} of ${payload.requestedCount} requested cards (limit: ${payload.batchLimit} per batch)`
+      : `Proposed ${proposedCount} cards (limit: ${payload.batchLimit} per batch)`;
+
+  const deckLabel = deckExistsLocal
+    ? payload.deckPath
+    : `${payload.deckPath} (create the deck above first)`;
+
+  const handleSubmitSelected = useCallback(async () => {
+    if (!deckIdLocal) {
+      toast.error(
+        "Target deck doesn't exist yet — create it from the deck proposal above first.",
+      );
+      return;
+    }
+    setBulkSubmitting(true);
+    let successCount = 0;
+    let failureCount = 0;
+
+    // Snapshot the indexes we're submitting so async writes don't race
+    // with state changes the user might make mid-flight.
+    const indexesToSubmit = rows
+      .map((r, i) => (r.checked && r.status.status !== "created" ? i : -1))
+      .filter((i) => i >= 0);
+
+    for (const i of indexesToSubmit) {
+      updateRow(i, { status: { status: "creating" } });
+      try {
+        const row = rows[i];
+        const res = await fetch("/api/flashcards", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            deckId: deckIdLocal,
+            frontContent: row.frontContent,
+            backContent: row.backContent,
+            frontLabel: row.frontLabel,
+            backLabel: row.backLabel,
+            isFrontRichText: false,
+            sourceContentId: payload.sourceContentId ?? undefined,
+          }),
+        });
+        const json = (await res.json().catch(() => null)) as
+          | { success: boolean; error?: { message?: string } }
+          | null;
+
+        if (!res.ok || !json?.success) {
+          const message =
+            json?.error?.message ?? `Failed (${res.status})`;
+          updateRow(i, {
+          status: { status: "error", message },
+          expanded: true,
+        });
+          failureCount++;
+          continue;
+        }
+        updateRow(i, { status: { status: "created" } });
+        successCount++;
+      } catch (err) {
+        const message =
+          err instanceof Error ? err.message : "Network error";
+        updateRow(i, {
+          status: { status: "error", message },
+          expanded: true,
+        });
+        failureCount++;
+      }
+    }
+
+    setBulkSubmitting(false);
+    if (successCount > 0) {
+      toast.success(
+        `Added ${successCount} card${successCount === 1 ? "" : "s"} to ${payload.deckPath}`,
+      );
+    }
+    if (failureCount > 0) {
+      toast.error(
+        `${failureCount} card${failureCount === 1 ? "" : "s"} failed — see inline errors`,
+      );
+    }
+  }, [deckIdLocal, payload, rows, updateRow]);
+
+  const handleAskForNextBatch = useCallback(() => {
+    const alreadyProposed = rows
+      .filter((r) => r.status.status === "created")
+      .map((r, i) => `${i + 1}`);
+    window.dispatchEvent(
+      new CustomEvent("flashcard-request-next-batch", {
+        detail: {
+          deckPath: payload.deckPath,
+          deckId: deckIdLocal,
+          sourceContentId: payload.sourceContentId,
+          alreadyProposedCount: alreadyProposed.length,
+          totalRequested: payload.requestedCount,
+          batchLimit: payload.batchLimit,
+        },
+      }),
+    );
+  }, [deckIdLocal, payload, rows]);
+
+  const allDone =
+    rows.length > 0 &&
+    rows.every((r) => r.status.status === "created");
+
+  return (
+    <div className="rounded-xl border border-amber-400/30 bg-amber-500/[0.04] p-3 text-sm dark:border-amber-400/20 dark:bg-amber-500/[0.06] max-w-md space-y-2">
+      <div className="flex items-start gap-2">
+        <BookOpen className="h-4 w-4 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
+        <div className="min-w-0 flex-1">
+          <div className="font-medium text-gray-900 dark:text-gray-100">
+            {headerLine}
+          </div>
+          <div className="text-[11px] text-gray-500 dark:text-gray-400">
+            Target deck: {deckLabel}
+          </div>
+          {payload.sourceContentId && (
+            <div className="text-[11px] text-gray-500 dark:text-gray-400">
+              Source: linked to the open note
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/*
+        Gallery: compact bullet list by default (one row per card,
+        front → back as plain text), expandable on click into the full
+        TipTap editors. Max-height + scroll keeps the cards panel from
+        dominating the chat when there are 10. Rows auto-expand when
+        their status flips to "error" so the user sees what failed.
+      */}
+      <div className="max-h-[480px] overflow-y-auto rounded-md border border-amber-400/20 bg-white/30 dark:border-amber-400/15 dark:bg-white/[0.02] divide-y divide-amber-400/15 dark:divide-amber-400/10">
+        {rows.map((row, i) => {
+          const isCreated = row.status.status === "created";
+          const isCreating = row.status.status === "creating";
+          const isError = row.status.status === "error";
+          const frontPreview =
+            extractPlainTextFromTiptap(row.frontContent) || "(empty)";
+          const backPreview =
+            extractPlainTextFromTiptap(row.backContent) || "(empty)";
+          return (
+            <div
+              key={i}
+              className={`${
+                isCreated
+                  ? "bg-emerald-500/[0.04]"
+                  : isError
+                    ? "bg-red-500/[0.04]"
+                    : ""
+              }`}
+            >
+              {/* Compact row — checkbox + summary + status icon + chevron */}
+              <div className="flex items-center gap-2 px-2 py-1.5">
+                <input
+                  type="checkbox"
+                  checked={row.checked}
+                  disabled={isCreated || isCreating}
+                  onChange={(e) =>
+                    updateRow(i, { checked: e.target.checked })
+                  }
+                  aria-label={`Include card ${i + 1}`}
+                  className="h-4 w-4 shrink-0 cursor-pointer accent-amber-500 disabled:cursor-not-allowed"
+                />
+                <button
+                  type="button"
+                  onClick={() =>
+                    updateRow(i, { expanded: !row.expanded })
+                  }
+                  className="min-w-0 flex-1 text-left text-[12px] text-gray-700 hover:text-gray-900 dark:text-gray-300 dark:hover:text-gray-100"
+                  aria-expanded={row.expanded}
+                  aria-controls={`card-editor-${i}`}
+                  title={row.expanded ? "Collapse" : "Click to edit"}
+                >
+                  <span className="mr-1 font-medium text-gray-500 dark:text-gray-400">
+                    {i + 1}.
+                  </span>
+                  <span className="truncate">{frontPreview}</span>
+                  <span className="mx-1 text-gray-400 dark:text-gray-500">
+                    →
+                  </span>
+                  <span className="truncate text-gray-600 dark:text-gray-400">
+                    {backPreview}
+                  </span>
+                </button>
+                <div className="flex shrink-0 items-center gap-1">
+                  {isCreated && (
+                    <Check
+                      className="h-4 w-4 text-emerald-600 dark:text-emerald-400"
+                      aria-label="Added"
+                    />
+                  )}
+                  {isCreating && (
+                    <Loader2
+                      className="h-4 w-4 animate-spin text-amber-600 dark:text-amber-400"
+                      aria-label="Adding"
+                    />
+                  )}
+                  {isError && (
+                    <AlertTriangle
+                      className="h-4 w-4 text-red-600 dark:text-red-400"
+                      aria-label="Error"
+                    />
+                  )}
+                  <button
+                    type="button"
+                    onClick={() =>
+                      updateRow(i, { expanded: !row.expanded })
+                    }
+                    className="text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
+                    aria-label={row.expanded ? "Collapse" : "Expand to edit"}
+                  >
+                    {row.expanded ? (
+                      <ChevronDown className="h-4 w-4" />
+                    ) : (
+                      <ChevronRightIcon className="h-4 w-4" />
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {/* Expanded editors */}
+              {row.expanded && (
+                <div
+                  id={`card-editor-${i}`}
+                  className="space-y-1.5 px-2 pb-2 pl-8"
+                >
+                  <div className="text-[10px] font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                    {row.frontLabel}
+                  </div>
+                  <AdaptiveFlashcardEditor
+                    value={row.frontContent}
+                    onChange={(value) =>
+                      updateRow(i, { frontContent: value })
+                    }
+                    mode="plain"
+                    placeholder="Front"
+                    editable={!isCreated && !isCreating}
+                    ariaLabel={`Card ${i + 1} front`}
+                    compact
+                  />
+                  <div className="text-[10px] font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                    {row.backLabel}
+                  </div>
+                  <AdaptiveFlashcardEditor
+                    value={row.backContent}
+                    onChange={(value) =>
+                      updateRow(i, { backContent: value })
+                    }
+                    mode="plain"
+                    placeholder="Back"
+                    editable={!isCreated && !isCreating}
+                    ariaLabel={`Card ${i + 1} back`}
+                    compact
+                  />
+                  {row.status.status === "error" && (
+                    <div className="flex items-start gap-1.5 rounded bg-red-500/10 px-1.5 py-1 text-[11px] text-red-700 dark:text-red-300">
+                      <AlertTriangle className="h-3 w-3 shrink-0 mt-0.5" />
+                      <span>{row.status.message}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="flex items-center justify-between gap-2 pt-1">
+        <div className="text-[11px] text-gray-500 dark:text-gray-400">
+          {allDone
+            ? `All ${createdCount} added`
+            : `${checkedCount} of ${proposedCount} selected${
+                createdCount > 0 ? ` · ${createdCount} added` : ""
+              }`}
+        </div>
+        <div className="flex items-center gap-2">
+          {showTruncationHint && (
+            <button
+              type="button"
+              onClick={handleAskForNextBatch}
+              className="inline-flex items-center gap-1 text-[11px] text-amber-700 hover:underline dark:text-amber-300"
+              title={`Ask the AI to propose the next ${payload.batchLimit}`}
+            >
+              Ask for next batch
+              <ArrowRight className="h-3 w-3" />
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={handleSubmitSelected}
+            disabled={
+              !deckExistsLocal ||
+              checkedCount === 0 ||
+              bulkSubmitting ||
+              allDone
+            }
+            className="inline-flex items-center gap-1.5 rounded-md border border-amber-500/40 bg-amber-500/[0.08] px-2.5 py-1 text-xs font-medium text-amber-700 hover:bg-amber-500/[0.14] disabled:cursor-not-allowed disabled:opacity-60 dark:border-amber-400/30 dark:bg-amber-500/[0.10] dark:text-amber-300 dark:hover:bg-amber-500/[0.18]"
+          >
+            {bulkSubmitting ? (
+              <>
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                Adding…
+              </>
+            ) : (
+              `Add selected${checkedCount > 0 ? ` (${checkedCount})` : ""}`
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}

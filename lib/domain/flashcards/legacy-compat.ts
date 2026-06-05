@@ -41,11 +41,13 @@ export async function resolveLegacyDeckId(
   const category = rawCategory.trim() || "General";
   const subcategory = rawSubcategory.trim();
 
-  // Root deck for the category.
+  // Root deck for the category. Lookup by path (which equals the root
+  // slug at the top level) since the uniqueness constraint is now on
+  // (ownerId, path), not (ownerId, slug).
   const rootSlug = slugifyDeckName(category);
   const rootPath = rootSlug;
   let root = await client.flashcardDeck.findUnique({
-    where: { ownerId_slug: { ownerId, slug: rootSlug } },
+    where: { ownerId_path: { ownerId, path: rootPath } },
     select: { id: true, path: true },
   });
   if (!root) {
@@ -62,11 +64,12 @@ export async function resolveLegacyDeckId(
 
   if (!subcategory) return root.id;
 
-  // Child deck for the subcategory under the root.
+  // Child deck for the subcategory under the root. Same parent-prefixed
+  // slug for legacy continuity, but lookup is by path (parent/leaf).
   const childSlug = slugifyDeckName(`${category}-${subcategory}`);
   const childPath = `${root.path}/${slugifyDeckName(subcategory)}`;
   const child = await client.flashcardDeck.findUnique({
-    where: { ownerId_slug: { ownerId, slug: childSlug } },
+    where: { ownerId_path: { ownerId, path: childPath } },
     select: { id: true },
   });
   if (child) return child.id;

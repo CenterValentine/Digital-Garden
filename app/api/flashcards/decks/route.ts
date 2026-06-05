@@ -141,13 +141,13 @@ export async function PATCH(request: NextRequest) {
     }
 
     // Sprint 6: locate the deck this (category, subcategory) pair
-    // points to. Same slug rule as resolveLegacyDeckId — but we don't
+    // points to. Same path rule as resolveLegacyDeckId — we don't
     // auto-create here, since a rename of a non-existent deck is a 404.
-    const sourceSlug = subcategory
-      ? `${slugifyDeckName(category)}-${slugifyDeckName(subcategory)}`
+    const sourcePath = subcategory
+      ? `${slugifyDeckName(category)}/${slugifyDeckName(subcategory)}`
       : slugifyDeckName(category);
     const sourceDeck = await prisma.flashcardDeck.findUnique({
-      where: { ownerId_slug: { ownerId: session.user.id, slug: sourceSlug } },
+      where: { ownerId_path: { ownerId: session.user.id, path: sourcePath } },
       select: { id: true, parentDeckId: true, path: true },
     });
     if (!sourceDeck) {
