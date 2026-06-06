@@ -591,9 +591,16 @@ export const ChatMessage = memo(function ChatMessage({
           <FlashcardDeckProposalCard key={`deck-${i}`} payload={payload} />
         ))}
 
-        {/* Card proposals — Session 2: inline editing + per-row checkboxes + bulk POST */}
+        {/* Card proposals — Session 2: inline editing + per-row checkboxes + bulk POST.
+            `proposalId` threads through to localStorage so the "already-added"
+            row state persists across chat reloads — without it, reloading would
+            re-enable "Add selected" and let the user duplicate the batch. */}
         {cardProposals.map((payload, i) => (
-          <FlashcardCardProposalList key={`cards-${i}`} payload={payload} />
+          <FlashcardCardProposalList
+            key={`cards-${i}`}
+            payload={payload}
+            proposalId={`${message.id}-cards-${i}`}
+          />
         ))}
 
         {/* Thinking indicator — shows during tool execution */}

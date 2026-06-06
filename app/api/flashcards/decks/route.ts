@@ -26,6 +26,7 @@ export async function GET() {
         select: {
           id: true,
           name: true,
+          path: true,
           parentDeckId: true,
           parent: { select: { name: true } },
         },
@@ -101,6 +102,8 @@ export async function GET() {
           masteredCount,
           reviewedCount: totals.reviewedCount,
           viewedCount: totals.viewedCount,
+          deckId: deck.id,
+          path: deck.path,
         },
       ];
     });
