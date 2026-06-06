@@ -79,21 +79,14 @@ export function FlashcardDeckProposalCard({
   const parentLabel = payload.parentDeckPath
     ? parentResolvedLocal
       ? payload.parentDeckPath
-      : `${payload.parentDeckPath} (create the parent above first)`
+      : `${payload.parentDeckPath} (will also be created)`
     : "(root)";
 
   const handleCreate = useCallback(async () => {
-    // Refuse to create a child deck before its parent exists — would
-    // silently land at root instead of under the intended parent. The
-    // user needs to click Create on the parent's card (above this one)
-    // first; once that fires `flashcard-deck-created`, parentResolved
-    // flips true and the button re-enables.
-    if (payload.parentDeckPath && !parentResolvedLocal) {
-      toast.error(
-        `Create the parent deck "${payload.parentDeckPath}" first.`,
-      );
-      return;
-    }
+    // The server cascade-creates missing parents when we pass
+    // parentDeckPath instead of parentDeckId, so we can commit even
+    // when the parent isn't created yet. Prefer the resolved id when
+    // we have it (faster, no walk).
     setState({ status: "creating" });
     try {
       const res = await fetch("/api/flashcards/decks", {
@@ -101,7 +94,11 @@ export function FlashcardDeckProposalCard({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: payload.name,
-          parentDeckId: parentDeckIdLocal ?? undefined,
+          ...(parentDeckIdLocal
+            ? { parentDeckId: parentDeckIdLocal }
+            : payload.parentDeckPath
+              ? { parentDeckPath: payload.parentDeckPath }
+              : {}),
         }),
       });
       const json = (await res.json().catch(() => null)) as
@@ -143,7 +140,7 @@ export function FlashcardDeckProposalCard({
       setState({ status: "error", message });
       toast.error(message);
     }
-  }, [payload, parentDeckIdLocal, parentResolvedLocal]);
+  }, [payload, parentDeckIdLocal]);
 
   if (state.status === "created") {
     return (
@@ -209,16 +206,8 @@ export function FlashcardDeckProposalCard({
       <button
         type="button"
         onClick={handleCreate}
-        disabled={
-          state.status === "creating" ||
-          (payload.parentDeckPath !== null && !parentResolvedLocal)
-        }
+        disabled={state.status === "creating"}
         className="inline-flex items-center gap-1.5 rounded-md border border-emerald-500/40 bg-emerald-500/[0.08] px-2.5 py-1 text-xs font-medium text-emerald-700 hover:bg-emerald-500/[0.14] disabled:cursor-not-allowed disabled:opacity-60 dark:border-emerald-400/30 dark:bg-emerald-500/[0.10] dark:text-emerald-300 dark:hover:bg-emerald-500/[0.18]"
-        title={
-          payload.parentDeckPath && !parentResolvedLocal
-            ? `Create parent deck "${payload.parentDeckPath}" first`
-            : undefined
-        }
       >
         {state.status === "creating" ? (
           <>

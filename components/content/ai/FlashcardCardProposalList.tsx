@@ -267,15 +267,19 @@ export function FlashcardCardProposalList({
       ? `Proposed ${proposedCount} of ${payload.requestedCount} requested cards (limit: ${payload.batchLimit} per batch)`
       : `Proposed ${proposedCount} cards (limit: ${payload.batchLimit} per batch)`;
 
-  // Three deck-state cases:
-  //   1. exists → use deckIdLocal directly
-  //   2. doesn't exist, parent resolved → create-then-add
-  //   3. doesn't exist, parent unresolved → blocked (waiting for parent)
+  // Two deck-state cases after Stage 3.5 — parent unresolved no
+  // longer blocks; the server cascade-creates missing ancestors:
+  //   1. exists → use deckIdLocal directly (skip create)
+  //   2. doesn't exist → create-then-add. When parent doesn't exist
+  //      either, pass parentDeckPath to the server and it cascades
+  //      through missing levels atomically.
   const deckLabel = deckExistsLocal
     ? payload.deck.proposedPath
     : parentResolvedLocal
       ? `${payload.deck.proposedPath} (will be created)`
-      : `${payload.deck.proposedPath} (create parent "${payload.deck.parentDeckPath}" first)`;
+      : payload.deck.parentDeckPath
+        ? `${payload.deck.proposedPath} (will be created — parent "${payload.deck.parentDeckPath}" too)`
+        : `${payload.deck.proposedPath} (will be created)`;
 
   const handleSubmitSelected = useCallback(async () => {
     setBulkSubmitting(true);
@@ -286,25 +290,26 @@ export function FlashcardCardProposalList({
     const successfulIndices: number[] = [];
 
     // ─── Phase 1: ensure the target deck exists ───
-    // If the embedded deck is new, create it before posting cards. This
-    // is the "cascading absorb" of Stage 3 — what used to be a sibling
-    // propose_deck card is now a phase of the same commit.
+    // If the embedded deck is new, create it before posting cards. The
+    // server cascades through missing parent levels when we pass
+    // parentDeckPath instead of parentDeckId, so even deep hierarchies
+    // commit in one click.
     let targetDeckId = deckIdLocal;
     if (!deckExistsLocal) {
-      if (!parentResolvedLocal) {
-        toast.error(
-          `Create the parent deck "${payload.deck.parentDeckPath}" above first.`,
-        );
-        setBulkSubmitting(false);
-        return;
-      }
       try {
         const res = await fetch("/api/flashcards/decks", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             name: payload.deck.name,
-            parentDeckId: parentDeckIdLocal ?? undefined,
+            // Prefer the resolved parent id when we have it (faster
+            // server-side, no walk). Fall back to parentDeckPath so
+            // the server cascades through missing ancestors.
+            ...(parentDeckIdLocal
+              ? { parentDeckId: parentDeckIdLocal }
+              : payload.deck.parentDeckPath
+                ? { parentDeckPath: payload.deck.parentDeckPath }
+                : {}),
           }),
         });
         const json = (await res.json().catch(() => null)) as
@@ -422,7 +427,6 @@ export function FlashcardCardProposalList({
   }, [
     deckIdLocal,
     deckExistsLocal,
-    parentResolvedLocal,
     parentDeckIdLocal,
     payload,
     rows,
@@ -703,19 +707,9 @@ export function FlashcardCardProposalList({
             type="button"
             onClick={handleSubmitSelected}
             disabled={
-              // Block when the parent isn't created yet (we can't
-              // create the leaf into a non-existent parent — the slug
-              // would land at root). When the leaf exists OR the
-              // parent exists, the commit can proceed.
-              (!deckExistsLocal && !parentResolvedLocal) ||
               checkedCount === 0 ||
               bulkSubmitting ||
               allDone
-            }
-            title={
-              !deckExistsLocal && !parentResolvedLocal
-                ? `Create parent deck "${payload.deck.parentDeckPath}" first`
-                : undefined
             }
             className="inline-flex items-center gap-1.5 rounded-md border border-amber-500/40 bg-amber-500/[0.08] px-2.5 py-1 text-xs font-medium text-amber-700 hover:bg-amber-500/[0.14] disabled:cursor-not-allowed disabled:opacity-60 dark:border-amber-400/30 dark:bg-amber-500/[0.10] dark:text-amber-300 dark:hover:bg-amber-500/[0.18]"
           >

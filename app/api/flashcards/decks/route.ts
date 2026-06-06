@@ -15,6 +15,64 @@ import type { FlashcardDeckDto } from "@/lib/domain/flashcards";
 // re-exported through the barrel.
 import { resolveLegacyDeckId } from "@/lib/domain/flashcards/legacy-compat";
 
+/**
+ * Walks a full path like "vietnamese/tones/six-tones" and ensures each
+ * segment exists as a deck, creating any missing ancestors top-down.
+ * Returns the LEAF segment's deck id + canonical path. Used by POST
+ * /api/flashcards/decks when called with `parentDeckPath` instead of
+ * `parentDeckId` — the propose_deck_with_cards absorb flow uses this
+ * to make a single click cascade through multiple missing levels.
+ *
+ * Display name derivation: each missing segment's `name` is title-
+ * cased from the kebab-case slug ("ai-concepts" → "Ai Concepts").
+ * Imperfect for acronyms; the user can rename auto-created ancestors
+ * later via PATCH /api/flashcards/decks/[id].
+ *
+ * Caps depth at 8 to prevent runaway path strings.
+ */
+async function ensureDeckPath(
+  ownerId: string,
+  fullPath: string,
+): Promise<{ deckId: string; path: string }> {
+  const segments = fullPath.split("/").filter(Boolean);
+  if (segments.length === 0) throw new Error("Empty deck path.");
+  if (segments.length > 8) throw new Error("Deck path too deep (max 8 levels).");
+
+  let currentPath = "";
+  let currentParentId: string | null = null;
+  let currentDeckId = "";
+
+  for (const segment of segments) {
+    currentPath = currentPath ? `${currentPath}/${segment}` : segment;
+    let deck = await prisma.flashcardDeck.findUnique({
+      where: { ownerId_path: { ownerId, path: currentPath } },
+      select: { id: true },
+    });
+    if (!deck) {
+      // Derive a display name from the slug. Kebab → space + title.
+      const name = segment
+        .split("-")
+        .filter(Boolean)
+        .map((s) => s.charAt(0).toUpperCase() + s.slice(1))
+        .join(" ");
+      deck = await prisma.flashcardDeck.create({
+        data: {
+          ownerId,
+          name,
+          slug: segment,
+          path: currentPath,
+          ...(currentParentId ? { parentDeckId: currentParentId } : {}),
+        },
+        select: { id: true },
+      });
+    }
+    currentParentId = deck.id;
+    currentDeckId = deck.id;
+  }
+
+  return { deckId: currentDeckId, path: currentPath };
+}
+
 export async function GET() {
   try {
     const session = await requireAuth();
@@ -268,6 +326,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Resolve parent in one of three ways (in order of preference):
+    //   1. parentDeckId — explicit existing deck id, fastest lookup.
+    //   2. parentDeckPath — walk the path and create missing
+    //      ancestors. Used by the propose_deck_with_cards absorb flow
+    //      when the model proposed a sub-deck whose parent doesn't
+    //      exist yet (e.g. "vietnamese/tones" with no Vietnamese
+    //      deck). The user clicks Create-deck-and-add once and the
+    //      server cascades through ancestors atomically.
+    //   3. Neither → deck lands at root.
     let parentDeckId: string | null = null;
     let parentPath: string | null = null;
     if (typeof body.parentDeckId === "string" && body.parentDeckId) {
@@ -286,6 +353,32 @@ export async function POST(request: NextRequest) {
       }
       parentDeckId = parent.id;
       parentPath = parent.path;
+    } else if (
+      typeof body.parentDeckPath === "string" &&
+      body.parentDeckPath.trim()
+    ) {
+      try {
+        const resolved = await ensureDeckPath(
+          session.user.id,
+          body.parentDeckPath.trim(),
+        );
+        parentDeckId = resolved.deckId;
+        parentPath = resolved.path;
+      } catch (err) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: {
+              code: "INVALID_INPUT",
+              message:
+                err instanceof Error
+                  ? err.message
+                  : "Failed to resolve parent path.",
+            },
+          },
+          { status: 400 },
+        );
+      }
     }
 
     const slug = slugifyDeckName(name);
