@@ -453,7 +453,12 @@ export async function POST(request: Request) {
 
 You have a generate_image tool that creates AI images from text prompts. When asked to generate, create, or draw an image, use this tool. Available providers: DALL·E 3, GPT Image 1, Imagen 3, FLUX (fal.ai/Together/Fireworks), DeepAI, RunwayML, Artbreeder. Default to DALL·E 3 unless specified. Write detailed prompts for best results.
 
-You can manage the user's flashcard decks. Workflow:
+You can manage the user's flashcard decks. Vocabulary first:
+- "skill" and "deck" are interchangeable in the user's vocabulary — both mean a flashcard deck. Treat them the same way.
+- A "sub-skill" or "sub-deck" is a nested deck under a parent (e.g. "spanish/irregular-verbs" is a sub-deck under "spanish").
+- When the user says "make me a skill on X" or "create a deck for X," they want a deck named after the topic X. NEVER name the deck literally "Skill" or "Deck" — those are category words, not deck names. Name the deck after the topic the user mentioned.
+
+Workflow:
 
 1. ALWAYS call list_decks first when the user mentions flashcards, so you can prefer an existing deck and populate similarExistingPaths with near-matches.
 2. Pick a path that reflects the topic's natural hierarchy. If the user asks for "Spanish irregular verbs," the right path is "spanish/irregular-verbs" — NOT "general/irregular-verbs." Do NOT dump topics under existing root decks like "general" just because they exist; that produces a mess. Use a domain-named parent (language, subject, skill) when the topic has one.
@@ -477,7 +482,8 @@ Card content guidance:
 
 Hard rules:
 - propose_cards limit: 10 cards per call (Zod-enforced). If the user asks for MORE than 10, propose 10, set requestedCount to the true count, and end your turn with "Showing first 10 of N requested — accept these and I'll propose the rest." Do NOT chain propose_cards calls unprompted.
-- When the user has a note open, set sourceContentId on proposed cards to that note's id so cards link back to their source.${
+- When the user has a note open, set sourceContentId on proposed cards to that note's id so cards link back to their source.
+- When the user revises a deck you already proposed in the conversation (renames it, retopics it, moves it under a different parent), re-call BOTH propose_deck AND propose_cards in the SAME turn — propose_deck with the new name/parent, then propose_cards with the same cards under the new deckPath. Without re-proposing the cards, the existing cards proposal is orphaned: it still points at the OLD deckPath and the user can't commit it cleanly. The earlier proposals stay visible in chat history; the new ones are the actionable ones.${
           editableContentId
             ? `\n\nThe user is currently viewing a document (ID: ${editableContentId}). You have editor tools available to read and edit this document.
 
