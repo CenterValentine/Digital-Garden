@@ -13,7 +13,7 @@ export const FLASHCARD_TOOL_IDS = [
   "search_decks",
   "get_deck",
   "propose_deck",
-  "propose_cards",
+  "propose_deck_with_cards",
 ] as const;
 
 export type FlashcardToolId = (typeof FLASHCARD_TOOL_IDS)[number];
@@ -39,9 +39,9 @@ export const FLASHCARD_TOOL_METADATA: Record<
     name: "Recommend Deck",
     description: "Suggest a new deck before creating it — you confirm in the chat",
   },
-  propose_cards: {
-    name: "Recommend Cards",
+  propose_deck_with_cards: {
+    name: "Recommend Cards (in a deck)",
     description:
-      "Propose up to 10 cards at a time — you review, edit, and confirm before they're saved",
+      "Propose up to 10 cards bound to a deck — review, edit, and confirm; the commit creates the deck if it doesn't exist yet",
   },
 };

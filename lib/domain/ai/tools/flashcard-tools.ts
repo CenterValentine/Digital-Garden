@@ -341,16 +341,42 @@ export function createFlashcardTools(ctx: ToolExecuteContext) {
       },
     }),
 
-    // ─── propose_cards ──────────────────────────────────────
-    propose_cards: tool({
+    // ─── propose_deck_with_cards ────────────────────────────
+    // Single tool for "cards in a deck context." The deck info is
+    // embedded so the commit step is self-sufficient — if the target
+    // deck doesn't exist, the client creates it as part of "Add
+    // selected." The leaf-deck propose_deck call is absorbed; only the
+    // standalone propose_deck remains for non-cascade deck proposals
+    // (typically the PARENT deck in a hierarchy).
+    propose_deck_with_cards: tool({
       description:
-        `Propose up to ${CARD_BATCH_LIMIT} flashcards for the user to review. Returns a proposal payload — does NOT create the cards. The user checks/unchecks cards, optionally edits front/back, and clicks 'Add selected' to commit. HARD LIMIT: ${CARD_BATCH_LIMIT} cards per call. If the user asks for more than ${CARD_BATCH_LIMIT}, propose ${CARD_BATCH_LIMIT}, set requestedCount to the true number, end your turn, and let the user accept these before you propose more.`,
+        `Propose up to ${CARD_BATCH_LIMIT} flashcards bound to a deck context. The deck may be EXISTING (cards added directly) or NEW (the commit step creates the deck and adds the cards atomically). HARD LIMIT: ${CARD_BATCH_LIMIT} cards per call. If the user asks for more than ${CARD_BATCH_LIMIT}, propose ${CARD_BATCH_LIMIT}, set requestedCount to the true number, end your turn, and let the user accept these before you propose more.`,
       inputSchema: z.object({
-        deckPath: z
+        name: z
           .string()
           .min(1)
+          .max(120)
           .describe(
-            "Full path of the target deck (e.g. 'spanish/verbs/irregular'). Must be an existing deck OR a deck the user just proposed in this conversation.",
+            "Leaf deck name (e.g. 'Irregular Verbs'). Combined with parentDeckPath to form the full target path. If a deck at that path already exists, the cards go there directly — otherwise the commit creates the deck first.",
+          ),
+        parentDeckPath: z
+          .string()
+          .optional()
+          .describe(
+            "Full path of the parent deck (e.g. 'spanish'). Omit for a root-level deck.",
+          ),
+        rationale: z
+          .string()
+          .optional()
+          .describe(
+            "One-sentence reason this deck fits — shown to the user only when the deck doesn't yet exist (i.e. the commit will create it). Omit when targeting an existing deck.",
+          ),
+        similarExistingPaths: z
+          .array(z.string())
+          .max(5)
+          .optional()
+          .describe(
+            "Paths of existing decks that almost match the topic — the user may prefer to add to one of these instead. Pulled from list_decks / search_decks results.",
           ),
         cards: z
           .array(
@@ -396,30 +422,58 @@ export function createFlashcardTools(ctx: ToolExecuteContext) {
           ),
       }),
       execute: async ({
-        deckPath,
+        name,
+        parentDeckPath,
+        rationale,
+        similarExistingPaths,
         cards,
         requestedCount,
         sourceContentId,
       }) => {
-        // Resolve deck path → id when possible so the Session 2 commit
-        // handler can POST without an extra lookup. Tolerate "not found" —
-        // the deck may be one the model just proposed in this turn (not
-        // yet created).
-        const deck = await prisma.flashcardDeck.findFirst({
-          where: { ownerId: ctx.userId, path: deckPath, deletedAt: null },
+        // Resolve parent path → id when possible. Tolerate "not found"
+        // — the parent may be one the model just proposed in this turn
+        // (not yet created); the client listens for
+        // `flashcard-deck-created` to adopt it when the sibling
+        // propose_deck card commits.
+        let parentDeckId: string | null = null;
+        if (parentDeckPath) {
+          const parent = await prisma.flashcardDeck.findFirst({
+            where: { ownerId: ctx.userId, path: parentDeckPath, deletedAt: null },
+            select: { id: true },
+          });
+          parentDeckId = parent?.id ?? null;
+        }
+
+        const proposedSlug = slugifyDeckName(name);
+        const proposedPath = parentDeckPath
+          ? `${parentDeckPath}/${proposedSlug}`
+          : proposedSlug;
+
+        // Does a deck at this exact path already exist? If yes, the
+        // commit skips deck creation entirely. If no, the embedded
+        // deck info drives the create-then-add-cards flow.
+        const existing = await prisma.flashcardDeck.findFirst({
+          where: { ownerId: ctx.userId, path: proposedPath, deletedAt: null },
           select: { id: true, name: true },
         });
 
-        // Default sourceContentId to the open note when the model omitted it
         const resolvedSourceContentId =
           sourceContentId ?? ctx.contentId ?? null;
 
         return JSON.stringify({
-          __cardProposal: true,
-          deckPath,
-          deckId: deck?.id ?? null,
-          deckName: deck?.name ?? null,
-          deckExists: deck !== null,
+          __deckWithCardsProposal: true,
+          deck: {
+            name,
+            proposedPath,
+            parentDeckPath: parentDeckPath ?? null,
+            parentDeckId,
+            parentResolved: parentDeckPath ? parentDeckId !== null : true,
+            rationale: rationale ?? null,
+            similarExistingPaths: similarExistingPaths ?? [],
+            deckExists: existing !== null,
+            deckId: existing?.id ?? null,
+            existingName: existing?.name ?? null,
+          },
           cards,
           requestedCount,
           batchLimit: CARD_BATCH_LIMIT,

@@ -123,12 +123,30 @@ interface DeckProposalPayload {
  * Carries `requestedCount` and `batchLimit` so the rendered card can
  * display the truncation honestly (e.g. "10 of 15 requested").
  */
-interface CardProposalPayload {
-  __cardProposal: true;
-  deckPath: string;
-  deckId: string | null;
-  deckName: string | null;
-  deckExists: boolean;
+/**
+ * Stage 3 — propose_deck_with_cards payload. Replaces the old
+ * __deckWithCardsProposal sentinel. The deck info is embedded so the commit
+ * step is self-sufficient: if `deck.deckExists` is false, the client
+ * creates the deck (using deck.name + deck.parentDeckId) before
+ * posting the cards. When the parent deck doesn't exist yet either
+ * (deck.parentResolved === false), the card waits for a sibling
+ * propose_deck card to fire `flashcard-deck-created` for the parent
+ * path before "Add selected" enables.
+ */
+interface DeckWithCardsProposalPayload {
+  __deckWithCardsProposal: true;
+  deck: {
+    name: string;
+    proposedPath: string;
+    parentDeckPath: string | null;
+    parentDeckId: string | null;
+    parentResolved: boolean;
+    rationale: string | null;
+    similarExistingPaths: string[];
+    deckExists: boolean;
+    deckId: string | null;
+    existingName: string | null;
+  };
   cards: Array<{
     front: string;
     back: string;
@@ -280,13 +298,13 @@ export const ChatMessage = memo(function ChatMessage({
     imagePayloads,
     notePayloads,
     deckProposals,
-    cardProposals,
+    deckWithCardsProposals,
     hasRunningTools,
   } = useMemo(() => {
     const images: ImagePayload[] = [];
     const notes: NotePayload[] = [];
     const deckProps: DeckProposalPayload[] = [];
-    const cardProps: CardProposalPayload[] = [];
+    const deckWithCardsProps: DeckWithCardsProposalPayload[] = [];
     let running = false;
     const seenImageIds = new Set<string>();
     const seenNoteIds = new Set<string>();
@@ -317,9 +335,9 @@ export const ChatMessage = memo(function ChatMessage({
           deckProps.push(deck);
           continue;
         }
-        const cards = parseCardProposal(tp.output);
+        const cards = parseDeckWithCardsProposal(tp.output);
         if (cards) {
-          cardProps.push(cards);
+          deckWithCardsProps.push(cards);
         }
       }
     }
@@ -328,7 +346,7 @@ export const ChatMessage = memo(function ChatMessage({
       imagePayloads: images,
       notePayloads: notes,
       deckProposals: deckProps,
-      cardProposals: cardProps,
+      deckWithCardsProposals: deckWithCardsProps,
       hasRunningTools: running,
     };
   }, [message.parts]);
@@ -559,7 +577,7 @@ export const ChatMessage = memo(function ChatMessage({
               if (parseImagePayload(toolPart.output) !== null) return null;
               if (parseNotePayload(toolPart.output) !== null) return null;
               if (parseDeckProposal(toolPart.output) !== null) return null;
-              if (parseCardProposal(toolPart.output) !== null) return null;
+              if (parseDeckWithCardsProposal(toolPart.output) !== null) return null;
             }
 
             return (
@@ -595,7 +613,7 @@ export const ChatMessage = memo(function ChatMessage({
             `proposalId` threads through to localStorage so the "already-added"
             row state persists across chat reloads — without it, reloading would
             re-enable "Add selected" and let the user duplicate the batch. */}
-        {cardProposals.map((payload, i) => (
+        {deckWithCardsProposals.map((payload, i) => (
           <FlashcardCardProposalList
             key={`cards-${i}`}
             payload={payload}
@@ -1299,13 +1317,13 @@ function parseDeckProposal(result: unknown): DeckProposalPayload | null {
 }
 
 /** Parse a card proposal payload from a propose_cards tool result. */
-function parseCardProposal(result: unknown): CardProposalPayload | null {
+function parseDeckWithCardsProposal(result: unknown): DeckWithCardsProposalPayload | null {
   if (result === undefined) return null;
   const str = typeof result === "string" ? result : JSON.stringify(result);
-  if (!str.includes('"__cardProposal"')) return null;
+  if (!str.includes('"__deckWithCardsProposal"')) return null;
   try {
     const parsed = JSON.parse(str);
-    if (parsed.__cardProposal) return parsed as CardProposalPayload;
+    if (parsed.__deckWithCardsProposal) return parsed as DeckWithCardsProposalPayload;
   } catch {
     /* not valid JSON */
   }

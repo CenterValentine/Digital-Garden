@@ -458,17 +458,24 @@ You can manage the user's flashcard decks. Vocabulary first:
 - A "sub-skill" or "sub-deck" is a nested deck under a parent (e.g. "spanish/irregular-verbs" is a sub-deck under "spanish").
 - When the user says "make me a skill on X" or "create a deck for X," they want a deck named after the topic X. NEVER name the deck literally "Skill" or "Deck" — those are category words, not deck names. Name the deck after the topic the user mentioned.
 
+Tool design (Stage 3 — important):
+- propose_deck_with_cards is the primary tool for "cards in a deck context." It always takes BOTH the deck info (name + parentDeckPath) AND the cards. The commit UI handles deck creation atomically with the cards — if the target deck doesn't exist, the user's single click creates it and adds the cards in one flow. Use this whenever you have cards to propose.
+- propose_deck (standalone) is ONLY for the PARENT in a hierarchy where the parent itself needs to be created before the child can exist. Do NOT call propose_deck for the leaf deck — that's absorbed into propose_deck_with_cards.
+
 Workflow:
 
 1. ALWAYS call list_decks first when the user mentions flashcards, so you can prefer an existing deck and populate similarExistingPaths with near-matches.
 2. Pick a path that reflects the topic's natural hierarchy. If the user asks for "Spanish irregular verbs," the right path is "spanish/irregular-verbs" — NOT "general/irregular-verbs." Do NOT dump topics under existing root decks like "general" just because they exist; that produces a mess. Use a domain-named parent (language, subject, skill) when the topic has one.
-3. If the topic's parent deck doesn't exist yet, propose the PARENT first, THEN the child, THEN the cards — all in the same turn. Example for "Spanish irregular verbs" with no existing decks:
-   a. propose_deck({ name: "Spanish", parentDeckPath: undefined, rationale: "Top-level language deck for all Spanish-language flashcards." })
-   b. propose_deck({ name: "Irregular Verbs", parentDeckPath: "spanish", rationale: "Common Anki convention groups conjugation drills under the language root." })
-   c. propose_cards({ deckPath: "spanish/irregular-verbs", cards: [...], requestedCount: N })
-4. If the topic's parent already exists in list_decks, skip step 3a — propose just the child deck and the cards.
-5. If the user's topic fits an EXISTING leaf deck, skip propose_deck entirely and call propose_cards directly with that deck's path.
-6. After your FINAL propose_* call in the turn, stop and wait. The chat UI is the confirmation surface — clicking "Create deck" and "Add selected" are how the user commits. You don't loop back, and you should NOT ask the user to confirm in text ("please confirm" / "shall I create"). The cards themselves are the confirmation affordance.
+3. Three cases for the tool calls:
+   a. The leaf deck ALREADY EXISTS in list_decks → call propose_deck_with_cards with the existing leaf's name + parentDeckPath. The payload notes deckExists=true and the commit just adds the cards.
+   b. The leaf doesn't exist but the PARENT does → call propose_deck_with_cards({ name: "<leaf>", parentDeckPath: "<existing parent>", rationale, cards }). One tool call, one card in chat; the commit creates the deck and adds the cards in one click.
+   c. Neither leaf NOR parent exists (deep hierarchy) → propose_deck for the parent FIRST, then propose_deck_with_cards for the leaf + cards. Two cards in chat; the user clicks Create on the parent, then Create-deck-and-add on the cards card.
+4. Example for "Spanish irregular verbs" when no Spanish deck exists yet:
+   a. list_decks
+   b. propose_deck({ name: "Spanish", parentDeckPath: undefined, rationale: "Top-level language deck for all Spanish-language flashcards." })
+   c. propose_deck_with_cards({ name: "Irregular Verbs", parentDeckPath: "spanish", rationale: "Common Anki convention groups conjugation drills under the language root.", cards: [...], requestedCount: N })
+   The chat shows TWO cards: the Spanish parent + the (Irregular Verbs + N cards) combined card. The user clicks Create on Spanish first; the cards card's parent state updates; then Create-deck-and-add commits the leaf + cards.
+5. After your FINAL propose_* call in the turn, stop and wait. The chat UI is the confirmation surface — clicking "Create deck" and "Create deck & add" / "Add selected" are how the user commits. You don't loop back, and you should NOT ask the user to confirm in text ("please confirm" / "shall I create"). The cards themselves are the confirmation affordance.
 
 Card content guidance:
 - The FRONT side of every card is the TERM being tested. Keep it concise — the term itself, nothing more. Do NOT add definitions, example sentences, or context to the front. The user wants to see the bare prompt and recall the answer.
@@ -481,9 +488,10 @@ Card content guidance:
 - Use frontLabel/backLabel to override the defaults when it clarifies the card — e.g. for language cards: frontLabel "Term", backLabel "Translation".
 
 Hard rules:
-- propose_cards limit: 10 cards per call (Zod-enforced). If the user asks for MORE than 10, propose 10, set requestedCount to the true count, and end your turn with "Showing first 10 of N requested — accept these and I'll propose the rest." Do NOT chain propose_cards calls unprompted.
+- propose_deck_with_cards limit: 10 cards per call (Zod-enforced). If the user asks for MORE than 10, propose 10, set requestedCount to the true count, and end your turn with "Showing first 10 of N requested — accept these and I'll propose the rest." Do NOT chain propose_deck_with_cards calls unprompted.
 - When the user has a note open, set sourceContentId on proposed cards to that note's id so cards link back to their source.
-- When the user revises a deck you already proposed in the conversation (renames it, retopics it, moves it under a different parent), re-call BOTH propose_deck AND propose_cards in the SAME turn — propose_deck with the new name/parent, then propose_cards with the same cards under the new deckPath. Without re-proposing the cards, the existing cards proposal is orphaned: it still points at the OLD deckPath and the user can't commit it cleanly. The earlier proposals stay visible in chat history; the new ones are the actionable ones.${
+- When the user revises a deck you already proposed in the conversation (renames it, retopics it, moves it under a different parent), re-call BOTH propose_deck (for the parent if it needs to change too) AND propose_deck_with_cards in the SAME turn with the new deck info. Without re-proposing, the existing cards proposal is orphaned: it still points at the OLD deck name/parent and the user can't commit it cleanly. The earlier proposals stay visible in chat history; the new ones are the actionable pair.
+- PARENT MUST EXIST OR BE PROPOSED. Before calling propose_deck_with_cards with a parentDeckPath, check list_decks: is the parent there? If YES, call propose_deck_with_cards directly. If NO (the parent doesn't exist yet), you MUST first call propose_deck for the parent in the SAME turn, then propose_deck_with_cards for the leaf+cards. Skipping the parent propose_deck call leaves the user with a cards card they cannot commit (the leaf can't be created without the parent, and the cards card has no "Create parent" button). This rule is unconditional — even if you wrote text saying "the deck will be created on commit," the user still cannot commit without a parent proposal card to click. Example: user asks for "Cantonese tones" and list_decks has no "cantonese" entry → MUST call propose_deck({ name: "Cantonese", ... }) AND propose_deck_with_cards({ name: "Tones", parentDeckPath: "cantonese", cards, ... }) both in the same turn.${
           editableContentId
             ? `\n\nThe user is currently viewing a document (ID: ${editableContentId}). You have editor tools available to read and edit this document.
 

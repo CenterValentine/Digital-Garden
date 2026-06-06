@@ -42,6 +42,7 @@ import {
   ArrowRight,
   ChevronDown,
   ChevronRight as ChevronRightIcon,
+  Sparkles,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -50,12 +51,29 @@ import {
 } from "@/lib/domain/flashcards";
 import { AdaptiveFlashcardEditor } from "@/extensions/flashcards/components/AdaptiveFlashcardEditor";
 
-interface CardProposalPayload {
-  __cardProposal: true;
-  deckPath: string;
-  deckId: string | null;
-  deckName: string | null;
-  deckExists: boolean;
+/**
+ * Stage 3 payload — propose_deck_with_cards. Deck info is embedded so
+ * the commit step is self-sufficient: when `deck.deckExists` is false
+ * the client creates the deck (using deck.name + deck.parentDeckId)
+ * before posting the cards. When the parent itself hasn't been
+ * created yet either (deck.parentResolved === false), the card waits
+ * for a sibling propose_deck card to fire `flashcard-deck-created`
+ * with the matching parent path before "Add selected" enables.
+ */
+interface DeckWithCardsProposalPayload {
+  __deckWithCardsProposal: true;
+  deck: {
+    name: string;
+    proposedPath: string;
+    parentDeckPath: string | null;
+    parentDeckId: string | null;
+    parentResolved: boolean;
+    rationale: string | null;
+    similarExistingPaths: string[];
+    deckExists: boolean;
+    deckId: string | null;
+    existingName: string | null;
+  };
   cards: Array<{
     front: string;
     back: string;
@@ -137,7 +155,7 @@ export function FlashcardCardProposalList({
   payload,
   proposalId,
 }: {
-  payload: CardProposalPayload;
+  payload: DeckWithCardsProposalPayload;
   /**
    * Stable id used to persist commit state across chat reloads. When
    * provided, indices of successfully-added cards are written to
@@ -175,14 +193,26 @@ export function FlashcardCardProposalList({
   const [rows, setRows] = useState<RowState[]>(initialRows);
   const [bulkSubmitting, setBulkSubmitting] = useState(false);
 
-  // Local mirrors of payload.deckExists / payload.deckId. When the
-  // sibling FlashcardDeckProposalCard successfully POSTs, it dispatches
-  // `flashcard-deck-created` — we adopt the resolved deckId here so
-  // "Add selected" can fire without the user re-asking the model to
-  // re-propose the cards.
-  const [deckExistsLocal, setDeckExistsLocal] = useState(payload.deckExists);
+  // Local mirrors of the embedded deck state. Three things track:
+  //   - deckExistsLocal / deckIdLocal: does the leaf deck exist? If
+  //     no, the commit step creates it before posting cards. Updated
+  //     when a sibling propose_deck card with the matching leaf path
+  //     fires `flashcard-deck-created` (rare since we absorbed leaf
+  //     proposals, but still possible if the model called both).
+  //   - parentDeckIdLocal / parentResolvedLocal: when the parent
+  //     itself hasn't been created yet, the commit step can't run
+  //     (creating the leaf would land at root instead of under the
+  //     intended parent). Updated when a sibling propose_deck card
+  //     with the matching parent path fires `flashcard-deck-created`.
+  const [deckExistsLocal, setDeckExistsLocal] = useState(payload.deck.deckExists);
   const [deckIdLocal, setDeckIdLocal] = useState<string | null>(
-    payload.deckId,
+    payload.deck.deckId,
+  );
+  const [parentDeckIdLocal, setParentDeckIdLocal] = useState<string | null>(
+    payload.deck.parentDeckId,
+  );
+  const [parentResolvedLocal, setParentResolvedLocal] = useState(
+    payload.deck.parentResolved,
   );
 
   useEffect(() => {
@@ -190,15 +220,28 @@ export function FlashcardCardProposalList({
       const detail = (e as CustomEvent).detail as
         | { deckPath?: string; deckId?: string | null }
         | undefined;
-      if (!detail) return;
-      if (detail.deckPath !== payload.deckPath) return;
-      setDeckExistsLocal(true);
-      if (detail.deckId) setDeckIdLocal(detail.deckId);
+      if (!detail || !detail.deckPath) return;
+      // Did the sibling create the leaf path we're targeting?
+      if (detail.deckPath === payload.deck.proposedPath) {
+        setDeckExistsLocal(true);
+        if (detail.deckId) setDeckIdLocal(detail.deckId);
+        return;
+      }
+      // Or did it create our parent?
+      if (
+        payload.deck.parentDeckPath &&
+        detail.deckPath === payload.deck.parentDeckPath
+      ) {
+        if (detail.deckId) {
+          setParentDeckIdLocal(detail.deckId);
+          setParentResolvedLocal(true);
+        }
+      }
     }
     window.addEventListener("flashcard-deck-created", handleDeckCreated);
     return () =>
       window.removeEventListener("flashcard-deck-created", handleDeckCreated);
-  }, [payload.deckPath]);
+  }, [payload.deck.proposedPath, payload.deck.parentDeckPath]);
 
   const updateRow = useCallback(
     (index: number, patch: Partial<RowState>) => {
@@ -224,23 +267,85 @@ export function FlashcardCardProposalList({
       ? `Proposed ${proposedCount} of ${payload.requestedCount} requested cards (limit: ${payload.batchLimit} per batch)`
       : `Proposed ${proposedCount} cards (limit: ${payload.batchLimit} per batch)`;
 
+  // Three deck-state cases:
+  //   1. exists → use deckIdLocal directly
+  //   2. doesn't exist, parent resolved → create-then-add
+  //   3. doesn't exist, parent unresolved → blocked (waiting for parent)
   const deckLabel = deckExistsLocal
-    ? payload.deckPath
-    : `${payload.deckPath} (create the deck above first)`;
+    ? payload.deck.proposedPath
+    : parentResolvedLocal
+      ? `${payload.deck.proposedPath} (will be created)`
+      : `${payload.deck.proposedPath} (create parent "${payload.deck.parentDeckPath}" first)`;
 
   const handleSubmitSelected = useCallback(async () => {
-    if (!deckIdLocal) {
-      toast.error(
-        "Target deck doesn't exist yet — create it from the deck proposal above first.",
-      );
-      return;
-    }
     setBulkSubmitting(true);
     let successCount = 0;
     let failureCount = 0;
     // Track successful indices in this batch so we can persist them
     // alongside any previously-persisted indices once the loop ends.
     const successfulIndices: number[] = [];
+
+    // ─── Phase 1: ensure the target deck exists ───
+    // If the embedded deck is new, create it before posting cards. This
+    // is the "cascading absorb" of Stage 3 — what used to be a sibling
+    // propose_deck card is now a phase of the same commit.
+    let targetDeckId = deckIdLocal;
+    if (!deckExistsLocal) {
+      if (!parentResolvedLocal) {
+        toast.error(
+          `Create the parent deck "${payload.deck.parentDeckPath}" above first.`,
+        );
+        setBulkSubmitting(false);
+        return;
+      }
+      try {
+        const res = await fetch("/api/flashcards/decks", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: payload.deck.name,
+            parentDeckId: parentDeckIdLocal ?? undefined,
+          }),
+        });
+        const json = (await res.json().catch(() => null)) as
+          | { success: boolean; data?: { id?: string; path?: string }; error?: { message?: string } }
+          | null;
+        if (!res.ok || !json?.success || !json.data?.id) {
+          toast.error(
+            json?.error?.message ?? `Failed to create deck (${res.status})`,
+          );
+          setBulkSubmitting(false);
+          return;
+        }
+        targetDeckId = json.data.id;
+        setDeckIdLocal(targetDeckId);
+        setDeckExistsLocal(true);
+        // Notify siblings (and anything else listening) so future card
+        // proposals targeting this same path can adopt the new id.
+        window.dispatchEvent(
+          new CustomEvent("flashcard-deck-created", {
+            detail: {
+              deckPath: json.data.path ?? payload.deck.proposedPath,
+              deckId: targetDeckId,
+            },
+          }),
+        );
+        toast.success(`Created deck "${payload.deck.name}"`);
+      } catch (err) {
+        toast.error(
+          err instanceof Error ? err.message : "Network error creating deck",
+        );
+        setBulkSubmitting(false);
+        return;
+      }
+    }
+
+    // ─── Phase 2: POST each selected card ───
+    if (!targetDeckId) {
+      // Shouldn't happen given the branch above, but be defensive.
+      setBulkSubmitting(false);
+      return;
+    }
 
     // Snapshot the indexes we're submitting so async writes don't race
     // with state changes the user might make mid-flight.
@@ -256,7 +361,7 @@ export function FlashcardCardProposalList({
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            deckId: deckIdLocal,
+            deckId: targetDeckId,
             frontContent: row.frontContent,
             backContent: row.backContent,
             frontLabel: row.frontLabel,
@@ -273,9 +378,9 @@ export function FlashcardCardProposalList({
           const message =
             json?.error?.message ?? `Failed (${res.status})`;
           updateRow(i, {
-          status: { status: "error", message },
-          expanded: true,
-        });
+            status: { status: "error", message },
+            expanded: true,
+          });
           failureCount++;
           continue;
         }
@@ -306,7 +411,7 @@ export function FlashcardCardProposalList({
     setBulkSubmitting(false);
     if (successCount > 0) {
       toast.success(
-        `Added ${successCount} card${successCount === 1 ? "" : "s"} to ${payload.deckPath}`,
+        `Added ${successCount} card${successCount === 1 ? "" : "s"} to ${payload.deck.proposedPath}`,
       );
     }
     if (failureCount > 0) {
@@ -314,7 +419,16 @@ export function FlashcardCardProposalList({
         `${failureCount} card${failureCount === 1 ? "" : "s"} failed — see inline errors`,
       );
     }
-  }, [deckIdLocal, payload, rows, updateRow, proposalId]);
+  }, [
+    deckIdLocal,
+    deckExistsLocal,
+    parentResolvedLocal,
+    parentDeckIdLocal,
+    payload,
+    rows,
+    updateRow,
+    proposalId,
+  ]);
 
   const handleAskForNextBatch = useCallback(() => {
     const alreadyProposed = rows
@@ -323,7 +437,7 @@ export function FlashcardCardProposalList({
     window.dispatchEvent(
       new CustomEvent("flashcard-request-next-batch", {
         detail: {
-          deckPath: payload.deckPath,
+          deckPath: payload.deck.proposedPath,
           deckId: deckIdLocal,
           sourceContentId: payload.sourceContentId,
           alreadyProposedCount: alreadyProposed.length,
@@ -356,6 +470,51 @@ export function FlashcardCardProposalList({
           )}
         </div>
       </div>
+
+      {/*
+        Absorbed deck-create affordance — Stage 3. When the leaf deck
+        doesn't yet exist, surface the rationale + similar-existing
+        chips so the user sees what's about to be created on commit.
+        This is the inline equivalent of the old separate
+        DeckProposalCard.
+      */}
+      {!deckExistsLocal && (
+        <div className="rounded-md border border-emerald-400/30 bg-emerald-500/[0.04] p-2 text-[12px] dark:border-emerald-400/20 dark:bg-emerald-500/[0.06] space-y-1.5">
+          <div className="flex items-start gap-1.5">
+            <Sparkles className="h-3.5 w-3.5 shrink-0 mt-0.5 text-emerald-600 dark:text-emerald-400" />
+            <div className="min-w-0 flex-1">
+              <span className="text-gray-700 dark:text-gray-300">
+                On commit, will create deck{" "}
+                <span className="font-mono text-emerald-700 dark:text-emerald-300">
+                  {payload.deck.proposedPath}
+                </span>
+              </span>
+            </div>
+          </div>
+          {payload.deck.rationale && (
+            <p className="text-gray-600 dark:text-gray-400">
+              {payload.deck.rationale}
+            </p>
+          )}
+          {payload.deck.similarExistingPaths.length > 0 && (
+            <div className="text-[11px] text-gray-500 dark:text-gray-400">
+              <div className="mb-1">
+                Similar existing decks (tell the AI to use one instead):
+              </div>
+              <div className="flex flex-wrap gap-1">
+                {payload.deck.similarExistingPaths.map((path) => (
+                  <span
+                    key={path}
+                    className="inline-flex items-center rounded-full bg-emerald-500/10 px-2 py-0.5 font-mono text-[11px] text-emerald-700 dark:text-emerald-300"
+                  >
+                    {path}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/*
         Gallery: compact bullet list by default (one row per card,
@@ -544,18 +703,29 @@ export function FlashcardCardProposalList({
             type="button"
             onClick={handleSubmitSelected}
             disabled={
-              !deckExistsLocal ||
+              // Block when the parent isn't created yet (we can't
+              // create the leaf into a non-existent parent — the slug
+              // would land at root). When the leaf exists OR the
+              // parent exists, the commit can proceed.
+              (!deckExistsLocal && !parentResolvedLocal) ||
               checkedCount === 0 ||
               bulkSubmitting ||
               allDone
+            }
+            title={
+              !deckExistsLocal && !parentResolvedLocal
+                ? `Create parent deck "${payload.deck.parentDeckPath}" first`
+                : undefined
             }
             className="inline-flex items-center gap-1.5 rounded-md border border-amber-500/40 bg-amber-500/[0.08] px-2.5 py-1 text-xs font-medium text-amber-700 hover:bg-amber-500/[0.14] disabled:cursor-not-allowed disabled:opacity-60 dark:border-amber-400/30 dark:bg-amber-500/[0.10] dark:text-amber-300 dark:hover:bg-amber-500/[0.18]"
           >
             {bulkSubmitting ? (
               <>
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                Adding…
+                {!deckExistsLocal ? "Creating + adding…" : "Adding…"}
               </>
+            ) : !deckExistsLocal ? (
+              `Create deck & add${checkedCount > 0 ? ` (${checkedCount})` : ""}`
             ) : (
               `Add selected${checkedCount > 0 ? ` (${checkedCount})` : ""}`
             )}
