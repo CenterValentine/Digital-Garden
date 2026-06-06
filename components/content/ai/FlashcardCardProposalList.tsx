@@ -314,7 +314,7 @@ export function FlashcardCardProposalList({
         `${failureCount} card${failureCount === 1 ? "" : "s"} failed — see inline errors`,
       );
     }
-  }, [deckIdLocal, payload, rows, updateRow]);
+  }, [deckIdLocal, payload, rows, updateRow, proposalId]);
 
   const handleAskForNextBatch = useCallback(() => {
     const alreadyProposed = rows

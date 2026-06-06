@@ -369,12 +369,27 @@ export function MultiConversationSidebar({ contentId }: Props) {
       </div>
 
       <div className="flex-1 min-h-0">
+        {/*
+          Stage 2: dropped the `key={activeId ?? "transient"}` remount on
+          purpose. With it, the panel would unmount/remount on every
+          conversation switch (and on the transient→bound promote), and
+          the in-flight first message would be lost across the remount.
+          Without it, the ChatPanel rebinds in place — useChat re-keys
+          internally on conversationKey change, but the surrounding
+          refs (pendingTransientSendRef, etc.) survive so the queued
+          first send can fire after the conversationId catches up.
+        */}
         <ChatPanel
-          key={activeId ?? "transient"}
           contentId={contentId}
           conversationId={activeId}
           onDeleteConversation={handleDeleteConversation}
           onForked={(newId) => {
+            void (async () => {
+              await reloadTabs();
+              setActiveId(newId);
+            })();
+          }}
+          onTransientPromoted={(newId) => {
             void (async () => {
               await reloadTabs();
               setActiveId(newId);
