@@ -17,6 +17,8 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { common, createLowlight } from "lowlight";
 import { Bot, User, Wrench, Loader2, Copy, Check, ImagePlus, GripVertical, BrainCircuit, ChevronRight, Pencil, RotateCcw, GitBranch, FileText } from "lucide-react";
+import { FlashcardDeckProposalCard } from "./FlashcardDeckProposalCard";
+import { FlashcardCardProposalList } from "./FlashcardCardProposalList";
 import { cn } from "@/lib/core/utils";
 import { useContentStore } from "@/state/content-store";
 import { useSettingsStore } from "@/state/settings-store";
@@ -99,6 +101,62 @@ interface ImagePayload {
   width: number;
   height: number;
   fileName: string;
+}
+
+/**
+ * Shape of the deck proposal payload returned by propose_deck.
+ * Session 1: renders a read-only stub with a DISABLED commit button so
+ * the affordance is visible before Session 2 wires up the POST.
+ */
+interface DeckProposalPayload {
+  __deckProposal: true;
+  name: string;
+  parentDeckPath: string | null;
+  parentDeckId: string | null;
+  parentResolved: boolean;
+  proposedPath: string;
+  rationale: string;
+  similarExistingPaths: string[];
+}
+
+/**
+ * Shape of the card proposal payload returned by propose_cards.
+ * Carries `requestedCount` and `batchLimit` so the rendered card can
+ * display the truncation honestly (e.g. "10 of 15 requested").
+ */
+/**
+ * Stage 3 — propose_deck_with_cards payload. Replaces the old
+ * __deckWithCardsProposal sentinel. The deck info is embedded so the commit
+ * step is self-sufficient: if `deck.deckExists` is false, the client
+ * creates the deck (using deck.name + deck.parentDeckId) before
+ * posting the cards. When the parent deck doesn't exist yet either
+ * (deck.parentResolved === false), the card waits for a sibling
+ * propose_deck card to fire `flashcard-deck-created` for the parent
+ * path before "Add selected" enables.
+ */
+interface DeckWithCardsProposalPayload {
+  __deckWithCardsProposal: true;
+  deck: {
+    name: string;
+    proposedPath: string;
+    parentDeckPath: string | null;
+    parentDeckId: string | null;
+    parentResolved: boolean;
+    rationale: string | null;
+    similarExistingPaths: string[];
+    deckExists: boolean;
+    deckId: string | null;
+    existingName: string | null;
+  };
+  cards: Array<{
+    front: string;
+    back: string;
+    frontLabel?: string;
+    backLabel?: string;
+  }>;
+  requestedCount: number;
+  batchLimit: number;
+  sourceContentId: string | null;
 }
 
 // Shared lowlight instance — same config as TipTap editor
@@ -233,12 +291,21 @@ export const ChatMessage = memo(function ChatMessage({
     onEdit?.(message.id, next);
   }, [draft, messageText, onEdit, message.id]);
 
-  // Pre-scan: extract image + note payloads from ALL tool parts at message
-  // level. More reliable than detecting inside the parts loop because it
-  // handles streaming state transitions and part type variations.
-  const { imagePayloads, notePayloads, hasRunningTools } = useMemo(() => {
+  // Pre-scan: extract image + note + flashcard-proposal payloads from ALL
+  // tool parts at message level. More reliable than detecting inside the
+  // parts loop because it handles streaming state transitions and part
+  // type variations.
+  const {
+    imagePayloads,
+    notePayloads,
+    deckProposals,
+    deckWithCardsProposals,
+    hasRunningTools,
+  } = useMemo(() => {
     const images: ImagePayload[] = [];
     const notes: NotePayload[] = [];
+    const deckProps: DeckProposalPayload[] = [];
+    const deckWithCardsProps: DeckWithCardsProposalPayload[] = [];
     let running = false;
     const seenImageIds = new Set<string>();
     const seenNoteIds = new Set<string>();
@@ -262,6 +329,16 @@ export const ChatMessage = memo(function ChatMessage({
         if (note && !seenNoteIds.has(note.contentId)) {
           seenNoteIds.add(note.contentId);
           notes.push(note);
+          continue;
+        }
+        const deck = parseDeckProposal(tp.output);
+        if (deck) {
+          deckProps.push(deck);
+          continue;
+        }
+        const cards = parseDeckWithCardsProposal(tp.output);
+        if (cards) {
+          deckWithCardsProps.push(cards);
         }
       }
     }
@@ -269,6 +346,8 @@ export const ChatMessage = memo(function ChatMessage({
     return {
       imagePayloads: images,
       notePayloads: notes,
+      deckProposals: deckProps,
+      deckWithCardsProposals: deckWithCardsProps,
       hasRunningTools: running,
     };
   }, [message.parts]);
@@ -498,11 +577,14 @@ export const ChatMessage = memo(function ChatMessage({
           // Tool parts: detect via detectToolPart helper (handles both static and dynamic)
           // Image generation tool results render as GeneratedImageCard at message level below.
           // Note creation/update tool results render as NotePayloadCard at message level below.
+          // Flashcard proposals render as DeckProposalCard / CardProposalList at message level below.
           const toolPart = detectToolPart(part);
           if (toolPart) {
             if (toolPart.state === "output-available") {
               if (parseImagePayload(toolPart.output) !== null) return null;
               if (parseNotePayload(toolPart.output) !== null) return null;
+              if (parseDeckProposal(toolPart.output) !== null) return null;
+              if (parseDeckWithCardsProposal(toolPart.output) !== null) return null;
             }
 
             return (
@@ -527,6 +609,23 @@ export const ChatMessage = memo(function ChatMessage({
         {/* Note cards — clickable link affordance for createNote / updateNote */}
         {notePayloads.map((payload) => (
           <NotePayloadCard key={payload.contentId} payload={payload} />
+        ))}
+
+        {/* Deck proposals — Session 2: interactive card with POST commit */}
+        {deckProposals.map((payload, i) => (
+          <FlashcardDeckProposalCard key={`deck-${i}`} payload={payload} />
+        ))}
+
+        {/* Card proposals — Session 2: inline editing + per-row checkboxes + bulk POST.
+            `proposalId` threads through to localStorage so the "already-added"
+            row state persists across chat reloads — without it, reloading would
+            re-enable "Add selected" and let the user duplicate the batch. */}
+        {deckWithCardsProposals.map((payload, i) => (
+          <FlashcardCardProposalList
+            key={`cards-${i}`}
+            payload={payload}
+            proposalId={`${message.id}-cards-${i}`}
+          />
         ))}
 
         {/* Thinking indicator — shows during tool execution */}
@@ -1204,6 +1303,34 @@ function parseNotePayload(result: unknown): NotePayload | null {
   try {
     const parsed = JSON.parse(str);
     if (parsed.__notePayload) return parsed as NotePayload;
+  } catch {
+    /* not valid JSON */
+  }
+  return null;
+}
+
+/** Parse a deck proposal payload from a propose_deck tool result. */
+function parseDeckProposal(result: unknown): DeckProposalPayload | null {
+  if (result === undefined) return null;
+  const str = typeof result === "string" ? result : JSON.stringify(result);
+  if (!str.includes('"__deckProposal"')) return null;
+  try {
+    const parsed = JSON.parse(str);
+    if (parsed.__deckProposal) return parsed as DeckProposalPayload;
+  } catch {
+    /* not valid JSON */
+  }
+  return null;
+}
+
+/** Parse a card proposal payload from a propose_cards tool result. */
+function parseDeckWithCardsProposal(result: unknown): DeckWithCardsProposalPayload | null {
+  if (result === undefined) return null;
+  const str = typeof result === "string" ? result : JSON.stringify(result);
+  if (!str.includes('"__deckWithCardsProposal"')) return null;
+  try {
+    const parsed = JSON.parse(str);
+    if (parsed.__deckWithCardsProposal) return parsed as DeckWithCardsProposalPayload;
   } catch {
     /* not valid JSON */
   }

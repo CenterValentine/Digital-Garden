@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Archive,
   Check,
+  ChevronDown,
+  ChevronRight,
   Eye,
   Layers,
   Loader2,
@@ -125,6 +127,23 @@ export function FlashcardsPanel() {
     id: string;
     title: string | null;
   } | null>(null);
+  // Section accordion (panel-level Skills + Cards expand/collapse). The
+  // per-deck inline settings panel (settingsDeckKey) is a separate
+  // accordion layer below — collapsing the Skills section hides the
+  // whole list, including any open settings panel.
+  const [skillsExpanded, setSkillsExpanded] = useState(true);
+  const [cardsExpanded, setCardsExpanded] = useState(true);
+  // Delete-skill dialog state. When deletingDeck is set, the dialog is
+  // open. moveToDeckIdChoice is "" when the user wants to delete the
+  // cards rather than move them, otherwise the target deck's id.
+  const [deletingDeck, setDeletingDeck] = useState<FlashcardDeckDto | null>(
+    null,
+  );
+  const [deleteCardsAction, setDeleteCardsAction] = useState<"delete" | "move">(
+    "delete",
+  );
+  const [moveToDeckIdChoice, setMoveToDeckIdChoice] = useState<string>("");
+  const [deletingInFlight, setDeletingInFlight] = useState(false);
 
   const fetchDecks = useCallback(async () => {
     const response = await fetch("/api/flashcards/decks", {
@@ -464,6 +483,89 @@ export function FlashcardsPanel() {
     }
   };
 
+  // Delete a skill (root deck) with the user's choice of what to do
+  // with the cards inside: cascade-delete them OR move them to another
+  // deck. Server-side handler is /api/flashcards/decks/[id] DELETE with
+  // ?cascade=true or ?moveToDeckId=<uuid>. Empty decks are deleted
+  // without either parameter.
+  const handleDeleteSkill = async () => {
+    if (!deletingDeck) return;
+    const deckId = deletingDeck.deckId;
+    if (!deckId) {
+      toast.error("This deck doesn't have an id — refresh the panel.");
+      return;
+    }
+    const hasCards = deletingDeck.count > 0;
+    const willMove = hasCards && deleteCardsAction === "move";
+    if (willMove && !moveToDeckIdChoice) {
+      toast.error("Pick a destination deck to move the cards into.");
+      return;
+    }
+
+    setDeletingInFlight(true);
+    try {
+      const params = new URLSearchParams();
+      if (willMove) {
+        params.set("moveToDeckId", moveToDeckIdChoice);
+      } else if (hasCards) {
+        params.set("cascade", "true");
+      }
+      const qs = params.toString();
+      const response = await fetch(
+        `/api/flashcards/decks/${deckId}${qs ? `?${qs}` : ""}`,
+        { method: "DELETE", credentials: "include" },
+      );
+      const json = (await response.json().catch(() => null)) as {
+        success?: boolean;
+        data?: {
+          movedCardCount?: number;
+          deletedCardCount?: number;
+          deletedDeckIds?: string[];
+        };
+        error?: { message?: string };
+      } | null;
+
+      if (!response.ok || !json?.success) {
+        toast.error(json?.error?.message ?? `Failed (${response.status})`);
+        return;
+      }
+
+      const movedCount = json.data?.movedCardCount ?? 0;
+      const deletedCardCount = json.data?.deletedCardCount ?? 0;
+      const deletedDeckCount = json.data?.deletedDeckIds?.length ?? 1;
+      const label = formatDeckLabel(deletingDeck);
+      if (movedCount > 0) {
+        toast.success(
+          `Deleted ${label} · moved ${movedCount} card${movedCount === 1 ? "" : "s"}`,
+        );
+      } else if (deletedCardCount > 0) {
+        toast.success(
+          `Deleted ${label} · ${deletedCardCount} card${deletedCardCount === 1 ? "" : "s"} deleted`,
+        );
+      } else {
+        toast.success(
+          `Deleted ${label}${deletedDeckCount > 1 ? ` and ${deletedDeckCount - 1} child deck(s)` : ""}`,
+        );
+      }
+      setDeletingDeck(null);
+      // Clear selection if the deleted deck was selected.
+      if (
+        selectedDeck &&
+        selectedDeck.category === deletingDeck.category &&
+        selectedDeck.subcategory === deletingDeck.subcategory
+      ) {
+        setSelectedDeck(null);
+      }
+      void fetchDecks();
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Network error deleting deck",
+      );
+    } finally {
+      setDeletingInFlight(false);
+    }
+  };
+
   const emptyMessage = loading
     ? "Loading flashcards..."
     : cards.length > 0 && cardSearch.trim()
@@ -515,11 +617,28 @@ export function FlashcardsPanel() {
 
       <div className="border-b border-black/10 dark:border-white/10 px-4 py-4">
         <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-            <Layers className="h-4 w-4" />
-            Skills
-          </div>
-          <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => setSkillsExpanded((v) => !v)}
+            className="flex min-w-0 items-center gap-2 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 hover:text-gold-primary"
+            aria-expanded={skillsExpanded}
+            aria-controls="flashcards-skills-section"
+            title={skillsExpanded ? "Collapse skills" : "Expand skills"}
+          >
+            {skillsExpanded ? (
+              <ChevronDown className="h-4 w-4 shrink-0" />
+            ) : (
+              <ChevronRight className="h-4 w-4 shrink-0" />
+            )}
+            <Layers className="h-4 w-4 shrink-0" />
+            <span>Skills</span>
+            {!skillsExpanded && filteredDecks.length > 0 ? (
+              <span className="rounded bg-black/[0.05] dark:bg-white/10 px-1.5 py-0.5 text-[10px] font-normal text-gray-700 dark:text-gray-300">
+                {filteredDecks.length}
+              </span>
+            ) : null}
+          </button>
+          <div className={`flex items-center gap-1 ${skillsExpanded ? "" : "hidden"}`}>
             <button
               type="button"
               onClick={() => setSkillFilterOpen((current) => !current)}
@@ -549,6 +668,8 @@ export function FlashcardsPanel() {
             ) : null}
           </div>
         </div>
+        {skillsExpanded && (
+          <div id="flashcards-skills-section">
         {skillFilterOpen || deckSearch ? (
           <div className="mt-3 space-y-2">
             <label className="flex items-center gap-2 rounded-md border border-black/10 dark:border-white/10 bg-black/[0.03] dark:bg-white/5 px-3 py-2 text-gray-500 dark:text-gray-400">
@@ -658,6 +779,22 @@ export function FlashcardsPanel() {
                       >
                         <MoreHorizontal className="h-4 w-4" />
                       </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setDeletingDeck(deck);
+                          setDeleteCardsAction(
+                            deck.count > 0 ? "delete" : "delete",
+                          );
+                          setMoveToDeckIdChoice("");
+                        }}
+                        disabled={!deck.deckId}
+                        className="flex h-8 w-8 items-center justify-center rounded-md text-gray-700 dark:text-gray-300 hover:bg-red-500/10 hover:text-red-500 disabled:cursor-not-allowed disabled:opacity-40"
+                        title="Delete this skill"
+                        aria-label="Delete this skill"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
                     </div>
                   </div>
                   {settingsOpen ? (
@@ -745,18 +882,37 @@ export function FlashcardsPanel() {
             })
           )}
         </div>
+          </div>
+        )}
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
         <div className="mb-3 space-y-3">
-          <div className="flex items-center justify-between">
-            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-              Cards
-            </p>
+          <div className="flex items-center justify-between gap-2">
+            <button
+              type="button"
+              onClick={() => setCardsExpanded((v) => !v)}
+              className="flex min-w-0 items-center gap-2 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 hover:text-gold-primary"
+              aria-expanded={cardsExpanded}
+              aria-controls="flashcards-cards-section"
+              title={cardsExpanded ? "Collapse cards" : "Expand cards"}
+            >
+              {cardsExpanded ? (
+                <ChevronDown className="h-4 w-4 shrink-0" />
+              ) : (
+                <ChevronRight className="h-4 w-4 shrink-0" />
+              )}
+              <span>Cards</span>
+              {!cardsExpanded && filteredCards.length > 0 ? (
+                <span className="rounded bg-black/[0.05] dark:bg-white/10 px-1.5 py-0.5 text-[10px] font-normal text-gray-700 dark:text-gray-300">
+                  {filteredCards.length}
+                </span>
+              ) : null}
+            </button>
             <button
               type="button"
               onClick={() => void refresh()}
-              className="rounded-md p-1.5 text-gray-500 dark:text-gray-400 hover:bg-black/[0.05] dark:hover:bg-black/[0.05] dark:bg-white/10 hover:text-gold-primary"
+              className={`rounded-md p-1.5 text-gray-500 dark:text-gray-400 hover:bg-black/[0.05] dark:hover:bg-black/[0.05] dark:bg-white/10 hover:text-gold-primary ${cardsExpanded ? "" : "hidden"}`}
               aria-label="Refresh flashcards"
             >
               {loading ? (
@@ -766,16 +922,19 @@ export function FlashcardsPanel() {
               )}
             </button>
           </div>
-          <label className="flex items-center gap-2 rounded-md border border-black/10 dark:border-white/10 bg-black/[0.03] dark:bg-white/5 px-3 py-2 text-gray-500 dark:text-gray-400">
-            <Search className="h-4 w-4 shrink-0" />
-            <input
-              value={cardSearch}
-              onChange={(event) => setCardSearch(event.target.value)}
-              placeholder="Search cards"
-              className="min-w-0 flex-1 bg-transparent text-base text-white outline-none placeholder:text-gray-500 md:text-sm"
-            />
-          </label>
         </div>
+
+        {cardsExpanded && (
+          <div id="flashcards-cards-section">
+            <label className="mb-3 flex items-center gap-2 rounded-md border border-black/10 dark:border-white/10 bg-black/[0.03] dark:bg-white/5 px-3 py-2 text-gray-500 dark:text-gray-400">
+              <Search className="h-4 w-4 shrink-0" />
+              <input
+                value={cardSearch}
+                onChange={(event) => setCardSearch(event.target.value)}
+                placeholder="Search cards"
+                className="min-w-0 flex-1 bg-transparent text-base text-white outline-none placeholder:text-gray-500 md:text-sm"
+              />
+            </label>
 
         {filteredCards.length === 0 ? (
           <p className="rounded-md border border-black/10 dark:border-white/10 bg-black/[0.025] dark:bg-white/[0.03] px-3 py-3 text-sm text-gray-500">
@@ -879,6 +1038,8 @@ export function FlashcardsPanel() {
             ))}
           </div>
         )}
+          </div>
+        )}
       </div>
 
       <FlashcardReviewOverlay
@@ -897,6 +1058,147 @@ export function FlashcardsPanel() {
       <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
         <DialogContent className="max-h-[calc(100vh-4rem)] w-[min(760px,92vw)] overflow-y-auto border-black/10 dark:border-white/10 bg-white dark:bg-[#1a2530] p-6 text-white">
           <FlashcardsSettingsDialog />
+        </DialogContent>
+      </Dialog>
+      <Dialog
+        open={deletingDeck !== null}
+        onOpenChange={(open) => {
+          if (!open && !deletingInFlight) {
+            setDeletingDeck(null);
+          }
+        }}
+      >
+        <DialogContent className="w-[min(520px,92vw)] border-black/10 dark:border-white/10 bg-white dark:bg-[#1a2530] p-6 text-gray-900 dark:text-gray-100">
+          {deletingDeck && (() => {
+            const hasCards = deletingDeck.count > 0;
+            const label = formatDeckLabel(deletingDeck);
+            // Filter out the deck being deleted and its descendants from
+            // the move-target picker. Descendants would be cascade-
+            // deleted with the source, so moving cards into them would
+            // be silently losing the cards.
+            const movablePath = deletingDeck.path;
+            const moveCandidates = decks.filter((d) => {
+              if (!d.deckId || !d.path) return false;
+              if (d.deckId === deletingDeck.deckId) return false;
+              if (movablePath && d.path === movablePath) return false;
+              if (movablePath && d.path.startsWith(`${movablePath}/`)) return false;
+              return true;
+            });
+
+            return (
+              <div className="space-y-4">
+                <div>
+                  <h3 className="text-lg font-semibold">Delete skill?</h3>
+                  <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                    <span className="font-medium text-gray-900 dark:text-gray-100">
+                      {label}
+                    </span>{" "}
+                    will be removed.{" "}
+                    {hasCards
+                      ? `Has ${deletingDeck.count} card${deletingDeck.count === 1 ? "" : "s"}.`
+                      : "(Empty)"}
+                  </p>
+                </div>
+
+                {hasCards && (
+                  <div className="space-y-2">
+                    <label className="flex cursor-pointer items-start gap-2 rounded-md border border-black/10 dark:border-white/10 bg-black/[0.03] dark:bg-white/5 p-3">
+                      <input
+                        type="radio"
+                        name="delete-cards-action"
+                        value="delete"
+                        checked={deleteCardsAction === "delete"}
+                        onChange={() => setDeleteCardsAction("delete")}
+                        className="mt-0.5 h-4 w-4 cursor-pointer"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <div className="text-sm font-medium">
+                          Delete the cards too
+                        </div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">
+                          All {deletingDeck.count} card
+                          {deletingDeck.count === 1 ? "" : "s"} in this skill
+                          will be soft-deleted alongside the skill.
+                        </div>
+                      </div>
+                    </label>
+                    <label className="flex cursor-pointer items-start gap-2 rounded-md border border-black/10 dark:border-white/10 bg-black/[0.03] dark:bg-white/5 p-3">
+                      <input
+                        type="radio"
+                        name="delete-cards-action"
+                        value="move"
+                        checked={deleteCardsAction === "move"}
+                        onChange={() => setDeleteCardsAction("move")}
+                        className="mt-0.5 h-4 w-4 cursor-pointer"
+                      />
+                      <div className="min-w-0 flex-1 space-y-2">
+                        <div>
+                          <div className="text-sm font-medium">
+                            Move cards to another skill
+                          </div>
+                          <div className="text-xs text-gray-500 dark:text-gray-400">
+                            Cards keep their progress; the skill is removed.
+                          </div>
+                        </div>
+                        {deleteCardsAction === "move" && (
+                          <select
+                            value={moveToDeckIdChoice}
+                            onChange={(e) => setMoveToDeckIdChoice(e.target.value)}
+                            className={MENU_SELECT_CLASS}
+                            aria-label="Destination skill"
+                          >
+                            <option value="">Pick a destination…</option>
+                            {moveCandidates.length === 0 ? (
+                              <option value="" disabled>
+                                No other skills available
+                              </option>
+                            ) : (
+                              moveCandidates.map((d) => (
+                                <option key={d.deckId} value={d.deckId}>
+                                  {d.path ?? formatDeckLabel(d)}
+                                </option>
+                              ))
+                            )}
+                          </select>
+                        )}
+                      </div>
+                    </label>
+                  </div>
+                )}
+
+                <div className="flex items-center justify-end gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setDeletingDeck(null)}
+                    disabled={deletingInFlight}
+                    className="rounded-md border border-black/10 dark:border-white/10 px-3 py-1.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-black/[0.05] dark:hover:bg-white/10 disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleDeleteSkill()}
+                    disabled={
+                      deletingInFlight ||
+                      (hasCards &&
+                        deleteCardsAction === "move" &&
+                        !moveToDeckIdChoice)
+                    }
+                    className="inline-flex items-center gap-1.5 rounded-md bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {deletingInFlight ? (
+                      <>
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        Deleting…
+                      </>
+                    ) : (
+                      "Delete skill"
+                    )}
+                  </button>
+                </div>
+              </div>
+            );
+          })()}
         </DialogContent>
       </Dialog>
     </div>

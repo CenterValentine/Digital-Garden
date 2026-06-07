@@ -234,10 +234,15 @@ model FlashcardDeck {
   children      FlashcardDeck[] @relation("FlashcardDeckHierarchy")
   flashcards    Flashcard[]
 
-  @@unique([ownerId, slug])
+  // Path is the materialized full hierarchy ("spanish/irregular-verbs").
+  // Uniqueness on (ownerId, path) — not (ownerId, slug) — because the
+  // slug column only carries the leaf name, which legitimately repeats
+  // across different parents (Anki-style nested decks). The previous
+  // slug-unique constraint blocked that pattern.
+  @@unique([ownerId, path])
   @@unique([ownerId, parentDeckId, name])
   @@index([ownerId, deletedAt])
-  @@index([ownerId, path])
+  @@index([ownerId, slug])  // non-unique; kept for legacy slug lookups
   @@index([parentDeckId, displayOrder])
 }
 

@@ -453,6 +453,19 @@ nav[class*="fixed"] {
   padding-bottom: 4rem;
 }
 
+/* Tight flashcard editor: strip the 4rem bottom padding the main editor
+   carries (for block "+" buttons that don't exist here) and collapse the
+   paragraph margins so a one-line term renders as ~one line of text,
+   growing only when the content wraps. Targets the AdaptiveFlashcardEditor
+   when used with `tight` prop — currently the AI proposal card's term
+   side. Two-class selector beats bare .ProseMirror without !important. */
+.ProseMirror.flashcard-editor-tight {
+  padding-bottom: 0;
+}
+.ProseMirror.flashcard-editor-tight p {
+  margin: 0;
+}
+
 .dark .ProseMirror {
   color: #E5D4B0;
 }

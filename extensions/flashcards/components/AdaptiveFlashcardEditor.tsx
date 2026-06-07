@@ -20,6 +20,14 @@ interface AdaptiveFlashcardEditorProps {
   editable?: boolean;
   ariaLabel: string;
   compact?: boolean;
+  /**
+   * One step smaller than `compact`. Removes the min-height entirely so
+   * the editor hugs its content (one line tall by default) and grows
+   * vertically as text wraps. Vertical padding is reduced too. Use for
+   * terse, one-line-default surfaces like the AI flashcard proposal
+   * card's front side. Overrides `compact` when both are set.
+   */
+  tight?: boolean;
 }
 
 function serialize(value: JSONContent) {
@@ -34,6 +42,7 @@ export function AdaptiveFlashcardEditor({
   editable = true,
   ariaLabel,
   compact = false,
+  tight = false,
 }: AdaptiveFlashcardEditorProps) {
   const lastValueRef = useRef(serialize(value || EMPTY_TIPTAP_DOC));
   const extensions = useMemo(() => {
@@ -68,10 +77,18 @@ export function AdaptiveFlashcardEditor({
     editorProps: {
       attributes: {
         "aria-label": ariaLabel,
-        class:
-          mode === "plain"
-            ? "flashcard-editor flashcard-editor-plain"
-            : "flashcard-editor flashcard-editor-rich",
+        // Class composes mode + tight. The tight class targets a
+        // globals.css override for `.ProseMirror.flashcard-editor-tight`
+        // which strips the 4rem bottom padding the main editor uses for
+        // the block-`+` button affordance — that padding doesn't apply
+        // here.
+        class: [
+          "flashcard-editor",
+          mode === "plain" ? "flashcard-editor-plain" : "flashcard-editor-rich",
+          tight ? "flashcard-editor-tight" : "",
+        ]
+          .filter(Boolean)
+          .join(" "),
       },
       handleKeyDown: (_view, event) => {
         if (mode !== "plain" || event.key !== "Enter") return false;
@@ -118,11 +135,20 @@ export function AdaptiveFlashcardEditor({
 
   const isToolbarVisible = mode === "rich" && editable;
 
+  // Sizing: `tight` is the smallest — no min-height, the editor hugs
+  // its content and grows with wrapping. `compact` is the intermediate
+  // size used by the in-panel inline editor. Default is the full-size
+  // editor used by the dialog flows. When both flags are set, `tight`
+  // wins (the override-compact case for the AI proposal cards).
+  const sizingClassName = tight
+    ? ""
+    : compact
+      ? "min-h-[120px]"
+      : "min-h-[180px]";
+
   return (
     <div
-      className={`rounded-md border border-black/[0.06] dark:border-white/[0.06] bg-black/[0.04] dark:bg-white/[0.02] ${
-        compact ? "min-h-[120px]" : "min-h-[180px]"
-      }`}
+      className={`rounded-md border border-black/[0.06] dark:border-white/[0.06] bg-black/[0.04] dark:bg-white/[0.02] ${sizingClassName}`}
     >
       {isToolbarVisible ? (
         <div className="flex min-h-11 items-center gap-1 overflow-x-auto border-b border-black/[0.06] dark:border-white/[0.06] px-2 py-1 text-xs">
@@ -175,7 +201,13 @@ export function AdaptiveFlashcardEditor({
           />
         </div>
       ) : null}
-      <div className="px-4 py-3 md:px-5 md:py-4">
+      <div
+        className={
+          tight
+            ? "px-3 py-1.5"
+            : "px-4 py-3 md:px-5 md:py-4"
+        }
+      >
         <EditorContent editor={editor} />
       </div>
     </div>

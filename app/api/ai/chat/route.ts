@@ -102,6 +102,7 @@ import {
 } from "@/lib/domain/ai/middleware";
 import { createBaseTools } from "@/lib/domain/ai/tools";
 import { createEditorTools } from "@/lib/domain/ai/tools";
+import { createFlashcardTools } from "@/lib/domain/ai/tools";
 import { prisma } from "@/lib/database/client";
 import { logger, spanPayload, startSpan, withRouteTrace, withSpan } from "@/lib/core/logger";
 
@@ -321,6 +322,7 @@ export async function POST(request: Request) {
       };
       const allTools = {
         ...createBaseTools(toolCtx),
+        ...createFlashcardTools(toolCtx),
         ...(editableContentId ? createEditorTools(toolCtx) : {}),
       };
       const toolConfig = (aiSettings as { toolConfig?: Record<
@@ -456,11 +458,49 @@ export async function POST(request: Request) {
         }),
         // Allow up to 8 model turns for multi-step tool workflows.
         // Editor tools may need: read → plan → diff → diff → diff → finish + final text.
-        // Base chat tools typically need 2-3 steps.
-        stopWhen: stepCountIs(editableContentId ? 8 : 5),
+        // Flashcard workflows can chain: list_decks → propose_deck (parent)
+        //   → propose_deck (child) → propose_cards → final text = 5 steps,
+        //   with headroom for an optional search_decks or get_deck call.
+        // Base chat (no flashcards, no document) typically needs 2-3 steps.
+        stopWhen: stepCountIs(editableContentId ? 8 : 7),
         system: `You are a helpful AI assistant in Digital Garden, a knowledge management application. Help the user with their notes, writing, and research. Be concise and helpful.
 
-You have a generate_image tool that creates AI images from text prompts. When asked to generate, create, or draw an image, use this tool. Available providers: DALL·E 3, GPT Image 1, Imagen 3, FLUX (fal.ai/Together/Fireworks), DeepAI, RunwayML, Artbreeder. Default to DALL·E 3 unless specified. Write detailed prompts for best results.${
+You have a generate_image tool that creates AI images from text prompts. When asked to generate, create, or draw an image, use this tool. Available providers: DALL·E 3, GPT Image 1, Imagen 3, FLUX (fal.ai/Together/Fireworks), DeepAI, RunwayML, Artbreeder. Default to DALL·E 3 unless specified. Write detailed prompts for best results.
+
+You can manage the user's flashcard decks. Vocabulary first:
+- "skill" and "deck" are interchangeable in the user's vocabulary — both mean a flashcard deck. Treat them the same way.
+- A "sub-skill" or "sub-deck" is a nested deck under a parent (e.g. "spanish/irregular-verbs" is a sub-deck under "spanish").
+- When the user says "make me a skill on X" or "create a deck for X," they want a deck named after the topic X. NEVER name the deck literally "Skill" or "Deck" — those are category words, not deck names. Name the deck after the topic the user mentioned.
+
+Tool design:
+- propose_deck_with_cards is the primary tool for "cards in a deck context." It takes BOTH the deck info (name + optional parentDeckPath) AND the cards. The commit handles deck creation atomically — including parent creation when the parent doesn't yet exist either. ONE tool call covers any depth of hierarchy. The user reviews the card and clicks "Create deck & add" (or "Add selected" if the deck already exists); the server cascades through missing ancestors and adds the cards in one flow.
+- propose_deck (standalone) is RARE. Use it only when the user explicitly asks to create a deck WITHOUT any cards yet (e.g. "set up a Japanese deck, I'll add cards later"). For "make me cards on X" — even when the deck or its parent doesn't exist yet — just call propose_deck_with_cards.
+
+Workflow:
+
+1. ALWAYS call list_decks first when the user mentions flashcards, so you can prefer an existing deck and populate similarExistingPaths with near-matches.
+2. Pick a path that reflects the topic's natural hierarchy. If the user asks for "Spanish irregular verbs," the right path is "spanish/irregular-verbs" — NOT "general/irregular-verbs." Use a domain-named parent (language, subject, skill) when the topic has one.
+3. Call propose_deck_with_cards ONCE with the appropriate deck info and cards. The commit step in the UI handles the three cases atomically:
+   a. Leaf exists → cards are added to it directly.
+   b. Leaf doesn't exist, parent exists → commit creates the leaf and adds cards.
+   c. Leaf doesn't exist, parent (or grandparent) also doesn't exist → commit walks the path and creates each missing ancestor, then the leaf, then adds cards.
+   You do NOT need to call propose_deck for missing parents — the propose_deck_with_cards commit handles it. Calling propose_deck for a parent that propose_deck_with_cards is already going to create produces a confusing chat (two cards, redundant clicks).
+4. After your propose_deck_with_cards call, stop and wait. The chat UI is the confirmation surface — clicking "Create deck & add" or "Add selected" are how the user commits. You don't loop back, and you should NOT ask the user to confirm in text ("please confirm" / "shall I create"). The card itself is the confirmation affordance. If the user wants a different deck name, they can edit the deck path inline on the card — you don't need to re-propose unless the user asks for a different topic.
+
+Card content guidance:
+- The FRONT side of every card is the TERM being tested. Keep it concise — the term itself, nothing more. Do NOT add definitions, example sentences, or context to the front. The user wants to see the bare prompt and recall the answer.
+- The BACK side is where the explanation lives — translation, definition, mnemonic, etc.
+- For LANGUAGE flashcards (the deck path or topic names a language: Spanish, Japanese, French, Latin, Mandarin, Arabic, etc.) ALWAYS include pronunciation on the BACK:
+  - Non-Latin scripts: add the romanization/transliteration (Japanese: kana → romaji; Mandarin: → pinyin with tone marks; Arabic: → transliteration; Cyrillic: → Latin transliteration).
+  - Latin-script languages with non-obvious pronunciation: add IPA or a simple phonetic respelling (French silent letters, English idioms, German umlauts).
+  - Format: put the translation on the first line and pronunciation in parentheses or on a second line. Example for "hacer" (Spanish): front = "hacer", back = "to do / to make\\n(ah-SAIR)".
+- For non-language cards (history, math, science, etc.) keep both sides focused on the concept; no pronunciation needed.
+- Use frontLabel/backLabel to override the defaults when it clarifies the card — e.g. for language cards: frontLabel "Term", backLabel "Translation".
+
+Hard rules:
+- propose_deck_with_cards limit: 10 cards per call (Zod-enforced). If the user asks for MORE than 10, propose 10, set requestedCount to the true count, and end your turn with "Showing first 10 of N requested — accept these and I'll propose the rest." Do NOT chain propose_deck_with_cards calls unprompted.
+- When the user has a note open, set sourceContentId on proposed cards to that note's id so cards link back to their source.
+- When the user revises a deck you already proposed in the conversation (renames it, retopics it, moves it under a different parent), the simplest fix is for the user to edit the deck path directly on the existing card. They can do that without involving you. If the user asks YOU to revise, just call propose_deck_with_cards again with the new deck info — the earlier proposal stays visible in chat history; the new one is the actionable one.${
           editableContentId
             ? `\n\nThe user is currently viewing a document (ID: ${editableContentId}). You have editor tools available to read and edit this document.
 

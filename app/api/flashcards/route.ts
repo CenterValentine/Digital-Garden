@@ -96,11 +96,11 @@ export async function GET(request: NextRequest) {
     } else if (category !== null) {
       const cat = category.trim() || "General";
       const sub = subcategory?.trim() ?? "";
-      const slug = sub
-        ? `${slugify(cat)}-${slugify(sub)}` // matches resolveLegacyDeckId child-slug pattern
+      const path = sub
+        ? `${slugify(cat)}/${slugify(sub)}` // matches resolveLegacyDeckId child-path pattern
         : slugify(cat);
       const deck = await prisma.flashcardDeck.findUnique({
-        where: { ownerId_slug: { ownerId: session.user.id, slug } },
+        where: { ownerId_path: { ownerId: session.user.id, path } },
         select: { id: true },
       });
       if (!deck) {

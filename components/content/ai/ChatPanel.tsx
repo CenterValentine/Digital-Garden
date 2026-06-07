@@ -66,6 +66,18 @@ interface ChatPanelProps {
    * (`MultiConversationSidebar`) can refresh its tabs and activate it.
    */
   onForked?: (newConversationId: string) => void;
+  /**
+   * Stage 2 (transient auto-promote). When the panel is in transient
+   * mode (no conversationId yet) and the user sends a first message,
+   * the panel POSTs `/api/conversations` to create a new conversation,
+   * then fires this callback so the parent can `setActiveId(newId)`
+   * and refresh tabs. The first message is queued and re-sent through
+   * the now-bound engine, so the response streams + persists normally.
+   *
+   * Without this prop, the panel stays transient (legacy scratch-pad
+   * behavior) — messages live in memory only and disappear on reload.
+   */
+  onTransientPromoted?: (newConversationId: string) => void;
 }
 
 export function ChatPanel({
@@ -74,7 +86,26 @@ export function ChatPanel({
   onDeleteConversation,
   onTitleChanged,
   onForked,
+  onTransientPromoted,
 }: ChatPanelProps) {
+  // ─── Stage 2: transient auto-promote refs ───
+  //
+  // skipNextLoadRef tells the binding hook to skip its initial fetch
+  // for the just-promoted conversation (server has zero messages; the
+  // local in-memory chat is authoritative for the in-flight first
+  // message).
+  //
+  // pendingTransientSendRef carries a queued first message across the
+  // null → set transition. When the conversationId prop updates, the
+  // useEffect below fires handleSend() to actually send the queued
+  // message through the now-bound engine.
+  //
+  // promotingInFlightRef guards against double-clicks during the brief
+  // POST window so we don't kick off two concurrent createConversation
+  // requests.
+  const skipNextLoadRef = useRef(false);
+  const pendingTransientSendRef = useRef(false);
+  const promotingInFlightRef = useRef(false);
   // Distinct useChat key per conversation so message arrays don't bleed
   // across tabs. Falls back to contentId for transient mode.
   const conversationKey = conversationId
@@ -169,6 +200,7 @@ export function ChatPanel({
     truncateRef,
     pendingUserPartsRef,
     onTitleChanged,
+    skipNextLoadRef,
   });
 
   // Seed the local context selection from the bound conversation whenever
@@ -195,6 +227,70 @@ export function ChatPanel({
     },
     [conversationId],
   );
+
+  // ─── Stage 2: wrap handleSend for transient auto-promote ───
+  //
+  // When the panel is in transient mode AND the parent opted in via
+  // onTransientPromoted, the first send triggers a conversation create
+  // BEFORE the message goes out. We queue the user's text in
+  // pendingTransientSendRef, fire the callback so the parent updates
+  // activeId, and let the useEffect below resend through the bound
+  // engine once conversationId flips from null → set.
+  const wrappedHandleSend = useCallback(() => {
+    if (
+      !conversationId &&
+      onTransientPromoted &&
+      !promotingInFlightRef.current &&
+      input.trim().length > 0
+    ) {
+      promotingInFlightRef.current = true;
+      void (async () => {
+        try {
+          const res = await fetch("/api/conversations", {
+            method: "POST",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(
+              contentId ? { snapshotContentNodeIds: [contentId] } : {},
+            ),
+          });
+          if (!res.ok) throw new Error("Couldn't save the chat");
+          const body = (await res.json()) as { data?: { id?: string } };
+          const newId = body?.data?.id;
+          if (!newId) throw new Error("Server didn't return a conversation id");
+          // The skip flag prevents the binding hook from fetching the
+          // (empty) just-created conversation and wiping our in-flight
+          // input. pendingTransientSendRef tells the resend useEffect
+          // to fire once the conversationId prop catches up.
+          skipNextLoadRef.current = true;
+          pendingTransientSendRef.current = true;
+          onTransientPromoted(newId);
+        } catch (err) {
+          // Promote failed — fall back to sending transient so the user
+          // doesn't lose their message. The chat won't persist this
+          // turn, but at least they get a response.
+          toast.error(
+            err instanceof Error
+              ? `${err.message} — sending as scratch chat`
+              : "Couldn't save the chat — sending as scratch chat",
+          );
+          handleSend();
+        } finally {
+          promotingInFlightRef.current = false;
+        }
+      })();
+      return;
+    }
+    handleSend();
+  }, [conversationId, onTransientPromoted, contentId, input, handleSend]);
+
+  // Resend the queued transient first message once conversationId catches up.
+  useEffect(() => {
+    if (conversationId && pendingTransientSendRef.current) {
+      pendingTransientSendRef.current = false;
+      handleSend();
+    }
+  }, [conversationId, handleSend]);
 
   // ─── AI Edit Orchestrator ───
   const isAiEditing = useEditorInstanceStore((s) =>
@@ -285,6 +381,31 @@ export function ChatPanel({
       setInput("");
     }
   }, [contentId, setMessages, setInput]);
+
+  // Flashcard "Ask for next batch" affordance. The CardProposalList
+  // dispatches this event when the model truncated to the per-batch
+  // limit; we pre-fill the chat input so the user can review the
+  // request (and edit it) before sending. Deliberate model-loop-back
+  // pattern for batch pagination — the only place in the flashcard
+  // flow that a card button feeds back into the model.
+  useEffect(() => {
+    function handleNextBatch(e: Event) {
+      const detail = (e as CustomEvent).detail as
+        | { deckPath?: string; batchLimit?: number }
+        | undefined;
+      const deckPath = detail?.deckPath ?? "this deck";
+      const batchLimit = detail?.batchLimit ?? 10;
+      setInput(
+        `Propose the next ${batchLimit} cards for ${deckPath}.`,
+      );
+    }
+    window.addEventListener("flashcard-request-next-batch", handleNextBatch);
+    return () =>
+      window.removeEventListener(
+        "flashcard-request-next-batch",
+        handleNextBatch,
+      );
+  }, [setInput]);
 
   // Trash button semantics:
   //   - Transient mode (no conversationId): clear local messages
@@ -473,7 +594,7 @@ export function ChatPanel({
       <ChatInput
         value={input}
         onChange={setInput}
-        onSubmit={handleSend}
+        onSubmit={wrappedHandleSend}
         onStop={stop}
         status={status}
         disabled={loadingInitial}
