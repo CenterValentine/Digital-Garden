@@ -14,9 +14,12 @@
  * spanish/verbs instead", so interactivity here is deferred.
  */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { Layers, Check, Loader2, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
+import { slugifyDeckName } from "@/lib/domain/flashcards";
+import { useExistingDeckPaths } from "./use-existing-deck-paths";
+import { DeckPathField } from "./DeckPathField";
 
 interface DeckProposalPayload {
   __deckProposal: true;
@@ -42,62 +45,77 @@ export function FlashcardDeckProposalCard({
 }) {
   const [state, setState] = useState<CreateState>({ status: "idle" });
 
-  // Local mirrors of payload.parentDeckId / payload.parentResolved.
-  // When the user is creating a nested topic (e.g. "spanish/irregular-
-  // verbs") the model can propose BOTH the parent ("spanish") and the
-  // child in the same turn. The child's parent doesn't exist when its
-  // propose_deck call runs, so parentResolved is false and parentDeckId
-  // is null — but as soon as the user clicks Create on the parent's
-  // card, it dispatches `flashcard-deck-created`. We adopt that event's
-  // deckId so this child can post with the right parentDeckId instead
-  // of landing at root.
-  const [parentDeckIdLocal, setParentDeckIdLocal] = useState<string | null>(
-    payload.parentDeckId,
-  );
-  const [parentResolvedLocal, setParentResolvedLocal] = useState(
-    payload.parentResolved,
-  );
+  // Editable deck path — Stage 4. Same pattern as the cards card.
+  const [pathDraft, setPathDraft] = useState(payload.proposedPath);
+  const existingDecks = useExistingDeckPaths();
 
-  useEffect(() => {
-    if (!payload.parentDeckPath || parentResolvedLocal) return;
-    function handleDeckCreated(e: Event) {
-      const detail = (e as CustomEvent).detail as
-        | { deckPath?: string; deckId?: string | null }
-        | undefined;
-      if (!detail) return;
-      if (detail.deckPath !== payload.parentDeckPath) return;
-      if (detail.deckId) {
-        setParentDeckIdLocal(detail.deckId);
-        setParentResolvedLocal(true);
-      }
-    }
-    window.addEventListener("flashcard-deck-created", handleDeckCreated);
-    return () =>
-      window.removeEventListener("flashcard-deck-created", handleDeckCreated);
-  }, [payload.parentDeckPath, parentResolvedLocal]);
+  const slugifyPath = useCallback((raw: string): string => {
+    return raw
+      .split("/")
+      .map((s) => slugifyDeckName(s))
+      .filter(Boolean)
+      .join("/");
+  }, []);
 
-  const parentLabel = payload.parentDeckPath
-    ? parentResolvedLocal
-      ? payload.parentDeckPath
-      : `${payload.parentDeckPath} (will also be created)`
+  const {
+    effectivePath,
+    effectiveLeafName,
+    effectiveParentPath,
+    effectiveDeckExists,
+    effectiveParentDeckId,
+    effectiveParentResolved,
+  } = useMemo(() => {
+    const slugged = slugifyPath(pathDraft);
+    const segments = slugged.split("/").filter(Boolean);
+    const leafSlug = segments.at(-1) ?? "";
+    const parentSegments = segments.slice(0, -1);
+    const parentPath = parentSegments.join("/");
+
+    const matchingDeck = existingDecks.find((d) => d.path === slugged);
+    const matchingParent = parentPath
+      ? existingDecks.find((d) => d.path === parentPath)
+      : null;
+
+    const leafName =
+      matchingDeck?.name ??
+      leafSlug
+        .split("-")
+        .filter(Boolean)
+        .map((s) => s.charAt(0).toUpperCase() + s.slice(1))
+        .join(" ");
+
+    return {
+      effectivePath: slugged,
+      effectiveLeafName: leafName,
+      effectiveParentPath: parentPath || null,
+      effectiveDeckExists: !!matchingDeck,
+      effectiveParentDeckId: matchingParent?.id ?? null,
+      effectiveParentResolved: !parentPath || !!matchingParent,
+    };
+  }, [pathDraft, existingDecks, slugifyPath]);
+
+  const parentLabel = effectiveParentPath
+    ? effectiveParentResolved
+      ? effectiveParentPath
+      : `${effectiveParentPath} (will also be created)`
     : "(root)";
 
   const handleCreate = useCallback(async () => {
-    // The server cascade-creates missing parents when we pass
-    // parentDeckPath instead of parentDeckId, so we can commit even
-    // when the parent isn't created yet. Prefer the resolved id when
-    // we have it (faster, no walk).
+    if (effectiveDeckExists) {
+      toast.error("This deck already exists.");
+      return;
+    }
     setState({ status: "creating" });
     try {
       const res = await fetch("/api/flashcards/decks", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          name: payload.name,
-          ...(parentDeckIdLocal
-            ? { parentDeckId: parentDeckIdLocal }
-            : payload.parentDeckPath
-              ? { parentDeckPath: payload.parentDeckPath }
+          name: effectiveLeafName,
+          ...(effectiveParentDeckId
+            ? { parentDeckId: effectiveParentDeckId }
+            : effectiveParentPath
+              ? { parentDeckPath: effectiveParentPath }
               : {}),
         }),
       });
@@ -121,26 +139,31 @@ export function FlashcardDeckProposalCard({
         return;
       }
 
-      const createdPath = json.data?.path ?? payload.proposedPath;
+      const createdPath = json.data?.path ?? effectivePath;
       const createdId = json.data?.id ?? null;
-      // Notify any sibling CardProposalList rendered in the same chat
-      // that this deck now exists, so its "Add selected" button enables
-      // even though its payload was captured before the POST. Match by
-      // path because the cards proposal carries the deck path too.
+      // Notify the shared deck-paths cache + sibling cards. The next
+      // render of any FlashcardCardProposalList picks up the new deck
+      // through useExistingDeckPaths.
       window.dispatchEvent(
         new CustomEvent("flashcard-deck-created", {
           detail: { deckPath: createdPath, deckId: createdId },
         }),
       );
       setState({ status: "created", deckPath: createdPath });
-      toast.success(`Deck "${payload.name}" created`);
+      toast.success(`Deck "${effectiveLeafName}" created`);
     } catch (err) {
       const message =
         err instanceof Error ? err.message : "Network error creating deck";
       setState({ status: "error", message });
       toast.error(message);
     }
-  }, [payload, parentDeckIdLocal]);
+  }, [
+    effectiveDeckExists,
+    effectiveLeafName,
+    effectiveParentDeckId,
+    effectiveParentPath,
+    effectivePath,
+  ]);
 
   if (state.status === "created") {
     return (
@@ -166,10 +189,37 @@ export function FlashcardDeckProposalCard({
         <Layers className="h-4 w-4 shrink-0 mt-0.5 text-emerald-600 dark:text-emerald-400" />
         <div className="min-w-0 flex-1">
           <div className="font-medium text-gray-900 dark:text-gray-100">
-            Proposed deck: {payload.name}
+            Proposed deck: {effectiveLeafName || "(unnamed)"}
           </div>
-          <div className="text-[11px] text-gray-500 dark:text-gray-400">
-            Path: {payload.proposedPath} · Parent: {parentLabel}
+          {/* Stage 4 — editable path with themed autocomplete */}
+          <div className="mt-1 flex items-center gap-1.5 text-[11px] text-gray-500 dark:text-gray-400">
+            <span className="shrink-0">Path:</span>
+            <DeckPathField
+              value={pathDraft}
+              onChange={setPathDraft}
+              disabled={state.status === "creating"}
+              placeholder="e.g. spanish/irregular-verbs"
+              accent="emerald"
+              ariaLabel="Deck path"
+              resetValueOnBlankBlur={payload.proposedPath}
+            />
+          </div>
+          <div className="text-[11px] text-gray-400 dark:text-gray-500">
+            <span className="font-mono">{effectivePath || "(empty path)"}</span>
+            {" · Parent: "}
+            <span>{parentLabel}</span>
+            {effectivePath !== payload.proposedPath && (
+              <>
+                {" · "}
+                <button
+                  type="button"
+                  onClick={() => setPathDraft(payload.proposedPath)}
+                  className="text-emerald-700 hover:underline dark:text-emerald-300"
+                >
+                  reset
+                </button>
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -206,7 +256,12 @@ export function FlashcardDeckProposalCard({
       <button
         type="button"
         onClick={handleCreate}
-        disabled={state.status === "creating"}
+        disabled={state.status === "creating" || !effectivePath}
+        title={
+          !effectivePath
+            ? "Deck path is empty — type a path or pick from the dropdown"
+            : undefined
+        }
         className="inline-flex items-center gap-1.5 rounded-md border border-emerald-500/40 bg-emerald-500/[0.08] px-2.5 py-1 text-xs font-medium text-emerald-700 hover:bg-emerald-500/[0.14] disabled:cursor-not-allowed disabled:opacity-60 dark:border-emerald-400/30 dark:bg-emerald-500/[0.10] dark:text-emerald-300 dark:hover:bg-emerald-500/[0.18]"
       >
         {state.status === "creating" ? (
