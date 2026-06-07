@@ -14,7 +14,7 @@
 "use client";
 
 import { useRef, useEffect, useCallback, useState, useMemo } from "react";
-import { Trash2, Bot, Pencil, Maximize2 } from "lucide-react";
+import { Trash2, Bot, Pencil, Maximize2, ChevronDown } from "lucide-react";
 import { PROVIDER_CATALOG } from "@/lib/domain/ai/providers/catalog";
 import { getProviderTheme } from "@/lib/design/system/ai-providers";
 import { ProviderIcon } from "./ProviderIcon";
@@ -123,7 +123,9 @@ export function ChatPanel({
     commandItems,
     followUps,
     clearFollowUps,
-    scrollRef,
+    setScrollEl,
+    showJumpToLatest,
+    scrollToBottom,
     getMessageStamp,
     seedMessageStamps,
   } = useConversationEngine({
@@ -414,7 +416,8 @@ export function ChatPanel({
       {/* Messages — loading state takes precedence so the user can't
           accidentally type into a fresh useChat session that's about to
           be overwritten by the historical load. */}
-      <div ref={scrollRef} className="scrollbar-hide flex-1 overflow-y-auto">
+      <div className="relative flex min-h-0 flex-1 flex-col">
+      <div ref={setScrollEl} className="scrollbar-hide flex-1 overflow-y-auto">
         {loadingInitial ? (
           <LoadingMessages />
         ) : hasMessages ? (
@@ -443,6 +446,16 @@ export function ChatPanel({
         ) : (
           <EmptyState />
         )}
+      </div>
+      {showJumpToLatest && (
+        <button
+          type="button"
+          onClick={scrollToBottom}
+          className="absolute bottom-2 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-full border border-white/15 bg-[#1a1a1a]/90 px-2.5 py-1 text-[11px] text-gray-200 shadow-lg backdrop-blur transition-colors hover:bg-white/10"
+        >
+          <ChevronDown className="h-3 w-3" /> Jump to latest
+        </button>
+      )}
       </div>
 
       {/* Suggested follow-ups (Session 7) — appears between the

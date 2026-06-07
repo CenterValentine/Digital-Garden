@@ -11,7 +11,7 @@
 "use client";
 
 import { useRef, useEffect, useCallback, useMemo, useState } from "react";
-import { Bot } from "lucide-react";
+import { Bot, ChevronDown } from "lucide-react";
 import { ChatMessage } from "../ai/ChatMessage";
 import { ChatInput } from "../ai/ChatInput";
 import { FollowUpsStrip } from "../ai/FollowUpsStrip";
@@ -228,6 +228,9 @@ function ChatViewerInner({
     followUps,
     clearFollowUps,
     scrollRef,
+    setScrollEl,
+    showJumpToLatest,
+    scrollToBottom,
     getMessageStamp,
     seedMessageStamps,
   } = useConversationEngine({
@@ -635,7 +638,8 @@ function ChatViewerInner({
       {/* Messages — bound mode shows a loader until the conversation
           history hydrates, so the user can't type into a soon-to-be-
           overwritten session. */}
-      <div ref={scrollRef} className="scrollbar-hide flex-1 overflow-y-auto">
+      <div className="relative flex min-h-0 flex-1 flex-col">
+      <div ref={setScrollEl} className="scrollbar-hide flex-1 overflow-y-auto">
         {loadingInitial ? (
           <ChatLoadingBody />
         ) : hasMessages ? (
@@ -669,6 +673,16 @@ function ChatViewerInner({
         ) : (
           <EmptyState title={displayTitle} />
         )}
+      </div>
+      {showJumpToLatest && (
+        <button
+          type="button"
+          onClick={scrollToBottom}
+          className="absolute bottom-3 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-full border border-white/15 bg-[#1a1a1a]/90 px-3 py-1 text-xs text-gray-200 shadow-lg backdrop-blur transition-colors hover:bg-white/10"
+        >
+          <ChevronDown className="h-3.5 w-3.5" /> Jump to latest
+        </button>
+      )}
       </div>
 
       {/* Suggested follow-ups (Session 7) */}

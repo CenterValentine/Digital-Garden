@@ -21,6 +21,7 @@ import { cn } from "@/lib/core/utils";
 import { useContentStore } from "@/state/content-store";
 import { useSettingsStore } from "@/state/settings-store";
 import { useNotesPanelStore } from "@/state/notes-panel-store";
+import { useImagePreviewStore } from "@/state/image-preview-store";
 import { useTypewriter } from "@/lib/domain/ai/use-typewriter";
 import type { UIMessage } from "ai";
 import type { Components } from "react-markdown";
@@ -407,18 +408,24 @@ export const ChatMessage = memo(function ChatMessage({
               : undefined;
             const isImg = filePart.mediaType?.startsWith("image/");
             if (isImg && filePart.url) {
+              const imgUrl = filePart.url;
               return (
                 // eslint-disable-next-line @next/next/no-img-element -- user-attached image, arbitrary host
                 <img
                   key={i}
-                  src={filePart.url}
+                  src={imgUrl}
                   alt={filePart.filename ?? "attachment"}
-                  onClick={openContent}
-                  title={openContent ? "Open attachment" : undefined}
-                  className={cn(
-                    "max-h-64 max-w-full rounded-lg border border-black/10 dark:border-white/10 inline-block",
-                    openContent && "cursor-pointer hover:opacity-90 transition-opacity",
-                  )}
+                  onClick={() =>
+                    useImagePreviewStore.getState().open([
+                      {
+                        src: imgUrl,
+                        alt: filePart.filename ?? "image",
+                        downloadUrl: imgUrl,
+                      },
+                    ])
+                  }
+                  title="Preview image"
+                  className="max-h-64 max-w-full cursor-zoom-in rounded-lg border border-black/10 dark:border-white/10 inline-block hover:opacity-90 transition-opacity"
                 />
               );
             }

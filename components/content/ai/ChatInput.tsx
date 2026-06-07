@@ -36,6 +36,7 @@ import {
 import type { ChatStatus } from "ai";
 import type { ChatAttachment } from "@/lib/domain/ai/use-conversation-engine";
 import { useTreeDragStore } from "@/state/tree-drag-store";
+import { useImagePreviewStore } from "@/state/image-preview-store";
 
 // react-arborist's drag source type. Must match `type: "NODE"` in
 // node_modules/react-arborist/dist/main/dnd/drag-hook.js so the composer
@@ -532,7 +533,7 @@ export function ChatInput({
                 ref={fileInputRef}
                 type="file"
                 multiple
-                accept="image/*,application/pdf,.pdf,text/plain,text/markdown,text/csv,application/json,.md,.markdown,.csv,.json,.txt,.log"
+                accept="image/*,.heic,.heif,image/heic,image/heif,application/pdf,.pdf,text/plain,text/markdown,text/csv,application/json,.md,.markdown,.csv,.json,.txt,.log"
                 className="hidden"
                 onChange={(e) => {
                   if (e.target.files?.length) onAddFiles(e.target.files);
@@ -752,7 +753,13 @@ function AttachmentChip({
         <img
           src={url}
           alt={name}
-          className="h-5 w-5 shrink-0 rounded object-cover"
+          onClick={() =>
+            useImagePreviewStore
+              .getState()
+              .open([{ src: url, alt: name, downloadUrl: url }])
+          }
+          title="Preview image"
+          className="h-5 w-5 shrink-0 cursor-zoom-in rounded object-cover"
         />
       ) : (
         <FileText className="h-3.5 w-3.5 shrink-0 text-gray-400" />

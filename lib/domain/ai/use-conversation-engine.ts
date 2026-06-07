@@ -26,6 +26,7 @@ import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, type UIMessage, type FileUIPart } from "ai";
 import { toast } from "sonner";
+import { convertHeicToJpegFile } from "@/lib/infrastructure/media/heic-convert";
 import type { ChatStatus } from "ai";
 import {
   BASE_TOOL_METADATA,
@@ -195,7 +196,14 @@ export interface UseConversationEngineResult {
   clearFollowUps: () => void;
 
   // ── scroll ──
+  /** RefObject for reads (e.g. scroll-to-message). Attach via `setScrollEl`. */
   scrollRef: React.RefObject<HTMLDivElement | null>;
+  /** Callback ref for the scroll container — binds the stick-to-bottom listener. */
+  setScrollEl: (el: HTMLDivElement | null) => void;
+  /** True when the user has scrolled up and auto-scroll is released. */
+  showJumpToLatest: boolean;
+  /** Scroll to the bottom and re-engage auto-scroll. */
+  scrollToBottom: () => void;
 
   // ── per-message stamping ──
   /**
@@ -263,6 +271,41 @@ export function useConversationEngine({
   pendingUserPartsRef,
 }: UseConversationEngineParams): UseConversationEngineResult {
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // ── stick-to-bottom scroll ──
+  // Auto-scroll only while the user is near the bottom. Scrolling up
+  // "breaks" the lock so the reply can be read mid-stream; returning to the
+  // bottom re-engages it. A scroll listener (bound via the `setScrollEl`
+  // callback ref) keeps `pinnedRef` current without re-rendering on scroll.
+  const SCROLL_BOTTOM_THRESHOLD = 80;
+  const pinnedRef = useRef(true);
+  const scrollCleanupRef = useRef<(() => void) | null>(null);
+  const [showJumpToLatest, setShowJumpToLatest] = useState(false);
+
+  const setScrollEl = useCallback((el: HTMLDivElement | null) => {
+    // Detach any prior listener (element swapped on chat switch / unmount).
+    scrollCleanupRef.current?.();
+    scrollCleanupRef.current = null;
+    scrollRef.current = el;
+    if (!el) return;
+    const onScroll = () => {
+      const distance = el.scrollHeight - el.scrollTop - el.clientHeight;
+      const atBottom = distance <= SCROLL_BOTTOM_THRESHOLD;
+      pinnedRef.current = atBottom;
+      setShowJumpToLatest(!atBottom);
+    };
+    el.addEventListener("scroll", onScroll, { passive: true });
+    scrollCleanupRef.current = () =>
+      el.removeEventListener("scroll", onScroll);
+  }, []);
+
+  const scrollToBottom = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    el.scrollTop = el.scrollHeight;
+    pinnedRef.current = true;
+    setShowJumpToLatest(false);
+  }, []);
 
   // ── Sticky drafts ──
   // Persist the in-progress prompt per chat to localStorage so users
@@ -629,8 +672,11 @@ export function useConversationEngine({
       ]);
       void (async () => {
         try {
+          // Convert Apple HEIC/HEIF to JPEG in the browser before upload so
+          // it renders cross-browser and vision models can read it.
+          const uploadFile = await convertHeicToJpegFile(file);
           const form = new FormData();
-          form.append("file", file);
+          form.append("file", uploadFile);
           const res = await fetch("/api/ai/attachments/upload", {
             method: "POST",
             credentials: "include",
@@ -749,6 +795,10 @@ export function useConversationEngine({
 
     setInput("");
     setAttachments([]);
+    // Sending implies the user wants to watch the reply — re-engage
+    // auto-scroll even if they'd scrolled up reading earlier turns.
+    pinnedRef.current = true;
+    setShowJumpToLatest(false);
     sendMessage(
       { parts },
       {
@@ -829,8 +879,9 @@ export function useConversationEngine({
     };
   }, []);
 
-  // ── auto-scroll on new messages ──
+  // ── auto-scroll on new messages — only while pinned to the bottom ──
   useEffect(() => {
+    if (!pinnedRef.current) return;
     const el = scrollRef.current;
     if (el) {
       el.scrollTop = el.scrollHeight;
@@ -864,6 +915,9 @@ export function useConversationEngine({
     followUps,
     clearFollowUps,
     scrollRef,
+    setScrollEl,
+    showJumpToLatest,
+    scrollToBottom,
     getMessageStamp,
     getProviderForMessage,
     seedMessageStamps,
