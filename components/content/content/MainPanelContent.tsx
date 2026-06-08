@@ -27,6 +27,13 @@ import {
 } from "@/state/content-store";
 import { useLeftPanelViewStore } from "@/state/left-panel-view-store";
 import { usePageTemplateStore } from "@/state/page-template-store";
+import {
+  useSaveConflictStore,
+  stashConflictDraft,
+  loadConflictDraft,
+  clearConflictDraft,
+} from "@/state/save-conflict-store";
+import { SaveConflictBanner } from "./SaveConflictBanner";
 import { useTreeStateStore } from "@/state/tree-state-store";
 import {
   useExtensionContentViewer,
@@ -112,6 +119,8 @@ interface ContentResponse {
       tiptapJson: JSONContent | null; // Persisted from Prisma Json field
       searchText: string;
       metadata: Record<string, unknown>;
+      // Optimistic-concurrency baseline echoed back as If-Match on PATCH.
+      bodyHash?: string;
     };
     folder?: {
       viewMode: string;
@@ -269,6 +278,13 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
   const [titleDraft, setTitleDraft] = useState("");
   const titleInputRef = useRef<HTMLInputElement>(null);
   const [templateDialogOpen, setTemplateDialogOpen] = useState(false);
+  // Read-only "their version" preview for the save-conflict "Open theirs"
+  // action — tabs are contentId-keyed, so we can't open a second tab for the
+  // same doc; a modal lets the user compare before choosing keep/take.
+  const [theirsPreview, setTheirsPreview] = useState<{
+    title: string;
+    content: JSONContent;
+  } | null>(null);
   const [contentCustomIcon, setContentCustomIcon] = useState<string | null>(null);
   const [contentIconColor, setContentIconColor] = useState<string | null>(null);
   const [contentType, setContentType] = useState<string | null>(null);
@@ -332,6 +348,20 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
   // a different document, we abort any pending fetch to prevent Doc A's content
   // from being written to Doc B's API endpoint.
   const saveAbortControllerRef = useRef<AbortController | null>(null);
+
+  // Optimistic-concurrency baseline (spec: write persistence). The bodyHash
+  // the server returned the last time we loaded/saved this doc. Echoed as the
+  // `If-Match` header on PATCH so a stale tab (the doc changed elsewhere since
+  // we loaded it) gets a 409 instead of silently overwriting newer content.
+  // Only the plain/REST save path uses this — collaboration docs persist via
+  // Hocuspocus and never reach handleSave's network call.
+  const bodyHashRef = useRef<string | null>(null);
+
+  const setConflict = useSaveConflictStore((s) => s.setConflict);
+  const clearConflict = useSaveConflictStore((s) => s.clearConflict);
+  const activeConflict = useSaveConflictStore((s) =>
+    selectedContentId ? s.conflicts[selectedContentId] ?? null : null
+  );
 
   // SSR initial-content gate: when the page server-rendered with a
   // pre-fetched ContentDetailResponse matching the current selection, we
@@ -530,6 +560,11 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
 
         if (cancelled) return;
 
+        // Capture the optimistic-concurrency baseline for the plain/REST save
+        // path. (SSR fast-path results have no note.bodyHash; that's fine —
+        // the first real save just proceeds without an If-Match.)
+        bodyHashRef.current = result.data.note?.bodyHash ?? null;
+
         setNoteTitle(result.data.title);
         setContentParentId(result.data.parentId);
         setContentIsPublished(Boolean(result.data.isPublished));
@@ -653,6 +688,23 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
           const initialOutline = extractOutline(emptyDoc);
           setOutline(selectedContentId, initialOutline);
         }
+
+        // Reload mid-conflict: if a prior session stashed unsaved edits for
+        // this doc, the server copy we just loaded is "theirs". Show the
+        // user's draft (not the server copy) and re-raise the conflict so it
+        // can be resolved — this is what preserves edits across a reload.
+        if (!cancelled && !isPageTemplateTab) {
+          const draft = loadConflictDraft(selectedContentId);
+          if (draft && bodyHashRef.current) {
+            setConflict({
+              contentId: selectedContentId,
+              mine: draft,
+              theirHash: bodyHashRef.current,
+            });
+            setNoteContent(draft);
+            setOutline(selectedContentId, extractOutline(draft));
+          }
+        }
       } catch (err) {
         if (cancelled) return;
         clientLogger.error({
@@ -683,6 +735,7 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
     setOutline,
     updateContentTab,
     initialContent,
+    setConflict,
   ]);
 
   useEffect(() => {
@@ -832,6 +885,16 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
         return;
       }
 
+      // Paused while a conflict awaits resolution — don't re-attempt the
+      // overwrite that was already refused. Resolution actions (Keep mine /
+      // Take theirs) clear the conflict before they re-save. Read live state
+      // (not the closure) so a conflict raised after this callback was created
+      // still pauses it.
+      if (useSaveConflictStore.getState().getConflict(selectedContentId)) {
+        setHasUnsavedChanges(true);
+        return;
+      }
+
       // Cancel any previous in-flight save
       if (saveAbortControllerRef.current) {
         saveAbortControllerRef.current.abort();
@@ -852,6 +915,13 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
           credentials: "include",
           headers: {
             "Content-Type": "application/json",
+            // Optimistic concurrency for the plain/REST save path: prove we're
+            // updating the version we last loaded. Server returns 409 if the
+            // doc changed elsewhere (stale tab / concurrent edit). Templates
+            // don't carry a bodyHash, so skip there.
+            ...(!isPageTemplateTab && bodyHashRef.current
+              ? { "If-Match": bodyHashRef.current }
+              : {}),
           },
           body: JSON.stringify({
             tiptapJson: content,
@@ -872,6 +942,36 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
         );
 
         const result = await response.json();
+
+        // Concurrent-change conflict (409): the doc changed elsewhere since we
+        // loaded it. Do NOT overwrite — stash the user's edits and raise a
+        // conflict for explicit resolution (Keep mine / Take theirs).
+        if (
+          !isPageTemplateTab &&
+          response.status === 409 &&
+          result?.meta?.reason === "if_match"
+        ) {
+          const postSaveId = getPaneActiveContentId(
+            useContentStore.getState(),
+            paneId
+          );
+          if (postSaveId === selectedContentId) {
+            stashConflictDraft(selectedContentId, content);
+            setConflict({
+              contentId: selectedContentId,
+              mine: content,
+              theirHash: result.meta.currentBodyHash ?? bodyHashRef.current ?? "",
+            });
+            setHasUnsavedChanges(true);
+            clientLogger.warn({
+              layer: "ui",
+              event: "save:conflict_detected",
+              summary: "save refused — document changed elsewhere (409)",
+              attrs: { content_id: selectedContentId },
+            });
+          }
+          return;
+        }
 
         if (isPageTemplateTab) {
           if (!response.ok) {
@@ -896,6 +996,13 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
         }
 
         setLastSaved(new Date());
+        // Advance the optimistic-concurrency baseline to the version we just
+        // wrote, so the next save's If-Match matches. Clear any stashed draft —
+        // a successful write means there's nothing unresolved to recover.
+        if (!isPageTemplateTab) {
+          bodyHashRef.current = result.data?.note?.bodyHash ?? bodyHashRef.current;
+          clearConflictDraft(selectedContentId);
+        }
         // Keep parent state in sync so re-mounts (e.g., ExpandableEditor
         // collapse/reopen) receive the latest persisted content
         setNoteContent(content);
@@ -933,8 +1040,55 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
       setHasUnsavedChanges,
       setIsSaving,
       setLastSaved,
+      setConflict,
     ]
   );
+
+  // ── Save-conflict resolution (stale-tab overwrite mitigation) ───────────
+  // Keep mine: re-save the user's edits, deliberately overwriting the newer
+  // server copy. Advancing the baseline to the server's current hash makes the
+  // forced PATCH's If-Match match, so it wins in one round-trip.
+  const handleConflictKeepMine = useCallback(() => {
+    if (!activeConflict || !selectedContentId) return;
+    bodyHashRef.current = activeConflict.theirHash;
+    const mine = activeConflict.mine;
+    clearConflict(selectedContentId);
+    clearConflictDraft(selectedContentId);
+    void handleSave(mine, { userInitiated: true });
+  }, [activeConflict, selectedContentId, clearConflict, handleSave]);
+
+  // Take theirs: discard local edits and reload the latest server version.
+  const handleConflictTakeTheirs = useCallback(() => {
+    if (!selectedContentId) return;
+    clearConflict(selectedContentId);
+    clearConflictDraft(selectedContentId);
+    setRefreshTrigger((n) => n + 1);
+  }, [selectedContentId, clearConflict]);
+
+  // Open theirs: fetch the latest server copy into a read-only preview so the
+  // user can compare/copy before deciding.
+  const handleConflictOpenTheirs = useCallback(async () => {
+    if (!selectedContentId) return;
+    try {
+      const res = await fetch(`/api/content/content/${selectedContentId}`, {
+        credentials: "include",
+      });
+      const json = await res.json();
+      const rawJson = json?.data?.note?.tiptapJson;
+      if (json?.success && rawJson) {
+        const parsed =
+          typeof rawJson === "string" ? JSON.parse(rawJson) : rawJson;
+        setTheirsPreview({
+          title: json.data.title ?? "Their version",
+          content: parsed as JSONContent,
+        });
+      } else {
+        toast.error("Couldn't load the other version.");
+      }
+    } catch {
+      toast.error("Couldn't load the other version.");
+    }
+  }, [selectedContentId]);
 
   // Wiki-link click handler - navigate to note or folder by title
   const handleWikiLinkClick = useCallback(
@@ -1909,6 +2063,16 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
               : "Editing a page template. Changes here affect future notes created from this template."}
           </div>
         ) : null}
+
+        {/* Save-conflict resolution (stale-tab / concurrent-edit overwrite) */}
+        <SaveConflictBanner
+          active={Boolean(activeConflict)}
+          onKeepMine={handleConflictKeepMine}
+          onTakeTheirs={handleConflictTakeTheirs}
+          onOpenTheirs={handleConflictOpenTheirs}
+          theirsPreview={theirsPreview}
+          onCloseTheirs={() => setTheirsPreview(null)}
+        />
 
         {/* Editor */}
         <div className="flex-1 overflow-hidden">
