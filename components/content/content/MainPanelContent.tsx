@@ -389,6 +389,14 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
       return;
     }
 
+    // Stale-commit guard (spec §3.7): a fast tab-switch can let this run's
+    // fetch resolve after the pane has moved to a different document. The
+    // cleanup sets `cancelled`, and every post-await commit checks it, so we
+    // never paint Doc A's content (or loading/error state) into a pane now
+    // showing Doc B. Reads are safe to drop — unlike writes — so this guards
+    // the commit, not the fetch.
+    let cancelled = false;
+
     const fetchNote = async () => {
       setIsLoading(true);
       setError(null);
@@ -419,6 +427,8 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
           if (!response.ok) {
             throw new Error(result.error || "Failed to fetch page template");
           }
+
+          if (cancelled) return;
 
           setNoteTitle(result.title);
           setContentParentId(null);
@@ -517,6 +527,8 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
             throw new Error(errorMsg);
           }
         }
+
+        if (cancelled) return;
 
         setNoteTitle(result.data.title);
         setContentParentId(result.data.parentId);
@@ -642,6 +654,7 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
           setOutline(selectedContentId, initialOutline);
         }
       } catch (err) {
+        if (cancelled) return;
         clientLogger.error({
           layer: "fetch",
           event: "content_fetch:caught",
@@ -651,11 +664,17 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
         });
         setError(err instanceof Error ? err.message : "Failed to load note");
       } finally {
-        setIsLoading(false);
+        // Don't flip the loading flag for a run the pane has navigated away
+        // from — the newer run owns it now.
+        if (!cancelled) setIsLoading(false);
       }
     };
 
     fetchNote();
+
+    return () => {
+      cancelled = true;
+    };
   }, [
     selectedContentId,
     refreshTrigger,
