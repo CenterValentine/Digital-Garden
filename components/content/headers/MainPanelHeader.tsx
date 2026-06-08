@@ -18,6 +18,7 @@ import {
   useContentStore,
   type WorkspacePaneId,
 } from "@/state/content-store";
+import { useWorkspaceStore } from "@/state/workspace-store";
 import { useExtensionShellTabMenuSections } from "@/lib/extensions/client-registry";
 import { getCollaborationBrowserSessionId } from "@/lib/domain/collaboration/runtime";
 import { prefetchContent } from "@/lib/domain/content/prefetch";
@@ -260,6 +261,10 @@ export function MainPanelHeader({
   const activateContentTab = useContentStore((state) => state.activateContentTab);
   const closeContentTab = useContentStore((state) => state.closeContentTab);
   const updateContentTab = useContentStore((state) => state.updateContentTab);
+  // Gate the per-tab title back-fill until the workspace snapshot has resolved:
+  // it names every open tab from contentMeta, so back-filling earlier would fire
+  // one redundant content fetch per tab on every cold load.
+  const workspaceStoreReady = useWorkspaceStore((state) => state.hasLoadedOnce);
   const shellTabMenuSections = useExtensionShellTabMenuSections();
 
   const [editingTabId, setEditingTabId] = useState<string | null>(null);
@@ -459,6 +464,10 @@ export function MainPanelHeader({
   }, [closeContentTab, isActivePane, pane?.activeTabId]);
 
   useEffect(() => {
+    // Wait for the workspace snapshot: backfillTabMeta names tabs from
+    // contentMeta, which resolves the common case without a fetch. Only tabs
+    // genuinely uncovered by the snapshot fall through to this per-tab fetch.
+    if (!workspaceStoreReady) return;
     const pendingTabs = tabs.filter((tab) => tab.title === "Loading...");
     if (pendingTabs.length === 0) return;
 
@@ -502,7 +511,7 @@ export function MainPanelHeader({
     return () => {
       isCancelled = true;
     };
-  }, [tabs, updateContentTab]);
+  }, [tabs, updateContentTab, workspaceStoreReady]);
 
   return (
     <>

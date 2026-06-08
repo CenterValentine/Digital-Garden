@@ -359,20 +359,26 @@ export async function ensureMainWorkspace(ownerId: string) {
 }
 
 /**
- * Resolve title/type for every open-tab content id across the given workspaces
- * — including tabs that aren't formal workspace items — in one query, so
- * formatWorkspace can emit a complete `contentMeta` map (spec §3.8).
+ * Resolve title/type for open-tab content ids that aren't already workspace
+ * items, so formatWorkspace can emit a complete `contentMeta` map (spec §3.8).
+ * Items already carry titles inline and formatWorkspace prefers them, so we
+ * only query the *uncovered* ids — and skip the query entirely (the common
+ * case, where every open tab is an assignment) to keep the critical workspace
+ * fetch lean.
  */
 async function buildContentLookup(
   ownerId: string,
   workspaces: WorkspaceWithItems[],
 ): Promise<Map<string, { title: string; contentType: string }>> {
   const ids = new Set<string>();
+  const covered = new Set<string>();
   for (const workspace of workspaces) {
+    for (const item of workspace.items) covered.add(item.contentId);
     for (const id of collectPaneContentIds(normalizeWorkspaceState(workspace))) {
       ids.add(id);
     }
   }
+  for (const id of covered) ids.delete(id);
   if (ids.size === 0) return new Map();
 
   const nodes = await prisma.contentNode.findMany({
