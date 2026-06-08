@@ -279,7 +279,15 @@ function readContentIdFromUrl(): string | null {
   return value && value.length > 0 ? value : null;
 }
 
-function restoreContentWorkspace(workspace: ContentWorkspaceResponse) {
+function restoreContentWorkspace(
+  workspace: ContentWorkspaceResponse,
+  // Background reconcile (receiveRefreshedWorkspaces) re-applies the remote
+  // snapshot to keep the open-tab SET in sync across windows — but it must not
+  // yank the active tab away from what the local user is currently viewing.
+  // When set and still an open tab in the snapshot, this wins as the active
+  // selection, so a poll/visibility refresh can't revert a fresh tab click.
+  preferActiveContentId?: string | null,
+) {
   const paneTabContentIds = Object.fromEntries(
     Object.entries(workspace.paneState.paneTabContentIds).map(
       ([paneId, pane]) => [paneId, pane?.contentIds ?? []],
@@ -298,9 +306,15 @@ function restoreContentWorkspace(workspace: ContentWorkspaceResponse) {
   const urlContentBelongsToWorkspace =
     contentIdFromUrl !== null &&
     workspace.items.some((item) => item.contentId === contentIdFromUrl);
-  const activeContentId = urlContentBelongsToWorkspace
-    ? contentIdFromUrl
-    : workspace.paneState.activeContentId;
+  const openTabIds = Object.values(paneTabContentIds).flat();
+  const preferStillOpen =
+    preferActiveContentId != null &&
+    openTabIds.includes(preferActiveContentId);
+  const activeContentId = preferStillOpen
+    ? preferActiveContentId
+    : urlContentBelongsToWorkspace
+      ? contentIdFromUrl
+      : workspace.paneState.activeContentId;
 
   // Per-content title + type from the snapshot so tabs paint named on the
   // first frame (spec §3.8) — no "Loading…" tab label, no post-mount fetch.
@@ -1117,7 +1131,11 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       const knownUpdatedAt = lastAppliedUpdatedAt[incomingActive.id];
       if (knownUpdatedAt && incomingActive.updatedAt !== knownUpdatedAt) {
         lastAppliedUpdatedAt[incomingActive.id] = incomingActive.updatedAt;
-        restoreContentWorkspace(incomingActive);
+        // Preserve the local active tab: a background refresh syncs the open-tab
+        // set, but must not revert what the user is currently viewing (e.g. a
+        // tab they just clicked after reload).
+        const localActive = useContentStore.getState().selectedContentId;
+        restoreContentWorkspace(incomingActive, localActive);
       }
     }
 
