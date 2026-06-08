@@ -15,6 +15,12 @@ const BOTTOM_LEFT_PANE_ID = "bottom-left";
 const BOTTOM_RIGHT_PANE_ID = "bottom-right";
 const LAST_SELECTED_KEY = "lastSelectedContentId";
 const TAB_PREFERENCES_KEY = "workspaceTabPreferences";
+// Synchronous first-frame title source (spec §3.8). The workspace snapshot
+// (which carries titles) only arrives after a network round-trip, but the
+// URL-restore path recreates tabs synchronously on mount. Persisting last-known
+// titles here lets restoreWorkspace name tabs on the first frame after a cold
+// reload — no "Loading…" flash, no per-tab title fetch.
+const TAB_TITLES_KEY = "workspaceTabTitles";
 
 const WORKSPACE_PANE_IDS = [
   TOP_LEFT_PANE_ID,
@@ -162,6 +168,16 @@ export interface ContentState {
   clearAllWorkspaceTabs: () => void;
   getWorkspaceStateSnapshot: () => WorkspaceStateSnapshot;
   restoreWorkspace: (workspace: WorkspaceRestoreOptions) => void;
+  /**
+   * Idempotently apply titles/types onto existing tabs from a resolved
+   * workspace snapshot. Order-independent: tabs may have been created by the
+   * URL-restore path (which has no titles) before the workspace snapshot
+   * arrives, so this backfills any tab still showing the "Loading…" default
+   * (spec §3.8). Keyed by contentId. Never overwrites a real title.
+   */
+  backfillTabMeta: (
+    tabMeta: Record<string, { title?: string | null; contentType?: string | null }>
+  ) => void;
   clearSelection: () => void;
   toggleMultiSelect: (id: string) => void;
   setMultiSelect: (ids: string[]) => void;
@@ -793,6 +809,58 @@ function saveTabPreferences(
   localStorage.setItem(TAB_PREFERENCES_KEY, JSON.stringify(preferences));
 }
 
+type StoredTabTitleMap = Record<string, { title: string; contentType: string | null }>;
+
+function loadStoredTabTitles(): StoredTabTitleMap {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = localStorage.getItem(TAB_TITLES_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as Record<
+      string,
+      { title?: unknown; contentType?: unknown }
+    >;
+    const result: StoredTabTitleMap = {};
+    for (const [contentId, entry] of Object.entries(parsed)) {
+      if (!contentId || typeof entry?.title !== "string") continue;
+      result[contentId] = {
+        title: entry.title,
+        contentType:
+          typeof entry.contentType === "string" ? entry.contentType : null,
+      };
+    }
+    return result;
+  } catch {
+    return {};
+  }
+}
+
+function saveStoredTabTitles(tabs: Record<string, WorkspaceTabState>) {
+  if (typeof window === "undefined") return;
+
+  // Merge over the existing cache so closing a tab doesn't evict its title —
+  // the cache is a best-effort name source, not a mirror of open tabs.
+  const existing = loadStoredTabTitles();
+  let changed = false;
+  for (const tab of Object.values(tabs)) {
+    // Only cache resolved titles, never the "Loading…" placeholder.
+    if (!tab.title || tab.title === "Loading...") continue;
+    const prev = existing[tab.contentId];
+    if (prev?.title === tab.title && prev?.contentType === tab.contentType) {
+      continue;
+    }
+    existing[tab.contentId] = { title: tab.title, contentType: tab.contentType };
+    changed = true;
+  }
+
+  if (!changed) return;
+  try {
+    localStorage.setItem(TAB_TITLES_KEY, JSON.stringify(existing));
+  } catch {
+    // Quota/serialization failure is non-fatal — titles just won't be cached.
+  }
+}
+
 function syncBrowserState(state: Pick<
   ContentState,
   "selectedContentId" | "panes" | "tabs" | "activePaneId" | "layoutMode"
@@ -810,6 +878,7 @@ function syncBrowserState(state: Pick<
   }
 
   saveTabPreferences(state.tabs);
+  saveStoredTabTitles(state.tabs);
 
   const url = new URL(window.location.href);
   if (restorableContentId) {
@@ -1501,6 +1570,10 @@ export const useContentStore = create<ContentState>((set, get) => ({
       const requestedLayoutMode = normalizedWorkspace.layoutMode ?? "single";
       const requestedPaneIds = getVisiblePaneIds(requestedLayoutMode);
       const storedTabPreferences = loadStoredTabPreferences();
+      // Synchronous first-frame title fallback (spec §3.8): when this restore
+      // came from the title-blind URL path, tabMeta is empty — seed names from
+      // the persisted cache so tabs don't flash "Loading…" before the snapshot.
+      const storedTabTitles = loadStoredTabTitles();
       const nextTabs = { ...state.tabs };
       const nextPanes = createEmptyLayoutPanes();
 
@@ -1509,14 +1582,15 @@ export const useContentStore = create<ContentState>((set, get) => ({
         contentIds.forEach((contentId) => {
           const tabId = getTabId(contentId);
           const meta = normalizedWorkspace.tabMeta?.[contentId];
+          const cached = storedTabTitles[contentId];
           nextTabs[tabId] =
             nextTabs[tabId] ??
             applyPanePreferenceToTab(
               createTab(contentId, {
                 pin: true,
                 temporary: false,
-                title: meta?.title ?? undefined,
-                contentType: meta?.contentType ?? undefined,
+                title: meta?.title ?? cached?.title ?? undefined,
+                contentType: meta?.contentType ?? cached?.contentType ?? undefined,
               }, storedTabPreferences[contentId]),
               requestedLayoutMode,
               paneId
@@ -1548,14 +1622,17 @@ export const useContentStore = create<ContentState>((set, get) => ({
         const tabId = getTabId(normalizedWorkspace.activeContentId);
         const activeMeta =
           normalizedWorkspace.tabMeta?.[normalizedWorkspace.activeContentId];
+        const activeCached =
+          storedTabTitles[normalizedWorkspace.activeContentId];
         nextTabs[tabId] =
           nextTabs[tabId] ??
           applyPanePreferenceToTab(
             createTab(normalizedWorkspace.activeContentId, {
               pin: true,
               temporary: false,
-              title: activeMeta?.title ?? undefined,
-              contentType: activeMeta?.contentType ?? undefined,
+              title: activeMeta?.title ?? activeCached?.title ?? undefined,
+              contentType:
+                activeMeta?.contentType ?? activeCached?.contentType ?? undefined,
             }, storedTabPreferences[normalizedWorkspace.activeContentId]),
             requestedLayoutMode,
             targetPaneId
@@ -1610,6 +1687,58 @@ export const useContentStore = create<ContentState>((set, get) => ({
           nextPanes,
           nextTabs
         ),
+      };
+    });
+  },
+
+  backfillTabMeta: (tabMeta) => {
+    set((state) => {
+      let changedTabs = false;
+      const nextTabs: Record<string, WorkspaceTabState> = {};
+      for (const [tabId, tab] of Object.entries(state.tabs)) {
+        const meta = tabMeta[tab.contentId];
+        if (!meta) {
+          nextTabs[tabId] = tab;
+          continue;
+        }
+        // Only fill gaps — never clobber a title/type the tab already has.
+        const needsTitle =
+          Boolean(meta.title) && (!tab.title || tab.title === "Loading...");
+        const needsType = Boolean(meta.contentType) && tab.contentType === null;
+        if (!needsTitle && !needsType) {
+          nextTabs[tabId] = tab;
+          continue;
+        }
+        changedTabs = true;
+        nextTabs[tabId] = {
+          ...tab,
+          title: needsTitle ? (meta.title as string) : tab.title,
+          contentType: needsType ? (meta.contentType as string) : tab.contentType,
+        };
+      }
+
+      // The right sidebar resolves its saved tab against selectedContentType
+      // (spec §3.4 / Phase A regression): if the selection was restored by a
+      // title-blind path, contentType is null and the chat tab resolves away.
+      // Repair it from the snapshot here.
+      const selectedMeta = state.selectedContentId
+        ? tabMeta[state.selectedContentId]
+        : undefined;
+      const needsSelectedType =
+        state.selectedContentType === null && Boolean(selectedMeta?.contentType);
+
+      if (!changedTabs && !needsSelectedType) return state;
+
+      // Persist the freshly-applied titles so the next cold reload names tabs
+      // on the first frame. backfill bypasses commitWorkspace/syncBrowserState
+      // (it must not rewrite the URL mid-restore), so cache the titles here.
+      if (changedTabs) saveStoredTabTitles(nextTabs);
+
+      return {
+        tabs: changedTabs ? nextTabs : state.tabs,
+        selectedContentType: needsSelectedType
+          ? (selectedMeta?.contentType as string)
+          : state.selectedContentType,
       };
     });
   },

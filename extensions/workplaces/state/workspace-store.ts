@@ -304,16 +304,9 @@ function restoreContentWorkspace(workspace: ContentWorkspaceResponse) {
 
   // Per-content title + type from the snapshot so tabs paint named on the
   // first frame (spec §3.8) — no "Loading…" tab label, no post-mount fetch.
-  const tabMeta: Record<
-    string,
-    { title?: string | null; contentType?: string | null }
-  > = {};
-  for (const item of workspace.items) {
-    tabMeta[item.contentId] = {
-      title: item.content?.title ?? null,
-      contentType: item.content?.contentType ?? null,
-    };
-  }
+  // contentMeta covers the full open-tab set (superset of items), so tabs that
+  // aren't formal workspace assignments are still named.
+  const tabMeta = workspace.contentMeta ?? {};
 
   isBypassingWorkspaceGuard = true;
   try {
@@ -539,6 +532,16 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
         if (useContentStore.getState().openContentIds.length === 0) {
           restoreContentWorkspace(activeWorkspace);
         }
+        // Order-independent title backfill (spec §3.8): the URL-restore path
+        // in MainPanelWorkspace can create tabs (from the `tabs_*` URL params)
+        // before this snapshot resolves, in which case the guard above skips
+        // restoreContentWorkspace and those tabs are stuck on "Loading…".
+        // contentMeta covers the full open-tab set, so this names every tab
+        // regardless of which restore path created it.
+        useContentStore
+          .getState()
+          .backfillTabMeta(activeWorkspace.contentMeta ?? {});
+
         restoreTreeSnapshotForWorkspace(activeWorkspace.id);
       }
     } catch (error) {

@@ -191,10 +191,43 @@ function workspaceStateHasContent(
   });
 }
 
+/** All content ids referenced by a normalized pane layout (open tabs). */
+function collectPaneContentIds(
+  normalizedState: WorkspaceStatePayload,
+): Set<string> {
+  const ids = new Set<string>();
+  for (const pane of Object.values(normalizedState.paneTabContentIds)) {
+    if (!pane) continue;
+    for (const id of pane.contentIds ?? []) ids.add(id);
+    if (pane.activeContentId) ids.add(pane.activeContentId);
+  }
+  if (normalizedState.activeContentId) ids.add(normalizedState.activeContentId);
+  return ids;
+}
+
 export function formatWorkspace(
   workspace: WorkspaceWithItems,
+  contentLookup?: Map<string, { title: string; contentType: string }>,
 ): ContentWorkspaceResponse {
   const normalizedState = normalizeWorkspaceState(workspace);
+
+  // Build contentMeta over the open-tab set (superset of items). Items carry
+  // titles inline; anything open but unassigned is filled from the lookup the
+  // read path passes in. Tabs without a resolvable title are simply omitted —
+  // the client keeps its "Loading…" default and falls back to a per-tab fetch.
+  const itemContentById = new Map(
+    workspace.items.map((item) => [item.contentId, item.content]),
+  );
+  const contentMeta: Record<string, { title: string; contentType: string }> = {};
+  for (const id of collectPaneContentIds(normalizedState)) {
+    const fromItem = itemContentById.get(id);
+    const title = fromItem?.title ?? contentLookup?.get(id)?.title;
+    const contentType =
+      fromItem?.contentType ?? contentLookup?.get(id)?.contentType;
+    if (title != null && contentType != null) {
+      contentMeta[id] = { title, contentType };
+    }
+  }
   return {
     id: workspace.id,
     name: workspace.name,
@@ -229,6 +262,7 @@ export function formatWorkspace(
         parentId: item.content.parentId,
       },
     })),
+    contentMeta,
   };
 }
 
@@ -324,6 +358,35 @@ export async function ensureMainWorkspace(ownerId: string) {
   });
 }
 
+/**
+ * Resolve title/type for every open-tab content id across the given workspaces
+ * — including tabs that aren't formal workspace items — in one query, so
+ * formatWorkspace can emit a complete `contentMeta` map (spec §3.8).
+ */
+async function buildContentLookup(
+  ownerId: string,
+  workspaces: WorkspaceWithItems[],
+): Promise<Map<string, { title: string; contentType: string }>> {
+  const ids = new Set<string>();
+  for (const workspace of workspaces) {
+    for (const id of collectPaneContentIds(normalizeWorkspaceState(workspace))) {
+      ids.add(id);
+    }
+  }
+  if (ids.size === 0) return new Map();
+
+  const nodes = await prisma.contentNode.findMany({
+    where: { id: { in: [...ids] }, ownerId, deletedAt: null },
+    select: { id: true, title: true, contentType: true },
+  });
+  return new Map(
+    nodes.map((node) => [
+      node.id,
+      { title: node.title, contentType: node.contentType },
+    ]),
+  );
+}
+
 export async function listWorkspaces(ownerId: string, includeArchived = false) {
   await ensureMainWorkspace(ownerId);
 
@@ -354,7 +417,10 @@ export async function listWorkspaces(ownerId: string, includeArchived = false) {
     orderBy: [{ isMain: "desc" }, { updatedAt: "desc" }],
   });
 
-  return workspaces.map(formatWorkspace);
+  const contentLookup = await buildContentLookup(ownerId, workspaces);
+  return workspaces.map((workspace) =>
+    formatWorkspace(workspace, contentLookup),
+  );
 }
 
 export async function getWorkspace(ownerId: string, workspaceId: string) {
@@ -383,7 +449,9 @@ export async function getWorkspace(ownerId: string, workspaceId: string) {
     },
   });
 
-  return workspace ? formatWorkspace(workspace) : null;
+  if (!workspace) return null;
+  const contentLookup = await buildContentLookup(ownerId, [workspace]);
+  return formatWorkspace(workspace, contentLookup);
 }
 
 export async function createWorkspace(ownerId: string, name: string) {
