@@ -7,9 +7,10 @@
 
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { RightSidebarHeader } from "./headers/RightSidebarHeader";
 import { RightSidebarContent } from "./content/RightSidebarContent";
+import { useContentReadiness } from "@/lib/features/content/load-readiness";
 import { useContentStore } from "@/state/content-store";
 import { useBlockStore } from "@/state/block-store";
 import { queryTools } from "@/lib/domain/tools";
@@ -22,42 +23,6 @@ import {
 } from "@/state/right-sidebar-state-store";
 import type { RightSidebarTab } from "@/state/right-sidebar-state-store";
 
-/**
- * Track when the persisted right-sidebar state store has finished
- * hydrating from localStorage. Effects that write to the store MUST
- * gate on this — writes during the hydration window get overwritten by
- * the persisted state's shallow merge AND corrupt localStorage by
- * persisting the default-plus-write intermediate.
- *
- * Zustand exposes hasHydrated() on the store's persist API. We
- * subscribe via onFinishHydration so React re-renders once it flips
- * true.
- */
-function useRightSidebarStoreHydrated(): boolean {
-  const [hydrated, setHydrated] = useState(() =>
-    useRightSidebarStateStore.persist?.hasHydrated() ?? false,
-  );
-  useEffect(() => {
-    const persistApi = useRightSidebarStateStore.persist;
-    if (!persistApi) return;
-    // Hydration may have completed between the useState lazy init
-    // (which sampled `hasHydrated()`) and this effect mounting — a
-    // narrow race we close by re-checking. The setState here is guarded
-    // by a single boolean transition (false → true) and is exactly
-    // the pattern Zustand's docs prescribe for "wait for hydration"
-    // surfaces, so the React Compiler "setState in effect" warning is
-    // a false positive here.
-    if (persistApi.hasHydrated()) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- one-shot hydration sync; see comment above
-      setHydrated(true);
-      return;
-    }
-    const unsub = persistApi.onFinishHydration(() => setHydrated(true));
-    return unsub;
-  }, []);
-  return hydrated;
-}
-
 export function RightSidebar() {
   const selectedContentId = useContentStore((state) => state.selectedContentId);
   const selectedContentType = useContentStore((state) => state.selectedContentType);
@@ -66,7 +31,8 @@ export function RightSidebar() {
   const prevBlockIdRef = useRef<string | null>(null);
   const extensionManifest = getExtensionManifestForView(activeView);
 
-  const storeHydrated = useRightSidebarStoreHydrated();
+  const { rightSidebarHydrated: storeHydrated, rightPanelReady } =
+    useContentReadiness();
 
   const savedTab = useRightSidebarStateStore((state) =>
     selectedContentId
@@ -160,11 +126,33 @@ export function RightSidebar() {
 
   return (
     <div className="flex h-full flex-col">
-      {/* Header with tab buttons */}
-      <RightSidebarHeader activeTab={activeTab} onTabChange={handleTabChange} />
+      {/* Header with tab buttons — non-interactive until the panel is ready
+          so the user never clicks a tab that resolves to the wrong view. */}
+      <RightSidebarHeader
+        activeTab={activeTab}
+        onTabChange={handleTabChange}
+        disabled={!rightPanelReady}
+      />
 
-      {/* Content based on active tab */}
-      <RightSidebarContent activeTab={activeTab} />
+      {/* Preference loader until the persisted last-seen view is known
+          (spec §3.4) — never render a guessed default that later corrects. */}
+      {rightPanelReady ? (
+        <RightSidebarContent activeTab={activeTab} />
+      ) : (
+        <RightSidebarLoader />
+      )}
+    </div>
+  );
+}
+
+/** Skeleton shown in the right panel until its saved view resolves. */
+function RightSidebarLoader() {
+  return (
+    <div className="flex-1 space-y-3 p-4" aria-busy="true" aria-label="Loading panel">
+      <div className="h-4 w-2/3 animate-pulse rounded bg-white/5" />
+      <div className="h-4 w-1/2 animate-pulse rounded bg-white/5" />
+      <div className="h-24 w-full animate-pulse rounded bg-white/5" />
+      <div className="h-4 w-3/4 animate-pulse rounded bg-white/5" />
     </div>
   );
 }
