@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { Globe } from "lucide-react";
+import { Eye, EyeOff } from "lucide-react";
 import { cn } from "@/lib/core/utils";
 import { usePublishStore } from "../../state/publish-store";
 import { fetchLinkedPublicItems } from "../../lib/client-api";
@@ -34,12 +34,17 @@ export function PublishStatusPill({ contentId }: PublishStatusPillProps) {
   const publishedItem = linkedItems.find((i) => i.state === "published");
   const anyItem = linkedItems[0];
 
+  // Icon-only indicator (no text → can never wrap, and stays a fixed width so
+  // adjacent toolbar changes don't reflow it). The full state lives in the
+  // tooltip. Eye = published, Eye-off = not published.
   if (linkedItems.length === 0) {
-    // Not yet published — subtle globe indicator
     return (
-      <div className="flex items-center gap-1 px-2 py-1 rounded-md text-muted-foreground text-xs">
-        <Globe className="w-3.5 h-3.5 opacity-40" />
-        <span className="opacity-40">Not published</span>
+      <div
+        className="flex shrink-0 items-center rounded-md px-1.5 py-1 text-muted-foreground"
+        title="Not published"
+        aria-label="Not published"
+      >
+        <EyeOff className="h-4 w-4 opacity-50" />
       </div>
     );
   }
@@ -50,31 +55,26 @@ export function PublishStatusPill({ contentId }: PublishStatusPillProps) {
     representativeItem.hasPendingChanges &&
     representativeItem.state === "published";
 
-  const { Icon, color, label } = pendingChanges
-    ? PENDING_CHANGES_ICON
-    : stateIcon;
+  // Keep the color/label from the state map for the tooltip, but render Eye so
+  // the published indicator reads consistently regardless of sub-state.
+  const { color, label } = pendingChanges ? PENDING_CHANGES_ICON : stateIcon;
+  const tooltip = pendingChanges
+    ? `Changes pending · /${representativeItem.slug}`
+    : linkedItems.length > 1
+      ? `${linkedItems.length} published`
+      : `${label} · /${representativeItem.slug}`;
 
   return (
     <div
       className={cn(
-        "flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium",
+        "flex shrink-0 items-center rounded-md px-1.5 py-1",
         "border border-transparent transition-colors",
         "hover:bg-muted/60 cursor-default"
       )}
-      title={
-        linkedItems.length === 1
-          ? `${label} · /${representativeItem.slug}`
-          : `${linkedItems.length} public items`
-      }
+      title={tooltip}
+      aria-label={tooltip}
     >
-      <Icon className={cn("w-3.5 h-3.5", color)} />
-      <span className={color}>
-        {pendingChanges
-          ? "Changes pending"
-          : linkedItems.length > 1
-          ? `${linkedItems.length} published`
-          : label}
-      </span>
+      <Eye className={cn("h-4 w-4", color)} />
     </div>
   );
 }

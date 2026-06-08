@@ -34,6 +34,7 @@ import {
   clearConflictDraft,
 } from "@/state/save-conflict-store";
 import { SaveConflictBanner } from "./SaveConflictBanner";
+import { EditorSkeleton } from "@/components/content/skeletons/EditorSkeleton";
 import { useTreeStateStore } from "@/state/tree-state-store";
 import {
   useExtensionContentViewer,
@@ -1855,13 +1856,11 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
     );
   }
 
-  // Loading state
+  // Loading state — staged skeleton mirroring the editor layout (title +
+  // paragraph blocks) rather than a bare "Loading…" so the structure reads as
+  // arriving. Shares the same skeleton as the page-level Suspense fallback.
   if (isLoading) {
-    return (
-      <div className="flex-1 flex items-center justify-center">
-        <div className="text-sm text-muted-foreground">Loading...</div>
-      </div>
-    );
+    return <EditorSkeleton />;
   }
 
   // Render content based on type
@@ -2151,7 +2150,7 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
         {selectedContentId &&
           !selectedContentId.startsWith("person:") &&
           contentType !== "page-template" &&
-          !isEmbedMode && <ContentToolbar />}
+          !isEmbedMode && <ContentToolbar contentId={selectedContentId} />}
         {isNonNoteContent ? (
           <div className="flex flex-1 min-h-0 flex-col overflow-hidden">
             {notesPanelPosition === "above" && (
