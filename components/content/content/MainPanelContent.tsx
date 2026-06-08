@@ -339,15 +339,12 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
   // afterwards goes through the normal fetch path so writes are observed.
   const consumedInitialContentRef = useRef(false);
 
-  // Cancel in-flight saves whenever selectedContentId changes
-  useEffect(() => {
-    return () => {
-      if (saveAbortControllerRef.current) {
-        saveAbortControllerRef.current.abort();
-        saveAbortControllerRef.current = null;
-      }
-    };
-  }, [selectedContentId]);
+  // NOTE (spec §3.6 — never cancel a write): we deliberately do NOT abort
+  // in-flight saves on navigation/unmount. The write must complete; the
+  // post-await guard in handleSave skips the stale UI commit if the pane has
+  // since moved to a different document. The AbortController is retained only
+  // for debounce coalescing (a newer save of the same doc supersedes an older
+  // one), not for cancelling on navigation.
 
   // Fetch note content when selection changes
   // Also re-fetch when content is updated (e.g., renamed in file tree)
