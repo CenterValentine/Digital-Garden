@@ -1122,6 +1122,15 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       state.activeWorkspaceId,
     );
 
+    // INVARIANT — cross-session isolation is scoped to the SAME workspace.
+    // This background reconcile only re-applies the local session's *active*
+    // workspace (keyed on state.activeWorkspaceId below); pane state for every
+    // other workspace is refreshed in the list but never applied to this view.
+    // Combined with per-workspace persistActiveWorkspace writes and the
+    // per-browser active-workspace pointer, two sessions on DIFFERENT
+    // workspaces never converge — only same-workspace sessions share pane
+    // state. Do not broaden this to apply non-active workspaces.
+    //
     // If the active workspace was saved by another tab (its updatedAt changed),
     // apply the remote pane state so open tabs stay in sync across windows.
     const incomingActive = ordered.find(
