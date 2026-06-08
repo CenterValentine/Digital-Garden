@@ -44,11 +44,11 @@ export function SaveConflictBanner({
       {active && (
         <div
           role="alert"
-          className="mx-4 my-3 flex flex-col gap-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-200 sm:flex-row sm:items-center sm:justify-between"
+          className="mx-4 my-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-200"
         >
           <div className="flex items-start gap-2">
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-            <div>
+            <div className="min-w-0">
               <p className="font-medium">This note changed elsewhere</p>
               <p className="text-amber-800/80 dark:text-amber-200/70">
                 Someone (or another device) updated it after you opened this
@@ -56,7 +56,7 @@ export function SaveConflictBanner({
               </p>
             </div>
           </div>
-          <div className="flex shrink-0 flex-wrap gap-2">
+          <div className="mt-3 flex flex-wrap justify-end gap-2">
             <button
               type="button"
               onClick={onOpenTheirs}
