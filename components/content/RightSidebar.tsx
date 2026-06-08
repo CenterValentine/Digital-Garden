@@ -7,7 +7,7 @@
 
 "use client";
 
-import { useEffect, useMemo, useRef } from "react";
+import { useMemo, useState } from "react";
 import { RightSidebarHeader } from "./headers/RightSidebarHeader";
 import { RightSidebarContent } from "./content/RightSidebarContent";
 import { useContentReadiness } from "@/lib/features/content/load-readiness";
@@ -28,11 +28,14 @@ export function RightSidebar() {
   const selectedContentType = useContentStore((state) => state.selectedContentType);
   const selectedBlockId = useBlockStore((s) => s.selectedBlockId);
   const activeView = useLeftPanelViewStore((state) => state.activeView);
-  const prevBlockIdRef = useRef<string | null>(null);
   const extensionManifest = getExtensionManifestForView(activeView);
 
-  const { rightSidebarHydrated: storeHydrated, rightPanelReady } =
-    useContentReadiness();
+  // The block a user explicitly dismissed the Properties override for (by
+  // clicking another tab while it was selected). Lets an explicit tab choice
+  // win over the live block→Properties override without persisting anything.
+  const [dismissedBlockId, setDismissedBlockId] = useState<string | null>(null);
+
+  const { rightPanelReady } = useContentReadiness();
 
   const savedTab = useRightSidebarStateStore((state) =>
     selectedContentId
@@ -57,70 +60,31 @@ export function RightSidebar() {
     return tabs;
   }, [selectedContentType, selectedBlockId]);
 
+  // The saved tab is sacred: it ONLY changes via an explicit user action
+  // (handleTabChange). Selecting a block shows the Properties panel as a LIVE,
+  // never-persisted override — so an editor mount flickering a block selection
+  // can no longer overwrite the user's saved tab (e.g. chat) and "stick" on a
+  // fallback. Everything here resolves live; nothing writes to the store.
   const activeTab = useMemo(() => {
-    if (!savedTab && selectedBlockId) {
-      return resolveRightSidebarTab("properties", availableTabs);
+    if (
+      selectedBlockId &&
+      selectedBlockId !== dismissedBlockId &&
+      availableTabs.includes("properties")
+    ) {
+      return "properties";
     }
     if (!savedTab && extensionManifest?.surfaces.includes("right-sidebar")) {
       return resolveRightSidebarTab("extension", availableTabs);
     }
     return resolveRightSidebarTab(savedTab, availableTabs);
-  }, [availableTabs, extensionManifest, savedTab, selectedBlockId]);
-
-  // Auto-correct effect: if the resolver chose a tab different from
-  // the persisted savedTab, write the corrected value back. Gated on
-  // store hydration so we don't overwrite the user's saved tab with a
-  // fallback computed against an empty/transient availableTabs list.
-  // Additionally requires a non-null selectedContentType — the
-  // resolver's fallback choice isn't trustworthy without it.
-  useEffect(() => {
-    if (!storeHydrated) return;
-    if (activeTab === "extension") return;
-    if (!selectedContentId || !selectedContentType || savedTab === activeTab) return;
-    setActiveTab(selectedContentId, activeTab);
-  }, [
-    storeHydrated,
-    activeTab,
-    savedTab,
-    selectedContentId,
-    selectedContentType,
-    setActiveTab,
-  ]);
-
-  // Auto-switch to properties tab when a block is selected. Two
-  // guards to prevent stale block selections from clobbering the
-  // saved tab on initial mount:
-  //   1. storeHydrated — don't write before the persisted tab loads.
-  //   2. prevBlockIdRef is seeded with the initial selectedBlockId on
-  //      first run AFTER hydration, so we only treat *changes* as
-  //      user-initiated selections. A block that's selected at mount
-  //      time (from some legacy / cached path) won't trigger a write.
-  const hasSeededBlockRef = useRef(false);
-  useEffect(() => {
-    if (!storeHydrated) return;
-    if (!selectedContentId) return;
-
-    // First post-hydration run: just record the initial state without
-    // writing. Any selectedBlockId at this point came from a non-user
-    // path (editor mount, stale extension state, etc.) and should not
-    // be treated as a "user clicked a block" event.
-    if (!hasSeededBlockRef.current) {
-      prevBlockIdRef.current = selectedBlockId;
-      hasSeededBlockRef.current = true;
-      return;
-    }
-
-    if (selectedBlockId && selectedBlockId !== prevBlockIdRef.current) {
-      setActiveTab(selectedContentId, "properties");
-    } else if (!selectedBlockId && prevBlockIdRef.current && savedTab === "properties") {
-      setActiveTab(selectedContentId, "backlinks");
-    }
-    prevBlockIdRef.current = selectedBlockId;
-  }, [storeHydrated, selectedBlockId, selectedContentId, savedTab, setActiveTab]);
+  }, [availableTabs, dismissedBlockId, extensionManifest, savedTab, selectedBlockId]);
 
   const handleTabChange = (tab: RightSidebarTab) => {
     if (tab === "extension") return;
     if (!selectedContentId) return;
+    // If the user picks a tab while a block is selected, their choice wins over
+    // the live Properties override (until they select a different block).
+    if (selectedBlockId) setDismissedBlockId(selectedBlockId);
     setActiveTab(selectedContentId, tab);
   };
 
