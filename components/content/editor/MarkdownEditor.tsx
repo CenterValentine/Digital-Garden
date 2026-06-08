@@ -284,6 +284,12 @@ export function MarkdownEditor({
     () => sanitizeTipTapJsonWithExtensions(content, viewerExtensions).json,
     [content, viewerExtensions]
   );
+  // Tracks the content reference the editor currently holds, seeded with the
+  // value the editor is created with (see useEditor `content` below). The
+  // content-sync effect compares against this to skip the redundant initial
+  // setContent — the editor already mounts with safeContent, so re-applying it
+  // on first render is a wasted doc re-parse on the critical (LCP) path.
+  const appliedContentRef = useRef<JSONContent | null>(safeContent);
   const isPlainEditorFallback =
     shouldUseCollaboration && runtimeEditPolicy?.reason === "degraded-plain-fallback";
   const collaborationState = useMemo(
@@ -800,14 +806,20 @@ export function MarkdownEditor({
     if (!editor || !safeContent) return;
     if (collaborationState) return;
 
+    // Already applied (including the initial mount, where the editor was
+    // created with this exact content) — skip the redundant re-parse.
+    if (safeContent === appliedContentRef.current) return;
+
     // If this content matches what we just saved, it's a save-echo — skip it
     if (safeContent === lastSavedContentRef.current) {
       lastSavedContentRef.current = null;
+      appliedContentRef.current = safeContent;
       return;
     }
 
     // Genuine external update — apply it
     editor.commands.setContent(safeContent);
+    appliedContentRef.current = safeContent;
   }, [collaborationState, editor, safeContent]);
 
   // Initial stats update when editor is created
