@@ -302,6 +302,19 @@ function restoreContentWorkspace(workspace: ContentWorkspaceResponse) {
     ? contentIdFromUrl
     : workspace.paneState.activeContentId;
 
+  // Per-content title + type from the snapshot so tabs paint named on the
+  // first frame (spec §3.8) — no "Loading…" tab label, no post-mount fetch.
+  const tabMeta: Record<
+    string,
+    { title?: string | null; contentType?: string | null }
+  > = {};
+  for (const item of workspace.items) {
+    tabMeta[item.contentId] = {
+      title: item.content?.title ?? null,
+      contentType: item.content?.contentType ?? null,
+    };
+  }
+
   isBypassingWorkspaceGuard = true;
   try {
     useContentStore.getState().restoreWorkspace({
@@ -309,6 +322,7 @@ function restoreContentWorkspace(workspace: ContentWorkspaceResponse) {
       activePaneId: workspace.paneState.activePaneId,
       layoutMode: workspace.paneState.layoutMode,
       paneTabContentIds,
+      tabMeta,
     });
   } finally {
     isBypassingWorkspaceGuard = false;

@@ -75,6 +75,12 @@ interface WorkspaceRestoreOptions {
   paneTabContentIds?: Partial<Record<WorkspacePaneId, string[]>>;
   tabContentIds?: string[];
   secondaryTabContentIds?: string[];
+  /**
+   * Per-content title + type from the restored workspace snapshot, so tabs
+   * paint named (and typed) on the first frame instead of "Loading…" and a
+   * post-mount title fetch (spec §3.8). Keyed by contentId.
+   */
+  tabMeta?: Record<string, { title?: string | null; contentType?: string | null }>;
 }
 
 export interface WorkspaceStateSnapshot {
@@ -690,6 +696,7 @@ function normalizeLegacyRestorePanes({
   paneTabContentIds,
   tabContentIds,
   secondaryTabContentIds = [],
+  tabMeta,
 }: WorkspaceRestoreOptions) {
   const normalizedLayoutMode =
     layoutMode ??
@@ -705,6 +712,7 @@ function normalizeLegacyRestorePanes({
       activePaneId,
       layoutMode: normalizedLayoutMode,
       paneTabContentIds,
+      tabMeta,
     };
   }
 
@@ -723,6 +731,7 @@ function normalizeLegacyRestorePanes({
       (normalizedLayoutMode === "dual-vertical" ? TOP_LEFT_PANE_ID : TOP_LEFT_PANE_ID),
     layoutMode: normalizedLayoutMode,
     paneTabContentIds: legacyPaneTabs,
+    tabMeta,
   };
 }
 
@@ -1499,12 +1508,15 @@ export const useContentStore = create<ContentState>((set, get) => ({
         const contentIds = normalizedWorkspace.paneTabContentIds?.[paneId] ?? [];
         contentIds.forEach((contentId) => {
           const tabId = getTabId(contentId);
+          const meta = normalizedWorkspace.tabMeta?.[contentId];
           nextTabs[tabId] =
             nextTabs[tabId] ??
             applyPanePreferenceToTab(
               createTab(contentId, {
                 pin: true,
                 temporary: false,
+                title: meta?.title ?? undefined,
+                contentType: meta?.contentType ?? undefined,
               }, storedTabPreferences[contentId]),
               requestedLayoutMode,
               paneId
@@ -1534,12 +1546,16 @@ export const useContentStore = create<ContentState>((set, get) => ({
         };
 
         const tabId = getTabId(normalizedWorkspace.activeContentId);
+        const activeMeta =
+          normalizedWorkspace.tabMeta?.[normalizedWorkspace.activeContentId];
         nextTabs[tabId] =
           nextTabs[tabId] ??
           applyPanePreferenceToTab(
             createTab(normalizedWorkspace.activeContentId, {
               pin: true,
               temporary: false,
+              title: activeMeta?.title ?? undefined,
+              contentType: activeMeta?.contentType ?? undefined,
             }, storedTabPreferences[normalizedWorkspace.activeContentId]),
             requestedLayoutMode,
             targetPaneId
