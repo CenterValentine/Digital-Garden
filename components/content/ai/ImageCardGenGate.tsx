@@ -90,11 +90,16 @@ export function ImageCardGenGate({
   const [pickModel, setPickModel] = useState<string>("");
   const [makeDefault, setMakeDefault] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const startedRef = useRef(false);
+  // Guards the expensive generation POST so it fires exactly once even when
+  // an effect double-invokes (StrictMode) or multiple triggers race. Reset on
+  // failure so the user can retry from the picker.
+  const genStartedRef = useRef(false);
 
   // Generate with a route (or the default when route is null → server resolves).
   const runGeneration = useCallback(
     async (route: Route | null, persistDefault: boolean) => {
+      if (genStartedRef.current) return;
+      genStartedRef.current = true;
       setPhase("generating");
       setError(null);
       try {
@@ -122,6 +127,8 @@ export function ImageCardGenGate({
         setPhase("done");
         onComplete(json.data.results);
       } catch (e) {
+        // Allow a retry from the picker after a failure.
+        genStartedRef.current = false;
         setError(e instanceof Error ? e.message : "Image generation failed");
         setPhase("picker");
       }
@@ -129,10 +136,11 @@ export function ImageCardGenGate({
     [cards, onComplete],
   );
 
-  // Load configured image providers + the saved default once.
+  // Load configured image providers + the saved default. The cancelled flag
+  // (not a run-once ref) guards stale state writes — so a StrictMode
+  // double-invoke can't deadlock the phase. Generation is separately guarded
+  // by genStartedRef, so a double-invoke won't double-generate.
   useEffect(() => {
-    if (startedRef.current) return;
-    startedRef.current = true;
     let cancelled = false;
     (async () => {
       try {
