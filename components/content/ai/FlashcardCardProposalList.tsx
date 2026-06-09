@@ -53,6 +53,7 @@ import {
 import { AdaptiveFlashcardEditor } from "@/extensions/flashcards/components/AdaptiveFlashcardEditor";
 import { useExistingDeckPaths } from "./use-existing-deck-paths";
 import { DeckPathField } from "./DeckPathField";
+import { ImageCardGenGate, type ImageGenResult } from "./ImageCardGenGate";
 
 /**
  * Stage 3 payload — propose_deck_with_cards. Deck info is embedded so
@@ -85,6 +86,11 @@ interface DeckWithCardsProposalPayload {
     // ── Identification-image cards (propose_image_cards) ──
     /** When true, this card's front is an AI-generated image + caption. */
     imageCard?: boolean;
+    /** True for draft image cards awaiting client-side generation. */
+    pendingImageGen?: boolean;
+    /** Draft fields used to generate the image after the provider window. */
+    imagePrompt?: string;
+    identifyLabel?: string;
     /** Prebuilt rich front (image node + caption); present on success. */
     frontContent?: JSONContent;
     /** Preview URL for the generated image. */
@@ -223,6 +229,48 @@ export function FlashcardCardProposalList({
   }, [payload.cards, proposalId]);
   const [rows, setRows] = useState<RowState[]>(initialRows);
   const [bulkSubmitting, setBulkSubmitting] = useState(false);
+
+  // Image-card proposals arrive as DRAFTS (pendingImageGen) — images are
+  // generated client-side after the provider window (ImageCardGenGate). The
+  // gate is shown until generation completes; "Add selected" is gated on it.
+  const needsImageGen = Boolean(
+    payload.imageCards && payload.cards.some((c) => c.pendingImageGen),
+  );
+  const imageDrafts = useMemo(
+    () =>
+      payload.cards.map((c) => ({
+        imagePrompt: c.imagePrompt ?? "",
+        identifyLabel: c.identifyLabel ?? c.front,
+      })),
+    [payload.cards],
+  );
+  const [imageGenDone, setImageGenDone] = useState(!needsImageGen);
+
+  // Apply generated images onto the draft rows (by index). Failed cards get an
+  // imageError and are unchecked so the batch commits only the cards that have
+  // a real image front.
+  const applyImageResults = useCallback(
+    (results: ImageGenResult[]) => {
+      setRows((prev) =>
+        prev.map((row, i) => {
+          const r = results[i];
+          if (!r) return row;
+          if (r.error || !r.frontContent) {
+            return { ...row, checked: false, imageError: r.error ?? "No image returned" };
+          }
+          return {
+            ...row,
+            frontContent: r.frontContent as JSONContent,
+            frontImageUrl: r.frontImageUrl ?? null,
+            isFrontRichText: true,
+            imageError: undefined,
+          };
+        }),
+      );
+      setImageGenDone(true);
+    },
+    [],
+  );
 
   // Editable deck path — Stage 4. The user can retarget the cards to
   // a different deck OR rename the proposed leaf inline. The cached
@@ -601,6 +649,11 @@ export function FlashcardCardProposalList({
         </div>
       )}
 
+      {/* Pre-generation provider window for identification-image cards. */}
+      {needsImageGen && !imageGenDone && (
+        <ImageCardGenGate cards={imageDrafts} onComplete={applyImageResults} />
+      )}
+
       {/*
         Gallery: compact bullet list by default (one row per card,
         front → back as plain text), expandable on click into the full
@@ -839,12 +892,15 @@ export function FlashcardCardProposalList({
               checkedCount === 0 ||
               bulkSubmitting ||
               allDone ||
-              !effectivePath
+              !effectivePath ||
+              !imageGenDone
             }
             title={
-              !effectivePath
-                ? "Target deck path is empty — type a path or pick from the dropdown"
-                : undefined
+              !imageGenDone
+                ? "Waiting for image generation…"
+                : !effectivePath
+                  ? "Target deck path is empty — type a path or pick from the dropdown"
+                  : undefined
             }
             className="inline-flex items-center gap-1.5 rounded-md border border-amber-500/40 bg-amber-500/[0.08] px-2.5 py-1 text-xs font-medium text-amber-700 hover:bg-amber-500/[0.14] disabled:cursor-not-allowed disabled:opacity-60 dark:border-amber-400/30 dark:bg-amber-500/[0.10] dark:text-amber-300 dark:hover:bg-amber-500/[0.18]"
           >

@@ -66,6 +66,13 @@ export interface GenerateAndStoreImageInput {
   size?: ImageSize;
   quality?: "standard" | "hd";
   style?: "natural" | "vivid";
+  /**
+   * Explicit API key for a per-request provider choice. When provided (with
+   * providerId/modelId), it is used directly and the saved generate_image route
+   * override is BYPASSED — so a user's per-batch provider pick wins over their
+   * persisted default. Omit to use resolveImageGenRoute (saved default / env).
+   */
+  apiKey?: string;
 }
 
 export interface GeneratedStoredImage {
@@ -93,9 +100,14 @@ export async function generateAndStoreImage(
     size = "1024x1024",
     quality,
     style,
+    apiKey,
   } = input;
 
-  const resolved = await resolveImageGenRoute(userId, { providerId, modelId });
+  // Explicit key (per-request provider choice) bypasses the saved override;
+  // otherwise resolve the user's configured route (override → env fallback).
+  const resolved = apiKey
+    ? { providerId, modelId, apiKey }
+    : await resolveImageGenRoute(userId, { providerId, modelId });
   const result = await generateImage(
     {
       prompt,

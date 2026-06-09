@@ -25,9 +25,7 @@ import { prisma } from "@/lib/database/client";
 import {
   summarizeFlashcardContent,
   slugifyDeckName,
-  createImageFrontDoc,
 } from "@/lib/domain/flashcards";
-import { generateAndStoreImage } from "@/lib/domain/ai/image/generate-and-store";
 import type { ToolExecuteContext } from "./types";
 
 const CARD_BATCH_LIMIT = 10;
@@ -589,43 +587,20 @@ export function createFlashcardTools(ctx: ToolExecuteContext) {
 
         const resolvedSourceContentId = sourceContentId ?? ctx.contentId ?? null;
 
-        // Generate each card's image at propose time so the user previews the
-        // real image before accepting. Fail-soft per card: a failed image still
-        // proposes (marked) so one failure doesn't sink the batch.
-        const proposedCards = await Promise.all(
-          cards.slice(0, IMAGE_CARD_LIMIT).map(async (card) => {
-            try {
-              const img = await generateAndStoreImage({
-                prompt: card.imagePrompt,
-                userId: ctx.userId,
-              });
-              return {
-                front: card.identifyLabel,
-                back: card.back,
-                backLabel: card.backLabel,
-                frontContent: createImageFrontDoc(
-                  img.url,
-                  img.contentId,
-                  card.identifyLabel,
-                ),
-                frontImageUrl: img.url,
-                frontImageContentId: img.contentId,
-                isFrontRichText: true,
-                imageCard: true,
-              };
-            } catch (error) {
-              return {
-                front: card.identifyLabel,
-                back: card.back,
-                backLabel: card.backLabel,
-                isFrontRichText: false,
-                imageCard: true,
-                imageError:
-                  error instanceof Error ? error.message : "Image generation failed",
-              };
-            }
-          }),
-        );
+        // Return DRAFTS only — no image generation here. The proposal UI gives
+        // the user a short window to pick/confirm the image provider, then
+        // generates the images client-side via POST /api/flashcards/generate-
+        // card-images. This keeps the proposal instant and lets the user
+        // control which provider (and cost) is used before any generation runs.
+        const proposedCards = cards.slice(0, IMAGE_CARD_LIMIT).map((card) => ({
+          front: card.identifyLabel,
+          back: card.back,
+          backLabel: card.backLabel,
+          imageCard: true,
+          pendingImageGen: true,
+          imagePrompt: card.imagePrompt,
+          identifyLabel: card.identifyLabel,
+        }));
 
         return JSON.stringify({
           __deckWithCardsProposal: true,
