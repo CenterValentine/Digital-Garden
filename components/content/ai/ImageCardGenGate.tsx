@@ -18,6 +18,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Loader2, Sparkles, AlertTriangle } from "lucide-react";
 import type { JSONContent } from "@tiptap/core";
 import { IMAGE_PROVIDER_CATALOG } from "@/lib/domain/ai/image/catalog";
+import { effectiveCapabilities } from "@/lib/domain/ai/features/capabilities";
 
 export interface ImageGenResult {
   frontImageUrl?: string;
@@ -31,39 +32,37 @@ interface DraftCard {
   identifyLabel: string;
 }
 
+/** A configured connection that has ≥1 image-capable model. */
 interface ProviderOption {
-  /** Connection id. */
-  id: string;
-  /** Connection display name. */
-  name: string;
-  /** Image provider preset id (in IMAGE_PROVIDER_CATALOG). */
-  presetId: string;
-  /** Provider display name from the catalog. */
+  connectionId: string;
+  connectionName: string;
+  presetId: string | null;
   providerName: string;
+  /** This connection's image-capable models. */
   models: Array<{ id: string; name: string }>;
 }
 
 interface Route {
-  presetId: string;
+  connectionId: string;
+  presetId: string | null;
   modelId: string;
 }
 
 const COUNTDOWN_SECONDS = 3;
 
-const IMAGE_PRESET_IDS = new Set<string>(
-  IMAGE_PROVIDER_CATALOG.map((p) => p.id as string),
-);
-
-function modelsFor(presetId: string): Array<{ id: string; name: string }> {
-  return (
-    IMAGE_PROVIDER_CATALOG.find((p) => p.id === presetId)?.models.map((m) => ({
-      id: m.id as string,
-      name: m.name,
-    })) ?? []
-  );
+/**
+ * Image capability is intrinsic to the MODEL, not the provider — so any model
+ * whose declared/inferred capabilities include image output qualifies,
+ * including gateway models. (Normalizes the "image" / "image-generation"
+ * naming split.)
+ */
+function isImageModel(model: { id: string; capabilities?: string[] }): boolean {
+  const caps = effectiveCapabilities(model);
+  return caps.has("image-generation") || caps.has("image");
 }
 
-function providerNameFor(presetId: string): string {
+function providerNameFor(presetId: string | null): string {
+  if (!presetId) return "Custom";
   return IMAGE_PROVIDER_CATALOG.find((p) => p.id === presetId)?.name ?? presetId;
 }
 
@@ -86,7 +85,7 @@ export function ImageCardGenGate({
   const [providers, setProviders] = useState<ProviderOption[]>([]);
   const [defaultRoute, setDefaultRoute] = useState<Route | null>(null);
   const [countdown, setCountdown] = useState(COUNTDOWN_SECONDS);
-  const [pickPreset, setPickPreset] = useState<string>("");
+  const [pickConnectionId, setPickConnectionId] = useState<string>("");
   const [pickModel, setPickModel] = useState<string>("");
   const [makeDefault, setMakeDefault] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -107,9 +106,14 @@ export function ImageCardGenGate({
       setPhase("generating");
       setError(null);
       try {
-        if (persistDefault && route) {
-          // Best-effort: write the persistent generate_image override.
-          await persistImageDefault(route);
+        if (persistDefault && route?.presetId) {
+          // Best-effort: write the persistent generate_image override. Needs a
+          // presetId (custom connections without one can't be saved as a route
+          // override).
+          await persistImageDefault({
+            presetId: route.presetId,
+            modelId: route.modelId,
+          });
         }
         const res = await fetch("/api/flashcards/generate-card-images", {
           method: "POST",
@@ -117,7 +121,7 @@ export function ImageCardGenGate({
           credentials: "include",
           body: JSON.stringify({
             cards,
-            providerId: route?.presetId,
+            connectionId: route?.connectionId,
             modelId: route?.modelId,
           }),
         });
@@ -155,28 +159,42 @@ export function ImageCardGenGate({
           fetch("/api/user/settings", { credentials: "include" }),
         ]);
         const connBody = (await connRes.json().catch(() => null)) as {
-          data?: { items?: Array<{ id: string; name: string; presetId: string | null }> };
+          data?: {
+            items?: Array<{
+              id: string;
+              name: string;
+              presetId: string | null;
+              models?: Array<{ id: string; name?: string; capabilities?: string[] }>;
+            }>;
+          };
         } | null;
         const settingsBody = (await settingsRes.json().catch(() => null)) as {
-          data?: { ai?: { toolConfig?: Record<string, { routeOverride?: Route }> } };
+          data?: { ai?: { toolConfig?: Record<string, { routeOverride?: { presetId: string; modelId: string } }> } };
         } | null;
         if (cancelled) return;
 
+        // Capability-based discovery: any connection (direct OR gateway) whose
+        // SAVED models include an image-capable one qualifies — not just the
+        // hardcoded direct-provider catalog.
         const compatible: ProviderOption[] = (connBody?.data?.items ?? [])
-          .filter((c) => c.presetId && IMAGE_PRESET_IDS.has(c.presetId))
-          .map((c) => ({
-            id: c.id,
-            name: c.name,
-            presetId: c.presetId as string,
-            providerName: providerNameFor(c.presetId as string),
-            models: modelsFor(c.presetId as string),
-          }))
+          .map((c) => {
+            const imageModels = (c.models ?? [])
+              .filter(isImageModel)
+              .map((m) => ({ id: m.id, name: m.name ?? m.id }));
+            return {
+              connectionId: c.id,
+              connectionName: c.name,
+              presetId: c.presetId,
+              providerName: providerNameFor(c.presetId),
+              models: imageModels,
+            };
+          })
           .filter((p) => p.models.length > 0);
 
         if (compatible.length === 0) {
-          // No configured connection — but image gen may still work via a
-          // server-side env key. Try the default route; runGeneration's catch
-          // shows the setup prompt only if that ALSO fails.
+          // No connection with an image model — but image gen may still work
+          // via a server-side env key. Try the default route; runGeneration's
+          // catch shows the setup prompt only if that ALSO fails.
           noConnectionsRef.current = true;
           setProviders([]);
           setDefaultRoute(null);
@@ -184,26 +202,35 @@ export function ImageCardGenGate({
           return;
         }
 
-        // Default route: saved override if it's a compatible provider, else
-        // the first compatible connection's first model.
+        // Default route: the saved generate_image override if it maps to a
+        // compatible connection+model, else the first compatible pair.
         const saved =
           settingsBody?.data?.ai?.toolConfig?.generate_image?.routeOverride;
-        const savedCompatible =
-          saved && compatible.some((p) => p.presetId === saved.presetId)
-            ? saved
-            : null;
-        const fallback: Route = {
-          presetId: compatible[0].presetId,
-          modelId: compatible[0].models[0].id,
-        };
-        const route = savedCompatible ?? fallback;
+        const savedConn =
+          saved &&
+          compatible.find(
+            (p) =>
+              p.presetId === saved.presetId &&
+              p.models.some((m) => m.id === saved.modelId),
+          );
+        const route: Route = savedConn
+          ? {
+              connectionId: savedConn.connectionId,
+              presetId: savedConn.presetId,
+              modelId: saved!.modelId,
+            }
+          : {
+              connectionId: compatible[0].connectionId,
+              presetId: compatible[0].presetId,
+              modelId: compatible[0].models[0].id,
+            };
 
         setProviders(compatible);
         setDefaultRoute(route);
-        setPickPreset(route.presetId);
+        setPickConnectionId(route.connectionId);
         setPickModel(route.modelId);
 
-        // One provider → no real choice → generate immediately. Multiple →
+        // One connection → no real choice → generate immediately. Multiple →
         // give the user a countdown window to intervene.
         if (compatible.length === 1) {
           void runGeneration(route, false);
@@ -299,7 +326,8 @@ export function ImageCardGenGate({
   }
 
   // phase === "picker"
-  const modelsForPick = modelsFor(pickPreset);
+  const pickedConn = providers.find((p) => p.connectionId === pickConnectionId);
+  const modelsForPick = pickedConn?.models ?? [];
   return (
     <div className={wrap}>
       <div className="flex items-center gap-2">
@@ -310,16 +338,17 @@ export function ImageCardGenGate({
         <label className="flex flex-col gap-0.5">
           <span className="text-[10px] uppercase tracking-wide opacity-70">Provider</span>
           <select
-            value={pickPreset}
+            value={pickConnectionId}
             onChange={(e) => {
-              setPickPreset(e.target.value);
-              setPickModel(modelsFor(e.target.value)[0]?.id ?? "");
+              setPickConnectionId(e.target.value);
+              const conn = providers.find((p) => p.connectionId === e.target.value);
+              setPickModel(conn?.models[0]?.id ?? "");
             }}
             className="rounded-md border border-amber-400/30 bg-white/40 px-2 py-1 text-[12px] dark:bg-black/30"
           >
             {providers.map((p) => (
-              <option key={p.id} value={p.presetId}>
-                {p.providerName} ({p.name})
+              <option key={p.connectionId} value={p.connectionId}>
+                {p.providerName} ({p.connectionName})
               </option>
             ))}
           </select>
@@ -340,10 +369,14 @@ export function ImageCardGenGate({
         </label>
         <button
           type="button"
-          disabled={!pickPreset || !pickModel}
+          disabled={!pickConnectionId || !pickModel}
           onClick={() =>
             void runGeneration(
-              { presetId: pickPreset, modelId: pickModel },
+              {
+                connectionId: pickConnectionId,
+                presetId: pickedConn?.presetId ?? null,
+                modelId: pickModel,
+              },
               makeDefault,
             )
           }
@@ -387,7 +420,10 @@ export function ImageCardGenGate({
  * settings, merge the override, PATCH the whole ai object (the settings route
  * expects the full ai blob). Best-effort — failure doesn't block generation.
  */
-async function persistImageDefault(route: Route): Promise<void> {
+async function persistImageDefault(route: {
+  presetId: string;
+  modelId: string;
+}): Promise<void> {
   try {
     const res = await fetch("/api/user/settings", { credentials: "include" });
     const body = (await res.json().catch(() => null)) as {

@@ -9,6 +9,7 @@
 import { prisma } from "@/lib/database/client";
 import { generateUniqueSlug } from "@/lib/domain/content";
 import { generateImage } from "./generate";
+import { generateImageViaGateway } from "./generate-via-gateway";
 import type { ImageProviderId, ImageModelId, ImageSize } from "./types";
 import { getUserSettings } from "@/lib/features/settings";
 import {
@@ -73,6 +74,13 @@ export interface GenerateAndStoreImageInput {
    * persisted default. Omit to use resolveImageGenRoute (saved default / env).
    */
   apiKey?: string;
+  /**
+   * Route through the Vercel AI Gateway image path instead of a direct
+   * provider. Set when the chosen connection is a gateway — `modelId` is then
+   * the namespaced gateway id (e.g. "openai/gpt-image-1") and any image-capable
+   * gateway model works, not just the direct-provider catalog. Requires apiKey.
+   */
+  gateway?: boolean;
 }
 
 export interface GeneratedStoredImage {
@@ -101,6 +109,7 @@ export async function generateAndStoreImage(
     quality,
     style,
     apiKey,
+    gateway,
   } = input;
 
   // Explicit key (per-request provider choice) bypasses the saved override;
@@ -108,18 +117,33 @@ export async function generateAndStoreImage(
   const resolved = apiKey
     ? { providerId, modelId, apiKey }
     : await resolveImageGenRoute(userId, { providerId, modelId });
-  const result = await generateImage(
-    {
-      prompt,
-      providerId: resolved.providerId,
-      modelId: resolved.modelId,
-      size: size as ImageSize,
-      quality,
-      style,
-      apiKey: resolved.apiKey,
-    },
-    userId,
-  );
+
+  // Gateway route: any image-capable gateway model (namespaced modelId) goes
+  // through the AI Gateway image path. providerId/canonicalModelId are
+  // best-effort result metadata derived from the namespace.
+  const result =
+    gateway && resolved.apiKey
+      ? await generateImageViaGateway({
+          prompt,
+          modelId: resolved.modelId,
+          apiKey: resolved.apiKey,
+          size: size as ImageSize,
+          providerId: (resolved.modelId.split("/")[0] ||
+            "openai") as ImageProviderId,
+          canonicalModelId: resolved.modelId as ImageModelId,
+        })
+      : await generateImage(
+          {
+            prompt,
+            providerId: resolved.providerId,
+            modelId: resolved.modelId,
+            size: size as ImageSize,
+            quality,
+            style,
+            apiKey: resolved.apiKey,
+          },
+          userId,
+        );
 
   // Decode/download the bytes.
   let imageBuffer: Buffer;

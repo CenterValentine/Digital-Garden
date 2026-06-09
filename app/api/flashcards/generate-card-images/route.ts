@@ -39,7 +39,7 @@ export async function POST(request: NextRequest) {
 
   const body = (await request.json().catch(() => null)) as {
     cards?: DraftInput[];
-    providerId?: string;
+    connectionId?: string;
     modelId?: string;
   } | null;
 
@@ -51,24 +51,30 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Per-request provider choice: resolve the chosen connection's key so it
-  // wins over the saved default. Omitted → generateAndStoreImage uses the
-  // user's configured default route.
-  const providerId =
-    typeof body?.providerId === "string" ? body.providerId : undefined;
+  // Per-request route: the chosen connection (by id) + model. Resolving the
+  // connection's key lets it win over the saved default, and its `kind` tells
+  // us whether to route through the gateway image path (so ANY image-capable
+  // gateway model works, not just the direct-provider catalog). Omitted →
+  // generateAndStoreImage uses the user's configured default route / env.
+  const connectionId =
+    typeof body?.connectionId === "string" ? body.connectionId : undefined;
   const modelId = typeof body?.modelId === "string" ? body.modelId : undefined;
 
   let chosenApiKey: string | undefined;
-  if (providerId) {
+  let chosenPresetId: string | undefined;
+  let chosenIsGateway = false;
+  if (connectionId) {
     try {
       const conns = await listConnections(userId);
-      const match = conns.find((c) => c.presetId === providerId);
+      const match = conns.find((c) => c.id === connectionId);
       if (match) {
         const withKey = await getConnectionWithKey(userId, match.id);
         chosenApiKey = withKey.apiKey;
+        chosenPresetId = match.presetId ?? undefined;
+        chosenIsGateway = match.kind === "gateway";
       }
     } catch {
-      // Fall through — no key resolved; generation will use the default route.
+      // Fall through — no key resolved; generation uses the default route.
     }
   }
 
@@ -86,12 +92,13 @@ export async function POST(request: NextRequest) {
           prompt,
           userId,
           providerId:
-            chosenApiKey && providerId
-              ? (providerId as ImageProviderId)
+            chosenApiKey && chosenPresetId
+              ? (chosenPresetId as ImageProviderId)
               : undefined,
           modelId:
             chosenApiKey && modelId ? (modelId as ImageModelId) : undefined,
           apiKey: chosenApiKey,
+          gateway: chosenIsGateway,
         });
         return {
           frontImageUrl: img.url,
