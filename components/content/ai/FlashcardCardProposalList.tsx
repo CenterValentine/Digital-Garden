@@ -783,6 +783,12 @@ export function FlashcardCardProposalList({
                     ariaLabel={`Card ${i + 1} back`}
                     compact
                   />
+                  {row.imageError && (
+                    <div className="flex items-start gap-1.5 rounded bg-red-500/10 px-1.5 py-1 text-[11px] text-red-700 dark:text-red-300">
+                      <AlertTriangle className="h-3 w-3 shrink-0 mt-0.5" />
+                      <span>Image generation failed: {row.imageError}</span>
+                    </div>
+                  )}
                   {row.status.status === "error" && (
                     <div className="flex items-start gap-1.5 rounded bg-red-500/10 px-1.5 py-1 text-[11px] text-red-700 dark:text-red-300">
                       <AlertTriangle className="h-3 w-3 shrink-0 mt-0.5" />
