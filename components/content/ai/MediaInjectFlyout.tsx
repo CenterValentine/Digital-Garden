@@ -70,7 +70,14 @@ export function MediaInjectFlyout({
 
   const runSearch = useCallback((q: string) => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    if (!q.trim()) {
+    const raw = q.trim();
+    // Path-aware: "learning/test" → search the leaf ("test") and keep only
+    // results whose ancestor path contains the earlier segments ("learning").
+    // The search API matches title/searchText, not full paths.
+    const segments = raw.split("/").map((s) => s.trim()).filter(Boolean);
+    const term = segments.length > 0 ? segments[segments.length - 1] : "";
+    const pathNeedles = segments.slice(0, -1).map((s) => s.toLowerCase());
+    if (!term) {
       setResults([]);
       setLoading(false);
       return;
@@ -79,13 +86,20 @@ export function MediaInjectFlyout({
     debounceRef.current = setTimeout(async () => {
       try {
         const res = await fetch(
-          `/api/content/search?query=${encodeURIComponent(q)}`,
+          `/api/content/search?query=${encodeURIComponent(term)}`,
           { credentials: "include" },
         );
         const json = (await res.json().catch(() => null)) as {
           data?: { items?: SearchItem[] };
         } | null;
-        setResults(json?.data?.items ?? []);
+        let items = json?.data?.items ?? [];
+        if (pathNeedles.length > 0) {
+          items = items.filter((it) => {
+            const hay = (it.path ?? "").toLowerCase();
+            return pathNeedles.every((n) => hay.includes(n));
+          });
+        }
+        setResults(items);
       } catch {
         setResults([]);
       } finally {

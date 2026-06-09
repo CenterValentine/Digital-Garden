@@ -1809,6 +1809,7 @@ function GeneratedAudioCard({ payload }: { payload: AudioPayload }) {
     selectedContentType === "note" || selectedContentType === "chat";
   // "Add to…" flyout — inject this clip into ANY content's note.
   const [injectAnchor, setInjectAnchor] = useState<{ x: number; y: number } | null>(null);
+  const [transcriptCopied, setTranscriptCopied] = useState(false);
   const audioMedia: InjectMedia = {
     kind: "audio",
     url: payload.url,
@@ -1855,12 +1856,29 @@ function GeneratedAudioCard({ payload }: { payload: AudioPayload }) {
   return (
     <div className="rounded-xl border border-black/10 dark:border-white/10 bg-black/[0.03] dark:bg-white/5 overflow-hidden max-w-sm">
       <div className="px-3 py-2 space-y-2">
-        {/* Spoken text summary */}
-        <div className="flex items-start gap-2">
+        {/* Spoken text summary + subtle copy-transcript affordance */}
+        <div className="group flex items-start gap-2">
           <Volume2 className="mt-0.5 h-4 w-4 shrink-0 text-teal-500 dark:text-teal-300" />
-          <p className="text-xs text-gray-600 dark:text-gray-400 line-clamp-2">
+          <p className="flex-1 text-xs text-gray-600 dark:text-gray-400 line-clamp-2">
             {payload.text}
           </p>
+          <button
+            type="button"
+            onClick={() => {
+              void navigator.clipboard?.writeText(payload.text);
+              setTranscriptCopied(true);
+              setTimeout(() => setTranscriptCopied(false), 2000);
+            }}
+            title="Copy transcript"
+            aria-label="Copy transcript"
+            className="mt-0.5 shrink-0 rounded p-0.5 text-gray-400 opacity-0 transition-opacity hover:text-gray-600 group-hover:opacity-100 dark:hover:text-gray-200"
+          >
+            {transcriptCopied ? (
+              <Check className="h-3.5 w-3.5 text-green-500" />
+            ) : (
+              <Copy className="h-3.5 w-3.5" />
+            )}
+          </button>
         </div>
 
         {/* Native audio player */}

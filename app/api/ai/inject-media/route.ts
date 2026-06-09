@@ -26,11 +26,11 @@ import { extractSearchTextFromTipTap } from "@/lib/domain/content";
 interface InjectMedia {
   kind: "audio" | "image";
   url: string;
-  contentId?: string;
-  mimeType?: string;
-  filename?: string;
-  alt?: string;
-  durationSeconds?: number;
+  contentId?: string | null;
+  mimeType?: string | null;
+  filename?: string | null;
+  alt?: string | null;
+  durationSeconds?: number | null;
 }
 
 /** Build the TipTap node for the media being injected. */
@@ -130,13 +130,15 @@ const bodySchema = z.object({
   media: z.object({
     kind: z.enum(["audio", "image"]),
     url: z.string().min(1),
-    contentId: z.string().optional(),
-    mimeType: z.string().optional(),
-    filename: z.string().optional(),
-    alt: z.string().optional(),
-    durationSeconds: z.number().optional(),
+    // nullish (not optional): the cards send `null` for absent values, and
+    // z.optional() rejects null — which was failing every audio inject.
+    contentId: z.string().nullish(),
+    mimeType: z.string().nullish(),
+    filename: z.string().nullish(),
+    alt: z.string().nullish(),
+    durationSeconds: z.number().nullish(),
   }),
-  instruction: z.string().optional(),
+  instruction: z.string().nullish(),
 });
 
 export async function POST(request: NextRequest) {
