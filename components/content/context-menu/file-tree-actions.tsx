@@ -34,7 +34,9 @@ import {
   ArrowDownRight,
   FolderInput,
   Sparkles,
+  Captions,
 } from "lucide-react";
+import { toast } from "sonner";
 import type { ContextMenuActionProvider, ContextMenuSection, ContextMenuAction } from "./types";
 import {
   getNewContentMenuItems,
@@ -583,6 +585,55 @@ export const fileTreeActionProvider: ContextMenuActionProvider = (ctx) => {
           onClick: async () => await onDownload?.(selectedIds),
           disabled: !onDownload,
           divider: true,
+        },
+      ],
+    });
+  }
+
+  // Section 6.5: AI — transcribe an audio file into a sibling note (Phase 5).
+  // Single audio file only. Opt-in (explicit click); the speech-to-text route
+  // is auto-discovered server-side.
+  if (
+    isSingleSelection &&
+    clickedId &&
+    clickedNode?.contentType === "file" &&
+    clickedNode.file?.mimeType?.startsWith("audio/")
+  ) {
+    const audioId = clickedId;
+    sections.push({
+      title: "AI",
+      actions: [
+        {
+          id: "transcribe-audio",
+          label: "Transcribe to note",
+          icon: <Captions className="h-4 w-4" />,
+          onClick: async () => {
+            const toastId = toast.loading("Transcribing audio…");
+            try {
+              const res = await fetch("/api/ai/transcribe", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                credentials: "include",
+                body: JSON.stringify({ contentId: audioId }),
+              });
+              const json = (await res.json().catch(() => null)) as {
+                success?: boolean;
+                error?: string;
+                data?: { noteId?: string | null };
+              } | null;
+              if (!res.ok || !json?.success) {
+                throw new Error(json?.error || "Transcription failed");
+              }
+              toast.success("Transcript note created", { id: toastId });
+              await onRefresh?.();
+            } catch (error) {
+              toast.error("Couldn't transcribe audio", {
+                id: toastId,
+                description:
+                  error instanceof Error ? error.message : "Transcription failed",
+              });
+            }
+          },
         },
       ],
     });

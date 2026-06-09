@@ -94,6 +94,20 @@ export const FEATURE_REGISTRY: FeatureSpec[] = [
     },
   },
   {
+    // Default provider for speech-to-text: transcribing uploaded audio files
+    // and (optionally) editor dictation. Auto-binds to the first
+    // transcription-capable connection when unset.
+    id: "speech-to-text",
+    label: "Speech-to-Text",
+    description:
+      "Default provider for transcription (transcribe an uploaded audio file into a note). Seed an OpenAI connection with a `whisper-1` or `gpt-4o-transcribe` model.",
+    requiredCapabilities: ["transcription"],
+    defaultSuggestion: {
+      presetId: "openai",
+      modelId: "whisper-1",
+    },
+  },
+  {
     id: "follow-ups",
     label: "Suggested Follow-ups",
     description:
