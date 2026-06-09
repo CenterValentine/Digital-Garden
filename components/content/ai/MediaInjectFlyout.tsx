@@ -15,8 +15,6 @@ import { createPortal } from "react-dom";
 import { Loader2, Search, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/core/utils";
-import { useContentStore } from "@/state/content-store";
-import { useNotesPanelStore } from "@/state/notes-panel-store";
 
 export interface InjectMedia {
   kind: "audio" | "image";
@@ -114,45 +112,11 @@ export function MediaInjectFlyout({
     async (target: SearchItem) => {
       if (injectingId) return;
 
-      // If the target is the content currently open in the panel, route the
-      // insert through its LIVE editor (a normal editor transaction + autosave)
-      // instead of a server PATCH — otherwise the open editor's stale copy
-      // triggers a save-conflict banner. The live editor appends the block;
-      // AI placement/instruction is skipped for the doc you're already looking
-      // at (you can see + reposition it).
-      const { selectedContentId, selectedContentType } = useContentStore.getState();
-      if (target.id === selectedContentId) {
-        const detail =
-          media.kind === "audio"
-            ? {
-                src: media.url,
-                filename: media.filename,
-                mimeType: media.mimeType,
-                durationSeconds: media.durationSeconds ?? null,
-                autoplayOnFlip: false,
-              }
-            : {
-                src: media.url,
-                alt: media.alt,
-                contentId: media.contentId,
-                source: "ai-generated",
-              };
-        const evtName = media.kind === "audio" ? "insert-ai-audio" : "insert-ai-image";
-        const fire = () => window.dispatchEvent(new CustomEvent(evtName, { detail }));
-        // Non-note content keeps its editor in the collapsible notes panel —
-        // expand it so the listener is mounted, then fire after it subscribes.
-        if (selectedContentType === "note") {
-          fire();
-        } else {
-          const panel = useNotesPanelStore.getState();
-          if (!panel.isExpanded) panel.setExpanded(true);
-          setTimeout(fire, panel.isExpanded ? 0 : 400);
-        }
-        toast.success(`Added to "${target.title}"`);
-        onClose();
-        return;
-      }
-
+      // Always server-inject: the endpoint writes NotePayload reliably (and
+      // AI-places). Routing the focused target through the live editor instead
+      // wrote to the collab Y.Doc, which silently dropped the insert when
+      // Hocuspocus wasn't synced. If the target note is open, the editor shows
+      // a "changed elsewhere" banner — "Take theirs" loads the injected media.
       setInjectingId(target.id);
       const toastId = toast.loading(`Adding ${media.kind} to "${target.title}"…`);
       try {
