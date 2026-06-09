@@ -1772,23 +1772,44 @@ function GeneratedImageCard({ payload }: { payload: ImagePayload }) {
 function GeneratedAudioCard({ payload }: { payload: AudioPayload }) {
   const [inserted, setInserted] = useState(false);
   const selectedContentType = useContentStore((s) => s.selectedContentType);
-  const canInsert = selectedContentType === "note";
+  // Notes target the full-page editor; chats target their sidecar "Add notes"
+  // TipTap doc (the ExpandableEditor), so both can receive the audio block.
+  const canInsert =
+    selectedContentType === "note" || selectedContentType === "chat";
 
   const handleInsertIntoDocument = useCallback(() => {
-    window.dispatchEvent(
-      new CustomEvent("insert-ai-audio", {
-        detail: {
-          src: payload.url,
-          filename: payload.fileName,
-          mimeType: payload.mimeType,
-          durationSeconds: payload.durationSeconds ?? null,
-          autoplayOnFlip: false,
-        },
-      })
-    );
+    const dispatch = () =>
+      window.dispatchEvent(
+        new CustomEvent("insert-ai-audio", {
+          detail: {
+            src: payload.url,
+            filename: payload.fileName,
+            mimeType: payload.mimeType,
+            durationSeconds: payload.durationSeconds ?? null,
+            autoplayOnFlip: false,
+          },
+        })
+      );
+
+    // A chat's note editor (ExpandableEditor → MarkdownEditor) only mounts —
+    // and only then registers its insert-ai-audio listener — when the notes
+    // panel is expanded. Expand it first, then dispatch once the lazily-loaded
+    // editor has had time to mount and subscribe. If already expanded (or a
+    // plain note), dispatch immediately.
+    if (selectedContentType === "chat") {
+      const notesPanel = useNotesPanelStore.getState();
+      if (!notesPanel.isExpanded) {
+        notesPanel.setExpanded(true);
+        setTimeout(dispatch, 400);
+      } else {
+        dispatch();
+      }
+    } else {
+      dispatch();
+    }
     setInserted(true);
     setTimeout(() => setInserted(false), 3000);
-  }, [payload]);
+  }, [payload, selectedContentType]);
 
   return (
     <div className="rounded-xl border border-black/10 dark:border-white/10 bg-black/[0.03] dark:bg-white/5 overflow-hidden max-w-sm">
@@ -1818,7 +1839,7 @@ function GeneratedAudioCard({ payload }: { payload: AudioPayload }) {
           type="button"
           onClick={handleInsertIntoDocument}
           disabled={inserted || !canInsert}
-          title={canInsert ? "Insert at cursor position" : "Open a note to insert audio"}
+          title={canInsert ? "Insert into the document's notes" : "Open a note or chat to insert audio"}
           className={cn(
             "flex items-center gap-1.5 w-full justify-center rounded-lg px-3 py-1.5 text-xs font-medium transition-colors",
             inserted
