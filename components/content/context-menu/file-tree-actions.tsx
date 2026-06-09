@@ -33,7 +33,6 @@ import {
   ArrowDownLeft,
   ArrowDownRight,
   FolderInput,
-  Sparkles,
   Captions,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -58,7 +57,6 @@ import {
 import { usePageTemplateStore } from "@/state/page-template-store";
 import { useFileTreeFilterStore } from "@/state/file-tree-filter-store";
 import { useSettingsStore } from "@/state/settings-store";
-import { useFolderAssistantStore } from "@/state/folder-assistant-store";
 
 /**
  * Context passed to file tree action provider
@@ -541,27 +539,21 @@ export const fileTreeActionProvider: ContextMenuActionProvider = (ctx) => {
     const folderAssistantOn =
       aiSettings?.enabled !== false &&
       aiSettings?.folderAssistant?.enabled !== false;
+    // Single "Move" entry whose flyout hosts: Folder assistant (top, when on)
+    // → search input → Recents. Consolidates the former two items.
     const moveActions: ContextMenuAction[] = [
       {
-        id: "move-folder-search",
-        label: "Folder search",
+        id: "move",
+        label: "Move",
         icon: <FolderInput className="h-4 w-4" />,
         customFlyout: {
           kind: "folder-search",
           selectedIds,
           excludeIds,
+          folderAssistant: folderAssistantOn,
         },
       },
     ];
-    if (folderAssistantOn) {
-      moveActions.push({
-        id: "move-folder-assistant",
-        label: "Folder assistant",
-        icon: <Sparkles className="h-4 w-4" />,
-        onClick: () =>
-          useFolderAssistantStore.getState().openDialog(selectedIds),
-      });
-    }
     sections.push({ title: "Move", actions: moveActions });
   }
 
