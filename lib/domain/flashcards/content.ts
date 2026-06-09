@@ -50,6 +50,67 @@ export function createImageFrontDoc(
   };
 }
 
+/**
+ * Build a card front/back fragment containing an audio clip. Two uses:
+ *  - Pronunciation (Mode A): a spoken term attached to a card, autoplay on flip.
+ *  - Sound identification (Mode B/C): the clip IS the front prompt (bird call,
+ *    engine). For identification pass an EMPTY label so the answer isn't given
+ *    away in a caption.
+ *
+ * Mirrors createImageFrontDoc. The `audioEmbed` node has no contentId attr (the
+ * src URL is sufficient for playback), so unlike the image node we only carry
+ * the storage URL.
+ */
+export function createAudioFrontDoc(
+  audioUrl: string,
+  label: string,
+  options: { autoplayOnFlip?: boolean } = {},
+): JSONContent {
+  const caption = label.trim();
+  return {
+    type: "doc",
+    content: [
+      {
+        type: "audioEmbed",
+        attrs: {
+          src: audioUrl,
+          filename: caption || "Audio",
+          autoplayOnFlip: options.autoplayOnFlip ?? false,
+        },
+      },
+      {
+        type: "paragraph",
+        content: caption ? [{ type: "text", text: caption }] : undefined,
+      },
+    ],
+  };
+}
+
+/**
+ * Append an audio clip to an existing card doc (e.g. attach a pronunciation to
+ * a term that's already on the front/back). Returns a new doc — does not mutate
+ * the input. If the value isn't a doc it's normalized first.
+ */
+export function appendAudioToDoc(
+  doc: unknown,
+  audioUrl: string,
+  options: { autoplayOnFlip?: boolean } = {},
+): JSONContent {
+  const base = normalizeTiptapDoc(doc);
+  const audioNode: JSONContent = {
+    type: "audioEmbed",
+    attrs: {
+      src: audioUrl,
+      filename: "Pronunciation",
+      autoplayOnFlip: options.autoplayOnFlip ?? false,
+    },
+  };
+  return {
+    ...base,
+    content: [...(base.content ?? []), audioNode],
+  };
+}
+
 export function isTiptapDoc(value: unknown): value is JSONContent {
   return Boolean(
     value &&
