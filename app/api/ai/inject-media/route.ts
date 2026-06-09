@@ -39,6 +39,10 @@ function mediaNode(media: InjectMedia): JSONContent {
     return {
       type: "audioEmbed",
       attrs: {
+        // Every block instance needs a unique blockId. Without it the editor's
+        // node-view factory auto-assigns one via a synchronous dispatch DURING
+        // render, which corrupts the view and crashes the panel on load.
+        blockId: crypto.randomUUID(),
         src: media.url,
         filename: media.filename ?? "Audio",
         mimeType: media.mimeType ?? null,

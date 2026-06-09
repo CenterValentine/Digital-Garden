@@ -170,6 +170,7 @@ export function AdaptiveFlashcardEditor({
         .insertContent({
           type: "audioEmbed",
           attrs: {
+            blockId: crypto.randomUUID(),
             src: result.audioUrl,
             filename: term,
             autoplayOnFlip: true,

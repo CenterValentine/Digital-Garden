@@ -73,6 +73,7 @@ export function createAudioFrontDoc(
       {
         type: "audioEmbed",
         attrs: {
+          blockId: crypto.randomUUID(),
           src: audioUrl,
           filename: caption || "Audio",
           autoplayOnFlip: options.autoplayOnFlip ?? false,
@@ -100,6 +101,7 @@ export function appendAudioToDoc(
   const audioNode: JSONContent = {
     type: "audioEmbed",
     attrs: {
+      blockId: crypto.randomUUID(),
       src: audioUrl,
       filename: "Pronunciation",
       autoplayOnFlip: options.autoplayOnFlip ?? false,

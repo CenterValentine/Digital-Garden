@@ -1128,6 +1128,7 @@ export function MarkdownEditor({
         .insertContent({
           type: "audioEmbed",
           attrs: {
+            blockId: crypto.randomUUID(),
             src,
             filename: filename ?? "AI speech",
             mimeType: mimeType ?? null,
