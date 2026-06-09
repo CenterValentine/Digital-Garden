@@ -232,10 +232,15 @@ model FlashcardDeck {
   children   FlashcardDeck[] @relation("FlashcardDeckHierarchy")
   flashcards Flashcard[]
 
-  @@unique([ownerId, slug])
+  // Path is the materialized full hierarchy ("spanish/irregular-verbs").
+  // Uniqueness on (ownerId, path) — not (ownerId, slug) — because the
+  // slug column only carries the leaf name, which legitimately repeats
+  // across different parents (Anki-style nested decks). The previous
+  // slug-unique constraint blocked that pattern.
+  @@unique([ownerId, path])
   @@unique([ownerId, parentDeckId, name])
   @@index([ownerId, deletedAt])
-  @@index([ownerId, path])
+  @@index([ownerId, slug]) // non-unique; kept for legacy slug lookups
   @@index([parentDeckId, displayOrder])
 }
 
@@ -493,6 +498,7 @@ model User {
   passwordHash            String?                  @db.Char(60)
   email                   String                   @unique @db.VarChar(255)
   role                    UserRole                 @default(guest)
+  canClaimCustomHosts     Boolean                  @default(false)
   createdAt               DateTime                 @default(now()) @db.Timestamptz(6)
   updatedAt               DateTime                 @updatedAt @db.Timestamptz(6)
   settings                Json?
@@ -511,6 +517,7 @@ model User {
   contentHistory          ContentHistory[]
   contentNodes            ContentNode[]
   conversations           Conversation[]
+  chatContexts            ChatContext[]
   sessions                Session[]
   storageConfigs          StorageProviderConfig[]
   tags                    Tag[]
@@ -1123,14 +1130,40 @@ model Conversation {
   ownerId                 String    @db.Uuid
   title                   String?   @db.VarChar(255)
   archivedToContentNodeId String?   @unique @db.Uuid
+  // Selected custom-instruction context for this chat. Single active
+  // context per conversation (ChatGPT-style). SetNull so deleting a
+  // context doesn't cascade-delete the chat — it just clears the link.
+  activeContextId         String?   @db.Uuid
   createdAt               DateTime  @default(now()) @db.Timestamptz(6)
   updatedAt               DateTime  @updatedAt @db.Timestamptz(6)
   deletedAt               DateTime? @db.Timestamptz(6)
 
   owner                 User                      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   archivedToContentNode ContentNode?              @relation("ConversationArchive", fields: [archivedToContentNodeId], references: [id], onDelete: SetNull)
+  activeContext         ChatContext?              @relation("ConversationActiveContext", fields: [activeContextId], references: [id], onDelete: SetNull)
   messages              ConversationMessage[]
   associations          ConversationAssociation[]
+
+  @@index([ownerId, updatedAt])
+  @@index([ownerId, deletedAt])
+}
+
+/// User-authored custom-instruction presets ("chat contexts"). Each is a
+/// named block of guidance that, when active, is appended to the chat
+/// system prompt to shape the assistant's voice/output. Created, edited,
+/// and deleted on the spot from the chat composer. Soft-deleted so an
+/// in-flight conversation reference degrades gracefully.
+model ChatContext {
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ownerId   String    @db.Uuid
+  name      String    @db.VarChar(120)
+  body      String    @db.Text
+  createdAt DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime  @updatedAt @db.Timestamptz(6)
+  deletedAt DateTime? @db.Timestamptz(6)
+
+  owner         User           @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  conversations Conversation[] @relation("ConversationActiveContext")
 
   @@index([ownerId, updatedAt])
   @@index([ownerId, deletedAt])
