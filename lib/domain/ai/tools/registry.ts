@@ -23,7 +23,11 @@ import { IMAGE_PROVIDER_CATALOG } from "@/lib/domain/ai/image/catalog";
 import type { ImageProviderId, ImageModelId, ImageSize } from "@/lib/domain/ai/image/types";
 import { generateAndStoreSpeech } from "@/lib/domain/ai/speech/generate-and-store";
 import { SPEECH_PROVIDER_CATALOG } from "@/lib/domain/ai/speech/catalog";
-import type { SpeechProviderId, SpeechModelId } from "@/lib/domain/ai/speech/types";
+import {
+  describeSpeechError,
+  type SpeechProviderId,
+  type SpeechModelId,
+} from "@/lib/domain/ai/speech/types";
 import type { ToolExecuteContext } from "./types";
 
 /**
@@ -480,8 +484,9 @@ export function createBaseTools(ctx: ToolExecuteContext) {
             fileName: stored.fileName,
           });
         } catch (error) {
-          const message = error instanceof Error ? error.message : "Speech generation failed";
-          return `Speech generation failed: ${message}`;
+          // Swap the low-level "no key" error for actionable setup guidance
+          // (points at Connections + Feature Routing → Text-to-Speech).
+          return `Speech generation failed: ${describeSpeechError(error)}`;
         }
       },
     }),

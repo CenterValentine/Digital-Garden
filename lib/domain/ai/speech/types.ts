@@ -33,6 +33,32 @@ export type SpeechModelId =
 /** Supported audio container/codec output formats */
 export type SpeechFormat = "mp3" | "opus" | "aac" | "flac" | "wav";
 
+/**
+ * Stable substring of the "no key" error thrown by `generateSpeech` when no
+ * provider key resolves. The tool/route boundary matches on this to swap the
+ * low-level message for the user-facing setup hint below.
+ */
+export const SPEECH_NO_KEY_MARKER = "No API key configured for speech provider";
+
+/**
+ * User-facing guidance shown when speech generation fails because no provider
+ * is set up. Points at the Connections + Feature Routing surfaces that fix it.
+ */
+export const SPEECH_SETUP_HINT =
+  "No text-to-speech provider is set up yet. In Settings → AI, add a speech-capable connection " +
+  "(e.g. OpenAI with a `tts-1` model), then choose it as the provider under " +
+  "Feature Routing → Text-to-Speech. Once configured, ask me again and I'll generate the audio.";
+
+/**
+ * Map a caught speech-generation error to a user-facing message: the friendly
+ * setup hint when no provider is configured, otherwise the original message.
+ */
+export function describeSpeechError(error: unknown): string {
+  const message =
+    error instanceof Error ? error.message : "Speech generation failed";
+  return message.includes(SPEECH_NO_KEY_MARKER) ? SPEECH_SETUP_HINT : message;
+}
+
 /** MIME type for a given output format. */
 export const SPEECH_FORMAT_MIME: Record<SpeechFormat, string> = {
   mp3: "audio/mpeg",

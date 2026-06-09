@@ -24,6 +24,14 @@ import {
   listConnections,
   getConnectionWithKey,
 } from "@/lib/features/ai-connections";
+import { effectiveCapabilities } from "@/lib/domain/ai/features/capabilities";
+
+/** Provider ids the speech dispatch can actually route to. */
+const SPEECH_PRESET_IDS: ReadonlySet<string> = new Set([
+  "openai",
+  "elevenlabs",
+  "google",
+]);
 
 /** Persisted route override for the `generate_speech` tool. */
 interface SpeechRouteOverride {
@@ -34,9 +42,15 @@ interface SpeechRouteOverride {
 }
 
 /**
- * Resolve the effective speech-gen route for a user: honor a `generate_speech`
- * tool route override (a saved Connection) if configured, else fall back to the
- * requested provider/model. Best-effort — never throws on settings read errors.
+ * Resolve the effective speech-gen route for a user. Priority:
+ *   1. A saved `generate_speech` tool route override (an explicit Connection).
+ *   2. Auto-discovery — the first Connection holding a speech-capable model
+ *      (capability-keyed, not a hardcoded provider list). So simply ADDING an
+ *      OpenAI connection with `tts-1` is enough; no separate "pin this tool's
+ *      provider" step is required (an improvement over generate_image, which
+ *      needs the override or an env key).
+ *   3. Fall back to the requested provider/model (env-key path).
+ * Best-effort — never throws on settings/connection read errors.
  */
 export async function resolveSpeechGenRoute(
   userId: string,
@@ -49,6 +63,9 @@ export async function resolveSpeechGenRoute(
   language?: string;
 }> {
   try {
+    const conns = await listConnections(userId);
+
+    // 1. Explicit override wins.
     const settings = await getUserSettings(userId);
     const override = (
       settings.ai as
@@ -60,20 +77,37 @@ export async function resolveSpeechGenRoute(
           }
         | undefined
     )?.toolConfig?.generate_speech?.routeOverride;
-    if (!override) return aiArgs;
+    if (override) {
+      const match = conns.find((c) => c.presetId === override.presetId);
+      if (match) {
+        const withKey = await getConnectionWithKey(userId, match.id);
+        return {
+          providerId: override.presetId as SpeechProviderId,
+          modelId: override.modelId as SpeechModelId,
+          apiKey: withKey.apiKey,
+          voice: override.voice,
+          language: override.language,
+        };
+      }
+    }
 
-    const conns = await listConnections(userId);
-    const match = conns.find((c) => c.presetId === override.presetId);
-    if (!match) return aiArgs;
-    const withKey = await getConnectionWithKey(userId, match.id);
+    // 2. Auto-discover the first connection with a speech-capable model.
+    for (const conn of conns) {
+      if (!conn.presetId || !SPEECH_PRESET_IDS.has(conn.presetId)) continue;
+      const speechModel = conn.models.find((m) =>
+        effectiveCapabilities(m).has("speech"),
+      );
+      if (!speechModel) continue;
+      const withKey = await getConnectionWithKey(userId, conn.id);
+      return {
+        providerId: conn.presetId as SpeechProviderId,
+        modelId: speechModel.id as SpeechModelId,
+        apiKey: withKey.apiKey,
+      };
+    }
 
-    return {
-      providerId: override.presetId as SpeechProviderId,
-      modelId: override.modelId as SpeechModelId,
-      apiKey: withKey.apiKey,
-      voice: override.voice,
-      language: override.language,
-    };
+    // 3. Nothing configured — let generateSpeech try the env-key fallback.
+    return aiArgs;
   } catch {
     return aiArgs;
   }

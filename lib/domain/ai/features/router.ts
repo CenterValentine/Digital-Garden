@@ -90,6 +90,38 @@ export async function resolveFeatureRoute(
     }
   }
 
+  // Last-resort auto-bind: no explicit route and the registry default didn't
+  // match a connection (e.g. the user added `tts-1-hd` but the default suggests
+  // `tts-1`). Pick the FIRST connection holding any model that satisfies the
+  // feature's required capabilities, so a feature "just works" the moment a
+  // compatible provider exists — no manual binding step. Capability-keyed, not
+  // a hardcoded provider list. Purely additive: only runs when nothing else
+  // resolved, so it never overrides a user's explicit choice or a working
+  // default. Marked `fromDefault` so the UI can show it as auto-selected.
+  if (resolved.length === 0) {
+    const conns = await listConnections(userId);
+    for (const c of conns) {
+      const model = c.models.find((m) =>
+        feature.requiredCapabilities.every((cap) =>
+          effectiveCapabilities(m).has(cap),
+        ),
+      );
+      if (!model) continue;
+      try {
+        const conn = await getConnectionWithKey(userId, c.id);
+        resolved.push({
+          connection: conn,
+          modelId: model.id,
+          position: 0,
+          fromDefault: true,
+        });
+        break;
+      } catch {
+        /* connection vanished — try the next */
+      }
+    }
+  }
+
   return resolved;
 }
 

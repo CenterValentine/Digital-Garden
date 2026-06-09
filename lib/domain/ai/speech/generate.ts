@@ -15,6 +15,7 @@
 import "server-only";
 import {
   SPEECH_FORMAT_MIME,
+  SPEECH_NO_KEY_MARKER,
   type SpeechFormat,
   type SpeechGenRequest,
   type SpeechGenResult,
@@ -43,7 +44,7 @@ export async function generateSpeech(
 
   if (!apiKey) {
     throw new Error(
-      `No API key configured for speech provider "${request.providerId}". ` +
+      `${SPEECH_NO_KEY_MARKER} "${request.providerId}". ` +
         `Set the matching environment variable or pass an apiKey in the request.`,
     );
   }
@@ -106,10 +107,13 @@ async function generateOpenAI(
   });
 
   const modelId = req.upstreamModelId ?? req.modelId;
+  // OpenAI's speech endpoint requires a voice — default to "alloy" when the
+  // caller (chat tool / auto-discovery) didn't pick one.
+  const voice = req.voice ?? "alloy";
   const result = await experimental_generateSpeech({
     model: openai.speech(modelId as Parameters<typeof openai.speech>[0]),
     text: req.text,
-    ...(req.voice ? { voice: req.voice } : {}),
+    voice,
     outputFormat: req.format,
     ...(req.speed ? { speed: req.speed } : {}),
     ...(req.language ? { language: req.language } : {}),
