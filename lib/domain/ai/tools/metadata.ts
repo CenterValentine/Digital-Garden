@@ -24,6 +24,7 @@ export const BASE_TOOL_IDS = [
   "createNote",
   "updateNote",
   "generate_image",
+  "generate_speech",
 ] as const;
 
 export type BaseToolId = (typeof BASE_TOOL_IDS)[number];
@@ -68,6 +69,13 @@ export const BASE_TOOL_METADATA: Record<BaseToolId, BaseToolMeta> = {
       "Generate an AI image from a text prompt using DALL·E, Imagen, FLUX, and other providers",
     callsAi: true,
     requiredCapabilities: ["image-generation"],
+  },
+  generate_speech: {
+    name: "Generate Speech",
+    description:
+      "Convert text to spoken audio using OpenAI, ElevenLabs, or Google text-to-speech voices",
+    callsAi: true,
+    requiredCapabilities: ["speech"],
   },
 };
 

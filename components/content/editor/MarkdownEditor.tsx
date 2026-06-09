@@ -1113,6 +1113,35 @@ export function MarkdownEditor({
     return () => window.removeEventListener("insert-ai-image", handleInsertAiImage);
   }, [editor]);
 
+  // Audio subsystem: insert an AI-generated speech clip at the cursor as an
+  // `audioEmbed` block. Mirrors the insert-ai-image flow above.
+  useEffect(() => {
+    if (!editor) return;
+
+    const handleInsertAiAudio = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      const { src, filename, mimeType, durationSeconds, autoplayOnFlip } = detail;
+
+      editor
+        .chain()
+        .focus()
+        .insertContent({
+          type: "audioEmbed",
+          attrs: {
+            src,
+            filename: filename ?? "AI speech",
+            mimeType: mimeType ?? null,
+            durationSeconds: durationSeconds ?? null,
+            autoplayOnFlip: autoplayOnFlip ?? false,
+          },
+        })
+        .run();
+    };
+
+    window.addEventListener("insert-ai-audio", handleInsertAiAudio);
+    return () => window.removeEventListener("insert-ai-audio", handleInsertAiAudio);
+  }, [editor]);
+
   // Sprint 37: Insert image from file — shared by paste, drop, and file input.
   // Immediately shows a blob URL placeholder, uploads async, then swaps src.
   // NOTE: editorProps handlers use insertImageFromFileRef (not this directly)

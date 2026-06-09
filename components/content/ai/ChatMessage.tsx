@@ -16,7 +16,7 @@ import { createPortal } from "react-dom";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { common, createLowlight } from "lowlight";
-import { Bot, User, Wrench, Loader2, Copy, Check, ImagePlus, GripVertical, BrainCircuit, ChevronRight, Pencil, RotateCcw, GitBranch, FileText } from "lucide-react";
+import { Bot, User, Wrench, Loader2, Copy, Check, ImagePlus, GripVertical, BrainCircuit, ChevronRight, Pencil, RotateCcw, GitBranch, FileText, Volume2 } from "lucide-react";
 import { FlashcardDeckProposalCard } from "./FlashcardDeckProposalCard";
 import { FlashcardCardProposalList } from "./FlashcardCardProposalList";
 import { cn } from "@/lib/core/utils";
@@ -100,6 +100,19 @@ interface ImagePayload {
   modelId: string;
   width: number;
   height: number;
+  fileName: string;
+}
+
+/** Shape of the audio payload returned by the generate_speech tool */
+interface AudioPayload {
+  __audioPayload: true;
+  contentId: string;
+  url: string;
+  text: string;
+  mimeType: string;
+  durationSeconds?: number | null;
+  providerId: string;
+  modelId: string;
   fileName: string;
 }
 
@@ -297,17 +310,20 @@ export const ChatMessage = memo(function ChatMessage({
   // type variations.
   const {
     imagePayloads,
+    audioPayloads,
     notePayloads,
     deckProposals,
     deckWithCardsProposals,
     hasRunningTools,
   } = useMemo(() => {
     const images: ImagePayload[] = [];
+    const audios: AudioPayload[] = [];
     const notes: NotePayload[] = [];
     const deckProps: DeckProposalPayload[] = [];
     const deckWithCardsProps: DeckWithCardsProposalPayload[] = [];
     let running = false;
     const seenImageIds = new Set<string>();
+    const seenAudioIds = new Set<string>();
     const seenNoteIds = new Set<string>();
 
     for (const part of message.parts) {
@@ -323,6 +339,12 @@ export const ChatMessage = memo(function ChatMessage({
         if (image && !seenImageIds.has(image.contentId)) {
           seenImageIds.add(image.contentId);
           images.push(image);
+          continue;
+        }
+        const audio = parseAudioPayload(tp.output);
+        if (audio && !seenAudioIds.has(audio.contentId)) {
+          seenAudioIds.add(audio.contentId);
+          audios.push(audio);
           continue;
         }
         const note = parseNotePayload(tp.output);
@@ -345,6 +367,7 @@ export const ChatMessage = memo(function ChatMessage({
 
     return {
       imagePayloads: images,
+      audioPayloads: audios,
       notePayloads: notes,
       deckProposals: deckProps,
       deckWithCardsProposals: deckWithCardsProps,
@@ -582,6 +605,7 @@ export const ChatMessage = memo(function ChatMessage({
           if (toolPart) {
             if (toolPart.state === "output-available") {
               if (parseImagePayload(toolPart.output) !== null) return null;
+              if (parseAudioPayload(toolPart.output) !== null) return null;
               if (parseNotePayload(toolPart.output) !== null) return null;
               if (parseDeckProposal(toolPart.output) !== null) return null;
               if (parseDeckWithCardsProposal(toolPart.output) !== null) return null;
@@ -604,6 +628,11 @@ export const ChatMessage = memo(function ChatMessage({
         {/* Image cards — rendered at message level for reliability */}
         {imagePayloads.map((payload) => (
           <GeneratedImageCard key={payload.contentId} payload={payload} />
+        ))}
+
+        {/* Audio cards — inline player for generate_speech results */}
+        {audioPayloads.map((payload) => (
+          <GeneratedAudioCard key={payload.contentId} payload={payload} />
         ))}
 
         {/* Note cards — clickable link affordance for createNote / updateNote */}
@@ -1295,6 +1324,20 @@ function parseImagePayload(result: unknown): ImagePayload | null {
   return null;
 }
 
+/** Parse an audio payload from a generate_speech tool result string */
+function parseAudioPayload(result: unknown): AudioPayload | null {
+  if (result === undefined) return null;
+  const str = typeof result === "string" ? result : JSON.stringify(result);
+  if (!str.includes('"__audioPayload"')) return null;
+  try {
+    const parsed = JSON.parse(str);
+    if (parsed.__audioPayload) return parsed as AudioPayload;
+  } catch {
+    // not valid JSON
+  }
+  return null;
+}
+
 /** Parse a note payload (createNote / updateNote) from a tool result. */
 function parseNotePayload(result: unknown): NotePayload | null {
   if (result === undefined) return null;
@@ -1712,6 +1755,87 @@ function GeneratedImageCard({ payload }: { payload: ImagePayload }) {
           ) : (
             <>
               <ImagePlus className="h-3.5 w-3.5" />
+              Insert into document
+            </>
+          )}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Inline player for an AI-generated speech clip (generate_speech tool).
+ * Mirrors GeneratedImageCard: native playback + an "Insert into document"
+ * action that drops an `audioEmbed` block at the editor cursor.
+ */
+function GeneratedAudioCard({ payload }: { payload: AudioPayload }) {
+  const [inserted, setInserted] = useState(false);
+  const selectedContentType = useContentStore((s) => s.selectedContentType);
+  const canInsert = selectedContentType === "note";
+
+  const handleInsertIntoDocument = useCallback(() => {
+    window.dispatchEvent(
+      new CustomEvent("insert-ai-audio", {
+        detail: {
+          src: payload.url,
+          filename: payload.fileName,
+          mimeType: payload.mimeType,
+          durationSeconds: payload.durationSeconds ?? null,
+          autoplayOnFlip: false,
+        },
+      })
+    );
+    setInserted(true);
+    setTimeout(() => setInserted(false), 3000);
+  }, [payload]);
+
+  return (
+    <div className="rounded-xl border border-black/10 dark:border-white/10 bg-black/[0.03] dark:bg-white/5 overflow-hidden max-w-sm">
+      <div className="px-3 py-2 space-y-2">
+        {/* Spoken text summary */}
+        <div className="flex items-start gap-2">
+          <Volume2 className="mt-0.5 h-4 w-4 shrink-0 text-teal-500 dark:text-teal-300" />
+          <p className="text-xs text-gray-600 dark:text-gray-400 line-clamp-2">
+            {payload.text}
+          </p>
+        </div>
+
+        {/* Native audio player */}
+        <audio controls src={payload.url} className="w-full" preload="metadata">
+          <track kind="captions" />
+        </audio>
+
+        {/* Provider badge */}
+        <div className="flex items-center gap-2 text-[10px] text-gray-500 dark:text-gray-400">
+          <span className="rounded bg-black/[0.03] dark:bg-white/5 px-1.5 py-0.5">
+            {payload.providerId}/{payload.modelId}
+          </span>
+        </div>
+
+        {/* Insert action */}
+        <button
+          type="button"
+          onClick={handleInsertIntoDocument}
+          disabled={inserted || !canInsert}
+          title={canInsert ? "Insert at cursor position" : "Open a note to insert audio"}
+          className={cn(
+            "flex items-center gap-1.5 w-full justify-center rounded-lg px-3 py-1.5 text-xs font-medium transition-colors",
+            inserted
+              ? "bg-green-500/20 text-green-300 border border-green-500/20"
+              : canInsert
+                ? "bg-blue-500/20 text-blue-300 border border-blue-500/20 hover:bg-blue-500/30"
+                : "bg-black/[0.03] dark:bg-white/5 text-gray-500 dark:text-gray-400 border border-white/5 cursor-not-allowed"
+          )}
+        >
+          {inserted ? (
+            <>
+              <Check className="h-3.5 w-3.5" />
+              Inserted
+            </>
+          ) : (
+            <>
+              <Volume2 className="h-3.5 w-3.5" />
               Insert into document
             </>
           )}
