@@ -14,7 +14,7 @@
 "use client";
 
 import { useRef, useEffect, useCallback, useState, useMemo } from "react";
-import { Trash2, Bot, Pencil, Maximize2 } from "lucide-react";
+import { Trash2, Bot, Pencil, Maximize2, ChevronDown } from "lucide-react";
 import { PROVIDER_CATALOG } from "@/lib/domain/ai/providers/catalog";
 import { getProviderTheme } from "@/lib/design/system/ai-providers";
 import { ProviderIcon } from "./ProviderIcon";
@@ -26,6 +26,7 @@ import { ChatInput } from "./ChatInput";
 import { FollowUpsStrip } from "./FollowUpsStrip";
 import { ChatErrorBanner } from "./ChatErrorBanner";
 import { MakeAndModelPicker } from "./MakeAndModelPicker";
+import { ChatContextPicker } from "./ChatContextPicker";
 import { useConversationEngine } from "@/lib/domain/ai/use-conversation-engine";
 import {
   useConversationBinding,
@@ -65,6 +66,18 @@ interface ChatPanelProps {
    * (`MultiConversationSidebar`) can refresh its tabs and activate it.
    */
   onForked?: (newConversationId: string) => void;
+  /**
+   * Stage 2 (transient auto-promote). When the panel is in transient
+   * mode (no conversationId yet) and the user sends a first message,
+   * the panel POSTs `/api/conversations` to create a new conversation,
+   * then fires this callback so the parent can `setActiveId(newId)`
+   * and refresh tabs. The first message is queued and re-sent through
+   * the now-bound engine, so the response streams + persists normally.
+   *
+   * Without this prop, the panel stays transient (legacy scratch-pad
+   * behavior) — messages live in memory only and disappear on reload.
+   */
+  onTransientPromoted?: (newConversationId: string) => void;
 }
 
 export function ChatPanel({
@@ -73,7 +86,26 @@ export function ChatPanel({
   onDeleteConversation,
   onTitleChanged,
   onForked,
+  onTransientPromoted,
 }: ChatPanelProps) {
+  // ─── Stage 2: transient auto-promote refs ───
+  //
+  // skipNextLoadRef tells the binding hook to skip its initial fetch
+  // for the just-promoted conversation (server has zero messages; the
+  // local in-memory chat is authoritative for the in-flight first
+  // message).
+  //
+  // pendingTransientSendRef carries a queued first message across the
+  // null → set transition. When the conversationId prop updates, the
+  // useEffect below fires handleSend() to actually send the queued
+  // message through the now-bound engine.
+  //
+  // promotingInFlightRef guards against double-clicks during the brief
+  // POST window so we don't kick off two concurrent createConversation
+  // requests.
+  const skipNextLoadRef = useRef(false);
+  const pendingTransientSendRef = useRef(false);
+  const promotingInFlightRef = useRef(false);
   // Distinct useChat key per conversation so message arrays don't bleed
   // across tabs. Falls back to contentId for transient mode.
   const conversationKey = conversationId
@@ -91,6 +123,11 @@ export function ChatPanel({
   // Exact parts of the just-sent user turn (engine → binding) so
   // attachments persist reliably.
   const pendingUserPartsRef = useRef<UIMessage["parts"] | null>(null);
+
+  // Selected custom-instruction context for this chat. Seeded from the
+  // bound conversation's persisted value (below) and forwarded to the
+  // engine so each turn carries it to the chat route.
+  const [activeContextId, setActiveContextId] = useState<string | null>(null);
 
   const {
     messages,
@@ -117,13 +154,16 @@ export function ChatPanel({
     commandItems,
     followUps,
     clearFollowUps,
-    scrollRef,
+    setScrollEl,
+    showJumpToLatest,
+    scrollToBottom,
     getMessageStamp,
     seedMessageStamps,
   } = useConversationEngine({
     conversationKey,
     contentId,
     conversationId,
+    activeContextId,
     onFinish: conversationId
       ? (event) => {
           // Forward the SDK's fresh assistant message so persistTurns
@@ -148,7 +188,7 @@ export function ChatPanel({
   // memory) — shared with the full-page ChatViewer via this hook so both
   // surfaces operate on the SAME Conversation store. `persistRef` is the
   // ref the engine's onFinish closes over; the hook populates it.
-  const { loadingInitial } = useConversationBinding({
+  const { loadingInitial, initialActiveContextId } = useConversationBinding({
     conversationId: conversationId ?? null,
     messages,
     setMessages: setMessages as (messages: unknown) => void,
@@ -160,7 +200,97 @@ export function ChatPanel({
     truncateRef,
     pendingUserPartsRef,
     onTitleChanged,
+    skipNextLoadRef,
   });
+
+  // Seed the local context selection from the bound conversation whenever
+  // it (re)loads. Transient mode resolves to null. User changes after load
+  // are owned by `handleContextChange` below.
+  useEffect(() => {
+    setActiveContextId(initialActiveContextId);
+  }, [initialActiveContextId]);
+
+  // Change handler: update local state immediately (drives the engine body)
+  // and, when bound, persist the choice to the conversation so reopening it
+  // restores the context. Fire-and-forget — a failed write only loses
+  // persistence, not the active selection for this session.
+  const handleContextChange = useCallback(
+    (id: string | null) => {
+      setActiveContextId(id);
+      if (!conversationId) return;
+      void fetch(`/api/conversations/${encodeURIComponent(conversationId)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ activeContextId: id }),
+      }).catch(() => {});
+    },
+    [conversationId],
+  );
+
+  // ─── Stage 2: wrap handleSend for transient auto-promote ───
+  //
+  // When the panel is in transient mode AND the parent opted in via
+  // onTransientPromoted, the first send triggers a conversation create
+  // BEFORE the message goes out. We queue the user's text in
+  // pendingTransientSendRef, fire the callback so the parent updates
+  // activeId, and let the useEffect below resend through the bound
+  // engine once conversationId flips from null → set.
+  const wrappedHandleSend = useCallback(() => {
+    if (
+      !conversationId &&
+      onTransientPromoted &&
+      !promotingInFlightRef.current &&
+      input.trim().length > 0
+    ) {
+      promotingInFlightRef.current = true;
+      void (async () => {
+        try {
+          const res = await fetch("/api/conversations", {
+            method: "POST",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(
+              contentId ? { snapshotContentNodeIds: [contentId] } : {},
+            ),
+          });
+          if (!res.ok) throw new Error("Couldn't save the chat");
+          const body = (await res.json()) as { data?: { id?: string } };
+          const newId = body?.data?.id;
+          if (!newId) throw new Error("Server didn't return a conversation id");
+          // The skip flag prevents the binding hook from fetching the
+          // (empty) just-created conversation and wiping our in-flight
+          // input. pendingTransientSendRef tells the resend useEffect
+          // to fire once the conversationId prop catches up.
+          skipNextLoadRef.current = true;
+          pendingTransientSendRef.current = true;
+          onTransientPromoted(newId);
+        } catch (err) {
+          // Promote failed — fall back to sending transient so the user
+          // doesn't lose their message. The chat won't persist this
+          // turn, but at least they get a response.
+          toast.error(
+            err instanceof Error
+              ? `${err.message} — sending as scratch chat`
+              : "Couldn't save the chat — sending as scratch chat",
+          );
+          handleSend();
+        } finally {
+          promotingInFlightRef.current = false;
+        }
+      })();
+      return;
+    }
+    handleSend();
+  }, [conversationId, onTransientPromoted, contentId, input, handleSend]);
+
+  // Resend the queued transient first message once conversationId catches up.
+  useEffect(() => {
+    if (conversationId && pendingTransientSendRef.current) {
+      pendingTransientSendRef.current = false;
+      handleSend();
+    }
+  }, [conversationId, handleSend]);
 
   // ─── AI Edit Orchestrator ───
   const isAiEditing = useEditorInstanceStore((s) =>
@@ -251,6 +381,31 @@ export function ChatPanel({
       setInput("");
     }
   }, [contentId, setMessages, setInput]);
+
+  // Flashcard "Ask for next batch" affordance. The CardProposalList
+  // dispatches this event when the model truncated to the per-batch
+  // limit; we pre-fill the chat input so the user can review the
+  // request (and edit it) before sending. Deliberate model-loop-back
+  // pattern for batch pagination — the only place in the flashcard
+  // flow that a card button feeds back into the model.
+  useEffect(() => {
+    function handleNextBatch(e: Event) {
+      const detail = (e as CustomEvent).detail as
+        | { deckPath?: string; batchLimit?: number }
+        | undefined;
+      const deckPath = detail?.deckPath ?? "this deck";
+      const batchLimit = detail?.batchLimit ?? 10;
+      setInput(
+        `Propose the next ${batchLimit} cards for ${deckPath}.`,
+      );
+    }
+    window.addEventListener("flashcard-request-next-batch", handleNextBatch);
+    return () =>
+      window.removeEventListener(
+        "flashcard-request-next-batch",
+        handleNextBatch,
+      );
+  }, [setInput]);
 
   // Trash button semantics:
   //   - Transient mode (no conversationId): clear local messages
@@ -382,7 +537,8 @@ export function ChatPanel({
       {/* Messages — loading state takes precedence so the user can't
           accidentally type into a fresh useChat session that's about to
           be overwritten by the historical load. */}
-      <div ref={scrollRef} className="scrollbar-hide flex-1 overflow-y-auto">
+      <div className="relative flex min-h-0 flex-1 flex-col">
+      <div ref={setScrollEl} className="scrollbar-hide flex-1 overflow-y-auto">
         {loadingInitial ? (
           <LoadingMessages />
         ) : hasMessages ? (
@@ -412,6 +568,16 @@ export function ChatPanel({
           <EmptyState />
         )}
       </div>
+      {showJumpToLatest && (
+        <button
+          type="button"
+          onClick={scrollToBottom}
+          className="absolute bottom-2 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-full border border-white/15 bg-[#1a1a1a]/90 px-2.5 py-1 text-[11px] text-gray-200 shadow-lg backdrop-blur transition-colors hover:bg-white/10"
+        >
+          <ChevronDown className="h-3 w-3" /> Jump to latest
+        </button>
+      )}
+      </div>
 
       {/* Suggested follow-ups (Session 7) — appears between the
           messages list and the composer when the engine returns
@@ -428,7 +594,7 @@ export function ChatPanel({
       <ChatInput
         value={input}
         onChange={setInput}
-        onSubmit={handleSend}
+        onSubmit={wrappedHandleSend}
         onStop={stop}
         status={status}
         disabled={loadingInitial}
@@ -441,13 +607,22 @@ export function ChatPanel({
         attachmentsUploading={attachmentsUploading}
         supportsImages={supportsImageAttachments}
         footerLeading={
-          <MakeAndModelPicker
-            providerId={providerId}
-            modelId={modelId}
-            onChange={handleModelChange}
-            disabled={isActive}
-            contributors={mixed.contributors as AIProviderId[]}
-          />
+          <div className="flex min-w-0 items-center">
+            <MakeAndModelPicker
+              providerId={providerId}
+              modelId={modelId}
+              onChange={handleModelChange}
+              disabled={isActive}
+              contributors={mixed.contributors as AIProviderId[]}
+              compact
+            />
+            <ChatContextPicker
+              value={activeContextId}
+              onChange={handleContextChange}
+              disabled={isActive}
+              compact
+            />
+          </div>
         }
       />
     </div>

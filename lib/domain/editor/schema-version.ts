@@ -81,7 +81,7 @@
  * See: docs/notes-feature/TIPTAP-SCHEMA-EVOLUTION-GUIDE.md
  */
 
-export const TIPTAP_SCHEMA_VERSION = "1.9.0";
+export const TIPTAP_SCHEMA_VERSION = "1.11.0";
 
 export interface SchemaVersion {
   version: string;
@@ -109,6 +109,38 @@ export interface SchemaChange {
  * 4. Run tests: pnpm test lib/domain/export
  */
 export const SCHEMA_HISTORY: SchemaVersion[] = [
+  {
+    version: "1.11.0",
+    date: "2026-05-23",
+    changes: [
+      {
+        type: "add",
+        target: "mark",
+        name: "clozeDeletion",
+        description:
+          "Inline mark wrapping text marked for cloze deletion. Attrs: ordinal (1-indexed) and hint. Cmd+Shift+C wraps selection with the next available ordinal. extractClozeCards consumes the mark to generate one sibling Flashcard per ordinal (Session 3A).",
+        breaking: false,
+        migrationsAvailable: [],
+      },
+    ],
+    migrationsRequired: false,
+  },
+  {
+    version: "1.10.0",
+    date: "2026-05-23",
+    changes: [
+      {
+        type: "add",
+        target: "node",
+        name: "audioEmbed",
+        description:
+          "Atom block that embeds an uploaded audio file with an inline player. Empty state shows a file picker / drop zone; on upload, attrs are populated with src/filename/duration/mimeType/fileSize. autoplayOnFlip attribute is consumed by FlashcardReviewOverlay in Phase 2.",
+        breaking: false,
+        migrationsAvailable: [],
+      },
+    ],
+    migrationsRequired: false,
+  },
   {
     version: "1.9.0",
     date: "2026-05-22",
@@ -540,6 +572,7 @@ export function getCurrentSchemaSnapshot() {
       "metricsStrip",
       "processSteps",
       "flashcardEmbed",
+      "audioEmbed",
       "unsupportedBlock",
       "unsupportedInline",
     ],
@@ -552,6 +585,7 @@ export function getCurrentSchemaSnapshot() {
       "link",
       "aiHighlight",
       "flashcardSelect",
+      "clozeDeletion",
     ],
     extensions: [
       "StarterKit",
@@ -589,7 +623,9 @@ export function getCurrentSchemaSnapshot() {
       "WeeklySummary",
       "HabitTracker",
       "FlashcardEmbed",
+      "AudioEmbed",
       "FlashcardSelect",
+      "ClozeDeletion",
       "UnsupportedBlock",
       "UnsupportedInline",
     ],

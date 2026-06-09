@@ -18,58 +18,10 @@ import {
   extractSearchTextFromTipTap,
   markdownToTiptap,
 } from "@/lib/domain/content";
-import { generateImage } from "@/lib/domain/ai/image/generate";
+import { generateAndStoreImage } from "@/lib/domain/ai/image/generate-and-store";
 import { IMAGE_PROVIDER_CATALOG } from "@/lib/domain/ai/image/catalog";
 import type { ImageProviderId, ImageModelId, ImageSize } from "@/lib/domain/ai/image/types";
-import { getUserSettings } from "@/lib/features/settings";
-import {
-  listConnections,
-  getConnectionWithKey,
-} from "@/lib/features/ai-connections";
 import type { ToolExecuteContext } from "./types";
-
-/**
- * Resolve the active image-gen route + key for this user.
- *
- * Priority:
- *   1. User's settings.ai.toolConfig.generate_image.routeOverride →
- *      look up the Connection by presetId, decrypt its key, override
- *      the AI-supplied (providerId, modelId).
- *   2. Fall back to whatever the chat AI passed in the tool args.
- *      The image generator then resolves the key via env vars only
- *      (legacy AIProviderKey was removed).
- */
-async function resolveImageGenRoute(
-  userId: string,
-  aiArgs: { providerId: ImageProviderId; modelId: ImageModelId },
-): Promise<{
-  providerId: ImageProviderId;
-  modelId: ImageModelId;
-  apiKey?: string;
-}> {
-  try {
-    const settings = await getUserSettings(userId);
-    const override = (settings.ai as { toolConfig?: Record<string, {
-      routeOverride?: { presetId: string; modelId: string };
-    }> } | undefined)?.toolConfig?.generate_image?.routeOverride;
-    if (!override) return aiArgs;
-
-    const conns = await listConnections(userId);
-    const match = conns.find((c) => c.presetId === override.presetId);
-    if (!match) return aiArgs;
-    const withKey = await getConnectionWithKey(userId, match.id);
-
-    return {
-      providerId: override.presetId as ImageProviderId,
-      modelId: override.modelId as ImageModelId,
-      apiKey: withKey.apiKey,
-    };
-  } catch {
-    // Override lookup is best-effort — never break image gen because
-    // settings couldn't be read.
-    return aiArgs;
-  }
-}
 
 /**
  * Detect markdownToTiptap's silent fallback. The fallback wraps the
@@ -440,98 +392,28 @@ export function createBaseTools(ctx: ToolExecuteContext) {
       }),
       execute: async ({ prompt, providerId, modelId, size, quality, style }) => {
         try {
-          const resolved = await resolveImageGenRoute(ctx.userId, {
+          const stored = await generateAndStoreImage({
+            prompt,
+            userId: ctx.userId,
             providerId: providerId as ImageProviderId,
             modelId: modelId as ImageModelId,
+            size: size as ImageSize,
+            quality,
+            style,
           });
-          const result = await generateImage(
-            {
-              prompt,
-              providerId: resolved.providerId,
-              modelId: resolved.modelId,
-              size: size as ImageSize,
-              quality,
-              style,
-              apiKey: resolved.apiKey,
-            },
-            ctx.userId
-          );
-
-          // Download/decode the image and upload to storage
-          let imageBuffer: Buffer;
-
-          if (result.base64) {
-            imageBuffer = Buffer.from(result.base64, "base64");
-          } else if (result.url) {
-            const imageRes = await fetch(result.url);
-            if (!imageRes.ok) {
-              throw new Error(`Failed to download generated image: ${imageRes.statusText}`);
-            }
-            imageBuffer = Buffer.from(await imageRes.arrayBuffer());
-          } else {
-            throw new Error("Image generation returned neither URL nor base64 data");
-          }
-
-          // Upload to storage
-          const { getUserStorageProvider } = await import("@/lib/infrastructure/storage");
-          const storageProvider = await getUserStorageProvider(ctx.userId);
-          const crypto = await import("crypto");
-          const checksum = crypto.createHash("sha256").update(imageBuffer).digest("hex");
-          const fileExtension = result.mimeType === "image/jpeg" ? "jpg" : "png";
-          const timestamp = Date.now();
-          const storageKey = `uploads/${ctx.userId}/ai-gen-${timestamp}-${crypto.randomBytes(8).toString("hex")}.${fileExtension}`;
-
-          await storageProvider.uploadFile(storageKey, imageBuffer, result.mimeType);
-
-          // Create ContentNode + FilePayload
-          const truncatedPrompt = prompt.slice(0, 60).replace(/[^a-zA-Z0-9\s-]/g, "").trim();
-          const fileName = `${truncatedPrompt || "ai-image"}.${fileExtension}`;
-          const slug = await generateUniqueSlug(fileName, ctx.userId);
-
-          const content = await prisma.contentNode.create({
-            data: {
-              ownerId: ctx.userId,
-              title: fileName,
-              slug,
-              contentType: "file",
-              parentId: null,
-              role: "referenced",
-              displayOrder: 0,
-              filePayload: {
-                create: {
-                  fileName,
-                  fileExtension,
-                  mimeType: result.mimeType,
-                  fileSize: BigInt(imageBuffer.length),
-                  checksum,
-                  storageProvider: "r2",
-                  storageKey,
-                  searchText: `AI generated image: ${prompt}`,
-                  uploadStatus: "ready",
-                  uploadedAt: new Date(),
-                  isProcessed: true,
-                  processingStatus: "complete",
-                  width: result.width || null,
-                  height: result.height || null,
-                },
-              },
-            },
-          });
-
-          const publicUrl = await storageProvider.generateDownloadUrl(storageKey);
 
           // Return structured result for ChatMessage rendering
           return JSON.stringify({
             __imagePayload: true,
-            contentId: content.id,
-            url: publicUrl,
+            contentId: stored.contentId,
+            url: stored.url,
             prompt,
-            revisedPrompt: result.revisedPrompt || null,
-            providerId: result.providerId,
-            modelId: result.modelId,
-            width: result.width,
-            height: result.height,
-            fileName,
+            revisedPrompt: stored.revisedPrompt,
+            providerId: stored.providerId,
+            modelId: stored.modelId,
+            width: stored.width,
+            height: stored.height,
+            fileName: stored.fileName,
           });
         } catch (error) {
           const message = error instanceof Error ? error.message : "Image generation failed";

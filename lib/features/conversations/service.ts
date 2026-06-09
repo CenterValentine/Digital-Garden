@@ -87,6 +87,7 @@ export async function listConversations(
       id: true,
       title: true,
       archivedToContentNodeId: true,
+      activeContextId: true,
       createdAt: true,
       updatedAt: true,
     },
@@ -495,12 +496,31 @@ export async function updateConversation(
   conversationId: string,
   patch: UpdateConversationPatch,
 ): Promise<ConversationSummary> {
+  // Validate context ownership before linking — never trust a client
+  // id. `null` is allowed (clears the link); a non-null id must resolve
+  // to a live context owned by this user.
+  if (
+    "activeContextId" in patch &&
+    patch.activeContextId != null
+  ) {
+    const owned = await prisma.chatContext.findFirst({
+      where: { id: patch.activeContextId, ownerId: userId, deletedAt: null },
+      select: { id: true },
+    });
+    if (!owned) throw new ConversationNotFoundError(patch.activeContextId);
+  }
+
   // Ownership gate: updateMany returns count = 0 if the row doesn't
   // belong to this user, leaving the DB untouched. Then we re-read.
   const { count } = await prisma.conversation.updateMany({
     where: { id: conversationId, ownerId: userId, deletedAt: null },
     data: {
       title: patch.title ?? undefined,
+      // Explicit `in patch` test so `null` clears the link rather than
+      // being coalesced to "no change".
+      ...("activeContextId" in patch && {
+        activeContextId: patch.activeContextId ?? null,
+      }),
     },
   });
 
@@ -512,6 +532,7 @@ export async function updateConversation(
       id: true,
       title: true,
       archivedToContentNodeId: true,
+      activeContextId: true,
       createdAt: true,
       updatedAt: true,
     },
@@ -799,6 +820,7 @@ type ConversationRow = {
   id: string;
   title: string | null;
   archivedToContentNodeId: string | null;
+  activeContextId: string | null;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -808,6 +830,7 @@ function toSummary(row: ConversationRow): ConversationSummary {
     id: row.id,
     title: row.title,
     archivedToContentNodeId: row.archivedToContentNodeId,
+    activeContextId: row.activeContextId,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
     lastMessageAt: row.updatedAt.toISOString(),

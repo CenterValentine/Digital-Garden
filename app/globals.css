@@ -453,6 +453,19 @@ nav[class*="fixed"] {
   padding-bottom: 4rem;
 }
 
+/* Tight flashcard editor: strip the 4rem bottom padding the main editor
+   carries (for block "+" buttons that don't exist here) and collapse the
+   paragraph margins so a one-line term renders as ~one line of text,
+   growing only when the content wraps. Targets the AdaptiveFlashcardEditor
+   when used with `tight` prop — currently the AI proposal card's term
+   side. Two-class selector beats bare .ProseMirror without !important. */
+.ProseMirror.flashcard-editor-tight {
+  padding-bottom: 0;
+}
+.ProseMirror.flashcard-editor-tight p {
+  margin: 0;
+}
+
 .dark .ProseMirror {
   color: #E5D4B0;
 }
@@ -1243,6 +1256,44 @@ nav[class*="fixed"] {
 body.flashcard-select-cursor,
 body.flashcard-select-cursor * {
   cursor: crosshair !important;
+}
+
+/* ────────────────────────────────────────────────────────────────────────
+ * Cloze Deletion mark (Session 3A)
+ *
+ * Scoped to .ProseMirror so the styling shows only in editing surfaces;
+ * the ServerClozeDeletion variant emits a bare span on publishing pages
+ * so this CSS never applies there. Amber tint + an ordinal badge before
+ * the marked text (rendered via ::before with the data-cloze-ordinal
+ * attribute) so authors can see at a glance which spans share a card.
+ * ──────────────────────────────────────────────────────────────────── */
+.ProseMirror .cloze-deletion {
+  background: rgba(234, 179, 8, 0.16);
+  padding: 0 0.2em;
+  border-radius: 0.25em;
+  position: relative;
+  transition: background 120ms ease;
+}
+.ProseMirror .cloze-deletion:hover {
+  background: rgba(234, 179, 8, 0.24);
+}
+.ProseMirror .cloze-deletion::before {
+  content: attr(data-cloze-ordinal);
+  font-size: 0.65em;
+  vertical-align: super;
+  margin-right: 0.15em;
+  font-weight: 700;
+  color: rgb(180, 130, 5);
+  font-feature-settings: "tnum";
+}
+.dark .ProseMirror .cloze-deletion {
+  background: rgba(234, 179, 8, 0.20);
+}
+.dark .ProseMirror .cloze-deletion:hover {
+  background: rgba(234, 179, 8, 0.30);
+}
+.dark .ProseMirror .cloze-deletion::before {
+  color: rgb(252, 211, 77);
 }
 
 /* Sprint 41: Chat outline scroll-to flash animation */

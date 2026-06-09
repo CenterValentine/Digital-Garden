@@ -34,13 +34,27 @@ const ICON_MAP: Record<string, ComponentType<{ className?: string }>> = {
   Upload,
 };
 
-export function ContentToolbar() {
+interface ContentToolbarProps {
+  /**
+   * The content this toolbar represents. In a multi-pane layout each pane
+   * renders its own toolbar, so it must reflect THAT pane's content — not the
+   * globally-active selection. Falls back to the global selection when omitted
+   * (single-surface mounts). Passing the pane's id also stops an adjacent
+   * pane's activity from reflowing this toolbar (flashcard/publish width churn).
+   */
+  contentId?: string | null;
+}
+
+export function ContentToolbar({ contentId: contentIdProp }: ContentToolbarProps = {}) {
   const toolSurface = useToolSurface();
-  const selectedContentId = useContentStore((state) => state.selectedContentId);
-  const selectedTitle = useContentStore((state) => {
-    if (!state.selectedContentId) return null;
-    return state.tabs[`tab:${state.selectedContentId}`]?.title ?? null;
-  });
+  const globalSelectedContentId = useContentStore((state) => state.selectedContentId);
+  const selectedContentId =
+    contentIdProp !== undefined ? contentIdProp : globalSelectedContentId;
+  const selectedTitle = useContentStore((state) =>
+    selectedContentId
+      ? state.tabs[`tab:${selectedContentId}`]?.title ?? null
+      : null
+  );
   const setActiveView = useLeftPanelViewStore((state) => state.setActiveView);
   const flashcardsEnabled = useIsExtensionEnabled(FLASHCARDS_EXTENSION_ID);
   const publishingEnabled = useIsExtensionEnabled(PUBLISHING_EXTENSION_ID);

@@ -32,6 +32,8 @@ import {
   ExternalLink,
   ArrowDownLeft,
   ArrowDownRight,
+  FolderInput,
+  Sparkles,
 } from "lucide-react";
 import type { ContextMenuActionProvider, ContextMenuSection, ContextMenuAction } from "./types";
 import {
@@ -53,6 +55,8 @@ import {
 } from "@/state/content-store";
 import { usePageTemplateStore } from "@/state/page-template-store";
 import { useFileTreeFilterStore } from "@/state/file-tree-filter-store";
+import { useSettingsStore } from "@/state/settings-store";
+import { useFolderAssistantStore } from "@/state/folder-assistant-store";
 
 /**
  * Context passed to file tree action provider
@@ -521,6 +525,42 @@ export const fileTreeActionProvider: ContextMenuActionProvider = (ctx) => {
         },
       ],
     });
+  }
+
+  // Section 5.5: Move (folder search now; AI folder assistant in Phase 2).
+  // Excludes the items themselves and their current parent as obvious
+  // non-targets; the move API is the hard guard against true cycles.
+  if (selectedIds.length > 0 && !isPeopleMount) {
+    const excludeIds = [
+      ...selectedIds,
+      ...(clickedNode?.parentId ? [clickedNode.parentId] : []),
+    ];
+    const aiSettings = useSettingsStore.getState().ai;
+    const folderAssistantOn =
+      aiSettings?.enabled !== false &&
+      aiSettings?.folderAssistant?.enabled !== false;
+    const moveActions: ContextMenuAction[] = [
+      {
+        id: "move-folder-search",
+        label: "Folder search",
+        icon: <FolderInput className="h-4 w-4" />,
+        customFlyout: {
+          kind: "folder-search",
+          selectedIds,
+          excludeIds,
+        },
+      },
+    ];
+    if (folderAssistantOn) {
+      moveActions.push({
+        id: "move-folder-assistant",
+        label: "Folder assistant",
+        icon: <Sparkles className="h-4 w-4" />,
+        onClick: () =>
+          useFolderAssistantStore.getState().openDialog(selectedIds),
+      });
+    }
+    sections.push({ title: "Move", actions: moveActions });
   }
 
   // Section 6: Share & Export

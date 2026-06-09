@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/glass/button";
 import { getSurfaceStyles } from "@/lib/design/system";
 import { ProviderIcon } from "@/components/content/ai/ProviderIcon";
 import { getProviderTheme } from "@/lib/design/system/ai-providers";
+import { effectiveCapabilities } from "@/lib/domain/ai/features/capabilities";
 import { ConnectionUsageCard } from "./ConnectionUsageCard";
 import {
   CONNECTION_TEMPLATES,
@@ -553,6 +554,35 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
   );
 }
 
+// Capability display + normalization for the fetched-model picker. The
+// fetcher/inferrer emit "image-generation" while the feature flag is "image";
+// normalizing them means a single "Image" badge/filter covers both.
+const CAP_LABELS: Record<string, string> = {
+  "image-generation": "Image",
+  image: "Image",
+  vision: "Vision",
+  text: "Text",
+  streaming: "Stream",
+  reasoning: "Reasoning",
+  audio: "Audio",
+  embedding: "Embed",
+};
+function normalizeCap(cap: string): string {
+  return cap === "image-generation" ? "image" : cap;
+}
+function prettyCap(cap: string): string {
+  return CAP_LABELS[cap] ?? cap;
+}
+/** Normalized capability set for a fetched model (declared + id-inferred). */
+function modelCapabilities(model: {
+  id: string;
+  capabilities?: string[];
+}): string[] {
+  const set = new Set<string>();
+  for (const c of effectiveCapabilities(model)) set.add(normalizeCap(c));
+  return [...set];
+}
+
 function ModelEditor({
   models,
   setModels,
@@ -594,24 +624,47 @@ function ModelEditor({
   // match against id + display name; sort cycles asc/desc on id.
   const [fetchedFilter, setFetchedFilter] = useState("");
   const [fetchedSort, setFetchedSort] = useState<"asc" | "desc">("asc");
+  // Capability type filter (null = all). Lets the user narrow a gateway's huge
+  // model list to just image-capable (or vision, reasoning, …) models so they
+  // can tell at a glance which to add for image generation.
+  const [capabilityFilter, setCapabilityFilter] = useState<string | null>(null);
+
+  // Distinct capabilities present across the fetched models, ordered by a
+  // stable display preference, for the filter chips. Built dynamically so any
+  // capability a gateway declares (or we infer) gets a chip.
+  const availableCapabilities = useMemo(() => {
+    if (!fetchedModels) return [] as string[];
+    const seen = new Set<string>();
+    for (const m of fetchedModels) {
+      for (const c of modelCapabilities(m)) seen.add(c);
+    }
+    const order = ["image", "vision", "reasoning", "audio", "text", "streaming", "embedding"];
+    return [...seen].sort((a, b) => {
+      const ia = order.indexOf(a);
+      const ib = order.indexOf(b);
+      return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+    });
+  }, [fetchedModels]);
 
   const visibleFetched = useMemo(() => {
     if (!fetchedModels) return [];
     const q = fetchedFilter.trim().toLowerCase();
-    const filtered = q
-      ? fetchedModels.filter(
-          (m) =>
-            m.id.toLowerCase().includes(q) ||
-            m.name.toLowerCase().includes(q),
-        )
-      : fetchedModels.slice();
+    const filtered = fetchedModels.filter((m) => {
+      if (q && !m.id.toLowerCase().includes(q) && !m.name.toLowerCase().includes(q)) {
+        return false;
+      }
+      if (capabilityFilter && !modelCapabilities(m).includes(capabilityFilter)) {
+        return false;
+      }
+      return true;
+    });
     filtered.sort((a, b) =>
       fetchedSort === "asc"
         ? a.id.localeCompare(b.id)
         : b.id.localeCompare(a.id),
     );
     return filtered;
-  }, [fetchedModels, fetchedFilter, fetchedSort]);
+  }, [fetchedModels, fetchedFilter, fetchedSort, capabilityFilter]);
 
   /** Count of currently-visible rows that are already selected. */
   const visibleSelectedCount = useMemo(() => {
@@ -640,6 +693,7 @@ function ModelEditor({
     setFetchedModels(null);
     setSelectedFetched(new Set());
     setFetchedFilter("");
+    setCapabilityFilter(null);
     setFetchedSort("asc");
   }, []);
 
@@ -704,6 +758,7 @@ function ModelEditor({
       // doesn't scale when a gateway returns 277 models.
       setSelectedFetched(new Set());
       setFetchedFilter("");
+      setCapabilityFilter(null);
       setFetchedSort("asc");
     } catch (e) {
       setFetchError(e instanceof Error ? e.message : "Network error");
@@ -878,6 +933,39 @@ function ModelEditor({
               </button>
             </div>
 
+            {/* Capability type filter — narrows the list to image/vision/etc. */}
+            {availableCapabilities.length > 0 && (
+              <div className="flex flex-wrap items-center gap-1.5 px-3 py-1.5 border-b border-amber-500/10">
+                <button
+                  type="button"
+                  onClick={() => setCapabilityFilter(null)}
+                  className={`rounded-full px-2 py-0.5 text-[10px] uppercase tracking-wide transition-colors ${
+                    capabilityFilter === null
+                      ? "bg-amber-500/25 text-amber-100 border border-amber-400/40"
+                      : "border border-amber-500/15 text-amber-200/70 hover:bg-amber-500/10"
+                  }`}
+                >
+                  All
+                </button>
+                {availableCapabilities.map((cap) => (
+                  <button
+                    key={cap}
+                    type="button"
+                    onClick={() =>
+                      setCapabilityFilter((cur) => (cur === cap ? null : cap))
+                    }
+                    className={`rounded-full px-2 py-0.5 text-[10px] uppercase tracking-wide transition-colors ${
+                      capabilityFilter === cap
+                        ? "bg-amber-500/25 text-amber-100 border border-amber-400/40"
+                        : "border border-amber-500/15 text-amber-200/70 hover:bg-amber-500/10"
+                    }`}
+                  >
+                    {prettyCap(cap)}
+                  </button>
+                ))}
+              </div>
+            )}
+
             {/* List body */}
             <div className="max-h-72 overflow-y-auto" role="listbox" aria-multiselectable="true">
               {visibleFetched.length === 0 ? (
@@ -888,6 +976,7 @@ function ModelEditor({
                 visibleFetched.map((item) => {
                   const exists = models.some((m) => m.id === item.id);
                   const checked = selectedFetched.has(item.id);
+                  const caps = modelCapabilities(item);
                   return (
                     <label
                       key={item.id}
@@ -909,9 +998,27 @@ function ModelEditor({
                           </div>
                         )}
                       </div>
+                      {/* Capability badges — Image highlighted so image-gen
+                          models stand out in a long gateway list. */}
+                      {caps.length > 0 && (
+                        <span className="flex shrink-0 flex-wrap items-center gap-1">
+                          {caps.map((cap) => (
+                            <span
+                              key={cap}
+                              className={`rounded px-1 py-px text-[9px] uppercase tracking-wide ${
+                                cap === "image"
+                                  ? "bg-emerald-500/20 text-emerald-300 border border-emerald-400/30"
+                                  : "bg-white/5 text-gray-400"
+                              }`}
+                            >
+                              {prettyCap(cap)}
+                            </span>
+                          ))}
+                        </span>
+                      )}
                       {exists && (
                         <span className="text-[9px] uppercase tracking-wide text-gray-500 shrink-0">
-                          already added
+                          added
                         </span>
                       )}
                     </label>

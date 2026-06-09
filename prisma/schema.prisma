@@ -93,7 +93,6 @@ enum FlashcardRating {
   easy
 }
 
-
 // Card variant. `basic` is the historical default. `cloze` is wired in
 // Session 2B alongside noteId + clozeOrdinal + clozeSourceJson on the
 // Flashcard model; sibling cloze cards generated from the same source
@@ -234,10 +233,15 @@ model FlashcardDeck {
   children      FlashcardDeck[] @relation("FlashcardDeckHierarchy")
   flashcards    Flashcard[]
 
-  @@unique([ownerId, slug])
+  // Path is the materialized full hierarchy ("spanish/irregular-verbs").
+  // Uniqueness on (ownerId, path) — not (ownerId, slug) — because the
+  // slug column only carries the leaf name, which legitimately repeats
+  // across different parents (Anki-style nested decks). The previous
+  // slug-unique constraint blocked that pattern.
+  @@unique([ownerId, path])
   @@unique([ownerId, parentDeckId, name])
   @@index([ownerId, deletedAt])
-  @@index([ownerId, path])
+  @@index([ownerId, slug])  // non-unique; kept for legacy slug lookups
   @@index([parentDeckId, displayOrder])
 }
 
@@ -273,8 +277,13 @@ model Flashcard {
   archivedAt      DateTime?             @db.Timestamptz(6)
   deletedAt       DateTime?             @db.Timestamptz(6)
 
-  // ---- Cloze additions (Anki import / Session 2B). noteId is a loose
-  // ---- pointer (no FK) — promote to a real FK later if shared state grows.
+  // ---- Cloze + sibling grouping (Session 2B).
+  // noteId groups sibling cards generated from the same source. For
+  // basic cards it stays NULL. For cloze cards, all siblings (one per
+  // ordinal) share the same noteId. Also future-proofs multi-template
+  // notes (front-to-back + back-to-front + audio-to-meaning) without
+  // a second migration. Lightweight UUID — no separate FlashcardNote
+  // table; promote to a real FK later if shared state grows.
   noteId          String?               @db.Uuid
   clozeOrdinal    Int?
   // Source TipTap document the cloze cards were generated from. Stored
@@ -516,6 +525,7 @@ model User {
   contentHistory       ContentHistory[]
   contentNodes         ContentNode[]
   conversations           Conversation[]
+  chatContexts            ChatContext[]
   sessions             Session[]
   storageConfigs       StorageProviderConfig[]
   tags                 Tag[]
@@ -1128,14 +1138,40 @@ model Conversation {
   ownerId                  String    @db.Uuid
   title                    String?   @db.VarChar(255)
   archivedToContentNodeId  String?   @unique @db.Uuid
+  // Selected custom-instruction context for this chat. Single active
+  // context per conversation (ChatGPT-style). SetNull so deleting a
+  // context doesn't cascade-delete the chat — it just clears the link.
+  activeContextId          String?   @db.Uuid
   createdAt                DateTime  @default(now()) @db.Timestamptz(6)
   updatedAt                DateTime  @updatedAt @db.Timestamptz(6)
   deletedAt                DateTime? @db.Timestamptz(6)
 
   owner                 User                      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   archivedToContentNode ContentNode?              @relation("ConversationArchive", fields: [archivedToContentNodeId], references: [id], onDelete: SetNull)
+  activeContext         ChatContext?              @relation("ConversationActiveContext", fields: [activeContextId], references: [id], onDelete: SetNull)
   messages              ConversationMessage[]
   associations          ConversationAssociation[]
+
+  @@index([ownerId, updatedAt])
+  @@index([ownerId, deletedAt])
+}
+
+/// User-authored custom-instruction presets ("chat contexts"). Each is a
+/// named block of guidance that, when active, is appended to the chat
+/// system prompt to shape the assistant's voice/output. Created, edited,
+/// and deleted on the spot from the chat composer. Soft-deleted so an
+/// in-flight conversation reference degrades gracefully.
+model ChatContext {
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ownerId   String    @db.Uuid
+  name      String    @db.VarChar(120)
+  body      String    @db.Text
+  createdAt DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime  @updatedAt @db.Timestamptz(6)
+  deletedAt DateTime? @db.Timestamptz(6)
+
+  owner         User           @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  conversations Conversation[] @relation("ConversationActiveContext")
 
   @@index([ownerId, updatedAt])
   @@index([ownerId, deletedAt])

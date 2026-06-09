@@ -19,6 +19,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/infrastructure/auth/middleware";
 import { getUserStorageProvider } from "@/lib/infrastructure/storage";
 import { DocumentExtractor } from "@/lib/infrastructure/media/document-extractor";
+import { convertHeicToJpeg } from "@/lib/infrastructure/media/image-processor";
 import { prisma } from "@/lib/database/client";
 import { generateUniqueSlug } from "@/lib/domain/content/slug";
 import { logger, withRouteTrace, withSpan } from "@/lib/core/logger";
@@ -118,7 +119,14 @@ export async function POST(request: NextRequest) {
       }
 
       const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
-      const isImage = IMAGE_TYPES.has(file.type);
+      // Apple HEIC/HEIF — only Safari renders it natively and vision models
+      // can't read it, so it's converted to JPEG below. Treated as an image.
+      const isHeic =
+        file.type === "image/heic" ||
+        file.type === "image/heif" ||
+        ext === "heic" ||
+        ext === "heif";
+      const isImage = IMAGE_TYPES.has(file.type) || isHeic;
       const isText = TEXT_TYPES.has(file.type) || TEXT_EXTENSIONS.has(ext);
 
       // ── Text-like: upload (for the persisted chip) + return content
@@ -177,20 +185,40 @@ export async function POST(request: NextRequest) {
             attrs: { mime_type: file.type, size_bytes: file.size },
           },
           async (span) => {
-            const buffer = Buffer.from(await file.arrayBuffer());
-            const safeExt = ext || "png";
+            let buffer: Buffer = Buffer.from(await file.arrayBuffer());
+            let mediaType = file.type || "image/png";
+            let displayName = file.name;
+            let safeExt = ext || "png";
+            // HEIC/HEIF → JPEG so it renders cross-browser + vision models
+            // can read it. Falls back to the original bytes if decode fails.
+            if (isHeic) {
+              try {
+                buffer = await convertHeicToJpeg(buffer);
+                mediaType = "image/jpeg";
+                safeExt = "jpg";
+                displayName = file.name.replace(/\.(heic|heif)$/i, "") + ".jpg";
+                span.attr("heic_converted", true);
+              } catch (err) {
+                logger.warn({
+                  layer: "storage",
+                  event: "attachment_heic_convert:failed",
+                  summary: "HEIC→JPEG conversion failed; storing original",
+                  error: err,
+                });
+              }
+            }
             const key = `chat-attachments/${session.user.id}/${Date.now()}-${crypto
               .randomBytes(6)
               .toString("hex")}.${safeExt}`;
             const provider = await getUserStorageProvider(session.user.id);
-            const url = await provider.uploadFile(key, buffer, file.type);
+            const url = await provider.uploadFile(key, buffer, mediaType);
             span.attr("storage_key", key);
             const contentNodeId = await createReferencedFileNode(
               session.user.id,
               {
-                name: file.name,
-                mediaType: file.type,
-                size: file.size,
+                name: displayName,
+                mediaType,
+                size: buffer.length,
                 storageKey: key,
                 storageUrl: url,
                 buffer,
@@ -201,9 +229,9 @@ export async function POST(request: NextRequest) {
               url,
               key,
               contentNodeId,
-              mediaType: file.type,
-              name: file.name,
-              size: file.size,
+              mediaType,
+              name: displayName,
+              size: buffer.length,
             });
           },
         );

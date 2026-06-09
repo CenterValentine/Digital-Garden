@@ -36,6 +36,7 @@ import {
 import type { ChatStatus } from "ai";
 import type { ChatAttachment } from "@/lib/domain/ai/use-conversation-engine";
 import { useTreeDragStore } from "@/state/tree-drag-store";
+import { useImagePreviewStore } from "@/state/image-preview-store";
 
 // react-arborist's drag source type. Must match `type: "NODE"` in
 // node_modules/react-arborist/dist/main/dnd/drag-hook.js so the composer
@@ -102,7 +103,14 @@ export function ChatInput({
   const fileInputRef = useRef<HTMLInputElement>(null);
   // The last value we emitted via onChange. When `value` prop comes back
   // identical, we skip re-rendering the DOM so the caret stays put.
-  const lastEmittedRef = useRef<string>(value);
+  //
+  // Seeded to `null` (not `value`) so the `[value]` effect ALWAYS paints on
+  // mount — including the case where `value` is a rehydrated sticky draft.
+  // If we seeded with `value`, the mount guard `value === lastEmittedRef`
+  // would short-circuit and the contenteditable would render empty while
+  // state still held the draft (invisible-but-sendable text). That was the
+  // root cause of the "drafts don't restore on reload" bug.
+  const lastEmittedRef = useRef<string | null>(null);
   // Range marking the trigger position (start = the `@` or `/` char,
   // end = current caret). Stable across renders because we don't rewrite
   // the DOM during typing.
@@ -525,7 +533,7 @@ export function ChatInput({
                 ref={fileInputRef}
                 type="file"
                 multiple
-                accept="image/*,application/pdf,.pdf,text/plain,text/markdown,text/csv,application/json,.md,.markdown,.csv,.json,.txt,.log"
+                accept="image/*,.heic,.heif,image/heic,image/heif,application/pdf,.pdf,text/plain,text/markdown,text/csv,application/json,.md,.markdown,.csv,.json,.txt,.log"
                 className="hidden"
                 onChange={(e) => {
                   if (e.target.files?.length) onAddFiles(e.target.files);
@@ -745,7 +753,13 @@ function AttachmentChip({
         <img
           src={url}
           alt={name}
-          className="h-5 w-5 shrink-0 rounded object-cover"
+          onClick={() =>
+            useImagePreviewStore
+              .getState()
+              .open([{ src: url, alt: name, downloadUrl: url }])
+          }
+          title="Preview image"
+          className="h-5 w-5 shrink-0 cursor-zoom-in rounded object-cover"
         />
       ) : (
         <FileText className="h-3.5 w-3.5 shrink-0 text-gray-400" />

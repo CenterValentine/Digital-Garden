@@ -32,9 +32,11 @@ npx prisma studio     # Database GUI (http://localhost:5555)
 
 **Primary verification is still manual** — `pnpm build` must pass, then smoke-test in browser. The Playwright harness adds visual regression coverage but only for signed-out routes today (auth fixture pending).
 
-**Build pipeline:** `prisma generate` → `pnpm build:tokens` (style-dictionary) → `tsc --noEmit` → `pnpm collab:schema:check` → `pnpm lint` → `next build --webpack`.
+**Build pipeline:** `prisma generate` → `pnpm build:tokens` (style-dictionary) → `tsc --noEmit` → `pnpm collab:schema:check` → `pnpm lint` → `next build --turbopack`.
 
-**Vercel build** skips the `tsc --noEmit` and `lint` steps (`vercel-build` script). Those gates are enforced locally and in CI; Vercel stays minimal for fast deploys. Local dev uses Turbopack (no webpack flag). Migrations are run manually via `npx prisma migrate deploy`.
+**Vercel build** skips the `tsc --noEmit` and `lint` steps (`vercel-build` script). Those gates are enforced locally and in CI; Vercel stays minimal for fast deploys. Migrations are run manually via `npx prisma migrate deploy`.
+
+**Bundler is Turbopack** for both `build` and `vercel-build` (and dev). Switched off `next build --webpack` after the webpack production build began timing out on Vercel's 2-core/8 GB builder — the growing module graph sent V8's GC into a thrash spiral under the 5120 MB heap cap (45-min timeout, no error). Turbopack builds the same tree in ~40s at the same cap. Keep local `build` and `vercel-build` on the **same** bundler so local green faithfully predicts the deploy.
 
 **Heap size for local `pnpm build`** — Node's default V8 heap (~4 GB) is no longer enough on this codebase; full builds can abort with `Abort trap: 6` during the type-emit or compilation phase. Local builds need `NODE_OPTIONS='--max-old-space-size=8192'`:
 

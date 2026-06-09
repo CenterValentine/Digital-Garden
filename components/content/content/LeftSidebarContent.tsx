@@ -880,29 +880,31 @@ export function LeftSidebarContent({
       onSelectionChange(hasMultiple);
     }
 
-    // Open content in main panel - use first selected
+    // Open content in main panel - use first selected.
+    // An EMPTY selection must NOT clear the open content: react-arborist fires
+    // onSelect([]) when the freshly-loaded tree mounts (and on stray
+    // deselects), which would otherwise null the global selection ~after load
+    // and collapse the right sidebar to backlinks. The open content is closed
+    // via tab-close or the explicit root-node click, never via a tree deselect.
     const firstNode = nodes[0];
-    if (firstNode) {
-      if (firstNode.treeNodeKind === "person") {
-        setSelectedContentId(firstNode.id, {
-          title: firstNode.title,
-          contentType: "person-profile",
-        });
-        return;
-      }
+    if (!firstNode) return;
 
-      if (firstNode.treeNodeKind === "peopleGroup") {
-        return;
-      }
-
+    if (firstNode.treeNodeKind === "person") {
       setSelectedContentId(firstNode.id, {
         title: firstNode.title,
-        contentType: firstNode.contentType,
+        contentType: "person-profile",
       });
-    } else {
-      // No selection - clear content
-      setSelectedContentId(null);
+      return;
     }
+
+    if (firstNode.treeNodeKind === "peopleGroup") {
+      return;
+    }
+
+    setSelectedContentId(firstNode.id, {
+      title: firstNode.title,
+      contentType: firstNode.contentType,
+    });
   };
 
   // Handler: Create or edit external link from dialog
@@ -1369,15 +1371,20 @@ export function LeftSidebarContent({
           pendingVisualizationEngine.current = null;
         }
 
-        // Navigate to newly created file (but not folders)
-        if (type !== "folder") {
-          replaceContentTab(`tab:${tempId}`, apiResponse.id, {
-            title: apiResponse.title,
-            contentType: apiResponse.contentType,
-            temporary: false,
-            pin: true,
-          });
-        }
+        // Reconcile the optimistic tab → the real id. For files this is the
+        // navigate-to-new-file. For folders it's normally a no-op (folders
+        // aren't auto-opened) — but if the user OPENED the folder while it was
+        // still a `temp-` placeholder, its tab/selection is stuck on the temp
+        // id and the folder never loads (ListView can't fetch a temp parent's
+        // children). Swapping unconditionally reconciles that stuck selection
+        // to the real id so the folder loads. replaceContentTab no-ops when no
+        // tab exists for the temp id.
+        replaceContentTab(`tab:${tempId}`, apiResponse.id, {
+          title: apiResponse.title,
+          contentType: apiResponse.contentType,
+          temporary: false,
+          pin: true,
+        });
       } else {
         // Fallback: If API doesn't return expected data, refresh tree
         setCreatingItem(null);

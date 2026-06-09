@@ -61,15 +61,40 @@ export function inferCapabilities(modelId: string): string[] {
 }
 
 /**
+ * Capability aliases. The model catalog/fetcher and the feature
+ * registry speak the `CapabilityFlag` token `"image"` ("image
+ * output"); id inference (above) emits the more descriptive
+ * `"image-generation"`. They name the SAME capability — collapse the
+ * alias to the registry's canonical token so a feature requiring
+ * `"image"` matches an id-inferred image model, and the AIConnections
+ * badge filter, the feature-routing compatible-pairs filter, and the
+ * server route resolver all agree. Add future synonym pairs here, not
+ * at each call site.
+ */
+const CAPABILITY_ALIASES: Record<string, string> = {
+  "image-generation": "image",
+};
+
+/** Canonical form of a capability token (collapses known aliases). */
+export function normalizeCapability(cap: string): string {
+  return CAPABILITY_ALIASES[cap] ?? cap;
+}
+
+/**
  * Effective capability set for a saved model: union of the explicit
  * `capabilities` array (catalog/fetcher-derived) and any flags
- * inferred from the model id. Use this anywhere a feature-routing
- * filter wants to know what a model can do.
+ * inferred from the model id, each normalized to its canonical token.
+ * Use this anywhere a feature-routing filter wants to know what a
+ * model can do. Because tokens are normalized, an id-inferred image
+ * model (`"image-generation"`) satisfies a feature requiring `"image"`.
  */
 export function effectiveCapabilities(
   model: { id: string; capabilities?: string[] },
 ): Set<string> {
-  const have = new Set<string>(model.capabilities ?? []);
-  for (const inferred of inferCapabilities(model.id)) have.add(inferred);
+  const have = new Set<string>();
+  for (const c of model.capabilities ?? []) have.add(normalizeCapability(c));
+  for (const inferred of inferCapabilities(model.id)) {
+    have.add(normalizeCapability(inferred));
+  }
   return have;
 }
