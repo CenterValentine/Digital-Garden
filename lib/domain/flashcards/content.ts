@@ -18,6 +18,38 @@ export function createTextTiptapDoc(text: string): JSONContent {
   };
 }
 
+/**
+ * Build a rich card front for an identification (image-recall) card: the
+ * generated image followed by a short instruction caption beneath it. Stored as
+ * frontContent with isFrontRichText=true. The `image` node matches the editor's
+ * EditorImage (extends @tiptap/extension-image) attrs.
+ */
+export function createImageFrontDoc(
+  imageUrl: string,
+  imageContentId: string | null,
+  label: string,
+): JSONContent {
+  const caption = label.trim();
+  return {
+    type: "doc",
+    content: [
+      {
+        type: "image",
+        attrs: {
+          src: imageUrl,
+          contentId: imageContentId,
+          source: "ai-generated",
+          alt: caption || "Identification image",
+        },
+      },
+      {
+        type: "paragraph",
+        content: caption ? [{ type: "text", text: caption }] : undefined,
+      },
+    ],
+  };
+}
+
 export function isTiptapDoc(value: unknown): value is JSONContent {
   return Boolean(
     value &&

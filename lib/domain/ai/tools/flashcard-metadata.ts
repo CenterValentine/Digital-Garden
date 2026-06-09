@@ -14,6 +14,7 @@ export const FLASHCARD_TOOL_IDS = [
   "get_deck",
   "propose_deck",
   "propose_deck_with_cards",
+  "propose_image_cards",
 ] as const;
 
 export type FlashcardToolId = (typeof FLASHCARD_TOOL_IDS)[number];
@@ -43,5 +44,10 @@ export const FLASHCARD_TOOL_METADATA: Record<
     name: "Recommend Cards (in a deck)",
     description:
       "Propose up to 10 cards bound to a deck — review, edit, and confirm; the commit creates the deck if it doesn't exist yet",
+  },
+  propose_image_cards: {
+    name: "Recommend Image Cards",
+    description:
+      "Propose up to 5 identification cards with AI-generated images on the front (plants, insects, code, etc.) — images are generated for preview before you confirm. Uses your image-generation provider.",
   },
 };

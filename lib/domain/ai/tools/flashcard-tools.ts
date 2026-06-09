@@ -22,10 +22,18 @@ import "server-only";
 import { tool } from "ai";
 import { z } from "zod/v4";
 import { prisma } from "@/lib/database/client";
-import { summarizeFlashcardContent, slugifyDeckName } from "@/lib/domain/flashcards";
+import {
+  summarizeFlashcardContent,
+  slugifyDeckName,
+  createImageFrontDoc,
+} from "@/lib/domain/flashcards";
+import { generateAndStoreImage } from "@/lib/domain/ai/image/generate-and-store";
 import type { ToolExecuteContext } from "./types";
 
 const CARD_BATCH_LIMIT = 10;
+// Identification-image cards are capped lower than text cards: each one runs a
+// real image-generation call at propose time (latency + cost).
+const IMAGE_CARD_LIMIT = 5;
 
 interface DeckRow {
   id: string;
@@ -477,6 +485,166 @@ export function createFlashcardTools(ctx: ToolExecuteContext) {
           cards,
           requestedCount,
           batchLimit: CARD_BATCH_LIMIT,
+          sourceContentId: resolvedSourceContentId,
+        });
+      },
+    }),
+
+    propose_image_cards: tool({
+      description:
+        `Propose up to ${IMAGE_CARD_LIMIT} IDENTIFICATION flashcards whose front is an AI-GENERATED IMAGE plus a short instruction, for visual-recall study (plants, insects, anatomy, code screenshots, landmarks, etc.). For each card you provide: imagePrompt (what image to generate), identifyLabel (a few-word instruction shown under the image, e.g. "Identify this plant"), and back (the answer). The image is generated at PROPOSE time so the user previews it before accepting. HARD LIMIT: ${IMAGE_CARD_LIMIT} cards per call — if the user asks for more, propose ${IMAGE_CARD_LIMIT}, set requestedCount to the true number, and let them accept these first. Use propose_deck_with_cards (not this) for plain text Q&A cards.`,
+      inputSchema: z.object({
+        name: z
+          .string()
+          .min(1)
+          .max(120)
+          .describe(
+            "Leaf deck name. Combined with parentDeckPath to form the full target path. Existing deck → cards added directly; otherwise the commit creates it first.",
+          ),
+        parentDeckPath: z
+          .string()
+          .optional()
+          .describe("Full path of the parent deck (e.g. 'biology'). Omit for a root-level deck."),
+        rationale: z
+          .string()
+          .optional()
+          .describe("One-sentence reason this deck fits — shown only when the deck will be created."),
+        similarExistingPaths: z
+          .array(z.string())
+          .max(5)
+          .optional()
+          .describe("Paths of existing decks that almost match — from list_decks / search_decks."),
+        cards: z
+          .array(
+            z.object({
+              imagePrompt: z
+                .string()
+                .min(1)
+                .describe(
+                  "Prompt for the image generator describing the subject to depict (e.g. 'a single monarch butterfly on a flower, photorealistic, plain background'). Be specific and unambiguous so the image clearly shows the answer.",
+                ),
+              identifyLabel: z
+                .string()
+                .min(1)
+                .max(80)
+                .describe(
+                  "Few-word instruction shown under the image telling the user what to identify (e.g. 'Identify this butterfly', 'Name this data structure').",
+                ),
+              back: z
+                .string()
+                .min(1)
+                .describe("The answer / identification revealed on the back of the card (plain text)."),
+              backLabel: z
+                .string()
+                .max(80)
+                .optional()
+                .describe("Label for the back side (default: 'Answer')."),
+            }),
+          )
+          .min(1)
+          .max(IMAGE_CARD_LIMIT)
+          .describe(
+            `Array of ${IMAGE_CARD_LIMIT} or fewer identification card drafts. ENFORCED by Zod — passing more will fail.`,
+          ),
+        requestedCount: z
+          .number()
+          .int()
+          .min(1)
+          .describe(
+            "How many cards the user actually asked for. If they asked for 8 and you're proposing 5 (the limit), pass 8 here.",
+          ),
+        sourceContentId: z
+          .string()
+          .uuid()
+          .optional()
+          .describe("ContentNode id of the note these cards were drafted from, if any."),
+      }),
+      execute: async ({
+        name,
+        parentDeckPath,
+        rationale,
+        similarExistingPaths,
+        cards,
+        requestedCount,
+        sourceContentId,
+      }) => {
+        let parentDeckId: string | null = null;
+        if (parentDeckPath) {
+          const parent = await prisma.flashcardDeck.findFirst({
+            where: { ownerId: ctx.userId, path: parentDeckPath, deletedAt: null },
+            select: { id: true },
+          });
+          parentDeckId = parent?.id ?? null;
+        }
+
+        const proposedSlug = slugifyDeckName(name);
+        const proposedPath = parentDeckPath
+          ? `${parentDeckPath}/${proposedSlug}`
+          : proposedSlug;
+
+        const existing = await prisma.flashcardDeck.findFirst({
+          where: { ownerId: ctx.userId, path: proposedPath, deletedAt: null },
+          select: { id: true, name: true },
+        });
+
+        const resolvedSourceContentId = sourceContentId ?? ctx.contentId ?? null;
+
+        // Generate each card's image at propose time so the user previews the
+        // real image before accepting. Fail-soft per card: a failed image still
+        // proposes (marked) so one failure doesn't sink the batch.
+        const proposedCards = await Promise.all(
+          cards.slice(0, IMAGE_CARD_LIMIT).map(async (card) => {
+            try {
+              const img = await generateAndStoreImage({
+                prompt: card.imagePrompt,
+                userId: ctx.userId,
+              });
+              return {
+                front: card.identifyLabel,
+                back: card.back,
+                backLabel: card.backLabel,
+                frontContent: createImageFrontDoc(
+                  img.url,
+                  img.contentId,
+                  card.identifyLabel,
+                ),
+                frontImageUrl: img.url,
+                frontImageContentId: img.contentId,
+                isFrontRichText: true,
+                imageCard: true,
+              };
+            } catch (error) {
+              return {
+                front: card.identifyLabel,
+                back: card.back,
+                backLabel: card.backLabel,
+                isFrontRichText: false,
+                imageCard: true,
+                imageError:
+                  error instanceof Error ? error.message : "Image generation failed",
+              };
+            }
+          }),
+        );
+
+        return JSON.stringify({
+          __deckWithCardsProposal: true,
+          deck: {
+            name,
+            proposedPath,
+            parentDeckPath: parentDeckPath ?? null,
+            parentDeckId,
+            parentResolved: parentDeckPath ? parentDeckId !== null : true,
+            rationale: rationale ?? null,
+            similarExistingPaths: similarExistingPaths ?? [],
+            deckExists: existing !== null,
+            deckId: existing?.id ?? null,
+            existingName: existing?.name ?? null,
+          },
+          cards: proposedCards,
+          requestedCount,
+          batchLimit: IMAGE_CARD_LIMIT,
+          imageCards: true,
           sourceContentId: resolvedSourceContentId,
         });
       },

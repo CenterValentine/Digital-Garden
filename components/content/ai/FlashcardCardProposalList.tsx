@@ -82,9 +82,23 @@ interface DeckWithCardsProposalPayload {
     back: string;
     frontLabel?: string;
     backLabel?: string;
+    // ── Identification-image cards (propose_image_cards) ──
+    /** When true, this card's front is an AI-generated image + caption. */
+    imageCard?: boolean;
+    /** Prebuilt rich front (image node + caption); present on success. */
+    frontContent?: JSONContent;
+    /** Preview URL for the generated image. */
+    frontImageUrl?: string;
+    frontImageContentId?: string | null;
+    /** True when frontContent is rich (image card); drives the commit flag. */
+    isFrontRichText?: boolean;
+    /** Set when image generation failed for this card (still proposable). */
+    imageError?: string;
   }>;
   requestedCount: number;
   batchLimit: number;
+  /** True when this proposal is a batch of identification-image cards. */
+  imageCards?: boolean;
   sourceContentId: string | null;
 }
 
@@ -152,6 +166,12 @@ interface RowState {
   frontLabel: string;
   backLabel: string;
   status: RowStatus;
+  /** Identification-image card: commit with isFrontRichText, render image. */
+  isFrontRichText: boolean;
+  /** Preview URL for an image-card front (null for text cards). */
+  frontImageUrl: string | null;
+  /** Image generation failed for this card front (still proposable as text). */
+  imageError?: string;
 }
 
 export function FlashcardCardProposalList({
@@ -177,19 +197,27 @@ export function FlashcardCardProposalList({
     const added = loadAddedIndices(proposalId);
     return payload.cards.map((card, idx) => {
       const wasAdded = added.has(idx);
+      // Image cards arrive with a prebuilt rich front (image + caption);
+      // text cards convert their plain front to a single-paragraph doc.
+      const isImageFront = Boolean(card.imageCard && card.frontContent);
       return {
         // Already-added cards default unchecked: the user can't re-add
         // them (status is created), and showing them unchecked makes
         // the "X of Y selected" counter accurate.
         checked: !wasAdded,
         expanded: false,
-        frontContent: createTextTiptapDoc(card.front),
+        frontContent: isImageFront
+          ? (card.frontContent as JSONContent)
+          : createTextTiptapDoc(card.front),
         backContent: createTextTiptapDoc(card.back),
         frontLabel: card.frontLabel ?? "Question",
         backLabel: card.backLabel ?? "Answer",
         status: (wasAdded
           ? { status: "created" }
           : { status: "idle" }) as RowStatus,
+        isFrontRichText: isImageFront,
+        frontImageUrl: card.frontImageUrl ?? null,
+        imageError: card.imageError,
       };
     });
   }, [payload.cards, proposalId]);
@@ -386,7 +414,7 @@ export function FlashcardCardProposalList({
             backContent: row.backContent,
             frontLabel: row.frontLabel,
             backLabel: row.backLabel,
-            isFrontRichText: false,
+            isFrontRichText: row.isFrontRichText,
             sourceContentId: payload.sourceContentId ?? undefined,
           }),
         });
@@ -612,6 +640,22 @@ export function FlashcardCardProposalList({
                   aria-label={`Include card ${i + 1}`}
                   className="h-4 w-4 shrink-0 cursor-pointer accent-amber-500 disabled:cursor-not-allowed"
                 />
+                {/* Identification-image preview thumbnail (propose-time gen). */}
+                {row.frontImageUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element -- presigned R2 URL, not a static asset; next/image adds no value for a 36px proposal thumbnail
+                  <img
+                    src={row.frontImageUrl}
+                    alt=""
+                    className="h-9 w-9 shrink-0 rounded border border-amber-400/20 object-cover"
+                  />
+                ) : row.imageError ? (
+                  <span
+                    title={`Image generation failed: ${row.imageError}`}
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded border border-red-400/30 text-red-500"
+                  >
+                    <AlertTriangle className="h-4 w-4" />
+                  </span>
+                ) : null}
                 {/*
                   Horizontal scroll-to-peek pattern on the flex item:
                   whitespace-nowrap keeps the row one line tall,
@@ -694,21 +738,37 @@ export function FlashcardCardProposalList({
                     {row.frontLabel}
                   </div>
                   {/*
-                    `tight` overrides `compact` here — the term side is
-                    one line by default and auto-grows on wrap. Compact
-                    was overkill: 120px min-height for a one-word term.
+                    Image cards: the front is a generated image + caption —
+                    not text-editable. Show it read-only (the user edits the
+                    answer, or unchecks the card if the image is wrong).
+                    `tight` overrides `compact` here — the term side is one
+                    line by default and auto-grows on wrap.
                   */}
-                  <AdaptiveFlashcardEditor
-                    value={row.frontContent}
-                    onChange={(value) =>
-                      updateRow(i, { frontContent: value })
-                    }
-                    mode="plain"
-                    placeholder="Front"
-                    editable={!isCreated && !isCreating}
-                    ariaLabel={`Card ${i + 1} front`}
-                    tight
-                  />
+                  {row.frontImageUrl ? (
+                    <div className="space-y-1">
+                      {/* eslint-disable-next-line @next/next/no-img-element -- presigned R2 URL preview */}
+                      <img
+                        src={row.frontImageUrl}
+                        alt={frontPreview}
+                        className="max-h-48 w-auto rounded border border-amber-400/20 object-contain"
+                      />
+                      <div className="text-[12px] text-gray-700 dark:text-gray-300">
+                        {frontPreview}
+                      </div>
+                    </div>
+                  ) : (
+                    <AdaptiveFlashcardEditor
+                      value={row.frontContent}
+                      onChange={(value) =>
+                        updateRow(i, { frontContent: value })
+                      }
+                      mode="plain"
+                      placeholder="Front"
+                      editable={!isCreated && !isCreating}
+                      ariaLabel={`Card ${i + 1} front`}
+                      tight
+                    />
+                  )}
                   <div className="text-[10px] font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
                     {row.backLabel}
                   </div>
