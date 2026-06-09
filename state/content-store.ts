@@ -861,6 +861,17 @@ function saveStoredTabTitles(tabs: Record<string, WorkspaceTabState>) {
   }
 }
 
+/**
+ * `temp-*` ids are optimistic/unsaved placeholders (a folder/doc mid-creation).
+ * They must never be persisted to the URL or localStorage: on reload they'd be
+ * restored as a tab that can't load (no real ContentNode → 404 / "failed to
+ * load content"). The server snapshot already drops them (owned-content
+ * filter); this guards the client URL persistence.
+ */
+function isPersistableContentId(id: string | null | undefined): id is string {
+  return Boolean(id) && !id!.startsWith("temp-");
+}
+
 function syncBrowserState(state: Pick<
   ContentState,
   "selectedContentId" | "panes" | "tabs" | "activePaneId" | "layoutMode"
@@ -869,7 +880,10 @@ function syncBrowserState(state: Pick<
 
   const visiblePaneIds = getVisiblePaneIds(state.layoutMode);
   const activeTab = getActiveTab(state);
-  const restorableContentId = state.selectedContentId ?? activeTab?.contentId ?? null;
+  const rawRestorable = state.selectedContentId ?? activeTab?.contentId ?? null;
+  const restorableContentId = isPersistableContentId(rawRestorable)
+    ? rawRestorable
+    : null;
 
   if (restorableContentId) {
     localStorage.setItem(LAST_SELECTED_KEY, restorableContentId);
@@ -908,7 +922,7 @@ function syncBrowserState(state: Pick<
 
     const contentIds = state.panes[paneId].tabIds
       .map((tabId) => state.tabs[tabId]?.contentId ?? null)
-      .filter((value): value is string => Boolean(value));
+      .filter(isPersistableContentId);
 
     if (contentIds.length > 0) {
       url.searchParams.set(paramName, contentIds.join(","));
