@@ -43,6 +43,8 @@ interface ChatContextPickerProps {
   /** Fires when the user selects a context (or clears with null). */
   onChange: (id: string | null) => void;
   disabled?: boolean;
+  /** Icon-only trigger for narrow containers (the chat side panel). */
+  compact?: boolean;
 }
 
 type FormDraft = { id: string | null; name: string; body: string };
@@ -51,6 +53,7 @@ export function ChatContextPicker({
   value,
   onChange,
   disabled = false,
+  compact = false,
 }: ChatContextPickerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [isOpen, setIsOpen] = useState(false);
@@ -363,13 +366,17 @@ export function ChatContextPicker({
         }
       >
         <SlidersHorizontal className="h-3 w-3 shrink-0" />
-        <span className="max-w-[120px] truncate">{displayName}</span>
-        <ChevronUp
-          className={cn(
-            "h-3 w-3 shrink-0 transition-transform",
-            isOpen && "rotate-180",
-          )}
-        />
+        {!compact && (
+          <>
+            <span className="max-w-[120px] truncate">{displayName}</span>
+            <ChevronUp
+              className={cn(
+                "h-3 w-3 shrink-0 transition-transform",
+                isOpen && "rotate-180",
+              )}
+            />
+          </>
+        )}
       </button>
     </div>
   );

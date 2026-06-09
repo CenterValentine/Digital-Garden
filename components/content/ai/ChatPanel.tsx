@@ -614,11 +614,13 @@ export function ChatPanel({
               onChange={handleModelChange}
               disabled={isActive}
               contributors={mixed.contributors as AIProviderId[]}
+              compact
             />
             <ChatContextPicker
               value={activeContextId}
               onChange={handleContextChange}
               disabled={isActive}
+              compact
             />
           </div>
         }
