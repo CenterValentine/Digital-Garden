@@ -16,7 +16,8 @@ import { createPortal } from "react-dom";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { common, createLowlight } from "lowlight";
-import { Bot, User, Wrench, Loader2, Copy, Check, ImagePlus, GripVertical, BrainCircuit, ChevronRight, Pencil, RotateCcw, GitBranch, FileText, Volume2 } from "lucide-react";
+import { Bot, User, Wrench, Loader2, Copy, Check, ImagePlus, GripVertical, BrainCircuit, ChevronRight, Pencil, RotateCcw, GitBranch, FileText, Volume2, FolderPlus } from "lucide-react";
+import { MediaInjectFlyout, type InjectMedia } from "./MediaInjectFlyout";
 import { FlashcardDeckProposalCard } from "./FlashcardDeckProposalCard";
 import { FlashcardCardProposalList } from "./FlashcardCardProposalList";
 import { cn } from "@/lib/core/utils";
@@ -1649,6 +1650,15 @@ function GeneratedImageCard({ payload }: { payload: ImagePayload }) {
   const [inserted, setInserted] = useState(false);
   const selectedContentType = useContentStore((s) => s.selectedContentType);
   const canInsert = selectedContentType === "note";
+  // "Add to…" flyout — inject this image into ANY content's note.
+  const [injectAnchor, setInjectAnchor] = useState<{ x: number; y: number } | null>(null);
+  const imageMedia: InjectMedia = {
+    kind: "image",
+    url: payload.url,
+    contentId: payload.contentId,
+    alt: payload.revisedPrompt || payload.prompt,
+    filename: payload.fileName,
+  };
 
   const handleInsertIntoDocument = useCallback(() => {
     // Dispatch CustomEvent for the editor to handle
@@ -1759,7 +1769,28 @@ function GeneratedImageCard({ payload }: { payload: ImagePayload }) {
             </>
           )}
         </button>
+
+        {/* Add to… — inject into any content's note */}
+        <button
+          type="button"
+          onClick={(e) => {
+            const r = e.currentTarget.getBoundingClientRect();
+            setInjectAnchor({ x: r.left, y: r.bottom });
+          }}
+          title="Add this image to a note, chat, or any content"
+          className="flex items-center gap-1.5 w-full justify-center rounded-lg px-3 py-1.5 text-xs font-medium transition-colors bg-black/[0.03] dark:bg-white/5 text-gray-600 dark:text-gray-300 border border-black/10 dark:border-white/10 hover:bg-black/[0.06] dark:hover:bg-white/10"
+        >
+          <FolderPlus className="h-3.5 w-3.5" />
+          Add to…
+        </button>
       </div>
+      {injectAnchor && (
+        <MediaInjectFlyout
+          media={imageMedia}
+          anchor={injectAnchor}
+          onClose={() => setInjectAnchor(null)}
+        />
+      )}
     </div>
   );
 }
@@ -1776,6 +1807,16 @@ function GeneratedAudioCard({ payload }: { payload: AudioPayload }) {
   // TipTap doc (the ExpandableEditor), so both can receive the audio block.
   const canInsert =
     selectedContentType === "note" || selectedContentType === "chat";
+  // "Add to…" flyout — inject this clip into ANY content's note.
+  const [injectAnchor, setInjectAnchor] = useState<{ x: number; y: number } | null>(null);
+  const audioMedia: InjectMedia = {
+    kind: "audio",
+    url: payload.url,
+    contentId: payload.contentId,
+    mimeType: payload.mimeType,
+    filename: payload.fileName,
+    durationSeconds: payload.durationSeconds ?? null,
+  };
 
   const handleInsertIntoDocument = useCallback(() => {
     const dispatch = () =>
@@ -1861,7 +1902,28 @@ function GeneratedAudioCard({ payload }: { payload: AudioPayload }) {
             </>
           )}
         </button>
+
+        {/* Add to… — inject into any content's note */}
+        <button
+          type="button"
+          onClick={(e) => {
+            const r = e.currentTarget.getBoundingClientRect();
+            setInjectAnchor({ x: r.left, y: r.bottom });
+          }}
+          title="Add this audio to a note, chat, or any content"
+          className="flex items-center gap-1.5 w-full justify-center rounded-lg px-3 py-1.5 text-xs font-medium transition-colors bg-black/[0.03] dark:bg-white/5 text-gray-600 dark:text-gray-300 border border-black/10 dark:border-white/10 hover:bg-black/[0.06] dark:hover:bg-white/10"
+        >
+          <FolderPlus className="h-3.5 w-3.5" />
+          Add to…
+        </button>
       </div>
+      {injectAnchor && (
+        <MediaInjectFlyout
+          media={audioMedia}
+          anchor={injectAnchor}
+          onClose={() => setInjectAnchor(null)}
+        />
+      )}
     </div>
   );
 }
