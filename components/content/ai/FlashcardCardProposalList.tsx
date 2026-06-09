@@ -244,7 +244,23 @@ export function FlashcardCardProposalList({
       })),
     [payload.cards],
   );
-  const [imageGenDone, setImageGenDone] = useState(!needsImageGen);
+  // A proposal whose image cards were already committed (persisted added
+  // indices → every row starts "created") is done — don't offer to regenerate.
+  const allInitiallyCreated = useMemo(
+    () =>
+      initialRows.length > 0 &&
+      initialRows.every((r) => r.status.status === "created"),
+    [initialRows],
+  );
+  const [imageGenDone, setImageGenDone] = useState(
+    !needsImageGen || allInitiallyCreated,
+  );
+  // Image generation is EXPLICIT, never automatic. Generated images aren't
+  // written back into the persisted chat payload, so without this gate every
+  // ungenerated proposal in chat history would re-fire (billable) generation on
+  // each page load. The gate (and its provider window) mounts only after the
+  // user clicks "Generate" — on reload the button just sits dormant.
+  const [imageGenStarted, setImageGenStarted] = useState(false);
 
   // Apply generated images onto the draft rows (by index). Failed cards get an
   // imageError and are unchecked so the batch commits only the cards that have
@@ -649,9 +665,39 @@ export function FlashcardCardProposalList({
         </div>
       )}
 
-      {/* Pre-generation provider window for identification-image cards. */}
+      {/*
+        Identification-image cards. Generation is opt-in: a dormant prompt
+        until the user clicks Generate (so chat history never auto-spends on
+        image generation), then the provider window / countdown takes over.
+      */}
       {needsImageGen && !imageGenDone && (
-        <ImageCardGenGate cards={imageDrafts} onComplete={applyImageResults} />
+        imageGenStarted ? (
+          <ImageCardGenGate cards={imageDrafts} onComplete={applyImageResults} />
+        ) : (
+          <div className="mx-1 mb-2 rounded-lg border border-amber-400/25 bg-amber-500/[0.06] px-3 py-2.5 text-[12px] text-amber-900 dark:text-amber-200">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <Sparkles className="h-4 w-4 shrink-0" />
+                <span>
+                  {imageDrafts.length} card
+                  {imageDrafts.length === 1 ? "" : "s"} need an AI-generated
+                  front image.
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setImageGenStarted(true)}
+                className="rounded-md bg-amber-600 px-3 py-1.5 font-medium text-white transition-colors hover:bg-amber-700 dark:bg-amber-500 dark:text-amber-950 dark:hover:bg-amber-400"
+              >
+                Generate {imageDrafts.length} image
+                {imageDrafts.length === 1 ? "" : "s"}
+              </button>
+            </div>
+            <p className="mt-1 text-[11px] opacity-70">
+              Uses your image provider — won&apos;t start until you click.
+            </p>
+          </div>
+        )
       )}
 
       {/*

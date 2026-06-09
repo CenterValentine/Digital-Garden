@@ -230,9 +230,16 @@ export function ImageCardGenGate({
         setPickConnectionId(route.connectionId);
         setPickModel(route.modelId);
 
-        // One connection → no real choice → generate immediately. Multiple →
-        // give the user a countdown window to intervene.
-        if (compatible.length === 1) {
+        // Skip the window only when there's genuinely nothing to choose —
+        // i.e. a single image model across all connections. Counting
+        // connections (not models) was wrong: one gateway connection holding
+        // several image models would skip the picker, so the user could never
+        // change model. Count total model choices instead.
+        const totalChoices = compatible.reduce(
+          (n, p) => n + p.models.length,
+          0,
+        );
+        if (totalChoices <= 1) {
           void runGeneration(route, false);
         } else {
           setPhase("countdown");
