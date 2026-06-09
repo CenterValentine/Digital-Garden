@@ -880,29 +880,31 @@ export function LeftSidebarContent({
       onSelectionChange(hasMultiple);
     }
 
-    // Open content in main panel - use first selected
+    // Open content in main panel - use first selected.
+    // An EMPTY selection must NOT clear the open content: react-arborist fires
+    // onSelect([]) when the freshly-loaded tree mounts (and on stray
+    // deselects), which would otherwise null the global selection ~after load
+    // and collapse the right sidebar to backlinks. The open content is closed
+    // via tab-close or the explicit root-node click, never via a tree deselect.
     const firstNode = nodes[0];
-    if (firstNode) {
-      if (firstNode.treeNodeKind === "person") {
-        setSelectedContentId(firstNode.id, {
-          title: firstNode.title,
-          contentType: "person-profile",
-        });
-        return;
-      }
+    if (!firstNode) return;
 
-      if (firstNode.treeNodeKind === "peopleGroup") {
-        return;
-      }
-
+    if (firstNode.treeNodeKind === "person") {
       setSelectedContentId(firstNode.id, {
         title: firstNode.title,
-        contentType: firstNode.contentType,
+        contentType: "person-profile",
       });
-    } else {
-      // No selection - clear content
-      setSelectedContentId(null);
+      return;
     }
+
+    if (firstNode.treeNodeKind === "peopleGroup") {
+      return;
+    }
+
+    setSelectedContentId(firstNode.id, {
+      title: firstNode.title,
+      contentType: firstNode.contentType,
+    });
   };
 
   // Handler: Create or edit external link from dialog
