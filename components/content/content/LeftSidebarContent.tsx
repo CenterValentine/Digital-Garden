@@ -1371,15 +1371,20 @@ export function LeftSidebarContent({
           pendingVisualizationEngine.current = null;
         }
 
-        // Navigate to newly created file (but not folders)
-        if (type !== "folder") {
-          replaceContentTab(`tab:${tempId}`, apiResponse.id, {
-            title: apiResponse.title,
-            contentType: apiResponse.contentType,
-            temporary: false,
-            pin: true,
-          });
-        }
+        // Reconcile the optimistic tab → the real id. For files this is the
+        // navigate-to-new-file. For folders it's normally a no-op (folders
+        // aren't auto-opened) — but if the user OPENED the folder while it was
+        // still a `temp-` placeholder, its tab/selection is stuck on the temp
+        // id and the folder never loads (ListView can't fetch a temp parent's
+        // children). Swapping unconditionally reconciles that stuck selection
+        // to the real id so the folder loads. replaceContentTab no-ops when no
+        // tab exists for the temp id.
+        replaceContentTab(`tab:${tempId}`, apiResponse.id, {
+          title: apiResponse.title,
+          contentType: apiResponse.contentType,
+          temporary: false,
+          pin: true,
+        });
       } else {
         // Fallback: If API doesn't return expected data, refresh tree
         setCreatingItem(null);
