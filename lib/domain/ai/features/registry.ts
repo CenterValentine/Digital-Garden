@@ -13,14 +13,17 @@
  */
 
 export type CapabilityFlag =
-  | "text"        // basic text generation (universal)
-  | "streaming"   // token-by-token streaming
-  | "tools"       // function/tool calling
-  | "vision"      // image input
-  | "image"       // image output
-  | "reasoning"   // extended thinking surface
-  | "low-cost"    // prefer cheap/fast models (soft preference)
-  | "embedding";  // embedding generation (future)
+  | "text"          // basic text generation (universal)
+  | "streaming"     // token-by-token streaming
+  | "tools"         // function/tool calling
+  | "vision"        // image input
+  | "image"         // image output
+  | "speech"        // speech output (text-to-speech)
+  | "audio-input"   // audio understanding (model can hear non-speech sound)
+  | "transcription" // speech-to-text (returns words of speech)
+  | "reasoning"     // extended thinking surface
+  | "low-cost"      // prefer cheap/fast models (soft preference)
+  | "embedding";    // embedding generation (future)
 
 export interface FeatureSpec {
   /** Stable id used as AIFeatureRoute.featureId. */
@@ -76,6 +79,21 @@ export const FEATURE_REGISTRY: FeatureSpec[] = [
     },
   },
   {
+    // Default provider for the `generate_speech` chat tool and flashcard
+    // pronunciation. Like image-generation, the tool has its own per-tool
+    // override (Settings → AI → AI Tools); this feature route is the default
+    // when that override is unset.
+    id: "text-to-speech",
+    label: "Text-to-Speech",
+    description:
+      "Default provider for speech generation (the `generate_speech` chat tool and flashcard pronunciation). Per-tool overrides in AI Tools take precedence.",
+    requiredCapabilities: ["speech"],
+    defaultSuggestion: {
+      presetId: "openai",
+      modelId: "tts-1",
+    },
+  },
+  {
     id: "follow-ups",
     label: "Suggested Follow-ups",
     description:
@@ -128,6 +146,9 @@ export const CAPABILITY_DISPLAY: CapabilityFlag[] = [
   "tools",
   "vision",
   "image",
+  "speech",
+  "audio-input",
+  "transcription",
   "reasoning",
   "low-cost",
   "embedding",
