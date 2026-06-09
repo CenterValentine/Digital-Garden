@@ -276,8 +276,13 @@ model Flashcard {
   archivedAt    DateTime?         @db.Timestamptz(6)
   deletedAt     DateTime?         @db.Timestamptz(6)
 
-  // ---- Cloze additions (Anki import / Session 2B). noteId is a loose
-  // ---- pointer (no FK) — promote to a real FK later if shared state grows.
+  // ---- Cloze + sibling grouping (Session 2B).
+  // noteId groups sibling cards generated from the same source. For
+  // basic cards it stays NULL. For cloze cards, all siblings (one per
+  // ordinal) share the same noteId. Also future-proofs multi-template
+  // notes (front-to-back + back-to-front + audio-to-meaning) without
+  // a second migration. Lightweight UUID — no separate FlashcardNote
+  // table; promote to a real FK later if shared state grows.
   noteId          String? @db.Uuid
   clozeOrdinal    Int?
   // Source TipTap document the cloze cards were generated from. Stored
