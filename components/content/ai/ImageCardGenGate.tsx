@@ -94,6 +94,10 @@ export function ImageCardGenGate({
   // an effect double-invokes (StrictMode) or multiple triggers race. Reset on
   // failure so the user can retry from the picker.
   const genStartedRef = useRef(false);
+  // True when there are no configured image connections — generation then
+  // relies on the server-side default (env key). On failure with no
+  // connections there's no picker to fall back to, so we show the setup prompt.
+  const noConnectionsRef = useRef(false);
 
   // Generate with a route (or the default when route is null → server resolves).
   const runGeneration = useCallback(
@@ -127,10 +131,12 @@ export function ImageCardGenGate({
         setPhase("done");
         onComplete(json.data.results);
       } catch (e) {
-        // Allow a retry from the picker after a failure.
+        // Allow a retry. With no connections there's no picker — show the
+        // setup prompt (the env-backed default also failed). Otherwise the
+        // picker lets the user choose a different connection/model and retry.
         genStartedRef.current = false;
         setError(e instanceof Error ? e.message : "Image generation failed");
-        setPhase("picker");
+        setPhase(noConnectionsRef.current ? "no-providers" : "picker");
       }
     },
     [cards, onComplete],
@@ -168,7 +174,13 @@ export function ImageCardGenGate({
           .filter((p) => p.models.length > 0);
 
         if (compatible.length === 0) {
-          setPhase("no-providers");
+          // No configured connection — but image gen may still work via a
+          // server-side env key. Try the default route; runGeneration's catch
+          // shows the setup prompt only if that ALSO fails.
+          noConnectionsRef.current = true;
+          setProviders([]);
+          setDefaultRoute(null);
+          void runGeneration(null, false);
           return;
         }
 
