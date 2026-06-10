@@ -109,6 +109,10 @@ export function AudioCardGenGate({
   const [pickModel, setPickModel] = useState<string>("");
   const [pickVoice, setPickVoice] = useState<string>("");
   const [makeDefault, setMakeDefault] = useState(false);
+  // Set when the user touches the model/voice selects during the countdown —
+  // it freezes the auto-generate timer so the AI waits until they finish
+  // adjusting their selection (then click Generate).
+  const [paused, setPaused] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // Guards the expensive generation POST so it fires exactly once even when
   // an effect double-invokes (StrictMode) or multiple triggers race. Reset on
@@ -280,16 +284,18 @@ export function AudioCardGenGate({
     };
   }, [runGeneration]);
 
-  // Countdown tick → auto-generate with the default when it hits zero.
+  // Countdown tick → auto-generate with the default when it hits zero. Frozen
+  // while `paused` (the user is adjusting model/voice) so it never fires mid-
+  // edit.
   useEffect(() => {
-    if (phase !== "countdown") return;
+    if (phase !== "countdown" || paused) return;
     if (countdown <= 0) {
       void runGeneration(defaultRoute, false);
       return;
     }
     const t = setTimeout(() => setCountdown((n) => n - 1), 1000);
     return () => clearTimeout(t);
-  }, [phase, countdown, defaultRoute, runGeneration]);
+  }, [phase, paused, countdown, defaultRoute, runGeneration]);
 
   if (phase === "done") return null;
 
@@ -338,23 +344,94 @@ export function AudioCardGenGate({
   }
 
   if (phase === "countdown") {
-    const name = defaultRoute ? providerNameFor(defaultRoute.presetId) : "default";
+    // A flat model list across every compatible connection drives the single
+    // "Model" select; the composite value carries which connection it belongs
+    // to so the picked route is unambiguous when a model id repeats.
+    const allModels = providers.flatMap((p) =>
+      p.models.map((m) => ({
+        connectionId: p.connectionId,
+        presetId: p.presetId,
+        modelId: m.id,
+        label: providers.length > 1 ? `${m.name} · ${p.providerName}` : m.name,
+      })),
+    );
+    const pickedConn = providers.find((p) => p.connectionId === pickConnectionId);
+    const voices = voicesFor(pickModel);
+    const route: Route = {
+      connectionId: pickConnectionId,
+      presetId: pickedConn?.presetId ?? null,
+      modelId: pickModel,
+      voice: pickVoice || undefined,
+    };
     return (
       <div className={wrap}>
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <Sparkles className="h-4 w-4 shrink-0" />
+        <div className="flex items-center gap-2">
+          <Sparkles className="h-4 w-4 shrink-0" />
+          {paused ? (
+            <span className="font-medium">Pick a model &amp; voice, then Generate</span>
+          ) : (
             <span>
-              Generating with <span className="font-medium">{name}</span> in{" "}
-              <span className="font-mono">{countdown}</span>…
+              Generating with{" "}
+              <span className="font-medium">{providerNameFor(route.presetId)}</span>{" "}
+              in <span className="font-mono">{countdown}</span>… — or adjust below
             </span>
-          </div>
+          )}
+        </div>
+        <div className="mt-2 flex flex-wrap items-end gap-2">
+          <label className="flex flex-col gap-0.5">
+            <span className="text-[10px] uppercase tracking-wide opacity-70">Model</span>
+            <select
+              value={`${pickConnectionId}::${pickModel}`}
+              onMouseDown={() => setPaused(true)}
+              onFocus={() => setPaused(true)}
+              onChange={(e) => {
+                setPaused(true);
+                const sep = e.target.value.indexOf("::");
+                const cid = e.target.value.slice(0, sep);
+                const mid = e.target.value.slice(sep + 2);
+                setPickConnectionId(cid);
+                setPickModel(mid);
+                setPickVoice(getDefaultVoice(mid) ?? "");
+              }}
+              className="rounded-md border border-amber-400/30 bg-white/40 px-2 py-1 text-[12px] dark:bg-black/30"
+            >
+              {allModels.map((m) => (
+                <option
+                  key={`${m.connectionId}::${m.modelId}`}
+                  value={`${m.connectionId}::${m.modelId}`}
+                >
+                  {m.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          {voices.length > 0 && (
+            <label className="flex flex-col gap-0.5">
+              <span className="text-[10px] uppercase tracking-wide opacity-70">Voice</span>
+              <select
+                value={pickVoice}
+                onMouseDown={() => setPaused(true)}
+                onFocus={() => setPaused(true)}
+                onChange={(e) => {
+                  setPaused(true);
+                  setPickVoice(e.target.value);
+                }}
+                className="rounded-md border border-amber-400/30 bg-white/40 px-2 py-1 text-[12px] dark:bg-black/30"
+              >
+                {voices.map((v) => (
+                  <option key={v.id} value={v.id}>
+                    {v.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
           <button
             type="button"
-            onClick={() => setPhase("picker")}
-            className="rounded-md border border-amber-400/40 px-2.5 py-1 font-medium transition-colors hover:bg-amber-500/15"
+            onClick={() => void runGeneration(route, false)}
+            className="rounded-md bg-amber-600 px-3 py-1.5 font-medium text-white transition-colors hover:bg-amber-700 dark:bg-amber-500 dark:text-amber-950 dark:hover:bg-amber-400"
           >
-            Choose a different voice
+            {paused ? "Generate" : "Generate now"}
           </button>
         </div>
       </div>

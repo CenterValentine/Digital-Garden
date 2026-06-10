@@ -56,7 +56,7 @@ import { useExistingDeckPaths } from "./use-existing-deck-paths";
 import { DeckPathField } from "./DeckPathField";
 import { ImageCardGenGate, type ImageGenResult } from "./ImageCardGenGate";
 import { AudioCardGenGate, type AudioGenResult } from "./AudioCardGenGate";
-import { appendAudioToDoc } from "@/lib/domain/flashcards/content";
+import { createAudioFrontDoc } from "@/lib/domain/flashcards/content";
 
 /**
  * Stage 3 payload — propose_deck_with_cards. Deck info is embedded so
@@ -197,8 +197,10 @@ interface RowState {
   frontImageUrl: string | null;
   /** Image generation failed for this card front (still proposable as text). */
   imageError?: string;
-  /** Pronunciation card: its back carries (or will carry) spoken audio. */
+  /** Pronunciation card: its FRONT carries (or will carry) spoken audio. */
   isAudioCard?: boolean;
+  /** The term spoken on an audio card's front (the TTS caption + source). */
+  term?: string;
   /** TTS generation failed for this card (still proposable as silent text). */
   audioError?: string;
 }
@@ -248,6 +250,7 @@ export function FlashcardCardProposalList({
         frontImageUrl: card.frontImageUrl ?? null,
         imageError: card.imageError,
         isAudioCard: Boolean(card.audioCard),
+        term: card.audioCard ? card.term ?? card.front : undefined,
         audioError: card.audioError,
       };
     });
@@ -337,9 +340,10 @@ export function FlashcardCardProposalList({
   // chat history would re-fire billable TTS on each load).
   const [audioGenStarted, setAudioGenStarted] = useState(false);
 
-  // Apply generated audio onto the draft rows (by index). The pronunciation
-  // rides on the BACK (definition + audioEmbed, autoplay-on-flip) so flipping
-  // to the answer speaks the term. Failed cards get an audioError and are
+  // Apply generated audio onto the draft rows (by index). Pronunciation cards
+  // are AUDIO-FIRST: the FRONT becomes the spoken term (autoplays on show) and
+  // the interpretation/definition stays on the back — so the user hears the
+  // word, then flips to its meaning. Failed cards get an audioError and are
   // unchecked so the batch commits only the cards that actually got audio.
   const applyAudioResults = useCallback(
     (results: AudioGenResult[]) => {
@@ -352,9 +356,10 @@ export function FlashcardCardProposalList({
           }
           return {
             ...row,
-            backContent: appendAudioToDoc(row.backContent, r.audioUrl, {
+            frontContent: createAudioFrontDoc(r.audioUrl, row.term ?? "", {
               autoplayOnFlip: true,
             }),
+            isFrontRichText: true,
             audioError: undefined,
           };
         }),
