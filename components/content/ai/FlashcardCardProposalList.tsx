@@ -115,13 +115,20 @@ interface DeckWithCardsProposalPayload {
     audioContentId?: string | null;
     /** Set when TTS generation failed for this card (still proposable). */
     audioError?: string;
+    // ── Sound-identification cards (propose_sound_id_cards) — scaffold ──
+    /** Draft sound-ID card; commits as a text prompt until a sound provider exists. */
+    soundCard?: boolean;
+    /** Description of the sound to source — preserved for a future provider. */
+    soundPrompt?: string;
   }>;
   requestedCount: number;
   batchLimit: number;
   /** True when this proposal is a batch of identification-image cards. */
   imageCards?: boolean;
-  /** True when this proposal is a batch of pronunciation (TTS) cards. */
+  /** True when one or more cards in this batch carry spoken audio. */
   audioCards?: boolean;
+  /** True when this proposal is a batch of sound-identification cards (scaffold). */
+  soundCards?: boolean;
   sourceContentId: string | null;
 }
 
@@ -857,6 +864,26 @@ export function FlashcardCardProposalList({
             </p>
           </div>
         )
+      )}
+
+      {/*
+        Sound-identification cards (propose_sound_id_cards) — SCAFFOLD. No sound
+        provider is wired yet, so these commit as text prompts; the banner is
+        honest about that and points at the working (uploaded-clip) path.
+      */}
+      {payload.soundCards && (
+        <div className="mx-1 mb-2 rounded-lg border border-amber-400/25 bg-amber-500/[0.06] px-3 py-2.5 text-[12px] text-amber-900 dark:text-amber-200">
+          <div className="flex items-start gap-2">
+            <Volume2 className="mt-0.5 h-4 w-4 shrink-0" />
+            <div>
+              <p className="font-medium">Sound clips aren&apos;t auto-generated yet</p>
+              <p className="opacity-80">
+                These commit as text prompts for now. To attach real audio, upload
+                your clips and use “cards from media.”
+              </p>
+            </div>
+          </div>
+        </div>
       )}
 
       {/*

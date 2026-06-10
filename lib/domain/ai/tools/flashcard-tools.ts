@@ -32,6 +32,9 @@ const CARD_BATCH_LIMIT = 10;
 // Identification-image cards are capped lower than text cards: each one runs a
 // real image-generation call at propose time (latency + cost).
 const IMAGE_CARD_LIMIT = 5;
+// Sound-identification cards (propose_sound_id_cards) — scaffold only; no sound
+// provider is wired yet, so cards commit as text prompts.
+const SOUND_CARD_LIMIT = 10;
 
 interface DeckRow {
   id: string;
@@ -649,6 +652,138 @@ export function createFlashcardTools(ctx: ToolExecuteContext) {
           requestedCount,
           batchLimit: IMAGE_CARD_LIMIT,
           imageCards: true,
+          sourceContentId: resolvedSourceContentId,
+        });
+      },
+    }),
+
+    propose_sound_id_cards: tool({
+      description:
+        `Propose up to ${SOUND_CARD_LIMIT} SOUND-IDENTIFICATION flashcards — the front is a real-world SOUND (a bird call, animal, instrument, engine, machine) and the back names it. For auditory recall ("which bird is this?", "name this engine"). For each card provide: soundPrompt (a precise description of the exact sound to source, e.g. "song of an American Robin, clear recording"), identifyLabel (the few-word instruction shown to the user, e.g. "Identify this bird"), and back (the answer). NOTE: automatic sound generation/sourcing is NOT wired yet, so for now these commit as TEXT prompts (the identifyLabel on the front, answer on the back) without an actual clip — the soundPrompt is preserved for when a sound provider lands. To make sound-ID cards WITH real audio today, the user should upload their own clips and use "cards from media". Do NOT use this for spoken words/pronunciation (that's propose_deck_with_cards with an audio directive) or for visual identification (propose_image_cards).`,
+      inputSchema: z.object({
+        name: z
+          .string()
+          .min(1)
+          .max(120)
+          .describe(
+            "Leaf deck name. Combined with parentDeckPath to form the full target path. Existing deck → cards added directly; otherwise the commit creates it first.",
+          ),
+        parentDeckPath: z
+          .string()
+          .optional()
+          .describe("Full path of the parent deck (e.g. 'birds'). Omit for a root-level deck."),
+        rationale: z
+          .string()
+          .optional()
+          .describe("One-sentence reason this deck fits — shown only when the deck will be created."),
+        similarExistingPaths: z
+          .array(z.string())
+          .max(5)
+          .optional()
+          .describe("Paths of existing decks that almost match — from list_decks / search_decks."),
+        cards: z
+          .array(
+            z.object({
+              soundPrompt: z
+                .string()
+                .min(1)
+                .describe(
+                  "Precise description of the exact sound to source/generate (e.g. 'song of an American Robin'). Preserved for a future sound provider.",
+                ),
+              identifyLabel: z
+                .string()
+                .min(1)
+                .max(80)
+                .describe(
+                  "Few-word instruction shown on the front (e.g. 'Identify this bird', 'Name this engine').",
+                ),
+              back: z
+                .string()
+                .min(1)
+                .describe("The answer / identification revealed on the back (plain text)."),
+              backLabel: z
+                .string()
+                .max(80)
+                .optional()
+                .describe("Label for the back side (default: 'Answer')."),
+            }),
+          )
+          .min(1)
+          .max(SOUND_CARD_LIMIT)
+          .describe(
+            `Array of ${SOUND_CARD_LIMIT} or fewer sound-identification card drafts. ENFORCED by Zod — passing more will fail.`,
+          ),
+        requestedCount: z
+          .number()
+          .int()
+          .min(1)
+          .describe("How many cards the user actually asked for (for the 'proposed N of M' hint)."),
+        sourceContentId: z
+          .string()
+          .uuid()
+          .optional()
+          .describe("ContentNode id of the note these cards were drafted from, if any."),
+      }),
+      execute: async ({
+        name,
+        parentDeckPath,
+        rationale,
+        similarExistingPaths,
+        cards,
+        requestedCount,
+        sourceContentId,
+      }) => {
+        let parentDeckId: string | null = null;
+        if (parentDeckPath) {
+          const parent = await prisma.flashcardDeck.findFirst({
+            where: { ownerId: ctx.userId, path: parentDeckPath, deletedAt: null },
+            select: { id: true },
+          });
+          parentDeckId = parent?.id ?? null;
+        }
+
+        const proposedSlug = slugifyDeckName(name);
+        const proposedPath = parentDeckPath
+          ? `${parentDeckPath}/${proposedSlug}`
+          : proposedSlug;
+
+        const existing = await prisma.flashcardDeck.findFirst({
+          where: { ownerId: ctx.userId, path: proposedPath, deletedAt: null },
+          select: { id: true, name: true },
+        });
+
+        const resolvedSourceContentId = sourceContentId ?? ctx.contentId ?? null;
+
+        // SCAFFOLD: no sound provider exists yet, so cards commit as plain text
+        // prompts (identifyLabel → answer). The soundPrompt rides along for the
+        // future generation step. soundCards flags the proposal so the UI can
+        // explain the limitation + point at the upload path.
+        const proposedCards = cards.slice(0, SOUND_CARD_LIMIT).map((card) => ({
+          front: card.identifyLabel,
+          back: card.back,
+          backLabel: card.backLabel,
+          soundCard: true,
+          soundPrompt: card.soundPrompt,
+        }));
+
+        return JSON.stringify({
+          __deckWithCardsProposal: true,
+          deck: {
+            name,
+            proposedPath,
+            parentDeckPath: parentDeckPath ?? null,
+            parentDeckId,
+            parentResolved: parentDeckPath ? parentDeckId !== null : true,
+            rationale: rationale ?? null,
+            similarExistingPaths: similarExistingPaths ?? [],
+            deckExists: existing !== null,
+            deckId: existing?.id ?? null,
+            existingName: existing?.name ?? null,
+          },
+          cards: proposedCards,
+          requestedCount,
+          batchLimit: SOUND_CARD_LIMIT,
+          soundCards: true,
           sourceContentId: resolvedSourceContentId,
         });
       },
