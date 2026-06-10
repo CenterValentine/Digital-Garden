@@ -281,6 +281,10 @@ const flashcardsSettingsSchema = z
     // proposal gate gates the actual TTS spend). Set false to only add audio on
     // explicit request.
     autoPronounce: z.boolean().optional(),
+    // When true (default), accepting an AI card proposal skips cards whose front
+    // already exists in the target deck (and dups within the batch) instead of
+    // creating them. Skipped rows are shown as "Duplicate".
+    dropDuplicatesOnAdd: z.boolean().optional(),
   })
   .optional();
 

@@ -57,6 +57,7 @@ import { DeckPathField } from "./DeckPathField";
 import { ImageCardGenGate, type ImageGenResult } from "./ImageCardGenGate";
 import { AudioCardGenGate, type AudioGenResult } from "./AudioCardGenGate";
 import { createAudioFrontDoc, appendAudioToDoc } from "@/lib/domain/flashcards/content";
+import { useSettingsStore } from "@/state/settings-store";
 
 /**
  * Stage 3 payload — propose_deck_with_cards. Deck info is embedded so
@@ -184,7 +185,13 @@ type RowStatus =
   | { status: "idle" }
   | { status: "creating" }
   | { status: "created" }
+  | { status: "duplicate" }
   | { status: "error"; message: string };
+
+/** Normalize a card front for duplicate comparison (case/space-insensitive). */
+function normalizeFront(text: string): string {
+  return text.trim().toLowerCase().replace(/\s+/g, " ");
+}
 
 interface RowState {
   checked: boolean;
@@ -530,6 +537,7 @@ export function FlashcardCardProposalList({
     setBulkSubmitting(true);
     let successCount = 0;
     let failureCount = 0;
+    let duplicateCount = 0;
     // Track successful indices in this batch so we can persist them
     // alongside any previously-persisted indices once the loop ends.
     const successfulIndices: number[] = [];
@@ -603,10 +611,48 @@ export function FlashcardCardProposalList({
       .map((r, i) => (r.checked && r.status.status !== "created" ? i : -1))
       .filter((i) => i >= 0);
 
+    // Duplicate handling (opt-out setting, default on). Fetch the target deck's
+    // existing card fronts ONCE so we can skip cards already in the deck — and
+    // dedupe within this batch (the AI sometimes proposes the same card twice).
+    // Only TEXT fronts are compared; image/media fronts have no comparable text.
+    const dropDuplicates =
+      useSettingsStore.getState().flashcards?.dropDuplicatesOnAdd !== false;
+    const existingFronts = new Set<string>();
+    const seenFronts = new Set<string>();
+    if (dropDuplicates && effectiveDeckExists) {
+      try {
+        const res = await fetch(
+          `/api/flashcards?deckId=${encodeURIComponent(targetDeckId)}`,
+          { credentials: "include" },
+        );
+        const json = (await res.json().catch(() => null)) as
+          | { data?: Array<{ frontContent?: unknown }> }
+          | null;
+        for (const card of json?.data ?? []) {
+          const norm = normalizeFront(extractPlainTextFromTiptap(card.frontContent));
+          if (norm) existingFronts.add(norm);
+        }
+      } catch {
+        // Non-fatal — on fetch failure we just don't dedupe against the deck.
+      }
+    }
+
     for (const i of indexesToSubmit) {
+      const row = rows[i];
+
+      // Skip duplicates (already in the deck, or earlier in this batch).
+      if (dropDuplicates) {
+        const norm = normalizeFront(extractPlainTextFromTiptap(row.frontContent));
+        if (norm && (existingFronts.has(norm) || seenFronts.has(norm))) {
+          updateRow(i, { status: { status: "duplicate" }, checked: false });
+          duplicateCount++;
+          continue;
+        }
+        if (norm) seenFronts.add(norm);
+      }
+
       updateRow(i, { status: { status: "creating" } });
       try {
-        const row = rows[i];
         const res = await fetch("/api/flashcards", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -661,7 +707,14 @@ export function FlashcardCardProposalList({
     setBulkSubmitting(false);
     if (successCount > 0) {
       toast.success(
-        `Added ${successCount} card${successCount === 1 ? "" : "s"} to ${effectivePath}`,
+        `Added ${successCount} card${successCount === 1 ? "" : "s"} to ${effectivePath}` +
+          (duplicateCount > 0
+            ? ` · skipped ${duplicateCount} duplicate${duplicateCount === 1 ? "" : "s"}`
+            : ""),
+      );
+    } else if (duplicateCount > 0 && failureCount === 0) {
+      toast.info(
+        `All ${duplicateCount} selected card${duplicateCount === 1 ? " was a duplicate" : "s were duplicates"} — already in ${effectivePath}`,
       );
     }
     if (failureCount > 0) {
@@ -905,6 +958,7 @@ export function FlashcardCardProposalList({
           const isCreated = row.status.status === "created";
           const isCreating = row.status.status === "creating";
           const isError = row.status.status === "error";
+          const isDuplicate = row.status.status === "duplicate";
           const frontPreview =
             extractPlainTextFromTiptap(row.frontContent) || "(empty)";
           const backPreview =
@@ -917,7 +971,9 @@ export function FlashcardCardProposalList({
                   ? "bg-emerald-500/[0.04]"
                   : isError
                     ? "bg-red-500/[0.04]"
-                    : ""
+                    : isDuplicate
+                      ? "opacity-60"
+                      : ""
               }`}
             >
               {/* Compact row — checkbox + summary + status icon + chevron */}
@@ -925,7 +981,7 @@ export function FlashcardCardProposalList({
                 <input
                   type="checkbox"
                   checked={row.checked}
-                  disabled={isCreated || isCreating}
+                  disabled={isCreated || isCreating || isDuplicate}
                   onChange={(e) =>
                     updateRow(i, { checked: e.target.checked })
                   }
@@ -1021,6 +1077,14 @@ export function FlashcardCardProposalList({
                       className="h-4 w-4 text-red-600 dark:text-red-400"
                       aria-label="Error"
                     />
+                  )}
+                  {isDuplicate && (
+                    <span
+                      className="rounded bg-gray-500/15 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400"
+                      title="Already in this deck — skipped"
+                    >
+                      Duplicate
+                    </span>
                   )}
                   <button
                     type="button"
