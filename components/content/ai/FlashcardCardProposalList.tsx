@@ -43,6 +43,7 @@ import {
   ChevronDown,
   ChevronRight as ChevronRightIcon,
   Sparkles,
+  Volume2,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -54,6 +55,8 @@ import { AdaptiveFlashcardEditor } from "@/extensions/flashcards/components/Adap
 import { useExistingDeckPaths } from "./use-existing-deck-paths";
 import { DeckPathField } from "./DeckPathField";
 import { ImageCardGenGate, type ImageGenResult } from "./ImageCardGenGate";
+import { AudioCardGenGate, type AudioGenResult } from "./AudioCardGenGate";
+import { appendAudioToDoc } from "@/lib/domain/flashcards/content";
 
 /**
  * Stage 3 payload — propose_deck_with_cards. Deck info is embedded so
@@ -100,11 +103,27 @@ interface DeckWithCardsProposalPayload {
     isFrontRichText?: boolean;
     /** Set when image generation failed for this card (still proposable). */
     imageError?: string;
+    // ── Pronunciation cards (propose_pronunciation_cards) ──
+    /** When true, this card gets a spoken pronunciation on the back. */
+    audioCard?: boolean;
+    /** True for draft audio cards awaiting client-side TTS generation. */
+    pendingAudioGen?: boolean;
+    /** The term to speak (front text + TTS source). */
+    term?: string;
+    /** BCP-47 language hint for the voice. */
+    language?: string;
+    /** Preview URL for the generated audio (post-gen). */
+    audioUrl?: string;
+    audioContentId?: string | null;
+    /** Set when TTS generation failed for this card (still proposable). */
+    audioError?: string;
   }>;
   requestedCount: number;
   batchLimit: number;
   /** True when this proposal is a batch of identification-image cards. */
   imageCards?: boolean;
+  /** True when this proposal is a batch of pronunciation (TTS) cards. */
+  audioCards?: boolean;
   sourceContentId: string | null;
 }
 
@@ -178,6 +197,10 @@ interface RowState {
   frontImageUrl: string | null;
   /** Image generation failed for this card front (still proposable as text). */
   imageError?: string;
+  /** Pronunciation card: its back carries (or will carry) spoken audio. */
+  isAudioCard?: boolean;
+  /** TTS generation failed for this card (still proposable as silent text). */
+  audioError?: string;
 }
 
 export function FlashcardCardProposalList({
@@ -224,6 +247,8 @@ export function FlashcardCardProposalList({
         isFrontRichText: isImageFront,
         frontImageUrl: card.frontImageUrl ?? null,
         imageError: card.imageError,
+        isAudioCard: Boolean(card.audioCard),
+        audioError: card.audioError,
       };
     });
   }, [payload.cards, proposalId]);
@@ -284,6 +309,57 @@ export function FlashcardCardProposalList({
         }),
       );
       setImageGenDone(true);
+    },
+    [],
+  );
+
+  // ── Pronunciation cards (audio twin of the image block above) ──
+  // Audio proposals arrive as DRAFTS (pendingAudioGen) — TTS is synthesized
+  // client-side after the voice/provider window (AudioCardGenGate). The gate is
+  // shown until generation completes; "Add selected" is gated on it.
+  const needsAudioGen = Boolean(
+    payload.audioCards && payload.cards.some((c) => c.pendingAudioGen),
+  );
+  const audioDrafts = useMemo(
+    () =>
+      payload.cards.map((c) => ({
+        term: c.term ?? c.front,
+        language: c.language,
+      })),
+    [payload.cards],
+  );
+  const [audioGenDone, setAudioGenDone] = useState(
+    !needsAudioGen || allInitiallyCreated,
+  );
+  // TTS generation is EXPLICIT, never automatic — same reasoning as images:
+  // generated audio isn't written back into the persisted chat payload, so the
+  // gate must only mount after the user clicks "Generate" (otherwise replaying
+  // chat history would re-fire billable TTS on each load).
+  const [audioGenStarted, setAudioGenStarted] = useState(false);
+
+  // Apply generated audio onto the draft rows (by index). The pronunciation
+  // rides on the BACK (definition + audioEmbed, autoplay-on-flip) so flipping
+  // to the answer speaks the term. Failed cards get an audioError and are
+  // unchecked so the batch commits only the cards that actually got audio.
+  const applyAudioResults = useCallback(
+    (results: AudioGenResult[]) => {
+      setRows((prev) =>
+        prev.map((row, i) => {
+          const r = results[i];
+          if (!r) return row;
+          if (r.error || !r.audioUrl) {
+            return { ...row, checked: false, audioError: r.error ?? "No audio returned" };
+          }
+          return {
+            ...row,
+            backContent: appendAudioToDoc(row.backContent, r.audioUrl, {
+              autoplayOnFlip: true,
+            }),
+            audioError: undefined,
+          };
+        }),
+      );
+      setAudioGenDone(true);
     },
     [],
   );
@@ -701,6 +777,41 @@ export function FlashcardCardProposalList({
       )}
 
       {/*
+        Pronunciation cards (audio twin of the image gate above). Generation is
+        opt-in: a dormant prompt until the user clicks Generate (so chat history
+        never auto-spends on TTS), then the voice/provider window takes over.
+      */}
+      {needsAudioGen && !audioGenDone && (
+        audioGenStarted ? (
+          <AudioCardGenGate cards={audioDrafts} onComplete={applyAudioResults} />
+        ) : (
+          <div className="mx-1 mb-2 rounded-lg border border-amber-400/25 bg-amber-500/[0.06] px-3 py-2.5 text-[12px] text-amber-900 dark:text-amber-200">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <Sparkles className="h-4 w-4 shrink-0" />
+                <span>
+                  {audioDrafts.length} card
+                  {audioDrafts.length === 1 ? "" : "s"} need a spoken
+                  pronunciation.
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setAudioGenStarted(true)}
+                className="rounded-md bg-amber-600 px-3 py-1.5 font-medium text-white transition-colors hover:bg-amber-700 dark:bg-amber-500 dark:text-amber-950 dark:hover:bg-amber-400"
+              >
+                Generate {audioDrafts.length} pronunciation
+                {audioDrafts.length === 1 ? "" : "s"}
+              </button>
+            </div>
+            <p className="mt-1 text-[11px] opacity-70">
+              Uses your speech provider — won&apos;t start until you click.
+            </p>
+          </div>
+        )
+      )}
+
+      {/*
         Gallery: compact bullet list by default (one row per card,
         front → back as plain text), expandable on click into the full
         TipTap editors. Max-height + scroll keeps the cards panel from
@@ -754,6 +865,25 @@ export function FlashcardCardProposalList({
                   >
                     <AlertTriangle className="h-4 w-4" />
                   </span>
+                ) : null}
+                {/* Pronunciation indicator: warns on failed TTS, otherwise a
+                    speaker once audio is attached (post-gen). */}
+                {row.isAudioCard ? (
+                  row.audioError ? (
+                    <span
+                      title={`Audio generation failed: ${row.audioError}`}
+                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded border border-red-400/30 text-red-500"
+                    >
+                      <AlertTriangle className="h-4 w-4" />
+                    </span>
+                  ) : audioGenDone ? (
+                    <span
+                      title="Pronunciation plays on flip"
+                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded border border-amber-400/20 text-amber-600 dark:text-amber-400"
+                    >
+                      <Volume2 className="h-4 w-4" />
+                    </span>
+                  ) : null
                 ) : null}
                 {/*
                   Horizontal scroll-to-peek pattern on the flex item:
@@ -939,14 +1069,17 @@ export function FlashcardCardProposalList({
               bulkSubmitting ||
               allDone ||
               !effectivePath ||
-              !imageGenDone
+              !imageGenDone ||
+              !audioGenDone
             }
             title={
               !imageGenDone
                 ? "Waiting for image generation…"
-                : !effectivePath
-                  ? "Target deck path is empty — type a path or pick from the dropdown"
-                  : undefined
+                : !audioGenDone
+                  ? "Waiting for audio generation…"
+                  : !effectivePath
+                    ? "Target deck path is empty — type a path or pick from the dropdown"
+                    : undefined
             }
             className="inline-flex items-center gap-1.5 rounded-md border border-amber-500/40 bg-amber-500/[0.08] px-2.5 py-1 text-xs font-medium text-amber-700 hover:bg-amber-500/[0.14] disabled:cursor-not-allowed disabled:opacity-60 dark:border-amber-400/30 dark:bg-amber-500/[0.10] dark:text-amber-300 dark:hover:bg-amber-500/[0.18]"
           >
