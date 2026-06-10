@@ -56,7 +56,7 @@ import { useExistingDeckPaths } from "./use-existing-deck-paths";
 import { DeckPathField } from "./DeckPathField";
 import { ImageCardGenGate, type ImageGenResult } from "./ImageCardGenGate";
 import { AudioCardGenGate, type AudioGenResult } from "./AudioCardGenGate";
-import { createAudioFrontDoc } from "@/lib/domain/flashcards/content";
+import { createAudioFrontDoc, appendAudioToDoc } from "@/lib/domain/flashcards/content";
 
 /**
  * Stage 3 payload — propose_deck_with_cards. Deck info is embedded so
@@ -103,15 +103,13 @@ interface DeckWithCardsProposalPayload {
     isFrontRichText?: boolean;
     /** Set when image generation failed for this card (still proposable). */
     imageError?: string;
-    // ── Pronunciation cards (propose_pronunciation_cards) ──
-    /** When true, this card gets a spoken pronunciation on the back. */
-    audioCard?: boolean;
+    // ── Spoken audio (propose_deck_with_cards `audio` directive) ──
+    /** When present, this card carries a spoken clip on the named side. The
+     *  text spoken is whatever the card holds on that side. hideText → that
+     *  side shows only the player (listening-comprehension card). */
+    audio?: { side: "front" | "back"; hideText?: boolean };
     /** True for draft audio cards awaiting client-side TTS generation. */
     pendingAudioGen?: boolean;
-    /** The term to speak (front text + TTS source). */
-    term?: string;
-    /** BCP-47 language hint for the voice. */
-    language?: string;
     /** Preview URL for the generated audio (post-gen). */
     audioUrl?: string;
     audioContentId?: string | null;
@@ -197,10 +195,11 @@ interface RowState {
   frontImageUrl: string | null;
   /** Image generation failed for this card front (still proposable as text). */
   imageError?: string;
-  /** Pronunciation card: its FRONT carries (or will carry) spoken audio. */
+  /** This card carries (or will carry) a spoken clip. */
   isAudioCard?: boolean;
-  /** The term spoken on an audio card's front (the TTS caption + source). */
-  term?: string;
+  /** Which side the clip sits on, and whether that side hides its text. */
+  audioSide?: "front" | "back";
+  audioHideText?: boolean;
   /** TTS generation failed for this card (still proposable as silent text). */
   audioError?: string;
 }
@@ -249,8 +248,9 @@ export function FlashcardCardProposalList({
         isFrontRichText: isImageFront,
         frontImageUrl: card.frontImageUrl ?? null,
         imageError: card.imageError,
-        isAudioCard: Boolean(card.audioCard),
-        term: card.audioCard ? card.term ?? card.front : undefined,
+        isAudioCard: Boolean(card.audio),
+        audioSide: card.audio?.side,
+        audioHideText: card.audio?.hideText,
         audioError: card.audioError,
       };
     });
@@ -320,16 +320,38 @@ export function FlashcardCardProposalList({
   // Audio proposals arrive as DRAFTS (pendingAudioGen) — TTS is synthesized
   // client-side after the voice/provider window (AudioCardGenGate). The gate is
   // shown until generation completes; "Add selected" is gated on it.
+  // Per-card audio plan: only the cards carrying an `audio` directive. Each
+  // entry keeps its ROW INDEX so generated clips land on the right card (a
+  // batch can mix audio and silent cards), and the spoken text = the text on
+  // the chosen side.
+  const audioPlan = useMemo(
+    () =>
+      payload.cards
+        .map((c, index) => ({
+          index,
+          side: c.audio?.side,
+          hideText: c.audio?.hideText ?? false,
+          term: c.audio?.side === "back" ? c.back : c.front,
+        }))
+        .filter(
+          (
+            p,
+          ): p is { index: number; side: "front" | "back"; hideText: boolean; term: string } =>
+            p.side === "front" || p.side === "back",
+        ),
+    [payload.cards],
+  );
   const needsAudioGen = Boolean(
-    payload.audioCards && payload.cards.some((c) => c.pendingAudioGen),
+    payload.audioCards &&
+      audioPlan.some((p) => payload.cards[p.index].pendingAudioGen),
   );
   const audioDrafts = useMemo(
     () =>
-      payload.cards.map((c) => ({
-        term: c.term ?? c.front,
-        language: c.language,
+      audioPlan.map((p) => ({
+        term: p.term,
+        language: undefined as string | undefined,
       })),
-    [payload.cards],
+    [audioPlan],
   );
   const [audioGenDone, setAudioGenDone] = useState(
     !needsAudioGen || allInitiallyCreated,
@@ -340,33 +362,54 @@ export function FlashcardCardProposalList({
   // chat history would re-fire billable TTS on each load).
   const [audioGenStarted, setAudioGenStarted] = useState(false);
 
-  // Apply generated audio onto the draft rows (by index). Pronunciation cards
-  // are AUDIO-FIRST: the FRONT becomes the spoken term (autoplays on show) and
-  // the interpretation/definition stays on the back — so the user hears the
-  // word, then flips to its meaning. Failed cards get an audioError and are
-  // unchecked so the batch commits only the cards that actually got audio.
+  // Apply generated audio onto the draft rows. Results align with audioPlan
+  // (same order). Placement is per-card: front-side audio rebuilds the front as
+  // the spoken clip (hideText → player only, for listening cards; otherwise the
+  // word is shown and spoken); back-side audio appends the clip to the back.
+  // Either way it autoplays when that side is shown. Failed cards get an
+  // audioError and are unchecked so the batch commits only cards that got audio.
   const applyAudioResults = useCallback(
     (results: AudioGenResult[]) => {
-      setRows((prev) =>
-        prev.map((row, i) => {
-          const r = results[i];
-          if (!r) return row;
+      setRows((prev) => {
+        const next = [...prev];
+        audioPlan.forEach((p, k) => {
+          const r = results[k];
+          if (!r) return;
+          const row = next[p.index];
           if (r.error || !r.audioUrl) {
-            return { ...row, checked: false, audioError: r.error ?? "No audio returned" };
+            next[p.index] = {
+              ...row,
+              checked: false,
+              audioError: r.error ?? "No audio returned",
+            };
+            return;
           }
-          return {
-            ...row,
-            frontContent: createAudioFrontDoc(r.audioUrl, row.term ?? "", {
-              autoplayOnFlip: true,
-            }),
-            isFrontRichText: true,
-            audioError: undefined,
-          };
-        }),
-      );
+          if (p.side === "front") {
+            next[p.index] = {
+              ...row,
+              frontContent: createAudioFrontDoc(
+                r.audioUrl,
+                p.hideText ? "" : p.term,
+                { autoplayOnFlip: true },
+              ),
+              isFrontRichText: true,
+              audioError: undefined,
+            };
+          } else {
+            next[p.index] = {
+              ...row,
+              backContent: appendAudioToDoc(row.backContent, r.audioUrl, {
+                autoplayOnFlip: true,
+              }),
+              audioError: undefined,
+            };
+          }
+        });
+        return next;
+      });
       setAudioGenDone(true);
     },
-    [],
+    [audioPlan],
   );
 
   // Editable deck path — Stage 4. The user can retarget the cards to

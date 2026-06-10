@@ -139,6 +139,10 @@ export async function POST(request: Request) {
       // Load user's stored AI settings as defaults
       const userSettings = await getUserSettings(session.user.id);
       const aiSettings = userSettings.ai ?? {};
+      // Auto-pronounce: when on (default), the model is told to attach spoken
+      // audio to non-English vocab cards by default. The proposal gate still
+      // gates the actual TTS spend, so "default on" never auto-bills.
+      const autoPronounceDefault = userSettings.flashcards?.autoPronounce !== false;
 
       // Resolve provider and model — request overrides > user settings > defaults
       const providerId =
@@ -476,7 +480,15 @@ Tool design:
 - propose_deck_with_cards is the primary tool for "cards in a deck context." It takes BOTH the deck info (name + optional parentDeckPath) AND the cards. The commit handles deck creation atomically — including parent creation when the parent doesn't yet exist either. ONE tool call covers any depth of hierarchy. The user reviews the card and clicks "Create deck & add" (or "Add selected" if the deck already exists); the server cascades through missing ancestors and adds the cards in one flow.
 - propose_deck (standalone) is RARE. Use it only when the user explicitly asks to create a deck WITHOUT any cards yet (e.g. "set up a Japanese deck, I'll add cards later"). For "make me cards on X" — even when the deck or its parent doesn't exist yet — just call propose_deck_with_cards.
 - propose_image_cards creates IDENTIFICATION cards whose front is an AI-GENERATED IMAGE plus a short instruction caption, for VISUAL recall — identifying plants, insects, animals, anatomy, landmarks, chemical structures, code screenshots, etc. Use it ONLY when the study goal is recognizing something visual (the user asks for "picture cards," "identify-the-X cards," or the topic is inherently visual). For each card provide: imagePrompt (a specific, unambiguous prompt that makes the image clearly depict the answer — e.g. "a single monarch butterfly, wings open, photorealistic, plain white background"), identifyLabel (few-word instruction shown under the image, e.g. "Identify this butterfly"), and back (the answer). Images generate at propose time so the user previews them before accepting. LIMIT 5 cards per call. Do NOT use it for plain text Q&A — use propose_deck_with_cards for those.
-- propose_pronunciation_cards creates PRONUNCIATION cards: a TERM on the front and its definition/translation on the back, plus a SPOKEN pronunciation of the term that autoplays when the card is flipped. Use it when hearing the word matters — language vocabulary, hard-to-say names, musical/medical/scientific terms (the user asks for "pronunciation cards," "cards that say the word," "spoken/audio cards," or is studying a spoken language). For each card provide: term (the word/phrase, shown on the front AND spoken on the back), back (the definition/translation), and optional language (BCP-47, e.g. "es", "fr-FR") so the voice pronounces it correctly; you can also set a batch-level language. The audio is NOT generated at propose time — the user picks a voice/provider in a follow-up window, then generation runs. LIMIT 10 cards per call. Do NOT use it for silent text Q&A — use propose_deck_with_cards for those.
+- SPOKEN AUDIO on cards (propose_deck_with_cards 'audio' directive): any card in propose_deck_with_cards can carry a spoken clip by adding an 'audio' field of shape { side, hideText? }. The spoken text is whatever you wrote on that side — never repeat it elsewhere. Three patterns:
+  • Pronunciation (most common): a non-English vocab term → audio: { side: "front" } so the word is shown AND spoken (hear it, recall the meaning on the back). For reverse/production cards where the spoken word is the ANSWER, use side: "back".
+  • Listening comprehension: the learner must understand by EAR (e.g. hear a Chinese sentence and recall its meaning) → audio: { side: "front", hideText: true }. The front then shows ONLY a play button; put the transcription + translation on the back.
+  • The audio is NOT generated at propose time — the user picks a voice/provider in a follow-up window, then generation runs (opt-in, no auto-spend). Audio rides alongside ordinary cards; a single propose_deck_with_cards batch may mix audio and silent cards.
+  Do NOT use audio for plain English Q&A unless the user explicitly asks for spoken English.${
+    autoPronounceDefault
+      ? `\n  • DEFAULT BEHAVIOR: when the deck is non-English vocabulary (or scientific/Latin names), ADD audio:{ side: "front" } to every card by DEFAULT — the user has opted into automatic pronunciation. Only omit it if the user says they don't want audio. (Generation is still opt-in; you're only attaching the directive.)`
+      : ""
+  }
 
 Workflow:
 

@@ -32,10 +32,6 @@ const CARD_BATCH_LIMIT = 10;
 // Identification-image cards are capped lower than text cards: each one runs a
 // real image-generation call at propose time (latency + cost).
 const IMAGE_CARD_LIMIT = 5;
-// Pronunciation cards generate TTS per term AFTER the proposal (via the gate),
-// not at propose time — so the cap matches the generate-card-audio endpoint (10)
-// rather than the lower image limit.
-const AUDIO_CARD_LIMIT = 10;
 
 interface DeckRow {
   id: string;
@@ -409,6 +405,24 @@ export function createFlashcardTools(ctx: ToolExecuteContext) {
                 .max(80)
                 .optional()
                 .describe("Label for the back side (default: 'Answer')."),
+              audio: z
+                .object({
+                  side: z
+                    .enum(["front", "back"])
+                    .describe(
+                      "Which face carries the spoken clip — the side that holds the word/phrase in the target language. Usually 'front' (hear the term, recall its meaning); 'back' for reverse/production cards where the answer is the spoken word.",
+                    ),
+                  hideText: z
+                    .boolean()
+                    .optional()
+                    .describe(
+                      "true = that face shows ONLY the audio player (the spoken text IS the thing being tested) — use for LISTENING-comprehension cards (e.g. hear a Chinese sentence, recall the meaning). Put the transcription on the OTHER side. Omit/false for pronunciation, where the word is both shown and spoken.",
+                    ),
+                })
+                .optional()
+                .describe(
+                  "Attach a spoken pronunciation/clip to this card. Add it when the term is non-English (or the user explicitly asks for English audio). The text spoken is whatever you wrote on the chosen `side` — do NOT repeat it elsewhere. The user picks a voice/provider before any audio is generated (opt-in).",
+                ),
             }),
           )
           .min(1)
@@ -470,6 +484,16 @@ export function createFlashcardTools(ctx: ToolExecuteContext) {
         const resolvedSourceContentId =
           sourceContentId ?? ctx.contentId ?? null;
 
+        // Cards carrying an `audio` directive arrive as DRAFTS — the TTS is
+        // synthesized client-side after the voice/provider window
+        // (AudioCardGenGate), so flag each for generation and set the batch
+        // flag that mounts the gate. Audio rides alongside ordinary cards: a
+        // batch can mix audio and silent cards.
+        const processedCards = cards.map((c) =>
+          c.audio ? { ...c, pendingAudioGen: true } : c,
+        );
+        const hasAudio = processedCards.some((c) => c.audio);
+
         return JSON.stringify({
           __deckWithCardsProposal: true,
           deck: {
@@ -484,9 +508,10 @@ export function createFlashcardTools(ctx: ToolExecuteContext) {
             deckId: existing?.id ?? null,
             existingName: existing?.name ?? null,
           },
-          cards,
+          cards: processedCards,
           requestedCount,
           batchLimit: CARD_BATCH_LIMIT,
+          audioCards: hasAudio,
           sourceContentId: resolvedSourceContentId,
         });
       },
@@ -624,147 +649,6 @@ export function createFlashcardTools(ctx: ToolExecuteContext) {
           requestedCount,
           batchLimit: IMAGE_CARD_LIMIT,
           imageCards: true,
-          sourceContentId: resolvedSourceContentId,
-        });
-      },
-    }),
-
-    propose_pronunciation_cards: tool({
-      description:
-        `Propose up to ${AUDIO_CARD_LIMIT} PRONUNCIATION flashcards: a TERM on the front and its definition/translation plus a SPOKEN pronunciation on the back (the audio autoplays when the card is flipped). For language vocabulary, hard-to-say names, musical/medical terms, etc. For each card provide: term (the word/phrase to test AND to speak), back (the definition/translation/explanation), and optional language (BCP-47, e.g. "es", "fr-FR") so the voice pronounces it correctly. The audio is NOT generated now — the proposal returns drafts and the user picks a voice/provider in a follow-up window, then generation runs (no auto-spend). HARD LIMIT: ${AUDIO_CARD_LIMIT} cards per call — if the user asks for more, propose ${AUDIO_CARD_LIMIT}, set requestedCount to the true number, and let them accept these first. Use propose_deck_with_cards (not this) for plain text Q&A with no spoken audio.`,
-      inputSchema: z.object({
-        name: z
-          .string()
-          .min(1)
-          .max(120)
-          .describe(
-            "Leaf deck name. Combined with parentDeckPath to form the full target path. Existing deck → cards added directly; otherwise the commit creates it first.",
-          ),
-        parentDeckPath: z
-          .string()
-          .optional()
-          .describe("Full path of the parent deck (e.g. 'spanish'). Omit for a root-level deck."),
-        rationale: z
-          .string()
-          .optional()
-          .describe("One-sentence reason this deck fits — shown only when the deck will be created."),
-        similarExistingPaths: z
-          .array(z.string())
-          .max(5)
-          .optional()
-          .describe("Paths of existing decks that almost match — from list_decks / search_decks."),
-        language: z
-          .string()
-          .optional()
-          .describe(
-            "Default BCP-47 language for the whole batch (e.g. 'es', 'fr-FR'). Per-card language overrides this.",
-          ),
-        cards: z
-          .array(
-            z.object({
-              term: z
-                .string()
-                .min(1)
-                .describe(
-                  "The word/phrase shown on the front AND spoken aloud on the back (e.g. 'la biblioteca', 'Schadenfreude').",
-                ),
-              back: z
-                .string()
-                .min(1)
-                .describe("The definition / translation / explanation revealed on the back (plain text)."),
-              language: z
-                .string()
-                .optional()
-                .describe("BCP-47 language for THIS term's pronunciation, overriding the batch language."),
-              backLabel: z
-                .string()
-                .max(80)
-                .optional()
-                .describe("Label for the back side (default: 'Answer')."),
-            }),
-          )
-          .min(1)
-          .max(AUDIO_CARD_LIMIT)
-          .describe(
-            `Array of ${AUDIO_CARD_LIMIT} or fewer pronunciation card drafts. ENFORCED by Zod — passing more will fail.`,
-          ),
-        requestedCount: z
-          .number()
-          .int()
-          .min(1)
-          .describe(
-            "How many cards the user actually asked for. If they asked for 15 and you're proposing 10 (the limit), pass 15 here.",
-          ),
-        sourceContentId: z
-          .string()
-          .uuid()
-          .optional()
-          .describe("ContentNode id of the note these cards were drafted from, if any."),
-      }),
-      execute: async ({
-        name,
-        parentDeckPath,
-        rationale,
-        similarExistingPaths,
-        language,
-        cards,
-        requestedCount,
-        sourceContentId,
-      }) => {
-        let parentDeckId: string | null = null;
-        if (parentDeckPath) {
-          const parent = await prisma.flashcardDeck.findFirst({
-            where: { ownerId: ctx.userId, path: parentDeckPath, deletedAt: null },
-            select: { id: true },
-          });
-          parentDeckId = parent?.id ?? null;
-        }
-
-        const proposedSlug = slugifyDeckName(name);
-        const proposedPath = parentDeckPath
-          ? `${parentDeckPath}/${proposedSlug}`
-          : proposedSlug;
-
-        const existing = await prisma.flashcardDeck.findFirst({
-          where: { ownerId: ctx.userId, path: proposedPath, deletedAt: null },
-          select: { id: true, name: true },
-        });
-
-        const resolvedSourceContentId = sourceContentId ?? ctx.contentId ?? null;
-
-        // Return DRAFTS only — no TTS here. The proposal UI gives the user a
-        // short window to pick/confirm the speech provider + voice, then
-        // generates the audio client-side via POST /api/flashcards/generate-
-        // card-audio. This keeps the proposal instant and ensures no audio is
-        // synthesized (billable) until the user explicitly opts in.
-        const proposedCards = cards.slice(0, AUDIO_CARD_LIMIT).map((card) => ({
-          front: card.term,
-          back: card.back,
-          backLabel: card.backLabel,
-          audioCard: true,
-          pendingAudioGen: true,
-          term: card.term,
-          language: card.language ?? language,
-        }));
-
-        return JSON.stringify({
-          __deckWithCardsProposal: true,
-          deck: {
-            name,
-            proposedPath,
-            parentDeckPath: parentDeckPath ?? null,
-            parentResolved: parentDeckPath ? parentDeckId !== null : true,
-            parentDeckId,
-            rationale: rationale ?? null,
-            similarExistingPaths: similarExistingPaths ?? [],
-            deckExists: existing !== null,
-            deckId: existing?.id ?? null,
-            existingName: existing?.name ?? null,
-          },
-          cards: proposedCards,
-          requestedCount,
-          batchLimit: AUDIO_CARD_LIMIT,
-          audioCards: true,
           sourceContentId: resolvedSourceContentId,
         });
       },
