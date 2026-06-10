@@ -533,7 +533,7 @@ export function ChatInput({
                 ref={fileInputRef}
                 type="file"
                 multiple
-                accept="image/*,.heic,.heif,image/heic,image/heif,application/pdf,.pdf,text/plain,text/markdown,text/csv,application/json,.md,.markdown,.csv,.json,.txt,.log"
+                accept="image/*,.heic,.heif,image/heic,image/heif,audio/*,.mp3,.wav,.m4a,.aac,.ogg,.oga,.opus,.flac,application/pdf,.pdf,text/plain,text/markdown,text/csv,application/json,.md,.markdown,.csv,.json,.txt,.log"
                 className="hidden"
                 onChange={(e) => {
                   if (e.target.files?.length) onAddFiles(e.target.files);

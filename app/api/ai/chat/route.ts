@@ -103,6 +103,7 @@ import {
 import { createBaseTools } from "@/lib/domain/ai/tools";
 import { createEditorTools } from "@/lib/domain/ai/tools";
 import { createFlashcardTools } from "@/lib/domain/ai/tools";
+import { effectiveCapabilities } from "@/lib/domain/ai/features/capabilities";
 import { prisma } from "@/lib/database/client";
 import { logger, spanPayload, startSpan, withRouteTrace, withSpan } from "@/lib/core/logger";
 
@@ -384,7 +385,12 @@ export async function POST(request: Request) {
       // Anthropic/Google), and inline the server-extracted text for
       // everything else — so the displayed/persisted message stays a clean
       // chip while the model still receives the content.
-      const resolvedMessages = resolveAttachmentsForModel(messages, providerId);
+      const audioCapable = effectiveCapabilities({ id: modelId }).has("audio-input");
+      const resolvedMessages = resolveAttachmentsForModel(
+        messages,
+        providerId,
+        audioCapable,
+      );
 
       // Convert UIMessages to ModelMessages for streamText
       const modelMessages = await convertToModelMessages(
@@ -724,6 +730,7 @@ const PDF_NATIVE_PROVIDERS = new Set(["anthropic", "google"]);
 function resolveAttachmentsForModel(
   messages: unknown[],
   providerId: string,
+  audioCapable: boolean,
 ): unknown[] {
   const nativePdf = PDF_NATIVE_PROVIDERS.has(providerId);
 
@@ -762,9 +769,16 @@ function resolveAttachmentsForModel(
 
       const isImage = mediaType.startsWith("image/");
       const isPdf = mediaType === "application/pdf";
+      const isAudio = mediaType.startsWith("audio/");
 
-      if (isImage || (isPdf && nativePdf)) {
+      if (isImage || (isPdf && nativePdf) || (isAudio && audioCapable)) {
         kept.push(stripAppMeta(p));
+      } else if (isAudio) {
+        // Audio but the model can't hear it — tell the model so it can ask the
+        // user to switch to an audio-input model rather than silently ignoring.
+        inlined.push(
+          `[Attached audio: ${filename} — the selected model can't process audio. Ask the user to switch to an audio-input model.]`,
+        );
       } else {
         inlined.push(
           appText

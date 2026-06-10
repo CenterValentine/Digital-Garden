@@ -532,6 +532,18 @@ export const ChatMessage = memo(function ChatMessage({
                 />
               );
             }
+            // Audio attachment → inline player so the user can replay the clip.
+            if (filePart.mediaType?.startsWith("audio/") && filePart.url) {
+              return (
+                <audio
+                  key={i}
+                  controls
+                  src={filePart.url}
+                  preload="metadata"
+                  className="my-1 max-w-full rounded-lg"
+                />
+              );
+            }
             return (
               <button
                 key={i}
