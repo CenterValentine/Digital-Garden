@@ -316,37 +316,42 @@ export async function POST(request: Request) {
       // per-tool `enabled` in settings. Tools default to enabled; only
       // `enabled === false` entries are dropped. If the result is empty
       // we pass `undefined` so streamText knows there are no tools at all.
-      // Collect image/audio attachments (in order) so propose_cards_from_media
-      // can package each as a card front. The model has already seen these in
-      // context; the tool references them by index. contentNodeId rides in the
-      // file part's `app` provider-metadata.
+      // Collect image/audio attachments for propose_cards_from_media to package
+      // as card fronts. Scope to the MOST RECENT user message that carries media
+      // — NOT the whole conversation. The model indexes "the media I was just
+      // given" (0..n) per turn; collecting every attachment across the chat
+      // would offset those indices and pull the wrong (earlier) clips. We walk
+      // backwards and take the first user message that has media parts.
       const attachedMedia: Array<{
         url: string;
         mediaType: string;
         contentNodeId?: string;
         filename?: string;
       }> = [];
-      for (const m of messages) {
+      for (let mi = messages.length - 1; mi >= 0; mi--) {
+        const m = messages[mi];
         if (m.role !== "user" || !Array.isArray(m.parts)) continue;
-        for (const part of m.parts as Array<Record<string, unknown>>) {
-          if (
+        const mediaParts = (m.parts as Array<Record<string, unknown>>).filter(
+          (part) =>
             part?.type === "file" &&
             typeof part.url === "string" &&
             typeof part.mediaType === "string" &&
-            (part.mediaType.startsWith("image/") ||
-              part.mediaType.startsWith("audio/"))
-          ) {
-            const app = (
-              part.providerMetadata as { app?: { contentNodeId?: string } } | undefined
-            )?.app;
-            attachedMedia.push({
-              url: part.url,
-              mediaType: part.mediaType,
-              contentNodeId: app?.contentNodeId,
-              filename: typeof part.filename === "string" ? part.filename : undefined,
-            });
-          }
+            ((part.mediaType as string).startsWith("image/") ||
+              (part.mediaType as string).startsWith("audio/")),
+        );
+        if (mediaParts.length === 0) continue;
+        for (const part of mediaParts) {
+          const app = (
+            part.providerMetadata as { app?: { contentNodeId?: string } } | undefined
+          )?.app;
+          attachedMedia.push({
+            url: part.url as string,
+            mediaType: part.mediaType as string,
+            contentNodeId: app?.contentNodeId,
+            filename: typeof part.filename === "string" ? part.filename : undefined,
+          });
         }
+        break; // only the most recent batch of attachments
       }
 
       const toolCtx = {
