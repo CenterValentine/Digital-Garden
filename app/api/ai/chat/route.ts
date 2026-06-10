@@ -316,6 +316,39 @@ export async function POST(request: Request) {
       // per-tool `enabled` in settings. Tools default to enabled; only
       // `enabled === false` entries are dropped. If the result is empty
       // we pass `undefined` so streamText knows there are no tools at all.
+      // Collect image/audio attachments (in order) so propose_cards_from_media
+      // can package each as a card front. The model has already seen these in
+      // context; the tool references them by index. contentNodeId rides in the
+      // file part's `app` provider-metadata.
+      const attachedMedia: Array<{
+        url: string;
+        mediaType: string;
+        contentNodeId?: string;
+        filename?: string;
+      }> = [];
+      for (const m of messages) {
+        if (m.role !== "user" || !Array.isArray(m.parts)) continue;
+        for (const part of m.parts as Array<Record<string, unknown>>) {
+          if (
+            part?.type === "file" &&
+            typeof part.url === "string" &&
+            typeof part.mediaType === "string" &&
+            (part.mediaType.startsWith("image/") ||
+              part.mediaType.startsWith("audio/"))
+          ) {
+            const app = (
+              part.providerMetadata as { app?: { contentNodeId?: string } } | undefined
+            )?.app;
+            attachedMedia.push({
+              url: part.url,
+              mediaType: part.mediaType,
+              contentNodeId: app?.contentNodeId,
+              filename: typeof part.filename === "string" ? part.filename : undefined,
+            });
+          }
+        }
+      }
+
       const toolCtx = {
         userId: session.user.id,
         contentId: editableContentId,
@@ -323,6 +356,7 @@ export async function POST(request: Request) {
         // chat IS the open content. Pass that through so createNote can
         // default the new note's parent folder to the chat's own parent.
         chatContentId: isChatContent ? contentId : undefined,
+        attachedMedia,
       };
       const allTools = {
         ...createBaseTools(toolCtx),
@@ -480,6 +514,7 @@ Tool design:
 - propose_deck_with_cards is the primary tool for "cards in a deck context." It takes BOTH the deck info (name + optional parentDeckPath) AND the cards. The commit handles deck creation atomically — including parent creation when the parent doesn't yet exist either. ONE tool call covers any depth of hierarchy. The user reviews the card and clicks "Create deck & add" (or "Add selected" if the deck already exists); the server cascades through missing ancestors and adds the cards in one flow.
 - propose_deck (standalone) is RARE. Use it only when the user explicitly asks to create a deck WITHOUT any cards yet (e.g. "set up a Japanese deck, I'll add cards later"). For "make me cards on X" — even when the deck or its parent doesn't exist yet — just call propose_deck_with_cards.
 - propose_image_cards creates IDENTIFICATION cards whose front is an AI-GENERATED IMAGE plus a short instruction caption, for VISUAL recall — identifying plants, insects, animals, anatomy, landmarks, chemical structures, code screenshots, etc. Use it ONLY when the study goal is recognizing something visual (the user asks for "picture cards," "identify-the-X cards," or the topic is inherently visual). For each card provide: imagePrompt (a specific, unambiguous prompt that makes the image clearly depict the answer — e.g. "a single monarch butterfly, wings open, photorealistic, plain white background"), identifyLabel (few-word instruction shown under the image, e.g. "Identify this butterfly"), and back (the answer). Images generate at propose time so the user previews them before accepting. LIMIT 5 cards per call. Do NOT use it for plain text Q&A — use propose_deck_with_cards for those.
+- propose_cards_from_media creates IDENTIFICATION cards from media the user ATTACHED to the chat (images and/or audio) — the front is the uploaded media itself and the back is YOUR identification. This is the inverse of propose_image_cards (which generates an image). You have already seen/heard the attachments; for each card pass mediaIndex (0-based, in attachment order), identifyLabel ("Identify this mushroom"), and back (your answer). Use it whenever the user attaches photos/recordings and asks to "make identification flashcards from these." If nothing is attached, tell the user to attach the media first.
 - propose_sound_id_cards creates SOUND-IDENTIFICATION cards — the front is a real-world SOUND (bird call, animal, instrument, engine) and the back names it. Use it when the study goal is recognizing a NON-SPEECH sound by ear. For each card: soundPrompt (precise description of the sound to source), identifyLabel (front instruction, e.g. "Identify this bird"), back (the answer). IMPORTANT: automatic sound sourcing isn't available yet, so these currently commit as TEXT prompts without a real clip — only use this tool when the user explicitly wants sound-ID cards, and tell them that to attach real audio today they should upload clips and use "cards from media". This is NOT for pronunciation (use the audio directive) or images (propose_image_cards).
 - SPOKEN AUDIO on cards (propose_deck_with_cards 'audio' directive): any card in propose_deck_with_cards can carry a spoken clip by adding an 'audio' field of shape { side, hideText? }. The spoken text is whatever you wrote on that side — never repeat it elsewhere. Three patterns:
   • Pronunciation (most common): a non-English vocab term → audio: { side: "front" } so the word is shown AND spoken (hear it, recall the meaning on the back). For reverse/production cards where the spoken word is the ANSWER, use side: "back".

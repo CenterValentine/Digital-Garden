@@ -120,6 +120,9 @@ interface DeckWithCardsProposalPayload {
     soundCard?: boolean;
     /** Description of the sound to source — preserved for a future provider. */
     soundPrompt?: string;
+    // ── Cards from uploaded media (propose_cards_from_media) ──
+    /** Front is the uploaded image/audio itself; commits directly (no gen). */
+    mediaCard?: boolean;
   }>;
   requestedCount: number;
   batchLimit: number;
@@ -129,6 +132,8 @@ interface DeckWithCardsProposalPayload {
   audioCards?: boolean;
   /** True when this proposal is a batch of sound-identification cards (scaffold). */
   soundCards?: boolean;
+  /** True when cards were built from uploaded media (propose_cards_from_media). */
+  mediaCards?: boolean;
   sourceContentId: string | null;
 }
 
@@ -234,16 +239,18 @@ export function FlashcardCardProposalList({
     const added = loadAddedIndices(proposalId);
     return payload.cards.map((card, idx) => {
       const wasAdded = added.has(idx);
-      // Image cards arrive with a prebuilt rich front (image + caption);
-      // text cards convert their plain front to a single-paragraph doc.
-      const isImageFront = Boolean(card.imageCard && card.frontContent);
+      // Cards that arrive with a prebuilt rich front (image+caption from a
+      // committed image card, or the uploaded media front from
+      // propose_cards_from_media) use it directly; plain text cards convert
+      // their front to a single-paragraph doc.
+      const isRichFront = Boolean(card.frontContent);
       return {
         // Already-added cards default unchecked: the user can't re-add
         // them (status is created), and showing them unchecked makes
         // the "X of Y selected" counter accurate.
         checked: !wasAdded,
         expanded: false,
-        frontContent: isImageFront
+        frontContent: isRichFront
           ? (card.frontContent as JSONContent)
           : createTextTiptapDoc(card.front),
         backContent: createTextTiptapDoc(card.back),
@@ -252,7 +259,7 @@ export function FlashcardCardProposalList({
         status: (wasAdded
           ? { status: "created" }
           : { status: "idle" }) as RowStatus,
-        isFrontRichText: isImageFront,
+        isFrontRichText: isRichFront,
         frontImageUrl: card.frontImageUrl ?? null,
         imageError: card.imageError,
         isAudioCard: Boolean(card.audio),
