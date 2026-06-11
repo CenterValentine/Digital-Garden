@@ -445,6 +445,25 @@ async function loadWorkspaces(state) {
   } catch {
     state.workspaces = [];
   }
+  // Default the content tree to the user's main workspace so it mirrors the
+  // app's curated view-root instead of the flat global root (workspaceId=null
+  // returns every node with parentId=null). Prefer a main workspace that
+  // actually has a view-root so scoping narrows; otherwise fall back to any
+  // workspace with one. Auto-selects only once, and never overrides an
+  // explicit user choice (including a deliberate "All content" selection).
+  if (!state.workspaceAutoSelected && !state.selectedWorkspaceId) {
+    const list = state.workspaces || [];
+    const preferred =
+      list.find((w) => w.isMain && w.viewRootContentId) ||
+      list.find((w) => w.viewRootContentId) ||
+      list.find((w) => w.isMain) ||
+      null;
+    if (preferred) {
+      state.selectedWorkspaceId = preferred.id;
+      state.loadedForWorkspaceId = null; // force the next tree load to refetch
+    }
+  }
+  state.workspaceAutoSelected = true;
 }
 
 function renderWorkspaceSelector(state) {
@@ -2721,6 +2740,7 @@ async function initOverlay() {
     panelOpen: false,
     workspaces: [],
     selectedWorkspaceId: null,
+    workspaceAutoSelected: false,
     isIdle: false,
     idleTimer: null,
     resourceContext: null,
