@@ -49,16 +49,43 @@ import {
 import crypto from "node:crypto";
 
 /**
+ * Stable JSON serialization with deep-sorted object keys.
+ *
+ * `JSON.stringify` emits keys in insertion order, which is NOT stable across the
+ * round-trip a note body takes: `sanitizeTipTapJsonWithExtensions` rebuilds the
+ * node tree (reordering `type`/`attrs`/`content`), and Postgres JSONB doesn't
+ * preserve key order on store/read. So two byte-different serializations of the
+ * SAME content would hash differently — tripping a false `If-Match` conflict on
+ * every save. Sorting keys makes the hash purely content-based; array order
+ * (which is semantically meaningful in TipTap) is preserved.
+ */
+function stableStringify(value: unknown): string {
+  if (value === null || typeof value !== "object") return JSON.stringify(value);
+  if (Array.isArray(value)) {
+    return `[${value.map(stableStringify).join(",")}]`;
+  }
+  const obj = value as Record<string, unknown>;
+  const body = Object.keys(obj)
+    .sort()
+    .map((key) => `${JSON.stringify(key)}:${stableStringify(obj[key])}`)
+    .join(",");
+  return `{${body}}`;
+}
+
+/**
  * Deterministic short hash of the tiptap JSON body. Used for `If-Match`
  * preconditions on PATCH so clients can prove they're updating the version
  * of the document they last saw. Slicing to 64 hex chars (SHA-256 truncated)
  * keeps the header value compact while preserving negligible collision risk
  * for per-document version checks.
+ *
+ * Hashes a canonical (key-sorted) serialization so the hash compares CONTENT,
+ * not serialization order — see `stableStringify`.
  */
 function hashTiptap(json: unknown): string {
   return crypto
     .createHash("sha256")
-    .update(JSON.stringify(json))
+    .update(stableStringify(json))
     .digest("hex")
     .slice(0, 64);
 }
