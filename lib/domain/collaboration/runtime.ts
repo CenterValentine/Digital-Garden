@@ -464,7 +464,7 @@ function deriveEditPolicy(
       reason: "degraded-plain-fallback",
       warning:
         state.warning ||
-        "Collaborative state could not be created for this note, so editing is using the saved note content directly until collaboration becomes available again.",
+        "Collaborative editing isn't working for this note. You can keep editing — we'll warn you if it's changed somewhere else.",
     };
   }
 
@@ -500,7 +500,7 @@ function deriveEditPolicy(
       reason: "degraded-local-fallback",
       warning:
         state.warning ||
-        "Editing is using durable local collaborative state, but collaboration exclusivity and remote sync are not guaranteed until collaboration reconnects.",
+        "We're experiencing some signal degradation with the collaboration server. Editing should sync, but cannot be guaranteed until the collaboration server reconnects. Edit with caution.",
     };
   }
 
