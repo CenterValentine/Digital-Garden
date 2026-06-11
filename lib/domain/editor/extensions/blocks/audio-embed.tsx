@@ -28,6 +28,13 @@ const { schema: audioEmbedSchema, defaults: audioEmbedDefaults } =
       .nullable()
       .default(null)
       .describe("Storage URL of the uploaded audio file"),
+    contentId: z
+      .string()
+      .nullable()
+      .default(null)
+      .describe(
+        "ContentNode id of the embedded audio file. Enables usage ref-counting (ContentLink audio-ref) and lifecycle cleanup; mirrors the image node's contentId.",
+      ),
     filename: z
       .string()
       .nullable()
@@ -102,6 +109,13 @@ export function audioEmbedAttrSpec(): Record<string, unknown> {
         null,
       renderHTML: (attrs: Record<string, unknown>) =>
         attrs.src ? { "data-src": attrs.src as string } : {},
+    },
+    contentId: {
+      default: null,
+      parseHTML: (el: HTMLElement) =>
+        el.getAttribute("data-content-id") || null,
+      renderHTML: (attrs: Record<string, unknown>) =>
+        attrs.contentId ? { "data-content-id": attrs.contentId as string } : {},
     },
     filename: {
       default: null,

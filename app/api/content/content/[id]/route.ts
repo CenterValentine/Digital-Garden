@@ -24,7 +24,10 @@ import {
 } from "@/lib/domain/content";
 import { normalizeUrl } from "@/lib/domain/content/external-validation";
 import { syncContentTags } from "@/lib/domain/content/tag-sync";
-import { syncImageReferences } from "@/lib/domain/content/image-refs";
+import {
+  syncImageReferences,
+  softDeleteIfOrphaned,
+} from "@/lib/domain/content/image-refs";
 import { syncPersonMentions } from "@/lib/domain/content/person-mention-sync";
 import {
   resolveContentAccess,
@@ -1507,6 +1510,41 @@ export async function DELETE(
             },
           );
         }
+      }
+
+      // Cascade generated/referenced media. When a source node is trashed,
+      // soft-delete the referenced media it OWNED (generated from it) or
+      // EMBEDDED — but only when that media has no other LIVE reference, so a
+      // generated image/clip reused in another note or card survives. The
+      // source was soft-deleted above, so its own edges no longer count.
+      try {
+        const [ownedEmbeds, embeddedLinks] = await Promise.all([
+          prisma.contentNode.findMany({
+            where: { ownedByNoteId: id, role: "referenced", deletedAt: null },
+            select: { id: true },
+          }),
+          prisma.contentLink.findMany({
+            where: {
+              sourceId: id,
+              linkType: { in: ["image-ref", "audio-ref"] },
+            },
+            select: { targetId: true },
+          }),
+        ]);
+        const candidateIds = new Set<string>([
+          ...ownedEmbeds.map((n) => n.id),
+          ...embeddedLinks.map((l) => l.targetId),
+        ]);
+        for (const targetId of candidateIds) {
+          await softDeleteIfOrphaned(targetId, session.user.id);
+        }
+      } catch (cascadeError) {
+        logger.warn({
+          event: "content.delete.media_cascade_failed",
+          summary:
+            "generated-media cascade failed (node soft-delete already done)",
+          error: cascadeError,
+        });
       }
 
       return NextResponse.json({

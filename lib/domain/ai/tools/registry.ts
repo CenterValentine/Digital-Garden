@@ -407,6 +407,9 @@ export function createBaseTools(ctx: ToolExecuteContext) {
             size: size as ImageSize,
             quality,
             style,
+            // Co-locate the generated image beside the chat it came from and
+            // mark it owned, so it's discoverable + lifecycle-tracked.
+            sourceContentId: ctx.chatContentId ?? null,
           });
 
           // Return structured result for ChatMessage rendering
@@ -468,6 +471,9 @@ export function createBaseTools(ctx: ToolExecuteContext) {
             modelId: modelId as SpeechModelId,
             voice,
             language,
+            // Co-locate the generated clip beside the chat it came from and
+            // mark it owned, so it's discoverable + lifecycle-tracked.
+            sourceContentId: ctx.chatContentId ?? null,
           });
 
           // Return structured result for ChatMessage rendering (mirrors

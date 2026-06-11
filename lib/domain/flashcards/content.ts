@@ -57,12 +57,13 @@ export function createImageFrontDoc(
  *    engine). For identification pass an EMPTY label so the answer isn't given
  *    away in a caption.
  *
- * Mirrors createImageFrontDoc. The `audioEmbed` node has no contentId attr (the
- * src URL is sufficient for playback), so unlike the image node we only carry
- * the storage URL.
+ * Mirrors createImageFrontDoc. The `audioEmbed` node carries `contentId` (the
+ * ContentNode id of the generated clip) alongside the playback URL so audio is
+ * usage-ref-countable (ContentLink audio-ref) and lifecycle-cleanable.
  */
 export function createAudioFrontDoc(
   audioUrl: string,
+  audioContentId: string | null,
   label: string,
   options: { autoplayOnFlip?: boolean } = {},
 ): JSONContent {
@@ -75,6 +76,7 @@ export function createAudioFrontDoc(
         attrs: {
           blockId: crypto.randomUUID(),
           src: audioUrl,
+          contentId: audioContentId,
           filename: caption || "Audio",
           autoplayOnFlip: options.autoplayOnFlip ?? false,
         },
@@ -95,6 +97,7 @@ export function createAudioFrontDoc(
 export function appendAudioToDoc(
   doc: unknown,
   audioUrl: string,
+  audioContentId: string | null,
   options: { autoplayOnFlip?: boolean } = {},
 ): JSONContent {
   const base = normalizeTiptapDoc(doc);
@@ -103,6 +106,7 @@ export function appendAudioToDoc(
     attrs: {
       blockId: crypto.randomUUID(),
       src: audioUrl,
+      contentId: audioContentId,
       filename: "Pronunciation",
       autoplayOnFlip: options.autoplayOnFlip ?? false,
     },

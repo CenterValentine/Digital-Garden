@@ -128,7 +128,7 @@ export async function POST(request: NextRequest) {
         const back = [object.answer, object.detail].filter((s) => s && s.trim()).join("\n\n");
         const frontContent = isImage
           ? createImageFrontDoc(url, contentId, "")
-          : createAudioFrontDoc(url, "", { autoplayOnFlip: true });
+          : createAudioFrontDoc(url, contentId, "", { autoplayOnFlip: true });
 
         return {
           front: isImage ? "Identify this image" : "Identify this sound",

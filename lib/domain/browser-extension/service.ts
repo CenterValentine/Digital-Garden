@@ -443,6 +443,12 @@ export async function getExtensionContentPickerTree(
     where: {
       ownerId: userId,
       deletedAt: null,
+      // The extension picker only ever associates against browsable documents.
+      // Match the app's default tree visibility: show `primary` only, hiding
+      // `referenced` (embedded/generated media like AI images + TTS clips) and
+      // `system` nodes. Without this the picker surfaced the hidden generated
+      // media that every other surface conceals.
+      role: "primary",
     },
     orderBy: [{ parentId: "asc" }, { displayOrder: "asc" }, { createdAt: "asc" }],
     select: {

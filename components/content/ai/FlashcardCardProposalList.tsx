@@ -410,6 +410,7 @@ export function FlashcardCardProposalList({
               ...row,
               frontContent: createAudioFrontDoc(
                 r.audioUrl,
+                r.audioContentId ?? null,
                 p.hideText ? "" : p.term,
                 { autoplayOnFlip: true },
               ),
@@ -419,9 +420,12 @@ export function FlashcardCardProposalList({
           } else {
             next[p.index] = {
               ...row,
-              backContent: appendAudioToDoc(row.backContent, r.audioUrl, {
-                autoplayOnFlip: true,
-              }),
+              backContent: appendAudioToDoc(
+                row.backContent,
+                r.audioUrl,
+                r.audioContentId ?? null,
+                { autoplayOnFlip: true },
+              ),
               audioError: undefined,
             };
           }

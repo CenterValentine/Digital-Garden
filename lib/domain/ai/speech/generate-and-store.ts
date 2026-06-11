@@ -25,6 +25,10 @@ import {
   getConnectionWithKey,
 } from "@/lib/features/ai-connections";
 import { effectiveCapabilities } from "@/lib/domain/ai/features/capabilities";
+import {
+  resolveGeneratedMediaPlacement,
+  findRecentGeneratedMedia,
+} from "@/lib/domain/ai/generated-media";
 
 /** Provider ids the speech dispatch can actually route to. */
 const SPEECH_PRESET_IDS: ReadonlySet<string> = new Set([
@@ -134,6 +138,13 @@ export interface GenerateAndStoreSpeechInput {
    * Falls back to a truncation of the spoken text.
    */
   label?: string;
+  /**
+   * ContentNode the audio is generated FROM. When set, the stored clip
+   * co-locates under the source's parent and is marked `ownedByNoteId` so it's
+   * discoverable beside its source and the lifecycle can follow it. Omit (or
+   * null) → stored at the root, unowned.
+   */
+  sourceContentId?: string | null;
 }
 
 export interface GeneratedStoredSpeech {
@@ -162,7 +173,42 @@ export async function generateAndStoreSpeech(
     speed,
     apiKey,
     label,
+    sourceContentId,
   } = input;
+
+  // Resolve placement (co-locate under the source) up front so it also keys
+  // the idempotency lookup.
+  const { parentId, ownedByNoteId } = await resolveGeneratedMediaPlacement(
+    userId,
+    sourceContentId,
+  );
+  const searchText = `AI generated speech: ${text.slice(0, 200)}`;
+
+  // Idempotency: reuse a recent identical generation instead of producing a
+  // duplicate (e.g. a client effect that double-fired on a StrictMode remount).
+  const existing = await findRecentGeneratedMedia(userId, {
+    searchText,
+    ownedByNoteId,
+  });
+  if (existing) {
+    const { getUserStorageProvider } = await import(
+      "@/lib/infrastructure/storage"
+    );
+    const sp = await getUserStorageProvider(userId);
+    const dupExt = mimeToExtension(existing.mimeType);
+    const dupBase = (label ?? text.slice(0, 60))
+      .replace(/[^a-zA-Z0-9\s-]/g, "")
+      .trim();
+    return {
+      contentId: existing.contentId,
+      url: await sp.generateDownloadUrl(existing.storageKey),
+      mimeType: existing.mimeType,
+      durationSeconds: null,
+      providerId,
+      modelId,
+      fileName: `${dupBase || "ai-speech"}.${dupExt}`,
+    };
+  }
 
   // Explicit key (per-request provider choice) bypasses the saved override;
   // otherwise resolve the user's configured route (override → env fallback).
@@ -209,8 +255,9 @@ export async function generateAndStoreSpeech(
       title: fileName,
       slug,
       contentType: "file",
-      parentId: null,
+      parentId,
       role: "referenced",
+      ownedByNoteId,
       displayOrder: 0,
       filePayload: {
         create: {
@@ -221,7 +268,7 @@ export async function generateAndStoreSpeech(
           checksum,
           storageProvider: "r2",
           storageKey,
-          searchText: `AI generated speech: ${text.slice(0, 200)}`,
+          searchText,
           uploadStatus: "ready",
           uploadedAt: new Date(),
           isProcessed: true,

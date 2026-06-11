@@ -16,6 +16,10 @@ import {
   listConnections,
   getConnectionWithKey,
 } from "@/lib/features/ai-connections";
+import {
+  resolveGeneratedMediaPlacement,
+  findRecentGeneratedMedia,
+} from "@/lib/domain/ai/generated-media";
 
 /**
  * Resolve the effective image-gen route for a user: honor a `generate_image`
@@ -81,6 +85,13 @@ export interface GenerateAndStoreImageInput {
    * gateway model works, not just the direct-provider catalog. Requires apiKey.
    */
   gateway?: boolean;
+  /**
+   * ContentNode the media is generated FROM (e.g. the note a chat is attached
+   * to). When set, the stored image co-locates under the source's parent and is
+   * marked `ownedByNoteId`, so it's discoverable beside its source and the
+   * lifecycle can follow it. Omit (or null) → stored at the root, unowned.
+   */
+  sourceContentId?: string | null;
 }
 
 export interface GeneratedStoredImage {
@@ -110,7 +121,44 @@ export async function generateAndStoreImage(
     style,
     apiKey,
     gateway,
+    sourceContentId,
   } = input;
+
+  // Resolve placement (co-locate under the source) up front so it also keys
+  // the idempotency lookup.
+  const { parentId, ownedByNoteId } = await resolveGeneratedMediaPlacement(
+    userId,
+    sourceContentId,
+  );
+  const searchText = `AI generated image: ${prompt}`;
+
+  // Idempotency: reuse a recent identical generation instead of producing a
+  // duplicate (e.g. a client effect that double-fired on a StrictMode remount).
+  const existing = await findRecentGeneratedMedia(userId, {
+    searchText,
+    ownedByNoteId,
+  });
+  if (existing) {
+    const { getUserStorageProvider } = await import(
+      "@/lib/infrastructure/storage"
+    );
+    const sp = await getUserStorageProvider(userId);
+    const dupExt = existing.mimeType === "image/jpeg" ? "jpg" : "png";
+    const dupFileName = `${
+      prompt.slice(0, 60).replace(/[^a-zA-Z0-9\s-]/g, "").trim() || "ai-image"
+    }.${dupExt}`;
+    return {
+      contentId: existing.contentId,
+      url: await sp.generateDownloadUrl(existing.storageKey),
+      mimeType: existing.mimeType,
+      width: existing.width,
+      height: existing.height,
+      revisedPrompt: null,
+      providerId,
+      modelId,
+      fileName: dupFileName,
+    };
+  }
 
   // Explicit key (per-request provider choice) bypasses the saved override;
   // otherwise resolve the user's configured route (override → env fallback).
@@ -181,8 +229,9 @@ export async function generateAndStoreImage(
       title: fileName,
       slug,
       contentType: "file",
-      parentId: null,
+      parentId,
       role: "referenced",
+      ownedByNoteId,
       displayOrder: 0,
       filePayload: {
         create: {
@@ -193,7 +242,7 @@ export async function generateAndStoreImage(
           checksum,
           storageProvider: "r2",
           storageKey,
-          searchText: `AI generated image: ${prompt}`,
+          searchText,
           uploadStatus: "ready",
           uploadedAt: new Date(),
           isProcessed: true,

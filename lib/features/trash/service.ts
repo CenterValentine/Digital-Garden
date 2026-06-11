@@ -148,6 +148,47 @@ export async function purgeExpiredTrash(): Promise<{
     }
   }
 
+  // Clean each expired file node's object-storage blob BEFORE the row delete.
+  // The deleteMany cascades FilePayload rows, but not the underlying R2/S3
+  // object — without this, purged generated media (and any uploaded file)
+  // leaks storage forever.
+  const expiredContentNodes = await prisma.contentNode.findMany({
+    where: { deletedAt: { lt: cutoff } },
+    select: {
+      ownerId: true,
+      filePayload: { select: { storageKey: true } },
+    },
+  });
+  // Resolve each owner's provider once, then drop their blobs.
+  const keysByOwner = new Map<string, string[]>();
+  for (const node of expiredContentNodes) {
+    const key = node.filePayload?.storageKey;
+    if (!key) continue;
+    const list = keysByOwner.get(node.ownerId) ?? [];
+    list.push(key);
+    keysByOwner.set(node.ownerId, list);
+  }
+  for (const [ownerId, keys] of keysByOwner) {
+    let provider;
+    try {
+      provider = await getUserStorageProvider(ownerId);
+    } catch {
+      continue; // no storage configured — nothing to clean
+    }
+    for (const key of keys) {
+      try {
+        await provider.deleteFile(key);
+      } catch (error) {
+        logger.warn({
+          layer: "storage",
+          event: "trash.purge.content_blob_failed",
+          summary: `failed to delete content blob ${key}`,
+          error,
+        });
+      }
+    }
+  }
+
   const expiredContent = await prisma.contentNode.deleteMany({
     where: { deletedAt: { lt: cutoff } },
   });
