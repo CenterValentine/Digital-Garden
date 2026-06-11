@@ -22,6 +22,7 @@ import type {
 // Deep import — legacy-compat has a Prisma value import and is NOT
 // re-exported through the barrel (see legacy-compat.ts header).
 import { resolveLegacyDeckId } from "@/lib/domain/flashcards/legacy-compat";
+import { fileFlashcardMediaUnderDeck } from "@/lib/domain/flashcards/media-folder";
 
 // Sprint 6 changes:
 //  - POST: deckId is the source of truth. If the request only carries
@@ -244,6 +245,16 @@ export async function POST(request: NextRequest) {
       },
       select: FLASHCARD_SELECT,
     });
+
+    // File any generated/referenced media embedded in this card into the
+    // deck-mirrored `referenced` folder, so it doesn't pile up at the root.
+    // Best-effort — never blocks card creation.
+    await fileFlashcardMediaUnderDeck(
+      session.user.id,
+      deckId,
+      frontContent,
+      backContent,
+    );
 
     // Persist "last used" for the prefill route. We still write the
     // legacy strings into User.settings so the Panel's autocomplete
