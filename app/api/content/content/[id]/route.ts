@@ -615,14 +615,20 @@ export async function PATCH(
         );
       }
 
-      // ── If-Match precondition (optional) ─────────────────────────────────
-      // Standard HTTP precondition. When clients pass `If-Match: <bodyHash>`,
-      // we verify the current notePayload hash matches what they last saw.
-      // Mismatch → 409 Conflict; client should re-fetch and re-apply.
-      // Missing header → proceed (backwards compatible — existing clients
-      // are unaffected). Hash is computed on the fly from the existing
-      // tiptapJson, so no schema migration is required for this guard.
-      const ifMatch = request.headers.get("if-match");
+      // ── Body-hash precondition (optional) ────────────────────────────────
+      // App-level optimistic concurrency. Clients echo the bodyHash they last
+      // saw via the CUSTOM `X-Body-Hash` header; we verify it matches the
+      // current notePayload hash. Mismatch → 409 Conflict; client re-fetches.
+      // Missing header → proceed (backwards compatible). Hash is computed on
+      // the fly, so no schema migration is required.
+      //
+      // IMPORTANT: this is NOT the standard `If-Match` header. Vercel's edge
+      // evaluates `If-Match` as an HTTP conditional precondition against the
+      // response ETag and returns 412 *before the request reaches this
+      // function* (our responses carry no matching ETag), so the check never
+      // ran on production. A non-conditional custom header passes through.
+      const ifMatch =
+        request.headers.get("x-body-hash") ?? request.headers.get("if-match");
       if (ifMatch && existing.notePayload) {
         const currentHash = hashTiptap(existing.notePayload.tiptapJson);
         if (currentHash !== ifMatch.trim()) {

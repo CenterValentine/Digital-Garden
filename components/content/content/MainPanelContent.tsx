@@ -920,8 +920,14 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
             // updating the version we last loaded. Server returns 409 if the
             // doc changed elsewhere (stale tab / concurrent edit). Templates
             // don't carry a bodyHash, so skip there.
+            //
+            // CUSTOM header on purpose — do NOT use the standard `If-Match`.
+            // Vercel's edge treats `If-Match` as an HTTP conditional precondition
+            // and rejects it with a 412 *before the request reaches the function*
+            // (our responses have no matching ETag), so the app's check never
+            // runs. A non-conditional `X-Body-Hash` header passes through.
             ...(!isPageTemplateTab && bodyHashRef.current
-              ? { "If-Match": bodyHashRef.current }
+              ? { "X-Body-Hash": bodyHashRef.current }
               : {}),
           },
           body: JSON.stringify({
