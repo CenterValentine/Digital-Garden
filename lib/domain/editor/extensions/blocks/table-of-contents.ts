@@ -86,6 +86,7 @@ const { schema: tocSchema, defaults: tocDefaults } = createBlockSchema(
 
 registerBlock({
   type: "tableOfContents",
+  ttsSkip: true, // auto-generated navigation — not authored prose
   label: "Table of Contents",
   description: "Auto-generated outline of document headings",
   iconName: "List",

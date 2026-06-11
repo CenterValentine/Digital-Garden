@@ -23,6 +23,10 @@ import { useContentStore } from "@/state/content-store";
 import { useLeftPanelViewStore } from "@/state/left-panel-view-store";
 import { PUBLISHING_EXTENSION_ID } from "@/extensions/publishing/manifest";
 import { PublishStatusPill } from "@/extensions/publishing/components/toolbar/PublishStatusPill";
+import { ReadAloudButton } from "@/components/content/tts/ReadAloudButton";
+
+/** Content types whose own text the toolbar "Listen" can narrate. */
+const READ_ALOUD_CONTENT_TYPES = new Set(["note", "file", "html", "code"]);
 
 /** Map iconName strings to lucide-react components */
 const ICON_MAP: Record<string, ComponentType<{ className?: string }>> = {
@@ -70,6 +74,14 @@ export function ContentToolbar({ contentId: contentIdProp }: ContentToolbarProps
     !selectedContentId.startsWith("person:")
       ? selectedContentId
       : null;
+  // "Listen" reads THE CONTENT's own text, by type (note text, or a file's
+  // extracted document text) — not the sidecar note. Shown only for content
+  // types that carry narratable text.
+  const activeContentType = useContentStore((state) => state.selectedContentType);
+  const canReadAloud =
+    Boolean(sourceContentId) &&
+    activeContentType != null &&
+    READ_ALOUD_CONTENT_TYPES.has(activeContentType);
 
   useEffect(() => {
     if (!flashcardsEnabled || !sourceContentId) {
@@ -126,7 +138,12 @@ export function ContentToolbar({ contentId: contentIdProp }: ContentToolbarProps
 
   const showPublishPill = publishingEnabled && sourceContentId;
 
-  if (tools.length === 0 && visibleSourceFlashcardCount === 0 && !showPublishPill) {
+  if (
+    tools.length === 0 &&
+    visibleSourceFlashcardCount === 0 &&
+    !showPublishPill &&
+    !canReadAloud
+  ) {
     return null;
   }
 
@@ -138,6 +155,13 @@ export function ContentToolbar({ contentId: contentIdProp }: ContentToolbarProps
     >
       {showPublishPill && (
         <PublishStatusPill contentId={sourceContentId} />
+      )}
+      {canReadAloud && (
+        <ReadAloudButton
+          contentId={sourceContentId}
+          contentType={activeContentType}
+          source="content"
+        />
       )}
       {tools.map((tool) => {
         const Icon = ICON_MAP[tool.definition.iconName];

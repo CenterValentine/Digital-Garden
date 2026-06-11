@@ -24,6 +24,7 @@ const { schema: unsupportedBlockSchema, defaults: unsupportedBlockDefaults } =
 
 registerBlock({
   type: UNSUPPORTED_BLOCK_NODE_TYPE,
+  ttsSkip: true, // placeholder for unknown content — not narratable
   label: "Unsupported Block",
   description:
     "Preserved block content that is unavailable in the current editor build.",

@@ -32,14 +32,18 @@ import {
   Strikethrough,
   Code,
   TextQuote,
+  Volume2,
   X,
   Heading1,
   Heading2,
   Heading3,
 } from "lucide-react";
+import type { JSONContent } from "@tiptap/core";
 import { queryTools } from "@/lib/domain/tools";
 import type { ToolDefinition } from "@/lib/domain/tools";
 import { useContextMenuStore } from "@/state/context-menu-store";
+import { ttsController } from "@/lib/features/tts";
+import { extractReadableText } from "@/lib/domain/editor/tts/extract-readable-text";
 
 // Create unique plugin key for this bubble menu
 const textFormattingBubbleMenuKey = new PluginKey("textFormattingBubbleMenu");
@@ -544,6 +548,24 @@ export function BubbleMenu({ editor, onLinkClick }: BubbleMenuProps) {
             type="button"
           >
             <ClipboardPaste className="h-4 w-4" />
+          </button>
+          {/* Read selection aloud — runs the slice through the TTS extractor so
+              non-narratable nodes (code, diagrams) in the selection are skipped. */}
+          <button
+            onMouseDown={preventFocusLoss}
+            onClick={() => {
+              const fragment = editor.state.selection.content().content;
+              const json = fragment.toJSON() as JSONContent[] | null;
+              const text = extractReadableText(json);
+              if (text) {
+                void ttsController.play(text, { label: "Reading selection" });
+              }
+            }}
+            className="rounded p-1.5 transition-colors hover:bg-white/10 text-gray-400"
+            title="Read selection aloud"
+            type="button"
+          >
+            <Volume2 className="h-4 w-4" />
           </button>
         </div>
 

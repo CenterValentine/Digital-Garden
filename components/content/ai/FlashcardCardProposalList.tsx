@@ -43,6 +43,7 @@ import {
   ChevronDown,
   ChevronRight as ChevronRightIcon,
   Sparkles,
+  Volume2,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -54,6 +55,9 @@ import { AdaptiveFlashcardEditor } from "@/extensions/flashcards/components/Adap
 import { useExistingDeckPaths } from "./use-existing-deck-paths";
 import { DeckPathField } from "./DeckPathField";
 import { ImageCardGenGate, type ImageGenResult } from "./ImageCardGenGate";
+import { AudioCardGenGate, type AudioGenResult } from "./AudioCardGenGate";
+import { createAudioFrontDoc, appendAudioToDoc } from "@/lib/domain/flashcards/content";
+import { useSettingsStore } from "@/state/settings-store";
 
 /**
  * Stage 3 payload — propose_deck_with_cards. Deck info is embedded so
@@ -100,11 +104,37 @@ interface DeckWithCardsProposalPayload {
     isFrontRichText?: boolean;
     /** Set when image generation failed for this card (still proposable). */
     imageError?: string;
+    // ── Spoken audio (propose_deck_with_cards `audio` directive) ──
+    /** When present, this card carries a spoken clip on the named side. The
+     *  text spoken is whatever the card holds on that side. hideText → that
+     *  side shows only the player (listening-comprehension card). */
+    audio?: { side: "front" | "back"; hideText?: boolean };
+    /** True for draft audio cards awaiting client-side TTS generation. */
+    pendingAudioGen?: boolean;
+    /** Preview URL for the generated audio (post-gen). */
+    audioUrl?: string;
+    audioContentId?: string | null;
+    /** Set when TTS generation failed for this card (still proposable). */
+    audioError?: string;
+    // ── Sound-identification cards (propose_sound_id_cards) — scaffold ──
+    /** Draft sound-ID card; commits as a text prompt until a sound provider exists. */
+    soundCard?: boolean;
+    /** Description of the sound to source — preserved for a future provider. */
+    soundPrompt?: string;
+    // ── Cards from uploaded media (propose_cards_from_media) ──
+    /** Front is the uploaded image/audio itself; commits directly (no gen). */
+    mediaCard?: boolean;
   }>;
   requestedCount: number;
   batchLimit: number;
   /** True when this proposal is a batch of identification-image cards. */
   imageCards?: boolean;
+  /** True when one or more cards in this batch carry spoken audio. */
+  audioCards?: boolean;
+  /** True when this proposal is a batch of sound-identification cards (scaffold). */
+  soundCards?: boolean;
+  /** True when cards were built from uploaded media (propose_cards_from_media). */
+  mediaCards?: boolean;
   sourceContentId: string | null;
 }
 
@@ -155,7 +185,13 @@ type RowStatus =
   | { status: "idle" }
   | { status: "creating" }
   | { status: "created" }
+  | { status: "duplicate" }
   | { status: "error"; message: string };
+
+/** Normalize a card front for duplicate comparison (case/space-insensitive). */
+function normalizeFront(text: string): string {
+  return text.trim().toLowerCase().replace(/\s+/g, " ");
+}
 
 interface RowState {
   checked: boolean;
@@ -178,6 +214,13 @@ interface RowState {
   frontImageUrl: string | null;
   /** Image generation failed for this card front (still proposable as text). */
   imageError?: string;
+  /** This card carries (or will carry) a spoken clip. */
+  isAudioCard?: boolean;
+  /** Which side the clip sits on, and whether that side hides its text. */
+  audioSide?: "front" | "back";
+  audioHideText?: boolean;
+  /** TTS generation failed for this card (still proposable as silent text). */
+  audioError?: string;
 }
 
 export function FlashcardCardProposalList({
@@ -203,16 +246,18 @@ export function FlashcardCardProposalList({
     const added = loadAddedIndices(proposalId);
     return payload.cards.map((card, idx) => {
       const wasAdded = added.has(idx);
-      // Image cards arrive with a prebuilt rich front (image + caption);
-      // text cards convert their plain front to a single-paragraph doc.
-      const isImageFront = Boolean(card.imageCard && card.frontContent);
+      // Cards that arrive with a prebuilt rich front (image+caption from a
+      // committed image card, or the uploaded media front from
+      // propose_cards_from_media) use it directly; plain text cards convert
+      // their front to a single-paragraph doc.
+      const isRichFront = Boolean(card.frontContent);
       return {
         // Already-added cards default unchecked: the user can't re-add
         // them (status is created), and showing them unchecked makes
         // the "X of Y selected" counter accurate.
         checked: !wasAdded,
         expanded: false,
-        frontContent: isImageFront
+        frontContent: isRichFront
           ? (card.frontContent as JSONContent)
           : createTextTiptapDoc(card.front),
         backContent: createTextTiptapDoc(card.back),
@@ -221,9 +266,13 @@ export function FlashcardCardProposalList({
         status: (wasAdded
           ? { status: "created" }
           : { status: "idle" }) as RowStatus,
-        isFrontRichText: isImageFront,
+        isFrontRichText: isRichFront,
         frontImageUrl: card.frontImageUrl ?? null,
         imageError: card.imageError,
+        isAudioCard: Boolean(card.audio),
+        audioSide: card.audio?.side,
+        audioHideText: card.audio?.hideText,
+        audioError: card.audioError,
       };
     });
   }, [payload.cards, proposalId]);
@@ -286,6 +335,102 @@ export function FlashcardCardProposalList({
       setImageGenDone(true);
     },
     [],
+  );
+
+  // ── Pronunciation cards (audio twin of the image block above) ──
+  // Audio proposals arrive as DRAFTS (pendingAudioGen) — TTS is synthesized
+  // client-side after the voice/provider window (AudioCardGenGate). The gate is
+  // shown until generation completes; "Add selected" is gated on it.
+  // Per-card audio plan: only the cards carrying an `audio` directive. Each
+  // entry keeps its ROW INDEX so generated clips land on the right card (a
+  // batch can mix audio and silent cards), and the spoken text = the text on
+  // the chosen side.
+  const audioPlan = useMemo(
+    () =>
+      payload.cards
+        .map((c, index) => ({
+          index,
+          side: c.audio?.side,
+          hideText: c.audio?.hideText ?? false,
+          term: c.audio?.side === "back" ? c.back : c.front,
+        }))
+        .filter(
+          (
+            p,
+          ): p is { index: number; side: "front" | "back"; hideText: boolean; term: string } =>
+            p.side === "front" || p.side === "back",
+        ),
+    [payload.cards],
+  );
+  const needsAudioGen = Boolean(
+    payload.audioCards &&
+      audioPlan.some((p) => payload.cards[p.index].pendingAudioGen),
+  );
+  const audioDrafts = useMemo(
+    () =>
+      audioPlan.map((p) => ({
+        term: p.term,
+        language: undefined as string | undefined,
+      })),
+    [audioPlan],
+  );
+  const [audioGenDone, setAudioGenDone] = useState(
+    !needsAudioGen || allInitiallyCreated,
+  );
+  // TTS generation is EXPLICIT, never automatic — same reasoning as images:
+  // generated audio isn't written back into the persisted chat payload, so the
+  // gate must only mount after the user clicks "Generate" (otherwise replaying
+  // chat history would re-fire billable TTS on each load).
+  const [audioGenStarted, setAudioGenStarted] = useState(false);
+
+  // Apply generated audio onto the draft rows. Results align with audioPlan
+  // (same order). Placement is per-card: front-side audio rebuilds the front as
+  // the spoken clip (hideText → player only, for listening cards; otherwise the
+  // word is shown and spoken); back-side audio appends the clip to the back.
+  // Either way it autoplays when that side is shown. Failed cards get an
+  // audioError and are unchecked so the batch commits only cards that got audio.
+  const applyAudioResults = useCallback(
+    (results: AudioGenResult[]) => {
+      setRows((prev) => {
+        const next = [...prev];
+        audioPlan.forEach((p, k) => {
+          const r = results[k];
+          if (!r) return;
+          const row = next[p.index];
+          if (r.error || !r.audioUrl) {
+            next[p.index] = {
+              ...row,
+              checked: false,
+              audioError: r.error ?? "No audio returned",
+            };
+            return;
+          }
+          if (p.side === "front") {
+            next[p.index] = {
+              ...row,
+              frontContent: createAudioFrontDoc(
+                r.audioUrl,
+                p.hideText ? "" : p.term,
+                { autoplayOnFlip: true },
+              ),
+              isFrontRichText: true,
+              audioError: undefined,
+            };
+          } else {
+            next[p.index] = {
+              ...row,
+              backContent: appendAudioToDoc(row.backContent, r.audioUrl, {
+                autoplayOnFlip: true,
+              }),
+              audioError: undefined,
+            };
+          }
+        });
+        return next;
+      });
+      setAudioGenDone(true);
+    },
+    [audioPlan],
   );
 
   // Editable deck path — Stage 4. The user can retarget the cards to
@@ -392,6 +537,7 @@ export function FlashcardCardProposalList({
     setBulkSubmitting(true);
     let successCount = 0;
     let failureCount = 0;
+    let duplicateCount = 0;
     // Track successful indices in this batch so we can persist them
     // alongside any previously-persisted indices once the loop ends.
     const successfulIndices: number[] = [];
@@ -465,10 +611,48 @@ export function FlashcardCardProposalList({
       .map((r, i) => (r.checked && r.status.status !== "created" ? i : -1))
       .filter((i) => i >= 0);
 
+    // Duplicate handling (opt-out setting, default on). Fetch the target deck's
+    // existing card fronts ONCE so we can skip cards already in the deck — and
+    // dedupe within this batch (the AI sometimes proposes the same card twice).
+    // Only TEXT fronts are compared; image/media fronts have no comparable text.
+    const dropDuplicates =
+      useSettingsStore.getState().flashcards?.dropDuplicatesOnAdd !== false;
+    const existingFronts = new Set<string>();
+    const seenFronts = new Set<string>();
+    if (dropDuplicates && effectiveDeckExists) {
+      try {
+        const res = await fetch(
+          `/api/flashcards?deckId=${encodeURIComponent(targetDeckId)}`,
+          { credentials: "include" },
+        );
+        const json = (await res.json().catch(() => null)) as
+          | { data?: Array<{ frontContent?: unknown }> }
+          | null;
+        for (const card of json?.data ?? []) {
+          const norm = normalizeFront(extractPlainTextFromTiptap(card.frontContent));
+          if (norm) existingFronts.add(norm);
+        }
+      } catch {
+        // Non-fatal — on fetch failure we just don't dedupe against the deck.
+      }
+    }
+
     for (const i of indexesToSubmit) {
+      const row = rows[i];
+
+      // Skip duplicates (already in the deck, or earlier in this batch).
+      if (dropDuplicates) {
+        const norm = normalizeFront(extractPlainTextFromTiptap(row.frontContent));
+        if (norm && (existingFronts.has(norm) || seenFronts.has(norm))) {
+          updateRow(i, { status: { status: "duplicate" }, checked: false });
+          duplicateCount++;
+          continue;
+        }
+        if (norm) seenFronts.add(norm);
+      }
+
       updateRow(i, { status: { status: "creating" } });
       try {
-        const row = rows[i];
         const res = await fetch("/api/flashcards", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -523,7 +707,14 @@ export function FlashcardCardProposalList({
     setBulkSubmitting(false);
     if (successCount > 0) {
       toast.success(
-        `Added ${successCount} card${successCount === 1 ? "" : "s"} to ${effectivePath}`,
+        `Added ${successCount} card${successCount === 1 ? "" : "s"} to ${effectivePath}` +
+          (duplicateCount > 0
+            ? ` · skipped ${duplicateCount} duplicate${duplicateCount === 1 ? "" : "s"}`
+            : ""),
+      );
+    } else if (duplicateCount > 0 && failureCount === 0) {
+      toast.info(
+        `All ${duplicateCount} selected card${duplicateCount === 1 ? " was a duplicate" : "s were duplicates"} — already in ${effectivePath}`,
       );
     }
     if (failureCount > 0) {
@@ -701,6 +892,61 @@ export function FlashcardCardProposalList({
       )}
 
       {/*
+        Pronunciation cards (audio twin of the image gate above). Generation is
+        opt-in: a dormant prompt until the user clicks Generate (so chat history
+        never auto-spends on TTS), then the voice/provider window takes over.
+      */}
+      {needsAudioGen && !audioGenDone && (
+        audioGenStarted ? (
+          <AudioCardGenGate cards={audioDrafts} onComplete={applyAudioResults} />
+        ) : (
+          <div className="mx-1 mb-2 rounded-lg border border-amber-400/25 bg-amber-500/[0.06] px-3 py-2.5 text-[12px] text-amber-900 dark:text-amber-200">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <Sparkles className="h-4 w-4 shrink-0" />
+                <span>
+                  {audioDrafts.length} card
+                  {audioDrafts.length === 1 ? "" : "s"} need a spoken
+                  pronunciation.
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setAudioGenStarted(true)}
+                className="rounded-md bg-amber-600 px-3 py-1.5 font-medium text-white transition-colors hover:bg-amber-700 dark:bg-amber-500 dark:text-amber-950 dark:hover:bg-amber-400"
+              >
+                Generate {audioDrafts.length} pronunciation
+                {audioDrafts.length === 1 ? "" : "s"}
+              </button>
+            </div>
+            <p className="mt-1 text-[11px] opacity-70">
+              Uses your speech provider — won&apos;t start until you click.
+            </p>
+          </div>
+        )
+      )}
+
+      {/*
+        Sound-identification cards (propose_sound_id_cards) — SCAFFOLD. No sound
+        provider is wired yet, so these commit as text prompts; the banner is
+        honest about that and points at the working (uploaded-clip) path.
+      */}
+      {payload.soundCards && (
+        <div className="mx-1 mb-2 rounded-lg border border-amber-400/25 bg-amber-500/[0.06] px-3 py-2.5 text-[12px] text-amber-900 dark:text-amber-200">
+          <div className="flex items-start gap-2">
+            <Volume2 className="mt-0.5 h-4 w-4 shrink-0" />
+            <div>
+              <p className="font-medium">Sound clips aren&apos;t auto-generated yet</p>
+              <p className="opacity-80">
+                These commit as text prompts for now. To attach real audio, upload
+                your clips and use “cards from media.”
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/*
         Gallery: compact bullet list by default (one row per card,
         front → back as plain text), expandable on click into the full
         TipTap editors. Max-height + scroll keeps the cards panel from
@@ -712,6 +958,7 @@ export function FlashcardCardProposalList({
           const isCreated = row.status.status === "created";
           const isCreating = row.status.status === "creating";
           const isError = row.status.status === "error";
+          const isDuplicate = row.status.status === "duplicate";
           const frontPreview =
             extractPlainTextFromTiptap(row.frontContent) || "(empty)";
           const backPreview =
@@ -724,7 +971,9 @@ export function FlashcardCardProposalList({
                   ? "bg-emerald-500/[0.04]"
                   : isError
                     ? "bg-red-500/[0.04]"
-                    : ""
+                    : isDuplicate
+                      ? "opacity-60"
+                      : ""
               }`}
             >
               {/* Compact row — checkbox + summary + status icon + chevron */}
@@ -732,7 +981,7 @@ export function FlashcardCardProposalList({
                 <input
                   type="checkbox"
                   checked={row.checked}
-                  disabled={isCreated || isCreating}
+                  disabled={isCreated || isCreating || isDuplicate}
                   onChange={(e) =>
                     updateRow(i, { checked: e.target.checked })
                   }
@@ -754,6 +1003,25 @@ export function FlashcardCardProposalList({
                   >
                     <AlertTriangle className="h-4 w-4" />
                   </span>
+                ) : null}
+                {/* Pronunciation indicator: warns on failed TTS, otherwise a
+                    speaker once audio is attached (post-gen). */}
+                {row.isAudioCard ? (
+                  row.audioError ? (
+                    <span
+                      title={`Audio generation failed: ${row.audioError}`}
+                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded border border-red-400/30 text-red-500"
+                    >
+                      <AlertTriangle className="h-4 w-4" />
+                    </span>
+                  ) : audioGenDone ? (
+                    <span
+                      title="Pronunciation plays on flip"
+                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded border border-amber-400/20 text-amber-600 dark:text-amber-400"
+                    >
+                      <Volume2 className="h-4 w-4" />
+                    </span>
+                  ) : null
                 ) : null}
                 {/*
                   Horizontal scroll-to-peek pattern on the flex item:
@@ -809,6 +1077,14 @@ export function FlashcardCardProposalList({
                       className="h-4 w-4 text-red-600 dark:text-red-400"
                       aria-label="Error"
                     />
+                  )}
+                  {isDuplicate && (
+                    <span
+                      className="rounded bg-gray-500/15 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400"
+                      title="Already in this deck — skipped"
+                    >
+                      Duplicate
+                    </span>
                   )}
                   <button
                     type="button"
@@ -939,14 +1215,17 @@ export function FlashcardCardProposalList({
               bulkSubmitting ||
               allDone ||
               !effectivePath ||
-              !imageGenDone
+              !imageGenDone ||
+              !audioGenDone
             }
             title={
               !imageGenDone
                 ? "Waiting for image generation…"
-                : !effectivePath
-                  ? "Target deck path is empty — type a path or pick from the dropdown"
-                  : undefined
+                : !audioGenDone
+                  ? "Waiting for audio generation…"
+                  : !effectivePath
+                    ? "Target deck path is empty — type a path or pick from the dropdown"
+                    : undefined
             }
             className="inline-flex items-center gap-1.5 rounded-md border border-amber-500/40 bg-amber-500/[0.08] px-2.5 py-1 text-xs font-medium text-amber-700 hover:bg-amber-500/[0.14] disabled:cursor-not-allowed disabled:opacity-60 dark:border-amber-400/30 dark:bg-amber-500/[0.10] dark:text-amber-300 dark:hover:bg-amber-500/[0.18]"
           >

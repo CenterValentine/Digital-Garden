@@ -66,6 +66,10 @@ function WorkspaceConflictDialogBody({
   const [borrowPreset, setBorrowPreset] = useState<BorrowPreset>("3h");
   const [borrowUntil, setBorrowUntil] = useState(() => borrowUntilForPreset("3h"));
   const [useFolderScope, setUseFolderScope] = useState(false);
+  // Progressive disclosure: the "Borrow for" duration picker only appears after
+  // the user chooses to borrow, keeping the default view to the primary
+  // borrow-vs-share decision.
+  const [borrowMode, setBorrowMode] = useState(false);
 
   const folderScopeLabel = useMemo(() => {
     if (!conflict.folderScopeContentTitle) return null;
@@ -128,91 +132,114 @@ function WorkspaceConflictDialogBody({
             </div>
           ) : null}
 
-          <div>
-            <div className="mb-2 text-sm font-medium">Borrow for</div>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-              <button
-                type="button"
-                onClick={() => selectPreset("1h")}
-                className={presetButtonClass("1h")}
-              >
-                1 hour
-              </button>
-              <button
-                type="button"
-                onClick={() => selectPreset("3h")}
-                className={presetButtonClass("3h")}
-              >
-                3 hours
-              </button>
-              <button
-                type="button"
-                onClick={() => selectPreset("eod")}
-                className={presetButtonClass("eod")}
-              >
-                EOD
-              </button>
-              <button
-                type="button"
-                onClick={() => selectPreset("custom")}
-                className={presetButtonClass("custom")}
-              >
-                Custom
-              </button>
-            </div>
-          </div>
+          {borrowMode ? (
+            <>
+              <div>
+                <div className="mb-2 text-sm font-medium">Borrow for</div>
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  <button
+                    type="button"
+                    onClick={() => selectPreset("1h")}
+                    className={presetButtonClass("1h")}
+                  >
+                    1 hour
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => selectPreset("3h")}
+                    className={presetButtonClass("3h")}
+                  >
+                    3 hours
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => selectPreset("eod")}
+                    className={presetButtonClass("eod")}
+                  >
+                    EOD
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => selectPreset("custom")}
+                    className={presetButtonClass("custom")}
+                  >
+                    Custom
+                  </button>
+                </div>
+              </div>
 
-          {borrowPreset === "custom" ? (
-            <label className="block text-sm font-medium">
-              Custom borrow until
-              <input
-                type="datetime-local"
-                value={borrowUntil}
-                onChange={(event) => setBorrowUntil(event.target.value)}
-                className="mt-1 w-full rounded-md border border-black/10 bg-white/70 px-3 py-2 text-sm outline-none focus:border-gold-primary dark:border-white/10 dark:bg-white/5"
-              />
-            </label>
+              {borrowPreset === "custom" ? (
+                <label className="block text-sm font-medium">
+                  Custom borrow until
+                  <input
+                    type="datetime-local"
+                    value={borrowUntil}
+                    onChange={(event) => setBorrowUntil(event.target.value)}
+                    className="mt-1 w-full rounded-md border border-black/10 bg-white/70 px-3 py-2 text-sm outline-none focus:border-gold-primary dark:border-white/10 dark:bg-white/5"
+                  />
+                </label>
+              ) : null}
+
+              <p className="rounded-md border border-gold-primary/20 bg-gold-primary/10 px-3 py-2 text-xs text-gold-primary">
+                Borrowed tabs are temporary. When the borrow window expires, the tab releases from this workspace automatically.
+              </p>
+            </>
           ) : null}
-
-          <p className="rounded-md border border-gold-primary/20 bg-gold-primary/10 px-3 py-2 text-xs text-gold-primary">
-            Borrowed tabs are temporary. When the borrow window expires, the tab releases from this workspace automatically.
-          </p>
         </div>
 
-        <div className={`grid gap-2 ${isViewScope ? "grid-cols-3" : "grid-cols-2 sm:grid-cols-4"}`}>
-          <button
-            type="button"
-            onClick={() => cancelOpenConflict()}
-            className="whitespace-nowrap rounded-md border border-black/10 px-3 py-2 text-sm transition-colors hover:bg-black/5 dark:border-white/10 dark:hover:bg-white/10"
-          >
-            Cancel
-          </button>
-          {!isViewScope && (
+        {borrowMode ? (
+          <div className="grid grid-cols-2 gap-2">
             <button
               type="button"
-              onClick={() => void switchToConflictWorkspace()}
+              onClick={() => setBorrowMode(false)}
               className="whitespace-nowrap rounded-md border border-black/10 px-3 py-2 text-sm transition-colors hover:bg-black/5 dark:border-white/10 dark:hover:bg-white/10"
             >
-              Open workspace
+              Back
             </button>
-          )}
-          <button
-            type="button"
-            onClick={() =>
-              void borrowPendingContent(toIso(borrowUntil), { useFolderScope })
-            }
-            className="whitespace-nowrap rounded-md border border-gold-primary/30 bg-gold-primary/10 px-3 py-2 text-sm font-medium text-gold-primary transition-colors hover:bg-gold-primary/15"
-          >
-            Borrow
-          </button>
-          <button
-            type="button"
-            onClick={() => void sharePendingContent({ useFolderScope })}
-            className="whitespace-nowrap rounded-md border border-gold-primary/30 bg-gold-primary px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-gold-primary/90"
-          >
-            Always share
-          </button>
-        </div>
+            <button
+              type="button"
+              onClick={() =>
+                void borrowPendingContent(toIso(borrowUntil), { useFolderScope })
+              }
+              className="whitespace-nowrap rounded-md border border-gold-primary/30 bg-gold-primary px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-gold-primary/90"
+            >
+              Borrow
+            </button>
+          </div>
+        ) : (
+          <div className={`grid gap-2 ${isViewScope ? "grid-cols-3" : "grid-cols-2 sm:grid-cols-4"}`}>
+            <button
+              type="button"
+              onClick={() => cancelOpenConflict()}
+              className="whitespace-nowrap rounded-md border border-black/10 px-3 py-2 text-sm transition-colors hover:bg-black/5 dark:border-white/10 dark:hover:bg-white/10"
+            >
+              Cancel
+            </button>
+            {!isViewScope && (
+              <button
+                type="button"
+                onClick={() => void switchToConflictWorkspace()}
+                className="whitespace-nowrap rounded-md border border-black/10 px-3 py-2 text-sm transition-colors hover:bg-black/5 dark:border-white/10 dark:hover:bg-white/10"
+              >
+                Open workspace
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => setBorrowMode(true)}
+              className="whitespace-nowrap rounded-md border border-gold-primary/30 bg-gold-primary/10 px-3 py-2 text-sm font-medium text-gold-primary transition-colors hover:bg-gold-primary/15"
+            >
+              Borrow
+            </button>
+            <button
+              type="button"
+              onClick={() => void sharePendingContent({ useFolderScope })}
+              className="whitespace-nowrap rounded-md border border-gold-primary/30 bg-gold-primary px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-gold-primary/90"
+            >
+              Always share
+            </button>
+          </div>
+        )}
       </DialogContent>
   );
 }

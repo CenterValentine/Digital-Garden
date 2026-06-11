@@ -27,6 +27,7 @@ const { schema: checkboxInputSchema, defaults: checkboxInputDefaults } =
 
 registerBlock({
   type: "checkboxInput",
+  ttsSkip: true, // form input — not narratable prose
   label: "Checkbox",
   description: "Single checkbox or checkbox group",
   iconName: "CheckSquare",

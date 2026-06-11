@@ -21,7 +21,7 @@ import {
   useState,
 } from "react";
 import { createPortal } from "react-dom";
-import { Clock, FolderInput, Loader2 } from "lucide-react";
+import { Clock, FolderInput, Loader2, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/core/utils";
 import {
@@ -30,6 +30,7 @@ import {
   type FolderSearchResult,
 } from "@/lib/features/content/move";
 import { useFolderMoveStore } from "@/state/folder-move-store";
+import { useFolderAssistantStore } from "@/state/folder-assistant-store";
 
 const HOVER_BRIDGE_PX = 12;
 
@@ -37,6 +38,8 @@ interface FolderSearchFlyoutProps {
   position: { x: number; y: number; maxHeight?: number };
   selectedIds: string[];
   excludeIds: string[];
+  /** Render the AI "Folder assistant" entry at the top of the flyout. */
+  folderAssistant?: boolean;
   onClose: () => void;
   onMouseEnter: () => void;
 }
@@ -45,6 +48,7 @@ export function FolderSearchFlyout({
   position,
   selectedIds,
   excludeIds,
+  folderAssistant = false,
   onClose,
   onMouseEnter,
 }: FolderSearchFlyoutProps) {
@@ -206,6 +210,21 @@ export function FolderSearchFlyout({
         )}
         style={{ maxHeight: `${position.maxHeight || 380}px` }}
       >
+        {/* AI Folder assistant — pinned above search + recents. */}
+        {folderAssistant && (
+          <button
+            type="button"
+            onClick={() => {
+              useFolderAssistantStore.getState().openDialog(selectedRef.current);
+              onClose();
+            }}
+            className="flex w-full items-center gap-2 border-b border-gray-200/60 px-2.5 py-2 text-left text-sm text-gray-900 transition-colors hover:bg-primary/5 dark:border-gray-700/60 dark:text-gray-100"
+          >
+            <Sparkles className="h-4 w-4 flex-shrink-0 text-primary" />
+            Folder assistant
+          </button>
+        )}
+
         {/* Search input */}
         <div className="border-b border-gray-200/60 p-1.5 dark:border-gray-700/60">
           <input

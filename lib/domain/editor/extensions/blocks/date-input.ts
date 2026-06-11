@@ -43,6 +43,7 @@ const { schema: dateInputSchema, defaults: dateInputDefaults } =
 
 registerBlock({
   type: "dateInput",
+  ttsSkip: true, // form input — not narratable prose
   label: "Date Input",
   description: "Date or datetime picker",
   iconName: "Calendar",

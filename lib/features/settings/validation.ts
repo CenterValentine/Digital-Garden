@@ -276,6 +276,15 @@ const flashcardsSettingsSchema = z
     // - quickFireEnabled: gates the Enter-at-idle shortcut.
     lastUsedSelectionDeckId: z.string().min(1).max(64).optional(),
     quickFireEnabled: z.boolean().optional(),
+    // When true (default), the AI is told to attach a spoken pronunciation to
+    // non-English vocabulary cards by default (still opt-in to generate — the
+    // proposal gate gates the actual TTS spend). Set false to only add audio on
+    // explicit request.
+    autoPronounce: z.boolean().optional(),
+    // When true (default), accepting an AI card proposal skips cards whose front
+    // already exists in the target deck (and dups within the batch) instead of
+    // creating them. Skipped rows are shown as "Duplicate".
+    dropDuplicatesOnAdd: z.boolean().optional(),
   })
   .optional();
 

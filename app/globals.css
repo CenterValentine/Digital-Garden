@@ -3307,6 +3307,35 @@ mark {
   color: rgba(255, 255, 255, 0.4);
 }
 
+/* Audio subsystem (Phase 4): the published audioEmbed renders a native
+   <audio controls> via ServerAudioEmbed.renderHTML. Dark-mode-first: light
+   defaults below, .dark companions follow. */
+.public-prose .block-audio-embed {
+  margin: 1rem 0;
+}
+.public-prose .block-audio-embed audio {
+  width: 100%;
+  display: block;
+  border-radius: 8px;
+}
+.public-prose .block-audio-embed-empty {
+  min-height: 2.5rem;
+  border: 1px dashed rgba(0, 0, 0, 0.15);
+  border-radius: 8px;
+  padding: 1rem;
+  color: rgba(0, 0, 0, 0.4);
+  font-size: 0.85rem;
+  font-style: italic;
+  text-align: center;
+}
+.public-prose .block-audio-embed-empty::before {
+  content: "Audio — source not available";
+}
+.dark .public-prose .block-audio-embed-empty {
+  border-color: rgba(255, 255, 255, 0.15);
+  color: rgba(255, 255, 255, 0.4);
+}
+
 .public-prose .block-excalidraw {
   margin: 1rem 0;
 }

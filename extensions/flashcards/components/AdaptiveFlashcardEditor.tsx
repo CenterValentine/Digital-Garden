@@ -1,13 +1,14 @@
 "use client";
 
-import { useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { EditorContent, useEditor } from "@tiptap/react";
 import Document from "@tiptap/extension-document";
 import Paragraph from "@tiptap/extension-paragraph";
 import Text from "@tiptap/extension-text";
 import Placeholder from "@tiptap/extension-placeholder";
 import type { Editor, JSONContent } from "@tiptap/core";
-import { ImagePlus } from "lucide-react";
+import { ImagePlus, Loader2, Volume2 } from "lucide-react";
+import { toast } from "sonner";
 import { getEditorExtensions } from "@/lib/domain/editor/extensions-client";
 import { useImagePasteHandler } from "@/lib/domain/editor/hooks/use-image-paste";
 import { EMPTY_TIPTAP_DOC, normalizeTiptapDoc } from "@/lib/domain/flashcards";
@@ -133,6 +134,61 @@ export function AdaptiveFlashcardEditor({
   // OS file picker. Same pattern as MarkdownEditor's image upload.
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Mode A pronunciation: clicking 🔊 synthesizes speech for THIS side's text
+  // and appends an autoplay-on-flip audioEmbed. The click is the opt-in (no
+  // auto-spend); the speech route is auto-discovered server-side.
+  const [isGeneratingAudio, setIsGeneratingAudio] = useState(false);
+  const handleGeneratePronunciation = useCallback(async () => {
+    if (!editor || isGeneratingAudio) return;
+    const term = editor.getText().trim();
+    if (!term) {
+      toast.error("Add some text first", {
+        description: "Type the term you want pronounced, then click 🔊.",
+      });
+      return;
+    }
+    setIsGeneratingAudio(true);
+    const toastId = toast.loading("Generating pronunciation…");
+    try {
+      const res = await fetch("/api/flashcards/generate-card-audio", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ cards: [{ term }] }),
+      });
+      const json = (await res.json().catch(() => null)) as {
+        success?: boolean;
+        data?: { results?: Array<{ audioUrl?: string; error?: string }> };
+      } | null;
+      const result = json?.data?.results?.[0];
+      if (!res.ok || !json?.success || !result?.audioUrl) {
+        throw new Error(result?.error || "Speech generation failed");
+      }
+      editor
+        .chain()
+        .focus()
+        .insertContent({
+          type: "audioEmbed",
+          attrs: {
+            blockId: crypto.randomUUID(),
+            src: result.audioUrl,
+            filename: term,
+            autoplayOnFlip: true,
+          },
+        })
+        .run();
+      toast.success("Pronunciation added", { id: toastId });
+    } catch (error) {
+      toast.error("Couldn't generate pronunciation", {
+        id: toastId,
+        description:
+          error instanceof Error ? error.message : "Speech generation failed",
+      });
+    } finally {
+      setIsGeneratingAudio(false);
+    }
+  }, [editor, isGeneratingAudio]);
+
   const isToolbarVisible = mode === "rich" && editable;
 
   // Sizing: `tight` is the smallest — no min-height, the editor hugs
@@ -173,6 +229,24 @@ export function AdaptiveFlashcardEditor({
           >
             Code
           </button>
+          {/* Audio subsystem (Mode A): generate a spoken pronunciation of this
+              side's text and attach it as an autoplay-on-flip audioEmbed. The
+              click is the opt-in — nothing generates automatically. */}
+          <button
+            type="button"
+            onClick={handleGeneratePronunciation}
+            disabled={isGeneratingAudio}
+            title="Generate pronunciation"
+            aria-label="Generate pronunciation"
+            className="ml-auto inline-flex min-h-9 items-center gap-1 rounded px-2 text-gray-700 dark:text-gray-300 hover:bg-black/[0.05] dark:hover:bg-white/10 disabled:opacity-50"
+          >
+            {isGeneratingAudio ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Volume2 className="h-3.5 w-3.5" />
+            )}
+            Pronounce
+          </button>
           {/* Sprint 7: image-insert button. Opens the OS file picker;
               on file pick we hand off to the same insertImageFromFile
               the paste/drop pipeline uses, so all three paths share
@@ -182,7 +256,7 @@ export function AdaptiveFlashcardEditor({
             onClick={() => fileInputRef.current?.click()}
             title="Insert image"
             aria-label="Insert image"
-            className="ml-auto inline-flex min-h-9 items-center gap-1 rounded px-2 text-gray-700 dark:text-gray-300 hover:bg-black/[0.05] dark:hover:bg-white/10"
+            className="inline-flex min-h-9 items-center gap-1 rounded px-2 text-gray-700 dark:text-gray-300 hover:bg-black/[0.05] dark:hover:bg-white/10"
           >
             <ImagePlus className="h-3.5 w-3.5" />
             Image

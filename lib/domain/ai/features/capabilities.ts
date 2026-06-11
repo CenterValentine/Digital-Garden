@@ -57,6 +57,43 @@ export function inferCapabilities(modelId: string): string[] {
     out.push("image-generation");
   }
 
+  // Text-to-speech (audio output) models:
+  //   - OpenAI tts-1 / tts-1-hd / gpt-4o-mini-tts
+  //   - ElevenLabs `eleven_*` model ids
+  //   - Google Cloud TTS voice families (Neural2 / WaveNet / Chirp / Studio)
+  //     and any id ending in `-tts`.
+  if (
+    /\btts\b/i.test(bare) ||
+    /^eleven/i.test(bare) ||
+    /-tts$/i.test(bare) ||
+    /\b(wavenet|neural2|chirp|studio)\b/i.test(bare)
+  ) {
+    out.push("speech");
+  }
+
+  // Speech-to-text (transcription) models:
+  //   - OpenAI whisper-1 / gpt-4o-transcribe
+  //   - ElevenLabs Scribe
+  if (
+    /\bwhisper\b/i.test(bare) ||
+    /transcribe/i.test(bare) ||
+    /\bscribe\b/i.test(bare)
+  ) {
+    out.push("transcription");
+  }
+
+  // Audio-understanding (audio input) models — models that can *hear* a sound
+  // and reason about it (distinct from transcription, which returns words).
+  // Inference is deliberately weak here: "can this model hear?" is hard to read
+  // from an id, so prefer the connection's explicit `capabilities`. We only
+  // flag the well-known audio-capable multimodal stems.
+  if (
+    /gpt-4o.*audio/i.test(bare) ||
+    /^gemini-(1\.5|2|2\.5|3)/i.test(bare)
+  ) {
+    out.push("audio-input");
+  }
+
   return out;
 }
 
@@ -73,6 +110,11 @@ export function inferCapabilities(modelId: string): string[] {
  */
 const CAPABILITY_ALIASES: Record<string, string> = {
   "image-generation": "image",
+  "text-to-speech": "speech",
+  tts: "speech",
+  "speech-to-text": "transcription",
+  stt: "transcription",
+  "audio-output": "speech",
 };
 
 /** Canonical form of a capability token (collapses known aliases). */

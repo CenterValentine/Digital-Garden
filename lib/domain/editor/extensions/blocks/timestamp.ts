@@ -45,6 +45,7 @@ const { schema: timestampSchema, defaults: timestampDefaults } =
 
 registerBlock({
   type: "timestamp",
+  ttsSkip: true, // frozen date stamp — UI chrome, not prose
   label: "Timestamp",
   description: "Frozen date stamp — captures today's date at insertion",
   iconName: "CalendarClock",

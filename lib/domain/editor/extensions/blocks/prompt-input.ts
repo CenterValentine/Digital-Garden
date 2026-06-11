@@ -39,6 +39,7 @@ const { schema: promptInputSchema, defaults: promptInputDefaults } =
 
 registerBlock({
   type: "promptInput",
+  ttsSkip: true, // AI form input — not narratable prose
   label: "AI Prompt",
   description: "AI-powered input with snippet context",
   iconName: "Sparkles",

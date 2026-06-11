@@ -21,6 +21,13 @@ import {
 import { generateAndStoreImage } from "@/lib/domain/ai/image/generate-and-store";
 import { IMAGE_PROVIDER_CATALOG } from "@/lib/domain/ai/image/catalog";
 import type { ImageProviderId, ImageModelId, ImageSize } from "@/lib/domain/ai/image/types";
+import { generateAndStoreSpeech } from "@/lib/domain/ai/speech/generate-and-store";
+import { SPEECH_PROVIDER_CATALOG } from "@/lib/domain/ai/speech/catalog";
+import {
+  describeSpeechError,
+  type SpeechProviderId,
+  type SpeechModelId,
+} from "@/lib/domain/ai/speech/types";
 import type { ToolExecuteContext } from "./types";
 
 /**
@@ -418,6 +425,68 @@ export function createBaseTools(ctx: ToolExecuteContext) {
         } catch (error) {
           const message = error instanceof Error ? error.message : "Image generation failed";
           return `Image generation failed: ${message}`;
+        }
+      },
+    }),
+
+    generate_speech: tool({
+      description:
+        "Convert text to spoken audio (text-to-speech). The audio is saved to storage and rendered as an inline player. " +
+        "Available providers: " +
+        SPEECH_PROVIDER_CATALOG.map((p) => `${p.name} (${p.models.map((m) => m.name).join(", ")})`).join("; ") +
+        ". Default to OpenAI tts-1 if the user doesn't specify a provider or voice.",
+      inputSchema: z.object({
+        text: z
+          .string()
+          .min(1)
+          .describe("The text to speak aloud. Keep it concise; long passages cost more and take longer."),
+        providerId: z
+          .enum(["openai", "elevenlabs", "google"] as const)
+          .optional()
+          .default("openai")
+          .describe("Text-to-speech provider to use"),
+        modelId: z
+          .string()
+          .optional()
+          .default("tts-1")
+          .describe("Specific model ID (e.g. tts-1, tts-1-hd, eleven_multilingual_v2, google-tts-neural2)"),
+        voice: z
+          .string()
+          .optional()
+          .describe("Voice id/name (e.g. alloy, nova for OpenAI; a voiceId for ElevenLabs; en-US-Neural2-A for Google)"),
+        language: z
+          .string()
+          .optional()
+          .describe("Language hint as an ISO 639-1 code (e.g. en, es, fr) when relevant"),
+      }),
+      execute: async ({ text, providerId, modelId, voice, language }) => {
+        try {
+          const stored = await generateAndStoreSpeech({
+            text,
+            userId: ctx.userId,
+            providerId: providerId as SpeechProviderId,
+            modelId: modelId as SpeechModelId,
+            voice,
+            language,
+          });
+
+          // Return structured result for ChatMessage rendering (mirrors
+          // __imagePayload).
+          return JSON.stringify({
+            __audioPayload: true,
+            contentId: stored.contentId,
+            url: stored.url,
+            text,
+            mimeType: stored.mimeType,
+            durationSeconds: stored.durationSeconds,
+            providerId: stored.providerId,
+            modelId: stored.modelId,
+            fileName: stored.fileName,
+          });
+        } catch (error) {
+          // Swap the low-level "no key" error for actionable setup guidance
+          // (points at Connections + Feature Routing → Text-to-Speech).
+          return `Speech generation failed: ${describeSpeechError(error)}`;
         }
       },
     }),

@@ -63,6 +63,7 @@ export { audioEmbedSchema, audioEmbedDefaults };
 
 registerBlock({
   type: "audioEmbed",
+  ttsSkip: true, // audio player embed — has its own playback
   label: "Audio",
   description: "Embed an audio file with an inline player",
   iconName: "Music",

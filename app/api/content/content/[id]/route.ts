@@ -417,6 +417,9 @@ export async function GET(
           storageKey: content.filePayload.storageKey,
           storageUrl: content.filePayload.storageUrl,
           storageMetadata: content.filePayload.storageMetadata as Record<string, unknown>,
+          // Extracted document text (PDF/doc body) — powers search and the
+          // "read aloud" whole-document Listen for file content types.
+          searchText: content.filePayload.searchText,
           uploadStatus: content.filePayload.uploadStatus,
           uploadedAt: content.filePayload.uploadedAt,
           uploadError: content.filePayload.uploadError,

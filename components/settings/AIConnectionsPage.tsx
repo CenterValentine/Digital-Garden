@@ -638,7 +638,7 @@ function ModelEditor({
     for (const m of fetchedModels) {
       for (const c of modelCapabilities(m)) seen.add(c);
     }
-    const order = ["image", "vision", "reasoning", "audio", "text", "streaming", "embedding"];
+    const order = ["image", "speech", "vision", "audio-input", "transcription", "reasoning", "text", "streaming", "embedding"];
     return [...seen].sort((a, b) => {
       const ia = order.indexOf(a);
       const ib = order.indexOf(b);

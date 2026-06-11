@@ -51,6 +51,8 @@ export interface ContextMenuAction {
     kind: "folder-search";
     selectedIds: string[];
     excludeIds: string[];
+    /** Show the AI "Folder assistant" entry at the top of the flyout. */
+    folderAssistant?: boolean;
   };
   /** Secondary icon action (e.g. delete button on the right) */
   secondaryAction?: {

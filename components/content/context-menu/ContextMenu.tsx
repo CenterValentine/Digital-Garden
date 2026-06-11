@@ -679,6 +679,7 @@ export function ContextMenu({ actionProviders }: ContextMenuProps) {
                       }}
                       selectedIds={action.customFlyout.selectedIds}
                       excludeIds={action.customFlyout.excludeIds}
+                      folderAssistant={action.customFlyout.folderAssistant}
                       onClose={closeMenu}
                       onMouseEnter={handleSubmenuMouseEnter}
                     />

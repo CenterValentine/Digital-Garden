@@ -33,6 +33,7 @@ import {
   BASE_TOOL_IDS,
 } from "@/lib/domain/ai/tools/metadata";
 import { PROVIDER_CATALOG } from "@/lib/domain/ai/providers/catalog";
+import { effectiveCapabilities } from "@/lib/domain/ai/features/capabilities";
 import {
   useModelSelection,
 } from "@/components/content/ai/ModelPicker";
@@ -237,11 +238,12 @@ export interface ChatAttachment {
   name: string;
   /**
    * image → sent as a file part (vision);
+   * audio → sent as a file part (audio-input models), else placeholder;
    * text  → inlined into the prompt;
    * document (PDF) → native file part for capable models, else inlined
    * extracted text.
    */
-  kind: "image" | "text" | "document";
+  kind: "image" | "audio" | "text" | "document";
   status: "uploading" | "ready" | "error";
   /** Image/document: the hosted URL the model fetches. */
   url?: string;
@@ -656,16 +658,30 @@ export function useConversationEngine({
     return Boolean(model?.capabilities?.includes("vision"));
   }, [providerId, modelId]);
 
+  // Does the active model accept audio inputs (audio-input capability)? Uses
+  // effectiveCapabilities so id-inferred audio models (Gemini, gpt-4o-audio)
+  // count even when the catalog row doesn't declare the flag.
+  const supportsAudioAttachments = useMemo(() => {
+    const provider = PROVIDER_CATALOG.find((p) => p.id === providerId);
+    const model = provider?.models.find((m) => m.id === modelId);
+    return effectiveCapabilities({
+      id: modelId,
+      capabilities: model?.capabilities,
+    }).has("audio-input");
+  }, [providerId, modelId]);
+
   const addAttachmentFiles = useCallback((files: File[] | FileList) => {
     const list = Array.from(files);
     for (const file of list) {
       const id = `att-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
       const initialKind: ChatAttachment["kind"] = file.type.startsWith("image/")
         ? "image"
-        : file.type === "application/pdf" ||
-            file.name.toLowerCase().endsWith(".pdf")
-          ? "document"
-          : "text";
+        : file.type.startsWith("audio/")
+          ? "audio"
+          : file.type === "application/pdf" ||
+              file.name.toLowerCase().endsWith(".pdf")
+            ? "document"
+            : "text";
       setAttachments((prev) => [
         ...prev,
         { id, name: file.name, kind: initialKind, status: "uploading" },
@@ -726,6 +742,7 @@ export function useConversationEngine({
     const text = input.trim();
     const ready = attachments.filter((a) => a.status === "ready" && a.url);
     const hasImageParts = ready.some((a) => a.kind === "image");
+    const hasAudioParts = ready.some((a) => a.kind === "audio");
 
     // Nothing to send (no text, no ready attachments).
     if (!text && ready.length === 0) return;
@@ -740,6 +757,15 @@ export function useConversationEngine({
     if (hasImageParts && !supportsImageAttachments) {
       toast.error(
         "The selected model can't read images. Switch to a vision-capable model or remove the image.",
+      );
+      return;
+    }
+
+    // Audio guard: only audio-input-capable models can hear a clip. Without
+    // this the model silently gets a placeholder and ignores the audio.
+    if (hasAudioParts && !supportsAudioAttachments) {
+      toast.error(
+        "The selected model can't process audio. Switch to an audio-input model (e.g. Gemini) or remove the audio.",
       );
       return;
     }
@@ -817,6 +843,7 @@ export function useConversationEngine({
     attachments,
     attachmentsUploading,
     supportsImageAttachments,
+    supportsAudioAttachments,
     pendingUserPartsRef,
     sendMessage,
     contentId,

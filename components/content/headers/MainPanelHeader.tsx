@@ -22,6 +22,7 @@ import { useWorkspaceStore } from "@/state/workspace-store";
 import { useExtensionShellTabMenuSections } from "@/lib/extensions/client-registry";
 import { getCollaborationBrowserSessionId } from "@/lib/domain/collaboration/runtime";
 import { prefetchContent } from "@/lib/domain/content/prefetch";
+import { BorrowedTabBadge } from "@/extensions/workplaces/components/BorrowedTabBadge";
 
 interface TabPresenceSession {
   sessionId: string;
@@ -584,6 +585,8 @@ export function MainPanelHeader({
                   sessions={presenceByContentId[tab.contentId] ?? []}
                   anchorRect={tabRects[tab.id] ?? null}
                 />
+                {/* Lazy expiry warning for borrowed (temporary) tabs */}
+                <BorrowedTabBadge contentId={tab.contentId} />
                 {editingTabId === tab.id ? (
                   <input
                     ref={renameInputRef}

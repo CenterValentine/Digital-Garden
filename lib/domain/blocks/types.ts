@@ -61,6 +61,21 @@ export interface BlockDefinition {
   searchTerms?: string[];
   /** Attrs managed inline in the editor — hidden from Properties Panel sidebar */
   hiddenFields?: string[];
+  /**
+   * Text-to-speech eligibility. When `true`, the "read aloud" text extractor
+   * (`lib/domain/editor/tts/extract-readable-text.ts`) skips this block ENTIRELY
+   * — neither its own text nor its descendants are narrated.
+   *
+   * Developer-declared, per registered block — NOT a user setting. Set it for
+   * blocks whose content is not narratable prose: diagrams (Excalidraw,
+   * Mermaid), interactive widgets (habit tracker, stopwatch, form inputs),
+   * embeds (audio, flashcards), and purely structural/visual blocks.
+   *
+   * Omit (or `false`) for prose and layout blocks. Layout blocks (family
+   * `"layout"`) are never skipped by default, so the extractor recurses into
+   * them and reads their non-skipped children.
+   */
+  ttsSkip?: boolean;
 }
 
 /**

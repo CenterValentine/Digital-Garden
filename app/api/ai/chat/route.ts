@@ -103,6 +103,7 @@ import {
 import { createBaseTools } from "@/lib/domain/ai/tools";
 import { createEditorTools } from "@/lib/domain/ai/tools";
 import { createFlashcardTools } from "@/lib/domain/ai/tools";
+import { effectiveCapabilities } from "@/lib/domain/ai/features/capabilities";
 import { prisma } from "@/lib/database/client";
 import { logger, spanPayload, startSpan, withRouteTrace, withSpan } from "@/lib/core/logger";
 
@@ -139,6 +140,10 @@ export async function POST(request: Request) {
       // Load user's stored AI settings as defaults
       const userSettings = await getUserSettings(session.user.id);
       const aiSettings = userSettings.ai ?? {};
+      // Auto-pronounce: when on (default), the model is told to attach spoken
+      // audio to non-English vocab cards by default. The proposal gate still
+      // gates the actual TTS spend, so "default on" never auto-bills.
+      const autoPronounceDefault = userSettings.flashcards?.autoPronounce !== false;
 
       // Resolve provider and model — request overrides > user settings > defaults
       const providerId =
@@ -312,6 +317,44 @@ export async function POST(request: Request) {
       // per-tool `enabled` in settings. Tools default to enabled; only
       // `enabled === false` entries are dropped. If the result is empty
       // we pass `undefined` so streamText knows there are no tools at all.
+      // Collect image/audio attachments for propose_cards_from_media to package
+      // as card fronts. Scope to the MOST RECENT user message that carries media
+      // — NOT the whole conversation. The model indexes "the media I was just
+      // given" (0..n) per turn; collecting every attachment across the chat
+      // would offset those indices and pull the wrong (earlier) clips. We walk
+      // backwards and take the first user message that has media parts.
+      const attachedMedia: Array<{
+        url: string;
+        mediaType: string;
+        contentNodeId?: string;
+        filename?: string;
+      }> = [];
+      for (let mi = messages.length - 1; mi >= 0; mi--) {
+        const m = messages[mi];
+        if (m.role !== "user" || !Array.isArray(m.parts)) continue;
+        const mediaParts = (m.parts as Array<Record<string, unknown>>).filter(
+          (part) =>
+            part?.type === "file" &&
+            typeof part.url === "string" &&
+            typeof part.mediaType === "string" &&
+            ((part.mediaType as string).startsWith("image/") ||
+              (part.mediaType as string).startsWith("audio/")),
+        );
+        if (mediaParts.length === 0) continue;
+        for (const part of mediaParts) {
+          const app = (
+            part.providerMetadata as { app?: { contentNodeId?: string } } | undefined
+          )?.app;
+          attachedMedia.push({
+            url: part.url as string,
+            mediaType: part.mediaType as string,
+            contentNodeId: app?.contentNodeId,
+            filename: typeof part.filename === "string" ? part.filename : undefined,
+          });
+        }
+        break; // only the most recent batch of attachments
+      }
+
       const toolCtx = {
         userId: session.user.id,
         contentId: editableContentId,
@@ -319,6 +362,7 @@ export async function POST(request: Request) {
         // chat IS the open content. Pass that through so createNote can
         // default the new note's parent folder to the chat's own parent.
         chatContentId: isChatContent ? contentId : undefined,
+        attachedMedia,
       };
       const allTools = {
         ...createBaseTools(toolCtx),
@@ -341,7 +385,12 @@ export async function POST(request: Request) {
       // Anthropic/Google), and inline the server-extracted text for
       // everything else — so the displayed/persisted message stays a clean
       // chip while the model still receives the content.
-      const resolvedMessages = resolveAttachmentsForModel(messages, providerId);
+      const audioCapable = effectiveCapabilities({ id: modelId }).has("audio-input");
+      const resolvedMessages = resolveAttachmentsForModel(
+        messages,
+        providerId,
+        audioCapable,
+      );
 
       // Convert UIMessages to ModelMessages for streamText
       const modelMessages = await convertToModelMessages(
@@ -476,6 +525,17 @@ Tool design:
 - propose_deck_with_cards is the primary tool for "cards in a deck context." It takes BOTH the deck info (name + optional parentDeckPath) AND the cards. The commit handles deck creation atomically — including parent creation when the parent doesn't yet exist either. ONE tool call covers any depth of hierarchy. The user reviews the card and clicks "Create deck & add" (or "Add selected" if the deck already exists); the server cascades through missing ancestors and adds the cards in one flow.
 - propose_deck (standalone) is RARE. Use it only when the user explicitly asks to create a deck WITHOUT any cards yet (e.g. "set up a Japanese deck, I'll add cards later"). For "make me cards on X" — even when the deck or its parent doesn't exist yet — just call propose_deck_with_cards.
 - propose_image_cards creates IDENTIFICATION cards whose front is an AI-GENERATED IMAGE plus a short instruction caption, for VISUAL recall — identifying plants, insects, animals, anatomy, landmarks, chemical structures, code screenshots, etc. Use it ONLY when the study goal is recognizing something visual (the user asks for "picture cards," "identify-the-X cards," or the topic is inherently visual). For each card provide: imagePrompt (a specific, unambiguous prompt that makes the image clearly depict the answer — e.g. "a single monarch butterfly, wings open, photorealistic, plain white background"), identifyLabel (few-word instruction shown under the image, e.g. "Identify this butterfly"), and back (the answer). Images generate at propose time so the user previews them before accepting. LIMIT 5 cards per call. Do NOT use it for plain text Q&A — use propose_deck_with_cards for those.
+- propose_cards_from_media creates IDENTIFICATION cards from media the user ATTACHED to the chat (images and/or audio) — the front is the uploaded media itself and the back is YOUR identification. This is the inverse of propose_image_cards (which generates an image). You have already seen/heard the attachments; for each card pass mediaIndex (0-based, in attachment order), identifyLabel ("Identify this mushroom"), and back (your answer). Use it whenever the user attaches photos/recordings and asks to "make identification flashcards from these." If nothing is attached, tell the user to attach the media first.
+- propose_sound_id_cards creates SOUND-IDENTIFICATION cards — the front is a real-world SOUND (bird call, animal, instrument, engine) and the back names it. Use it when the study goal is recognizing a NON-SPEECH sound by ear. For each card: soundPrompt (precise description of the sound to source), identifyLabel (front instruction, e.g. "Identify this bird"), back (the answer). IMPORTANT: automatic sound sourcing isn't available yet, so these currently commit as TEXT prompts without a real clip — only use this tool when the user explicitly wants sound-ID cards, and tell them that to attach real audio today they should upload clips and use "cards from media". This is NOT for pronunciation (use the audio directive) or images (propose_image_cards).
+- SPOKEN AUDIO on cards (propose_deck_with_cards 'audio' directive): any card in propose_deck_with_cards can carry a spoken clip by adding an 'audio' field of shape { side, hideText? }. The spoken text is whatever you wrote on that side — never repeat it elsewhere. Three patterns:
+  • Pronunciation (most common): a non-English vocab term → audio: { side: "front" } so the word is shown AND spoken (hear it, recall the meaning on the back). For reverse/production cards where the spoken word is the ANSWER, use side: "back".
+  • Listening comprehension: the learner must understand by EAR (e.g. hear a Chinese sentence and recall its meaning) → audio: { side: "front", hideText: true }. The front then shows ONLY a play button; put the transcription + translation on the back.
+  • The audio is NOT generated at propose time — the user picks a voice/provider in a follow-up window, then generation runs (opt-in, no auto-spend). Audio rides alongside ordinary cards; a single propose_deck_with_cards batch may mix audio and silent cards.
+  Do NOT use audio for plain English Q&A unless the user explicitly asks for spoken English.${
+    autoPronounceDefault
+      ? `\n  • DEFAULT BEHAVIOR: when the deck is non-English vocabulary (or scientific/Latin names), ADD audio:{ side: "front" } to every card by DEFAULT — the user has opted into automatic pronunciation. Only omit it if the user says they don't want audio. (Generation is still opt-in; you're only attaching the directive.)`
+      : ""
+  }
 
 Workflow:
 
@@ -670,6 +730,7 @@ const PDF_NATIVE_PROVIDERS = new Set(["anthropic", "google"]);
 function resolveAttachmentsForModel(
   messages: unknown[],
   providerId: string,
+  audioCapable: boolean,
 ): unknown[] {
   const nativePdf = PDF_NATIVE_PROVIDERS.has(providerId);
 
@@ -708,9 +769,16 @@ function resolveAttachmentsForModel(
 
       const isImage = mediaType.startsWith("image/");
       const isPdf = mediaType === "application/pdf";
+      const isAudio = mediaType.startsWith("audio/");
 
-      if (isImage || (isPdf && nativePdf)) {
+      if (isImage || (isPdf && nativePdf) || (isAudio && audioCapable)) {
         kept.push(stripAppMeta(p));
+      } else if (isAudio) {
+        // Audio but the model can't hear it — tell the model so it can ask the
+        // user to switch to an audio-input model rather than silently ignoring.
+        inlined.push(
+          `[Attached audio: ${filename} — the selected model can't process audio. Ask the user to switch to an audio-input model.]`,
+        );
       } else {
         inlined.push(
           appText

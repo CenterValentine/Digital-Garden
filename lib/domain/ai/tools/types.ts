@@ -21,4 +21,15 @@ export interface ToolExecuteContext {
    * note next to the chat instead of at the vault root.
    */
   chatContentId?: string;
+  /**
+   * Image/audio attachments on the conversation, in order. propose_cards_from_media
+   * references these by index to build each card's media front. The model has
+   * already seen them in context, so it supplies the identification per item.
+   */
+  attachedMedia?: Array<{
+    url: string;
+    mediaType: string;
+    contentNodeId?: string;
+    filename?: string;
+  }>;
 }

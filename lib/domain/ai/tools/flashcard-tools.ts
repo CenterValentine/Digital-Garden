@@ -25,6 +25,8 @@ import { prisma } from "@/lib/database/client";
 import {
   summarizeFlashcardContent,
   slugifyDeckName,
+  createImageFrontDoc,
+  createAudioFrontDoc,
 } from "@/lib/domain/flashcards";
 import type { ToolExecuteContext } from "./types";
 
@@ -32,6 +34,12 @@ const CARD_BATCH_LIMIT = 10;
 // Identification-image cards are capped lower than text cards: each one runs a
 // real image-generation call at propose time (latency + cost).
 const IMAGE_CARD_LIMIT = 5;
+// Sound-identification cards (propose_sound_id_cards) — scaffold only; no sound
+// provider is wired yet, so cards commit as text prompts.
+const SOUND_CARD_LIMIT = 10;
+// Cards from attached media (propose_cards_from_media) — the media already
+// exists (the user uploaded it), so this caps how many attachments per call.
+const MEDIA_CARD_LIMIT = 10;
 
 interface DeckRow {
   id: string;
@@ -405,6 +413,24 @@ export function createFlashcardTools(ctx: ToolExecuteContext) {
                 .max(80)
                 .optional()
                 .describe("Label for the back side (default: 'Answer')."),
+              audio: z
+                .object({
+                  side: z
+                    .enum(["front", "back"])
+                    .describe(
+                      "Which face carries the spoken clip — the side that holds the word/phrase in the target language. Usually 'front' (hear the term, recall its meaning); 'back' for reverse/production cards where the answer is the spoken word.",
+                    ),
+                  hideText: z
+                    .boolean()
+                    .optional()
+                    .describe(
+                      "true = that face shows ONLY the audio player (the spoken text IS the thing being tested) — use for LISTENING-comprehension cards (e.g. hear a Chinese sentence, recall the meaning). Put the transcription on the OTHER side. Omit/false for pronunciation, where the word is both shown and spoken.",
+                    ),
+                })
+                .optional()
+                .describe(
+                  "Attach a spoken pronunciation/clip to this card. Add it when the term is non-English (or the user explicitly asks for English audio). The text spoken is whatever you wrote on the chosen `side` — do NOT repeat it elsewhere. The user picks a voice/provider before any audio is generated (opt-in).",
+                ),
             }),
           )
           .min(1)
@@ -466,6 +492,16 @@ export function createFlashcardTools(ctx: ToolExecuteContext) {
         const resolvedSourceContentId =
           sourceContentId ?? ctx.contentId ?? null;
 
+        // Cards carrying an `audio` directive arrive as DRAFTS — the TTS is
+        // synthesized client-side after the voice/provider window
+        // (AudioCardGenGate), so flag each for generation and set the batch
+        // flag that mounts the gate. Audio rides alongside ordinary cards: a
+        // batch can mix audio and silent cards.
+        const processedCards = cards.map((c) =>
+          c.audio ? { ...c, pendingAudioGen: true } : c,
+        );
+        const hasAudio = processedCards.some((c) => c.audio);
+
         return JSON.stringify({
           __deckWithCardsProposal: true,
           deck: {
@@ -480,9 +516,10 @@ export function createFlashcardTools(ctx: ToolExecuteContext) {
             deckId: existing?.id ?? null,
             existingName: existing?.name ?? null,
           },
-          cards,
+          cards: processedCards,
           requestedCount,
           batchLimit: CARD_BATCH_LIMIT,
+          audioCards: hasAudio,
           sourceContentId: resolvedSourceContentId,
         });
       },
@@ -620,6 +657,290 @@ export function createFlashcardTools(ctx: ToolExecuteContext) {
           requestedCount,
           batchLimit: IMAGE_CARD_LIMIT,
           imageCards: true,
+          sourceContentId: resolvedSourceContentId,
+        });
+      },
+    }),
+
+    propose_sound_id_cards: tool({
+      description:
+        `Propose up to ${SOUND_CARD_LIMIT} SOUND-IDENTIFICATION flashcards — the front is a real-world SOUND (a bird call, animal, instrument, engine, machine) and the back names it. For auditory recall ("which bird is this?", "name this engine"). For each card provide: soundPrompt (a precise description of the exact sound to source, e.g. "song of an American Robin, clear recording"), identifyLabel (the few-word instruction shown to the user, e.g. "Identify this bird"), and back (the answer). NOTE: automatic sound generation/sourcing is NOT wired yet, so for now these commit as TEXT prompts (the identifyLabel on the front, answer on the back) without an actual clip — the soundPrompt is preserved for when a sound provider lands. To make sound-ID cards WITH real audio today, the user should upload their own clips and use "cards from media". Do NOT use this for spoken words/pronunciation (that's propose_deck_with_cards with an audio directive) or for visual identification (propose_image_cards).`,
+      inputSchema: z.object({
+        name: z
+          .string()
+          .min(1)
+          .max(120)
+          .describe(
+            "Leaf deck name. Combined with parentDeckPath to form the full target path. Existing deck → cards added directly; otherwise the commit creates it first.",
+          ),
+        parentDeckPath: z
+          .string()
+          .optional()
+          .describe("Full path of the parent deck (e.g. 'birds'). Omit for a root-level deck."),
+        rationale: z
+          .string()
+          .optional()
+          .describe("One-sentence reason this deck fits — shown only when the deck will be created."),
+        similarExistingPaths: z
+          .array(z.string())
+          .max(5)
+          .optional()
+          .describe("Paths of existing decks that almost match — from list_decks / search_decks."),
+        cards: z
+          .array(
+            z.object({
+              soundPrompt: z
+                .string()
+                .min(1)
+                .describe(
+                  "Precise description of the exact sound to source/generate (e.g. 'song of an American Robin'). Preserved for a future sound provider.",
+                ),
+              identifyLabel: z
+                .string()
+                .min(1)
+                .max(80)
+                .describe(
+                  "Few-word instruction shown on the front (e.g. 'Identify this bird', 'Name this engine').",
+                ),
+              back: z
+                .string()
+                .min(1)
+                .describe("The answer / identification revealed on the back (plain text)."),
+              backLabel: z
+                .string()
+                .max(80)
+                .optional()
+                .describe("Label for the back side (default: 'Answer')."),
+            }),
+          )
+          .min(1)
+          .max(SOUND_CARD_LIMIT)
+          .describe(
+            `Array of ${SOUND_CARD_LIMIT} or fewer sound-identification card drafts. ENFORCED by Zod — passing more will fail.`,
+          ),
+        requestedCount: z
+          .number()
+          .int()
+          .min(1)
+          .describe("How many cards the user actually asked for (for the 'proposed N of M' hint)."),
+        sourceContentId: z
+          .string()
+          .uuid()
+          .optional()
+          .describe("ContentNode id of the note these cards were drafted from, if any."),
+      }),
+      execute: async ({
+        name,
+        parentDeckPath,
+        rationale,
+        similarExistingPaths,
+        cards,
+        requestedCount,
+        sourceContentId,
+      }) => {
+        let parentDeckId: string | null = null;
+        if (parentDeckPath) {
+          const parent = await prisma.flashcardDeck.findFirst({
+            where: { ownerId: ctx.userId, path: parentDeckPath, deletedAt: null },
+            select: { id: true },
+          });
+          parentDeckId = parent?.id ?? null;
+        }
+
+        const proposedSlug = slugifyDeckName(name);
+        const proposedPath = parentDeckPath
+          ? `${parentDeckPath}/${proposedSlug}`
+          : proposedSlug;
+
+        const existing = await prisma.flashcardDeck.findFirst({
+          where: { ownerId: ctx.userId, path: proposedPath, deletedAt: null },
+          select: { id: true, name: true },
+        });
+
+        const resolvedSourceContentId = sourceContentId ?? ctx.contentId ?? null;
+
+        // SCAFFOLD: no sound provider exists yet, so cards commit as plain text
+        // prompts (identifyLabel → answer). The soundPrompt rides along for the
+        // future generation step. soundCards flags the proposal so the UI can
+        // explain the limitation + point at the upload path.
+        const proposedCards = cards.slice(0, SOUND_CARD_LIMIT).map((card) => ({
+          front: card.identifyLabel,
+          back: card.back,
+          backLabel: card.backLabel,
+          soundCard: true,
+          soundPrompt: card.soundPrompt,
+        }));
+
+        return JSON.stringify({
+          __deckWithCardsProposal: true,
+          deck: {
+            name,
+            proposedPath,
+            parentDeckPath: parentDeckPath ?? null,
+            parentDeckId,
+            parentResolved: parentDeckPath ? parentDeckId !== null : true,
+            rationale: rationale ?? null,
+            similarExistingPaths: similarExistingPaths ?? [],
+            deckExists: existing !== null,
+            deckId: existing?.id ?? null,
+            existingName: existing?.name ?? null,
+          },
+          cards: proposedCards,
+          requestedCount,
+          batchLimit: SOUND_CARD_LIMIT,
+          soundCards: true,
+          sourceContentId: resolvedSourceContentId,
+        });
+      },
+    }),
+
+    propose_cards_from_media: tool({
+      description:
+        `Make IDENTIFICATION flashcards from media the user ATTACHED to this chat (images and/or audio). You have already SEEN/heard each attachment in context — examine it and create one card per item: the FRONT is the uploaded media itself, the BACK is your identification/answer (the inverse of propose_image_cards, which GENERATES an image). For each card provide: mediaIndex (0-based index into the attached media, in the order they appear in the conversation), identifyLabel (short instruction shown under the media, e.g. "Identify this mushroom"), and back (your answer). ONLY call this when the user attached image/audio and wants cards from it — if nothing is attached, say so instead of calling it. HARD LIMIT: ${MEDIA_CARD_LIMIT} cards per call.`,
+      inputSchema: z.object({
+        name: z
+          .string()
+          .min(1)
+          .max(120)
+          .describe(
+            "Leaf deck name. Combined with parentDeckPath to form the full target path. Existing deck → cards added directly; otherwise the commit creates it first.",
+          ),
+        parentDeckPath: z
+          .string()
+          .optional()
+          .describe("Full path of the parent deck. Omit for a root-level deck."),
+        rationale: z
+          .string()
+          .optional()
+          .describe("One-sentence reason this deck fits — shown only when the deck will be created."),
+        similarExistingPaths: z
+          .array(z.string())
+          .max(5)
+          .optional()
+          .describe("Paths of existing decks that almost match — from list_decks / search_decks."),
+        cards: z
+          .array(
+            z.object({
+              mediaIndex: z
+                .number()
+                .int()
+                .min(0)
+                .describe(
+                  "0-based index into the attached media (order they appear in the conversation). Each attachment should map to at most one card.",
+                ),
+              identifyLabel: z
+                .string()
+                .min(1)
+                .max(80)
+                .describe("Short instruction shown under the media (e.g. 'Identify this bird')."),
+              back: z
+                .string()
+                .min(1)
+                .describe("Your identification / answer revealed on the back (plain text)."),
+              backLabel: z
+                .string()
+                .max(80)
+                .optional()
+                .describe("Label for the back side (default: 'Answer')."),
+            }),
+          )
+          .min(1)
+          .max(MEDIA_CARD_LIMIT)
+          .describe(
+            `Array of ${MEDIA_CARD_LIMIT} or fewer cards, one per attached item you want to test. ENFORCED by Zod.`,
+          ),
+        requestedCount: z
+          .number()
+          .int()
+          .min(1)
+          .describe("How many cards the user actually asked for (for the 'proposed N of M' hint)."),
+        sourceContentId: z
+          .string()
+          .uuid()
+          .optional()
+          .describe("ContentNode id of the note these cards were drafted from, if any."),
+      }),
+      execute: async ({
+        name,
+        parentDeckPath,
+        rationale,
+        similarExistingPaths,
+        cards,
+        requestedCount,
+        sourceContentId,
+      }) => {
+        const media = ctx.attachedMedia ?? [];
+        if (media.length === 0) {
+          return "No image or audio attachments were found in this conversation. Ask the user to attach the media first, then call this tool.";
+        }
+
+        let parentDeckId: string | null = null;
+        if (parentDeckPath) {
+          const parent = await prisma.flashcardDeck.findFirst({
+            where: { ownerId: ctx.userId, path: parentDeckPath, deletedAt: null },
+            select: { id: true },
+          });
+          parentDeckId = parent?.id ?? null;
+        }
+
+        const proposedSlug = slugifyDeckName(name);
+        const proposedPath = parentDeckPath
+          ? `${parentDeckPath}/${proposedSlug}`
+          : proposedSlug;
+
+        const existing = await prisma.flashcardDeck.findFirst({
+          where: { ownerId: ctx.userId, path: proposedPath, deletedAt: null },
+          select: { id: true, name: true },
+        });
+
+        const resolvedSourceContentId = sourceContentId ?? ctx.contentId ?? null;
+
+        // Build each card's media FRONT from the attachment the model picked.
+        // The media already exists, so the front is prebuilt rich content (no
+        // generation step / gate) and commits directly.
+        const proposedCards = cards
+          .slice(0, MEDIA_CARD_LIMIT)
+          .map((card) => {
+            const item = media[card.mediaIndex];
+            if (!item) return null;
+            const isImage = item.mediaType.startsWith("image/");
+            const frontContent = isImage
+              ? createImageFrontDoc(item.url, item.contentNodeId ?? null, card.identifyLabel)
+              : createAudioFrontDoc(item.url, card.identifyLabel, { autoplayOnFlip: true });
+            return {
+              front: card.identifyLabel,
+              back: card.back,
+              backLabel: card.backLabel,
+              mediaCard: true,
+              frontContent,
+              frontImageUrl: isImage ? item.url : undefined,
+              isFrontRichText: true,
+            };
+          })
+          .filter((c): c is NonNullable<typeof c> => c !== null);
+
+        if (proposedCards.length === 0) {
+          return "None of the provided mediaIndex values matched an attachment. Re-check the indices against the attached media order.";
+        }
+
+        return JSON.stringify({
+          __deckWithCardsProposal: true,
+          deck: {
+            name,
+            proposedPath,
+            parentDeckPath: parentDeckPath ?? null,
+            parentDeckId,
+            parentResolved: parentDeckPath ? parentDeckId !== null : true,
+            rationale: rationale ?? null,
+            similarExistingPaths: similarExistingPaths ?? [],
+            deckExists: existing !== null,
+            deckId: existing?.id ?? null,
+            existingName: existing?.name ?? null,
+          },
+          cards: proposedCards,
+          requestedCount,
+          batchLimit: MEDIA_CARD_LIMIT,
+          mediaCards: true,
           sourceContentId: resolvedSourceContentId,
         });
       },

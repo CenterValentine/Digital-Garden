@@ -2804,3 +2804,46 @@ async function initOverlay() {
 initOverlay().catch((error) => {
   console.warn("[DG Overlay] Failed to initialize overlay", error);
 });
+
+// ─── Read aloud (TTS) playback ─────────────────────────────────
+// The background service worker has no DOM and can't play audio, so it hands us
+// either the synthesized bytes (cloud) or the raw text (Web Speech fallback) to
+// play here in the page context.
+let dgTtsAudio = null;
+
+function dgStopTts() {
+  if (dgTtsAudio) {
+    dgTtsAudio.pause();
+    dgTtsAudio.src = "";
+    dgTtsAudio = null;
+  }
+  if (typeof window !== "undefined" && "speechSynthesis" in window) {
+    window.speechSynthesis.cancel();
+  }
+}
+
+chrome.runtime.onMessage.addListener((message) => {
+  if (!message || typeof message.type !== "string") return;
+
+  if (message.type === "dg-tts-play") {
+    dgStopTts();
+    const src = `data:${message.mimeType || "audio/mpeg"};base64,${message.audioBase64}`;
+    dgTtsAudio = new Audio(src);
+    dgTtsAudio.addEventListener("ended", () => {
+      dgTtsAudio = null;
+    });
+    dgTtsAudio.play().catch((error) => {
+      console.warn("[DG Overlay] TTS playback failed", error);
+    });
+  } else if (message.type === "dg-tts-fallback") {
+    dgStopTts();
+    try {
+      const utterance = new SpeechSynthesisUtterance(message.text || "");
+      window.speechSynthesis.speak(utterance);
+    } catch (error) {
+      console.warn("[DG Overlay] Web Speech fallback failed", error);
+    }
+  } else if (message.type === "dg-tts-stop") {
+    dgStopTts();
+  }
+});

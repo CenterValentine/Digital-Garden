@@ -103,9 +103,26 @@ const TEXT_TYPES = new Set([
 ]);
 const TEXT_EXTENSIONS = new Set(["txt", "md", "markdown", "csv", "json", "log"]);
 
+// Audio attachments — kept as a fetchable URL and fed to the model as a
+// multimodal audio-input part (audio-input-capable models only; the chat route
+// inlines a placeholder for others). Some browsers report odd mime types, so we
+// also sniff by extension.
+const AUDIO_EXTENSIONS = new Set([
+  "mp3",
+  "wav",
+  "m4a",
+  "aac",
+  "ogg",
+  "oga",
+  "opus",
+  "flac",
+  "webm",
+]);
+
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024; // 10 MB
 const MAX_TEXT_BYTES = 512 * 1024; // 512 KB raw
 const MAX_PDF_BYTES = 20 * 1024 * 1024; // 20 MB
+const MAX_AUDIO_BYTES = 25 * 1024 * 1024; // 25 MB
 const MAX_INLINED_CHARS = 100_000; // cap what we fold into the prompt
 
 export async function POST(request: NextRequest) {
@@ -128,6 +145,7 @@ export async function POST(request: NextRequest) {
         ext === "heif";
       const isImage = IMAGE_TYPES.has(file.type) || isHeic;
       const isText = TEXT_TYPES.has(file.type) || TEXT_EXTENSIONS.has(ext);
+      const isAudio = file.type.startsWith("audio/") || AUDIO_EXTENSIONS.has(ext);
 
       // ── Text-like: upload (for the persisted chip) + return content
       //    (the server inlines it into the model prompt). ──
@@ -237,6 +255,57 @@ export async function POST(request: NextRequest) {
         );
       }
 
+      // ── Audio: upload to storage, return a fetchable URL. The model
+      //    consumes it as a multimodal audio-input part (audio-input-capable
+      //    models only; the chat route inlines a placeholder for others). No
+      //    transcription here — that's a separate explicit action. ──
+      if (isAudio) {
+        if (file.size > MAX_AUDIO_BYTES) {
+          return NextResponse.json(
+            { error: "Audio must be under 25 MB" },
+            { status: 400 },
+          );
+        }
+        return withSpan(
+          { layer: "storage", name: "attachment:audio" },
+          {
+            summary: "chat audio attachment upload",
+            attrs: { mime_type: file.type, size_bytes: file.size },
+          },
+          async (span) => {
+            const buffer = Buffer.from(await file.arrayBuffer());
+            const mediaType = file.type || `audio/${ext || "mpeg"}`;
+            const safeExt = ext || "mp3";
+            const key = `chat-attachments/${session.user.id}/${Date.now()}-${crypto
+              .randomBytes(6)
+              .toString("hex")}.${safeExt}`;
+            const provider = await getUserStorageProvider(session.user.id);
+            const url = await provider.uploadFile(key, buffer, mediaType);
+            span.attr("storage_key", key);
+            const contentNodeId = await createReferencedFileNode(
+              session.user.id,
+              {
+                name: file.name,
+                mediaType,
+                size: buffer.length,
+                storageKey: key,
+                storageUrl: url,
+                buffer,
+              },
+            );
+            return NextResponse.json({
+              kind: "audio",
+              url,
+              key,
+              contentNodeId,
+              mediaType,
+              name: file.name,
+              size: buffer.length,
+            });
+          },
+        );
+      }
+
       // ── PDF: upload (for native document models) + extract text
       //    (fallback for everyone else). Returns both representations so
       //    send-time can pick based on the active model's capability. ──
@@ -305,7 +374,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           error:
-            "Unsupported attachment type. Images, PDFs, and text files (txt, md, csv, json) are supported.",
+            "Unsupported attachment type. Images, audio, PDFs, and text files (txt, md, csv, json) are supported.",
         },
         { status: 415 },
       );

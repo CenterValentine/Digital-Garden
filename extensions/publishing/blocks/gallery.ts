@@ -49,6 +49,7 @@ const { schema: gallerySchema, defaults: galleryDefaults } = createBlockSchema("
 
 registerBlock({
   type: "gallery",
+  ttsSkip: true, // image gallery — visual, not narratable
   label: "Gallery",
   description: "Image gallery — grid, masonry, or carousel layouts",
   iconName: "LayoutGrid",

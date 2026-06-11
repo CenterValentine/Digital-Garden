@@ -38,6 +38,7 @@ const { schema: dividerSchema, defaults: dividerDefaults } =
 
 registerBlock({
   type: "blockDivider",
+  ttsSkip: true, // visual divider — no narratable text
   label: "Styled Divider",
   description: "Horizontal divider with customizable style",
   iconName: "Minus",

@@ -33,8 +33,9 @@ import {
   ArrowDownLeft,
   ArrowDownRight,
   FolderInput,
-  Sparkles,
+  Captions,
 } from "lucide-react";
+import { toast } from "sonner";
 import type { ContextMenuActionProvider, ContextMenuSection, ContextMenuAction } from "./types";
 import {
   getNewContentMenuItems,
@@ -56,7 +57,6 @@ import {
 import { usePageTemplateStore } from "@/state/page-template-store";
 import { useFileTreeFilterStore } from "@/state/file-tree-filter-store";
 import { useSettingsStore } from "@/state/settings-store";
-import { useFolderAssistantStore } from "@/state/folder-assistant-store";
 
 /**
  * Context passed to file tree action provider
@@ -539,27 +539,21 @@ export const fileTreeActionProvider: ContextMenuActionProvider = (ctx) => {
     const folderAssistantOn =
       aiSettings?.enabled !== false &&
       aiSettings?.folderAssistant?.enabled !== false;
+    // Single "Move" entry whose flyout hosts: Folder assistant (top, when on)
+    // → search input → Recents. Consolidates the former two items.
     const moveActions: ContextMenuAction[] = [
       {
-        id: "move-folder-search",
-        label: "Folder search",
+        id: "move",
+        label: "Move",
         icon: <FolderInput className="h-4 w-4" />,
         customFlyout: {
           kind: "folder-search",
           selectedIds,
           excludeIds,
+          folderAssistant: folderAssistantOn,
         },
       },
     ];
-    if (folderAssistantOn) {
-      moveActions.push({
-        id: "move-folder-assistant",
-        label: "Folder assistant",
-        icon: <Sparkles className="h-4 w-4" />,
-        onClick: () =>
-          useFolderAssistantStore.getState().openDialog(selectedIds),
-      });
-    }
     sections.push({ title: "Move", actions: moveActions });
   }
 
@@ -583,6 +577,55 @@ export const fileTreeActionProvider: ContextMenuActionProvider = (ctx) => {
           onClick: async () => await onDownload?.(selectedIds),
           disabled: !onDownload,
           divider: true,
+        },
+      ],
+    });
+  }
+
+  // Section 6.5: AI — transcribe an audio file into a sibling note (Phase 5).
+  // Single audio file only. Opt-in (explicit click); the speech-to-text route
+  // is auto-discovered server-side.
+  if (
+    isSingleSelection &&
+    clickedId &&
+    clickedNode?.contentType === "file" &&
+    clickedNode.file?.mimeType?.startsWith("audio/")
+  ) {
+    const audioId = clickedId;
+    sections.push({
+      title: "AI",
+      actions: [
+        {
+          id: "transcribe-audio",
+          label: "Transcribe to note",
+          icon: <Captions className="h-4 w-4" />,
+          onClick: async () => {
+            const toastId = toast.loading("Transcribing audio…");
+            try {
+              const res = await fetch("/api/ai/transcribe", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                credentials: "include",
+                body: JSON.stringify({ contentId: audioId }),
+              });
+              const json = (await res.json().catch(() => null)) as {
+                success?: boolean;
+                error?: string;
+                data?: { noteId?: string | null };
+              } | null;
+              if (!res.ok || !json?.success) {
+                throw new Error(json?.error || "Transcription failed");
+              }
+              toast.success("Transcript note created", { id: toastId });
+              await onRefresh?.();
+            } catch (error) {
+              toast.error("Couldn't transcribe audio", {
+                id: toastId,
+                description:
+                  error instanceof Error ? error.message : "Transcription failed",
+              });
+            }
+          },
         },
       ],
     });
