@@ -32,6 +32,8 @@
  *   tsx scripts/fix-duplicate-main-workspace.ts --apply         # write, all owners
  *   tsx scripts/fix-duplicate-main-workspace.ts --owner=you@x.com          # dry-run, one owner
  *   tsx scripts/fix-duplicate-main-workspace.ts --owner=you@x.com --apply  # write, one owner
+ *   tsx scripts/fix-duplicate-main-workspace.ts --owner=you@x.com --drop-dupes          # also archive "Main Workspace" look-alikes (dry-run)
+ *   tsx scripts/fix-duplicate-main-workspace.ts --owner=you@x.com --drop-dupes --apply  # ...and write
  */
 
 import "./_load-env.js";
@@ -42,6 +44,11 @@ const MAIN_WORKSPACE_SLUG = "main";
 const MAIN_WORKSPACE_NAME = "Main Workspace";
 
 const APPLY = process.argv.includes("--apply");
+// Also DROP non-canonical workspaces NAMED "Main Workspace" (slug != "main")
+// by archiving them (status=archived) — removes them from every active-workspace
+// surface (the picker filters status=active) while keeping the row, so it's
+// reversible. Content/items are left intact.
+const DROP_DUPES = process.argv.includes("--drop-dupes");
 const ownerArg = process.argv
   .find((a) => a.startsWith("--owner="))
   ?.split("=")[1]
@@ -164,11 +171,26 @@ async function main(): Promise<void> {
       `same-named "Main Workspace" (non-canonical slug, NOT touched): ${namedDupes.length}`,
   );
   if (namedDupes.length > 0) {
-    console.log(
-      `  ↳ review these manually (rename or merge — they may hold content):`,
-    );
-    for (const w of namedDupes) {
-      console.log(`    ${w.id}  owner=${w.ownerId}  slug=${w.slug}`);
+    if (DROP_DUPES) {
+      console.log(`  ↳ archiving (status=archived) to drop from the picker:`);
+      for (const w of namedDupes) {
+        console.log(
+          `    DROP ${w.id}  "${MAIN_WORKSPACE_NAME}" (slug=${w.slug})`,
+        );
+        if (APPLY) {
+          await prisma.contentWorkspace.update({
+            where: { id: w.id },
+            data: { status: "archived", archivedAt: new Date() },
+          });
+        }
+      }
+    } else {
+      console.log(
+        `  ↳ review manually, or pass --drop-dupes to archive them (reversible):`,
+      );
+      for (const w of namedDupes) {
+        console.log(`    ${w.id}  owner=${w.ownerId}  slug=${w.slug}`);
+      }
     }
   }
 
