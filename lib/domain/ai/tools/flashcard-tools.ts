@@ -906,7 +906,7 @@ export function createFlashcardTools(ctx: ToolExecuteContext) {
             const isImage = item.mediaType.startsWith("image/");
             const frontContent = isImage
               ? createImageFrontDoc(item.url, item.contentNodeId ?? null, card.identifyLabel)
-              : createAudioFrontDoc(item.url, card.identifyLabel, { autoplayOnFlip: true });
+              : createAudioFrontDoc(item.url, item.contentNodeId ?? null, card.identifyLabel, { autoplayOnFlip: true });
             return {
               front: card.identifyLabel,
               back: card.back,

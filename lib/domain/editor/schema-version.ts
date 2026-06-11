@@ -81,7 +81,7 @@
  * See: docs/notes-feature/TIPTAP-SCHEMA-EVOLUTION-GUIDE.md
  */
 
-export const TIPTAP_SCHEMA_VERSION = "1.11.0";
+export const TIPTAP_SCHEMA_VERSION = "1.12.0";
 
 export interface SchemaVersion {
   version: string;
@@ -109,6 +109,22 @@ export interface SchemaChange {
  * 4. Run tests: pnpm test lib/domain/export
  */
 export const SCHEMA_HISTORY: SchemaVersion[] = [
+  {
+    version: "1.12.0",
+    date: "2026-06-11",
+    changes: [
+      {
+        type: "add",
+        target: "node",
+        name: "audioEmbed",
+        description:
+          "Add nullable `contentId` attr to audioEmbed, mirroring the image node. Carries the ContentNode id of the embedded clip so audio usage is ref-countable (ContentLink audio-ref) and lifecycle-cleanable. Backward-compatible: existing nodes default contentId=null.",
+        breaking: false,
+        migrationsAvailable: [],
+      },
+    ],
+    migrationsRequired: false,
+  },
   {
     version: "1.11.0",
     date: "2026-05-23",
