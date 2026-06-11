@@ -11,6 +11,8 @@ import { ConditionalNotesLayout } from "@/components/content/ConditionalNotesLay
 import { NotesLayoutMarker } from "@/components/content/NotesLayoutMarker";
 import { PageLifecycle, WebVitalsReporter } from "@/lib/features/observability";
 import { DeferredStoreHydrator } from "@/lib/features/stores/deferred-store-hydrator";
+import { ReadAloudMiniPlayer } from "@/components/content/tts/ReadAloudMiniPlayer";
+import { PdfTextReader } from "@/components/content/tts/PdfTextReader";
 
 export default function NotesLayout({
   children,
@@ -44,6 +46,12 @@ export default function NotesLayout({
         <ConditionalNotesLayout glass0={glass0}>
           {children}
         </ConditionalNotesLayout>
+
+        {/* Floating "read aloud" transport — visible only during playback */}
+        <ReadAloudMiniPlayer />
+
+        {/* Draggable extracted-text reader for PDFs/docs (select → Speak) */}
+        <PdfTextReader />
       </div>
     </>
   );

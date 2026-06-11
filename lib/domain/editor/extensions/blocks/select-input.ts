@@ -29,6 +29,7 @@ const { schema: selectInputSchema, defaults: selectInputDefaults } =
 
 registerBlock({
   type: "selectInput",
+  ttsSkip: true, // form input — not narratable prose
   label: "Select Input",
   description: "Dropdown select with configurable options",
   iconName: "ChevronDown",

@@ -29,6 +29,7 @@ const { schema: numberInputSchema, defaults: numberInputDefaults } =
 
 registerBlock({
   type: "numberInput",
+  ttsSkip: true, // form input — not narratable prose
   label: "Number Input",
   description: "Numeric input with min, max, and step",
   iconName: "Hash",

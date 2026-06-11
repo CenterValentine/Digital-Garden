@@ -57,6 +57,7 @@ export { flashcardEmbedSchema, flashcardEmbedDefaults };
 // here means both server and client bundles see the registration.
 registerBlock({
   type: "flashcardEmbed",
+  ttsSkip: true, // interactive deck embed — not narratable prose
   label: "Flashcard Deck",
   description: "Embed a flashcard deck or card subset; tap to flip, Play to review",
   iconName: "Layers",

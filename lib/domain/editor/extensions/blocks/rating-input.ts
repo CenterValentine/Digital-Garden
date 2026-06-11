@@ -29,6 +29,7 @@ const { schema: ratingInputSchema, defaults: ratingInputDefaults } =
 
 registerBlock({
   type: "ratingInput",
+  ttsSkip: true, // form input — not narratable prose
   label: "Rating",
   description: "Star, heart, or number rating selector",
   iconName: "Star",

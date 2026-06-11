@@ -37,6 +37,7 @@ const { schema: heroSchema, defaults: heroDefaults } = createBlockSchema("heroIm
 
 registerBlock({
   type: "heroImage",
+  ttsSkip: true, // hero image — visual, not narratable
   label: "Hero Image",
   description: "Full-width banner with headline, subheadline, and optional CTA",
   iconName: "Image",

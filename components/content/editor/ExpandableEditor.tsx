@@ -19,6 +19,7 @@ import { useCallback } from "react";
 import { ChevronRight, ArrowUp, ArrowDown, BookmarkPlus } from "lucide-react";
 import { cn } from "@/lib/core/utils";
 import { MarkdownEditor } from "./MarkdownEditor";
+import { ReadAloudButton } from "@/components/content/tts/ReadAloudButton";
 import { useNotesPanelStore } from "@/state/notes-panel-store";
 import type { JSONContent } from "@tiptap/core";
 
@@ -151,6 +152,15 @@ export function ExpandableEditor({
         {/* Inline toolbar — only visible when expanded */}
         {isExpanded && (
           <div className="flex items-center gap-0.5 ml-1">
+            {/* Read this note aloud — proximate to the note itself, distinct
+                from the toolbar Listen which reads the parent content's text. */}
+            {hasContent && (
+              <ReadAloudButton
+                contentId={contentId}
+                source="note"
+                variant="icon"
+              />
+            )}
             {onSaveAsPageTemplate && (
               <button
                 onClick={(e) => { e.stopPropagation(); onSaveAsPageTemplate(); }}

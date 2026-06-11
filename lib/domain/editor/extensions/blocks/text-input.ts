@@ -32,6 +32,7 @@ const { schema: textInputSchema, defaults: textInputDefaults } =
 
 registerBlock({
   type: "textInput",
+  ttsSkip: true, // form input — not narratable prose
   label: "Text Input",
   description: "Single or multi-line text input field",
   iconName: "Type",

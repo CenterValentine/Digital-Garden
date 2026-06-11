@@ -147,6 +147,8 @@ export interface ContentDetailResponse {
     storageKey: string;
     storageUrl: string | null;
     storageMetadata: Record<string, unknown>;
+    /** Extracted document text (PDF/doc body) — powers search + read-aloud. */
+    searchText: string;
     uploadStatus: "uploading" | "ready" | "failed";
     uploadedAt: Date | null;
     uploadError: string | null;

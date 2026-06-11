@@ -1275,6 +1275,117 @@ async function exchangeEmbedSession() {
   }
 }
 
+// ─── Read aloud (TTS) ──────────────────────────────────────────
+// Session LRU cache of synthesized audio so repeating the same selection reuses
+// the bytes instead of re-paying the provider. Best-effort: lives only for the
+// service worker's lifetime (MV3 may evict the worker), which still covers
+// back-to-back repeats. Mirrors the in-app cache (lib/features/tts/cache.ts).
+const TTS_CACHE_MAX = 8;
+const ttsCache = new Map(); // key -> { base64, mimeType }
+
+function ttsHash(str) {
+  let h = 0;
+  for (let i = 0; i < str.length; i++) {
+    h = (Math.imul(31, h) + str.charCodeAt(i)) | 0;
+  }
+  return (h >>> 0).toString(36);
+}
+
+function ttsCacheGet(key) {
+  const value = ttsCache.get(key);
+  if (value) {
+    ttsCache.delete(key);
+    ttsCache.set(key, value); // touch → MRU
+  }
+  return value;
+}
+
+function ttsCachePut(key, value) {
+  if (ttsCache.has(key)) ttsCache.delete(key);
+  ttsCache.set(key, value);
+  while (ttsCache.size > TTS_CACHE_MAX) {
+    const oldest = ttsCache.keys().next().value;
+    if (oldest === undefined) break;
+    ttsCache.delete(oldest);
+  }
+}
+
+// Binary-safe fetch to the TTS proxy. Unlike apiFetch (which parses JSON), this
+// returns raw audio bytes. The key stays server-side — we only ever get audio.
+async function fetchSpeechAudio(text) {
+  const key = ttsHash(text);
+  const cached = ttsCacheGet(key);
+  if (cached) return cached;
+
+  const config = await getConfig();
+  if (!config.appBaseUrl || !config.token) {
+    throw new Error("Extension not connected");
+  }
+  const url = getApiUrl(
+    config.appBaseUrl,
+    "/api/integrations/browser-extension/tts",
+  );
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${config.token}`,
+    },
+    body: JSON.stringify({ text }),
+  });
+  if (!res.ok) {
+    throw new Error(`TTS request failed (${res.status})`);
+  }
+  const buffer = await res.arrayBuffer();
+  const mimeType = res.headers.get("content-type") || "audio/mpeg";
+  const result = { base64: arrayBufferToBase64(buffer), mimeType };
+  ttsCachePut(key, result);
+  return result;
+}
+
+function arrayBufferToBase64(buffer) {
+  const bytes = new Uint8Array(buffer);
+  let binary = "";
+  const chunk = 0x8000; // avoid call-stack limits on String.fromCharCode
+  for (let i = 0; i < bytes.length; i += chunk) {
+    binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
+  }
+  return btoa(binary);
+}
+
+async function sendTtsFallback(tabId, text) {
+  await chrome.tabs
+    .sendMessage(tabId, { type: "dg-tts-fallback", text })
+    .catch(() => {});
+}
+
+// Read the highlighted selection aloud. Cloud (HD, BYOK) is preferred; offline
+// or any cloud failure degrades to the page's Web Speech engine — so the user
+// always hears something. Mirrors the in-app fallback policy.
+async function readAloudSelection(tabId, selectionText) {
+  const text = (selectionText || "").trim();
+  if (!text || tabId == null) return;
+
+  if (typeof navigator !== "undefined" && navigator.onLine === false) {
+    await sendTtsFallback(tabId, text);
+    return;
+  }
+  try {
+    const { base64, mimeType } = await fetchSpeechAudio(text);
+    await chrome.tabs.sendMessage(tabId, {
+      type: "dg-tts-play",
+      audioBase64: base64,
+      mimeType,
+    });
+  } catch (error) {
+    console.warn(
+      "[DG Bookmarks] Cloud TTS failed — falling back to Web Speech:",
+      error?.message,
+    );
+    await sendTtsFallback(tabId, text);
+  }
+}
+
 chrome.runtime.onInstalled.addListener(async () => {
   chrome.contextMenus.create({
     id: "dg-save-page",
@@ -1285,6 +1396,11 @@ chrome.runtime.onInstalled.addListener(async () => {
     id: "dg-capture-session",
     title: "Capture Session to Digital Garden",
     contexts: ["action"],
+  });
+  chrome.contextMenus.create({
+    id: "dg-read-aloud",
+    title: "Read aloud with Digital Garden",
+    contexts: ["selection"],
   });
   chrome.alarms.create("dg-pull-sync", { periodInMinutes: 5 });
   chrome.alarms.create("dg-embed-session-refresh", { periodInMinutes: 20 });
@@ -1299,6 +1415,13 @@ chrome.contextMenus.onClicked.addListener(async (info) => {
     }
     if (info.menuItemId === "dg-capture-session") {
       await captureCurrentSession({});
+    }
+    if (info.menuItemId === "dg-read-aloud") {
+      const [tab] = await chrome.tabs.query({
+        active: true,
+        currentWindow: true,
+      });
+      await readAloudSelection(tab?.id, info.selectionText);
     }
   } catch (error) {
     console.error("[DG Bookmarks] Context menu failed", error);
