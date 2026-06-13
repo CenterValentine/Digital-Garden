@@ -209,10 +209,11 @@ function selectorForElement(element) {
   return segments.join(" > ") || "body";
 }
 
-function openAppContent(appBaseUrl, contentId) {
+function openAppContent(appBaseUrl, contentId, workspaceId) {
   if (!appBaseUrl || !contentId) return;
   const url = new URL(DG_OVERLAY_APP_ROUTE, appBaseUrl);
   url.searchParams.set("content", contentId);
+  if (workspaceId) url.searchParams.set("workspace", workspaceId);
   window.open(url.toString(), "_blank", "noopener,noreferrer");
 }
 
@@ -1872,7 +1873,14 @@ function renderTreePopover(state) {
   if (!container) return;
   const visibleTree = state.contentTree;
   if (!visibleTree || visibleTree.length === 0) {
-    renderStatus(container, "No content is available to associate yet.");
+    container.innerHTML = `
+      <div class="dg-status">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">
+          <span>No content is available to associate yet.</span>
+          <button class="dg-mini-action" type="button" data-reload-tree title="Refresh file tree">↻ Refresh</button>
+        </div>
+      </div>
+    `;
     return;
   }
   container.innerHTML = `
@@ -1880,6 +1888,7 @@ function renderTreePopover(state) {
       <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">
         <span>Create content at the root, or use the compact actions on folders to add nested items.</span>
         <span style="display:flex;gap:6px;">
+          <button class="dg-mini-action" type="button" data-reload-tree title="Refresh file tree">↻</button>
           <button class="dg-mini-action" type="button" data-create-tree-item="folder">+ Folder</button>
           <button class="dg-mini-action" type="button" data-create-tree-item="note">+ Note</button>
           <button class="dg-mini-action" type="button" data-create-tree-item="external">+ Link</button>
@@ -2413,7 +2422,7 @@ function createContentPanel(state, item, kind, persisted = null) {
     }
 
     if (action === "app") {
-      openAppContent(state.config.appBaseUrl, panel.contentId);
+      openAppContent(state.config.appBaseUrl, panel.contentId, state.selectedWorkspaceId || null);
       return;
     }
 
@@ -3177,6 +3186,23 @@ function wireRootEvents(state) {
         renderStatus(
           state.popoverBodies.associations,
           error instanceof Error ? error.message : "Failed to remove association",
+          "error"
+        );
+      }
+      return;
+    }
+
+    const reloadTreeButton = event.target.closest("[data-reload-tree]");
+    if (reloadTreeButton) {
+      renderStatus(state.popoverBodies.tree, "Refreshing…");
+      state.contentTree = null;
+      try {
+        await loadContentTree(state, { workspaceId: state.selectedWorkspaceId || null });
+        renderTreePopover(state);
+      } catch (error) {
+        renderStatus(
+          state.popoverBodies.tree,
+          error instanceof Error ? error.message : "Failed to refresh",
           "error"
         );
       }
