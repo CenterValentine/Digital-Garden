@@ -541,6 +541,9 @@ Workflow:
 
 1. ALWAYS call list_decks first when the user mentions flashcards, so you can prefer an existing deck and populate similarExistingPaths with near-matches.
 2. Pick a path that reflects the topic's natural hierarchy. If the user asks for "Spanish irregular verbs," the right path is "spanish/irregular-verbs" — NOT "general/irregular-verbs." Use a domain-named parent (language, subject, skill) when the topic has one.
+   - EVERY deck MUST have a named root SKILL — the first segment of the path. The skill is the broad subject the cards belong to (the language, the course, the domain): "spanish", "latin", "biology", "anatomy". The deeper segments are sub-skills. NEVER propose a bare single-segment leaf like name:"Irregular Verbs" with no parentDeckPath when the cards clearly belong to a broader skill — that produces an orphan deck the user sees as "No Skill Category". Instead set name:"Irregular Verbs" + parentDeckPath:"spanish" so the full path is "spanish/irregular-verbs".
+   - The ONLY time a single-segment root path is correct is when the user's topic IS the whole skill (e.g. "make me a Latin deck" → name:"Latin", no parent). When in doubt, infer the skill from the subject matter (a set of Latin vocabulary → skill "latin") rather than dropping the card at the root with no skill.
+   - NEVER emit an empty, whitespace, or placeholder ("untitled", "general", "skill", "deck") name for any path segment. Every segment is a real, human-meaningful name.
 3. Call propose_deck_with_cards ONCE with the appropriate deck info and cards. The commit step in the UI handles the three cases atomically:
    a. Leaf exists → cards are added to it directly.
    b. Leaf doesn't exist, parent exists → commit creates the leaf and adds cards.

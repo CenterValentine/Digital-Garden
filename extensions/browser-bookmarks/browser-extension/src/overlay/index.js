@@ -977,6 +977,10 @@ function createOverlayApp(state) {
 }
 
 function schedulePersist(state, contentId) {
+  // Every per-resource persist is also a signal that the tab's open-panel set
+  // may have changed (geometry, collapse, reopen, drag) — keep the tab-scoped
+  // snapshot in sync so navigation restores the latest layout.
+  scheduleTabPersist(state);
   const timer = state.persistTimers.get(contentId);
   if (timer) {
     clearTimeout(timer);
@@ -1014,6 +1018,74 @@ function schedulePersist(state, contentId) {
       });
     }, 220)
   );
+}
+
+// ── Tab-scoped panel persistence ─────────────────────────────────────────────
+// Open panels are bound to a page's WebResource (URL) for restore-on-reload.
+// That means in-tab navigation (browsing the same site) drops them. To keep a
+// note open while the user explores, we ALSO snapshot the currently-open panels
+// to tab-scoped session storage (via the background, keyed by sender.tab.id)
+// and restore them on every page load — independent of the URL.
+function scheduleTabPersist(state) {
+  if (state.tabPersistTimer) clearTimeout(state.tabPersistTimer);
+  state.tabPersistTimer = setTimeout(() => {
+    state.tabPersistTimer = null;
+    const panels = Array.from(state.openPanels.values())
+      .filter((panel) => panel.state !== "closed")
+      .map((panel) => ({
+        contentId: panel.contentId,
+        kind: panel.kind,
+        title: panel.title || null,
+        state: panel.state,
+        // Embedded panels anchor to a page element that won't exist after
+        // navigation — restore them as floating.
+        layoutMode: panel.layoutMode === "embedded" ? "floating" : panel.layoutMode,
+        dockSide: panel.dockSide || null,
+        positionX: panel.positionX,
+        positionY: panel.positionY,
+        width: panel.width,
+        height: panel.height,
+        opacity: panel.opacity,
+      }));
+    runtimeMessage({ type: "save-tab-panels", payload: { panels } }).catch(
+      () => {}
+    );
+  }, 250);
+}
+
+// Re-open the panels that were open in this tab, regardless of the current URL.
+// Runs after restorePanelsFromState, so resource-bound panels win and we only
+// add the ones not already open (dedupe by contentId).
+async function restoreTabStickyPanels(state) {
+  let descriptors;
+  try {
+    descriptors = await runtimeMessage({ type: "get-tab-panels" });
+  } catch {
+    return;
+  }
+  if (!Array.isArray(descriptors)) return;
+  for (const descriptor of descriptors) {
+    if (!descriptor?.contentId || state.openPanels.has(descriptor.contentId)) {
+      continue;
+    }
+    const item = { id: descriptor.contentId, title: descriptor.title || null };
+    const persisted = {
+      state: descriptor.state === "collapsed" ? "collapsed" : "open",
+      layoutMode:
+        descriptor.layoutMode === "embedded"
+          ? "floating"
+          : descriptor.layoutMode || "floating",
+      dockSide: descriptor.dockSide || "right",
+      positionX: descriptor.positionX ?? null,
+      positionY: descriptor.positionY ?? null,
+      width: descriptor.width ?? 420,
+      height: descriptor.height ?? null,
+      opacity: descriptor.opacity ?? 1,
+      embeddedSelector: null, // page changed — no element to anchor to
+      metadata: {},
+    };
+    createContentPanel(state, item, descriptor.kind || "note", persisted);
+  }
 }
 
 function setIdle(state, idle) {
@@ -1767,7 +1839,9 @@ function closePanel(state, contentId, nextState = "closed") {
     panel.container.remove();
     panel.collapsedChip.remove();
     state.openPanels.delete(contentId);
-    // schedulePersist intentionally NOT called here — we persisted above
+    // schedulePersist intentionally NOT called here — we persisted above.
+    // Drop the closed panel from the tab snapshot so it doesn't re-open on nav.
+    scheduleTabPersist(state);
   } else {
     panel.container.style.display = "none";
     if (!state.tileOrder.includes(contentId)) {
@@ -1863,6 +1937,7 @@ function createContentPanel(state, item, kind, persisted = null) {
   const panel = {
     contentId: item.id,
     kind,
+    title,
     container,
     toolbar: container.querySelector(".dg-panel-toolbar"),
     toolbarTitle: container.querySelector(".dg-panel-toolbar-title strong"),
@@ -1890,6 +1965,7 @@ function createContentPanel(state, item, kind, persisted = null) {
   };
 
   state.openPanels.set(item.id, panel);
+  scheduleTabPersist(state); // remember this note for in-tab navigation
   makePanelDraggable(state, panel);
   wirePanelDirectEditor(state, panel);
   applyPanelGeometry(state, panel);
@@ -2754,6 +2830,7 @@ async function initOverlay() {
     tileOrder: [],
     openPanels: new Map(),
     persistTimers: new Map(),
+    tabPersistTimer: null,
     lastHoveredSelector: "body",
     launcherPosition: null,
     targetBanner: null,
@@ -2810,6 +2887,9 @@ async function initOverlay() {
     await loadResourceContext(state);
     renderAssociationsPopover(state);
     await restorePanelsFromState(state);
+    // Re-open notes the user had open in this tab, regardless of the URL they
+    // started on — so a note persists while they browse the site.
+    await restoreTabStickyPanels(state);
   } catch (error) {
     console.warn("[DG Overlay] Initial resource context load failed", {
       error: error instanceof Error ? error.message : error,

@@ -1181,6 +1181,9 @@ async function captureCurrentSession(payload = {}) {
 }
 
 const EMBED_SESSION_CACHE_KEY = "dgEmbedSession";
+// Per-tab open-panel descriptors (chrome.storage.session), so notes persist
+// across in-tab navigation. One key per tab id; cleared on tab close.
+const TAB_PANELS_KEY_PREFIX = "dgTabPanels:";
 // Two-minute buffer: refresh before the session actually expires
 const EMBED_SESSION_REFRESH_BUFFER_MS = 2 * 60 * 1000;
 
@@ -1478,10 +1481,41 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   }
 });
 
-chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+// Drop a tab's sticky open-panel descriptors when it closes, so a later tab
+// that reuses the id starts clean.
+chrome.tabs.onRemoved.addListener((tabId) => {
+  void chrome.storage.session.remove(`${TAB_PANELS_KEY_PREFIX}${tabId}`);
+});
+
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   (async () => {
     if (message.type === "get-config") {
       sendResponse({ ok: true, data: await getConfig() });
+      return;
+    }
+    // Tab-scoped open-panel persistence: notes stay open as the user navigates
+    // within a tab. Keyed by the SENDER's tab id (derived here, not trusted from
+    // the content script) in chrome.storage.session so it survives navigation
+    // and clears on browser restart. See tabs.onRemoved cleanup below.
+    if (message.type === "save-tab-panels") {
+      const tabId = sender.tab?.id;
+      if (tabId != null) {
+        await chrome.storage.session.set({
+          [`${TAB_PANELS_KEY_PREFIX}${tabId}`]: message.payload?.panels ?? [],
+        });
+      }
+      sendResponse({ ok: true, data: true });
+      return;
+    }
+    if (message.type === "get-tab-panels") {
+      const tabId = sender.tab?.id;
+      let panels = [];
+      if (tabId != null) {
+        const key = `${TAB_PANELS_KEY_PREFIX}${tabId}`;
+        const stored = await chrome.storage.session.get(key);
+        if (Array.isArray(stored[key])) panels = stored[key];
+      }
+      sendResponse({ ok: true, data: panels });
       return;
     }
     if (message.type === "get-extension-context") {

@@ -2,18 +2,24 @@
 
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import type { JSONContent } from "@tiptap/core";
-import { Type } from "lucide-react";
+import { ArrowUpDown, Type } from "lucide-react";
 import { toast } from "sonner";
 import {
   EMPTY_TIPTAP_DOC,
   createTextTiptapDoc,
   extractPlainTextFromTiptap,
 } from "@/lib/domain/flashcards";
-import type { FlashcardDto, FlashcardOptionsDto } from "@/lib/domain/flashcards";
+import type {
+  FlashcardDeckRecordDto,
+  FlashcardDto,
+  FlashcardOptionsDto,
+} from "@/lib/domain/flashcards";
 import { AdaptiveFlashcardEditor } from "./AdaptiveFlashcardEditor";
 
 interface FlashcardQuickAddFormProps {
   sourceContentId: string | null;
+  /** Pre-seed the skill path (e.g. from the selected tree node). */
+  initialDeckPath?: string | null;
   onCreated?: (card: FlashcardDto) => void;
   onCancel?: () => void;
   mobileSheet?: boolean;
@@ -23,6 +29,7 @@ interface PrefillData {
   sourceTitle: string | null;
   category: string;
   subcategory: string;
+  deckPath: string;
   frontLabel: string;
   backLabel: string;
 }
@@ -34,36 +41,33 @@ const EMPTY_OPTIONS: FlashcardOptionsDto = {
   backLabels: ["Answer"],
 };
 
-const NEW_SKILL_VALUE = "__new_flashcard_skill__";
-const NEW_SKILL_CATEGORY_VALUE = "__new_flashcard_skill_category__";
-const MENU_SELECT_CLASS =
-  "w-full rounded-md border border-black/15 dark:border-white/20 bg-white dark:bg-gray-900/95 px-3 py-2 text-base text-gray-900 dark:text-gray-100 shadow-sm outline-none transition-colors hover:bg-black/[0.05] dark:hover:bg-black/[0.05] dark:bg-white/10 focus:border-gold-primary focus:bg-gray-50 dark:focus:bg-gray-900 md:text-sm";
 const MENU_INPUT_CLASS =
-  "w-full rounded-md border border-black/15 dark:border-white/20 bg-black/[0.05] dark:bg-white/10 px-3 py-2 text-base text-gray-900 dark:text-gray-100 outline-none placeholder:text-gray-500 focus:border-white/40 md:text-sm";
+  "w-full rounded-md border border-black/15 dark:border-white/20 bg-black/[0.05] dark:bg-white/10 px-3 py-2 text-base text-gray-900 dark:text-gray-100 outline-none placeholder:text-gray-500 focus:border-gold-primary md:text-sm";
 
 function addUniqueSorted(values: string[], value: string) {
   const normalized = value.trim();
   if (!normalized) return values;
   return Array.from(new Set([...values, normalized])).sort((a, b) =>
-    a.localeCompare(b)
+    a.localeCompare(b),
   );
 }
 
 export function FlashcardQuickAddForm({
   sourceContentId,
+  initialDeckPath,
   onCreated,
   onCancel,
   mobileSheet = false,
 }: FlashcardQuickAddFormProps) {
   const idPrefix = useId();
-  const [prefill, setPrefill] = useState<PrefillData | null>(null);
   const [options, setOptions] = useState<FlashcardOptionsDto>(EMPTY_OPTIONS);
+  const [deckPaths, setDeckPaths] = useState<string[]>([]);
   const [frontLabel, setFrontLabel] = useState("Question");
   const [backLabel, setBackLabel] = useState("Answer");
-  const [category, setCategory] = useState("General");
-  const [subcategory, setSubcategory] = useState("");
-  const [isCreatingSkill, setIsCreatingSkill] = useState(false);
-  const [isCreatingSkillCategory, setIsCreatingSkillCategory] = useState(false);
+  // Single skill/subskill/subskill path — replaces the old two-select
+  // Skill / Skill Category affordance. Resolved-or-created server-side.
+  const [deckPath, setDeckPath] = useState("");
+  const [sourceTitle, setSourceTitle] = useState<string | null>(null);
   const [isFrontRichText, setIsFrontRichText] = useState(false);
   const [frontContent, setFrontContent] = useState<JSONContent>(EMPTY_TIPTAP_DOC);
   const [backContent, setBackContent] = useState<JSONContent>(EMPTY_TIPTAP_DOC);
@@ -71,6 +75,7 @@ export function FlashcardQuickAddForm({
   const frontLabelRef = useRef<HTMLInputElement>(null);
   const frontLabelListId = `${idPrefix}-flashcard-front-labels`;
   const backLabelListId = `${idPrefix}-flashcard-back-labels`;
+  const deckPathListId = `${idPrefix}-flashcard-deck-paths`;
 
   useEffect(() => {
     let cancelled = false;
@@ -83,22 +88,21 @@ export function FlashcardQuickAddForm({
       .then((result) => {
         if (cancelled || !result?.success) return;
         const data = result.data as PrefillData;
-        setPrefill(data);
+        setSourceTitle(data.sourceTitle);
         setFrontLabel(data.frontLabel || "Question");
         setBackLabel(data.backLabel || "Answer");
-        setCategory(data.category || "General");
-        setSubcategory(data.subcategory || "");
-        setIsCreatingSkill(false);
-        setIsCreatingSkillCategory(false);
+        // An explicit pre-seed (selected tree node) wins over the
+        // server's "last used" default.
+        setDeckPath(initialDeckPath?.trim() || data.deckPath || "");
       })
       .catch(() => {
-        if (!cancelled) setPrefill(null);
+        if (!cancelled && initialDeckPath) setDeckPath(initialDeckPath.trim());
       });
 
     return () => {
       cancelled = true;
     };
-  }, [sourceContentId]);
+  }, [sourceContentId, initialDeckPath]);
 
   useEffect(() => {
     let cancelled = false;
@@ -118,46 +122,31 @@ export function FlashcardQuickAddForm({
     };
   }, []);
 
+  // Existing deck paths drive the path-input autocomplete.
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/flashcards/decks/tree", { credentials: "include" })
+      .then((response) => response.json())
+      .then((result) => {
+        if (cancelled || !result?.success) return;
+        const paths = (result.data as FlashcardDeckRecordDto[])
+          .map((deck) => deck.path)
+          .sort((a, b) => a.localeCompare(b));
+        setDeckPaths(paths);
+      })
+      .catch(() => {
+        if (!cancelled) setDeckPaths([]);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const frontText = useMemo(
     () => extractPlainTextFromTiptap(frontContent),
-    [frontContent]
+    [frontContent],
   );
-
-  const skillOptions = useMemo(
-    () => addUniqueSorted(options.categories, "General"),
-    [options.categories]
-  );
-
-  const subcategoryOptions = useMemo(
-    () => options.subcategoriesByCategory[category] ?? [],
-    [category, options.subcategoriesByCategory]
-  );
-
-  const skillSelection = useMemo(
-    () =>
-      !isCreatingSkill && category && skillOptions.includes(category)
-        ? category
-        : NEW_SKILL_VALUE,
-    [category, isCreatingSkill, skillOptions]
-  );
-
-  const skillCategorySelection = useMemo(
-    () =>
-      isCreatingSkillCategory
-        ? NEW_SKILL_CATEGORY_VALUE
-        : !subcategory
-          ? ""
-          : subcategoryOptions.includes(subcategory)
-            ? subcategory
-            : NEW_SKILL_CATEGORY_VALUE,
-    [isCreatingSkillCategory, subcategory, subcategoryOptions]
-  );
-
-  const showSkillInput =
-    isCreatingSkill || Boolean(category && !skillOptions.includes(category));
-  const showSkillCategoryInput =
-    isCreatingSkillCategory ||
-    Boolean(subcategory && !subcategoryOptions.includes(subcategory));
 
   const resetContent = useCallback(() => {
     setFrontContent(EMPTY_TIPTAP_DOC);
@@ -167,6 +156,17 @@ export function FlashcardQuickAddForm({
     }
   }, [mobileSheet]);
 
+  // Swap front ↔ back. The back editor is always rich, so the new front
+  // inherits rich mode; labels swap alongside the content. Lets the user
+  // flip recall direction without retyping (#67).
+  const swapSides = useCallback(() => {
+    setFrontContent(backContent);
+    setBackContent(frontContent);
+    setFrontLabel(backLabel);
+    setBackLabel(frontLabel);
+    setIsFrontRichText(true);
+  }, [backContent, frontContent, backLabel, frontLabel]);
+
   const save = useCallback(
     async (createAnother: boolean) => {
       if (saving) return;
@@ -174,8 +174,8 @@ export function FlashcardQuickAddForm({
         toast.error("Add a front side first.");
         return;
       }
-      if (!category.trim()) {
-        toast.error("Choose or create a skill.");
+      if (!deckPath.trim()) {
+        toast.error("Enter a skill path, e.g. spanish/verbs.");
         return;
       }
 
@@ -189,8 +189,7 @@ export function FlashcardQuickAddForm({
             sourceContentId,
             frontLabel,
             backLabel,
-            category,
-            subcategory,
+            deckPath: deckPath.trim(),
             isFrontRichText,
             frontText,
             frontContent,
@@ -205,17 +204,11 @@ export function FlashcardQuickAddForm({
         toast.success("Flashcard saved");
         const created = result.data as FlashcardDto;
         setOptions((current) => ({
-          categories: addUniqueSorted(current.categories, created.category),
-          subcategoriesByCategory: {
-            ...current.subcategoriesByCategory,
-            [created.category]: addUniqueSorted(
-              current.subcategoriesByCategory[created.category] ?? [],
-              created.subcategory
-            ),
-          },
+          ...current,
           frontLabels: addUniqueSorted(current.frontLabels, created.frontLabel),
           backLabels: addUniqueSorted(current.backLabels, created.backLabel),
         }));
+        setDeckPaths((current) => addUniqueSorted(current, deckPath.trim()));
         onCreated?.(created);
         if (createAnother) {
           resetContent();
@@ -231,7 +224,7 @@ export function FlashcardQuickAddForm({
     [
       backContent,
       backLabel,
-      category,
+      deckPath,
       frontContent,
       frontLabel,
       frontText,
@@ -241,8 +234,7 @@ export function FlashcardQuickAddForm({
       resetContent,
       saving,
       sourceContentId,
-      subcategory,
-    ]
+    ],
   );
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
@@ -255,96 +247,43 @@ export function FlashcardQuickAddForm({
   return (
     <div className="flex h-full min-h-0 flex-col" onKeyDown={handleKeyDown}>
       <div className="min-h-0 flex-1 overflow-y-auto px-1 pb-4">
-        {prefill?.sourceTitle ? (
+        {sourceTitle ? (
           <div className="mb-3 rounded-md border border-gold-primary/25 bg-gold-primary/10 px-3 py-2 text-xs text-gold-primary">
-            Snapped to {prefill.sourceTitle}
+            Snapped to {sourceTitle}
           </div>
         ) : null}
 
-        <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
-          <label className="space-y-1 text-xs text-gray-600 dark:text-gray-400">
-            Skill
-            <select
-              value={skillSelection}
-              onChange={(event) => {
-                if (event.target.value === NEW_SKILL_VALUE) {
-                  setIsCreatingSkill(true);
-                  setIsCreatingSkillCategory(false);
-                  setCategory("");
-                  setSubcategory("");
-                  return;
-                }
-                setIsCreatingSkill(false);
-                setIsCreatingSkillCategory(false);
-                setCategory(event.target.value);
-                setSubcategory("");
-              }}
-              className={MENU_SELECT_CLASS}
-            >
-              {skillOptions.map((option) => (
-                <option key={option} value={option}>
-                  {option}
-                </option>
-              ))}
-              <option value={NEW_SKILL_VALUE}>Create new skill...</option>
-            </select>
-            {showSkillInput ? (
-              <input
-                value={category}
-                onChange={(event) => {
-                  setCategory(event.target.value);
-                  setSubcategory("");
-                }}
-                placeholder="New skill"
-                className={MENU_INPUT_CLASS}
-              />
-            ) : null}
-          </label>
-          <label className="space-y-1 text-xs text-gray-600 dark:text-gray-400">
-            Skill Category
-            <select
-              value={skillCategorySelection}
-              onChange={(event) => {
-                if (event.target.value === NEW_SKILL_CATEGORY_VALUE) {
-                  setIsCreatingSkillCategory(true);
-                  setSubcategory("");
-                  return;
-                }
-                setIsCreatingSkillCategory(false);
-                setSubcategory(event.target.value);
-              }}
-              className={MENU_SELECT_CLASS}
-            >
-              <option value="">No skill category</option>
-              {subcategoryOptions.map((option) => (
-                <option key={option} value={option}>
-                  {option}
-                </option>
-              ))}
-              <option value={NEW_SKILL_CATEGORY_VALUE}>
-                Create new skill category...
-              </option>
-            </select>
-            {showSkillCategoryInput ? (
-              <input
-                value={subcategory}
-                onChange={(event) => setSubcategory(event.target.value)}
-                placeholder="New skill category"
-                className={MENU_INPUT_CLASS}
-              />
-            ) : null}
-          </label>
-        </div>
+        <label className="space-y-1 text-xs text-gray-600 dark:text-gray-300">
+          Skill path
+          <input
+            value={deckPath}
+            onChange={(event) => setDeckPath(event.target.value)}
+            list={deckPathListId}
+            placeholder="skill/subskill/subskill"
+            spellCheck={false}
+            autoCapitalize="none"
+            className={MENU_INPUT_CLASS}
+          />
+          <datalist id={deckPathListId}>
+            {deckPaths.map((path) => (
+              <option key={path} value={path} />
+            ))}
+          </datalist>
+          <span className="block text-[11px] text-gray-500 dark:text-gray-400">
+            First segment is the skill; deeper segments are sub-skills.
+            Missing levels are created for you.
+          </span>
+        </label>
 
         <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-2">
-          <label className="space-y-1 text-xs text-gray-600 dark:text-gray-400">
+          <label className="space-y-1 text-xs text-gray-600 dark:text-gray-300">
             Front Label
             <input
               ref={frontLabelRef}
               value={frontLabel}
               onChange={(event) => setFrontLabel(event.target.value)}
               list={frontLabelListId}
-              className="w-full rounded-md border border-black/10 dark:border-white/10 bg-black/[0.03] dark:bg-white/5 px-3 py-2 text-base text-gray-900 dark:text-white outline-none focus:border-gold-primary md:text-sm"
+              className="w-full rounded-md border border-black/10 dark:border-white/20 bg-black/[0.03] dark:bg-white/[0.08] px-3 py-2 text-base text-gray-900 dark:text-white outline-none focus:border-gold-primary md:text-sm"
             />
             <datalist id={frontLabelListId}>
               {options.frontLabels.map((option) => (
@@ -352,13 +291,13 @@ export function FlashcardQuickAddForm({
               ))}
             </datalist>
           </label>
-          <label className="space-y-1 text-xs text-gray-600 dark:text-gray-400">
+          <label className="space-y-1 text-xs text-gray-600 dark:text-gray-300">
             Back Label
             <input
               value={backLabel}
               onChange={(event) => setBackLabel(event.target.value)}
               list={backLabelListId}
-              className="w-full rounded-md border border-black/10 dark:border-white/10 bg-black/[0.03] dark:bg-white/5 px-3 py-2 text-base text-gray-900 dark:text-white outline-none focus:border-gold-primary md:text-sm"
+              className="w-full rounded-md border border-black/10 dark:border-white/20 bg-black/[0.03] dark:bg-white/[0.08] px-3 py-2 text-base text-gray-900 dark:text-white outline-none focus:border-gold-primary md:text-sm"
             />
             <datalist id={backLabelListId}>
               {options.backLabels.map((option) => (
@@ -370,29 +309,40 @@ export function FlashcardQuickAddForm({
 
         <div className="mt-4 space-y-2">
           <div className="flex items-center justify-between gap-3">
-            <span className="text-xs font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-400">
+            <span className="text-xs font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-200">
               {frontLabel || "Question"}
             </span>
-            <button
-              type="button"
-              onClick={() => {
-                setIsFrontRichText((current) => !current);
-                if (isFrontRichText) {
-                  setFrontContent(createTextTiptapDoc(frontText));
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={swapSides}
+                className="flex h-9 w-9 items-center justify-center rounded-md border border-black/15 dark:border-white/20 text-gray-700 dark:text-gray-300 transition-colors hover:bg-gold-primary/10 hover:text-gold-primary"
+                title="Swap front and back"
+                aria-label="Swap front and back"
+              >
+                <ArrowUpDown className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsFrontRichText((current) => !current);
+                  if (isFrontRichText) {
+                    setFrontContent(createTextTiptapDoc(frontText));
+                  }
+                }}
+                className={`flex h-9 w-9 items-center justify-center rounded-md border transition-colors ${
+                  isFrontRichText
+                    ? "border-gold-primary/40 bg-gold-primary/10 text-gold-primary"
+                    : "border-black/15 dark:border-white/20 text-gray-700 dark:text-gray-300 hover:bg-black/[0.05] dark:hover:bg-black/[0.05] dark:bg-white/10 hover:text-gold-primary"
+                }`}
+                title={isFrontRichText ? "Use simple text" : "Enable rich text"}
+                aria-label={
+                  isFrontRichText ? "Use simple text" : "Enable rich text"
                 }
-              }}
-              className={`flex h-9 w-9 items-center justify-center rounded-md border transition-colors ${
-                isFrontRichText
-                  ? "border-gold-primary/40 bg-gold-primary/10 text-gold-primary"
-                  : "border-black/15 dark:border-white/20 text-gray-700 dark:text-gray-300 hover:bg-black/[0.05] dark:hover:bg-black/[0.05] dark:bg-white/10 hover:text-gold-primary"
-              }`}
-              title={isFrontRichText ? "Use simple text" : "Enable rich text"}
-              aria-label={
-                isFrontRichText ? "Use simple text" : "Enable rich text"
-              }
-            >
-              <Type className="h-4 w-4" />
-            </button>
+              >
+                <Type className="h-4 w-4" />
+              </button>
+            </div>
           </div>
           <AdaptiveFlashcardEditor
             value={frontContent}
@@ -405,7 +355,7 @@ export function FlashcardQuickAddForm({
         </div>
 
         <div className="mt-4 space-y-2">
-          <span className="text-xs font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-400">
+          <span className="text-xs font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-200">
             {backLabel || "Answer"}
           </span>
           <AdaptiveFlashcardEditor

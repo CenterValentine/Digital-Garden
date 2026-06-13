@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import {
+  ArrowUpDown,
   ChevronLeft,
   ChevronRight,
   Pencil,
@@ -139,6 +140,10 @@ export function FlashcardReviewOverlay({
 }: FlashcardReviewOverlayProps) {
   const [index, setIndex] = useState(0);
   const [flipped, setFlipped] = useState(false);
+  // Direction is seeded from the `mode` prop but can be flipped per
+  // session via the in-overlay toggle (#67) without disturbing the
+  // caller's default. Drives which face shows first + the FSRS audit.
+  const [effectiveMode, setEffectiveMode] = useState<FlashcardReviewMode>(mode);
   const [shownSide, setShownSide] = useState<FlashcardShownSide>(() =>
     getInitialSide(mode)
   );
@@ -172,6 +177,7 @@ export function FlashcardReviewOverlay({
     wasOpenRef.current = true;
     viewedCardIdsRef.current.clear();
     setIndex(0);
+    setEffectiveMode(mode);
     const side = getInitialSide(mode);
     setShownSide(side);
     setFlipped(side === "back");
@@ -228,11 +234,27 @@ export function FlashcardReviewOverlay({
   }, [cards, mode, open, filterKey]);
 
   const resetSide = useCallback(() => {
-    const side = getInitialSide(mode);
+    const side = getInitialSide(effectiveMode);
     setShownSide(side);
     setFlipped(side === "back");
     setStartedAt(Date.now());
-  }, [mode]);
+  }, [effectiveMode]);
+
+  // Flip the session's recall direction (front↔back) and re-orient the
+  // current card immediately. Random collapses to front-first so the
+  // toggle stays predictable.
+  const toggleDirection = useCallback(() => {
+    setEffectiveMode((prev) => {
+      const next: FlashcardReviewMode =
+        prev === "back_to_front" ? "front_to_back" : "back_to_front";
+      const side: FlashcardShownSide =
+        next === "back_to_front" ? "back" : "front";
+      setShownSide(side);
+      setFlipped(side === "back");
+      setStartedAt(Date.now());
+      return next;
+    });
+  }, []);
 
   const flipCard = useCallback(() => {
     setFlipped((value) => {
@@ -329,7 +351,7 @@ export function FlashcardReviewOverlay({
           body: JSON.stringify({
             cardId: current.id,
             rating,
-            reviewMode: mode,
+            reviewMode: effectiveMode,
             shownSide,
             responseTimeMs: Date.now() - startedAt,
           }),
@@ -363,7 +385,7 @@ export function FlashcardReviewOverlay({
     [
       current,
       index,
-      mode,
+      effectiveMode,
       onClose,
       onCardUpdated,
       reducedMotion,
@@ -705,6 +727,15 @@ export function FlashcardReviewOverlay({
               the FSRS schedule — they're session-flow helpers. Kept
               small to give visual primacy to the rating row below. */}
           <div className="mb-2 flex items-center justify-end gap-2 text-xs text-gray-600 dark:text-gray-400">
+            <button
+              type="button"
+              onClick={toggleDirection}
+              className="inline-flex items-center gap-1 rounded-md px-2 py-1 hover:bg-black/[0.04] dark:hover:bg-white/[0.06]"
+              title="Flip recall direction (front ↔ back)"
+            >
+              <ArrowUpDown className="h-3.5 w-3.5" />
+              {effectiveMode === "back_to_front" ? "Back→Front" : "Front→Back"}
+            </button>
             <button
               type="button"
               onClick={skipCard}

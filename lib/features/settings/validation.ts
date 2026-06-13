@@ -265,6 +265,10 @@ const flashcardsSettingsSchema = z
   .object({
     lastUsedCategory: z.string().min(1).max(120).optional(),
     lastUsedSubcategory: z.string().max(120).optional(),
+    // Sprint: path-based builder. Full skill/subskill/subskill path of the
+    // last deck a card was added to, so the path input can prefill the
+    // whole hierarchy (the 2-level category/subcategory pair can't).
+    lastUsedDeckPath: z.string().max(600).optional(),
     defaultFrontLabel: z.string().min(1).max(80).optional(),
     defaultBackLabel: z.string().min(1).max(80).optional(),
     defaultReviewMode: z
