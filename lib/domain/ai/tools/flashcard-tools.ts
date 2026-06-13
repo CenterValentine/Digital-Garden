@@ -301,14 +301,18 @@ export function createFlashcardTools(ctx: ToolExecuteContext) {
       inputSchema: z.object({
         name: z
           .string()
+          .trim()
           .min(1)
           .max(120)
-          .describe("Display name for the new deck (e.g. 'Irregular Verbs')"),
+          .describe(
+            "Display name for the new deck (e.g. 'Irregular Verbs'). Must be a real, human-meaningful name — never empty, whitespace, or a placeholder like 'Untitled'/'General'/'Skill'.",
+          ),
         parentDeckPath: z
           .string()
+          .trim()
           .optional()
           .describe(
-            "Full path of the parent deck (e.g. 'spanish/verbs'). Omit for a root-level deck.",
+            "Full path of the parent SKILL (e.g. 'spanish/verbs'). The first path segment is the root skill. Set this whenever the deck belongs under a broader subject so it nests under a named skill rather than landing at the root with no skill. Omit ONLY when this deck IS itself a root skill.",
           ),
         rationale: z
           .string()
@@ -368,16 +372,18 @@ export function createFlashcardTools(ctx: ToolExecuteContext) {
       inputSchema: z.object({
         name: z
           .string()
+          .trim()
           .min(1)
           .max(120)
           .describe(
-            "Leaf deck name (e.g. 'Irregular Verbs'). Combined with parentDeckPath to form the full target path. If a deck at that path already exists, the cards go there directly — otherwise the commit creates the deck first.",
+            "Leaf deck name (e.g. 'Irregular Verbs'). Combined with parentDeckPath to form the full target path. If a deck at that path already exists, the cards go there directly — otherwise the commit creates the deck first. Must be a real, human-meaningful name — never empty, whitespace, or a placeholder like 'Untitled'/'General'/'Skill'.",
           ),
         parentDeckPath: z
           .string()
+          .trim()
           .optional()
           .describe(
-            "Full path of the parent deck (e.g. 'spanish'). Omit for a root-level deck.",
+            "Full path of the parent SKILL (e.g. 'spanish'). The first path segment is the root skill the cards belong to. Set this whenever the cards belong to a broader subject so the deck nests under a named skill — e.g. 'Irregular Verbs' cards should be name:'Irregular Verbs' + parentDeckPath:'spanish', giving 'spanish/irregular-verbs'. Omit ONLY when the topic itself IS the whole skill (e.g. a plain 'Latin' deck). Never leave a topical leaf at the root with no skill parent — that creates an orphan the user sees as 'No Skill Category'.",
           ),
         rationale: z
           .string()

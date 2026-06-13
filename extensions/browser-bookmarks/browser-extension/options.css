@@ -1,0 +1,314 @@
+/* Options page overrides — linked after styles.css */
+
+body {
+  width: auto;
+  min-height: 100vh;
+  padding: 32px 24px 64px;
+  background: var(--bg);
+}
+
+/* ── Layout primitives ── */
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* ── Page title ── */
+.title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: -0.01em;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 4px;
+}
+
+/* ── Cards ── */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 18px 20px;
+}
+
+/* ── Section heading row ── */
+.section-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.section-heading .muted {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+/* ── Help icon button ── */
+.icon-help {
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  border: 1px solid var(--border-input);
+  background: transparent;
+  color: var(--text-faint);
+  font: inherit;
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.12s, color 0.12s;
+  flex-shrink: 0;
+}
+
+.icon-help:hover {
+  background: var(--surface-hover);
+  color: var(--text-muted);
+}
+
+/* ── Hint text ── */
+.hint {
+  font-size: 12px;
+  color: var(--text-faint);
+  line-height: 1.5;
+}
+
+/* ── Status grid ── */
+.status-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.status-card {
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.status-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.status-value {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  word-break: break-all;
+}
+
+.status-card .hint {
+  margin-top: 2px;
+  font-size: 11px;
+}
+
+/* ── Form elements ── */
+button {
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 7px 14px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-input);
+  background: var(--gold);
+  color: #131313;
+  cursor: pointer;
+  transition: filter 0.12s;
+}
+
+button:hover {
+  filter: brightness(1.08);
+}
+
+button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+button.secondary {
+  background: var(--surface-hover);
+  color: var(--text-muted);
+  border-color: var(--border-input);
+}
+
+button.secondary:hover {
+  background: rgba(255, 255, 255, 0.1);
+  filter: none;
+}
+
+select,
+textarea,
+input[type="text"],
+input[type="url"] {
+  font: inherit;
+  font-size: 13px;
+  padding: 8px 11px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-input);
+  background: var(--input-bg);
+  color: var(--text);
+  width: 100%;
+  transition: border-color 0.15s;
+  appearance: auto;
+}
+
+select:focus,
+textarea:focus,
+input:focus {
+  outline: none;
+  border-color: var(--gold);
+}
+
+textarea {
+  min-height: 80px;
+  resize: vertical;
+  font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
+  font-size: 12px;
+}
+
+/* ── Bookmark tree inspector ── */
+#bookmark-tree {
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  max-height: 400px;
+  overflow: auto;
+  font-size: 12px;
+}
+
+.tree-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 7px 12px;
+  border-bottom: 1px solid var(--border);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  position: sticky;
+  top: 0;
+  background: #0f1117;
+}
+
+.tree-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 12px 6px calc(12px + var(--tree-depth, 0px));
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+  transition: background 0.1s;
+}
+
+.tree-row:last-child { border-bottom: 0; }
+.tree-row:hover { background: var(--surface-hover); }
+
+.tree-row-main {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  min-width: 0;
+  flex: 1;
+}
+
+.tree-toggle {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-faint);
+  font-size: 11px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.tree-toggle:hover { color: var(--text-muted); filter: none; }
+
+.tree-spacer { width: 18px; height: 18px; flex-shrink: 0; display: inline-block; }
+
+.tree-kind { font-size: 13px; flex-shrink: 0; margin-top: 1px; }
+
+.tree-node-content { min-width: 0; }
+
+.tree-node-title {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tree-node-meta {
+  font-size: 11px;
+  color: var(--text-faint);
+  margin-top: 1px;
+  line-height: 1.4;
+}
+
+.tree-node-meta code {
+  font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
+  font-size: 10px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 3px;
+  padding: 0 3px;
+  color: var(--gold-text);
+}
+
+.tree-node-url {
+  font-size: 10px;
+  color: var(--text-faint);
+  opacity: 0.7;
+  margin-top: 1px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 380px;
+}
+
+.tree-row-actions { flex-shrink: 0; padding-top: 2px; }
+
+.tiny-button {
+  font: inherit;
+  font-size: 10px;
+  font-weight: 500;
+  padding: 3px 8px;
+  border-radius: 5px;
+  border: 1px solid var(--border-input);
+  background: var(--surface);
+  color: var(--text-muted);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.tiny-button:hover { background: var(--surface-hover); filter: none; }
+
+/* ── Toast / status messages ── */
+#bookmark-tree-status {
+  min-height: 16px;
+}

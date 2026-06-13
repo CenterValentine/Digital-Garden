@@ -1,12 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useId, useState } from "react";
 import type { JSONContent } from "@tiptap/core";
 import { Sparkles } from "lucide-react";
 import { toast } from "sonner";
 
 import { EMPTY_TIPTAP_DOC } from "@/lib/domain/flashcards";
-import type { FlashcardDto, FlashcardOptionsDto } from "@/lib/domain/flashcards";
+import type {
+  FlashcardDeckRecordDto,
+  FlashcardDto,
+} from "@/lib/domain/flashcards";
 import {
   countClozeCards,
   type TipTapNode,
@@ -15,6 +18,8 @@ import { AdaptiveFlashcardEditor } from "./AdaptiveFlashcardEditor";
 
 interface FlashcardClozeQuickAddFormProps {
   sourceContentId: string | null;
+  /** Pre-seed the skill path (e.g. from the selected tree node). */
+  initialDeckPath?: string | null;
   onCreated?: (cards: FlashcardDto[]) => void;
   onCancel?: () => void;
 }
@@ -23,28 +28,24 @@ interface PrefillData {
   sourceTitle: string | null;
   category: string;
   subcategory: string;
+  deckPath: string;
 }
 
-const EMPTY_OPTIONS: FlashcardOptionsDto = {
-  categories: ["General"],
-  subcategoriesByCategory: {},
-  frontLabels: ["Question"],
-  backLabels: ["Answer"],
-};
-
-const MENU_SELECT_CLASS =
-  "w-full rounded-md border border-black/15 dark:border-white/20 bg-white dark:bg-gray-900/95 px-3 py-2 text-base text-gray-900 dark:text-gray-100 shadow-sm outline-none transition-colors hover:bg-black/[0.05] dark:hover:bg-black/[0.05] dark:bg-white/10 focus:border-gold-primary md:text-sm";
+const MENU_INPUT_CLASS =
+  "w-full rounded-md border border-black/15 dark:border-white/20 bg-black/[0.05] dark:bg-white/10 px-3 py-2 text-base text-gray-900 dark:text-gray-100 outline-none placeholder:text-gray-500 focus:border-gold-primary md:text-sm";
 
 export function FlashcardClozeQuickAddForm({
   sourceContentId,
+  initialDeckPath,
   onCreated,
   onCancel,
 }: FlashcardClozeQuickAddFormProps) {
-  const [options, setOptions] = useState<FlashcardOptionsDto>(EMPTY_OPTIONS);
-  const [category, setCategory] = useState("General");
-  const [subcategory, setSubcategory] = useState("");
+  const idPrefix = useId();
+  const [deckPath, setDeckPath] = useState("");
+  const [deckPaths, setDeckPaths] = useState<string[]>([]);
   const [sourceContent, setSourceContent] = useState<JSONContent>(EMPTY_TIPTAP_DOC);
   const [saving, setSaving] = useState(false);
+  const deckPathListId = `${idPrefix}-cloze-deck-paths`;
 
   useEffect(() => {
     let cancelled = false;
@@ -57,28 +58,29 @@ export function FlashcardClozeQuickAddForm({
       .then((result) => {
         if (cancelled || !result?.success) return;
         const data = result.data as PrefillData;
-        setCategory(data.category || "General");
-        setSubcategory(data.subcategory || "");
+        setDeckPath(initialDeckPath?.trim() || data.deckPath || "");
       })
       .catch(() => {
-        // Silent — fall back to defaults
+        if (!cancelled && initialDeckPath) setDeckPath(initialDeckPath.trim());
       });
     return () => {
       cancelled = true;
     };
-  }, [sourceContentId]);
+  }, [sourceContentId, initialDeckPath]);
 
   useEffect(() => {
     let cancelled = false;
-    fetch("/api/flashcards/options", { credentials: "include" })
+    fetch("/api/flashcards/decks/tree", { credentials: "include" })
       .then((response) => response.json())
       .then((result) => {
-        if (!cancelled && result?.success) {
-          setOptions(result.data as FlashcardOptionsDto);
-        }
+        if (cancelled || !result?.success) return;
+        const paths = (result.data as FlashcardDeckRecordDto[])
+          .map((deck) => deck.path)
+          .sort((a, b) => a.localeCompare(b));
+        setDeckPaths(paths);
       })
       .catch(() => {
-        if (!cancelled) setOptions(EMPTY_OPTIONS);
+        if (!cancelled) setDeckPaths([]);
       });
     return () => {
       cancelled = true;
@@ -92,12 +94,7 @@ export function FlashcardClozeQuickAddForm({
     [sourceContent],
   );
 
-  const subcategoryOptions = useMemo(
-    () => options.subcategoriesByCategory[category] ?? [],
-    [options.subcategoriesByCategory, category],
-  );
-
-  const canSave = cardsToCreate > 0 && !saving;
+  const canSave = cardsToCreate > 0 && !saving && Boolean(deckPath.trim());
 
   const handleSave = useCallback(async () => {
     if (!canSave) return;
@@ -108,8 +105,7 @@ export function FlashcardClozeQuickAddForm({
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({
-          category,
-          subcategory,
+          deckPath: deckPath.trim(),
           sourceJson: sourceContent,
           sourceContentId,
         }),
@@ -129,13 +125,18 @@ export function FlashcardClozeQuickAddForm({
         }`,
       );
       setSourceContent(EMPTY_TIPTAP_DOC);
+      setDeckPaths((current) =>
+        current.includes(deckPath.trim())
+          ? current
+          : [...current, deckPath.trim()].sort((a, b) => a.localeCompare(b)),
+      );
       onCreated?.(result.data);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to create cloze cards");
     } finally {
       setSaving(false);
     }
-  }, [canSave, category, subcategory, sourceContent, sourceContentId, onCreated]);
+  }, [canSave, deckPath, sourceContent, sourceContentId, onCreated]);
 
   return (
     <div className="flex h-full flex-col">
@@ -149,44 +150,27 @@ export function FlashcardClozeQuickAddForm({
           to make it a cloze deletion. Each numbered cloze becomes one sibling card.
         </div>
 
-        <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
-          <label className="space-y-1 text-xs text-gray-600 dark:text-gray-400">
-            Skill
-            <select
-              value={category}
-              onChange={(event) => {
-                setCategory(event.target.value);
-                setSubcategory("");
-              }}
-              className={MENU_SELECT_CLASS}
-            >
-              {options.categories.map((option) => (
-                <option key={option} value={option}>
-                  {option}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="space-y-1 text-xs text-gray-600 dark:text-gray-400">
-            Skill Category
-            <select
-              value={subcategory}
-              onChange={(event) => setSubcategory(event.target.value)}
-              className={MENU_SELECT_CLASS}
-            >
-              <option value="">No skill category</option>
-              {subcategoryOptions.map((option) => (
-                <option key={option} value={option}>
-                  {option}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
+        <label className="space-y-1 text-xs text-gray-600 dark:text-gray-400">
+          Skill path
+          <input
+            value={deckPath}
+            onChange={(event) => setDeckPath(event.target.value)}
+            list={deckPathListId}
+            placeholder="skill/subskill/subskill"
+            spellCheck={false}
+            autoCapitalize="none"
+            className={MENU_INPUT_CLASS}
+          />
+          <datalist id={deckPathListId}>
+            {deckPaths.map((path) => (
+              <option key={path} value={path} />
+            ))}
+          </datalist>
+        </label>
 
         <div className="mt-4 space-y-2">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-400">
+            <span className="text-xs font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-200">
               Source
             </span>
             <span
@@ -215,12 +199,12 @@ export function FlashcardClozeQuickAddForm({
         </div>
       </div>
 
-      <div className="mt-3 flex shrink-0 items-center justify-end gap-2 border-t border-white/10 pt-3">
+      <div className="mt-3 flex shrink-0 items-center justify-end gap-2 border-t border-black/10 dark:border-white/10 pt-3">
         {onCancel ? (
           <button
             type="button"
             onClick={onCancel}
-            className="rounded-md border border-white/15 px-3 py-2 text-sm text-gray-300 hover:bg-white/10"
+            className="rounded-md border border-black/15 dark:border-white/15 px-3 py-2 text-sm text-gray-600 dark:text-gray-300 hover:bg-black/[0.05] dark:hover:bg-white/10"
           >
             Cancel
           </button>
@@ -229,7 +213,7 @@ export function FlashcardClozeQuickAddForm({
           type="button"
           onClick={handleSave}
           disabled={!canSave}
-          className="rounded-md bg-amber-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-amber-600 disabled:cursor-not-allowed disabled:bg-white/10 disabled:text-gray-500"
+          className="rounded-md bg-amber-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-amber-600 disabled:cursor-not-allowed disabled:bg-black/10 dark:disabled:bg-white/10 disabled:text-gray-500"
         >
           {saving
             ? "Saving…"

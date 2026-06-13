@@ -26,7 +26,10 @@ import {
   sanitizeFlashcardSubcategory,
   toFlashcardDto,
 } from "@/lib/domain/flashcards";
-import { resolveLegacyDeckId } from "@/lib/domain/flashcards/legacy-compat";
+import {
+  ensureDeckPath,
+  resolveLegacyDeckId,
+} from "@/lib/domain/flashcards/legacy-compat";
 import {
   extractClozeCards,
   type TipTapNode,
@@ -34,6 +37,7 @@ import {
 
 interface ClozeCreateBody {
   deckId?: string;
+  deckPath?: string;
   category?: string;
   subcategory?: string;
   sourceJson?: unknown;
@@ -53,6 +57,10 @@ export async function POST(request: NextRequest) {
     const explicitDeckId =
       typeof body.deckId === "string" && body.deckId.trim()
         ? body.deckId.trim()
+        : null;
+    const deckPath =
+      typeof body.deckPath === "string" && body.deckPath.trim()
+        ? body.deckPath.trim()
         : null;
     const category = sanitizeFlashcardCategory(body.category);
     const subcategory = sanitizeFlashcardSubcategory(body.subcategory);
@@ -88,6 +96,21 @@ export async function POST(request: NextRequest) {
         );
       }
       deckId = deck.id;
+    } else if (deckPath) {
+      try {
+        ({ deckId } = await ensureDeckPath(session.user.id, deckPath));
+      } catch (err) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: {
+              code: "INVALID_INPUT",
+              message: err instanceof Error ? err.message : "Invalid deck path.",
+            },
+          },
+          { status: 400 },
+        );
+      }
     } else {
       deckId = await resolveLegacyDeckId(session.user.id, category, subcategory);
     }

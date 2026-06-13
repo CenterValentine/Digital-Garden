@@ -7,7 +7,7 @@ import Paragraph from "@tiptap/extension-paragraph";
 import Text from "@tiptap/extension-text";
 import Placeholder from "@tiptap/extension-placeholder";
 import type { Editor, JSONContent } from "@tiptap/core";
-import { ImagePlus, Loader2, Volume2 } from "lucide-react";
+import { Bold, Code, ImagePlus, Italic, Loader2, Volume2 } from "lucide-react";
 import { toast } from "sonner";
 import { getEditorExtensions } from "@/lib/domain/editor/extensions-client";
 import { useImagePasteHandler } from "@/lib/domain/editor/hooks/use-image-paste";
@@ -204,62 +204,59 @@ export function AdaptiveFlashcardEditor({
 
   return (
     <div
-      className={`rounded-md border border-black/[0.06] dark:border-white/[0.06] bg-black/[0.04] dark:bg-white/[0.02] ${sizingClassName}`}
+      className={`rounded-md border border-black/[0.08] dark:border-white/[0.12] bg-black/[0.04] dark:bg-white/[0.05] ${sizingClassName}`}
     >
       {isToolbarVisible ? (
-        <div className="flex min-h-11 items-center gap-1 overflow-x-auto border-b border-black/[0.06] dark:border-white/[0.06] px-2 py-1 text-xs">
+        <div className="flex min-h-11 items-center gap-1 overflow-x-auto border-b border-black/[0.08] dark:border-white/[0.12] px-2 py-1 text-xs">
           <button
             type="button"
             onClick={() => editor?.chain().focus().toggleBold().run()}
-            className="min-h-9 rounded px-2 text-gray-700 dark:text-gray-300 hover:bg-black/[0.05] dark:hover:bg-white/10"
+            title="Bold"
+            aria-label="Bold"
+            className="flex h-8 w-8 items-center justify-center rounded text-gray-700 dark:text-gray-300 hover:bg-black/[0.05] dark:hover:bg-white/10"
           >
-            Bold
+            <Bold className="h-3.5 w-3.5" />
           </button>
           <button
             type="button"
             onClick={() => editor?.chain().focus().toggleItalic().run()}
-            className="min-h-9 rounded px-2 text-gray-700 dark:text-gray-300 hover:bg-black/[0.05] dark:hover:bg-white/10"
+            title="Italic"
+            aria-label="Italic"
+            className="flex h-8 w-8 items-center justify-center rounded text-gray-700 dark:text-gray-300 hover:bg-black/[0.05] dark:hover:bg-white/10"
           >
-            Italic
+            <Italic className="h-3.5 w-3.5" />
           </button>
           <button
             type="button"
             onClick={() => editor?.chain().focus().toggleCodeBlock().run()}
-            className="min-h-9 rounded px-2 text-gray-700 dark:text-gray-300 hover:bg-black/[0.05] dark:hover:bg-white/10"
+            title="Code block"
+            aria-label="Code block"
+            className="flex h-8 w-8 items-center justify-center rounded text-gray-700 dark:text-gray-300 hover:bg-black/[0.05] dark:hover:bg-white/10"
           >
-            Code
+            <Code className="h-3.5 w-3.5" />
           </button>
-          {/* Audio subsystem (Mode A): generate a spoken pronunciation of this
-              side's text and attach it as an autoplay-on-flip audioEmbed. The
-              click is the opt-in — nothing generates automatically. */}
           <button
             type="button"
             onClick={handleGeneratePronunciation}
             disabled={isGeneratingAudio}
             title="Generate pronunciation"
             aria-label="Generate pronunciation"
-            className="ml-auto inline-flex min-h-9 items-center gap-1 rounded px-2 text-gray-700 dark:text-gray-300 hover:bg-black/[0.05] dark:hover:bg-white/10 disabled:opacity-50"
+            className="ml-auto flex h-8 w-8 items-center justify-center rounded text-gray-700 dark:text-gray-300 hover:bg-black/[0.05] dark:hover:bg-white/10 disabled:opacity-50"
           >
             {isGeneratingAudio ? (
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
             ) : (
               <Volume2 className="h-3.5 w-3.5" />
             )}
-            Pronounce
           </button>
-          {/* Sprint 7: image-insert button. Opens the OS file picker;
-              on file pick we hand off to the same insertImageFromFile
-              the paste/drop pipeline uses, so all three paths share
-              upload + placeholder + swap-to-final logic. */}
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
             title="Insert image"
             aria-label="Insert image"
-            className="inline-flex min-h-9 items-center gap-1 rounded px-2 text-gray-700 dark:text-gray-300 hover:bg-black/[0.05] dark:hover:bg-white/10"
+            className="flex h-8 w-8 items-center justify-center rounded text-gray-700 dark:text-gray-300 hover:bg-black/[0.05] dark:hover:bg-white/10"
           >
             <ImagePlus className="h-3.5 w-3.5" />
-            Image
           </button>
           <input
             ref={fileInputRef}

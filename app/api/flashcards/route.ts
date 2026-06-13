@@ -21,7 +21,11 @@ import type {
 } from "@/lib/domain/flashcards";
 // Deep import — legacy-compat has a Prisma value import and is NOT
 // re-exported through the barrel (see legacy-compat.ts header).
-import { resolveLegacyDeckId } from "@/lib/domain/flashcards/legacy-compat";
+import {
+  ensureDeckPath,
+  resolveDescendantDeckIds,
+  resolveLegacyDeckId,
+} from "@/lib/domain/flashcards/legacy-compat";
 import { fileFlashcardMediaUnderDeck } from "@/lib/domain/flashcards/media-folder";
 
 // Sprint 6 changes:
@@ -86,6 +90,13 @@ export async function GET(request: NextRequest) {
     const subcategory = searchParams.get("subcategory");
     const sourceContentId = searchParams.get("sourceContentId");
     const reviewStatus = parseLegacyReviewStatus(searchParams.get("reviewStatus"));
+    // Subtree mode: play this deck PLUS every descendant deck. Pairs
+    // with an explicit deckId (the file-tree's "play this whole skill").
+    const includeDescendants =
+      searchParams.get("includeDescendants") === "true";
+    // Review sessions can span a large subtree or "play all" — let the
+    // caller raise the default page size. Clamp so it can't be abused.
+    const limit = parseQueryLimit(searchParams.get("limit"));
 
     // Resolve deckId filter. Explicit param takes precedence. When
     // category/subcategory strings are supplied (legacy Panel UI), we
@@ -112,10 +123,24 @@ export async function GET(request: NextRequest) {
       deckIdFilter = deck.id;
     }
 
+    // Expand the single deck filter into the deck + all its descendants
+    // when subtree mode is requested. resolveDescendantDeckIds returns
+    // [] for a missing/foreign deck, which yields zero cards below.
+    let deckClause: Prisma.FlashcardWhereInput = {};
+    if (deckIdFilter && includeDescendants) {
+      const deckIds = await resolveDescendantDeckIds(
+        session.user.id,
+        deckIdFilter,
+      );
+      deckClause = { deckId: { in: deckIds } };
+    } else if (deckIdFilter) {
+      deckClause = { deckId: deckIdFilter };
+    }
+
     const where: Prisma.FlashcardWhereInput = {
       ownerId: session.user.id,
       deletedAt: null,
-      ...(deckIdFilter ? { deckId: deckIdFilter } : {}),
+      ...deckClause,
       ...(sourceContentId ? { sourceContentId } : {}),
       ...(reviewStatus
         ? { state: { in: statesForLegacyStatus(reviewStatus) } }
@@ -126,7 +151,7 @@ export async function GET(request: NextRequest) {
       where,
       select: FLASHCARD_SELECT,
       orderBy: [{ updatedAt: "desc" }],
-      take: 200,
+      take: limit,
     });
 
     return NextResponse.json({
@@ -143,6 +168,18 @@ export async function GET(request: NextRequest) {
       { status: message.includes("Authentication") ? 401 : 500 }
     );
   }
+}
+
+// Default page size for the panel's card list; review sessions raise it
+// via ?limit. Clamped to [1, 2000] so a hand-crafted request can't pull
+// the whole table.
+const DEFAULT_CARD_LIMIT = 200;
+const MAX_CARD_LIMIT = 2000;
+function parseQueryLimit(value: string | null): number {
+  if (!value) return DEFAULT_CARD_LIMIT;
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) return DEFAULT_CARD_LIMIT;
+  return Math.min(parsed, MAX_CARD_LIMIT);
 }
 
 // Internal slug helper — duplicated from api.ts's slugifyDeckName so we
@@ -210,13 +247,24 @@ export async function POST(request: NextRequest) {
     const subcategory = sanitizeFlashcardSubcategory(body.subcategory);
     const explicitDeckId =
       typeof body.deckId === "string" && body.deckId.trim() ? body.deckId.trim() : null;
+    // Single skill/subskill/subskill path string from the builder. When
+    // present it wins over the legacy category/subcategory pair and is
+    // resolved-or-created (ancestors included) by ensureDeckPath.
+    const deckPath =
+      typeof body.deckPath === "string" && body.deckPath.trim()
+        ? body.deckPath.trim()
+        : null;
 
     let deckId: string;
+    // Canonical path of the resolved deck, used to persist "last used"
+    // for the path-based builder prefill. Null when we didn't resolve a
+    // path (explicit deckId / legacy strings).
+    let resolvedDeckPath: string | null = null;
     if (explicitDeckId) {
       // Validate the deck exists + belongs to this user.
       const deck = await prisma.flashcardDeck.findFirst({
         where: { id: explicitDeckId, ownerId: session.user.id, deletedAt: null },
-        select: { id: true },
+        select: { id: true, path: true },
       });
       if (!deck) {
         return NextResponse.json(
@@ -228,6 +276,26 @@ export async function POST(request: NextRequest) {
         );
       }
       deckId = deck.id;
+      resolvedDeckPath = deck.path;
+    } else if (deckPath) {
+      try {
+        ({ deckId, path: resolvedDeckPath } = await ensureDeckPath(
+          session.user.id,
+          deckPath,
+        ));
+      } catch (err) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: {
+              code: "INVALID_INPUT",
+              message:
+                err instanceof Error ? err.message : "Invalid deck path.",
+            },
+          },
+          { status: 400 }
+        );
+      }
     } else {
       deckId = await resolveLegacyDeckId(session.user.id, category, subcategory);
     }
@@ -259,11 +327,13 @@ export async function POST(request: NextRequest) {
     // Persist "last used" for the prefill route. We still write the
     // legacy strings into User.settings so the Panel's autocomplete
     // continues to work — that field is a Json blob, not a column
-    // being dropped.
+    // being dropped. lastUsedDeckPath captures the full hierarchy so the
+    // path-based builder can prefill deeper-than-2-level decks.
     await updateUserSettings(session.user.id, {
       flashcards: {
         lastUsedCategory: category || "General",
         lastUsedSubcategory: subcategory,
+        ...(resolvedDeckPath ? { lastUsedDeckPath: resolvedDeckPath } : {}),
       },
     });
 
