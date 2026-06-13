@@ -7,7 +7,7 @@
  * Returns null when no toolbar tools are available.
  */
 
-import { BookmarkPlus, Download, Layers, Link2, Share2, Upload } from "lucide-react";
+import { BookmarkPlus, Download, Layers, Link2, Share2, Upload, Zap } from "lucide-react";
 import { useToolSurface } from "@/lib/domain/tools";
 import { useCallback, useEffect, useState, type ComponentType } from "react";
 import {
@@ -24,6 +24,11 @@ import { useLeftPanelViewStore } from "@/state/left-panel-view-store";
 import { PUBLISHING_EXTENSION_ID } from "@/extensions/publishing/manifest";
 import { PublishStatusPill } from "@/extensions/publishing/components/toolbar/PublishStatusPill";
 import { ReadAloudButton } from "@/components/content/tts/ReadAloudButton";
+import { SPEED_READER_EXTENSION_ID } from "@/extensions/speed-reader/manifest";
+import {
+  SPEED_READER_OPEN_EVENT,
+  type SpeedReaderOpenEventDetail,
+} from "@/extensions/speed-reader/events";
 
 /** Content types whose own text the toolbar "Listen" can narrate. */
 const READ_ALOUD_CONTENT_TYPES = new Set(["note", "file", "html", "code"]);
@@ -62,6 +67,7 @@ export function ContentToolbar({ contentId: contentIdProp }: ContentToolbarProps
   const setActiveView = useLeftPanelViewStore((state) => state.setActiveView);
   const flashcardsEnabled = useIsExtensionEnabled(FLASHCARDS_EXTENSION_ID);
   const publishingEnabled = useIsExtensionEnabled(PUBLISHING_EXTENSION_ID);
+  const speedReaderEnabled = useIsExtensionEnabled(SPEED_READER_EXTENSION_ID);
   const [sourceFlashcardCount, setSourceFlashcardCount] = useState<{
     sourceContentId: string;
     count: number;
@@ -137,12 +143,23 @@ export function ContentToolbar({ contentId: contentIdProp }: ContentToolbarProps
   }, [selectedTitle, setActiveView, sourceContentId]);
 
   const showPublishPill = publishingEnabled && sourceContentId;
+  const showSpeedRead = speedReaderEnabled && !!sourceContentId;
+
+  const openSpeedReader = useCallback(() => {
+    if (!sourceContentId) return;
+    window.dispatchEvent(
+      new CustomEvent<SpeedReaderOpenEventDetail>(SPEED_READER_OPEN_EVENT, {
+        detail: { sourceContentId, sourceTitle: selectedTitle },
+      })
+    );
+  }, [selectedTitle, sourceContentId]);
 
   if (
     tools.length === 0 &&
     visibleSourceFlashcardCount === 0 &&
     !showPublishPill &&
-    !canReadAloud
+    !canReadAloud &&
+    !showSpeedRead
   ) {
     return null;
   }
@@ -179,6 +196,17 @@ export function ContentToolbar({ contentId: contentIdProp }: ContentToolbarProps
           </button>
         );
       })}
+      {showSpeedRead && (
+        <button
+          onClick={openSpeedReader}
+          className="flex shrink-0 items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          title="Speed Read"
+          type="button"
+        >
+          <Zap className="h-4 w-4" />
+          <span className="whitespace-nowrap">Speed Read</span>
+        </button>
+      )}
       {visibleSourceFlashcardCount > 0 ? (
         <button
           onClick={openSourceFlashcards}
