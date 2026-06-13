@@ -183,10 +183,11 @@ async function apiFetch(path, init = {}) {
   }
 
   if (!response.ok) {
+    // Never use rawBody as the error message — it can be a full HTML page (e.g.
+    // a Next.js 404) which leaks into UI rendering when stringified as an Error.
     const message =
       json?.error?.message ||
-      rawBody.trim() ||
-      `Request failed: ${path} (${response.status} ${response.statusText})`;
+      `Request failed: ${path} (${response.status})`;
     throw new Error(message);
   }
 

@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
 
     const decks = await prisma.flashcardDeck.findMany({
       where: { ownerId: token.user.id, deletedAt: null },
-      select: { id: true, name: true, parentDeckId: true },
+      select: { id: true, name: true, path: true, parentDeckId: true },
       orderBy: [{ path: "asc" }],
     });
 

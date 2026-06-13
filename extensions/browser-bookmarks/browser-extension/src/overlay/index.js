@@ -937,6 +937,14 @@ function overlayStyles() {
     .dg-flashcard-textarea:focus { outline:none; border-color:rgba(255,255,255,0.2); }
     .dg-flashcard-deck-select { width:100%; padding:5px 8px; border-radius:6px; border:1px solid rgba(255,255,255,0.1); background:rgba(20,20,20,0.85); color:rgba(255,255,255,0.75); font:inherit; font-size:11px; }
     .dg-flashcard-deck-select:focus { outline:none; border-color:rgba(255,255,255,0.2); }
+    .dg-deck-ac { position:relative; }
+    .dg-deck-ac-input { width:100%; padding:5px 8px; border-radius:6px; border:1px solid rgba(255,255,255,0.1); background:rgba(0,0,0,0.25); color:rgba(255,255,255,0.85); font:inherit; font-size:11px; box-sizing:border-box; }
+    .dg-deck-ac-input:focus { outline:none; border-color:rgba(255,255,255,0.2); }
+    .dg-deck-dropdown { position:absolute; z-index:10; top:calc(100% + 2px); left:0; right:0; max-height:140px; overflow-y:auto; border-radius:6px; border:1px solid rgba(255,255,255,0.12); background:rgba(22,24,30,0.97); box-shadow:0 4px 16px rgba(0,0,0,0.5); }
+    .dg-deck-dropdown[hidden] { display:none; }
+    .dg-deck-option { display:block; width:100%; padding:5px 9px; border:0; background:transparent; color:rgba(255,255,255,0.75); font:inherit; font-size:11px; text-align:left; cursor:pointer; }
+    .dg-deck-option:hover, .dg-deck-option[data-selected] { background:rgba(201,168,108,0.14); color:#c9a86c; }
+    .dg-flashcard-inline-capture { background:none; border:none; color:rgba(201,168,108,0.8); font:inherit; font-size:10px; cursor:pointer; padding:0; text-decoration:underline; }
     .dg-flashcard-actions { display:flex; gap:6px; justify-content:flex-end; margin-top:2px; }
     .dg-flashcard-btn { padding:4px 10px; border-radius:5px; border:1px solid rgba(255,255,255,0.15); background:rgba(255,255,255,0.06); color:rgba(255,255,255,0.75); font:inherit; font-size:11px; cursor:pointer; }
     .dg-flashcard-btn:hover:not(:disabled) { background:rgba(255,255,255,0.1); }
@@ -1477,49 +1485,39 @@ function renderFlashcardSection(state) {
       </button>
     `;
   } else if (fc.phase === "has-front") {
-    body.innerHTML = `
-      <div>
-        <div class="dg-flashcard-label">Front${fc.frontText ? " ✓" : ""}</div>
-        <textarea class="dg-flashcard-textarea" data-fc-field="front" rows="2" placeholder="Type front side…">${escapeHtml(fc.frontText)}</textarea>
-      </div>
-      <div>
-        <div class="dg-flashcard-label">Back — ${hasSel ? "click to capture, or type below" : "select text on page or type below"}</div>
-        ${hasSel ? `<div class="dg-flashcard-side-btns" style="margin-bottom:4px"><button class="dg-flashcard-side-btn" type="button" data-action="flashcard-capture-back">← Capture selection as back</button></div>` : ""}
-        <textarea class="dg-flashcard-textarea" data-fc-field="back" rows="2" placeholder="Type back side…">${escapeHtml(fc.backText)}</textarea>
-      </div>
-      <div class="dg-flashcard-actions">
-        <button class="dg-flashcard-btn" type="button" data-action="flashcard-cancel">Cancel</button>
-        <button class="dg-flashcard-btn" type="button" data-action="flashcard-advance" data-primary>Next →</button>
-      </div>
-    `;
-  } else if (fc.phase === "confirming") {
-    const deckOptions = (fc.decks || []).map((d) =>
-      `<option value="${escapeHtml(d.id)}" ${d.id === fc.deckId ? "selected" : ""}>${escapeHtml(d.name)}</option>`
-    ).join("");
+    const currentPath = (fc.decks || []).find((d) => d.id === fc.deckId)?.path ?? fc.deckPath ?? "";
+    const deckListItems = (fc.decks || [])
+      .map((d) => `<button class="dg-deck-option" type="button" data-action="fc-deck-pick" data-deck-id="${escapeHtml(d.id)}" data-deck-path="${escapeHtml(d.path)}">${escapeHtml(d.path)}</button>`)
+      .join("");
     const deckPicker = fc.decks === null
       ? `<div class="dg-flashcard-hint">Loading decks…</div>`
       : fc.decks.length === 0
         ? `<div class="dg-flashcard-hint">No decks found — create one in Digital Garden first.</div>`
-        : `<select class="dg-flashcard-deck-select" data-fc-field="deck">${deckOptions}</select>`;
+        : `<div class="dg-deck-ac">
+            <input type="text" class="dg-deck-ac-input" data-fc-field="deck-path"
+              placeholder="Type to search decks…" value="${escapeHtml(currentPath)}"
+              autocomplete="off" spellcheck="false">
+            <div class="dg-deck-dropdown" hidden>${deckListItems}</div>
+          </div>`;
 
     body.innerHTML = `
       ${fc.error ? `<div class="dg-flashcard-error">${escapeHtml(fc.error)}</div>` : ""}
       <div>
         <div class="dg-flashcard-label">Front</div>
-        <textarea class="dg-flashcard-textarea" data-fc-field="front" rows="2">${escapeHtml(fc.frontText)}</textarea>
+        <textarea class="dg-flashcard-textarea" data-fc-field="front" rows="2" placeholder="Type front side…">${escapeHtml(fc.frontText)}</textarea>
       </div>
       <div>
-        <div class="dg-flashcard-label">Back</div>
-        <textarea class="dg-flashcard-textarea" data-fc-field="back" rows="2">${escapeHtml(fc.backText)}</textarea>
+        <div class="dg-flashcard-label">Back${hasSel ? ` — <button class="dg-flashcard-inline-capture" type="button" data-action="flashcard-capture-back">capture selection</button>` : ""}</div>
+        <textarea class="dg-flashcard-textarea" data-fc-field="back" rows="2" placeholder="Type back side…">${escapeHtml(fc.backText)}</textarea>
       </div>
       <div>
-        <div class="dg-flashcard-label">Deck</div>
+        <div class="dg-flashcard-label">Skill path</div>
         ${deckPicker}
       </div>
       <div class="dg-flashcard-actions">
         <button class="dg-flashcard-btn" type="button" data-action="flashcard-cancel">Cancel</button>
         <button class="dg-flashcard-btn" type="button" data-action="flashcard-submit" data-primary
-          ${fc.submitting ? "disabled" : ""}>${fc.submitting ? "Saving…" : "Create card"}</button>
+          ${fc.submitting ? "disabled" : ""}>${fc.submitting ? "Saving…" : "Create"}</button>
       </div>
     `;
   }
@@ -1537,11 +1535,13 @@ async function loadFlashcardDecksIfNeeded(state) {
     if (!state.flashcard.deckId && decks.length > 0) {
       // Prefer the domain's last-used deck, fall back to first
       const preferred = decks.find((d) => d.id === state.flashcard.defaultDeckId);
-      state.flashcard.deckId = (preferred ?? decks[0]).id;
+      const chosen = preferred ?? decks[0];
+      state.flashcard.deckId = chosen.id;
+      state.flashcard.deckPath = chosen.path ?? "";
     }
-  } catch (err) {
+  } catch (_err) {
     state.flashcard.decks = [];
-    state.flashcard.error = err instanceof Error ? err.message : "Failed to load decks — check your connection";
+    state.flashcard.error = "Could not load skill decks — is the Digital Garden app running?";
   }
   if (state.panelOpen && state.popoverBodies.associations) {
     renderAssociationsPopover(state);
@@ -1552,8 +1552,9 @@ async function submitFlashcard(state) {
   const body = state.popoverBodies.associations?.querySelector(".dg-flashcard-body");
   const frontText = (body?.querySelector("[data-fc-field='front']")?.value ?? state.flashcard.frontText).trim();
   const backText = (body?.querySelector("[data-fc-field='back']")?.value ?? state.flashcard.backText).trim();
-  const deckSelect = body?.querySelector("[data-fc-field='deck']");
-  const deckId = deckSelect?.value ?? state.flashcard.deckId;
+  const typedPath = (body?.querySelector("[data-fc-field='deck-path']")?.value ?? "").trim();
+  const matchedDeck = typedPath ? (state.flashcard.decks || []).find((d) => d.path === typedPath) : null;
+  const deckId = matchedDeck?.id ?? state.flashcard.deckId;
 
   if (!frontText || !backText) {
     state.flashcard.error = "Both sides need text before saving.";
@@ -1561,7 +1562,9 @@ async function submitFlashcard(state) {
     return;
   }
   if (!deckId) {
-    state.flashcard.error = "Please select a deck.";
+    state.flashcard.error = typedPath
+      ? `No deck matches "${typedPath}" — pick one from the list.`
+      : "Please select a deck.";
     renderAssociationsPopover(state);
     return;
   }
@@ -1595,9 +1598,10 @@ async function submitFlashcard(state) {
     });
 
     // Reset to idle, preserving deck selection for the next card
+    const savedDeckPath = matchedDeck?.path ?? state.flashcard.deckPath ?? "";
     state.flashcard = {
       phase: "idle", frontText: "", backText: "",
-      deckId, defaultDeckId: state.flashcard.defaultDeckId,
+      deckId, deckPath: savedDeckPath, defaultDeckId: state.flashcard.defaultDeckId,
       decks: state.flashcard.decks,
       expanded: false, submitting: false, error: null,
     };
@@ -1663,6 +1667,8 @@ function renderAssociationsPopover(state) {
   const context = state.resourceContext;
   if (!context) {
     renderStatus(container, "This page is not connected to Digital Garden yet.");
+    appendLocalFlashcardHistorySection(container, state);
+    container.appendChild(renderFlashcardSection(state));
     return;
   }
 
@@ -3059,13 +3065,9 @@ function wireRootEvents(state) {
         const text = state._pendingSelectionText;
         if (!text) return;
         state.flashcard.frontText = text;
+        state.flashcard.phase = "has-front";
         state.flashcard.expanded = true;
-        if (state.flashcard.backText) {
-          state.flashcard.phase = "confirming";
-          void loadFlashcardDecksIfNeeded(state);
-        } else {
-          state.flashcard.phase = "has-front";
-        }
+        void loadFlashcardDecksIfNeeded(state);
         renderAssociationsPopover(state);
         return;
       }
@@ -3075,39 +3077,42 @@ function wireRootEvents(state) {
         state.flashcard.backText = "";
         state.flashcard.expanded = true;
         state.flashcard.error = null;
+        void loadFlashcardDecksIfNeeded(state);
         renderAssociationsPopover(state);
         return;
       }
       if (action === "flashcard-capture-back") {
         const text = state._pendingSelectionText;
         if (!text || state.flashcard.phase !== "has-front") return;
-        state.flashcard.backText = text;
-        state.flashcard.phase = "confirming";
-        void loadFlashcardDecksIfNeeded(state);
-        renderAssociationsPopover(state);
+        // Inject the selection into the back textarea directly without a full re-render
+        const fcBody = event.target.closest(".dg-flashcard-body");
+        const backField = fcBody?.querySelector("[data-fc-field='back']");
+        if (backField) {
+          backField.value = text;
+          state.flashcard.backText = text;
+        }
         return;
       }
-      if (action === "flashcard-advance") {
-        const fcBody = event.target.closest(".dg-flashcard-body");
-        const frontVal = (fcBody?.querySelector("[data-fc-field='front']")?.value ?? state.flashcard.frontText).trim();
-        const backVal = (fcBody?.querySelector("[data-fc-field='back']")?.value ?? state.flashcard.backText).trim();
-        if (!frontVal || !backVal) {
-          state.flashcard.error = "Both sides need text before continuing.";
-          renderAssociationsPopover(state);
-          return;
+      if (action === "fc-deck-pick") {
+        const btn = event.target.closest("[data-action='fc-deck-pick']");
+        if (!btn) return;
+        state.flashcard.deckId = btn.getAttribute("data-deck-id");
+        state.flashcard.deckPath = btn.getAttribute("data-deck-path");
+        // Update the input value and hide the dropdown without a full re-render
+        const ac = btn.closest(".dg-deck-ac");
+        if (ac) {
+          const inp = ac.querySelector(".dg-deck-ac-input");
+          if (inp) inp.value = state.flashcard.deckPath;
+          const dd = ac.querySelector(".dg-deck-dropdown");
+          if (dd) dd.hidden = true;
         }
-        state.flashcard.frontText = frontVal;
-        state.flashcard.backText = backVal;
-        state.flashcard.phase = "confirming";
-        state.flashcard.error = null;
-        void loadFlashcardDecksIfNeeded(state);
-        renderAssociationsPopover(state);
         return;
       }
       if (action === "flashcard-cancel") {
         state.flashcard = {
           phase: "idle", frontText: "", backText: "",
-          deckId: state.flashcard.deckId, defaultDeckId: state.flashcard.defaultDeckId,
+          deckId: state.flashcard.deckId, deckPath: state.flashcard.deckPath,
+          defaultDeckId: state.flashcard.defaultDeckId,
           decks: state.flashcard.decks, expanded: false, submitting: false, error: null,
         };
         renderAssociationsPopover(state);
@@ -3257,7 +3262,35 @@ function wireRootEvents(state) {
       if (domainBody) domainBody.innerHTML = renderDomainBody(state);
       return;
     }
+    if (event.target.matches(".dg-deck-ac-input")) {
+      const query = event.target.value.toLowerCase();
+      const dd = event.target.parentElement?.querySelector(".dg-deck-dropdown");
+      if (!dd) return;
+      dd.hidden = false;
+      for (const opt of dd.querySelectorAll(".dg-deck-option")) {
+        const path = opt.getAttribute("data-deck-path") || "";
+        opt.hidden = query.length > 0 && !path.toLowerCase().includes(query);
+      }
+      return;
+    }
   });
+
+  state.shadow.addEventListener("focus", (event) => {
+    if (event.target.matches(".dg-deck-ac-input")) {
+      const dd = event.target.parentElement?.querySelector(".dg-deck-dropdown");
+      if (dd) dd.hidden = false;
+    }
+  }, true);
+
+  state.shadow.addEventListener("blur", (event) => {
+    if (event.target.matches(".dg-deck-ac-input")) {
+      // Delay so a click on a dropdown option fires before we hide it
+      setTimeout(() => {
+        const dd = event.target.parentElement?.querySelector(".dg-deck-dropdown");
+        if (dd) dd.hidden = true;
+      }, 150);
+    }
+  }, true);
 
   // Persist deck selection changes immediately so submitFlashcard reads the right value
   state.shadow.addEventListener("change", (event) => {
@@ -3340,6 +3373,7 @@ async function initOverlay() {
       frontText: "",
       backText: "",
       deckId: null,
+      deckPath: "",        // the path string matching deckId, kept in sync
       defaultDeckId: null, // loaded from domain memory; persists across sessions
       decks: null,         // null = not yet loaded
       expanded: false,
