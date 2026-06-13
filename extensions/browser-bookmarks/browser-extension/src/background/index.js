@@ -271,6 +271,17 @@ async function fetchDomainAssociations(url, excludeResourceId) {
   return apiFetch(`/api/integrations/browser-extension/domain-associations?${params}`);
 }
 
+async function fetchFlashcardDecks() {
+  return apiFetch("/api/integrations/browser-extension/flashcard/decks");
+}
+
+async function createFlashcard(payload) {
+  return apiFetch("/api/integrations/browser-extension/flashcard", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
 async function saveOverlayViewState(payload) {
   return apiFetch("/api/integrations/browser-extension/view-state", {
     method: "PATCH",
@@ -1658,6 +1669,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
     if (message.type === "fetch-domain-associations") {
       sendResponse({ ok: true, data: await fetchDomainAssociations(message.url, message.excludeResourceId || null) });
+      return;
+    }
+    if (message.type === "fetch-flashcard-decks") {
+      sendResponse({ ok: true, data: await fetchFlashcardDecks() });
+      return;
+    }
+    if (message.type === "create-flashcard") {
+      sendResponse({ ok: true, data: await createFlashcard(message.payload || {}) });
       return;
     }
     if (message.type === "save-overlay-view-state") {

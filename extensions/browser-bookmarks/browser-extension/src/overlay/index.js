@@ -3,10 +3,29 @@ const DG_OVERLAY_APP_ROUTE = "/content/";
 const DG_OVERLAY_IDLE_MS = 2400;
 const DG_OVERLAY_MAX_CONNECTIONS = 5;
 const DG_LAUNCHER_SIZE = 58;
+// Stale threshold: force-refetch data older than this when re-opening the panel
+const DG_OVERLAY_STALE_MS = 5 * 60 * 1000;
+// How long to wait for the background service worker before giving up
+const DG_RUNTIME_MSG_TIMEOUT_MS = 10000;
 
 function runtimeMessage(message) {
   return new Promise((resolve, reject) => {
+    let settled = false;
+
+    // Guard against MV3 service worker timing out: if the background worker
+    // was terminated and hasn't restarted, the sendMessage callback never
+    // fires — leaving the promise pending forever. Rejecting after a timeout
+    // surfaces a recoverable error instead of an infinite loading state.
+    const timer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      reject(new Error("__timeout__"));
+    }, DG_RUNTIME_MSG_TIMEOUT_MS);
+
     chrome.runtime.sendMessage(message, (response) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
       if (chrome.runtime.lastError) {
         reject(new Error(chrome.runtime.lastError.message));
         return;
@@ -240,6 +259,35 @@ async function saveDomainMemory(hostname, data, scope) {
   } catch { /* best-effort */ }
 }
 
+async function saveDomainDefaultDeck(hostname, deckId) {
+  try {
+    const existing = await loadDomainMemory(hostname);
+    await saveDomainMemory(hostname, { ...existing, defaultDeckId: deckId }, "hostname");
+  } catch { /* best-effort */ }
+}
+
+const DG_FLASHCARD_HISTORY_MAX = 50;
+
+async function loadLocalFlashcardHistory(hostname) {
+  try {
+    const etld1 = getEtld1(hostname);
+    const result = await chrome.storage.local.get(`dgFlashcardHistory:${etld1}`);
+    return result[`dgFlashcardHistory:${etld1}`] || [];
+  } catch {
+    return [];
+  }
+}
+
+async function saveLocalFlashcard(hostname, card) {
+  try {
+    const etld1 = getEtld1(hostname);
+    const key = `dgFlashcardHistory:${etld1}`;
+    const existing = await loadLocalFlashcardHistory(hostname);
+    existing.push(card);
+    await chrome.storage.local.set({ [key]: existing.slice(-DG_FLASHCARD_HISTORY_MAX) });
+  } catch { /* best-effort */ }
+}
+
 // ── Snap panel ────────────────────────────────────────────────────────────────
 
 function applyEdgeTabPosition(state) {
@@ -303,6 +351,20 @@ async function openSnapPanel(state) {
   state.root.setAttribute("data-panel-open", "true");
   if (state.snap === "floating") applyFloatingPanelPosition(state);
   markActivity(state);
+
+  // Evict cached data that is older than DG_OVERLAY_STALE_MS (5 min).
+  // This handles tabs that have been sitting open for a long time —
+  // associations change, content tree grows, sessions expire. Better to
+  // show a brief loading flash than silently display hours-old state.
+  const now = Date.now();
+  if (state.resourceContext && (now - (state.fetchedAt?.associations ?? 0)) > DG_OVERLAY_STALE_MS) {
+    state.resourceContext = null;
+    state.domainAssociations = null;
+  }
+  if (state.contentTree && (now - (state.fetchedAt?.tree ?? 0)) > DG_OVERLAY_STALE_MS) {
+    state.contentTree = null;
+  }
+
   const renderAssoc = async () => {
     if (!state.resourceContext) {
       renderStatus(state.popoverBodies.associations, "Loading page context…");
@@ -310,9 +372,14 @@ async function openSnapPanel(state) {
         await loadResourceContext(state);
         renderAssociationsPopover(state);
       } catch (e) {
-        const msg = e instanceof Error ? e.message : "Failed to load";
-        const isAuth = /token|trusted|unauthorized|auth/i.test(msg);
-        renderStatus(state.popoverBodies.associations, isAuth ? "Re-trust required — open Digital Garden settings to reconnect." : msg, "error");
+        renderLoadError(state.popoverBodies.associations, e, {
+          onRetry: () => {
+            renderStatus(state.popoverBodies.associations, "Retrying…");
+            loadResourceContext(state)
+              .then(() => renderAssociationsPopover(state))
+              .catch((re) => renderLoadError(state.popoverBodies.associations, re));
+          },
+        });
       }
     } else {
       renderAssociationsPopover(state);
@@ -326,9 +393,14 @@ async function openSnapPanel(state) {
         await loadContentTree(state, { workspaceId });
         renderTreePopover(state);
       } catch (e) {
-        const msg = e instanceof Error ? e.message : "Failed to load tree";
-        const isAuth = /token|trusted|unauthorized|auth/i.test(msg);
-        renderStatus(state.popoverBodies.tree, isAuth ? "Re-trust required — open Digital Garden settings to reconnect." : msg, "error");
+        renderLoadError(state.popoverBodies.tree, e, {
+          onRetry: () => {
+            renderStatus(state.popoverBodies.tree, "Retrying…");
+            loadContentTree(state, { workspaceId })
+              .then(() => renderTreePopover(state))
+              .catch((re) => renderLoadError(state.popoverBodies.tree, re));
+          },
+        });
       }
     } else {
       renderTreePopover(state);
@@ -683,6 +755,11 @@ function overlayStyles() {
       line-height: 1.45;
     }
     .dg-status[data-tone="error"] { color: #ffd6d6; }
+    .dg-error-card { margin: 10px 13px; padding: 10px 12px; border-radius: 8px; background: rgba(200,60,60,0.1); border: 1px solid rgba(200,60,60,0.22); display: flex; flex-direction: column; gap: 5px; }
+    .dg-error-heading { font-size: 12px; font-weight: 600; color: #ffd6d6; }
+    .dg-error-body { font-size: 11px; color: rgba(255,200,200,0.72); line-height: 1.45; }
+    .dg-error-action { margin-top: 4px; padding: 4px 10px; border-radius: 5px; border: 1px solid rgba(255,180,180,0.25); background: rgba(255,120,120,0.1); color: #ffcece; font: inherit; font-size: 11px; cursor: pointer; align-self: flex-start; }
+    .dg-error-action:hover { background: rgba(255,120,120,0.18); }
 
     /* ── Association list ── */
     .dg-list-item {
@@ -835,6 +912,39 @@ function overlayStyles() {
     .dg-domain-search-input:focus { border-color: rgba(255,255,255,0.2); }
     .dg-delete-assoc { flex-shrink: 0; color: rgba(255,100,100,0.72); border-color: rgba(255,100,100,0.2); }
     .dg-delete-assoc:hover { color: #ff9090; background: rgba(255,80,80,0.12); }
+    .dg-assoc-flashcards { border-top: 1px solid rgba(255,255,255,0.05); padding: 4px 0 0; }
+    .dg-section-label { font-size: 10px; font-weight: 600; letter-spacing: 0.06em; color: rgba(255,255,255,0.28); padding: 6px 12px 4px; text-transform: uppercase; }
+    .dg-flashcard-hist-item { padding: 5px 12px; border-bottom: 1px solid rgba(255,255,255,0.04); }
+    .dg-flashcard-hist-item:last-child { border-bottom: 0; }
+    .dg-flashcard-hist-front { font-size: 11px; color: rgba(255,255,255,0.72); font-weight: 500; line-height: 1.3; }
+    .dg-flashcard-hist-back { font-size: 11px; color: rgba(255,255,255,0.45); margin-top: 1px; line-height: 1.3; }
+    .dg-flashcard-hist-meta { font-size: 10px; color: rgba(255,255,255,0.28); margin-top: 2px; }
+    .dg-flashcard-section { border-top: 1px solid rgba(255,255,255,0.05); }
+    .dg-flashcard-toggle { width:100%; display:flex; align-items:center; gap:6px; padding:7px 12px; border:0; background:transparent; color:rgba(255,255,255,0.42); font:inherit; font-size:11px; cursor:pointer; text-align:left; }
+    .dg-flashcard-toggle:hover { background: rgba(255,255,255,0.03); color: rgba(255,255,255,0.72); }
+    .dg-flashcard-toggle-icon { font-size:9px; flex-shrink:0; }
+    .dg-flashcard-toggle-badge { margin-left:auto; background:rgba(201,168,108,0.18); color:#c9a86c; border-radius:4px; padding:1px 5px; font-size:10px; font-weight:600; }
+    .dg-flashcard-body { border-top:1px solid rgba(255,255,255,0.05); padding:8px 12px 10px; display:flex; flex-direction:column; gap:7px; }
+    .dg-flashcard-hint { font-size:11px; color:rgba(255,255,255,0.38); line-height:1.4; }
+    .dg-flashcard-hint em { color:rgba(255,255,255,0.65); font-style:normal; }
+    .dg-flashcard-side-btns { display:flex; gap:6px; }
+    .dg-flashcard-side-btn { flex:1; padding:5px 8px; border-radius:6px; border:1px solid rgba(255,255,255,0.12); background:rgba(255,255,255,0.04); color:rgba(255,255,255,0.7); font:inherit; font-size:11px; cursor:pointer; }
+    .dg-flashcard-side-btn:hover:not(:disabled) { background:rgba(255,255,255,0.08); }
+    .dg-flashcard-side-btn:disabled { opacity:0.32; cursor:not-allowed; }
+    .dg-flashcard-side-btn--secondary { opacity:0.65; }
+    .dg-flashcard-label { font-size:10px; color:rgba(255,255,255,0.38); margin-bottom:2px; }
+    .dg-flashcard-textarea { width:100%; padding:5px 8px; border-radius:6px; border:1px solid rgba(255,255,255,0.1); background:rgba(0,0,0,0.25); color:rgba(255,255,255,0.85); font:inherit; font-size:11px; resize:vertical; min-height:36px; box-sizing:border-box; }
+    .dg-flashcard-textarea:focus { outline:none; border-color:rgba(255,255,255,0.2); }
+    .dg-flashcard-deck-select { width:100%; padding:5px 8px; border-radius:6px; border:1px solid rgba(255,255,255,0.1); background:rgba(20,20,20,0.85); color:rgba(255,255,255,0.75); font:inherit; font-size:11px; }
+    .dg-flashcard-deck-select:focus { outline:none; border-color:rgba(255,255,255,0.2); }
+    .dg-flashcard-actions { display:flex; gap:6px; justify-content:flex-end; margin-top:2px; }
+    .dg-flashcard-btn { padding:4px 10px; border-radius:5px; border:1px solid rgba(255,255,255,0.15); background:rgba(255,255,255,0.06); color:rgba(255,255,255,0.75); font:inherit; font-size:11px; cursor:pointer; }
+    .dg-flashcard-btn:hover:not(:disabled) { background:rgba(255,255,255,0.1); }
+    .dg-flashcard-btn[data-primary] { background:rgba(201,168,108,0.18); border-color:rgba(201,168,108,0.35); color:#c9a86c; }
+    .dg-flashcard-btn[data-primary]:hover:not(:disabled) { background:rgba(201,168,108,0.26); }
+    .dg-flashcard-btn:disabled { opacity:0.45; cursor:not-allowed; }
+    .dg-flashcard-error { font-size:11px; color:rgba(220,80,80,0.9); }
+    .dg-flashcard-success { font-size:11px; color:rgba(120,200,120,0.9); text-align:center; padding:4px 0; }
     .dg-panel-collapsed {
       position: fixed; left: 18px; bottom: 18px; display: none;
       align-items: center; gap: 8px; border-radius: 999px;
@@ -1172,6 +1282,61 @@ function renderStatus(container, text, tone = "") {
   container.innerHTML = `<div class="dg-status"${tone ? ` data-tone="${tone}"` : ""}>${escapeHtml(text)}</div>`;
 }
 
+// Renders a structured error card for auth and service failures — more
+// actionable than a plain renderStatus error string.
+function renderErrorCard(container, { heading, body, action = null }) {
+  const actionHtml = action
+    ? `<button class="dg-error-action" type="button" data-error-action="${escapeHtml(action.type)}">${escapeHtml(action.label)}</button>`
+    : "";
+  container.innerHTML = `
+    <div class="dg-error-card">
+      <div class="dg-error-heading">${escapeHtml(heading)}</div>
+      <div class="dg-error-body">${escapeHtml(body)}</div>
+      ${actionHtml}
+    </div>
+  `;
+}
+
+function classifyLoadError(err) {
+  const msg = err instanceof Error ? err.message : String(err);
+  if (msg === "__timeout__") return "timeout";
+  if (/token|trusted|unauthorized|401|auth/i.test(msg)) return "auth";
+  if (/network|fetch|reach/i.test(msg)) return "network";
+  return "unknown";
+}
+
+function renderLoadError(container, err, { onRetry = null } = {}) {
+  const kind = classifyLoadError(err);
+  if (kind === "timeout") {
+    renderErrorCard(container, {
+      heading: "Extension waking up…",
+      body: "The background service is restarting. Click Retry to load.",
+      action: onRetry ? { type: "retry-load", label: "Retry" } : null,
+    });
+    // Auto-retry once after 2 s — service workers usually restart within that window
+    if (onRetry) setTimeout(onRetry, 2000);
+    return;
+  }
+  if (kind === "auth") {
+    renderErrorCard(container, {
+      heading: "Not signed in",
+      body: "Your Digital Garden session has expired. Sign in to reconnect.",
+      action: { type: "open-dg-app", label: "Open Digital Garden" },
+    });
+    return;
+  }
+  if (kind === "network") {
+    renderErrorCard(container, {
+      heading: "Can't reach Digital Garden",
+      body: "Check your connection or app URL in extension settings.",
+      action: onRetry ? { type: "retry-load", label: "Retry" } : { type: "open-settings", label: "Open settings" },
+    });
+    return;
+  }
+  const raw = err instanceof Error ? err.message : String(err);
+  renderStatus(container, raw, "error");
+}
+
 function resourcePayload() {
   return {
     url: window.location.href,
@@ -1195,6 +1360,7 @@ async function loadResourceContext(state) {
     type: "fetch-resource-context",
     payload: resourcePayload(),
   });
+  state.fetchedAt = { ...state.fetchedAt, associations: Date.now() };
   if (prevId !== state.resourceContext?.resource?.id) {
     state.domainAssociations = null;
     state.domainAssociationsExpanded = false;
@@ -1212,6 +1378,7 @@ async function loadContentTree(state, { workspaceId = null, force = false } = {}
     payload: { workspaceId: workspaceId || null },
   });
   state.loadedForWorkspaceId = workspaceId || null;
+  state.fetchedAt = { ...state.fetchedAt, tree: Date.now() };
   return state.contentTree;
 }
 
@@ -1266,6 +1433,192 @@ function schedulePanelAutosave(panel, saveFn, message = "Saving…") {
   }, 1400);
 }
 
+function renderFlashcardSection(state) {
+  const fc = state.flashcard;
+  const isExpanded = fc.expanded || fc.phase !== "idle";
+  const hasSel = Boolean(state._pendingSelectionText);
+
+  let headerLabel = "Flashcard from page";
+  if (fc.phase === "has-front") headerLabel = "Flashcard — add back side";
+  else if (fc.phase === "confirming") headerLabel = "Create flashcard";
+
+  const badge = (hasSel && fc.phase === "idle")
+    ? `<span class="dg-flashcard-toggle-badge">text selected</span>` : "";
+
+  const section = document.createElement("div");
+  section.className = "dg-flashcard-section";
+  section.innerHTML = `
+    <button class="dg-flashcard-toggle" type="button" data-action="toggle-flashcard">
+      <span class="dg-flashcard-toggle-icon">${isExpanded ? "▾" : "▸"}</span>
+      <span>${escapeHtml(headerLabel)}</span>
+      ${badge}
+    </button>
+  `;
+
+  if (!isExpanded) return section;
+
+  const body = document.createElement("div");
+  body.className = "dg-flashcard-body";
+
+  if (fc.phase === "idle") {
+    const selPreview = hasSel
+      ? `Selected: "<em>${escapeHtml(state._pendingSelectionText.slice(0, 80))}${state._pendingSelectionText.length > 80 ? "…" : ""}</em>"`
+      : null;
+    body.innerHTML = `
+      ${selPreview ? `<div class="dg-flashcard-hint">${selPreview}</div>` : ""}
+      ${hasSel ? `
+        <button class="dg-flashcard-side-btn" type="button" data-action="flashcard-capture-front" style="width:100%">
+          Use selection as front side →
+        </button>
+      ` : ""}
+      <button class="dg-flashcard-side-btn${hasSel ? " dg-flashcard-side-btn--secondary" : ""}" type="button"
+        data-action="flashcard-type-manually" style="width:100%">
+        Type manually →
+      </button>
+    `;
+  } else if (fc.phase === "has-front") {
+    body.innerHTML = `
+      <div>
+        <div class="dg-flashcard-label">Front${fc.frontText ? " ✓" : ""}</div>
+        <textarea class="dg-flashcard-textarea" data-fc-field="front" rows="2" placeholder="Type front side…">${escapeHtml(fc.frontText)}</textarea>
+      </div>
+      <div>
+        <div class="dg-flashcard-label">Back — ${hasSel ? "click to capture, or type below" : "select text on page or type below"}</div>
+        ${hasSel ? `<div class="dg-flashcard-side-btns" style="margin-bottom:4px"><button class="dg-flashcard-side-btn" type="button" data-action="flashcard-capture-back">← Capture selection as back</button></div>` : ""}
+        <textarea class="dg-flashcard-textarea" data-fc-field="back" rows="2" placeholder="Type back side…">${escapeHtml(fc.backText)}</textarea>
+      </div>
+      <div class="dg-flashcard-actions">
+        <button class="dg-flashcard-btn" type="button" data-action="flashcard-cancel">Cancel</button>
+        <button class="dg-flashcard-btn" type="button" data-action="flashcard-advance" data-primary>Next →</button>
+      </div>
+    `;
+  } else if (fc.phase === "confirming") {
+    const deckOptions = (fc.decks || []).map((d) =>
+      `<option value="${escapeHtml(d.id)}" ${d.id === fc.deckId ? "selected" : ""}>${escapeHtml(d.name)}</option>`
+    ).join("");
+    const deckPicker = fc.decks === null
+      ? `<div class="dg-flashcard-hint">Loading decks…</div>`
+      : fc.decks.length === 0
+        ? `<div class="dg-flashcard-hint">No decks found — create one in Digital Garden first.</div>`
+        : `<select class="dg-flashcard-deck-select" data-fc-field="deck">${deckOptions}</select>`;
+
+    body.innerHTML = `
+      ${fc.error ? `<div class="dg-flashcard-error">${escapeHtml(fc.error)}</div>` : ""}
+      <div>
+        <div class="dg-flashcard-label">Front</div>
+        <textarea class="dg-flashcard-textarea" data-fc-field="front" rows="2">${escapeHtml(fc.frontText)}</textarea>
+      </div>
+      <div>
+        <div class="dg-flashcard-label">Back</div>
+        <textarea class="dg-flashcard-textarea" data-fc-field="back" rows="2">${escapeHtml(fc.backText)}</textarea>
+      </div>
+      <div>
+        <div class="dg-flashcard-label">Deck</div>
+        ${deckPicker}
+      </div>
+      <div class="dg-flashcard-actions">
+        <button class="dg-flashcard-btn" type="button" data-action="flashcard-cancel">Cancel</button>
+        <button class="dg-flashcard-btn" type="button" data-action="flashcard-submit" data-primary
+          ${fc.submitting ? "disabled" : ""}>${fc.submitting ? "Saving…" : "Create card"}</button>
+      </div>
+    `;
+  }
+
+  section.appendChild(body);
+  return section;
+}
+
+async function loadFlashcardDecksIfNeeded(state) {
+  if (state.flashcard.decks !== null) return;
+  try {
+    const result = await runtimeMessage({ type: "fetch-flashcard-decks" });
+    const decks = result?.decks || [];
+    state.flashcard.decks = decks;
+    if (!state.flashcard.deckId && decks.length > 0) {
+      // Prefer the domain's last-used deck, fall back to first
+      const preferred = decks.find((d) => d.id === state.flashcard.defaultDeckId);
+      state.flashcard.deckId = (preferred ?? decks[0]).id;
+    }
+  } catch (err) {
+    state.flashcard.decks = [];
+    state.flashcard.error = err instanceof Error ? err.message : "Failed to load decks — check your connection";
+  }
+  if (state.panelOpen && state.popoverBodies.associations) {
+    renderAssociationsPopover(state);
+  }
+}
+
+async function submitFlashcard(state) {
+  const body = state.popoverBodies.associations?.querySelector(".dg-flashcard-body");
+  const frontText = (body?.querySelector("[data-fc-field='front']")?.value ?? state.flashcard.frontText).trim();
+  const backText = (body?.querySelector("[data-fc-field='back']")?.value ?? state.flashcard.backText).trim();
+  const deckSelect = body?.querySelector("[data-fc-field='deck']");
+  const deckId = deckSelect?.value ?? state.flashcard.deckId;
+
+  if (!frontText || !backText) {
+    state.flashcard.error = "Both sides need text before saving.";
+    renderAssociationsPopover(state);
+    return;
+  }
+  if (!deckId) {
+    state.flashcard.error = "Please select a deck.";
+    renderAssociationsPopover(state);
+    return;
+  }
+
+  state.flashcard.frontText = frontText;
+  state.flashcard.backText = backText;
+  state.flashcard.deckId = deckId;
+  state.flashcard.submitting = true;
+  state.flashcard.error = null;
+  renderAssociationsPopover(state);
+
+  try {
+    const result = await runtimeMessage({
+      type: "create-flashcard",
+      payload: { frontText, backText, deckId, sourceUrl: window.location.href, sourceTitle: document.title || null },
+    });
+    // runtimeMessage rejects on failure — if we reach here the card was created.
+    const cardId = result?.id || null;
+
+    // Persist the chosen deck for this domain and save to local history
+    const hostname = window.location.hostname;
+    const deckName = (state.flashcard.decks || []).find((d) => d.id === deckId)?.name || null;
+    void saveDomainDefaultDeck(hostname, deckId);
+    void saveLocalFlashcard(hostname, {
+      cardId, frontText, backText, deckId, deckName,
+      createdAt: new Date().toISOString(),
+      pageUrl: window.location.href,
+      pageTitle: document.title || null,
+    }).then(() => {
+      loadLocalFlashcardHistory(hostname).then((history) => { state.localFlashcards = history; });
+    });
+
+    // Reset to idle, preserving deck selection for the next card
+    state.flashcard = {
+      phase: "idle", frontText: "", backText: "",
+      deckId, defaultDeckId: state.flashcard.defaultDeckId,
+      decks: state.flashcard.decks,
+      expanded: false, submitting: false, error: null,
+    };
+    // Brief success flash by expanding with a success state, then collapsing
+    state.flashcard.expanded = true;
+    renderAssociationsPopover(state);
+    const successEl = state.popoverBodies.associations?.querySelector(".dg-flashcard-body");
+    if (successEl) {
+      successEl.innerHTML = `<div class="dg-flashcard-success">✓ Flashcard saved</div>`;
+    }
+    setTimeout(() => {
+      state.flashcard.expanded = false;
+      if (state.panelOpen && state.popoverBodies.associations) renderAssociationsPopover(state);
+    }, 1800);
+  } catch (err) {
+    state.flashcard.submitting = false;
+    state.flashcard.error = err instanceof Error ? err.message : "Failed to save flashcard";
+    renderAssociationsPopover(state);
+  }
+}
+
 function renderDomainBody(state) {
   const data = state.domainAssociations;
   if (data === "loading") {
@@ -1318,10 +1671,23 @@ function renderAssociationsPopover(state) {
   const externalContents = context.externalContents || [];
 
   if (associations.length === 0 && externalContents.length === 0) {
-    renderStatus(
-      container,
-      "No associated content was found for this webpage yet. Use the content tree to associate a note or content item."
-    );
+    container.innerHTML = `<div class="dg-status">No associated content was found for this webpage yet. Use the content tree to associate a note or content item.</div>`;
+    const hostname = state.resourceContext?.resource?.sourceHostname;
+    if (hostname) {
+      const domainSection = document.createElement("div");
+      domainSection.className = "dg-domain-section";
+      const isExpanded = state.domainAssociationsExpanded;
+      domainSection.innerHTML = `
+        <button class="dg-domain-toggle" type="button" data-action="toggle-domain-assoc">
+          <span class="dg-domain-toggle-icon">${isExpanded ? "▾" : "▸"}</span>
+          <span>More from ${escapeHtml(hostname)}</span>
+        </button>
+        ${isExpanded ? `<div class="dg-domain-body">${renderDomainBody(state)}</div>` : ""}
+      `;
+      container.appendChild(domainSection);
+    }
+    appendLocalFlashcardHistorySection(container, state);
+    container.appendChild(renderFlashcardSection(state));
     return;
   }
 
@@ -1388,6 +1754,25 @@ function renderAssociationsPopover(state) {
     `;
     container.appendChild(domainSection);
   }
+
+  appendLocalFlashcardHistorySection(container, state);
+  container.appendChild(renderFlashcardSection(state));
+}
+
+function appendLocalFlashcardHistorySection(container, state) {
+  const cards = state.localFlashcards;
+  if (!cards || cards.length === 0) return;
+  const section = document.createElement("div");
+  section.className = "dg-assoc-flashcards";
+  section.innerHTML = `<div class="dg-section-label">Flashcards from this domain</div>` +
+    cards.slice().reverse().slice(0, 10).map((c) => `
+      <div class="dg-flashcard-hist-item">
+        <div class="dg-flashcard-hist-front">${escapeHtml(c.frontText.slice(0, 80))}${c.frontText.length > 80 ? "…" : ""}</div>
+        <div class="dg-flashcard-hist-back">${escapeHtml(c.backText.slice(0, 80))}${c.backText.length > 80 ? "…" : ""}</div>
+        <div class="dg-flashcard-hist-meta">${escapeHtml(c.deckName || "Unknown deck")} · ${new Date(c.createdAt).toLocaleDateString()}</div>
+      </div>
+    `).join("");
+  container.appendChild(section);
 }
 
 function renderConnectionsPopover(state) {
@@ -2331,6 +2716,24 @@ function wireRootEvents(state) {
   // Polling — universal fallback, location.href is readable from isolated world
   setInterval(_onUrlChange, 1000);
 
+  // Track text selected on the host page for flashcard creation.
+  // selectionchange fires on every selection update; we read the text and
+  // update state._pendingSelectionText for the flashcard capture buttons.
+  document.addEventListener("selectionchange", () => {
+    const sel = window.getSelection();
+    const text = sel ? sel.toString().trim() : "";
+    // Ignore selections inside our shadow DOM (editor text etc.)
+    const anchor = sel?.anchorNode;
+    const inShadow = anchor && state.shadow && state.shadow.contains(anchor);
+    const prev = state._pendingSelectionText;
+    state._pendingSelectionText = (!inShadow && text.length >= 3 && text.length <= 2000) ? text : "";
+    // Update the flashcard section badge if the panel is open and the value changed
+    if (state.panelOpen && state.popoverBodies.associations && prev !== state._pendingSelectionText) {
+      const existing = state.popoverBodies.associations.querySelector(".dg-flashcard-section");
+      if (existing) existing.replaceWith(renderFlashcardSection(state));
+    }
+  });
+
   document.addEventListener(
     "click",
     (event) => {
@@ -2568,11 +2971,7 @@ function wireRootEvents(state) {
     renderStatus(state.popoverBodies.tree, "Loading…");
     void loadContentTree(state, { workspaceId, force: true })
       .then(() => renderTreePopover(state))
-      .catch((e) => {
-        const msg = e instanceof Error ? e.message : "Failed to load tree";
-        const isAuth = /token|trusted|unauthorized|auth/i.test(msg);
-        renderStatus(state.popoverBodies.tree, isAuth ? "Re-trust required — open Digital Garden settings to reconnect." : msg, "error");
-      });
+      .catch((e) => renderLoadError(state.popoverBodies.tree, e));
   });
 
   // ── Shadow-delegated click events ─────────────────────────────────────────
@@ -2595,6 +2994,23 @@ function wireRootEvents(state) {
     }
 
     // ── Associations section: refresh + domain toggle ─────────────────────────
+    const errorActionBtn = event.target.closest("[data-error-action]");
+    if (errorActionBtn) {
+      const errAction = errorActionBtn.getAttribute("data-error-action");
+      if (errAction === "open-dg-app") {
+        const appUrl = (state.config?.appBaseUrl || "").replace(/\/$/, "") + "/";
+        window.open(appUrl, "_blank");
+      } else if (errAction === "open-settings") {
+        window.open(chrome.runtime.getURL("options.html"), "_blank", "noopener");
+      } else if (errAction === "retry-load") {
+        // Re-run openSnapPanel which will re-fetch both panels
+        state.resourceContext = null;
+        state.contentTree = null;
+        void openSnapPanel(state);
+      }
+      return;
+    }
+
     const actionBtn = event.target.closest("[data-action]");
     if (actionBtn) {
       const action = actionBtn.getAttribute("data-action");
@@ -2609,7 +3025,7 @@ function wireRootEvents(state) {
           await loadResourceContext(state);
           renderAssociationsPopover(state);
         } catch (e) {
-          renderStatus(state.popoverBodies.associations, "Refresh failed — check connection", "error");
+          renderLoadError(state.popoverBodies.associations, e);
         }
         return;
       }
@@ -2631,6 +3047,74 @@ function wireRootEvents(state) {
           }
         }
         renderAssociationsPopover(state);
+        return;
+      }
+
+      if (action === "toggle-flashcard") {
+        state.flashcard.expanded = !state.flashcard.expanded;
+        renderAssociationsPopover(state);
+        return;
+      }
+      if (action === "flashcard-capture-front") {
+        const text = state._pendingSelectionText;
+        if (!text) return;
+        state.flashcard.frontText = text;
+        state.flashcard.expanded = true;
+        if (state.flashcard.backText) {
+          state.flashcard.phase = "confirming";
+          void loadFlashcardDecksIfNeeded(state);
+        } else {
+          state.flashcard.phase = "has-front";
+        }
+        renderAssociationsPopover(state);
+        return;
+      }
+      if (action === "flashcard-type-manually") {
+        state.flashcard.phase = "has-front";
+        state.flashcard.frontText = "";
+        state.flashcard.backText = "";
+        state.flashcard.expanded = true;
+        state.flashcard.error = null;
+        renderAssociationsPopover(state);
+        return;
+      }
+      if (action === "flashcard-capture-back") {
+        const text = state._pendingSelectionText;
+        if (!text || state.flashcard.phase !== "has-front") return;
+        state.flashcard.backText = text;
+        state.flashcard.phase = "confirming";
+        void loadFlashcardDecksIfNeeded(state);
+        renderAssociationsPopover(state);
+        return;
+      }
+      if (action === "flashcard-advance") {
+        const fcBody = event.target.closest(".dg-flashcard-body");
+        const frontVal = (fcBody?.querySelector("[data-fc-field='front']")?.value ?? state.flashcard.frontText).trim();
+        const backVal = (fcBody?.querySelector("[data-fc-field='back']")?.value ?? state.flashcard.backText).trim();
+        if (!frontVal || !backVal) {
+          state.flashcard.error = "Both sides need text before continuing.";
+          renderAssociationsPopover(state);
+          return;
+        }
+        state.flashcard.frontText = frontVal;
+        state.flashcard.backText = backVal;
+        state.flashcard.phase = "confirming";
+        state.flashcard.error = null;
+        void loadFlashcardDecksIfNeeded(state);
+        renderAssociationsPopover(state);
+        return;
+      }
+      if (action === "flashcard-cancel") {
+        state.flashcard = {
+          phase: "idle", frontText: "", backText: "",
+          deckId: state.flashcard.deckId, defaultDeckId: state.flashcard.defaultDeckId,
+          decks: state.flashcard.decks, expanded: false, submitting: false, error: null,
+        };
+        renderAssociationsPopover(state);
+        return;
+      }
+      if (action === "flashcard-submit") {
+        void submitFlashcard(state);
         return;
       }
     }
@@ -2728,13 +3212,28 @@ function wireRootEvents(state) {
         renderTreePopover(state);
         if (created.contentType === "note" || created.contentType === "external") {
           if (created.contentType === "note" && state.resourceContext?.resource?.id) {
-            await createResourceAssociation({
-              webResourceId: state.resourceContext.resource.id,
-              contentId: created.id,
+            // Optimistic: show the new note immediately before the server round-trip
+            if (!state.resourceContext.associations) state.resourceContext.associations = [];
+            state.resourceContext.associations.push({
+              content: { id: created.id, title: created.title || title, contentType: created.contentType },
             });
+            renderAssociationsPopover(state);
+
+            await runtimeMessage({
+              type: "create-resource-association",
+              payload: { webResourceId: state.resourceContext.resource.id, contentId: created.id },
+            });
+            // Refresh from server for accuracy (association IDs, full metadata)
             state.resourceContext = await loadResourceContext(state);
             renderAssociationsPopover(state);
           } else if (created.contentType === "external") {
+            // Optimistic: external association is auto-created server-side during content creation
+            if (!state.resourceContext.externalContents) state.resourceContext.externalContents = [];
+            state.resourceContext.externalContents.push({
+              id: created.id, title: created.title || title, contentType: "external",
+            });
+            renderAssociationsPopover(state);
+
             state.resourceContext = await loadResourceContext(state);
             renderAssociationsPopover(state);
           }
@@ -2752,10 +3251,20 @@ function wireRootEvents(state) {
 
   // ── Domain search input ────────────────────────────────────────────────────
   state.shadow.addEventListener("input", (event) => {
-    if (!event.target.closest("[data-domain-search]")) return;
-    state.domainAssociationsSearch = event.target.value || "";
-    const domainBody = state.popoverBodies.associations?.querySelector(".dg-domain-body");
-    if (domainBody) domainBody.innerHTML = renderDomainBody(state);
+    if (event.target.closest("[data-domain-search]")) {
+      state.domainAssociationsSearch = event.target.value || "";
+      const domainBody = state.popoverBodies.associations?.querySelector(".dg-domain-body");
+      if (domainBody) domainBody.innerHTML = renderDomainBody(state);
+      return;
+    }
+  });
+
+  // Persist deck selection changes immediately so submitFlashcard reads the right value
+  state.shadow.addEventListener("change", (event) => {
+    const deckField = event.target.closest("[data-fc-field='deck']");
+    if (deckField) {
+      state.flashcard.deckId = deckField.value;
+    }
   });
 }
 
@@ -2824,6 +3333,20 @@ async function initOverlay() {
     domainAssociationsExpanded: false,
     domainAssociationsSearch: "",
     edgeTabOffset: 0.5,
+    fetchedAt: { associations: 0, tree: 0 },
+    _pendingSelectionText: "",
+    flashcard: {
+      phase: "idle",       // "idle" | "has-front" | "confirming"
+      frontText: "",
+      backText: "",
+      deckId: null,
+      defaultDeckId: null, // loaded from domain memory; persists across sessions
+      decks: null,         // null = not yet loaded
+      expanded: false,
+      submitting: false,
+      error: null,
+    },
+    localFlashcards: null,  // null = not yet loaded; array of cards made on this etld1
     contentTree: null,
     loadedForWorkspaceId: null,
     expandedTreeIds: new Set(),
@@ -2879,7 +3402,11 @@ async function initOverlay() {
   const hostname = window.location.hostname;
   const domainMemory = await loadDomainMemory(hostname).catch(() => ({ snap: "right" }));
   state.edgeTabOffset = domainMemory.edgeTabOffset ?? 0.5;
+  state.flashcard.defaultDeckId = domainMemory.defaultDeckId || null;
   setSnap(state, domainMemory.snap || "right");
+
+  // Pre-load local flashcard history so it's ready when the panel opens
+  loadLocalFlashcardHistory(hostname).then((h) => { state.localFlashcards = h; }).catch(() => { state.localFlashcards = []; });
 
   void loadWorkspaces(state).then(() => renderWorkspaceSelector(state));
 
