@@ -52,6 +52,17 @@ Total estimated effort: ~150 lines + 1 schema field + cron extension.
 
 ---
 
+## Speed Reader Followups (from worktree `worktree-speed-reader`, 2026-06-01)
+
+The Speed Reader extension shipped as a disabled-by-default global extension with RSVP playback over notes, PDFs, OCR'd images, and external articles. Followup work:
+
+- [ ] **Adaptive AI reading speed** — observe per-user reading behavior (pause frequency, step-backs, longest dwell positions) and use an AI model to adapt WPM dynamically based on text complexity (lexical density, sentence length, technical-term ratio). Goals: slow down on dense paragraphs without user intervention; speed up on filler. Considerations: privacy-preserving (local inference where possible vs. cloud model fan-out), opt-in only, must surface why it's adjusting (a subtle "AI: dense passage, –15%" affordance). Likely depends on a small classifier fed by the chunk's preceding paragraph; could pilot with a cached embeddings-based readability score before going model-driven. Track effect on comprehension via retention prompts at session end.
+- [ ] **Sticky session resume** — persist current `position` per `contentId` in localStorage so closing/reopening the dialog resumes where you left off.
+- [ ] **Keyboard speed-trim shortcuts** — `[` and `]` to bump WPM ±25 without mousing to the slider.
+- [ ] **Comprehension prompts at session end** — optional 1-question recall on the final chunk's paragraph, scored locally, feeds the adaptive model in the first bullet.
+
+---
+
 ## Dev Infra Followups
 
 - [x] **Local Postgres (Docker) for development** — Shipped 2026-06-03 in PR `chore/local-postgres-dev`. Deliverables: `docker-compose.yml` (Postgres 16-alpine), `.env.docker.example` template, `scripts/check-db-target.ts` safety guard, `pnpm db:local:up/down/reset` + `pnpm db:target` scripts, `docs/notes-feature/guides/database/LOCAL-POSTGRES.md`. Verified workflow: `pnpm db:local:up → migrate deploy → db push → db:seed → pnpm dev` boots in <2s. Neon connection preserved as opt-in fallback.
