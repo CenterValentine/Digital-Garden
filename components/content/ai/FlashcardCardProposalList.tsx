@@ -762,7 +762,7 @@ export function FlashcardCardProposalList({
     rows.every((r) => r.status.status === "created");
 
   return (
-    <div className="rounded-xl border border-amber-400/30 bg-amber-500/[0.04] p-3 text-sm dark:border-amber-400/20 dark:bg-amber-500/[0.06] max-w-md space-y-2">
+    <div className="rounded-xl border border-amber-400/30 bg-amber-500/[0.04] p-3 text-sm dark:border-amber-400/20 dark:bg-amber-500/[0.06] max-w-md space-y-2 overflow-x-hidden">
       <div className="flex items-start gap-2">
         <BookOpen className="h-4 w-4 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
         <div className="min-w-0 flex-1">
@@ -899,6 +899,7 @@ export function FlashcardCardProposalList({
         Pronunciation cards (audio twin of the image gate above). Generation is
         opt-in: a dormant prompt until the user clicks Generate (so chat history
         never auto-spends on TTS), then the voice/provider window takes over.
+        User can also skip pronunciation entirely with the "Skip" button.
       */}
       {needsAudioGen && !audioGenDone && (
         audioGenStarted ? (
@@ -910,21 +911,30 @@ export function FlashcardCardProposalList({
                 <Sparkles className="h-4 w-4 shrink-0" />
                 <span>
                   {audioDrafts.length} card
-                  {audioDrafts.length === 1 ? "" : "s"} need a spoken
+                  {audioDrafts.length === 1 ? "" : "s"} can have a spoken
                   pronunciation.
                 </span>
               </div>
-              <button
-                type="button"
-                onClick={() => setAudioGenStarted(true)}
-                className="rounded-md bg-amber-600 px-3 py-1.5 font-medium text-white transition-colors hover:bg-amber-700 dark:bg-amber-500 dark:text-amber-950 dark:hover:bg-amber-400"
-              >
-                Generate {audioDrafts.length} pronunciation
-                {audioDrafts.length === 1 ? "" : "s"}
-              </button>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setAudioGenDone(true)}
+                  className="rounded-md border border-amber-400/40 bg-amber-400/10 px-3 py-1.5 font-medium text-amber-700 transition-colors hover:bg-amber-400/15 dark:border-amber-400/30 dark:text-amber-300 dark:hover:bg-amber-400/20"
+                >
+                  Skip
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAudioGenStarted(true)}
+                  className="rounded-md bg-amber-600 px-3 py-1.5 font-medium text-white transition-colors hover:bg-amber-700 dark:bg-amber-500 dark:text-amber-950 dark:hover:bg-amber-400"
+                >
+                  Generate {audioDrafts.length} pronunciation
+                  {audioDrafts.length === 1 ? "" : "s"}
+                </button>
+              </div>
             </div>
             <p className="mt-1 text-[11px] opacity-70">
-              Uses your speech provider — won&apos;t start until you click.
+              Generation uses your speech provider — pronunciation is optional.
             </p>
           </div>
         )

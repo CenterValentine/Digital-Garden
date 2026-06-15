@@ -11,6 +11,33 @@ import type { ToolDefinition, ToolQuery, ToolSurface } from "./types";
 const TOOL_REGISTRY: ToolDefinition[] = [
   // ─── TOOLBAR: Content header actions ───
   {
+    id: "copy-link",
+    label: "Copy Link",
+    iconName: "Link2",
+    surfaces: ["toolbar"],
+    contentTypes: "all",
+    order: 30,
+    group: "share",
+  },
+  {
+    id: "share",
+    label: "Share settings",
+    iconName: "Share2",
+    surfaces: ["toolbar"],
+    contentTypes: "all",
+    order: 40,
+    group: "share",
+  },
+  {
+    id: "save-as-template",
+    label: "Save as Template",
+    iconName: "BookmarkPlus",
+    surfaces: ["toolbar"],
+    contentTypes: ["note"],
+    order: 50,
+    group: "templates",
+  },
+  {
     id: "import-markdown",
     label: "Import",
     iconName: "Upload",
@@ -36,33 +63,6 @@ const TOOL_REGISTRY: ToolDefinition[] = [
     contentTypes: ["chat"],
     order: 100,
     group: "export",
-  },
-  {
-    id: "copy-link",
-    label: "Copy Link",
-    iconName: "Link2",
-    surfaces: ["toolbar"],
-    contentTypes: "all",
-    order: 200,
-    group: "share",
-  },
-  {
-    id: "share",
-    label: "Share settings",
-    iconName: "Share2",
-    surfaces: ["toolbar"],
-    contentTypes: "all",
-    order: 210,
-    group: "share",
-  },
-  {
-    id: "save-as-template",
-    label: "Save as Template",
-    iconName: "BookmarkPlus",
-    surfaces: ["toolbar"],
-    contentTypes: ["note"],
-    order: 110,
-    group: "templates",
   },
 
   // ─── TOOLBELT: Text formatting (matches current BubbleMenu) ───

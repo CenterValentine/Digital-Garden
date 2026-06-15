@@ -182,17 +182,22 @@ export function ContentToolbar({ contentId: contentIdProp }: ContentToolbarProps
       )}
       {tools.map((tool) => {
         const Icon = ICON_MAP[tool.definition.iconName];
+        const isIconOnly = tool.definition.id === "save-as-template";
         return (
           <button
             key={tool.definition.id}
             onClick={tool.execute}
             disabled={tool.isDisabled}
-            className="flex shrink-0 items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+            className={`flex shrink-0 items-center gap-1.5 rounded-md ${
+              isIconOnly
+                ? "px-1.5 py-1.5"
+                : "px-2.5 py-1.5"
+            } text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50`}
             title={tool.definition.label}
             type="button"
           >
             {Icon && <Icon className="h-4 w-4" />}
-            <span className="whitespace-nowrap">{tool.definition.label}</span>
+            {!isIconOnly && <span className="whitespace-nowrap">{tool.definition.label}</span>}
           </button>
         );
       })}
