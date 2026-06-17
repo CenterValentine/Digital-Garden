@@ -62,117 +62,178 @@ export function LeftSidebarHeader({
   const { activeView, setActiveView } = useLeftPanelViewStore();
   const extensionNavItems = useExtensionHeaderNavItems();
 
+  // Separate extension items into two groups: shown in main header vs. sub-affordance
+  const headerExtensionItems = extensionNavItems.filter(({ item }) => {
+    // Action items always go in header
+    if (item.type === "action") return true;
+    // View items: exclude daily-notes and publishing
+    return item.type !== "view" || !["daily-notes", "publishing"].includes(item.view ?? "");
+  });
+
+  const subAffordanceItems = extensionNavItems.filter(({ item }) => {
+    // Only include view items that are daily-notes or publishing
+    return item.type === "view" && ["daily-notes", "publishing"].includes(item.view ?? "");
+  });
+
   return (
-    <div className="flex h-12 shrink-0 items-center border-b border-white/10 px-2 gap-1">
-      <div className="scrollbar-hide flex min-w-0 flex-1 items-center gap-1 overflow-x-auto">
-        {/* Files icon button - always visible, active when files view is open */}
-        <button
-          onClick={() => {
-            setActiveView("files");
-            if (isSearchOpen) toggleSearch();
-          }}
-          className={`rounded p-1.5 transition-colors ${
-            activeView === "files"
-              ? "text-gold-primary hover:bg-black/[0.04] dark:hover:bg-white/10"
-              : "text-gray-500 dark:text-gray-400 hover:bg-black/[0.04] dark:hover:bg-white/10 hover:text-gold-primary"
-          }`}
-          title="Files"
-          type="button"
-        >
-          <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"
-            />
-          </svg>
-        </button>
-
-        {/* Search icon button - always visible, active when search view is open */}
-        <button
-          onClick={() => {
-            setActiveView("search");
-            if (!isSearchOpen) toggleSearch();
-          }}
-          className={`rounded p-1.5 transition-colors ${
-            activeView === "search"
-              ? "text-gold-primary hover:bg-black/[0.04] dark:hover:bg-white/10"
-              : "text-gray-500 dark:text-gray-400 hover:bg-black/[0.04] dark:hover:bg-white/10 hover:text-gold-primary"
-          }`}
-          title="Search (Cmd+/)"
-          type="button"
-        >
-          <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-            />
-          </svg>
-        </button>
-
-        {/* Extensions app button */}
-        <button
-          onClick={() => {
-            setActiveView("extensions");
-            if (isSearchOpen) toggleSearch();
-          }}
-          className={`rounded p-1.5 transition-colors ${
-            activeView === "extensions"
-              ? "text-gold-primary hover:bg-black/[0.04] dark:hover:bg-white/10"
-              : "text-gray-500 dark:text-gray-400 hover:bg-black/[0.04] dark:hover:bg-white/10 hover:text-gold-primary"
-          }`}
-          title="Extensions"
-          type="button"
-        >
-          <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M11 4a2 2 0 114 0v1a1 1 0 001 1h3a1 1 0 011 1v3a1 1 0 01-1 1h-1a2 2 0 100 4h1a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1v-1a2 2 0 10-4 0v1a1 1 0 01-1 1H7a1 1 0 01-1-1v-3a1 1 0 00-1-1H4a2 2 0 110-4h1a1 1 0 001-1V7a1 1 0 011-1h3a1 1 0 001-1V4z"
-            />
-          </svg>
-        </button>
-
-        {extensionNavItems.map(({ item, ActionComponent }) => {
-          if (item.type === "action") {
-            return ActionComponent ? (
-              <ActionComponent
-                key={item.id}
-                item={item}
-                className="rounded p-1.5 text-gray-500 dark:text-gray-400 transition-colors hover:bg-black/[0.04] dark:hover:bg-white/10 hover:text-gold-primary"
-                iconClassName="h-5 w-5"
+    <div className="flex h-full flex-col shrink-0">
+      {/* Main header row */}
+      <div className="flex h-12 shrink-0 items-center border-b border-white/10 px-2 gap-1">
+        <div className="scrollbar-hide flex min-w-0 flex-1 items-center gap-1 overflow-x-auto">
+          {/* Files icon button - always visible, active when files view is open */}
+          <button
+            onClick={() => {
+              setActiveView("files");
+              if (isSearchOpen) toggleSearch();
+            }}
+            className={`rounded p-1.5 transition-colors ${
+              activeView === "files"
+                ? "text-gold-primary hover:bg-black/[0.04] dark:hover:bg-white/10"
+                : "text-gray-500 dark:text-gray-400 hover:bg-black/[0.04] dark:hover:bg-white/10 hover:text-gold-primary"
+            }`}
+            title="Files"
+            type="button"
+          >
+            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"
               />
-            ) : null;
-          }
+            </svg>
+          </button>
 
-          return (
-            <button
-              key={item.view}
-              onClick={() => {
-                setActiveView(item.view);
-                if (isSearchOpen) toggleSearch();
-              }}
-              className={`rounded p-1.5 transition-colors ${
-                activeView === item.view
-                  ? "text-gold-primary hover:bg-black/[0.04] dark:hover:bg-white/10"
-                  : "text-gray-500 dark:text-gray-400 hover:bg-black/[0.04] dark:hover:bg-white/10 hover:text-gold-primary"
-              }`}
-              title={item.title ?? item.label}
-              type="button"
-            >
-              {renderExtensionIcon(item.iconName, "h-5 w-5")}
-            </button>
-          );
-        })}
+          {/* Extensions app button */}
+          <button
+            onClick={() => {
+              setActiveView("extensions");
+              if (isSearchOpen) toggleSearch();
+            }}
+            className={`rounded p-1.5 transition-colors ${
+              activeView === "extensions"
+                ? "text-gold-primary hover:bg-black/[0.04] dark:hover:bg-white/10"
+                : "text-gray-500 dark:text-gray-400 hover:bg-black/[0.04] dark:hover:bg-white/10 hover:text-gold-primary"
+            }`}
+            title="Extensions"
+            type="button"
+          >
+            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M11 4a2 2 0 114 0v1a1 1 0 001 1h3a1 1 0 011 1v3a1 1 0 01-1 1h-1a2 2 0 100 4h1a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1v-1a2 2 0 10-4 0v1a1 1 0 01-1 1H7a1 1 0 01-1-1v-3a1 1 0 00-1-1H4a2 2 0 110-4h1a1 1 0 001-1V7a1 1 0 011-1h3a1 1 0 001-1V4z"
+              />
+            </svg>
+          </button>
+
+          {headerExtensionItems.map(({ item, ActionComponent }) => {
+            if (item.type === "action") {
+              return ActionComponent ? (
+                <ActionComponent
+                  key={item.id}
+                  item={item}
+                  className="rounded p-1.5 text-gray-500 dark:text-gray-400 transition-colors hover:bg-black/[0.04] dark:hover:bg-white/10 hover:text-gold-primary"
+                  iconClassName="h-5 w-5"
+                />
+              ) : null;
+            }
+
+            return (
+              <button
+                key={item.view}
+                onClick={() => {
+                  setActiveView(item.view);
+                  if (isSearchOpen) toggleSearch();
+                }}
+                className={`rounded p-1.5 transition-colors ${
+                  activeView === item.view
+                    ? "text-gold-primary hover:bg-black/[0.04] dark:hover:bg-white/10"
+                    : "text-gray-500 dark:text-gray-400 hover:bg-black/[0.04] dark:hover:bg-white/10 hover:text-gold-primary"
+                }`}
+                title={item.title ?? item.label}
+                type="button"
+              >
+                {renderExtensionIcon(item.iconName, "h-5 w-5")}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Right side: Toggle only (plus button moved to sub-affordance) */}
+        <div className="flex shrink-0 items-center gap-1">
+          {/* Panel collapse toggle */}
+          <button
+            onClick={toggleMode}
+            className="rounded p-1 transition-colors hover:bg-black/[0.04] dark:hover:bg-white/10 text-gray-500 dark:text-gray-400 hover:text-gold-primary"
+            title={mode === "full" ? "Collapse sidebar (Cmd+B)" : "Expand sidebar (Cmd+B)"}
+            type="button"
+          >
+            {mode === "full" ? (
+              <PanelLeftClose className="h-4 w-4" />
+            ) : (
+              <PanelLeft className="h-4 w-4" />
+            )}
+          </button>
+        </div>
       </div>
 
-      {/* Right side: Actions + Toggle — must never be clipped */}
-      <div className="flex shrink-0 items-center gap-1">
-        {activeView === "files" ? (
+      {/* Sub-affordance row - shown below Files tab when files view is active */}
+      {activeView === "files" && (
+        <div className="flex h-10 shrink-0 items-center border-b border-white/5 px-2 gap-1">
+          {/* Search button */}
+          <button
+            onClick={() => {
+              setActiveView("search" as const);
+              if (!isSearchOpen) toggleSearch();
+            }}
+            className="rounded p-1.5 transition-colors text-gray-500 dark:text-gray-400 hover:bg-black/[0.04] dark:hover:bg-white/10 hover:text-gold-primary"
+            title="Search (Cmd+/)"
+            type="button"
+          >
+            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+              />
+            </svg>
+          </button>
+
+          {/* Sub-affordance extension items (daily-notes, publishing) */}
+          {subAffordanceItems.map(({ item, ActionComponent }) => {
+            if (item.type === "action") {
+              return ActionComponent ? (
+                <ActionComponent
+                  key={item.id}
+                  item={item}
+                  className="rounded p-1.5 text-gray-500 dark:text-gray-400 transition-colors hover:bg-black/[0.04] dark:hover:bg-white/10 hover:text-gold-primary"
+                  iconClassName="h-4 w-4"
+                />
+              ) : null;
+            }
+
+            return (
+              <button
+                key={item.view}
+                onClick={() => setActiveView(item.view)}
+                className={`rounded p-1.5 transition-colors ${
+                  activeView === item.view
+                    ? "text-gold-primary hover:bg-black/[0.04] dark:hover:bg-white/10"
+                    : "text-gray-500 dark:text-gray-400 hover:bg-black/[0.04] dark:hover:bg-white/10 hover:text-gold-primary"
+                }`}
+                title={item.title ?? item.label}
+                type="button"
+              >
+                {renderExtensionIcon(item.iconName, "h-4 w-4")}
+              </button>
+            );
+          })}
+
+          {/* Plus button - snapped to right edge */}
+          <div className="flex-1" />
           <LeftSidebarHeaderActions
             onCreateFolder={onCreateFolder ? () => onCreateFolder() : undefined}
             onCreateNote={onCreateNote ? () => onCreateNote() : undefined}
@@ -191,22 +252,8 @@ export function LeftSidebarHeader({
             onAddPeopleTarget={onAddPeopleTarget ? () => onAddPeopleTarget() : undefined}
             disabled={isCreateDisabled}
           />
-        ) : null}
-
-        {/* Panel collapse toggle */}
-        <button
-          onClick={toggleMode}
-          className="rounded p-1 transition-colors hover:bg-black/[0.04] dark:hover:bg-white/10 text-gray-500 dark:text-gray-400 hover:text-gold-primary"
-          title={mode === "full" ? "Collapse sidebar (Cmd+B)" : "Expand sidebar (Cmd+B)"}
-          type="button"
-        >
-          {mode === "full" ? (
-            <PanelLeftClose className="h-4 w-4" />
-          ) : (
-            <PanelLeft className="h-4 w-4" />
-          )}
-        </button>
-      </div>
+        </div>
+      )}
     </div>
   );
 }

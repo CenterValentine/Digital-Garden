@@ -44,7 +44,17 @@ export function invalidatePresetCache() {
 
 export function resolvePreset(url, presetMap, overrides = {}) {
   try {
-    const hostname = new URL(url).hostname.toLowerCase();
+    let hostname;
+    try {
+      hostname = new URL(url).hostname.toLowerCase();
+    } catch (_urlError) {
+      // Invalid URL format — try to extract hostname manually as fallback
+      const urlStr = String(url || "").trim();
+      const match = urlStr.match(/^(?:https?:\/\/)?([^/?#]+)/);
+      if (!match || !match[1]) return null;
+      hostname = match[1].toLowerCase();
+    }
+
     // User overrides take precedence over presets
     if (overrides[hostname]) return overrides[hostname];
     if (presetMap[hostname]) return presetMap[hostname];
@@ -63,7 +73,14 @@ export function resolvePreset(url, presetMap, overrides = {}) {
 
 export function applyUrlStrategy(url, preset) {
   try {
-    const parsed = new URL(url);
+    let parsed;
+    try {
+      parsed = new URL(url);
+    } catch (_urlError) {
+      // Invalid URL — return as-is after trimming
+      return String(url || "").trim();
+    }
+
     // Baseline normalization always applied regardless of strategy
     parsed.hash = "";
     if ((parsed.protocol === "https:" && parsed.port === "443") ||
