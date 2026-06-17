@@ -36,6 +36,8 @@ import { Spacer } from "./blocks/spacer";
 import { SkillBadges } from "./blocks/skill-badges";
 import { BookmarkCard } from "./blocks/bookmark-card";
 import { TagCloud } from "./blocks/tag-cloud";
+// W11 blocks
+import { StatsTable } from "./blocks/stats-table";
 
 export const publishingExtensionRuntime: ExtensionRuntime = {
   id: PUBLISHING_EXTENSION_ID,
@@ -73,5 +75,7 @@ export const publishingExtensionRuntime: ExtensionRuntime = {
     SkillBadges,
     BookmarkCard,
     TagCloud,
+    // W11
+    StatsTable,
   ],
 };

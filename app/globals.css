@@ -1973,6 +1973,9 @@ mark {
 .ProseMirror .block-stat-label { margin: 10px 0 0; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: #6b7280; outline: none; }
 .ProseMirror .block-stat-description { margin: 4px 0 0; font-size: 0.825rem; color: #9ca3af; outline: none; }
 
+/* StatsTable — editor preview */
+.ProseMirror .block-stats-table-editor { padding: 4px 0; }
+
 /* PostCard — light overrides */
 .ProseMirror .block-post-card {
   border: 1px solid #e5e7eb;
@@ -5950,6 +5953,121 @@ mark {
 }
 .dark .public-prose .block-metrics-strip-label {
   color: rgba(255,255,255,0.4);
+}
+
+/* ─── StatsTable ─────────────────────────────────────────────────────────── */
+.public-prose .block-stats-table {
+  margin: 1.5em 0;
+}
+.public-prose .block-stats-table-caption {
+  margin: 0 0 0.5em;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: rgba(0,0,0,0.4);
+}
+.dark .public-prose .block-stats-table-caption {
+  color: rgba(255,255,255,0.35);
+}
+.public-prose .block-stats-table-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid rgba(0,0,0,0.08);
+}
+.dark .public-prose .block-stats-table-list {
+  border-top-color: rgba(255,255,255,0.1);
+}
+.public-prose .block-stats-table--bordered .block-stats-table-list {
+  border: 1px solid rgba(0,0,0,0.1);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.dark .public-prose .block-stats-table--bordered .block-stats-table-list {
+  border-color: rgba(255,255,255,0.1);
+}
+.public-prose .block-stats-table-row {
+  display: flex;
+  align-items: baseline;
+  padding: 0.6em 0;
+  border-bottom: 1px solid rgba(0,0,0,0.06);
+}
+.dark .public-prose .block-stats-table-row {
+  border-bottom-color: rgba(255,255,255,0.07);
+}
+.public-prose .block-stats-table-row:last-child {
+  border-bottom: none;
+}
+/* bordered variant: tighter padding and contained rows */
+.public-prose .block-stats-table--bordered .block-stats-table-row {
+  padding: 0.6em 0.85em;
+  border-bottom: 1px solid rgba(0,0,0,0.06);
+}
+.dark .public-prose .block-stats-table--bordered .block-stats-table-row {
+  border-bottom-color: rgba(255,255,255,0.07);
+}
+/* striped variant */
+.public-prose .block-stats-table--striped .block-stats-table-row:nth-child(even) {
+  background: rgba(0,0,0,0.025);
+}
+.dark .public-prose .block-stats-table--striped .block-stats-table-row:nth-child(even) {
+  background: rgba(255,255,255,0.04);
+}
+/* compact variant */
+.public-prose .block-stats-table--compact .block-stats-table-row {
+  padding: 0.35em 0;
+}
+/* highlighted row */
+.public-prose .block-stats-table-row--highlight {
+  background: rgba(59,130,246,0.07);
+}
+.dark .public-prose .block-stats-table-row--highlight {
+  background: rgba(99,155,255,0.1);
+}
+.public-prose .block-stats-table-label {
+  flex: 0 0 42%;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: rgba(0,0,0,0.45);
+  padding-right: 0.75em;
+}
+.dark .public-prose .block-stats-table-label {
+  color: rgba(255,255,255,0.4);
+}
+.public-prose .block-stats-table-value {
+  flex: 1;
+  font-size: 0.95rem;
+  color: rgba(0,0,0,0.85);
+  font-variant-numeric: tabular-nums;
+}
+.dark .public-prose .block-stats-table-value {
+  color: rgba(255,255,255,0.88);
+}
+/* featured variant: accent the value */
+.public-prose .block-stats-table--featured .block-stats-table-value {
+  font-weight: 600;
+  color: #1d4ed8;
+}
+.dark .public-prose .block-stats-table--featured .block-stats-table-value {
+  color: #93c5fd;
+}
+/* highlight row value gets the accent regardless of variant */
+.public-prose .block-stats-table-row--highlight .block-stats-table-value {
+  font-weight: 600;
+  color: #1d4ed8;
+}
+.dark .public-prose .block-stats-table-row--highlight .block-stats-table-value {
+  color: #93c5fd;
+}
+.public-prose .block-stats-table-empty {
+  color: rgba(0,0,0,0.35);
+  font-size: 0.875rem;
+}
+.dark .public-prose .block-stats-table-empty {
+  color: rgba(255,255,255,0.3);
 }
 
 /* ─── Timeline ───────────────────────────────────────────────────────────── */
