@@ -4,10 +4,14 @@
  * Atom block: a vertical key/value list for presenting structured outcomes,
  * case study results, or mixed-unit metrics (e.g. "Cost: $100", "Savings: 90 hrs/wk").
  *
+ * Supports heterogeneous value types per row:
+ * - "text"  — plain string value (default)
+ * - "pills" — comma-separated values rendered as inline pills (e.g. "React, TypeScript, Prisma")
+ *
  * Attrs:
- * - caption  optional heading above the table
- * - items    JSON string: [{label, value, highlight?}]
- * - variant  default | striped | bordered | compact | featured
+ * - caption   optional heading above the table
+ * - items     JSON string: [{label, value, valueType?, highlight?}]
+ * - variant   default | striped | bordered | compact | featured
  */
 
 import { Node, mergeAttributes } from "@tiptap/core";
@@ -22,6 +26,7 @@ import { createBlockNodeView } from "@/lib/domain/blocks/node-view-factory";
 export interface StatsTableItem {
   label: string;
   value: string;
+  valueType?: "text" | "pills";
   highlight?: boolean;
 }
 
@@ -29,7 +34,14 @@ function parseItems(raw: string): StatsTableItem[] {
   try { return JSON.parse(raw) as StatsTableItem[]; } catch { return []; }
 }
 
+function parsePills(value: string): string[] {
+  return value.split(",").map((s) => s.trim()).filter(Boolean);
+}
+
 // ─── Schema ──────────────────────────────────────────────────────────────────
+
+const ITEMS_TOOLTIP =
+  "For 'Pills' rows, separate values with commas — e.g. React, TypeScript, Prisma. Each token becomes an inline pill badge.";
 
 const { schema: statsTableSchema, defaults: statsTableDefaults } = createBlockSchema(
   "statsTable",
@@ -38,18 +50,41 @@ const { schema: statsTableSchema, defaults: statsTableDefaults } = createBlockSc
     items: z
       .string()
       .default("[]")
-      .describe('JSON array of stats. Each item: {"label":"Cost","value":"$100","highlight":false}')
+      .describe('JSON array of stats. Each item: {"label":"Cost","value":"$100","valueType":"text","highlight":false}')
       .meta({
         fieldType: "json-array",
+        tooltip: ITEMS_TOOLTIP,
         addLabel: "Add stat",
         emptyMessage: "No stats yet — click Add stat",
         jsonArraySchema: [
           { key: "label", label: "Label", type: "text", placeholder: "Cost", required: true },
-          { key: "value", label: "Value", type: "text", placeholder: "$100", required: true },
-          { key: "highlight", label: "Highlight row", type: "select", options: [
-            { value: "false", label: "Normal" },
-            { value: "true", label: "Highlighted" },
-          ]},
+          {
+            key: "value",
+            label: "Value",
+            type: "text",
+            placeholder: "$100",
+            required: true,
+            tooltip: "Plain text, or comma-separated for pills (e.g. React, TypeScript)",
+          },
+          {
+            key: "valueType",
+            label: "Value type",
+            type: "select",
+            tooltip: "Pills renders comma-separated values as inline badge chips",
+            options: [
+              { value: "text", label: "Text" },
+              { value: "pills", label: "Pills (comma-separated)" },
+            ],
+          },
+          {
+            key: "highlight",
+            label: "Highlight row",
+            type: "select",
+            options: [
+              { value: "false", label: "Normal" },
+              { value: "true", label: "Highlighted" },
+            ],
+          },
         ],
       }),
     variant: z.enum(["default", "striped", "bordered", "compact", "featured"]).default("default"),
@@ -68,7 +103,7 @@ registerBlock({
   attrsSchema: statsTableSchema,
   defaultAttrs: statsTableDefaults(),
   slashCommand: "/stats-table",
-  searchTerms: ["stats", "table", "outcomes", "case study", "results", "kv", "key value", "metrics", "facts"],
+  searchTerms: ["stats", "table", "outcomes", "case study", "results", "kv", "key value", "metrics", "facts", "pills", "skills", "tools"],
 });
 
 // ─── Shared attrs ─────────────────────────────────────────────────────────────
@@ -85,13 +120,19 @@ function statsTableAttrs() {
 
 // ─── Editor preview HTML ──────────────────────────────────────────────────────
 
+function pillsHtml(value: string): string {
+  return parsePills(value)
+    .map((p) => `<span style="display:inline-block;padding:1px 8px;margin:1px 3px 1px 0;border-radius:999px;font-size:11px;font-weight:500;background:#f3f4f6;color:#374151;border:1px solid #e5e7eb;white-space:nowrap">${p}</span>`)
+    .join("");
+}
+
 function editorHtml(items: StatsTableItem[], variant: string, caption: string): string {
   if (items.length === 0) {
     return `
       <div style="padding:20px;border:1px dashed #d1d5db;border-radius:8px;text-align:center">
         <p style="margin:0 0 4px;font-size:13px;font-weight:500;color:#374151">Stats Table</p>
         <p style="margin:0;font-size:12px;color:#9ca3af">Add stats via Properties (⋯)</p>
-        <p style="margin:6px 0 0;font-size:11px;color:#d1d5db;font-family:monospace">{"label":"Cost","value":"$100"}</p>
+        <p style="margin:6px 0 0;font-size:11px;color:#d1d5db;font-family:monospace">{"label":"Tech","value":"React, TypeScript","valueType":"pills"}</p>
       </div>
     `;
   }
@@ -106,16 +147,18 @@ function editorHtml(items: StatsTableItem[], variant: string, caption: string): 
   const rows = items.map((item, i) => {
     const isStriped = variant === "striped" && i % 2 === 1;
     const isHighlight = item.highlight === true;
-    const bg = isHighlight
-      ? "#eff6ff"
-      : isStriped ? "#f9fafb" : "#fff";
-    const valueFontWeight = isHighlight || variant === "featured" ? "600" : "400";
-    const valueColor = isHighlight || variant === "featured" ? "#1d4ed8" : "#111827";
+    const isPills = item.valueType === "pills";
+    const bg = isHighlight ? "#eff6ff" : isStriped ? "#f9fafb" : "#fff";
+    const valueFontWeight = !isPills && (isHighlight || variant === "featured") ? "600" : "400";
+    const valueColor = !isPills && (isHighlight || variant === "featured") ? "#1d4ed8" : "#111827";
     const borderBottom = i < items.length - 1 ? "border-bottom:1px solid #f3f4f6;" : "";
+    const valueContent = isPills
+      ? `<span style="display:flex;flex-wrap:wrap;gap:2px;align-items:center">${pillsHtml(item.value)}</span>`
+      : `<span style="font-weight:${valueFontWeight};color:${valueColor}">${item.value}</span>`;
     return `
-      <div style="display:flex;align-items:baseline;padding:${padding};${borderBottom}background:${bg}">
+      <div style="display:flex;align-items:${isPills ? "center" : "baseline"};padding:${padding};${borderBottom}background:${bg}">
         <span style="flex:0 0 45%;font-size:12px;font-weight:500;color:#6b7280;text-transform:uppercase;letter-spacing:0.04em;padding-right:8px">${item.label}</span>
-        <span style="flex:1;font-size:13px;font-weight:${valueFontWeight};color:${valueColor}">${item.value}</span>
+        <span style="flex:1;font-size:13px">${valueContent}</span>
       </div>
     `;
   }).join("");
@@ -191,17 +234,25 @@ export const ServerStatsTable = Node.create({
     const variant = (HTMLAttributes["data-variant"] ?? "default") as string;
     const caption = (HTMLAttributes["data-caption"] ?? "") as string;
 
-    const rows = items.map((item) => [
-      "li",
-      {
-        class: [
-          "block-stats-table-row",
-          item.highlight ? "block-stats-table-row--highlight" : "",
-        ].filter(Boolean).join(" "),
-      },
-      ["span", { class: "block-stats-table-label" }, item.label],
-      ["span", { class: "block-stats-table-value" }, item.value],
-    ]);
+    const rows = items.map((item) => {
+      const isPills = item.valueType === "pills";
+      const rowClass = [
+        "block-stats-table-row",
+        item.highlight ? "block-stats-table-row--highlight" : "",
+        isPills ? "block-stats-table-row--pills" : "",
+      ].filter(Boolean).join(" ");
+
+      const valueChildren = isPills
+        ? parsePills(item.value).map((p) => ["span", { class: "block-stats-table-pill" }, p])
+        : [item.value];
+
+      return [
+        "li",
+        { class: rowClass },
+        ["span", { class: "block-stats-table-label" }, item.label],
+        ["span", { class: "block-stats-table-value" }, ...valueChildren],
+      ];
+    });
 
     return [
       "div",

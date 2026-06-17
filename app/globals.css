@@ -6069,6 +6069,56 @@ mark {
 .dark .public-prose .block-stats-table-empty {
   color: rgba(255,255,255,0.3);
 }
+/* pills row: align center so chips sit beside the label nicely */
+.public-prose .block-stats-table-row--pills {
+  align-items: center;
+}
+.public-prose .block-stats-table-row--pills .block-stats-table-value {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  font-size: inherit;
+  font-weight: inherit;
+  color: inherit;
+}
+.public-prose .block-stats-table-pill {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 500;
+  background: rgba(0,0,0,0.06);
+  color: rgba(0,0,0,0.7);
+  border: 1px solid rgba(0,0,0,0.08);
+  white-space: nowrap;
+}
+.dark .public-prose .block-stats-table-pill {
+  background: rgba(255,255,255,0.08);
+  color: rgba(255,255,255,0.75);
+  border-color: rgba(255,255,255,0.1);
+}
+/* featured variant pills get the accent tint */
+.public-prose .block-stats-table--featured .block-stats-table-pill {
+  background: rgba(29,78,216,0.08);
+  color: #1d4ed8;
+  border-color: rgba(29,78,216,0.2);
+}
+.dark .public-prose .block-stats-table--featured .block-stats-table-pill {
+  background: rgba(147,197,253,0.12);
+  color: #93c5fd;
+  border-color: rgba(147,197,253,0.2);
+}
+/* highlighted rows: pills also pick up the accent */
+.public-prose .block-stats-table-row--highlight .block-stats-table-pill {
+  background: rgba(29,78,216,0.08);
+  color: #1d4ed8;
+  border-color: rgba(29,78,216,0.2);
+}
+.dark .public-prose .block-stats-table-row--highlight .block-stats-table-pill {
+  background: rgba(147,197,253,0.12);
+  color: #93c5fd;
+  border-color: rgba(147,197,253,0.2);
+}
 
 /* ─── Timeline ───────────────────────────────────────────────────────────── */
 .public-prose .block-timeline {
