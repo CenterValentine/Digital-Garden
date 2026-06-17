@@ -18,6 +18,7 @@ const TOOL_REGISTRY: ToolDefinition[] = [
     contentTypes: "all",
     order: 30,
     group: "share",
+    iconOnly: true,
   },
   {
     id: "share",
@@ -27,6 +28,7 @@ const TOOL_REGISTRY: ToolDefinition[] = [
     contentTypes: "all",
     order: 40,
     group: "share",
+    iconOnly: true,
   },
   {
     id: "save-as-template",
@@ -43,8 +45,9 @@ const TOOL_REGISTRY: ToolDefinition[] = [
     iconName: "Upload",
     surfaces: ["toolbar"],
     contentTypes: "all",
-    order: 90,
+    order: 75,
     group: "import",
+    iconOnly: true,
   },
   {
     id: "export-markdown",
@@ -52,8 +55,9 @@ const TOOL_REGISTRY: ToolDefinition[] = [
     iconName: "Download",
     surfaces: ["toolbar"],
     contentTypes: ["note"],
-    order: 100,
+    order: 85,
     group: "export",
+    iconOnly: true,
   },
   {
     id: "export-chat",

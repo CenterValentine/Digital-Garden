@@ -63,22 +63,27 @@ export function LeftSidebarHeader({
   const extensionNavItems = useExtensionHeaderNavItems();
 
   // Separate extension items into two groups: shown in main header vs. sub-affordance
+  // Daily Notes is type "action" with id "open-periodic-note", Publishing is type "view" with view "publishing-view"
+  const subAffordanceIds = new Set(["open-periodic-note", "publishing-view"]);
+
   const headerExtensionItems = extensionNavItems.filter(({ item }) => {
-    // Action items always go in header
-    if (item.type === "action") return true;
-    // View items: exclude daily-notes and publishing
-    return item.type !== "view" || !["daily-notes", "publishing"].includes(item.view ?? "");
+    // Exclude items that belong in sub-affordance
+    if (item.type === "action") return !subAffordanceIds.has(item.id);
+    if (item.type === "view") return !subAffordanceIds.has(item.view ?? "");
+    return true;
   });
 
   const subAffordanceItems = extensionNavItems.filter(({ item }) => {
-    // Only include view items that are daily-notes or publishing
-    return item.type === "view" && ["daily-notes", "publishing"].includes(item.view ?? "");
+    // Include only daily-notes action and publishing view
+    if (item.type === "action") return subAffordanceIds.has(item.id);
+    if (item.type === "view") return subAffordanceIds.has(item.view ?? "");
+    return false;
   });
 
   return (
-    <div className="flex h-full flex-col shrink-0">
+    <div className={`flex flex-col shrink-0 ${activeView === "files" ? "bg-black/[0.06]" : ""}`}>
       {/* Main header row */}
-      <div className="flex h-12 shrink-0 items-center border-b border-white/10 px-2 gap-1">
+      <div className="flex h-12 shrink-0 items-center px-2 gap-1">
         <div className="scrollbar-hide flex min-w-0 flex-1 items-center gap-1 overflow-x-auto">
           {/* Files icon button - always visible, active when files view is open */}
           <button
@@ -89,7 +94,7 @@ export function LeftSidebarHeader({
             className={`rounded p-1.5 transition-colors ${
               activeView === "files"
                 ? "text-gold-primary hover:bg-black/[0.04] dark:hover:bg-white/10"
-                : "text-gray-500 dark:text-gray-400 hover:bg-black/[0.04] dark:hover:bg-white/10 hover:text-gold-primary"
+                : "text-gray-500 dark:text-gray-400 hover:bg-black/[0.04] dark:hover:bg-white/10"
             }`}
             title="Files"
             type="button"
@@ -179,81 +184,98 @@ export function LeftSidebarHeader({
         </div>
       </div>
 
-      {/* Sub-affordance row - shown below Files tab when files view is active */}
-      {activeView === "files" && (
-        <div className="flex h-10 shrink-0 items-center border-b border-white/5 px-2 gap-1">
-          {/* Search button */}
-          <button
-            onClick={() => {
+      {/* Sub-affordance row - always visible */}
+      <div className="flex h-6 shrink-0 items-center border-b border-white/10 px-1.5 gap-0.5">
+        {/* Search button - toggle to go back to files */}
+        <button
+          onClick={() => {
+            if (activeView === "search") {
+              setActiveView("files");
+              if (isSearchOpen) toggleSearch();
+            } else {
               setActiveView("search" as const);
               if (!isSearchOpen) toggleSearch();
-            }}
-            className="rounded p-1.5 transition-colors text-gray-500 dark:text-gray-400 hover:bg-black/[0.04] dark:hover:bg-white/10 hover:text-gold-primary"
-            title="Search (Cmd+/)"
-            type="button"
-          >
-            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-              />
-            </svg>
-          </button>
-
-          {/* Sub-affordance extension items (daily-notes, publishing) */}
-          {subAffordanceItems.map(({ item, ActionComponent }) => {
-            if (item.type === "action") {
-              return ActionComponent ? (
-                <ActionComponent
-                  key={item.id}
-                  item={item}
-                  className="rounded p-1.5 text-gray-500 dark:text-gray-400 transition-colors hover:bg-black/[0.04] dark:hover:bg-white/10 hover:text-gold-primary"
-                  iconClassName="h-4 w-4"
-                />
-              ) : null;
             }
+          }}
+          className={`rounded p-0.5 transition-colors ${
+            activeView === "search"
+              ? "text-gold-primary"
+              : "text-gray-500 dark:text-gray-400 hover:bg-black/[0.04] dark:hover:bg-white/10 hover:text-gold-primary"
+          }`}
+          title="Search (Cmd+/)"
+          type="button"
+        >
+          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+            />
+          </svg>
+        </button>
 
-            return (
-              <button
-                key={item.view}
-                onClick={() => setActiveView(item.view)}
-                className={`rounded p-1.5 transition-colors ${
-                  activeView === item.view
-                    ? "text-gold-primary hover:bg-black/[0.04] dark:hover:bg-white/10"
+        {/* Sub-affordance extension items (daily-notes, publishing) - toggle to go back to files */}
+        {subAffordanceItems.map(({ item, ActionComponent }) => {
+          if (item.type === "action") {
+            return ActionComponent ? (
+              <ActionComponent
+                key={item.id}
+                item={item}
+                className={`rounded p-0.5 transition-colors ${
+                  activeView === item.id
+                    ? "text-gold-primary"
                     : "text-gray-500 dark:text-gray-400 hover:bg-black/[0.04] dark:hover:bg-white/10 hover:text-gold-primary"
                 }`}
-                title={item.title ?? item.label}
-                type="button"
-              >
-                {renderExtensionIcon(item.iconName, "h-4 w-4")}
-              </button>
-            );
-          })}
+                iconClassName="h-4 w-4"
+              />
+            ) : null;
+          }
 
-          {/* Plus button - snapped to right edge */}
-          <div className="flex-1" />
-          <LeftSidebarHeaderActions
-            onCreateFolder={onCreateFolder ? () => onCreateFolder() : undefined}
-            onCreateNote={onCreateNote ? () => onCreateNote() : undefined}
-            onCreateFile={onCreateFile ? () => onCreateFile() : undefined}
-            onCreateDocument={onCreateDocument ? () => onCreateDocument() : undefined}
-            onCreateSpreadsheet={onCreateSpreadsheet ? () => onCreateSpreadsheet() : undefined}
-            onCreateCode={onCreateCode ? () => onCreateCode() : undefined}
-            onCreateHtml={onCreateHtml ? () => onCreateHtml() : undefined}
-            onCreateJson={onCreateJson ? () => onCreateJson() : undefined}
-            onCreateExternal={onCreateExternal ? () => onCreateExternal() : undefined}
-            onCreateVisualizationMermaid={onCreateVisualizationMermaid ? () => onCreateVisualizationMermaid() : undefined}
-            onCreateVisualizationExcalidraw={onCreateVisualizationExcalidraw ? () => onCreateVisualizationExcalidraw() : undefined}
-            onCreateVisualizationDiagramsNet={onCreateVisualizationDiagramsNet ? () => onCreateVisualizationDiagramsNet() : undefined}
-            onCreateChat={onCreateChat ? () => onCreateChat() : undefined}
-            onCreateAiImage={onCreateAiImage ? () => onCreateAiImage() : undefined}
-            onAddPeopleTarget={onAddPeopleTarget ? () => onAddPeopleTarget() : undefined}
-            disabled={isCreateDisabled}
-          />
-        </div>
-      )}
+          return (
+            <button
+              key={item.view}
+              onClick={() => {
+                if (activeView === item.view) {
+                  setActiveView("files");
+                } else {
+                  setActiveView(item.view);
+                }
+              }}
+              className={`rounded p-0.5 transition-colors ${
+                activeView === item.view
+                  ? "text-gold-primary"
+                  : "text-gray-500 dark:text-gray-400 hover:bg-black/[0.04] dark:hover:bg-white/10 hover:text-gold-primary"
+              }`}
+              title={item.title ?? item.label}
+              type="button"
+            >
+              {renderExtensionIcon(item.iconName, "h-4 w-4")}
+            </button>
+          );
+        })}
+
+        {/* Plus button - snapped to right edge */}
+        <div className="flex-1" />
+        <LeftSidebarHeaderActions
+          onCreateFolder={onCreateFolder ? () => onCreateFolder() : undefined}
+          onCreateNote={onCreateNote ? () => onCreateNote() : undefined}
+          onCreateFile={onCreateFile ? () => onCreateFile() : undefined}
+          onCreateDocument={onCreateDocument ? () => onCreateDocument() : undefined}
+          onCreateSpreadsheet={onCreateSpreadsheet ? () => onCreateSpreadsheet() : undefined}
+          onCreateCode={onCreateCode ? () => onCreateCode() : undefined}
+          onCreateHtml={onCreateHtml ? () => onCreateHtml() : undefined}
+          onCreateJson={onCreateJson ? () => onCreateJson() : undefined}
+          onCreateExternal={onCreateExternal ? () => onCreateExternal() : undefined}
+          onCreateVisualizationMermaid={onCreateVisualizationMermaid ? () => onCreateVisualizationMermaid() : undefined}
+          onCreateVisualizationExcalidraw={onCreateVisualizationExcalidraw ? () => onCreateVisualizationExcalidraw() : undefined}
+          onCreateVisualizationDiagramsNet={onCreateVisualizationDiagramsNet ? () => onCreateVisualizationDiagramsNet() : undefined}
+          onCreateChat={onCreateChat ? () => onCreateChat() : undefined}
+          onCreateAiImage={onCreateAiImage ? () => onCreateAiImage() : undefined}
+          onAddPeopleTarget={onAddPeopleTarget ? () => onAddPeopleTarget() : undefined}
+          disabled={isCreateDisabled}
+        />
+      </div>
     </div>
   );
 }
