@@ -68,6 +68,11 @@ export function AuthSessionSync() {
     document.addEventListener("visibilitychange", handleVisibilityChange);
 
     const verifySession = async () => {
+      // Guard at entry: if sign-out has already been triggered (isCancelled),
+      // do not fire another fetch — the interval will be cleared by the cleanup,
+      // but there may be in-flight calls already past the top-of-function guard.
+      if (isCancelled) return;
+
       try {
         const response = await fetch("/api/auth/session?required=true", {
           credentials: "include",
@@ -86,6 +91,11 @@ export function AuthSessionSync() {
           });
 
           if (consecutiveFailures >= CONSECUTIVE_FAILURES_REQUIRED) {
+            // Stop all future polls immediately — prevents the "consecutive: 3/2, 4/2"
+            // log noise and duplicate publishSignedOut calls seen when the interval
+            // keeps firing during the router.replace transition.
+            isCancelled = true;
+            window.clearInterval(interval);
             clientLogger.warn({
               layer: "ui",
               event: "session_check:signing_out",
