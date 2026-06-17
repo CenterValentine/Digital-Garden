@@ -549,6 +549,18 @@ export function getSlashCommands(): SlashCommand[] {
       aliases: ["tags", "cloud", "topics", "categories", "browse"],
       kind: "published",
     },
+    // ── W11 ─────────────────────────────────────────────────────────────────
+    {
+      title: "Stats Table",
+      description: "Vertical key/value list for case study outcomes and mixed-unit metrics",
+      icon: "≡",
+      command: ({ editor, range }) => {
+        editor.chain().focus().deleteRange(range)
+          .insertContent({ type: "statsTable", attrs: {} }).run();
+      },
+      aliases: ["stats", "table", "outcomes", "case study", "results", "kv", "key value", "metrics", "facts", "pills", "skills", "tools"],
+      kind: "published",
+    },
     {
       title: "Code Block",
       description: "Insert a code block",
