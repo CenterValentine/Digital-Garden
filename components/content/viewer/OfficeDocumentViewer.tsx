@@ -16,6 +16,7 @@ import { Download, AlertCircle, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/glass/button";
 import { toast } from "sonner";
 import mammoth from "mammoth";
+import DOMPurify from "dompurify";
 import { useUploadSettingsStore } from "@/state/upload-settings-store";
 import { OnlyOfficeEditor } from "./OnlyOfficeEditor";
 import { GoogleDriveEditor } from "./GoogleDriveEditor";
@@ -75,7 +76,13 @@ export function OfficeDocumentViewer({
       const arrayBuffer = await response.arrayBuffer();
       const result = await mammoth.convertToHtml({ arrayBuffer });
 
-      setClientHtml(result.value);
+      // mammoth converts user-uploaded docx — sanitize before injecting via
+      // dangerouslySetInnerHTML downstream. Default DOMPurify policy strips
+      // <script>, event handler attrs, and javascript:/vbscript: URIs while
+      // preserving tables, lists, headings, formatting, and data: image
+      // URIs (mammoth embeds docx images inline).
+      const safeHtml = DOMPurify.sanitize(result.value);
+      setClientHtml(safeHtml);
 
       if (result.messages.length > 0) {
         clientLogger.warn({

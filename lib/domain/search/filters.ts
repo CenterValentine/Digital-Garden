@@ -115,14 +115,33 @@ export function buildSearchQuery(filter: SearchFilter): URLSearchParams {
   return params;
 }
 
+const HTML_ESCAPES: Record<string, string> = {
+  "&": "&amp;",
+  "<": "&lt;",
+  ">": "&gt;",
+  '"': "&quot;",
+  "'": "&#39;",
+};
+
+function escapeHtml(text: string): string {
+  return text.replace(/[&<>"']/g, (c) => HTML_ESCAPES[c]!);
+}
+
 /**
- * Highlight search matches in text
+ * Highlight search matches in text, returning HTML-safe output.
+ *
+ * Consumed by SearchPanel via dangerouslySetInnerHTML, so the returned
+ * string must be safe HTML. The pattern runs against raw text to preserve
+ * (user-supplied) regex semantics; the output is emitted piece-by-piece
+ * with each match wrapped in <mark>…</mark> and every non-match segment
+ * HTML-escaped. Without escaping, a note containing
+ * `<img src=x onerror=…>` would XSS the searcher.
  *
  * @param text - Original text
  * @param query - Search query
  * @param caseSensitive - Use case-sensitive matching
  * @param useRegex - Treat query as regex pattern
- * @returns Text with <mark> tags around matches
+ * @returns HTML-escaped text with <mark> tags around matches
  */
 export function highlightMatches(
   text: string,
@@ -130,25 +149,35 @@ export function highlightMatches(
   caseSensitive: boolean = false,
   useRegex: boolean = false
 ): string {
-  if (!query.trim()) return text;
+  if (!query.trim()) return escapeHtml(text);
 
   try {
-    let pattern: string;
-    if (useRegex) {
-      // Use query as-is if regex mode
-      pattern = query;
-    } else {
-      // Escape special regex characters for literal search
-      pattern = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    }
-
+    const pattern = useRegex
+      ? query
+      : query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     const flags = caseSensitive ? "g" : "gi";
     const regex = new RegExp(`(${pattern})`, flags);
 
-    return text.replace(regex, "<mark>$1</mark>");
-  } catch (e) {
-    // Invalid regex - return text unchanged
-    return text;
+    let result = "";
+    let lastIndex = 0;
+    let match: RegExpExecArray | null;
+    while ((match = regex.exec(text)) !== null) {
+      // Skip zero-width matches (e.g. user regex `a*` or `(?=foo)`) and
+      // force progress so the loop terminates.
+      if (match[0].length === 0) {
+        if (match.index === regex.lastIndex) regex.lastIndex++;
+        continue;
+      }
+      result += escapeHtml(text.slice(lastIndex, match.index));
+      result += "<mark>" + escapeHtml(match[0]) + "</mark>";
+      lastIndex = match.index + match[0].length;
+    }
+    result += escapeHtml(text.slice(lastIndex));
+    return result;
+  } catch {
+    // Invalid regex — return escaped text with no highlights. The pre-fix
+    // version returned raw text here, which was the XSS path.
+    return escapeHtml(text);
   }
 }
 

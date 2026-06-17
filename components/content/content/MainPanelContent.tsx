@@ -1148,6 +1148,20 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
     [paneId, setSelectedContentId]
   );
 
+  // Handle wiki-link "Open" context menu action.
+  // "Open in Pane" is handled directly in editor-actions.tsx via the pane submenu.
+  useEffect(() => {
+    const handleOpen = (e: Event) => {
+      const { targetTitle } = (e as CustomEvent<{ targetTitle: string }>).detail;
+      void handleWikiLinkClick(targetTitle);
+    };
+
+    window.addEventListener("open-wiki-link", handleOpen);
+    return () => {
+      window.removeEventListener("open-wiki-link", handleOpen);
+    };
+  }, [handleWikiLinkClick]);
+
   // Fetch notes for wiki-link autocomplete
   const fetchNotesForWikiLink = useCallback(
     async (query: string) => {

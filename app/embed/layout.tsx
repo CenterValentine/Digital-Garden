@@ -9,6 +9,7 @@
  */
 
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 
 export const metadata: Metadata = {
   title: "Digital Garden",
@@ -111,11 +112,14 @@ const EMBED_BRIDGE_SCRIPT = `
 })();
 `;
 
-export default function EmbedLayout({
+export default async function EmbedLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  // Per-request nonce from the proxy. See app/layout.tsx for context on
+  // why we apply this now while CSP enforcement (M-2) is still pending.
+  const nonce = (await headers()).get("x-nonce") ?? undefined;
   return (
     <div
       id="embed-root"
@@ -136,7 +140,7 @@ export default function EmbedLayout({
         intercepts anchor clicks to forward external links to the parent overlay.
         Must stay inline (no Script component) so it executes before hydration.
       */}
-      <script dangerouslySetInnerHTML={{ __html: EMBED_BRIDGE_SCRIPT }} />
+      <script nonce={nonce} dangerouslySetInnerHTML={{ __html: EMBED_BRIDGE_SCRIPT }} />
       {children}
     </div>
   );

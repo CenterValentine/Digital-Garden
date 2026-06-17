@@ -85,7 +85,7 @@ export const PersonMention = Node.create<PersonMentionOptions>({
       "span",
       mergeAttributes(this.options.HTMLAttributes, HTMLAttributes, {
         "data-type": "person-mention",
-        class: "person-mention cursor-pointer rounded-full bg-blue-500/10 px-1.5 py-0.5 text-blue-600 hover:bg-blue-500/15",
+        class: "person-mention cursor-pointer rounded-full bg-cyan-500/10 px-1.5 py-0.5 text-cyan-500 hover:bg-cyan-500/20 dark:text-cyan-400",
       }),
       `@${node.attrs.label || "person"}`,
     ];

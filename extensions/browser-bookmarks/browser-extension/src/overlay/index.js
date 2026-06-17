@@ -1,3 +1,5 @@
+import { loadUrlPresets, resolvePreset, applyUrlStrategy } from "../url-strategy.js";
+
 const DG_OVERLAY_ROOT_ID = "dg-browser-overlay-root";
 const DG_OVERLAY_APP_ROUTE = "/content/";
 const DG_OVERLAY_IDLE_MS = 2400;
@@ -55,6 +57,17 @@ function normalizeComparableUrl(url) {
   } catch {
     return String(url || "").trim();
   }
+}
+
+// ── URL strategy state (populated async on init) ──────────────────────────
+// Falls back to normalizeComparableUrl (exact-URL matching) until presets load.
+let _urlPresetMap = null;
+let _urlStrategyOverrides = {};
+
+function applyUrlStrategyToHref(href) {
+  if (!_urlPresetMap) return normalizeComparableUrl(href);
+  const preset = resolvePreset(href, _urlPresetMap, _urlStrategyOverrides);
+  return applyUrlStrategy(href, preset);
 }
 
 function getCanonicalUrl() {
@@ -1347,8 +1360,11 @@ function renderLoadError(container, err, { onRetry = null } = {}) {
 }
 
 function resourcePayload() {
+  // Apply the domain's URL strategy before sending to the server so that
+  // note association uses the same canonical form as _onUrlChange comparisons.
+  const strategyUrl = applyUrlStrategyToHref(window.location.href);
   return {
-    url: window.location.href,
+    url: strategyUrl ?? window.location.href,
     canonicalUrl: getCanonicalUrl(),
     title: document.title || window.location.hostname,
     faviconUrl: getFaviconUrl(),
@@ -2708,19 +2724,48 @@ function wireRootEvents(state) {
   // only patches the content-script copy — the page's framework calls its own.
   // window.location.href IS shared across worlds, so polling is the reliable path.
   let _lastTrackedHref = window.location.href;
+  // Track the strategy-normalized form so that navigations that map to the same
+  // note (e.g. github.com/owner/repo/issues → github.com/owner/repo/pulls when
+  // path-depth is 2) don't trigger a reload at all.
+  let _lastTrackedNormalizedHref = applyUrlStrategyToHref(window.location.href);
+
   function _onUrlChange() {
     const current = window.location.href;
     if (current === _lastTrackedHref) return;
     _lastTrackedHref = current;
-    state.resourceContext = null;
+
+    const normalizedCurrent = applyUrlStrategyToHref(current);
+
+    // Strategy says ignore this domain — clear context but don't re-fetch.
+    if (normalizedCurrent === null) {
+      state.resourceContext = null;
+      state.domainAssociations = null;
+      state.domainAssociationsExpanded = false;
+      state.domainAssociationsSearch = "";
+      return;
+    }
+
+    // Same normalized URL = same note association → no reload needed.
+    if (normalizedCurrent === _lastTrackedNormalizedHref) return;
+    _lastTrackedNormalizedHref = normalizedCurrent;
+
+    // Domain associations are always page-specific — always clear.
     state.domainAssociations = null;
     state.domainAssociationsExpanded = false;
     state.domainAssociationsSearch = "";
+
     if (state.panelOpen) {
-      renderStatus(state.popoverBodies.associations, "Loading…");
+      // Soft reload: keep the old notes visible while fetching the new context,
+      // then swap in one paint. This avoids the "Loading…" flash on navigation.
       void loadResourceContext(state)
         .then(() => renderAssociationsPopover(state))
-        .catch(() => {});
+        .catch(() => {
+          state.resourceContext = null;
+          renderAssociationsPopover(state);
+        });
+    } else {
+      // Panel is closed — discard stale context so the next open is fresh.
+      state.resourceContext = null;
     }
   }
   // popstate fires in isolated world for Back/Forward
@@ -3366,6 +3411,19 @@ async function initOverlay() {
   if (window.location.origin === appOrigin) {
     return;
   }
+
+  // Load URL strategy presets non-blocking. The module-level vars are used by
+  // applyUrlStrategyToHref(); they fall back to exact-URL matching until ready.
+  loadUrlPresets().then(({ presetMap, overrides }) => {
+    _urlPresetMap = presetMap;
+    _urlStrategyOverrides = overrides;
+    // Re-seed the normalized URL tracker now that we have real strategies —
+    // avoids a false-reload on the first navigation after presets load.
+    // (The _lastTrackedNormalizedHref variable lives in the _onUrlChange closure
+    //  below and is initialized from applyUrlStrategyToHref at definition time,
+    //  which at that point falls back to exact-URL. It corrects itself naturally
+    //  on the next URL change; no action needed here.)
+  }).catch(() => {});
 
   const state = {
     config,

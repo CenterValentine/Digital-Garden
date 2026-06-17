@@ -1,0 +1,2120 @@
+{
+  "_version": 1,
+  "_updated": "2026-06-12",
+  "_description": "URL association strategy presets for the Digital Garden browser extension. User overrides take precedence over these defaults. Edit freely — no code changes required, changes take effect on next page load.",
+  "_strategies": {
+    "exact": "Domain + full path + query string (hash stripped). Best for articles, Q&A pages, specific unique content.",
+    "path": "Domain + full path, all query params stripped. Best for content sites where params are tracking noise.",
+    "path-depth": "Domain + first N path segments only. Best for hierarchical sites: GitHub (org/repo = depth 2), Reddit (r/community = depth 2).",
+    "params": "Domain + specific named params only. Best when a query param IS the content identifier (YouTube v=, HN id=).",
+    "domain": "Domain only. All pages on the domain share one note. Best for tools and dashboards.",
+    "ignore": "No overlay shown. Best for search engines, email, and ephemeral session-based apps."
+  },
+  "presets": [
+
+    {
+      "id": "youtube",
+      "label": "YouTube",
+      "category": "video",
+      "hosts": ["youtube.com", "youtu.be"],
+      "strategy": "params",
+      "keepParams": ["v", "list"],
+      "note": "v=video ID, list=playlist ID. Strips: feature, si, pp, gclid and all tracking params."
+    },
+    {
+      "id": "vimeo",
+      "label": "Vimeo",
+      "category": "video",
+      "hosts": ["vimeo.com"],
+      "strategy": "path",
+      "note": "Video ID is in the path. All query params are tracking or display state."
+    },
+    {
+      "id": "twitch",
+      "label": "Twitch",
+      "category": "video",
+      "hosts": ["twitch.tv"],
+      "strategy": "path-depth",
+      "depth": 1,
+      "note": "Channel name is the first path segment. tt_medium, tt_content are tracking."
+    },
+    {
+      "id": "bilibili",
+      "label": "Bilibili",
+      "category": "video",
+      "hosts": ["bilibili.com", "b23.tv"],
+      "strategy": "path",
+      "note": "BV/AV video ID is in the path. Strips all share, recommendation, and tracking params."
+    },
+    {
+      "id": "youku",
+      "label": "Youku",
+      "category": "video",
+      "hosts": ["youku.com"],
+      "strategy": "path",
+      "note": "Video ID is in the path. tpa is tracking."
+    },
+    {
+      "id": "dailymotion",
+      "label": "Dailymotion",
+      "category": "video",
+      "hosts": ["dailymotion.com"],
+      "strategy": "path",
+      "note": "Video ID is in the path."
+    },
+    {
+      "id": "rumble",
+      "label": "Rumble",
+      "category": "video",
+      "hosts": ["rumble.com"],
+      "strategy": "path",
+      "note": "Video slug is in the path."
+    },
+    {
+      "id": "ted",
+      "label": "TED",
+      "category": "video",
+      "hosts": ["ted.com"],
+      "strategy": "path",
+      "note": "Talk slug is in the path. All params are tracking or language preference."
+    },
+    {
+      "id": "nebula",
+      "label": "Nebula",
+      "category": "video",
+      "hosts": ["nebula.tv"],
+      "strategy": "path",
+      "note": "Creator and video slug are in the path."
+    },
+    {
+      "id": "curiositystream",
+      "label": "CuriosityStream",
+      "category": "video",
+      "hosts": ["curiositystream.com"],
+      "strategy": "path",
+      "note": "Documentary ID is in the path."
+    },
+    {
+      "id": "pbs",
+      "label": "PBS",
+      "category": "video",
+      "hosts": ["pbs.org"],
+      "strategy": "path",
+      "note": "Show and episode paths are stable."
+    },
+
+    {
+      "id": "spotify",
+      "label": "Spotify",
+      "category": "audio",
+      "hosts": ["open.spotify.com", "spotify.com"],
+      "strategy": "path",
+      "note": "Track/album/playlist/podcast ID is in the path. si param is a share tracking ID."
+    },
+    {
+      "id": "soundcloud",
+      "label": "SoundCloud",
+      "category": "audio",
+      "hosts": ["soundcloud.com"],
+      "strategy": "path-depth",
+      "depth": 2,
+      "note": "artist/track-slug is the canonical identifier."
+    },
+    {
+      "id": "bandcamp",
+      "label": "Bandcamp",
+      "category": "audio",
+      "hosts": ["bandcamp.com"],
+      "strategy": "path",
+      "note": "Artist subdomain + path identifies the release."
+    },
+    {
+      "id": "lastfm",
+      "label": "Last.fm",
+      "category": "audio",
+      "hosts": ["last.fm", "www.last.fm"],
+      "strategy": "path",
+      "note": "Artist, album, and track pages are all path-based."
+    },
+    {
+      "id": "discogs",
+      "label": "Discogs",
+      "category": "audio",
+      "hosts": ["discogs.com"],
+      "strategy": "path",
+      "note": "Release, artist, and label IDs are in the path."
+    },
+    {
+      "id": "apple-music",
+      "label": "Apple Music",
+      "category": "audio",
+      "hosts": ["music.apple.com"],
+      "strategy": "path",
+      "note": "Content ID is in the path. Query params are app routing and tracking."
+    },
+    {
+      "id": "podcasts-apple",
+      "label": "Apple Podcasts",
+      "category": "audio",
+      "hosts": ["podcasts.apple.com"],
+      "strategy": "path-depth",
+      "depth": 3,
+      "note": "podcast/show-slug/episode-id. First 3 segments identify the episode."
+    },
+    {
+      "id": "overcast",
+      "label": "Overcast",
+      "category": "audio",
+      "hosts": ["overcast.fm"],
+      "strategy": "path",
+      "note": "Episode URL is path-based."
+    },
+    {
+      "id": "pocketcasts",
+      "label": "Pocket Casts",
+      "category": "audio",
+      "hosts": ["pocketcasts.com"],
+      "strategy": "path",
+      "note": "Episode and show paths are stable."
+    },
+
+    {
+      "id": "twitter",
+      "label": "Twitter / X",
+      "category": "social",
+      "hosts": ["twitter.com", "x.com"],
+      "strategy": "path",
+      "note": "Strips src, s, cn, ref_url, t — all tracking. Path identifies tweet or profile."
+    },
+    {
+      "id": "reddit",
+      "label": "Reddit",
+      "category": "social",
+      "hosts": ["reddit.com", "old.reddit.com", "new.reddit.com"],
+      "strategy": "path",
+      "note": "Full path identifies subreddit vs post vs user. All query params are tracking or share data."
+    },
+    {
+      "id": "facebook",
+      "label": "Facebook",
+      "category": "social",
+      "hosts": ["facebook.com", "fb.com"],
+      "strategy": "path",
+      "note": "Strips hc_*, __tn__, eid, ref* and other tracking. Profile and post paths are meaningful."
+    },
+    {
+      "id": "instagram",
+      "label": "Instagram",
+      "category": "social",
+      "hosts": ["instagram.com"],
+      "strategy": "path",
+      "note": "igshid and igsh are share tracking IDs. Path identifies post, reel, or profile."
+    },
+    {
+      "id": "linkedin",
+      "label": "LinkedIn",
+      "category": "social",
+      "hosts": ["linkedin.com"],
+      "strategy": "path",
+      "note": "Strips refId, trk, trackingId. Path identifies profile, company, or post."
+    },
+    {
+      "id": "tiktok",
+      "label": "TikTok",
+      "category": "social",
+      "hosts": ["tiktok.com"],
+      "strategy": "path",
+      "note": "Video and user pages are path-based. All query params are tracking."
+    },
+    {
+      "id": "snapchat",
+      "label": "Snapchat",
+      "category": "social",
+      "hosts": ["snapchat.com"],
+      "strategy": "path",
+      "note": "Story and profile paths are meaningful. sc_referrer and sc_ua are tracking."
+    },
+    {
+      "id": "pinterest",
+      "label": "Pinterest",
+      "category": "social",
+      "hosts": ["pinterest.com"],
+      "strategy": "path",
+      "note": "Pin and board IDs are in the path."
+    },
+    {
+      "id": "tumblr",
+      "label": "Tumblr",
+      "category": "social",
+      "hosts": ["tumblr.com"],
+      "strategy": "path",
+      "note": "Post ID is in the path. Subdomain identifies the blog."
+    },
+    {
+      "id": "mastodon",
+      "label": "Mastodon (mastodon.social)",
+      "category": "social",
+      "hosts": ["mastodon.social"],
+      "strategy": "path",
+      "note": "Post and profile URLs are path-based. Add other instances manually as needed."
+    },
+    {
+      "id": "bluesky",
+      "label": "Bluesky",
+      "category": "social",
+      "hosts": ["bsky.app"],
+      "strategy": "path",
+      "note": "Post and profile URLs are path-based."
+    },
+    {
+      "id": "vk",
+      "label": "VK",
+      "category": "social",
+      "hosts": ["vk.com"],
+      "strategy": "path",
+      "note": "Profile and post paths are meaningful. Query params are tracking."
+    },
+    {
+      "id": "weibo",
+      "label": "Weibo",
+      "category": "social",
+      "hosts": ["weibo.com", "weibo.cn"],
+      "strategy": "path",
+      "note": "weibo_id and dt_dapp are tracking. Path identifies post or user."
+    },
+    {
+      "id": "xiaohongshu",
+      "label": "Xiaohongshu (RED)",
+      "category": "social",
+      "hosts": ["xiaohongshu.com"],
+      "strategy": "path",
+      "note": "Post ID is in the path. All share and tracking params stripped."
+    },
+    {
+      "id": "deviantart",
+      "label": "DeviantArt",
+      "category": "social",
+      "hosts": ["deviantart.com"],
+      "strategy": "path",
+      "note": "Artwork is identified by path. All tracking params stripped."
+    },
+    {
+      "id": "9gag",
+      "label": "9GAG",
+      "category": "social",
+      "hosts": ["9gag.com"],
+      "strategy": "path",
+      "note": "Post ID is in the path. ref param is tracking."
+    },
+    {
+      "id": "giphy",
+      "label": "GIPHY",
+      "category": "social",
+      "hosts": ["giphy.com"],
+      "strategy": "path",
+      "note": "GIF slug is in the path. ref param is tracking."
+    },
+
+    {
+      "id": "steam",
+      "label": "Steam",
+      "category": "gaming",
+      "hosts": ["store.steampowered.com", "steamcommunity.com"],
+      "strategy": "path",
+      "note": "App ID is in the path (/app/12345). snr param is tracking."
+    },
+    {
+      "id": "epicgames",
+      "label": "Epic Games Store",
+      "category": "gaming",
+      "hosts": ["store.epicgames.com", "epicgames.com"],
+      "strategy": "path",
+      "note": "Game slug is in the path. epic_affiliate and epic_gameId are tracking."
+    },
+    {
+      "id": "gog",
+      "label": "GOG",
+      "category": "gaming",
+      "hosts": ["gog.com"],
+      "strategy": "path",
+      "note": "Game slug is in the path. track_click and link_id are tracking."
+    },
+    {
+      "id": "roblox",
+      "label": "Roblox",
+      "category": "gaming",
+      "hosts": ["roblox.com"],
+      "strategy": "path",
+      "note": "Game/user ID is in the path. refPageId is tracking."
+    },
+    {
+      "id": "curseforge",
+      "label": "CurseForge",
+      "category": "gaming",
+      "hosts": ["curseforge.com"],
+      "strategy": "path",
+      "note": "Mod and addon pages are path-based."
+    },
+    {
+      "id": "itch",
+      "label": "itch.io",
+      "category": "gaming",
+      "hosts": ["itch.io"],
+      "strategy": "path-depth",
+      "depth": 2,
+      "note": "creator/game-slug is the identifier."
+    },
+    {
+      "id": "humblebundle",
+      "label": "Humble Bundle",
+      "category": "gaming",
+      "hosts": ["humblebundle.com"],
+      "strategy": "path",
+      "note": "Bundle and store pages are path-based. partner param is referral tracking."
+    },
+    {
+      "id": "indiedb",
+      "label": "IndieDB",
+      "category": "gaming",
+      "hosts": ["indiedb.com", "moddb.com"],
+      "strategy": "path",
+      "note": "Game and mod pages are path-based."
+    },
+    {
+      "id": "gamespot",
+      "label": "GameSpot",
+      "category": "gaming",
+      "hosts": ["gamespot.com"],
+      "strategy": "path",
+      "note": "Review and article paths are stable. PostType, ftag, UniqueID, TheTime are tracking."
+    },
+    {
+      "id": "ign",
+      "label": "IGN",
+      "category": "gaming",
+      "hosts": ["ign.com"],
+      "strategy": "path",
+      "note": "Article and review paths are stable."
+    },
+
+    {
+      "id": "nytimes",
+      "label": "New York Times",
+      "category": "news",
+      "hosts": ["nytimes.com"],
+      "strategy": "path",
+      "note": "Article slug is in the path. smid is social media tracking."
+    },
+    {
+      "id": "theguardian",
+      "label": "The Guardian",
+      "category": "news",
+      "hosts": ["theguardian.com"],
+      "strategy": "path",
+      "note": "Article path is stable and unique. CMP is a consent and tracking param."
+    },
+    {
+      "id": "bbc",
+      "label": "BBC",
+      "category": "news",
+      "hosts": ["bbc.com", "bbc.co.uk"],
+      "strategy": "path",
+      "note": "Article path is stable. xtor and at_* are tracking params."
+    },
+    {
+      "id": "reuters",
+      "label": "Reuters",
+      "category": "news",
+      "hosts": ["reuters.com"],
+      "strategy": "path",
+      "note": "Article slug is in the path. taid is tracking."
+    },
+    {
+      "id": "techcrunch",
+      "label": "TechCrunch",
+      "category": "news",
+      "hosts": ["techcrunch.com"],
+      "strategy": "path",
+      "note": "Article slug is in the path. ncid, sr, guccounter are tracking."
+    },
+    {
+      "id": "wired",
+      "label": "Wired",
+      "category": "news",
+      "hosts": ["wired.com"],
+      "strategy": "path",
+      "note": "Article slug is in the path. intcid is tracking."
+    },
+    {
+      "id": "cnbc",
+      "label": "CNBC",
+      "category": "news",
+      "hosts": ["cnbc.com"],
+      "strategy": "path",
+      "note": "Article slug is in the path. __source is tracking."
+    },
+    {
+      "id": "cnet",
+      "label": "CNET",
+      "category": "news",
+      "hosts": ["cnet.com"],
+      "strategy": "path",
+      "note": "Article slug is in the path. ftag is tracking."
+    },
+    {
+      "id": "forbes",
+      "label": "Forbes",
+      "category": "news",
+      "hosts": ["forbes.com"],
+      "strategy": "path",
+      "note": "Article slug is in the path. sh is tracking."
+    },
+    {
+      "id": "newyorker",
+      "label": "The New Yorker",
+      "category": "news",
+      "hosts": ["newyorker.com"],
+      "strategy": "path",
+      "note": "Article slug is in the path. bxid, cndid, esrc, mbid are tracking."
+    },
+    {
+      "id": "nypost",
+      "label": "New York Post",
+      "category": "news",
+      "hosts": ["nypost.com"],
+      "strategy": "path",
+      "note": "Article slug is in the path. __twitter_impression is tracking."
+    },
+    {
+      "id": "wsj",
+      "label": "Wall Street Journal",
+      "category": "news",
+      "hosts": ["wsj.com"],
+      "strategy": "path",
+      "note": "Article slug is in the path. All query params are tracking or auth."
+    },
+    {
+      "id": "washingtonpost",
+      "label": "Washington Post",
+      "category": "news",
+      "hosts": ["washingtonpost.com"],
+      "strategy": "path",
+      "note": "Article path is stable. All query params are tracking."
+    },
+    {
+      "id": "economist",
+      "label": "The Economist",
+      "category": "news",
+      "hosts": ["economist.com"],
+      "strategy": "path",
+      "note": "Article slug is in the path."
+    },
+    {
+      "id": "ft",
+      "label": "Financial Times",
+      "category": "news",
+      "hosts": ["ft.com"],
+      "strategy": "path",
+      "note": "Article path is stable."
+    },
+    {
+      "id": "apnews",
+      "label": "AP News",
+      "category": "news",
+      "hosts": ["apnews.com"],
+      "strategy": "path",
+      "note": "Article slug is in the path."
+    },
+    {
+      "id": "theverge",
+      "label": "The Verge",
+      "category": "news",
+      "hosts": ["theverge.com"],
+      "strategy": "path",
+      "note": "Article slug is in the path."
+    },
+    {
+      "id": "arstechnica",
+      "label": "Ars Technica",
+      "category": "news",
+      "hosts": ["arstechnica.com"],
+      "strategy": "path",
+      "note": "Article slug is in the path."
+    },
+    {
+      "id": "hackernews",
+      "label": "Hacker News",
+      "category": "news",
+      "hosts": ["news.ycombinator.com"],
+      "strategy": "params",
+      "keepParams": ["id"],
+      "note": "id= is the only stable identifier. Path-only (/item) is meaningless without it."
+    },
+    {
+      "id": "lobsters",
+      "label": "Lobsters",
+      "category": "news",
+      "hosts": ["lobste.rs"],
+      "strategy": "path",
+      "note": "Post slug is in the path."
+    },
+    {
+      "id": "msn",
+      "label": "MSN",
+      "category": "news",
+      "hosts": ["msn.com"],
+      "strategy": "path",
+      "note": "Article path is stable. cvid and ocid are tracking."
+    },
+    {
+      "id": "businessinsider",
+      "label": "Business Insider",
+      "category": "news",
+      "hosts": ["businessinsider.com", "insider.com"],
+      "strategy": "path",
+      "note": "Article slug is in the path."
+    },
+    {
+      "id": "buzzfeed",
+      "label": "BuzzFeed",
+      "category": "news",
+      "hosts": ["buzzfeed.com"],
+      "strategy": "path",
+      "note": "Article slug is in the path."
+    },
+    {
+      "id": "vox",
+      "label": "Vox",
+      "category": "news",
+      "hosts": ["vox.com"],
+      "strategy": "path",
+      "note": "Article slug is in the path."
+    },
+    {
+      "id": "axios",
+      "label": "Axios",
+      "category": "news",
+      "hosts": ["axios.com"],
+      "strategy": "path",
+      "note": "Article slug is in the path."
+    },
+    {
+      "id": "politico",
+      "label": "Politico",
+      "category": "news",
+      "hosts": ["politico.com"],
+      "strategy": "path",
+      "note": "Article slug is in the path."
+    },
+    {
+      "id": "spiegel",
+      "label": "Der Spiegel",
+      "category": "news",
+      "hosts": ["spiegel.de"],
+      "strategy": "path",
+      "note": "Article slug is in the path. b param is tracking."
+    },
+
+    {
+      "id": "amazon",
+      "label": "Amazon",
+      "category": "shopping",
+      "hosts": [
+        "amazon.com", "amazon.co.uk", "amazon.de", "amazon.co.jp",
+        "amazon.fr", "amazon.it", "amazon.es", "amazon.ca",
+        "amazon.com.au", "amazon.in", "amazon.com.mx", "amazon.com.br"
+      ],
+      "strategy": "path",
+      "note": "ASIN is in the path (/dp/ASIN). Strips all query params and /ref= path segments."
+    },
+    {
+      "id": "ebay",
+      "label": "eBay",
+      "category": "shopping",
+      "hosts": ["ebay.com", "ebay.co.uk", "ebay.de", "ebay.fr", "ebay.it", "ebay.es", "ebay.com.au"],
+      "strategy": "path",
+      "note": "Item ID is in the path. _trkparms, _trksid, _from, hash are tracking."
+    },
+    {
+      "id": "walmart",
+      "label": "Walmart",
+      "category": "shopping",
+      "hosts": ["walmart.com"],
+      "strategy": "path",
+      "note": "Product ID is in the path. u1 and ath* params are tracking."
+    },
+    {
+      "id": "etsy",
+      "label": "Etsy",
+      "category": "shopping",
+      "hosts": ["etsy.com"],
+      "strategy": "path",
+      "note": "Listing ID is in the path. click_key, click_sum, organic_search_click are tracking."
+    },
+    {
+      "id": "bestbuy",
+      "label": "Best Buy",
+      "category": "shopping",
+      "hosts": ["bestbuy.com"],
+      "strategy": "path",
+      "note": "Product SKU is in the path. irclickid, irgwc, loc, acampID are tracking."
+    },
+    {
+      "id": "aliexpress",
+      "label": "AliExpress",
+      "category": "shopping",
+      "hosts": ["aliexpress.com", "aliexpress.us"],
+      "strategy": "path",
+      "note": "Product ID is in the path. Strips ws_ab_test, btsid, algo_*, gps-id, scm_*, pvid."
+    },
+    {
+      "id": "taobao",
+      "label": "Taobao",
+      "category": "shopping",
+      "hosts": ["taobao.com", "world.taobao.com"],
+      "strategy": "path",
+      "note": "Item ID is in the path. Strips all recommendation, share, and tracking params."
+    },
+    {
+      "id": "tmall",
+      "label": "Tmall",
+      "category": "shopping",
+      "hosts": ["tmall.com"],
+      "strategy": "path",
+      "note": "Product ID is in the path. Strips share and tracking params."
+    },
+    {
+      "id": "flipkart",
+      "label": "Flipkart",
+      "category": "shopping",
+      "hosts": ["flipkart.com"],
+      "strategy": "path",
+      "note": "Product slug is in the path. Strips otracker, ssid, cid, pid, etc."
+    },
+    {
+      "id": "shopee",
+      "label": "Shopee",
+      "category": "shopping",
+      "hosts": ["shopee.com", "shopee.co.th", "shopee.tw", "shopee.sg", "shopee.ph"],
+      "strategy": "path",
+      "note": "Product path is stable. publish_id, sp_atk, xptdk are tracking."
+    },
+    {
+      "id": "lazada",
+      "label": "Lazada",
+      "category": "shopping",
+      "hosts": ["lazada.com", "lazada.co.th", "lazada.co.id", "lazada.com.my", "lazada.com.ph", "lazada.sg", "lazada.vn"],
+      "strategy": "path",
+      "note": "Product path is stable. Strips clickTrackInfo, abid, pvid, ad_src, spm, etc."
+    },
+    {
+      "id": "tokopedia",
+      "label": "Tokopedia",
+      "category": "shopping",
+      "hosts": ["tokopedia.com"],
+      "strategy": "path",
+      "note": "Product path is stable. src, trkid, whid are tracking."
+    },
+    {
+      "id": "mercadolibre",
+      "label": "MercadoLibre",
+      "category": "shopping",
+      "hosts": ["mercadolibre.com", "mercadolibre.com.ar", "mercadolibre.com.mx", "mercadolibre.com.co", "mercadolivre.com"],
+      "strategy": "path",
+      "note": "Product ID is in the path. Strips DEAL_ID, position, tracking_id, reco_*, ad_click_id."
+    },
+    {
+      "id": "idealo",
+      "label": "Idealo",
+      "category": "shopping",
+      "hosts": ["idealo.de", "idealo.co.uk", "idealo.fr", "idealo.it", "idealo.es", "idealo.com"],
+      "strategy": "path",
+      "note": "Product slug is in the path. sid, src, siteId are tracking."
+    },
+    {
+      "id": "goodreads",
+      "label": "Goodreads",
+      "category": "shopping",
+      "hosts": ["goodreads.com"],
+      "strategy": "path",
+      "note": "Book and author paths are stable. from_search, from_srp, qid, rank, ac are tracking."
+    },
+    {
+      "id": "zillow",
+      "label": "Zillow",
+      "category": "shopping",
+      "hosts": ["zillow.com"],
+      "strategy": "path",
+      "note": "Listing ID is in the path. rtoken is tracking."
+    },
+    {
+      "id": "redfin",
+      "label": "Redfin",
+      "category": "shopping",
+      "hosts": ["redfin.com"],
+      "strategy": "path",
+      "note": "Listing path is stable. riftinfo is tracking."
+    },
+    {
+      "id": "realtor",
+      "label": "Realtor.com",
+      "category": "shopping",
+      "hosts": ["realtor.com"],
+      "strategy": "path",
+      "note": "Listing path is stable. ex, identityID, MID, RID are tracking."
+    },
+    {
+      "id": "airbnb",
+      "label": "Airbnb",
+      "category": "shopping",
+      "hosts": ["airbnb.com", "airbnb.co.uk", "airbnb.de", "airbnb.fr", "airbnb.com.au", "airbnb.ca"],
+      "strategy": "path",
+      "note": "Listing ID is in the path (/rooms/ID). federated_search_id, source_impression_id are tracking."
+    },
+    {
+      "id": "booking",
+      "label": "Booking.com",
+      "category": "shopping",
+      "hosts": ["booking.com"],
+      "strategy": "path",
+      "note": "Property path is stable. All query params are search filters and tracking."
+    },
+    {
+      "id": "tripadvisor",
+      "label": "Tripadvisor",
+      "category": "shopping",
+      "hosts": ["tripadvisor.com"],
+      "strategy": "path",
+      "note": "Property and attraction paths are stable."
+    },
+    {
+      "id": "allrecipes",
+      "label": "Allrecipes",
+      "category": "shopping",
+      "hosts": ["allrecipes.com"],
+      "strategy": "path",
+      "note": "Recipe path is stable. internalSource, referringId, clickId are tracking."
+    },
+    {
+      "id": "shutterstock",
+      "label": "Shutterstock",
+      "category": "shopping",
+      "hosts": ["shutterstock.com"],
+      "strategy": "path",
+      "note": "Image and video paths are stable. src is tracking."
+    },
+
+    {
+      "id": "github",
+      "label": "GitHub",
+      "category": "developer",
+      "hosts": ["github.com"],
+      "strategy": "path",
+      "note": "Full path identifies org, repo, issue, PR, file, or discussion. email_token, email_source are tracking."
+    },
+    {
+      "id": "stackoverflow",
+      "label": "Stack Overflow",
+      "category": "developer",
+      "hosts": ["stackoverflow.com"],
+      "strategy": "path",
+      "note": "Question ID is in the path. All query params are tracking or pagination."
+    },
+    {
+      "id": "stackexchange",
+      "label": "Stack Exchange Network",
+      "category": "developer",
+      "hosts": [
+        "stackexchange.com", "superuser.com", "serverfault.com",
+        "askubuntu.com", "unix.stackexchange.com", "math.stackexchange.com",
+        "physics.stackexchange.com", "stats.stackexchange.com",
+        "datascience.stackexchange.com", "security.stackexchange.com",
+        "softwareengineering.stackexchange.com", "codereview.stackexchange.com",
+        "ux.stackexchange.com", "apple.stackexchange.com",
+        "crypto.stackexchange.com", "biology.stackexchange.com",
+        "chemistry.stackexchange.com", "electronics.stackexchange.com"
+      ],
+      "strategy": "path",
+      "note": "Question ID is in the path. All query params are tracking or pagination."
+    },
+    {
+      "id": "mdn",
+      "label": "MDN Web Docs",
+      "category": "developer",
+      "hosts": ["developer.mozilla.org"],
+      "strategy": "path",
+      "note": "Full path identifies the specific API or concept. src, platform, redirect_source are tracking."
+    },
+    {
+      "id": "devdocs",
+      "label": "DevDocs",
+      "category": "developer",
+      "hosts": ["devdocs.io"],
+      "strategy": "path",
+      "note": "Hash-based navigation. Path identifies the doc set."
+    },
+    {
+      "id": "npmjs",
+      "label": "npm Registry",
+      "category": "developer",
+      "hosts": ["npmjs.com"],
+      "strategy": "path-depth",
+      "depth": 2,
+      "note": "/package/name is the identifier. Depth 2 handles both scoped (@scope/pkg) and unscoped packages."
+    },
+    {
+      "id": "pypi",
+      "label": "PyPI",
+      "category": "developer",
+      "hosts": ["pypi.org"],
+      "strategy": "path-depth",
+      "depth": 2,
+      "note": "/project/name is the package identifier."
+    },
+    {
+      "id": "crates",
+      "label": "crates.io",
+      "category": "developer",
+      "hosts": ["crates.io"],
+      "strategy": "path-depth",
+      "depth": 2,
+      "note": "/crates/name is the package identifier."
+    },
+    {
+      "id": "pkg-go-dev",
+      "label": "pkg.go.dev",
+      "category": "developer",
+      "hosts": ["pkg.go.dev"],
+      "strategy": "path",
+      "note": "Full path is the Go import path. Query params are version selectors."
+    },
+    {
+      "id": "rubygems",
+      "label": "RubyGems",
+      "category": "developer",
+      "hosts": ["rubygems.org"],
+      "strategy": "path-depth",
+      "depth": 2,
+      "note": "/gems/name is the package identifier."
+    },
+    {
+      "id": "packagist",
+      "label": "Packagist (PHP)",
+      "category": "developer",
+      "hosts": ["packagist.org"],
+      "strategy": "path-depth",
+      "depth": 2,
+      "note": "/packages/vendor/name is the identifier."
+    },
+    {
+      "id": "dockerhub",
+      "label": "Docker Hub",
+      "category": "developer",
+      "hosts": ["hub.docker.com"],
+      "strategy": "path",
+      "note": "Image name and tag are in the path."
+    },
+    {
+      "id": "codepen",
+      "label": "CodePen",
+      "category": "developer",
+      "hosts": ["codepen.io"],
+      "strategy": "path",
+      "note": "Pen slug is in the path."
+    },
+    {
+      "id": "codesandbox",
+      "label": "CodeSandbox",
+      "category": "developer",
+      "hosts": ["codesandbox.io"],
+      "strategy": "path",
+      "note": "Sandbox ID is in the path."
+    },
+    {
+      "id": "stackblitz",
+      "label": "StackBlitz",
+      "category": "developer",
+      "hosts": ["stackblitz.com"],
+      "strategy": "path",
+      "note": "Project slug is in the path."
+    },
+    {
+      "id": "replit",
+      "label": "Replit",
+      "category": "developer",
+      "hosts": ["replit.com"],
+      "strategy": "path",
+      "note": "REPL path identifies the project."
+    },
+    {
+      "id": "gitlab",
+      "label": "GitLab",
+      "category": "developer",
+      "hosts": ["gitlab.com"],
+      "strategy": "path",
+      "note": "Full path identifies org, project, issue, or MR. ref_= is protected (branch navigation)."
+    },
+    {
+      "id": "bitbucket",
+      "label": "Bitbucket",
+      "category": "developer",
+      "hosts": ["bitbucket.org"],
+      "strategy": "path",
+      "note": "Full path identifies workspace, repo, PR, or issue."
+    },
+    {
+      "id": "jsfiddle",
+      "label": "JSFiddle",
+      "category": "developer",
+      "hosts": ["jsfiddle.net"],
+      "strategy": "path",
+      "note": "Fiddle ID is in the path."
+    },
+    {
+      "id": "regex101",
+      "label": "Regex101",
+      "category": "developer",
+      "hosts": ["regex101.com"],
+      "strategy": "path",
+      "note": "Saved regex permalink is path-based."
+    },
+    {
+      "id": "regexr",
+      "label": "RegExr",
+      "category": "developer",
+      "hosts": ["regexr.com"],
+      "strategy": "path",
+      "note": "Saved regex permalink is path-based."
+    },
+    {
+      "id": "caniuse",
+      "label": "Can I Use",
+      "category": "developer",
+      "hosts": ["caniuse.com"],
+      "strategy": "path",
+      "note": "Feature name is in the path or hash."
+    },
+    {
+      "id": "bundlephobia",
+      "label": "Bundlephobia",
+      "category": "developer",
+      "hosts": ["bundlephobia.com"],
+      "strategy": "path",
+      "note": "Package name is in the path."
+    },
+    {
+      "id": "json-schema",
+      "label": "JSON Schema",
+      "category": "developer",
+      "hosts": ["json-schema.org"],
+      "strategy": "path",
+      "note": "Spec section is in the path."
+    },
+
+    {
+      "id": "docs-github",
+      "label": "GitHub Docs",
+      "category": "documentation",
+      "hosts": ["docs.github.com"],
+      "strategy": "path",
+      "note": "Full path identifies the specific guide or reference page."
+    },
+    {
+      "id": "docs-stripe",
+      "label": "Stripe Docs",
+      "category": "documentation",
+      "hosts": ["stripe.com"],
+      "strategy": "path",
+      "note": "Full path covers both docs and API reference. Exception: referrer param is protected on stripe.com."
+    },
+    {
+      "id": "docs-aws",
+      "label": "AWS Docs",
+      "category": "documentation",
+      "hosts": ["docs.aws.amazon.com"],
+      "strategy": "path",
+      "note": "Full path identifies the service and page."
+    },
+    {
+      "id": "docs-gcp",
+      "label": "Google Cloud Docs",
+      "category": "documentation",
+      "hosts": ["cloud.google.com"],
+      "strategy": "path",
+      "note": "Full path covers docs, reference, and tutorials."
+    },
+    {
+      "id": "learn-microsoft",
+      "label": "Microsoft Learn",
+      "category": "documentation",
+      "hosts": ["learn.microsoft.com", "docs.microsoft.com"],
+      "strategy": "path",
+      "note": "Full path identifies the guide or API reference."
+    },
+    {
+      "id": "vercel-docs",
+      "label": "Vercel Docs",
+      "category": "documentation",
+      "hosts": ["vercel.com"],
+      "strategy": "path",
+      "note": "Full path covers docs, guides, and blog."
+    },
+    {
+      "id": "nextjs-docs",
+      "label": "Next.js Docs",
+      "category": "documentation",
+      "hosts": ["nextjs.org"],
+      "strategy": "path",
+      "note": "Full path identifies the specific guide or API page."
+    },
+    {
+      "id": "react-docs",
+      "label": "React Docs",
+      "category": "documentation",
+      "hosts": ["react.dev", "reactjs.org"],
+      "strategy": "path",
+      "note": "Full path identifies the guide or API reference."
+    },
+    {
+      "id": "vuejs-docs",
+      "label": "Vue.js Docs",
+      "category": "documentation",
+      "hosts": ["vuejs.org"],
+      "strategy": "path",
+      "note": "Full path identifies the guide or API reference."
+    },
+    {
+      "id": "svelte-docs",
+      "label": "Svelte Docs",
+      "category": "documentation",
+      "hosts": ["svelte.dev", "kit.svelte.dev"],
+      "strategy": "path",
+      "note": "Full path identifies the specific guide."
+    },
+    {
+      "id": "angular-docs",
+      "label": "Angular Docs",
+      "category": "documentation",
+      "hosts": ["angular.dev", "angular.io"],
+      "strategy": "path",
+      "note": "Full path identifies the guide or API reference."
+    },
+    {
+      "id": "tailwind-docs",
+      "label": "Tailwind CSS Docs",
+      "category": "documentation",
+      "hosts": ["tailwindcss.com"],
+      "strategy": "path",
+      "note": "Full path identifies the utility class or guide."
+    },
+    {
+      "id": "python-docs",
+      "label": "Python Docs",
+      "category": "documentation",
+      "hosts": ["docs.python.org"],
+      "strategy": "path",
+      "note": "Full path identifies the module or language reference."
+    },
+    {
+      "id": "rust-docs",
+      "label": "Rust Docs / docs.rs",
+      "category": "documentation",
+      "hosts": ["doc.rust-lang.org", "docs.rs"],
+      "strategy": "path",
+      "note": "Full path identifies the crate, module, or language reference."
+    },
+    {
+      "id": "go-docs",
+      "label": "Go Docs",
+      "category": "documentation",
+      "hosts": ["go.dev"],
+      "strategy": "path",
+      "note": "Full path identifies the package or guide."
+    },
+    {
+      "id": "swift-docs",
+      "label": "Swift Docs / Apple Developer",
+      "category": "documentation",
+      "hosts": ["docs.swift.org", "developer.apple.com"],
+      "strategy": "path",
+      "note": "Full path identifies the guide, framework, or API."
+    },
+    {
+      "id": "kotlin-docs",
+      "label": "Kotlin Docs",
+      "category": "documentation",
+      "hosts": ["kotlinlang.org"],
+      "strategy": "path",
+      "note": "Full path identifies the guide or API reference."
+    },
+    {
+      "id": "ruby-docs",
+      "label": "Ruby Docs",
+      "category": "documentation",
+      "hosts": ["ruby-lang.org", "rubyapi.org", "rubydoc.info"],
+      "strategy": "path",
+      "note": "Full path identifies the module or method reference."
+    },
+    {
+      "id": "php-docs",
+      "label": "PHP Docs",
+      "category": "documentation",
+      "hosts": ["php.net"],
+      "strategy": "path",
+      "note": "Full path identifies the function or class reference."
+    },
+    {
+      "id": "java-docs",
+      "label": "Java SE Docs",
+      "category": "documentation",
+      "hosts": ["docs.oracle.com"],
+      "strategy": "path",
+      "note": "Full path identifies the class or method reference."
+    },
+    {
+      "id": "cppreference",
+      "label": "cppreference.com",
+      "category": "documentation",
+      "hosts": ["cppreference.com", "en.cppreference.com"],
+      "strategy": "path",
+      "note": "Full path identifies the C/C++ language or library reference."
+    },
+    {
+      "id": "mozilla-org",
+      "label": "Mozilla Docs",
+      "category": "documentation",
+      "hosts": ["mozilla.org"],
+      "strategy": "path",
+      "note": "Article and guide paths are stable. src, platform, redirect_source are tracking."
+    },
+    {
+      "id": "w3schools",
+      "label": "W3Schools",
+      "category": "documentation",
+      "hosts": ["w3schools.com"],
+      "strategy": "path",
+      "note": "Tutorial paths are stable."
+    },
+    {
+      "id": "w3-org",
+      "label": "W3C",
+      "category": "documentation",
+      "hosts": ["w3.org"],
+      "strategy": "path",
+      "note": "Spec section paths are stable."
+    },
+    {
+      "id": "tc39",
+      "label": "TC39 Proposals",
+      "category": "documentation",
+      "hosts": ["tc39.es"],
+      "strategy": "path",
+      "note": "Spec section paths are stable."
+    },
+    {
+      "id": "ecma-international",
+      "label": "ECMA International",
+      "category": "documentation",
+      "hosts": ["ecma-international.org"],
+      "strategy": "path",
+      "note": "Spec paths are stable."
+    },
+    {
+      "id": "prettier-docs",
+      "label": "Prettier Docs",
+      "category": "documentation",
+      "hosts": ["prettier.io"],
+      "strategy": "path",
+      "note": "Doc section paths are stable."
+    },
+    {
+      "id": "eslint-docs",
+      "label": "ESLint Docs",
+      "category": "documentation",
+      "hosts": ["eslint.org"],
+      "strategy": "path",
+      "note": "Rule and guide paths are stable."
+    },
+    {
+      "id": "prisma-docs",
+      "label": "Prisma Docs",
+      "category": "documentation",
+      "hosts": ["prisma.io"],
+      "strategy": "path",
+      "note": "Full path identifies the specific ORM guide or API page."
+    },
+    {
+      "id": "graphql-docs",
+      "label": "GraphQL Docs",
+      "category": "documentation",
+      "hosts": ["graphql.org"],
+      "strategy": "path",
+      "note": "Spec and guide paths are stable."
+    },
+    {
+      "id": "openai-docs",
+      "label": "OpenAI Docs",
+      "category": "documentation",
+      "hosts": ["platform.openai.com"],
+      "strategy": "path",
+      "note": "Full path identifies the specific guide or API reference."
+    },
+    {
+      "id": "anthropic-docs",
+      "label": "Anthropic Docs",
+      "category": "documentation",
+      "hosts": ["docs.anthropic.com"],
+      "strategy": "path",
+      "note": "Full path identifies the guide or API reference."
+    },
+    {
+      "id": "huggingface-docs",
+      "label": "Hugging Face Docs",
+      "category": "documentation",
+      "hosts": ["huggingface.co"],
+      "strategy": "path",
+      "note": "Full path covers docs and model cards."
+    },
+    {
+      "id": "langchain-docs",
+      "label": "LangChain Docs",
+      "category": "documentation",
+      "hosts": ["python.langchain.com", "js.langchain.com"],
+      "strategy": "path",
+      "note": "Full path identifies the guide or API reference."
+    },
+    {
+      "id": "pytorch-docs",
+      "label": "PyTorch Docs",
+      "category": "documentation",
+      "hosts": ["pytorch.org"],
+      "strategy": "path",
+      "note": "Full path identifies the tutorial or API reference."
+    },
+    {
+      "id": "tensorflow-docs",
+      "label": "TensorFlow Docs",
+      "category": "documentation",
+      "hosts": ["tensorflow.org"],
+      "strategy": "path",
+      "note": "Full path identifies the guide or API reference."
+    },
+
+    {
+      "id": "khanacademy",
+      "label": "Khan Academy",
+      "category": "learning",
+      "hosts": ["khanacademy.org"],
+      "strategy": "path",
+      "note": "Full path identifies course, unit, and lesson."
+    },
+    {
+      "id": "coursera",
+      "label": "Coursera",
+      "category": "learning",
+      "hosts": ["coursera.org"],
+      "strategy": "path-depth",
+      "depth": 2,
+      "note": "/learn/course-slug. Depth 2 captures the course, ignoring session and module sub-paths."
+    },
+    {
+      "id": "udemy",
+      "label": "Udemy",
+      "category": "learning",
+      "hosts": ["udemy.com"],
+      "strategy": "path-depth",
+      "depth": 2,
+      "note": "/course/course-slug is the canonical course identifier."
+    },
+    {
+      "id": "edx",
+      "label": "edX",
+      "category": "learning",
+      "hosts": ["edx.org"],
+      "strategy": "path-depth",
+      "depth": 2,
+      "note": "/course/course-id is the canonical identifier."
+    },
+    {
+      "id": "skillshare",
+      "label": "Skillshare",
+      "category": "learning",
+      "hosts": ["skillshare.com"],
+      "strategy": "path-depth",
+      "depth": 2,
+      "note": "/classes/class-slug/ID. Depth 2 captures the class."
+    },
+    {
+      "id": "linkedin-learning",
+      "label": "LinkedIn Learning",
+      "category": "learning",
+      "hosts": ["linkedin.com/learning"],
+      "strategy": "path",
+      "note": "Full path identifies course and video. u param is tracking."
+    },
+    {
+      "id": "brilliant",
+      "label": "Brilliant",
+      "category": "learning",
+      "hosts": ["brilliant.org"],
+      "strategy": "path",
+      "note": "Course and lesson paths are meaningful."
+    },
+    {
+      "id": "duolingo",
+      "label": "Duolingo",
+      "category": "learning",
+      "hosts": ["duolingo.com"],
+      "strategy": "domain",
+      "note": "Session-based learning app. All pages relate to language practice — one domain-level note works best."
+    },
+    {
+      "id": "freecodecamp",
+      "label": "freeCodeCamp",
+      "category": "learning",
+      "hosts": ["freecodecamp.org"],
+      "strategy": "path",
+      "note": "Full path identifies curriculum section and challenge."
+    },
+    {
+      "id": "codecademy",
+      "label": "Codecademy",
+      "category": "learning",
+      "hosts": ["codecademy.com"],
+      "strategy": "path",
+      "note": "Full path identifies the course and lesson."
+    },
+    {
+      "id": "pluralsight",
+      "label": "Pluralsight",
+      "category": "learning",
+      "hosts": ["pluralsight.com"],
+      "strategy": "path-depth",
+      "depth": 2,
+      "note": "/courses/course-slug is the identifier."
+    },
+    {
+      "id": "frontendmasters",
+      "label": "Frontend Masters",
+      "category": "learning",
+      "hosts": ["frontendmasters.com"],
+      "strategy": "path-depth",
+      "depth": 2,
+      "note": "/courses/course-slug is the identifier."
+    },
+    {
+      "id": "udacity",
+      "label": "Udacity",
+      "category": "learning",
+      "hosts": ["udacity.com"],
+      "strategy": "path-depth",
+      "depth": 2,
+      "note": "/course/course-slug is the identifier."
+    },
+    {
+      "id": "deeplearning-ai",
+      "label": "DeepLearning.AI",
+      "category": "learning",
+      "hosts": ["deeplearning.ai"],
+      "strategy": "path",
+      "note": "Course and project pages are path-based. ecid, _hsmi, _hsenc are tracking."
+    },
+    {
+      "id": "fast-ai",
+      "label": "fast.ai",
+      "category": "learning",
+      "hosts": ["fast.ai", "course.fast.ai", "course19.fast.ai"],
+      "strategy": "path",
+      "note": "Lesson pages are path-based."
+    },
+    {
+      "id": "exercism",
+      "label": "Exercism",
+      "category": "learning",
+      "hosts": ["exercism.org"],
+      "strategy": "path",
+      "note": "Track and exercise paths are meaningful."
+    },
+    {
+      "id": "leetcode",
+      "label": "LeetCode",
+      "category": "learning",
+      "hosts": ["leetcode.com"],
+      "strategy": "path",
+      "note": "Problem slug is in the path. All query params are tracking or tab state."
+    },
+    {
+      "id": "hackerrank",
+      "label": "HackerRank",
+      "category": "learning",
+      "hosts": ["hackerrank.com"],
+      "strategy": "path",
+      "note": "Challenge path is meaningful."
+    },
+    {
+      "id": "codewars",
+      "label": "Codewars",
+      "category": "learning",
+      "hosts": ["codewars.com"],
+      "strategy": "path",
+      "note": "Kata slug is in the path."
+    },
+    {
+      "id": "advent-of-code",
+      "label": "Advent of Code",
+      "category": "learning",
+      "hosts": ["adventofcode.com"],
+      "strategy": "path",
+      "note": "Year and day paths are stable."
+    },
+    {
+      "id": "quizlet",
+      "label": "Quizlet",
+      "category": "learning",
+      "hosts": ["quizlet.com"],
+      "strategy": "path",
+      "note": "Study set ID is in the path. funnelUUID is tracking."
+    },
+    {
+      "id": "kahoot",
+      "label": "Kahoot",
+      "category": "learning",
+      "hosts": ["kahoot.com", "kahoot.it"],
+      "strategy": "path",
+      "note": "Quiz path is meaningful. refer_method is tracking."
+    },
+    {
+      "id": "anki",
+      "label": "AnkiWeb",
+      "category": "learning",
+      "hosts": ["ankiweb.net"],
+      "strategy": "path",
+      "note": "Shared deck paths are stable."
+    },
+    {
+      "id": "o-reilly",
+      "label": "O'Reilly Learning",
+      "category": "learning",
+      "hosts": ["learning.oreilly.com", "oreilly.com"],
+      "strategy": "path",
+      "note": "Book and course paths are meaningful."
+    },
+    {
+      "id": "manning",
+      "label": "Manning Publications",
+      "category": "learning",
+      "hosts": ["manning.com"],
+      "strategy": "path",
+      "note": "Book and MEAP chapter paths are stable."
+    },
+    {
+      "id": "aclweb",
+      "label": "ACL Anthology",
+      "category": "learning",
+      "hosts": ["aclanthology.org"],
+      "strategy": "path",
+      "note": "Paper IDs are in the path."
+    },
+
+    {
+      "id": "wikipedia",
+      "label": "Wikipedia",
+      "category": "research",
+      "hosts": [
+        "en.wikipedia.org", "de.wikipedia.org", "fr.wikipedia.org",
+        "es.wikipedia.org", "ja.wikipedia.org", "zh.wikipedia.org",
+        "ru.wikipedia.org", "pt.wikipedia.org", "it.wikipedia.org",
+        "ar.wikipedia.org", "nl.wikipedia.org", "pl.wikipedia.org",
+        "simple.wikipedia.org"
+      ],
+      "strategy": "path",
+      "note": "Article slug is in the path (/wiki/Article_Name). All query params are editing, tracking, or display."
+    },
+    {
+      "id": "arxiv",
+      "label": "arXiv",
+      "category": "research",
+      "hosts": ["arxiv.org"],
+      "strategy": "path",
+      "note": "Paper ID is in the path (/abs/2301.12345 or /pdf/2301.12345)."
+    },
+    {
+      "id": "pubmed",
+      "label": "PubMed",
+      "category": "research",
+      "hosts": ["pubmed.ncbi.nlm.nih.gov", "ncbi.nlm.nih.gov"],
+      "strategy": "path",
+      "note": "Article PMID is in the path. Query params are display options."
+    },
+    {
+      "id": "semanticscholar",
+      "label": "Semantic Scholar",
+      "category": "research",
+      "hosts": ["semanticscholar.org"],
+      "strategy": "path",
+      "note": "Paper ID and author paths are stable."
+    },
+    {
+      "id": "jstor",
+      "label": "JSTOR",
+      "category": "research",
+      "hosts": ["jstor.org"],
+      "strategy": "path",
+      "note": "Stable article path. All query params are display or tracking."
+    },
+    {
+      "id": "researchgate",
+      "label": "ResearchGate",
+      "category": "research",
+      "hosts": ["researchgate.net"],
+      "strategy": "path",
+      "note": "Publication and profile paths are stable."
+    },
+    {
+      "id": "academia",
+      "label": "Academia.edu",
+      "category": "research",
+      "hosts": ["academia.edu"],
+      "strategy": "path",
+      "note": "Paper paths are stable."
+    },
+    {
+      "id": "nature",
+      "label": "Nature",
+      "category": "research",
+      "hosts": ["nature.com"],
+      "strategy": "path",
+      "note": "Article paths are stable DOI-based slugs."
+    },
+    {
+      "id": "science",
+      "label": "Science",
+      "category": "research",
+      "hosts": ["science.org", "sciencemag.org"],
+      "strategy": "path",
+      "note": "Article paths are DOI-based."
+    },
+    {
+      "id": "cell",
+      "label": "Cell",
+      "category": "research",
+      "hosts": ["cell.com"],
+      "strategy": "path",
+      "note": "Article paths are stable. _returnURL is tracking."
+    },
+    {
+      "id": "sciencedirect",
+      "label": "ScienceDirect",
+      "category": "research",
+      "hosts": ["sciencedirect.com"],
+      "strategy": "path",
+      "note": "Article paths are DOI-based."
+    },
+    {
+      "id": "springer",
+      "label": "Springer / SpringerLink",
+      "category": "research",
+      "hosts": ["springer.com", "link.springer.com"],
+      "strategy": "path",
+      "note": "Article and book paths are stable."
+    },
+    {
+      "id": "ieee",
+      "label": "IEEE Xplore",
+      "category": "research",
+      "hosts": ["ieeexplore.ieee.org"],
+      "strategy": "path",
+      "note": "Paper ID is in the path."
+    },
+    {
+      "id": "acm-dl",
+      "label": "ACM Digital Library",
+      "category": "research",
+      "hosts": ["dl.acm.org"],
+      "strategy": "path",
+      "note": "Paper DOI is in the path."
+    },
+    {
+      "id": "oup",
+      "label": "Oxford Academic",
+      "category": "research",
+      "hosts": ["academic.oup.com"],
+      "strategy": "path",
+      "note": "Article path is stable. redirectedFrom is tracking."
+    },
+    {
+      "id": "ssrn",
+      "label": "SSRN",
+      "category": "research",
+      "hosts": ["ssrn.com"],
+      "strategy": "path",
+      "note": "Paper ID is in the path."
+    },
+    {
+      "id": "philpapers",
+      "label": "PhilPapers",
+      "category": "research",
+      "hosts": ["philpapers.org"],
+      "strategy": "path",
+      "note": "Paper and profile paths are stable."
+    },
+    {
+      "id": "plato-stanford",
+      "label": "Stanford Encyclopedia of Philosophy",
+      "category": "research",
+      "hosts": ["plato.stanford.edu"],
+      "strategy": "path",
+      "note": "Entry slug is in the path."
+    },
+    {
+      "id": "google-scholar",
+      "label": "Google Scholar",
+      "category": "research",
+      "hosts": ["scholar.google.com"],
+      "strategy": "ignore",
+      "note": "Search results are ephemeral and user-specific. Follow the link to the actual paper instead."
+    },
+    {
+      "id": "wolfram-mathworld",
+      "label": "Wolfram MathWorld",
+      "category": "research",
+      "hosts": ["mathworld.wolfram.com"],
+      "strategy": "path",
+      "note": "Article slug is in the path."
+    },
+    {
+      "id": "wolframalpha",
+      "label": "Wolfram Alpha",
+      "category": "research",
+      "hosts": ["wolframalpha.com"],
+      "strategy": "ignore",
+      "note": "Computation results are ephemeral and query-specific."
+    },
+    {
+      "id": "britannica",
+      "label": "Britannica",
+      "category": "research",
+      "hosts": ["britannica.com"],
+      "strategy": "path",
+      "note": "Article slug is in the path."
+    },
+
+    {
+      "id": "medium",
+      "label": "Medium",
+      "category": "reading",
+      "hosts": ["medium.com"],
+      "strategy": "path",
+      "note": "Article slug and user subdomain are path-based. source param is tracking."
+    },
+    {
+      "id": "substack",
+      "label": "Substack",
+      "category": "reading",
+      "hosts": ["substack.com"],
+      "strategy": "path",
+      "note": "Post path is stable. Each newsletter lives on its own subdomain."
+    },
+    {
+      "id": "dev-to",
+      "label": "DEV.to",
+      "category": "reading",
+      "hosts": ["dev.to"],
+      "strategy": "path",
+      "note": "Post slug is in the path."
+    },
+    {
+      "id": "hashnode",
+      "label": "Hashnode",
+      "category": "reading",
+      "hosts": ["hashnode.com", "hashnode.dev"],
+      "strategy": "path",
+      "note": "Post slug is in the path."
+    },
+    {
+      "id": "hackernoon",
+      "label": "HackerNoon",
+      "category": "reading",
+      "hosts": ["hackernoon.com"],
+      "strategy": "path",
+      "note": "Post slug is in the path."
+    },
+    {
+      "id": "smashingmagazine",
+      "label": "Smashing Magazine",
+      "category": "reading",
+      "hosts": ["smashingmagazine.com"],
+      "strategy": "path",
+      "note": "Article slug is in the path."
+    },
+    {
+      "id": "css-tricks",
+      "label": "CSS-Tricks",
+      "category": "reading",
+      "hosts": ["css-tricks.com"],
+      "strategy": "path",
+      "note": "Article slug is in the path."
+    },
+    {
+      "id": "web-dev",
+      "label": "web.dev",
+      "category": "reading",
+      "hosts": ["web.dev"],
+      "strategy": "path",
+      "note": "Article and guide paths are stable."
+    },
+    {
+      "id": "a-list-apart",
+      "label": "A List Apart",
+      "category": "reading",
+      "hosts": ["alistapart.com"],
+      "strategy": "path",
+      "note": "Article slug is in the path."
+    },
+    {
+      "id": "letterboxd",
+      "label": "Letterboxd",
+      "category": "reading",
+      "hosts": ["letterboxd.com"],
+      "strategy": "path",
+      "note": "Film and review paths are stable."
+    },
+    {
+      "id": "rottentomatoes",
+      "label": "Rotten Tomatoes",
+      "category": "reading",
+      "hosts": ["rottentomatoes.com"],
+      "strategy": "path",
+      "note": "Film and TV show paths are stable."
+    },
+    {
+      "id": "imdb",
+      "label": "IMDb",
+      "category": "reading",
+      "hosts": ["imdb.com"],
+      "strategy": "path",
+      "note": "Title ID is in the path (tt1234567). ref_ and pf_rd_* are tracking."
+    },
+    {
+      "id": "librarything",
+      "label": "LibraryThing",
+      "category": "reading",
+      "hosts": ["librarything.com"],
+      "strategy": "path",
+      "note": "Book and author paths are stable."
+    },
+    {
+      "id": "openlibrary",
+      "label": "Open Library",
+      "category": "reading",
+      "hosts": ["openlibrary.org"],
+      "strategy": "path",
+      "note": "Book and author IDs are in the path."
+    },
+    {
+      "id": "gutenberg",
+      "label": "Project Gutenberg",
+      "category": "reading",
+      "hosts": ["gutenberg.org"],
+      "strategy": "path",
+      "note": "Book ID is in the path."
+    },
+    {
+      "id": "pocket",
+      "label": "Pocket",
+      "category": "reading",
+      "hosts": ["getpocket.com"],
+      "strategy": "domain",
+      "note": "Reading list app. Domain-level association is most practical."
+    },
+    {
+      "id": "instapaper",
+      "label": "Instapaper",
+      "category": "reading",
+      "hosts": ["instapaper.com"],
+      "strategy": "domain",
+      "note": "Reading list app. Domain-level association is most practical."
+    },
+    {
+      "id": "readwise",
+      "label": "Readwise",
+      "category": "reading",
+      "hosts": ["readwise.io"],
+      "strategy": "domain",
+      "note": "Reading and highlights app. Domain-level association covers your reading practice."
+    },
+    {
+      "id": "standardebooks",
+      "label": "Standard Ebooks",
+      "category": "reading",
+      "hosts": ["standardebooks.org"],
+      "strategy": "path",
+      "note": "Book and author paths are stable."
+    },
+
+    {
+      "id": "figma",
+      "label": "Figma",
+      "category": "tools",
+      "hosts": ["figma.com"],
+      "strategy": "domain",
+      "note": "Design file URLs contain node IDs and view state. Domain-level association is most practical."
+    },
+    {
+      "id": "notion",
+      "label": "Notion",
+      "category": "tools",
+      "hosts": ["notion.so", "notion.site"],
+      "strategy": "ignore",
+      "note": "Workspace URLs contain session tokens and are not stable across sessions."
+    },
+    {
+      "id": "linear",
+      "label": "Linear",
+      "category": "tools",
+      "hosts": ["linear.app"],
+      "strategy": "domain",
+      "note": "Issue tracker. Domain-level association works well for team-level notes."
+    },
+    {
+      "id": "airtable",
+      "label": "Airtable",
+      "category": "tools",
+      "hosts": ["airtable.com"],
+      "strategy": "ignore",
+      "note": "Base and view URLs contain auth tokens and are not stable."
+    },
+    {
+      "id": "trello",
+      "label": "Trello",
+      "category": "tools",
+      "hosts": ["trello.com"],
+      "strategy": "domain",
+      "note": "Board URLs are stable but workspace context is the useful note level."
+    },
+    {
+      "id": "asana",
+      "label": "Asana",
+      "category": "tools",
+      "hosts": ["app.asana.com"],
+      "strategy": "ignore",
+      "note": "Task URLs contain session state and are not reliable for note association."
+    },
+    {
+      "id": "jira",
+      "label": "Jira / Atlassian",
+      "category": "tools",
+      "hosts": ["atlassian.net"],
+      "strategy": "domain",
+      "note": "Your team's Atlassian instance. Domain works well for project-level notes."
+    },
+    {
+      "id": "confluence",
+      "label": "Confluence",
+      "category": "tools",
+      "hosts": ["confluence.atlassian.com"],
+      "strategy": "path",
+      "note": "Page paths are stable. Query params are display options."
+    },
+    {
+      "id": "miro",
+      "label": "Miro",
+      "category": "tools",
+      "hosts": ["miro.com"],
+      "strategy": "domain",
+      "note": "Whiteboard URLs contain view state params."
+    },
+    {
+      "id": "loom",
+      "label": "Loom",
+      "category": "tools",
+      "hosts": ["loom.com"],
+      "strategy": "path",
+      "note": "Video recording paths are stable."
+    },
+    {
+      "id": "canva",
+      "label": "Canva",
+      "category": "tools",
+      "hosts": ["canva.com"],
+      "strategy": "domain",
+      "note": "Design URLs contain session tokens."
+    },
+    {
+      "id": "netlify",
+      "label": "Netlify",
+      "category": "tools",
+      "hosts": ["app.netlify.com"],
+      "strategy": "domain",
+      "note": "Dashboard pages are session-specific."
+    },
+    {
+      "id": "supabase",
+      "label": "Supabase",
+      "category": "tools",
+      "hosts": ["supabase.com"],
+      "strategy": "path",
+      "note": "Docs and blog paths are stable. Dashboard is session-based."
+    },
+    {
+      "id": "fiverr",
+      "label": "Fiverr",
+      "category": "tools",
+      "hosts": ["fiverr.com"],
+      "strategy": "path",
+      "note": "Gig and seller paths are stable. context_referrer, source, funnel are tracking."
+    },
+    {
+      "id": "upwork",
+      "label": "Upwork",
+      "category": "tools",
+      "hosts": ["upwork.com"],
+      "strategy": "path",
+      "note": "Job and profile paths are stable."
+    },
+    {
+      "id": "producthunt",
+      "label": "Product Hunt",
+      "category": "tools",
+      "hosts": ["producthunt.com"],
+      "strategy": "path",
+      "note": "Product launch paths are stable."
+    },
+    {
+      "id": "indiehackers",
+      "label": "Indie Hackers",
+      "category": "tools",
+      "hosts": ["indiehackers.com"],
+      "strategy": "path",
+      "note": "Product and post paths are stable."
+    },
+
+    {
+      "id": "google",
+      "label": "Google Search",
+      "category": "search",
+      "hosts": [
+        "google.com", "google.co.uk", "google.de", "google.fr",
+        "google.co.jp", "google.com.au", "google.ca", "google.it",
+        "google.es", "google.com.br", "google.co.in", "google.nl"
+      ],
+      "strategy": "ignore",
+      "note": "Search results are ephemeral and user-specific."
+    },
+    {
+      "id": "bing",
+      "label": "Bing",
+      "category": "search",
+      "hosts": ["bing.com"],
+      "strategy": "ignore",
+      "note": "Search results are ephemeral. cvid, sk, sp, sc, qs are tracking."
+    },
+    {
+      "id": "duckduckgo",
+      "label": "DuckDuckGo",
+      "category": "search",
+      "hosts": ["duckduckgo.com"],
+      "strategy": "ignore",
+      "note": "Search results are ephemeral."
+    },
+    {
+      "id": "perplexity",
+      "label": "Perplexity",
+      "category": "search",
+      "hosts": ["perplexity.ai"],
+      "strategy": "ignore",
+      "note": "AI search answers are ephemeral and session-specific."
+    },
+    {
+      "id": "brave-search",
+      "label": "Brave Search",
+      "category": "search",
+      "hosts": ["search.brave.com"],
+      "strategy": "ignore",
+      "note": "Search results are ephemeral."
+    },
+    {
+      "id": "startpage",
+      "label": "Startpage",
+      "category": "search",
+      "hosts": ["startpage.com"],
+      "strategy": "ignore",
+      "note": "Search results are ephemeral."
+    },
+    {
+      "id": "yandex",
+      "label": "Yandex Search",
+      "category": "search",
+      "hosts": ["yandex.ru", "yandex.com"],
+      "strategy": "ignore",
+      "note": "Search results are ephemeral. lr and redircnt are tracking."
+    },
+
+    {
+      "id": "gmail",
+      "label": "Gmail",
+      "category": "email",
+      "hosts": ["mail.google.com"],
+      "strategy": "ignore",
+      "note": "Email thread URLs are session-specific and not stable."
+    },
+    {
+      "id": "google-calendar",
+      "label": "Google Calendar",
+      "category": "email",
+      "hosts": ["calendar.google.com"],
+      "strategy": "ignore",
+      "note": "Calendar view URLs are session-specific."
+    },
+    {
+      "id": "google-docs",
+      "label": "Google Docs / Sheets / Slides",
+      "category": "email",
+      "hosts": ["docs.google.com", "sheets.google.com", "slides.google.com"],
+      "strategy": "ignore",
+      "note": "Document URLs contain auth tokens and are not reliably shareable without permissions."
+    },
+    {
+      "id": "outlook",
+      "label": "Outlook Web",
+      "category": "email",
+      "hosts": ["outlook.live.com", "outlook.office.com", "outlook.office365.com"],
+      "strategy": "ignore",
+      "note": "Email URLs are session-specific."
+    },
+    {
+      "id": "yahoo-mail",
+      "label": "Yahoo Mail",
+      "category": "email",
+      "hosts": ["mail.yahoo.com"],
+      "strategy": "ignore",
+      "note": "Email URLs are session-specific."
+    },
+    {
+      "id": "proton-mail",
+      "label": "Proton Mail",
+      "category": "email",
+      "hosts": ["mail.proton.me"],
+      "strategy": "ignore",
+      "note": "Email URLs are session-specific."
+    },
+
+    {
+      "id": "ad-networks",
+      "label": "Ad Networks (blocked)",
+      "category": "ads",
+      "hosts": [
+        "googlesyndication.com",
+        "googleadservices.com",
+        "doubleclick.net",
+        "amazon-adsystem.com",
+        "fls-na.amazon.com",
+        "adtech.com",
+        "adform.net"
+      ],
+      "strategy": "ignore",
+      "note": "Ad serving infrastructure — no user-visible content worth annotating."
+    }
+
+  ]
+}

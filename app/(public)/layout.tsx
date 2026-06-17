@@ -1,4 +1,5 @@
 import React from "react";
+import { headers } from "next/headers";
 import { MermaidHydrate } from "@/components/public/MermaidHydrate";
 import { PublicThemeToggle } from "@/components/public/PublicThemeToggle";
 
@@ -168,11 +169,14 @@ const PUBLIC_SCRIPT = `
 // This layout wraps all public-facing pages.
 // It is nested under app/layout.tsx (root) which provides html/body.
 // We suppress the default app nav via CSS (same pattern as the notes route).
-export default function PublicLayout({
+export default async function PublicLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  // Per-request nonce from the proxy. See app/layout.tsx for context on
+  // why we apply this now while CSP enforcement (M-2) is still pending.
+  const nonce = (await headers()).get("x-nonce") ?? undefined;
   return (
     // public-route class is used in globals.css to suppress the app nav
     // and remove the default pt-20 padding applied by the root layout.
@@ -183,7 +187,7 @@ export default function PublicLayout({
       {children}
       <PublicThemeToggle />
       <MermaidHydrate />
-      <script dangerouslySetInnerHTML={{ __html: PUBLIC_SCRIPT }} />
+      <script nonce={nonce} dangerouslySetInnerHTML={{ __html: PUBLIC_SCRIPT }} />
     </div>
   );
 }

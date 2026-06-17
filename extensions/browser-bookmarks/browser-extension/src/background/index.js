@@ -1,8 +1,11 @@
+import { loadUrlPresets, resolvePreset, applyUrlStrategy, getStrategyOverrides, setStrategyOverride } from "../url-strategy.js";
+
 const STORAGE_KEYS = {
   config: "dgBrowserBookmarksConfig",
   ignore: "dgBrowserBookmarksIgnore",
   install: "dgBrowserBookmarksInstall",
   quickSaveDrafts: "dgBrowserBookmarksQuickSaveDrafts",
+  strategyOverrides: "dgUrlStrategyOverrides",
 };
 
 const DEFAULT_CONFIG = {
@@ -1711,6 +1714,21 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       };
       await saveConfig(next);
       sendResponse({ ok: true, data: next });
+      return;
+    }
+    if (message.type === "get-url-preset") {
+      const { presetMap, overrides } = await loadUrlPresets();
+      const preset = resolvePreset(message.url, presetMap, overrides);
+      sendResponse({ ok: true, data: preset });
+      return;
+    }
+    if (message.type === "get-url-strategy-overrides") {
+      sendResponse({ ok: true, data: await getStrategyOverrides() });
+      return;
+    }
+    if (message.type === "set-url-strategy-override") {
+      const result = await setStrategyOverride(message.hostname, message.config ?? null);
+      sendResponse({ ok: true, data: result });
       return;
     }
     sendResponse({ ok: false, error: "Unknown message type" });
