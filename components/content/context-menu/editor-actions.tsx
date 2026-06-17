@@ -25,6 +25,7 @@ import {
   useContentStore,
   type WorkspacePaneId,
 } from "@/state/content-store";
+import { ArrowUpLeft, ArrowUpRight, ArrowDownLeft, ArrowDownRight } from "lucide-react";
 
 /** Captured selection data — frozen when the context menu opens */
 interface SelectionCapture {
@@ -611,11 +612,11 @@ export const editorActionProvider: ContextMenuActionProvider = (ctx) => {
       const visiblePaneIds = new Set(getVisiblePaneIds(layoutMode));
 
       const paneOptions = [
-        { id: TOP_LEFT_PANE_ID, fallback: "Left Pane" },
-        { id: TOP_RIGHT_PANE_ID, fallback: "Right Pane" },
-        { id: BOTTOM_LEFT_PANE_ID, fallback: "Bottom Left Pane" },
-        { id: BOTTOM_RIGHT_PANE_ID, fallback: "Bottom Right Pane" },
-      ] as Array<{ id: WorkspacePaneId; fallback: string }>;
+        { id: TOP_LEFT_PANE_ID, fallback: "Left Pane", icon: <ArrowUpLeft className="h-4 w-4" /> },
+        { id: TOP_RIGHT_PANE_ID, fallback: "Right Pane", icon: <ArrowUpRight className="h-4 w-4" /> },
+        { id: BOTTOM_LEFT_PANE_ID, fallback: "Bottom Left Pane", icon: <ArrowDownLeft className="h-4 w-4" /> },
+        { id: BOTTOM_RIGHT_PANE_ID, fallback: "Bottom Right Pane", icon: <ArrowDownRight className="h-4 w-4" /> },
+      ] as Array<{ id: WorkspacePaneId; fallback: string; icon: React.ReactNode }>;
 
       sections.push({
         actions: [
@@ -636,6 +637,7 @@ export const editorActionProvider: ContextMenuActionProvider = (ctx) => {
               label: visiblePaneIds.has(pane.id)
                 ? getPaneLabel(layoutMode, pane.id)
                 : `${pane.fallback} (expand layout)`,
+              icon: pane.icon,
               onClick: () => { void resolveWikiLinkAndOpen(targetTitle, pane.id); },
             })),
           },
@@ -920,7 +922,7 @@ export const editorActionProvider: ContextMenuActionProvider = (ctx) => {
       actions: [
         {
           id: "browser-cm-hint",
-          label: "Use ⌘+Click for browser context menu",
+          label: "Use ⌥+Click for browser context menu",
           disabled: true,
         },
       ],

@@ -193,8 +193,10 @@ export function LeftSidebarHeader({
       </div>
 
       {/* Sub-affordance row — visible for any view in the files section */}
+      {/* Gray bridge closes the visual gap between the main row and sub-row */}
+      {showFilesSection && <div className="h-0.5 shrink-0 bg-gray-100 dark:bg-gray-800" />}
       {showFilesSection && (
-        <div className="flex h-6 shrink-0 items-center border-b border-gray-200 dark:border-white/10 bg-gray-100 dark:bg-gray-800 px-1.5 gap-0.5 mt-0.5">
+        <div className="flex h-6 shrink-0 items-center border-b border-gray-200 dark:border-white/10 bg-gray-100 dark:bg-gray-800 px-1.5 gap-0.5">
 
           {/* Search — toggles back to files when already active */}
           <button
