@@ -9,6 +9,9 @@ import {
   setCachedSession,
 } from "./session-cache";
 
+// Renew when less than this much time remains on the session
+const SESSION_RENEW_THRESHOLD_MS = 2 * 24 * 60 * 60 * 1000; // 2 days
+
 const SESSION_COOKIE_NAME = "session_token";
 const EMBED_SESSION_HEADER = "x-embed-session";
 const SESSION_DURATION_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
@@ -129,6 +132,32 @@ export async function validateSession(
     sessionId: session.id,
     expiresAt: session.expiresAt,
   };
+
+  // Rolling renewal: extend the session if it's approaching expiry.
+  // This ensures active users never get signed out due to a stale session.
+  // We only touch the DB when renewal is needed (bounded by the threshold).
+  if (session.expiresAt.getTime() - Date.now() < SESSION_RENEW_THRESHOLD_MS) {
+    try {
+      const newExpiry = new Date(Date.now() + SESSION_DURATION_MS);
+      await prisma.session.update({
+        where: { id: session.id },
+        data: { expiresAt: newExpiry },
+      });
+      result.expiresAt = newExpiry;
+
+      const cookieStore = await cookies();
+      cookieStore.set(SESSION_COOKIE_NAME, sessionToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        expires: newExpiry,
+        path: "/",
+      });
+    } catch {
+      // Renewal is best-effort — don't break auth if the update fails.
+    }
+  }
+
   setCachedSession(sessionToken, result);
   return result;
 }

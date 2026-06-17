@@ -38,6 +38,7 @@ const TOOL_REGISTRY: ToolDefinition[] = [
     contentTypes: ["note"],
     order: 50,
     group: "templates",
+    iconOnly: true,
   },
   {
     id: "import-markdown",

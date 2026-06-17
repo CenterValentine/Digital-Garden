@@ -9,9 +9,13 @@ import {
   publishSignedOut,
   subscribeAuthSessionEvents,
 } from "@/lib/infrastructure/auth/client-session-events";
+import { clientLogger } from "@/lib/core/logger/client";
 
 const AUTH_STATUS_INTERVAL_MS = 10_000;
 const SIGNED_OUT_MESSAGE = "You were signed out. Sign in again to continue editing.";
+// Require this many consecutive 401s before triggering sign-out.
+// A single 401 can be a transient DB hiccup; two in a row (20 s apart) is authoritative.
+const CONSECUTIVE_FAILURES_REQUIRED = 2;
 
 function getCurrentRedirectPath(pathname: string | null, searchParams: URLSearchParams) {
   const path = pathname || "/content";
@@ -42,6 +46,7 @@ export function AuthSessionSync() {
 
     const unsubscribe = subscribeAuthSessionEvents(handleSignedOut);
     let isCancelled = false;
+    let consecutiveFailures = 0;
 
     const verifySession = async () => {
       try {
@@ -51,9 +56,34 @@ export function AuthSessionSync() {
         });
 
         if (isCancelled) return;
+
         if (response.status === 401) {
-          publishSignedOut("session-missing");
-          handleSignedOut();
+          consecutiveFailures += 1;
+          clientLogger.warn({
+            layer: "ui",
+            event: "session_check:401",
+            summary: `Session check returned 401 (consecutive: ${consecutiveFailures} / ${CONSECUTIVE_FAILURES_REQUIRED})`,
+            attrs: { consecutive: consecutiveFailures, required: CONSECUTIVE_FAILURES_REQUIRED },
+          });
+
+          if (consecutiveFailures >= CONSECUTIVE_FAILURES_REQUIRED) {
+            clientLogger.warn({
+              layer: "ui",
+              event: "session_check:signing_out",
+              summary: "Signing out after consecutive 401 failures",
+            });
+            publishSignedOut("session-missing");
+            handleSignedOut();
+          }
+        } else {
+          if (consecutiveFailures > 0) {
+            clientLogger.info({
+              layer: "ui",
+              event: "session_check:restored",
+              summary: `Session restored after ${consecutiveFailures} transient failure(s)`,
+            });
+          }
+          consecutiveFailures = 0;
         }
       } catch {
         // Network failures are not sign-out. Offline editing policy is handled separately.

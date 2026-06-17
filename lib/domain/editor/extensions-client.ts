@@ -75,6 +75,7 @@ import {
   UnsupportedInline,
 } from "./extensions/blocks/unsupported-content";
 import { getExtensionClientEditorExtensions } from "@/lib/extensions/editor-client-registry";
+import { Clipboard } from "./extensions/clipboard";
 
 // Create lowlight instance with common languages
 const lowlight = createLowlight(common);
@@ -329,6 +330,7 @@ export function getEditorExtensions(options?: EditorExtensionsOptions): Extensio
     // causing slash-command insertion to fail with
     // "RangeError: Unknown node type: inlineTimestamp".
     InlineTimestamp,
+    Clipboard,
   ];
 }
 

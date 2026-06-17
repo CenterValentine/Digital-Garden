@@ -226,6 +226,8 @@ export const WikiLink = Node.create<WikiLinkOptions>({
 
         props: {
           handleClick(view, pos, event) {
+            // Only handle left-click; right-click must reach the contextmenu handler
+            if (event.button !== 0) return false;
             const { doc } = view.state;
             const clickPos = view.posAtCoords({
               left: event.clientX,

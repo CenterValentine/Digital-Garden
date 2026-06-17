@@ -178,20 +178,20 @@ export function ContentToolbar({ contentId: contentIdProp }: ContentToolbarProps
           contentId={sourceContentId}
           contentType={activeContentType}
           source="content"
+          variant="icon"
         />
       )}
-      {tools.map((tool) => {
+      {/* Tools with order < 70: copy-link, share, save-as-template */}
+      {tools.filter((t) => t.definition.order < 70).map((tool) => {
         const Icon = ICON_MAP[tool.definition.iconName];
-        const isIconOnly = tool.definition.id === "save-as-template";
+        const isIconOnly = tool.definition.iconOnly ?? false;
         return (
           <button
             key={tool.definition.id}
             onClick={tool.execute}
             disabled={tool.isDisabled}
             className={`flex shrink-0 items-center gap-1.5 rounded-md ${
-              isIconOnly
-                ? "px-1.5 py-1.5"
-                : "px-2.5 py-1.5"
+              isIconOnly ? "px-1.5 py-1.5" : "px-2.5 py-1.5"
             } text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50`}
             title={tool.definition.label}
             type="button"
@@ -201,17 +201,37 @@ export function ContentToolbar({ contentId: contentIdProp }: ContentToolbarProps
           </button>
         );
       })}
+      {/* Speed Read — positioned before import/export (orders 75+) */}
       {showSpeedRead && (
         <button
           onClick={openSpeedReader}
-          className="flex shrink-0 items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="flex shrink-0 items-center gap-1.5 rounded-md px-1.5 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           title="Speed Read"
           type="button"
         >
           <Zap className="h-4 w-4" />
-          <span className="whitespace-nowrap">Speed Read</span>
         </button>
       )}
+      {/* Tools with order >= 70: import, export */}
+      {tools.filter((t) => t.definition.order >= 70).map((tool) => {
+        const Icon = ICON_MAP[tool.definition.iconName];
+        const isIconOnly = tool.definition.iconOnly ?? false;
+        return (
+          <button
+            key={tool.definition.id}
+            onClick={tool.execute}
+            disabled={tool.isDisabled}
+            className={`flex shrink-0 items-center gap-1.5 rounded-md ${
+              isIconOnly ? "px-1.5 py-1.5" : "px-2.5 py-1.5"
+            } text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50`}
+            title={tool.definition.label}
+            type="button"
+          >
+            {Icon && <Icon className="h-4 w-4" />}
+            {!isIconOnly && <span className="whitespace-nowrap">{tool.definition.label}</span>}
+          </button>
+        );
+      })}
       {visibleSourceFlashcardCount > 0 ? (
         <button
           onClick={openSourceFlashcards}
