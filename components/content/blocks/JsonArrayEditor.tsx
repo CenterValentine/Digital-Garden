@@ -128,7 +128,7 @@ function ItemFieldInput({
   onChange: (v: unknown) => void;
 }) {
   const baseClass =
-    "w-full px-2 py-1 text-xs rounded bg-white/8 border border-white/10 text-gray-200 placeholder:text-gray-600 focus:border-blue-500/50 focus:outline-none";
+    "w-full px-2 py-1 text-xs rounded bg-white/8 border border-white/10 text-gray-800 dark:text-gray-200 placeholder:text-gray-400 dark:placeholder:text-gray-600 focus:border-blue-500/50 focus:outline-none";
 
   if (field.type === "image") {
     return <ItemImageField value={(value as string) || ""} onChange={onChange} />;

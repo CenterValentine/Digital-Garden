@@ -20,6 +20,7 @@ import { createBlockSchema } from "@/lib/domain/blocks/schema";
 import { registerBlock } from "@/lib/domain/blocks/registry";
 import { blockIdAttr, dataAttr } from "@/lib/domain/blocks/data-attr";
 import { createBlockNodeView } from "@/lib/domain/blocks/node-view-factory";
+import { makeWrapAttrs } from "@/lib/domain/blocks/wrap-size";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -34,7 +35,8 @@ function parseItems(raw: string): StatsTableItem[] {
   try { return JSON.parse(raw) as StatsTableItem[]; } catch { return []; }
 }
 
-function parsePills(value: string): string[] {
+function parsePills(value: string | undefined | null): string[] {
+  if (!value) return [];
   return value.split(",").map((s) => s.trim()).filter(Boolean);
 }
 
@@ -115,6 +117,7 @@ function statsTableAttrs() {
     caption: dataAttr("caption", { default: "" }),
     items: dataAttr("items", { default: "[]" }),
     variant: dataAttr("variant", { default: "default" }),
+    ...makeWrapAttrs(),
   };
 }
 
@@ -202,6 +205,7 @@ export const StatsTable = Node.create({
       label: "Stats Table",
       iconName: "Table2",
       atom: true,
+      supportWrap: true,
       renderContent(node, contentDom) {
         contentDom.className = "block-stats-table-editor";
         const a = node.attrs as Record<string, string>;
