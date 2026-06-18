@@ -1026,6 +1026,18 @@ nav[class*="fixed"] {
   float: none !important;
 }
 
+/* StatsTable: tighter layout at smaller sizes */
+.ProseMirror .block-node[data-size="s"] .block-stats-table-editor {
+  --st-padding: 4px 6px;
+  --st-label-width: 38%;
+  font-size: 11px;
+}
+.ProseMirror .block-node[data-size="m"] .block-stats-table-editor {
+  --st-padding: 7px 9px;
+  --st-label-width: 42%;
+  font-size: 12px;
+}
+
 /* Image wrap toolbar — hidden by default, shown on selection */
 .ProseMirror .image-wrap-toolbar {
   position: absolute;
@@ -1086,15 +1098,35 @@ nav[class*="fixed"] {
   color: #fff;
 }
 
-/* Block chrome wrap controls */
+/* Block chrome wrap controls — floats ABOVE the block on hover */
 .block-wrap-controls {
+  /* Positioned above the block-node top edge.
+     block-chrome has top: 0.35rem, so subtracting that plus bar height
+     pushes the bar visually above the block border. */
+  position: absolute;
+  top: calc(-0.35rem - 28px);
+  right: 0;
+
   display: flex;
   align-items: center;
   gap: 1px;
-  margin-right: 4px;
+
+  background: rgba(255, 255, 255, 0.97);
+  border: 1px solid rgba(0, 0, 0, 0.13);
+  border-radius: 6px;
+  padding: 2px 5px;
+  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.1);
+
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.15s ease;
+  z-index: 20;
+}
+
+.dark .block-wrap-controls {
+  background: rgba(15, 23, 42, 0.97);
+  border-color: rgba(255, 255, 255, 0.14);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
 }
 
 .block-editing-active .block-node:hover .block-wrap-controls {
@@ -1106,7 +1138,7 @@ nav[class*="fixed"] {
 .block-size-btn {
   background: transparent;
   border: none;
-  color: rgba(0, 0, 0, 0.4);
+  color: rgba(0, 0, 0, 0.45);
   font-size: 10px;
   padding: 1px 4px;
   border-radius: 3px;
@@ -1115,16 +1147,31 @@ nav[class*="fixed"] {
   pointer-events: auto;
 }
 
+.dark .block-wrap-btn,
+.dark .block-size-btn {
+  color: rgba(255, 255, 255, 0.5);
+}
+
 .block-wrap-btn:hover,
 .block-size-btn:hover {
-  background: rgba(0, 0, 0, 0.035);
-  color: rgba(0, 0, 0, 0.7);
+  background: rgba(0, 0, 0, 0.05);
+  color: rgba(0, 0, 0, 0.75);
+}
+
+.dark .block-wrap-btn:hover,
+.dark .block-size-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.9);
 }
 
 .block-wrap-sep {
   color: rgba(0, 0, 0, 0.2);
   font-size: 9px;
   padding: 0 2px;
+}
+
+.dark .block-wrap-sep {
+  color: rgba(255, 255, 255, 0.2);
 }
 
 /* Active state in block chrome */
@@ -1134,8 +1181,18 @@ nav[class*="fixed"] {
 .block-wrap-controls[data-active-size="s"] .block-size-btn[data-size="s"],
 .block-wrap-controls[data-active-size="m"] .block-size-btn[data-size="m"],
 .block-wrap-controls[data-active-size="l"] .block-size-btn[data-size="l"] {
-  background: rgba(0, 0, 0, 0.06);
-  color: rgba(0, 0, 0, 0.7);
+  background: rgba(0, 0, 0, 0.07);
+  color: rgba(0, 0, 0, 0.8);
+}
+
+.dark .block-wrap-controls[data-active-wrap="inline"] .block-wrap-btn[data-mode="inline"],
+.dark .block-wrap-controls[data-active-wrap="left"]   .block-wrap-btn[data-mode="left"],
+.dark .block-wrap-controls[data-active-wrap="right"]  .block-wrap-btn[data-mode="right"],
+.dark .block-wrap-controls[data-active-size="s"] .block-size-btn[data-size="s"],
+.dark .block-wrap-controls[data-active-size="m"] .block-size-btn[data-size="m"],
+.dark .block-wrap-controls[data-active-size="l"] .block-size-btn[data-size="l"] {
+  background: rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.9);
 }
 
 /* Public prose: apply float and width from data attrs in published output */
@@ -1543,10 +1600,10 @@ mark {
   font-size: 10px;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: rgba(0, 0, 0, 0.38);
+  color: rgba(0, 0, 0, 0.4);
   padding: 1px 6px;
   border-radius: 4px;
-  background: rgba(255, 255, 255, 0.48);
+  background: rgba(0, 0, 0, 0.055);
   font-weight: 500;
   opacity: 0;
   pointer-events: none;
@@ -1973,8 +2030,123 @@ mark {
 .ProseMirror .block-stat-label { margin: 10px 0 0; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: #6b7280; outline: none; }
 .ProseMirror .block-stat-description { margin: 4px 0 0; font-size: 0.825rem; color: #9ca3af; outline: none; }
 
-/* StatsTable — editor preview */
-.ProseMirror .block-stats-table-editor { padding: 4px 0; }
+/* StatsTable — editor preview (CSS vars allow dark mode + pill color theming) */
+.ProseMirror .block-stats-table-editor {
+  padding: 4px 0;
+  --st-padding: 10px 12px;
+  --st-label-width: 45%;
+  /* light-mode defaults */
+  --st-border: #e5e7eb;
+  --st-row-bg: #fff;
+  --st-row-bg-alt: #f9fafb;
+  --st-row-bg-hi: #eff6ff;
+  --st-label-color: #6b7280;
+  --st-value-color: #111827;
+  --st-value-color-hi: #1d4ed8;
+  --st-caption-color: #9ca3af;
+  --st-pill-bg: #f3f4f6;
+  --st-pill-color: #374151;
+  --st-pill-border: #e5e7eb;
+  --st-dashed-border: #d1d5db;
+  --st-empty-title: #374151;
+  --st-empty-hint: #9ca3af;
+  --st-schema-hint: #d1d5db;
+}
+.dark .ProseMirror .block-stats-table-editor {
+  --st-border: rgba(255,255,255,0.1);
+  --st-row-bg: transparent;
+  --st-row-bg-alt: rgba(255,255,255,0.03);
+  --st-row-bg-hi: rgba(59,130,246,0.08);
+  --st-label-color: rgba(255,255,255,0.45);
+  --st-value-color: rgba(255,255,255,0.88);
+  --st-value-color-hi: #93c5fd;
+  --st-caption-color: rgba(255,255,255,0.35);
+  --st-pill-bg: rgba(255,255,255,0.08);
+  --st-pill-color: rgba(255,255,255,0.75);
+  --st-pill-border: rgba(255,255,255,0.12);
+  --st-dashed-border: rgba(255,255,255,0.18);
+  --st-empty-title: rgba(255,255,255,0.7);
+  --st-empty-hint: rgba(255,255,255,0.35);
+  --st-schema-hint: rgba(255,255,255,0.15);
+}
+/* Pill color themes (editor preview + published via data-pill-color) */
+.ProseMirror .block-stats-table-editor[data-pill-color="blue"],
+[data-pill-color="blue"] .block-stats-table-editor {
+  --st-pill-bg: #eff6ff; --st-pill-color: #1d4ed8; --st-pill-border: #bfdbfe;
+}
+.dark .ProseMirror .block-stats-table-editor[data-pill-color="blue"],
+.dark [data-pill-color="blue"] .block-stats-table-editor {
+  --st-pill-bg: rgba(59,130,246,0.12); --st-pill-color: #93c5fd; --st-pill-border: rgba(59,130,246,0.25);
+}
+.ProseMirror .block-stats-table-editor[data-pill-color="green"],
+[data-pill-color="green"] .block-stats-table-editor {
+  --st-pill-bg: #f0fdf4; --st-pill-color: #15803d; --st-pill-border: #bbf7d0;
+}
+.dark .ProseMirror .block-stats-table-editor[data-pill-color="green"],
+.dark [data-pill-color="green"] .block-stats-table-editor {
+  --st-pill-bg: rgba(34,197,94,0.1); --st-pill-color: #86efac; --st-pill-border: rgba(34,197,94,0.22);
+}
+.ProseMirror .block-stats-table-editor[data-pill-color="amber"],
+[data-pill-color="amber"] .block-stats-table-editor {
+  --st-pill-bg: #fffbeb; --st-pill-color: #b45309; --st-pill-border: #fde68a;
+}
+.dark .ProseMirror .block-stats-table-editor[data-pill-color="amber"],
+.dark [data-pill-color="amber"] .block-stats-table-editor {
+  --st-pill-bg: rgba(245,158,11,0.1); --st-pill-color: #fcd34d; --st-pill-border: rgba(245,158,11,0.22);
+}
+.ProseMirror .block-stats-table-editor[data-pill-color="purple"],
+[data-pill-color="purple"] .block-stats-table-editor {
+  --st-pill-bg: #faf5ff; --st-pill-color: #7e22ce; --st-pill-border: #e9d5ff;
+}
+.dark .ProseMirror .block-stats-table-editor[data-pill-color="purple"],
+.dark [data-pill-color="purple"] .block-stats-table-editor {
+  --st-pill-bg: rgba(168,85,247,0.1); --st-pill-color: #d8b4fe; --st-pill-border: rgba(168,85,247,0.22);
+}
+.ProseMirror .block-stats-table-editor[data-pill-color="rose"],
+[data-pill-color="rose"] .block-stats-table-editor {
+  --st-pill-bg: #fff1f2; --st-pill-color: #be123c; --st-pill-border: #fecdd3;
+}
+.dark .ProseMirror .block-stats-table-editor[data-pill-color="rose"],
+.dark [data-pill-color="rose"] .block-stats-table-editor {
+  --st-pill-bg: rgba(244,63,94,0.1); --st-pill-color: #fda4af; --st-pill-border: rgba(244,63,94,0.22);
+}
+.ProseMirror .block-stats-table-editor[data-pill-color="teal"],
+[data-pill-color="teal"] .block-stats-table-editor {
+  --st-pill-bg: #f0fdfa; --st-pill-color: #0f766e; --st-pill-border: #99f6e4;
+}
+.dark .ProseMirror .block-stats-table-editor[data-pill-color="teal"],
+.dark [data-pill-color="teal"] .block-stats-table-editor {
+  --st-pill-bg: rgba(20,184,166,0.1); --st-pill-color: #5eead4; --st-pill-border: rgba(20,184,166,0.22);
+}
+/* Pastel: cycles soft pastels — editor uses var overrides (inline style reads vars),
+   published uses direct properties (no inline styles in server HTML) */
+.block-stats-table-editor[data-pill-color="pastel"] span[style*="var(--st-pill"]:nth-child(6n+1) { --st-pill-bg:#fce7f3; --st-pill-color:#9d174d; --st-pill-border:#fbcfe8; }
+.block-stats-table-editor[data-pill-color="pastel"] span[style*="var(--st-pill"]:nth-child(6n+2) { --st-pill-bg:#e0f2fe; --st-pill-color:#075985; --st-pill-border:#bae6fd; }
+.block-stats-table-editor[data-pill-color="pastel"] span[style*="var(--st-pill"]:nth-child(6n+3) { --st-pill-bg:#dcfce7; --st-pill-color:#166534; --st-pill-border:#bbf7d0; }
+.block-stats-table-editor[data-pill-color="pastel"] span[style*="var(--st-pill"]:nth-child(6n+4) { --st-pill-bg:#fef3c7; --st-pill-color:#92400e; --st-pill-border:#fde68a; }
+.block-stats-table-editor[data-pill-color="pastel"] span[style*="var(--st-pill"]:nth-child(6n+5) { --st-pill-bg:#ede9fe; --st-pill-color:#5b21b6; --st-pill-border:#ddd6fe; }
+.block-stats-table-editor[data-pill-color="pastel"] span[style*="var(--st-pill"]:nth-child(6n+6) { --st-pill-bg:#fff7ed; --st-pill-color:#c2410c; --st-pill-border:#fed7aa; }
+.public-prose .block-stats-table-pill--pastel:nth-child(6n+1) { background:#fce7f3; color:#9d174d; border-color:#fbcfe8; }
+.public-prose .block-stats-table-pill--pastel:nth-child(6n+2) { background:#e0f2fe; color:#075985; border-color:#bae6fd; }
+.public-prose .block-stats-table-pill--pastel:nth-child(6n+3) { background:#dcfce7; color:#166534; border-color:#bbf7d0; }
+.public-prose .block-stats-table-pill--pastel:nth-child(6n+4) { background:#fef3c7; color:#92400e; border-color:#fde68a; }
+.public-prose .block-stats-table-pill--pastel:nth-child(6n+5) { background:#ede9fe; color:#5b21b6; border-color:#ddd6fe; }
+.public-prose .block-stats-table-pill--pastel:nth-child(6n+6) { background:#fff7ed; color:#c2410c; border-color:#fed7aa; }
+/* Rainbow: vivid cycling colors */
+.block-stats-table-editor[data-pill-color="rainbow"] span[style*="var(--st-pill"]:nth-child(7n+1) { --st-pill-bg:#eff6ff; --st-pill-color:#1d4ed8; --st-pill-border:#bfdbfe; }
+.block-stats-table-editor[data-pill-color="rainbow"] span[style*="var(--st-pill"]:nth-child(7n+2) { --st-pill-bg:#f0fdf4; --st-pill-color:#15803d; --st-pill-border:#bbf7d0; }
+.block-stats-table-editor[data-pill-color="rainbow"] span[style*="var(--st-pill"]:nth-child(7n+3) { --st-pill-bg:#fffbeb; --st-pill-color:#b45309; --st-pill-border:#fde68a; }
+.block-stats-table-editor[data-pill-color="rainbow"] span[style*="var(--st-pill"]:nth-child(7n+4) { --st-pill-bg:#faf5ff; --st-pill-color:#7e22ce; --st-pill-border:#e9d5ff; }
+.block-stats-table-editor[data-pill-color="rainbow"] span[style*="var(--st-pill"]:nth-child(7n+5) { --st-pill-bg:#fff1f2; --st-pill-color:#be123c; --st-pill-border:#fecdd3; }
+.block-stats-table-editor[data-pill-color="rainbow"] span[style*="var(--st-pill"]:nth-child(7n+6) { --st-pill-bg:#f0fdfa; --st-pill-color:#0f766e; --st-pill-border:#99f6e4; }
+.block-stats-table-editor[data-pill-color="rainbow"] span[style*="var(--st-pill"]:nth-child(7n+7) { --st-pill-bg:#fce7f3; --st-pill-color:#9d174d; --st-pill-border:#fbcfe8; }
+.public-prose .block-stats-table-pill--rainbow:nth-child(7n+1) { background:#eff6ff; color:#1d4ed8; border-color:#bfdbfe; }
+.public-prose .block-stats-table-pill--rainbow:nth-child(7n+2) { background:#f0fdf4; color:#15803d; border-color:#bbf7d0; }
+.public-prose .block-stats-table-pill--rainbow:nth-child(7n+3) { background:#fffbeb; color:#b45309; border-color:#fde68a; }
+.public-prose .block-stats-table-pill--rainbow:nth-child(7n+4) { background:#faf5ff; color:#7e22ce; border-color:#e9d5ff; }
+.public-prose .block-stats-table-pill--rainbow:nth-child(7n+5) { background:#fff1f2; color:#be123c; border-color:#fecdd3; }
+.public-prose .block-stats-table-pill--rainbow:nth-child(7n+6) { background:#f0fdfa; color:#0f766e; border-color:#99f6e4; }
+.public-prose .block-stats-table-pill--rainbow:nth-child(7n+7) { background:#fce7f3; color:#9d174d; border-color:#fbcfe8; }
 
 /* PostCard — light overrides */
 .ProseMirror .block-post-card {
@@ -6070,7 +6242,10 @@ mark {
   color: rgba(255,255,255,0.3);
 }
 /* pills row: align center so chips sit beside the label nicely */
-.public-prose .block-stats-table-row--pills {
+.public-prose .block-stats-table-row--pills,
+.public-prose .block-stats-table-row--percent,
+.public-prose .block-stats-table-row--rating,
+.public-prose .block-stats-table-row--badge {
   align-items: center;
 }
 .public-prose .block-stats-table-row--pills .block-stats-table-value {
@@ -6081,6 +6256,71 @@ mark {
   font-weight: inherit;
   color: inherit;
 }
+/* Percent bar */
+.public-prose .block-stats-table-percent {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+/* percent: outer wrapper → track span (track contains bar span with inline width) → label span */
+.public-prose .block-stats-table-percent {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+.public-prose .block-stats-table-percent-track {
+  flex: 1;
+  height: 6px;
+  background: rgba(0,0,0,0.07);
+  border-radius: 999px;
+  overflow: hidden;
+  display: block;
+}
+.public-prose .block-stats-table-percent-bar {
+  display: block;
+  height: 100%;
+  background: rgba(0,0,0,0.6);
+  border-radius: 999px;
+}
+.public-prose .block-stats-table-percent-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  min-width: 36px;
+  text-align: right;
+  color: rgba(0,0,0,0.7);
+}
+.dark .public-prose .block-stats-table-percent-bar { background: rgba(255,255,255,0.1); }
+.dark .public-prose .block-stats-table-percent-label { color: rgba(255,255,255,0.75); }
+/* Rating dots */
+.public-prose .block-stats-table-rating {
+  display: inline-flex;
+  gap: 2px;
+  font-size: 0.85rem;
+  letter-spacing: 1px;
+}
+.public-prose .block-stats-table-dot { color: rgba(0,0,0,0.12); }
+.public-prose .block-stats-table-dot--filled { color: rgba(0,0,0,0.65); }
+.dark .public-prose .block-stats-table-dot { color: rgba(255,255,255,0.15); }
+.dark .public-prose .block-stats-table-dot--filled { color: rgba(255,255,255,0.8); }
+/* Link */
+.public-prose .block-stats-table-link {
+  color: #1d4ed8;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  font-size: 0.82rem;
+}
+.dark .public-prose .block-stats-table-link { color: #93c5fd; }
+/* Boolean */
+.public-prose .block-stats-table-bool {
+  font-size: 1rem;
+  font-weight: 700;
+}
+.public-prose .block-stats-table-bool--yes { color: #16a34a; }
+.public-prose .block-stats-table-bool--no  { color: #dc2626; }
+.dark .public-prose .block-stats-table-bool--yes { color: #4ade80; }
+.dark .public-prose .block-stats-table-bool--no  { color: #f87171; }
 .public-prose .block-stats-table-pill {
   display: inline-block;
   padding: 2px 10px;
@@ -6119,6 +6359,45 @@ mark {
   color: #93c5fd;
   border-color: rgba(147,197,253,0.2);
 }
+
+/* Pill color themes — published output */
+.public-prose .block-stats-table-pill--blue {
+  background: #eff6ff; color: #1d4ed8; border-color: #bfdbfe;
+}
+.dark .public-prose .block-stats-table-pill--blue {
+  background: rgba(59,130,246,0.12); color: #93c5fd; border-color: rgba(59,130,246,0.25);
+}
+.public-prose .block-stats-table-pill--green {
+  background: #f0fdf4; color: #15803d; border-color: #bbf7d0;
+}
+.dark .public-prose .block-stats-table-pill--green {
+  background: rgba(34,197,94,0.1); color: #86efac; border-color: rgba(34,197,94,0.22);
+}
+.public-prose .block-stats-table-pill--amber {
+  background: #fffbeb; color: #b45309; border-color: #fde68a;
+}
+.dark .public-prose .block-stats-table-pill--amber {
+  background: rgba(245,158,11,0.1); color: #fcd34d; border-color: rgba(245,158,11,0.22);
+}
+.public-prose .block-stats-table-pill--purple {
+  background: #faf5ff; color: #7e22ce; border-color: #e9d5ff;
+}
+.dark .public-prose .block-stats-table-pill--purple {
+  background: rgba(168,85,247,0.1); color: #d8b4fe; border-color: rgba(168,85,247,0.22);
+}
+.public-prose .block-stats-table-pill--rose {
+  background: #fff1f2; color: #be123c; border-color: #fecdd3;
+}
+.dark .public-prose .block-stats-table-pill--rose {
+  background: rgba(244,63,94,0.1); color: #fda4af; border-color: rgba(244,63,94,0.22);
+}
+.public-prose .block-stats-table-pill--teal {
+  background: #f0fdfa; color: #0f766e; border-color: #99f6e4;
+}
+.dark .public-prose .block-stats-table-pill--teal {
+  background: rgba(20,184,166,0.1); color: #5eead4; border-color: rgba(20,184,166,0.22);
+}
+/* pastel + rainbow: nth-child cycling handled in editor CSS above (shared selectors) */
 
 /* ─── Timeline ───────────────────────────────────────────────────────────── */
 .public-prose .block-timeline {

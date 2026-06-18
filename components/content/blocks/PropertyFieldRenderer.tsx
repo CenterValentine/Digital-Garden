@@ -110,7 +110,7 @@ function GalleryItemsField({
       {items.length > 0 && (
         <div className="space-y-2">
           {items.map((item, i) => (
-            <div key={i} className="rounded-md border border-white/10 overflow-hidden">
+            <div key={i} className="rounded-md border border-gray-200 dark:border-white/10 overflow-hidden">
               {/* Thumbnail */}
               <div className="relative" style={{ height: 64 }}>
                 {item.src ? (
@@ -152,14 +152,14 @@ function GalleryItemsField({
                   value={item.alt}
                   onChange={(e) => updateItem(i, { alt: e.target.value })}
                   placeholder="Alt text"
-                  className="w-full px-1.5 py-0.5 text-xs rounded bg-white/8 border border-white/10 text-gray-300 placeholder:text-gray-600 focus:outline-none focus:border-blue-500/50"
+                  className="w-full px-1.5 py-0.5 text-xs rounded bg-gray-50 dark:bg-white/8 border border-gray-200 dark:border-white/10 text-gray-800 dark:text-gray-300 placeholder:text-gray-400 dark:placeholder:text-gray-600 focus:outline-none focus:border-blue-500/50"
                 />
                 <input
                   type="text"
                   value={item.caption ?? ""}
                   onChange={(e) => updateItem(i, { caption: e.target.value || undefined })}
                   placeholder="Caption (optional)"
-                  className="w-full px-1.5 py-0.5 text-xs rounded bg-white/8 border border-white/10 text-gray-300 placeholder:text-gray-600 focus:outline-none focus:border-blue-500/50"
+                  className="w-full px-1.5 py-0.5 text-xs rounded bg-gray-50 dark:bg-white/8 border border-gray-200 dark:border-white/10 text-gray-800 dark:text-gray-300 placeholder:text-gray-400 dark:placeholder:text-gray-600 focus:outline-none focus:border-blue-500/50"
                 />
               </div>
             </div>
@@ -173,14 +173,14 @@ function GalleryItemsField({
           type="button"
           onClick={() => fileInputRef.current?.click()}
           disabled={uploading}
-          className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 rounded-md border border-white/15 bg-white/5 text-xs text-gray-300 hover:bg-white/10 transition-colors disabled:opacity-50"
+          className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 rounded-md border border-gray-200 dark:border-white/15 bg-gray-50 dark:bg-white/5 text-xs text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/10 transition-colors disabled:opacity-50"
         >
           {uploading ? <><Loader2 className="w-3 h-3 animate-spin" /> Uploading…</> : <><Upload className="w-3 h-3" /> Add image</>}
         </button>
         <button
           type="button"
           onClick={() => setShowUrlInput((v) => !v)}
-          className="flex items-center gap-1 px-2 py-1.5 rounded-md border border-white/15 bg-white/5 text-xs text-gray-400 hover:bg-white/10 transition-colors"
+          className="flex items-center gap-1 px-2 py-1.5 rounded-md border border-gray-200 dark:border-white/15 bg-gray-50 dark:bg-white/5 text-xs text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/10 transition-colors"
           title="Add by URL"
         >
           <Link2 className="w-3 h-3" />
@@ -266,7 +266,7 @@ function ImageUploadField({
     <div className="space-y-1.5">
       {/* Preview */}
       {hasImage && (
-        <div className="relative rounded-md overflow-hidden border border-white/10 bg-black/20" style={{ height: 80 }}>
+        <div className="relative rounded-md overflow-hidden border border-gray-200 dark:border-white/10 bg-gray-100 dark:bg-black/20" style={{ height: 80 }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={value} alt="" className="w-full h-full object-cover" />
           <button
@@ -285,7 +285,7 @@ function ImageUploadField({
         type="button"
         onClick={() => fileInputRef.current?.click()}
         disabled={uploading}
-        className="w-full flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-md border border-white/15 bg-white/5 text-xs text-gray-300 hover:bg-white/10 hover:border-white/25 transition-colors disabled:opacity-50"
+        className="w-full flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-md border border-gray-200 dark:border-white/15 bg-gray-50 dark:bg-white/5 text-xs text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/10 hover:border-gray-300 dark:hover:border-white/25 transition-colors disabled:opacity-50"
       >
         {uploading ? (
           <><Loader2 className="w-3 h-3 animate-spin" /> Uploading…</>
@@ -394,7 +394,7 @@ export function PropertyField({
           type="text"
           value={(field.value as string) || ""}
           onChange={(e) => onChange(e.target.value)}
-          className="w-full px-2 py-1.5 text-sm rounded-md bg-white/8 border border-white/15 text-gray-200 placeholder:text-gray-600 focus:border-blue-500/50 focus:outline-none"
+          className="w-full px-2 py-1.5 text-sm rounded-md bg-gray-50 dark:bg-white/8 border border-gray-200 dark:border-white/15 text-gray-800 dark:text-gray-200 placeholder:text-gray-400 dark:placeholder:text-gray-600 focus:border-blue-500/50 focus:outline-none"
           placeholder={field.description}
         />
       )}
@@ -403,7 +403,7 @@ export function PropertyField({
         <select
           value={String(field.value ?? 0)}
           onChange={(e) => onChange(Number(e.target.value))}
-          className="w-full px-2 py-1.5 text-sm rounded-md bg-white/8 border border-white/15 text-gray-200 focus:border-blue-500/50 focus:outline-none"
+          className="w-full px-2 py-1.5 text-sm rounded-md bg-gray-50 dark:bg-white/8 border border-gray-200 dark:border-white/15 text-gray-800 dark:text-gray-200 focus:border-blue-500/50 focus:outline-none"
         >
           {WORKDAY_CUTOFF_OPTIONS.map((option) => (
             <option key={option.value} value={option.value}>
@@ -421,7 +421,7 @@ export function PropertyField({
           max={field.max}
           step={field.step ?? 1}
           onChange={(e) => onChange(Number(e.target.value))}
-          className="w-full px-2 py-1.5 text-sm rounded-md bg-white/8 border border-white/15 text-gray-200 focus:border-blue-500/50 focus:outline-none"
+          className="w-full px-2 py-1.5 text-sm rounded-md bg-gray-50 dark:bg-white/8 border border-gray-200 dark:border-white/15 text-gray-800 dark:text-gray-200 focus:border-blue-500/50 focus:outline-none"
         />
       )}
 
@@ -443,7 +443,7 @@ export function PropertyField({
         <select
           value={(field.value as string) || ""}
           onChange={(e) => onChange(e.target.value)}
-          className="w-full px-2 py-1.5 text-sm rounded-md bg-white/8 border border-white/15 text-gray-200 focus:border-blue-500/50 focus:outline-none"
+          className="w-full px-2 py-1.5 text-sm rounded-md bg-gray-50 dark:bg-white/8 border border-gray-200 dark:border-white/15 text-gray-800 dark:text-gray-200 focus:border-blue-500/50 focus:outline-none"
         >
           {field.options.map((opt) => (
             <option key={opt.value} value={opt.value}>
@@ -467,7 +467,7 @@ export function PropertyField({
             value={(field.value as string) || ""}
             onChange={(e) => onChange(e.target.value)}
             placeholder="#ffffff or rgb(255,255,255)"
-            className="flex-1 px-2 py-1.5 text-sm rounded-md bg-white/8 border border-white/15 text-gray-200 placeholder:text-gray-600 focus:border-blue-500/50 focus:outline-none font-mono"
+            className="flex-1 px-2 py-1.5 text-sm rounded-md bg-gray-50 dark:bg-white/8 border border-gray-200 dark:border-white/15 text-gray-800 dark:text-gray-200 placeholder:text-gray-400 dark:placeholder:text-gray-600 focus:border-blue-500/50 focus:outline-none font-mono"
           />
           {field.value && (
             <button
@@ -494,7 +494,7 @@ export function PropertyField({
               }
               setIconSelectorOpen(true);
             }}
-            className="w-full px-2 py-1.5 text-sm rounded-md bg-white/8 border border-white/15 text-gray-200 hover:border-blue-500/50 focus:outline-none text-left flex items-center gap-2"
+            className="w-full px-2 py-1.5 text-sm rounded-md bg-gray-50 dark:bg-white/8 border border-gray-200 dark:border-white/15 text-gray-800 dark:text-gray-200 hover:border-blue-500/50 focus:outline-none text-left flex items-center gap-2"
           >
             {field.value ? (
               <span className="truncate">{String(field.value)}</span>
