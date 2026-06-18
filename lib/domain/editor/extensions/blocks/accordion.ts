@@ -113,6 +113,81 @@ export const Accordion = Node.create({
 
   addKeyboardShortcuts() {
     return {
+      Enter: () => {
+        const { state, view } = this.editor;
+        const { selection } = state;
+        if (!selection.empty) return false;
+        const { $from } = selection;
+
+        // Find the nearest accordion ancestor
+        let accordionDepth = -1;
+        for (let d = $from.depth; d > 0; d--) {
+          if ($from.node(d).type.name === "accordion") {
+            accordionDepth = d;
+            break;
+          }
+        }
+        if (accordionDepth === -1) return false;
+
+        const accordionNode = $from.node(accordionDepth);
+        const parent = $from.parent;
+        const isEmpty = parent.type.name === "paragraph" && parent.content.size === 0;
+
+        // Only apply the 3-Enter exit logic when the cursor is a DIRECT child
+        // paragraph of the accordion (no nesting). In nested content, fall
+        // through to the manual split below.
+        if ($from.depth === accordionDepth + 1 && isEmpty) {
+          const indexInAccordion = $from.index(accordionDepth);
+          const isLastChild = indexInAccordion === accordionNode.childCount - 1;
+
+          // 3-Enter exit: cursor in empty trailing paragraph whose PREVIOUS
+          // sibling is also empty → delete both and insert paragraph after accordion.
+          // This means the user pressed Enter 3 times from the last line of text:
+          //   Enter → new empty paragraph (1)
+          //   Enter → another empty paragraph, prev was text → stays in (2)
+          //   Enter → prev is also empty → EXIT (3)
+          if (isLastChild && accordionNode.childCount >= 2) {
+            const prevSibling = accordionNode.child(indexInAccordion - 1);
+            const prevIsEmpty =
+              prevSibling.type.name === "paragraph" && prevSibling.content.size === 0;
+
+            if (prevIsEmpty) {
+              const accordionStart = $from.before(accordionDepth);
+              const lastParaStart = $from.before($from.depth);
+              const prevParaStart = lastParaStart - prevSibling.nodeSize;
+              const sizeRemoved = prevSibling.nodeSize + parent.nodeSize;
+              const afterAccordion = accordionStart + accordionNode.nodeSize - sizeRemoved;
+
+              const newPara = state.schema.nodes.paragraph?.create();
+              if (!newPara) return false;
+
+              const tr = state.tr;
+              tr.delete(prevParaStart, lastParaStart + parent.nodeSize);
+              tr.insert(afterAccordion, newPara);
+              try {
+                tr.setSelection(TextSelection.near(tr.doc.resolve(afterAccordion + 1)));
+              } catch { /* ignore if position invalid */ }
+              tr.scrollIntoView();
+              view.dispatch(tr);
+              view.focus();
+              return true;
+            }
+          }
+        }
+
+        // All other Enter presses inside accordion: manually split at paragraph
+        // depth only (depth=1). This prevents TipTap's splitBlock from splitting
+        // the defining accordion node when the cursor is at a paragraph boundary.
+        const tr = state.tr.split($from.pos, 1);
+        try {
+          tr.setSelection(TextSelection.near(tr.doc.resolve(tr.mapping.map($from.pos))));
+        } catch { /* ignore if position invalid */ }
+        tr.scrollIntoView();
+        view.dispatch(tr);
+        view.focus();
+        return true;
+      },
+
       Backspace: () => {
         // Don't fire if a non-PM contenteditable (e.g., accordion title) has focus.
         // The title lives inside editor.view.dom but is outside ProseMirror's
@@ -598,7 +673,12 @@ export const Accordion = Node.create({
             // handler, so without this guard every title click would put a
             // NodeSelection on the accordion — and the PM Backspace shortcut
             // would then fire against it while the title is being edited.
-            target.closest(".block-accordion-title");
+            target.closest(".block-accordion-title") ||
+            // Don't set NodeSelection when clicking inside the content area.
+            // A NodeSelection on mousedown causes drag-to-select-text to instead
+            // drag the entire block. Clicks in contentDOM let ProseMirror set
+            // a TextSelection naturally; the drag handle is the chrome + summary.
+            contentDOM.contains(target);
           if (interactive) return;
           selectBlockNode(editor, getNodePos);
           syncBlockSelection();

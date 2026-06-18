@@ -16,6 +16,13 @@ export async function GET(request: NextRequest) {
       const requiresSession = request.nextUrl.searchParams.get('required') === 'true'
 
       if (!session) {
+        if (requiresSession) {
+          logger.warn({
+            layer: 'auth',
+            event: 'session_route:returning_401',
+            summary: 'GET /api/auth/session?required=true → 401 (validateSession returned null)',
+          })
+        }
         return NextResponse.json(
           {
             success: !requiresSession,

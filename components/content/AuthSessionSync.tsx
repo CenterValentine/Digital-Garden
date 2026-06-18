@@ -14,8 +14,10 @@ import { clientLogger } from "@/lib/core/logger/client";
 const AUTH_STATUS_INTERVAL_MS = 10_000;
 const SIGNED_OUT_MESSAGE = "You were signed out. Sign in again to continue editing.";
 // Require this many consecutive 401s before triggering sign-out.
-// A single 401 can be a transient DB hiccup; two in a row (20 s apart) is authoritative.
-const CONSECUTIVE_FAILURES_REQUIRED = 2;
+// Three in a row (30 s apart) is authoritative: with NEGATIVE_TTL_MS = 10 s,
+// the third check always re-queries the DB fresh, so a Neon hiccup lasting
+// <20 s will clear before we reach this threshold.
+const CONSECUTIVE_FAILURES_REQUIRED = 3;
 
 function getCurrentRedirectPath(pathname: string | null, searchParams: URLSearchParams) {
   const path = pathname || "/content";
@@ -48,7 +50,29 @@ export function AuthSessionSync() {
     let isCancelled = false;
     let consecutiveFailures = 0;
 
+    // When the tab becomes visible again after a sleep/suspend, the frozen
+    // interval timer fires immediately on wake. Any cached null from the moment
+    // the computer slept carries forward into the first post-wake poll, making
+    // a transient DB reconnection error look like two consecutive 401s.
+    // Resetting here ensures the post-wake count always starts at 0.
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible" && consecutiveFailures > 0) {
+        clientLogger.info({
+          layer: "ui",
+          event: "session_check:counter_reset_on_wake",
+          summary: `Resetting ${consecutiveFailures} consecutive failure(s) after tab visibility restored`,
+        });
+        consecutiveFailures = 0;
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
     const verifySession = async () => {
+      // Guard at entry: if sign-out has already been triggered (isCancelled),
+      // do not fire another fetch — the interval will be cleared by the cleanup,
+      // but there may be in-flight calls already past the top-of-function guard.
+      if (isCancelled) return;
+
       try {
         const response = await fetch("/api/auth/session?required=true", {
           credentials: "include",
@@ -67,6 +91,11 @@ export function AuthSessionSync() {
           });
 
           if (consecutiveFailures >= CONSECUTIVE_FAILURES_REQUIRED) {
+            // Stop all future polls immediately — prevents the "consecutive: 3/2, 4/2"
+            // log noise and duplicate publishSignedOut calls seen when the interval
+            // keeps firing during the router.replace transition.
+            isCancelled = true;
+            window.clearInterval(interval);
             clientLogger.warn({
               layer: "ui",
               event: "session_check:signing_out",
@@ -96,6 +125,7 @@ export function AuthSessionSync() {
       isCancelled = true;
       window.clearInterval(interval);
       unsubscribe();
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, [pathname, router, searchParams]);
 

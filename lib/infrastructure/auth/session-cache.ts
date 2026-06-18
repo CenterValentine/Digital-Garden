@@ -19,7 +19,11 @@
 
 import type { SessionData } from "./types";
 
-const TTL_MS = 60 * 1000; // 1 minute — short enough that revocation is fast
+// Valid sessions: 60s TTL (revocations propagate within one minute across instances).
+// Null entries: 10s TTL — short enough that a transient DB hiccup (e.g. Neon
+// waking after a long idle period) doesn't lock a valid token out for a full minute.
+const POSITIVE_TTL_MS = 60 * 1000;
+const NEGATIVE_TTL_MS = 10 * 1000;
 const MAX_ENTRIES = 1000; // ~1MB at typical session shape; bounded memory
 
 type CacheEntry = {
@@ -51,9 +55,11 @@ export function getCachedSession(
     return undefined;
   }
 
-  // TTL check — independent of session.expiresAt. Even valid sessions get
-  // re-validated every TTL to pick up revocations from other instances.
-  if (Date.now() - entry.cachedAt > TTL_MS) {
+  // TTL check — independent of session.expiresAt. Positive entries live for
+  // POSITIVE_TTL_MS (revocations from other instances); negative (null) entries
+  // use NEGATIVE_TTL_MS so a transient DB error doesn't lock a valid token out.
+  const ttl = entry.session ? POSITIVE_TTL_MS : NEGATIVE_TTL_MS;
+  if (Date.now() - entry.cachedAt > ttl) {
     cache.delete(token);
     stats.misses += 1;
     return undefined;
