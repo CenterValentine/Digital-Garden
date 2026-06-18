@@ -218,7 +218,7 @@ First-party feature modules with clear ownership boundaries. Each extension live
 - `server/` — Services, types, route handlers
 - `state/` — Extension-local Zustand stores
 
-**Active extensions:** `daily-notes`, `flashcards`, `people`, `workplaces`, `calendar`
+**Active extensions:** `daily-notes`, `flashcards`, `people`, `workplaces`, `calendar`, `publishing`, `speed-reader`, `browser-bookmarks`
 
 **Key rules:**
 - Disabled extensions disappear through registry filters — never add direct conditionals in shared UI
@@ -341,10 +341,17 @@ Custom OAuth with Google Sign-In. `lib/infrastructure/auth/` (barrel export via 
 
 AI SDK v6 integration with BYOK (Bring Your Own Key) support.
 
+**AI domain structure:**
 - `types.ts` — Chat types, model configuration
 - `providers/` — Model provider factories (Anthropic, OpenAI) using `createAnthropic()` / `createOpenAI()`
 - `middleware/` — `defaultSettingsMiddleware` for model defaults
 - `tools/` — AI tool definitions: `metadata.ts` (client-safe, no Prisma), `registry.ts` (server-only, has Prisma)
+- `features/` — Multi-model routing: `FEATURE_REGISTRY`, `resolveFeatureRoute()`, `executeWithFallback()` for model fallback chains
+- `speech/` — TTS (text-to-speech) generation and storage: `generate.ts`, `generate-and-store.ts`, `catalog.ts`
+- `transcribe/` — STT (speech-to-text): `transcribe.ts`
+- `image/` — AI image generation: `generate.ts`, `generate-via-gateway.ts`, `generate-and-store.ts`
+- `use-conversation-engine.ts` — Shared hook for all AI chat surfaces
+- `conversation-persistence.ts` — Persists chat history to Prisma (`Conversation`, `ConversationMessage`, `ConversationAssociation` tables)
 
 **AI SDK v6 conventions:**
 - `useChat()`: Use `transport: new DefaultChatTransport({ api, body })` — no `api`/`body` props directly
@@ -381,7 +388,9 @@ POST             /content/export/vault          # Bulk ZIP export
 POST             /content/external/preview      # Open Graph metadata fetch
 ```
 
-Other API areas: `app/api/admin/`, `app/api/auth/`, `app/api/google-drive/`, `app/api/onlyoffice/`, `app/api/visualization/`, `app/api/categories/`, `app/api/user/`, `app/api/periodic-notes/`, `app/api/calendar/`
+Other API areas: `app/api/admin/`, `app/api/auth/`, `app/api/google-drive/`, `app/api/onlyoffice/`, `app/api/visualization/`, `app/api/categories/`, `app/api/user/`, `app/api/periodic-notes/`, `app/api/calendar/`, `app/api/conversations/` (persisted chat history), `app/api/flashcards/`, `app/api/publishing/`, `app/api/speed-reader/`, `app/api/media/`, `app/api/integrations/`, `app/api/trash/`, `app/api/logs/`, `app/api/cron/`
+
+**AI-specific routes:** `app/api/ai/chat/`, `app/api/ai/speech/` (TTS), `app/api/ai/transcribe/` (STT), `app/api/ai/image/`, `app/api/ai/inject-media/`, `app/api/ai/follow-ups/`, `app/api/ai/folder-assist/`
 
 **Type definitions:** `lib/domain/content/api-types.ts`
 
@@ -398,7 +407,10 @@ extensions/                     # First-party feature extensions
 ├── flashcards/
 ├── people/
 ├── workplaces/
-└── calendar/
+├── calendar/
+├── publishing/                 # Public site publishing
+├── speed-reader/               # RSVP speed reader (global-dialog surface)
+└── browser-bookmarks/          # Browser extension + embed iframe integration
 
 components/content/
 ├── ai/                         # AI chat panel components
@@ -470,6 +482,7 @@ const glass0 = getSurfaceStyles("glass-0");
 - **Never import Prisma into `"use client"` components** — causes dns/fs/net/tls bundler errors. Client-safe AI tool metadata lives in `lib/domain/ai/tools/metadata.ts`; server-only registry in `lib/domain/ai/tools/registry.ts`
 - For Prisma JSON writes, use `as unknown as Prisma.InputJsonValue` (the cast goes through `unknown` because Prisma's input type is intentionally narrow)
 - For unused parameters/vars that must remain (kept-for-signature, caught errors), prefix with `_` — eslint is configured to ignore `_`-prefixed identifiers via `argsIgnorePattern`/`varsIgnorePattern`/`caughtErrorsIgnorePattern`. **Do NOT** add bare `// eslint-disable` for unused-vars; rename instead.
+- **Next.js 16 middleware is `proxy.ts`, not `middleware.ts`** — this repo renames it per Next.js 16 conventions. The function export is named `proxy`. Do not create `middleware.ts`; the build will fail if both files coexist.
 
 ### Quality Gates — before declaring a task done
 
@@ -525,6 +538,40 @@ These were all caught by enforcing the React Compiler rules during lint. Treat c
 ### Menu Positioning
 
 Portal rendering + boundary detection in `lib/core/menu-positioning.ts`. Two-phase: render hidden to measure, then position. Auto-flips at viewport edges. Used by context menus, dropdowns, tooltips.
+
+## Publishing Block Development Protocol
+
+Full guide (block inventory, per-step checklist, footguns, template, CI gates reference):
+**[docs/notes-feature/guides/publishing/PUBLISHING-BLOCK-GUIDE.md](docs/notes-feature/guides/publishing/PUBLISHING-BLOCK-GUIDE.md)**
+
+### Five required surfaces — every block must satisfy all of them
+
+| # | What | Where |
+|---|---|---|
+| 1 | Block file: schema + `registerBlock()` + client extension + server extension | `extensions/publishing/blocks/<name>.ts` |
+| 2 | Server-runtime registration | `extensions/publishing/server-runtime.ts` |
+| 3 | CSS (light defaults + `.dark` companions for any extreme colors) | `app/globals.css` |
+| 4 | Playwright fixture JSON + entry in `PUBLISHING_FIXTURE_BLOCKS` + committed PNGs | `tests/e2e/_fixtures/publishing/` |
+| 5 | Post-merge Hocuspocus redeploy via Cloud Build | `cloudbuild.hocuspocus.yaml` |
+
+### Key rules (expanded in the guide)
+
+- **Always use `dataAttr("camelKey")`** in `addAttributes()` — hand-rolling attribute access has silently dropped attrs in production (see `hero-image.ts`).
+- **`renderHTML` reads kebab keys**: `HTMLAttributes["data-cta-text"]`, not `HTMLAttributes["ctaText"]`.
+- **No collab registration step needed**: publishing blocks flow into `getCollaborationServerExtensions()` automatically via `getExtensionServerEditorExtensions()` → `publishingExtensionServerRuntime`. Unlike editor-level TipTap extensions, no manual entry in `lib/domain/collaboration/extensions.ts` is required.
+- **Hocuspocus must be redeployed after merge**: it's a separate Cloud Run service (Docker image snapshot). Vercel does not redeploy it. Without a redeploy, unknown block types are serialized as `unsupportedBlock` placeholders, corrupting collaborative documents.
+- **Dark-mode CSS is hard**: every `.public-prose .block-*` rule using an extreme color needs a `.dark` companion. Eight blocks were invisible on light pages for this reason. Run `pnpm publishing:audit:themes`.
+
+### Quality gate commands
+
+```bash
+pnpm publishing:schema:check   # Server* export in server-runtime (hard gate)
+pnpm publishing:audit:defaults # Zod defaults vs renderHTML fallback drift (info)
+pnpm publishing:audit:themes   # CSS extreme colors without dark companion (info)
+pnpm typecheck && pnpm lint    # TypeScript + ESLint
+pnpm build                     # Full production build
+pnpm test:e2e                  # Per-block Playwright visual regression (hard gate)
+```
 
 ## Sprint/Epoch Development Model
 
