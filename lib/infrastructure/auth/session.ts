@@ -13,9 +13,6 @@ import { logger } from "@/lib/core/logger";
 // Renew when less than this much time remains on the session
 const SESSION_RENEW_THRESHOLD_MS = 2 * 24 * 60 * 60 * 1000; // 2 days
 
-// Renew when less than this much time remains on the session
-const SESSION_RENEW_THRESHOLD_MS = 2 * 24 * 60 * 60 * 1000; // 2 days
-
 const SESSION_COOKIE_NAME = "session_token";
 const EMBED_SESSION_HEADER = "x-embed-session";
 const SESSION_DURATION_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
