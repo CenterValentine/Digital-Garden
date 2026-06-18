@@ -586,15 +586,18 @@ export const Accordion = Node.create({
         chevron.classList.toggle("block-accordion-chevron-open", isOpen);
         contentDOM.classList.toggle("block-accordion-open", isOpen);
         contentDOM.classList.toggle("block-accordion-closed", !isOpen);
-        if (currentNode.attrs.openBehavior === "lastInteraction") {
-          const blockId = currentNode.attrs.blockId || "";
-          if (blockId) {
-            window.dispatchEvent(
-              new CustomEvent("block-attrs-change", {
-                detail: { blockId, key: "openState", value: isOpen },
-              })
-            );
-          }
+        // Always persist the user's manual toggle to the doc. openBehavior only
+        // controls the initial/default open state — it does not prevent the user
+        // from overriding it. Without this, "expanded" accordions that the user
+        // manually closes snap back open on any NodeView recreation (e.g.,
+        // Hocuspocus reconnect, editor restart), causing whack-a-mole behavior.
+        const blockId = currentNode.attrs.blockId || "";
+        if (blockId) {
+          window.dispatchEvent(
+            new CustomEvent("block-attrs-change", {
+              detail: { blockId, key: "openState", value: isOpen },
+            })
+          );
         }
       };
 
@@ -698,6 +701,16 @@ export const Accordion = Node.create({
         contentDOM,
         update(updatedNode) {
           if (updatedNode.type.name !== "accordion") return false;
+          // Reject NodeView reuse when ProseMirror maps this view to a different
+          // accordion node (both blockIds set but mismatched). Without this guard,
+          // position shifts from Y.js merges or content edits can cause ProseMirror
+          // to call update() on accordion A's view with accordion B's node data —
+          // flipping A's open state to match B's and vice versa (whack-a-mole).
+          const currentBlockId = currentNode.attrs.blockId as string | null;
+          const updatedBlockId = updatedNode.attrs.blockId as string | null;
+          if (currentBlockId && updatedBlockId && currentBlockId !== updatedBlockId) {
+            return false;
+          }
           const previousNode = currentNode;
           currentNode = updatedNode;
           dom.setAttribute("data-block-id", updatedNode.attrs.blockId || "");
