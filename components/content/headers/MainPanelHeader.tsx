@@ -36,6 +36,14 @@ interface TabPresenceSession {
   lastSeenAt: number;
 }
 
+// Transport states that represent an actively-synced collaboration connection.
+// Anything else (localOnly, coolingDown, disconnectedButDirty) renders as dormant/grey.
+const ACTIVE_TRANSPORT_STATES = new Set(["synced", "connected", "connecting", "promoting"]);
+
+function isActiveTransport(transportState: string | undefined): boolean {
+  return ACTIVE_TRANSPORT_STATES.has(transportState ?? "");
+}
+
 interface PresenceDisplayGroup {
   key: string;
   displayName: string;
@@ -45,6 +53,8 @@ interface PresenceDisplayGroup {
   sessionCount: number;
   firstSeenAt: number;
   colorSeed: string;
+  /** true if at least one session in this group has an active WebSocket to Hocuspocus */
+  hasActiveTransport: boolean;
 }
 
 interface PresenceSnapshotResponse {
@@ -130,6 +140,10 @@ function groupPresenceSessions(sessions: TabPresenceSession[]): PresenceDisplayG
       if (!existing.avatarUrl && session.avatarUrl) {
         existing.avatarUrl = session.avatarUrl;
       }
+      // Promote to active if any session in the group is actively synced.
+      if (isActiveTransport(session.transportState)) {
+        existing.hasActiveTransport = true;
+      }
     } else {
       groups.set(key, {
         key,
@@ -140,6 +154,7 @@ function groupPresenceSessions(sessions: TabPresenceSession[]): PresenceDisplayG
         sessionCount: 1,
         firstSeenAt: session.firstSeenAt || Date.now(),
         colorSeed: session.userId || session.sessionId,
+        hasActiveTransport: isActiveTransport(session.transportState),
       });
     }
   }
@@ -174,13 +189,17 @@ function TabPresenceDiscs({
       {visibleGroups.map((group, index) => {
         const initials = getInitials(group.displayName);
         const colorIndex = hashString(group.colorSeed) % 5;
-        const colors = [
+        const activeColors = [
           "bg-blue-500",
           "bg-emerald-500",
           "bg-violet-500",
           "bg-amber-500",
           "bg-rose-500",
         ];
+        // Active transport → coloured avatar. Dormant (sleeping/cooling down) → grey.
+        const avatarColorClass = group.hasActiveTransport
+          ? activeColors[colorIndex]
+          : "bg-gray-400 dark:bg-gray-500";
 
         return (
           <div
@@ -189,14 +208,16 @@ function TabPresenceDiscs({
             style={{ zIndex: groups.length - index }}
           >
             <div
-              className={`flex h-6 w-6 items-center justify-center overflow-hidden rounded-full border-2 border-background text-[10px] font-semibold uppercase text-white shadow-sm ${
-                colors[colorIndex]
-              }`}
+              className={`flex h-6 w-6 items-center justify-center overflow-hidden rounded-full border-2 border-background text-[10px] font-semibold uppercase text-white shadow-sm transition-colors duration-300 ${avatarColorClass}`}
               aria-label={group.displayName}
             >
               {group.avatarUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={group.avatarUrl} alt="" className="h-full w-full object-cover" />
+                <img
+                  src={group.avatarUrl}
+                  alt=""
+                  className={`h-full w-full object-cover ${group.hasActiveTransport ? "" : "opacity-60"}`}
+                />
               ) : (
                 initials
               )}
@@ -209,8 +230,9 @@ function TabPresenceDiscs({
                 <>
                   <p className="text-muted-foreground">{formatSessionStart(group.firstSeenAt)}</p>
                   <p className="text-muted-foreground">
+                    {group.hasActiveTransport ? "Live" : "Idle"} ·{" "}
                     {group.sessionCount} {group.sessionCount === 1 ? "session" : "sessions"} ·{" "}
-                    {group.surfaceCount} active {group.surfaceCount === 1 ? "view" : "views"}
+                    {group.surfaceCount} {group.surfaceCount === 1 ? "view" : "views"}
                   </p>
                 </>
               )}

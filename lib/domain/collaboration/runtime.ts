@@ -262,6 +262,8 @@ interface DocumentRuntimeEntry {
   listeners: Set<() => void>;
   cooldownTimer: ReturnType<typeof setTimeout> | null;
   idleEvictionTimer: ReturnType<typeof setTimeout> | null;
+  visibilitySleepTimer: ReturnType<typeof setTimeout> | null;
+  inactivitySleepTimer: ReturnType<typeof setTimeout> | null;
   bootstrapSlowTimer: ReturnType<typeof setTimeout> | null;
   bootstrapFallbackTimer: ReturnType<typeof setTimeout> | null;
   bootstrapAbortController: AbortController | null;
@@ -330,6 +332,12 @@ const BOOTSTRAP_SLOW_WARNING_MS = 10_000;
 const BOOTSTRAP_LOCAL_FALLBACK_MS = 25_000;
 const COOLDOWN_MS = 120_000;
 const IDLE_EVICTION_MS = 300_000;
+// Sleep thresholds — disconnect Cloud Run WebSocket when no real editing is happening.
+// Visibility sleep: tab hidden for N ms → sleep even if "multi-session" (browser extension
+// open in background counts as multi-session but isn't real collaboration).
+// Inactivity sleep: no Y.js edits for N ms while connected → sleep.
+const VISIBILITY_SLEEP_DELAY_MS = 3 * 60 * 1000;   // 3 minutes hidden
+const INACTIVITY_SLEEP_DELAY_MS = 10 * 60 * 1000;  // 10 minutes idle
 const LOCAL_CACHE_MANIFEST_KEY = "dg-collab-local-cache-manifest";
 const LOCAL_CACHE_PRUNE_AFTER_MS = 30 * 24 * 60 * 60 * 1000;
 
@@ -643,6 +651,8 @@ class CollaborationRuntimeManager {
       consumers: new Map(),
       cooldownTimer: null,
       idleEvictionTimer: null,
+      visibilitySleepTimer: null,
+      inactivitySleepTimer: null,
       bootstrapSlowTimer: null,
       bootstrapFallbackTimer: null,
       bootstrapAbortController: null,
@@ -708,6 +718,39 @@ class CollaborationRuntimeManager {
       if (entry.state.persistenceState !== "localReady") return;
 
       entry.lastActivityAt = Date.now();
+
+      // Cancel any pending sleep timers — the user is actively editing.
+      if (entry.inactivitySleepTimer) {
+        clearTimeout(entry.inactivitySleepTimer);
+        entry.inactivitySleepTimer = null;
+      }
+      if (entry.visibilitySleepTimer) {
+        clearTimeout(entry.visibilitySleepTimer);
+        entry.visibilitySleepTimer = null;
+      }
+
+      // If a sleep cooldown is in progress (coolingDown state), cancel it and
+      // resume the live connection — the user started editing again.
+      if (entry.state.connectionState === "coolingDown" && entry.cooldownTimer !== null) {
+        clearTimeout(entry.cooldownTimer);
+        entry.cooldownTimer = null;
+        entry.state.connectionState = "synced";
+        this.scheduleInactivitySleep(entry);
+        this.emit(entry);
+        return;
+      }
+
+      // If we slept (localOnly, no reconnectIntent) and the user starts typing,
+      // re-promote if there's another session present.
+      if (
+        entry.state.connectionState === "localOnly" &&
+        !entry.state.reconnectIntent &&
+        (entry.state.browserSessionTopology === "multiSession" ||
+          entry.state.remoteCollaborationTopology === "remotePresent")
+      ) {
+        void this.promote(entry, "reconnect-after-offline");
+      }
+
       if (
         entry.state.networkState === "offline" ||
         entry.state.connectionState === "disconnectedButDirty"
@@ -1594,6 +1637,8 @@ class CollaborationRuntimeManager {
         entry.state.localDirty = false;
         entry.state.unsyncedUpdateCount = 0;
         this.emit(entry);
+        // Start inactivity countdown after every successful sync.
+        this.scheduleInactivitySleep(entry);
       },
       onUnsyncedChanges: ({ number }) => {
         entry.state.unsyncedUpdateCount = number;
@@ -1899,6 +1944,35 @@ class CollaborationRuntimeManager {
     if (!entry) return;
     this.schedulePresenceHeartbeat(entry);
     this.syncPresenceTransport(entry);
+
+    const isHidden = typeof document !== "undefined" && document.visibilityState === "hidden";
+    if (isHidden) {
+      // Start a sleep countdown while the tab is in the background.
+      // Guard against double-scheduling (rapid hide/show cycles).
+      if (!entry.visibilitySleepTimer) {
+        entry.visibilitySleepTimer = setTimeout(() => {
+          entry.visibilitySleepTimer = null;
+          this.maybeEnterSleepMode(entry);
+        }, VISIBILITY_SLEEP_DELAY_MS);
+      }
+    } else {
+      // Tab became visible — cancel any pending sleep countdown.
+      if (entry.visibilitySleepTimer) {
+        clearTimeout(entry.visibilitySleepTimer);
+        entry.visibilitySleepTimer = null;
+      }
+      // Reset activity clock so inactivity timer gets a fresh window.
+      entry.lastActivityAt = Date.now();
+      // If we slept and came back to an active session, re-promote.
+      if (
+        entry.state.connectionState === "localOnly" &&
+        !entry.state.reconnectIntent &&
+        (entry.state.browserSessionTopology === "multiSession" ||
+          entry.state.remoteCollaborationTopology === "remotePresent")
+      ) {
+        void this.promote(entry, "reconnect-after-offline");
+      }
+    }
   }
 
   private handlePageHide(contentId: string) {
@@ -1931,6 +2005,60 @@ class CollaborationRuntimeManager {
       }
       this.emit(entry);
     }, COOLDOWN_MS);
+  }
+
+  // Permissive sleep — used by visibility and inactivity timers.
+  // Unlike maybeStartCooldown it does not require solo topology: we want
+  // the browser-extension-open-in-background case (multiSession but no
+  // real simultaneous editing) to sleep too.  Skips if dirty or offline.
+  private maybeEnterSleepMode(entry: DocumentRuntimeEntry) {
+    if (!entry.hocuspocusProvider || entry.state.connectionState !== "synced") return;
+    if (entry.state.localDirty || entry.state.unsyncedUpdateCount > 0) return;
+    if (entry.state.networkState !== "online") return;
+    if (entry.state.liveConsumerCount > 0) return;
+
+    if (entry.cooldownTimer) clearTimeout(entry.cooldownTimer);
+    entry.state.connectionState = "coolingDown";
+    this.emit(entry);
+
+    entry.cooldownTimer = setTimeout(() => {
+      entry.cooldownTimer = null;
+      if (
+        entry.state.localDirty ||
+        entry.state.unsyncedUpdateCount > 0 ||
+        entry.state.networkState !== "online"
+      ) {
+        // Something changed during cooldown — stay connected
+        entry.state.connectionState = entry.hocuspocusProvider ? "synced" : "localOnly";
+        this.emit(entry);
+        return;
+      }
+      this.destroyProviderOnly(entry);
+      entry.state.connectionState = "localOnly";
+      // Clear reconnectIntent so the normal reconnect loop doesn't immediately
+      // re-open a WebSocket.  Wakeup happens via presence (applyRemotePresenceSessions
+      // → promote) or user typing (ydocUpdateHandler → maybePromoteFromCurrentTopology).
+      entry.state.reconnectIntent = false;
+      this.emit(entry);
+    }, COOLDOWN_MS);
+  }
+
+  // Schedule an inactivity sleep timer.  Called after connect (onSynced) and
+  // reset after every local Y.js edit.  Fires maybeEnterSleepMode if the user
+  // hasn't typed for INACTIVITY_SLEEP_DELAY_MS.
+  private scheduleInactivitySleep(entry: DocumentRuntimeEntry) {
+    if (entry.inactivitySleepTimer) {
+      clearTimeout(entry.inactivitySleepTimer);
+      entry.inactivitySleepTimer = null;
+    }
+    if (!entry.hocuspocusProvider || entry.state.connectionState !== "synced") return;
+
+    entry.inactivitySleepTimer = setTimeout(() => {
+      entry.inactivitySleepTimer = null;
+      if (Date.now() - entry.lastActivityAt >= INACTIVITY_SLEEP_DELAY_MS) {
+        this.maybeEnterSleepMode(entry);
+      }
+    }, INACTIVITY_SLEEP_DELAY_MS);
   }
 
   private canDemoteProvider(entry: DocumentRuntimeEntry) {
@@ -1986,6 +2114,8 @@ class CollaborationRuntimeManager {
     document.removeEventListener("visibilitychange", entry.visibilityChangeHandler);
     window.removeEventListener("pagehide", entry.pageHideHandler);
     if (entry.cooldownTimer) clearTimeout(entry.cooldownTimer);
+    if (entry.visibilitySleepTimer) clearTimeout(entry.visibilitySleepTimer);
+    if (entry.inactivitySleepTimer) clearTimeout(entry.inactivitySleepTimer);
     // Abort any pending deferred initial promote so its callback doesn't
     // fire against a destroyed entry. Safe to call even if not scheduled.
     if (entry.initialPromoteCancel) {
