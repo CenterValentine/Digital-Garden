@@ -148,11 +148,17 @@ export const EditorImage = Image.extend({
         dom: wrapper,
         // Explicit selection management — ProseMirror doesn't always auto-apply
         // ProseMirror-selectednode class to custom NodeView dom elements.
+        // wrapper.draggable must be toggled here: img.draggable=false blocks native
+        // image drag (good — prevents resize conflicts), but nothing is draggable
+        // unless we make the wrapper draggable when selected. ProseMirror's dragstart
+        // handler then serializes the NodeSelection and handles the drop.
         selectNode() {
           wrapper.classList.add("ProseMirror-selectednode");
+          wrapper.draggable = true;
         },
         deselectNode() {
           wrapper.classList.remove("ProseMirror-selectednode");
+          wrapper.draggable = false;
         },
         // Update when node attrs change (e.g., after upload swaps src)
         update(updatedNode) {
