@@ -4,7 +4,7 @@ import { prisma } from "@/lib/database/client";
 import { filterCachedPresenceContentIds } from "@/lib/domain/collaboration/presence-access-cache";
 import { listCollaborationPresence } from "@/lib/domain/collaboration/presence-server";
 import { getSession } from "@/lib/infrastructure/auth/session";
-import { logger } from "@/lib/core/logger";
+import { logger, withSpan } from "@/lib/core/logger";
 import { withRouteTrace } from "@/lib/core/logger/route-trace";
 
 export const runtime = "nodejs";
@@ -34,7 +34,11 @@ function isUuid(value: string) {
 export async function GET(request: NextRequest) {
   return withRouteTrace(request, { route: "/api/collaboration/presence" }, async () => {
   try {
-    const session = await getSession();
+    const session = await withSpan(
+      { layer: "auth", name: "session" },
+      { summary: "session lookup" },
+      async () => getSession(),
+    );
     const contentIds = parseContentIds(request);
     const excludeSessionId = request.nextUrl.searchParams.get("excludeSessionId")?.trim();
 

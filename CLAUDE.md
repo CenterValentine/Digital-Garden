@@ -8,6 +8,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Archived apps** in `/archive` (not in build): `web-amino` (amino acid learning), `open-notes` (documentation).
 
+**[AGENTS.md](AGENTS.md):** Codex-authored briefs for side projects (typically starter scaffolds handed to Claude for final polish, especially UI/UX). When the user references a Codex hand-off, check AGENTS.md for context. CLAUDE.md is authoritative for everything else.
+
 ## Development Commands
 
 ```bash
@@ -19,16 +21,22 @@ pnpm lint             # ESLint with --max-warnings 175 ratchet (fails if count g
 pnpm build:tokens     # Regenerate CSS variables from design tokens
 pnpm db:seed          # Seed database with test ContentNode data
 pnpm collab:schema:check  # CI gate: validate collaboration schema covers all editor extensions
+pnpm collab:env:check     # Verify Hocuspocus env vars are present (scripts/check-hocuspocus-env.ts)
 pnpm publishing:schema:check  # CI gate: validate every publishing block has Server* variant + correct registerBlock type
 pnpm publishing:audit:defaults  # Static drift detector: Zod defaults vs renderHTML fallbacks across publishing blocks
 pnpm publishing:audit:themes  # Static theme-coverage audit: flags `.public-prose .block-*` rules with extreme colors (white-ish / dark-ish) that lack a `.dark` companion. Triage required — theme-stable surfaces (pricing, testimonial, etc.) are intentional false positives.
 pnpm test:e2e         # Playwright visual regression (assumes pnpm dev is running)
 pnpm test:e2e:update  # Regenerate baseline screenshots
 pnpm test:e2e:report  # Open last HTML run report
+pnpm extension:dev    # Build browser extension in watch mode (Phase 5 iframe shell)
+pnpm extension:build  # Build browser extension (production)
+pnpm extension:tokens # Sync design tokens into the extension's manifest/styles
 npx prisma generate   # Regenerate Prisma client (lib/database/generated/prisma)
 npx prisma db push    # Push schema changes in dev (no migration file)
 npx prisma studio     # Database GUI (http://localhost:5555)
 ```
+
+**Browser extension source** lives at [extensions/browser-bookmarks/browser-extension/](extensions/browser-bookmarks/browser-extension/). Build scripts are in [scripts/build-extension.mjs](scripts/build-extension.mjs) and [scripts/sync-extension-tokens.mjs](scripts/sync-extension-tokens.mjs).
 
 **Primary verification is still manual** — `pnpm build` must pass, then smoke-test in browser. The Playwright harness adds visual regression coverage but only for signed-out routes today (auth fixture pending).
 
@@ -218,7 +226,7 @@ First-party feature modules with clear ownership boundaries. Each extension live
 - `server/` — Services, types, route handlers
 - `state/` — Extension-local Zustand stores
 
-**Active extensions:** `daily-notes`, `flashcards`, `people`, `workplaces`, `calendar`
+**Active extensions:** `daily-notes`, `flashcards`, `people`, `workplaces`, `calendar`, `browser-bookmarks`, `publishing`
 
 **Key rules:**
 - Disabled extensions disappear through registry filters — never add direct conditionals in shared UI
@@ -293,7 +301,7 @@ All stores in `state/`. Pattern: `create<T>()(persist((set, get) => ({...}), { n
 
 ### Collaboration Architecture
 
-**Transport:** Hocuspocus server hosted on Google Cloud Run (not local). Do not check port 1234 or suggest `pnpm dev:collab` for production testing.
+**Transport:** Hocuspocus server hosted on Google Cloud Run (not local). The `pnpm dev:collab` / `pnpm start:collab` scripts (entry: [server/hocuspocus/bootstrap.ts](server/hocuspocus/bootstrap.ts)) exist to build/run the Cloud Run image — they are NOT used for local app development. Do not check port 1234 or recommend running them when debugging client-side collab issues.
 
 **Y.js document storage:** `CollaborationDocument` Prisma table stores binary `ydocState`. On load, the server bootstraps from TipTap JSON if no Y.js state exists. Presence (awareness) state is persisted to Postgres to handle Vercel serverless split.
 
@@ -398,7 +406,14 @@ extensions/                     # First-party feature extensions
 ├── flashcards/
 ├── people/
 ├── workplaces/
-└── calendar/
+├── calendar/
+├── publishing/                 # Public path / publish workflow (Epoch 15)
+└── browser-bookmarks/          # Phase 5 browser extension iframe embed
+
+server/
+└── hocuspocus/                 # Cloud Run Hocuspocus collab server (bootstrap.ts entry)
+
+proxy.ts                        # Next.js 16 proxy — runs before every matched request
 
 components/content/
 ├── ai/                         # AI chat panel components

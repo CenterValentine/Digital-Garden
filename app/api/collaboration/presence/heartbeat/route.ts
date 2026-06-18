@@ -7,7 +7,7 @@ import {
 } from "@/lib/domain/collaboration/presence-access-cache";
 import { upsertCollaborationPresence } from "@/lib/domain/collaboration/presence-server";
 import { getSession } from "@/lib/infrastructure/auth/session";
-import { logger } from "@/lib/core/logger";
+import { logger, withSpan } from "@/lib/core/logger";
 import { withRouteTrace } from "@/lib/core/logger/route-trace";
 
 export const runtime = "nodejs";
@@ -80,7 +80,11 @@ function sanitizeDisplayName(value: unknown) {
 export async function POST(request: NextRequest) {
   return withRouteTrace(request, { route: "/api/collaboration/presence/heartbeat" }, async () => {
   try {
-    const session = await getSession();
+    const session = await withSpan(
+      { layer: "auth", name: "session" },
+      { summary: "session lookup" },
+      async () => getSession(),
+    );
     const body = (await request.json()) as PresenceHeartbeatInput & {
       sessions?: PresenceHeartbeatInput[];
     };
