@@ -225,7 +225,7 @@ export const WikiLink = Node.create<WikiLinkOptions>({
         key: new PluginKey("wikiLinkInteraction"),
 
         props: {
-          handleClick(view, pos, event) {
+          handleClick(view, _pos, event) {
             // Only handle left-click; right-click must reach the contextmenu handler
             if (event.button !== 0) return false;
             const { doc } = view.state;
@@ -236,29 +236,14 @@ export const WikiLink = Node.create<WikiLinkOptions>({
 
             if (!clickPos) return false;
 
-            // Find the wiki-link node at this position
-            // Use safe boundaries to avoid nodesBetween errors
-            const from = Math.max(0, clickPos.pos - 1);
-            const to = Math.min(doc.content.size, clickPos.pos + 1);
+            // `inside` is >= 0 only when the click landed on the node's own DOM element.
+            // Using pos ± 1 also fires for clicks on adjacent text positions (the bug).
+            if (clickPos.inside < 0) return false;
 
-            let wikiLinkNode: ProseMirrorNode | null = null;
-
-            try {
-              doc.nodesBetween(from, to, (node) => {
-                if (node.type.name === "wikiLink") {
-                  wikiLinkNode = node;
-                  return false;
-                }
-              });
-            } catch (err) {
-              // Silently handle any range errors
-              return false;
-            }
-
-            // Single-click to navigate
-            if (wikiLinkNode && options.onClickLink) {
+            const clickedNode = doc.nodeAt(clickPos.inside);
+            if (clickedNode?.type.name === "wikiLink" && options.onClickLink) {
               event.preventDefault();
-              options.onClickLink((wikiLinkNode as ProseMirrorNode).attrs.targetTitle);
+              options.onClickLink(clickedNode.attrs.targetTitle);
               return true;
             }
 
