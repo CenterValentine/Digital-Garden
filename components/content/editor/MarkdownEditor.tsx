@@ -457,6 +457,18 @@ export function MarkdownEditor({
           }
           return false;
         },
+        drop: (view, event) => {
+          // Diagnostic only — remove before shipping
+          // eslint-disable-next-line no-console
+          console.log("[dnd:drop]", {
+            dragging: !!(view as unknown as { dragging: unknown }).dragging,
+            types: Array.from(event.dataTransfer?.types ?? []),
+            files: event.dataTransfer?.files.length ?? 0,
+            pos: view.posAtCoords({ left: event.clientX, top: event.clientY }),
+            editable: view.editable,
+          });
+          return false;
+        },
       },
       // Sprint 37: Image paste handler
       // Uses insertImageFromFileRef to avoid stale closure (see ref declaration)
@@ -490,7 +502,14 @@ export function MarkdownEditor({
       },
       // Sprint 37: Image drop handler (ProseMirror-level)
       // Uses insertImageFromFileRef to avoid stale closure (see ref declaration)
-      handleDrop: (view, event, _slice, moved) => {
+      handleDrop: (view, event, slice, moved) => {
+        // Diagnostic only — remove before shipping
+        // eslint-disable-next-line no-console
+        console.log("[dnd:handleDrop]", {
+          moved,
+          sliceSize: slice.content.size,
+          dragging: !!(view as unknown as { dragging: unknown }).dragging,
+        });
         if (moved) return false; // Internal drag — let ProseMirror handle it
 
         const files = Array.from(event.dataTransfer?.files || []);
