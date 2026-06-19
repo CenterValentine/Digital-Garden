@@ -66,6 +66,11 @@ export const EditorImage = Image.extend({
       wrapper.classList.add("image-resize-wrapper");
       wrapper.style.position = "relative";
       wrapper.style.maxWidth = "100%";
+      // Always draggable so ProseMirror's drag-move pipeline works without
+      // requiring the node to be selected first. Keeping img.draggable=false
+      // routes all drags through the wrapper, giving ProseMirror a stable
+      // event.target to resolve via nearestDesc.
+      wrapper.draggable = true;
 
       // Apply size as preset width (overrides drag-resize width when set)
       function syncWrapSize(n: typeof node) {
@@ -94,7 +99,12 @@ export const EditorImage = Image.extend({
       }
       img.style.width = "100%";
       img.style.height = "auto";
-      img.draggable = false; // Prevent native image drag interfering with resize
+      // img.draggable = false keeps the browser from initiating a native "save image"
+      // drag from the <img> element. wrapper.draggable = true (below) makes the wrapper
+      // the consistent drag source so ProseMirror's dragstart handler always sees
+      // event.target = wrapper, correctly identifies the node via nearestDesc, and sets
+      // view.dragging — enabling the full ProseMirror move-on-drop pipeline.
+      img.draggable = false;
 
       wrapper.appendChild(img);
 
@@ -146,8 +156,6 @@ export const EditorImage = Image.extend({
 
       return {
         dom: wrapper,
-        // Explicit selection management — ProseMirror doesn't always auto-apply
-        // ProseMirror-selectednode class to custom NodeView dom elements.
         selectNode() {
           wrapper.classList.add("ProseMirror-selectednode");
         },

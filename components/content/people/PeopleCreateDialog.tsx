@@ -5,6 +5,12 @@ import { X } from "lucide-react";
 import { toast } from "sonner";
 import { clientLogger } from "@/lib/core/logger/client";
 
+export interface CreatedPersonData {
+  personId: string;
+  label: string;
+  slug: string;
+}
+
 interface PeopleCreateDialogProps {
   mode: "person" | "group";
   initialName?: string;
@@ -12,11 +18,16 @@ interface PeopleCreateDialogProps {
   parentGroupId?: string | null;
   onClose: () => void;
   onCreated: () => void;
+  onCreatedWithData?: (person: CreatedPersonData) => void;
 }
 
 interface PeopleCreateResponse {
   success: boolean;
-  data?: unknown;
+  data?: {
+    personId: string;
+    label: string;
+    slug: string;
+  } | null;
   error?: {
     code: string;
     message: string;
@@ -30,6 +41,7 @@ export function PeopleCreateDialog({
   parentGroupId = null,
   onClose,
   onCreated,
+  onCreatedWithData,
 }: PeopleCreateDialogProps) {
   const [name, setName] = useState(initialName);
   const [givenName, setGivenName] = useState("");
@@ -104,6 +116,9 @@ export function PeopleCreateDialog({
         description: trimmedName,
       });
       window.dispatchEvent(new CustomEvent("dg:people-refresh"));
+      if (isPerson && result.data) {
+        onCreatedWithData?.({ personId: result.data.personId, label: result.data.label, slug: result.data.slug });
+      }
       onCreated();
       onClose();
     } catch (err) {

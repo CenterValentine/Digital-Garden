@@ -41,6 +41,9 @@ import type {
   CollaborationUser,
 } from "@/lib/domain/collaboration/runtime";
 import { sanitizeTipTapJsonWithExtensions } from "@/lib/domain/editor/unsupported-content";
+import { dropPoint } from "@tiptap/pm/transform";
+import type { NodeSelection } from "@tiptap/pm/state";
+import type { Slice } from "@tiptap/pm/model";
 
 interface RemoteCollaborator extends CollaborationUser {
   clientId: number;
@@ -457,6 +460,7 @@ export function MarkdownEditor({
           }
           return false;
         },
+        drop: () => false,
       },
       // Sprint 37: Image paste handler
       // Uses insertImageFromFileRef to avoid stale closure (see ref declaration)
@@ -490,8 +494,8 @@ export function MarkdownEditor({
       },
       // Sprint 37: Image drop handler (ProseMirror-level)
       // Uses insertImageFromFileRef to avoid stale closure (see ref declaration)
-      handleDrop: (view, event, _slice, moved) => {
-        if (moved) return false; // Internal drag — let ProseMirror handle it
+      handleDrop: (_view, event, slice, moved) => {
+        if (moved) return false; // Internal node drags handled in React onDrop
 
         const files = Array.from(event.dataTransfer?.files || []);
         const imageFiles = files.filter((f) => f.type.startsWith("image/"));
@@ -1269,21 +1273,25 @@ export function MarkdownEditor({
         ref={editorScrollRef}
         className="relative flex-1 overflow-y-auto"
         onDragOver={(e) => {
-          if (
-            e.dataTransfer.types.includes("Files") ||
-            e.dataTransfer.types.includes("application/x-dg-ai-image")
-          ) {
+          const isFile = e.dataTransfer.types.includes("Files");
+          const isAiImage = e.dataTransfer.types.includes("application/x-dg-ai-image");
+          const isInternalPMDrag = editor
+            ? !!(editor.view as unknown as { dragging: unknown }).dragging
+            : false;
+          if (isFile || isAiImage || isInternalPMDrag) {
             e.preventDefault();
-            e.dataTransfer.dropEffect = "copy";
+            e.dataTransfer.dropEffect = isInternalPMDrag ? "move" : "copy";
           }
         }}
         onDragEnter={(e) => {
-          if (
-            e.dataTransfer.types.includes("Files") ||
-            e.dataTransfer.types.includes("application/x-dg-ai-image")
-          ) {
+          const isFile = e.dataTransfer.types.includes("Files");
+          const isAiImage = e.dataTransfer.types.includes("application/x-dg-ai-image");
+          const isInternalPMDrag = editor
+            ? !!(editor.view as unknown as { dragging: unknown }).dragging
+            : false;
+          if (isFile || isAiImage || isInternalPMDrag) {
             e.preventDefault();
-            e.dataTransfer.dropEffect = "copy";
+            e.dataTransfer.dropEffect = isInternalPMDrag ? "move" : "copy";
           }
         }}
         onContextMenu={(e) => {
@@ -1364,6 +1372,53 @@ export function MarkdownEditor({
             e.stopPropagation();
             for (const file of imageFiles) {
               insertImageFromFile(file);
+            }
+            return;
+          }
+
+          // Internal ProseMirror drag (node move): React's onDrop fires before PM's
+          // native listener on view.dom, so view.dragging is still set here. We can't
+          // reliably re-dispatch through PM's event pipeline (posAtCoords may return
+          // null on a re-entrant synthetic dispatch), so we replicate PM's handleDrop
+          // logic directly: find the insert position, delete the source if it's a move,
+          // then insert the slice at the mapped position.
+          if (editor) {
+            type DraggingState = {
+              slice: Slice;
+              move: boolean;
+              node: NodeSelection | null;
+            };
+            const pmDragging = (editor.view as unknown as { dragging: DraggingState | null }).dragging;
+            if (pmDragging) {
+              e.preventDefault();
+              const { slice, move, node: draggingNode } = pmDragging;
+              const eventPos = editor.view.posAtCoords({ left: e.clientX, top: e.clientY });
+              if (eventPos) {
+                const { state } = editor.view;
+                const tr = state.tr;
+                // Find the best drop target on the original doc before any deletions
+                const insertPos = dropPoint(state.doc, eventPos.pos, slice) ?? eventPos.pos;
+                // Delete the original node when this is a move (not a copy)
+                if (move && draggingNode) {
+                  tr.delete(draggingNode.from, draggingNode.to);
+                } else if (move) {
+                  tr.deleteSelection();
+                }
+                // Map the insertion point through any preceding deletions
+                const pos = tr.mapping.map(insertPos);
+                const isNodeSlice =
+                  slice.openStart === 0 &&
+                  slice.openEnd === 0 &&
+                  slice.content.childCount === 1;
+                if (isNodeSlice && slice.content.firstChild) {
+                  tr.replaceRangeWith(pos, pos, slice.content.firstChild);
+                } else {
+                  tr.replaceRange(pos, pos, slice);
+                }
+                (editor.view as unknown as { dragging: null }).dragging = null;
+                editor.view.focus();
+                editor.view.dispatch(tr);
+              }
             }
           }
         }}

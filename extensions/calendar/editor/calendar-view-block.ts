@@ -156,6 +156,32 @@ function openCalendarEvent(eventId: string) {
   useLeftPanelViewStore.getState().setActiveView(CALENDAR_VIEW_KEY);
 }
 
+// Quick-add is a global dialog (extensions/calendar/client.tsx → globalDialogs),
+// so it is mounted whenever the calendar extension is enabled — including while
+// the user is editing a note. We can drive it straight from the store here.
+// The dialog's source dropdown is built from store `sources`, which only the
+// full workspace normally populates; the block fetch hydrates them (see
+// fetchCalendarRange) so creation works even if the calendar panel was never
+// opened this session.
+function pickDefaultSourceId(): string | null {
+  const sources = useCalendarStore.getState().sources;
+  const writable = sources.filter((source) => !source.isReadOnly);
+  return (writable.find((source) => source.visible) || writable[0])?.id ?? null;
+}
+
+function openQuickAddForSlot(start: Date, end: Date, allDay: boolean) {
+  useCalendarStore.getState().openQuickAdd({
+    title: "",
+    startAt: start.toISOString(),
+    endAt: end.toISOString(),
+    allDay,
+    timezone: null,
+    description: null,
+    linkedContentId: null,
+    sourceId: pickDefaultSourceId(),
+  });
+}
+
 async function fetchCalendarRange(attrs: Record<string, unknown>) {
   const { start, end } = rangeForAttrs(attrs);
   const response = await fetch(
@@ -171,6 +197,13 @@ async function fetchCalendarRange(attrs: Record<string, unknown>) {
 
   if (!response.ok || !result.success || !result.data) {
     throw new Error(result.error || "Failed to load calendar block");
+  }
+
+  // Hydrate writable calendar sources into the store so the quick-add dialog
+  // has somewhere to save events. Only fill when empty — if the workspace has
+  // already loaded sources (with user visibility toggles), leave them intact.
+  if (useCalendarStore.getState().sources.length === 0 && result.data.sources.length > 0) {
+    useCalendarStore.setState({ sources: result.data.sources });
   }
 
   return result.data.events;
@@ -355,6 +388,14 @@ function renderDay(root: HTMLElement, attrs: Record<string, unknown>, events: Ca
     label.textContent = new Date(2000, 0, 1, hour).toLocaleTimeString(undefined, { hour: "numeric" });
     const lane = document.createElement("div");
     lane.className = "calendar-view-block-hour-lane";
+    lane.title = "Click to add an event at this time";
+    // Empty-lane click → create at this exact hour. Pills stopPropagation.
+    lane.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      const start = new Date(date.getFullYear(), date.getMonth(), date.getDate(), hour, 0, 0);
+      openQuickAddForSlot(start, new Date(start.getTime() + 60 * 60 * 1000), false);
+    });
     for (const event of events.filter((candidate) => eventOccursOnDay(candidate, date))) {
       const eventHour = new Date(event.startAt).getHours();
       if (event.allDay || eventHour !== hour) continue;
@@ -378,6 +419,15 @@ function renderWeek(root: HTMLElement, attrs: Record<string, unknown>, events: C
   for (const day of days) {
     const column = document.createElement("div");
     column.className = "calendar-view-block-week-day";
+    column.title = "Click to add an event on this day";
+    // Empty-space click → create. Event pills stopPropagation (appendEventPill),
+    // so clicking an existing event opens it instead of creating a new one.
+    column.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      const start = new Date(day.getFullYear(), day.getMonth(), day.getDate(), 9, 0, 0);
+      openQuickAddForSlot(start, new Date(start.getTime() + 60 * 60 * 1000), false);
+    });
     const head = document.createElement("div");
     head.className = "calendar-view-block-week-head";
     head.textContent = day.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });

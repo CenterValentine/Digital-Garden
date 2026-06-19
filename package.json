@@ -2,6 +2,7 @@
   "name": "web",
   "version": "0.1.0",
   "private": true,
+  "packageManager": "pnpm@10.25.0",
   "scripts": {
     "predev": "pnpm clean:traces",
     "dev": "tsx scripts/predev.ts && next dev --port 3015",
@@ -210,6 +211,16 @@
         "react": "19",
         "react-dom": "19"
       }
-    }
+    },
+    "onlyBuiltDependencies": [
+      "@ffmpeg-installer/linux-x64",
+      "@prisma/engines",
+      "canvas",
+      "esbuild",
+      "prisma",
+      "sharp",
+      "tesseract.js",
+      "unrs-resolver"
+    ]
   }
 }
