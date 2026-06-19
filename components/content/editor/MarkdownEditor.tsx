@@ -1446,8 +1446,11 @@ export function MarkdownEditor({
           if (editor) {
             const pmDragging = (editor.view as unknown as { dragging: unknown }).dragging;
             if (pmDragging) {
-              e.preventDefault();
+              // dispatchEvent MUST come before preventDefault — calling preventDefault()
+              // on e.nativeEvent sets event.defaultPrevented=true, which makes
+              // runCustomHandler() return true and short-circuits editHandlers.drop.
               editor.view.dispatchEvent(e.nativeEvent);
+              e.preventDefault();
             }
           }
         }}
