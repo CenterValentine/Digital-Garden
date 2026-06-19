@@ -12,7 +12,6 @@
 
 import { Node, mergeAttributes } from "@tiptap/core";
 import { Plugin, PluginKey } from "@tiptap/pm/state";
-import type { Node as ProseMirrorNode } from "@tiptap/pm/model";
 import { InputRule } from "@tiptap/core";
 import Suggestion from "@tiptap/suggestion";
 
@@ -225,29 +224,22 @@ export const WikiLink = Node.create<WikiLinkOptions>({
         key: new PluginKey("wikiLinkInteraction"),
 
         props: {
-          handleClick(view, _pos, event) {
+          handleClick(_view, _pos, event) {
             // Only handle left-click; right-click must reach the contextmenu handler
             if (event.button !== 0) return false;
-            const { doc } = view.state;
-            const clickPos = view.posAtCoords({
-              left: event.clientX,
-              top: event.clientY,
-            });
 
-            if (!clickPos) return false;
+            // Read directly from DOM — posAtCoords.inside is layout-sensitive and
+            // can return -1 in prod when fonts/CSS differ from dev.
+            const target = event.target as HTMLElement;
+            const wikiLinkEl = target.closest('[data-type="wiki-link"]');
+            if (!wikiLinkEl) return false;
 
-            // `inside` is >= 0 only when the click landed on the node's own DOM element.
-            // Using pos ± 1 also fires for clicks on adjacent text positions (the bug).
-            if (clickPos.inside < 0) return false;
+            const targetTitle = wikiLinkEl.getAttribute("data-target-title");
+            if (!targetTitle || !options.onClickLink) return false;
 
-            const clickedNode = doc.nodeAt(clickPos.inside);
-            if (clickedNode?.type.name === "wikiLink" && options.onClickLink) {
-              event.preventDefault();
-              options.onClickLink(clickedNode.attrs.targetTitle);
-              return true;
-            }
-
-            return false;
+            event.preventDefault();
+            options.onClickLink(targetTitle);
+            return true;
           },
 
           handleKeyDown(view, event) {

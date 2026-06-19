@@ -41,6 +41,9 @@ import type {
   CollaborationUser,
 } from "@/lib/domain/collaboration/runtime";
 import { sanitizeTipTapJsonWithExtensions } from "@/lib/domain/editor/unsupported-content";
+import { dropPoint } from "@tiptap/pm/transform";
+import type { NodeSelection } from "@tiptap/pm/state";
+import type { Slice } from "@tiptap/pm/model";
 
 interface RemoteCollaborator extends CollaborationUser {
   clientId: number;
@@ -450,33 +453,14 @@ export function MarkdownEditor({
           }
           return false;
         },
-        dragover: (view, event) => {
-          // Diagnostic only — remove before shipping
-          // eslint-disable-next-line no-console
-          console.log("[dnd:dragover]", {
-            editable: view.editable,
-            dragging: !!(view as unknown as { dragging: unknown }).dragging,
-            types: Array.from(event.dataTransfer?.types ?? []),
-            defaultPrevented: event.defaultPrevented,
-          });
+        dragover: (_view, event) => {
           if (event.dataTransfer?.types.includes("Files")) {
             event.preventDefault();
             event.dataTransfer.dropEffect = "copy";
           }
           return false;
         },
-        drop: (view, event) => {
-          // Diagnostic only — remove before shipping
-          // eslint-disable-next-line no-console
-          console.log("[dnd:drop]", {
-            dragging: !!(view as unknown as { dragging: unknown }).dragging,
-            types: Array.from(event.dataTransfer?.types ?? []),
-            files: event.dataTransfer?.files.length ?? 0,
-            pos: view.posAtCoords({ left: event.clientX, top: event.clientY }),
-            editable: view.editable,
-          });
-          return false;
-        },
+        drop: () => false,
       },
       // Sprint 37: Image paste handler
       // Uses insertImageFromFileRef to avoid stale closure (see ref declaration)
@@ -510,15 +494,8 @@ export function MarkdownEditor({
       },
       // Sprint 37: Image drop handler (ProseMirror-level)
       // Uses insertImageFromFileRef to avoid stale closure (see ref declaration)
-      handleDrop: (view, event, slice, moved) => {
-        // Diagnostic only — remove before shipping
-        // eslint-disable-next-line no-console
-        console.log("[dnd:handleDrop]", {
-          moved,
-          sliceSize: slice.content.size,
-          dragging: !!(view as unknown as { dragging: unknown }).dragging,
-        });
-        if (moved) return false; // Internal drag — let ProseMirror handle it
+      handleDrop: (_view, event, slice, moved) => {
+        if (moved) return false; // Internal node drags handled in React onDrop
 
         const files = Array.from(event.dataTransfer?.files || []);
         const imageFiles = files.filter((f) => f.type.startsWith("image/"));
@@ -732,33 +709,6 @@ export function MarkdownEditor({
       editor.setEditable(effectiveEditable);
     }
   }, [editor, effectiveEditable]);
-
-  // Diagnostic only — window-level drag listeners to detect where in the pipeline D&D fails.
-  // Remove before shipping.
-  useEffect(() => {
-    const onWindowDragover = (e: DragEvent) => {
-      // eslint-disable-next-line no-console
-      console.log("[window:dragover]", {
-        target: (e.target as HTMLElement)?.tagName,
-        insideEditor: !!editor?.view.dom.contains(e.target as Node),
-        defaultPrevented: e.defaultPrevented,
-      });
-    };
-    const onWindowDrop = (e: DragEvent) => {
-      // eslint-disable-next-line no-console
-      console.log("[window:drop]", {
-        target: (e.target as HTMLElement)?.tagName,
-        insideEditor: !!editor?.view.dom.contains(e.target as Node),
-        defaultPrevented: e.defaultPrevented,
-      });
-    };
-    window.addEventListener("dragover", onWindowDragover);
-    window.addEventListener("drop", onWindowDrop);
-    return () => {
-      window.removeEventListener("dragover", onWindowDragover);
-      window.removeEventListener("drop", onWindowDrop);
-    };
-  }, [editor]);
 
   // Expose the note's Y.Doc on editor.storage so embedded block node-views
   // (e.g. excalidrawBlock) can attach to sub-maps without acquiring a second
@@ -1365,18 +1315,6 @@ export function MarkdownEditor({
           );
         }}
         onDrop={(e) => {
-          // Diagnostic only — remove before shipping
-          // eslint-disable-next-line no-console
-          console.log("[react:onDrop]", {
-            target: (e.target as HTMLElement)?.tagName,
-            insideEditor: !!editor?.view.dom.contains(e.target as Node),
-            types: Array.from(e.dataTransfer.types),
-            files: e.dataTransfer.files.length,
-            viewDragging: editor
-              ? !!(editor.view as unknown as { dragging: unknown }).dragging
-              : false,
-          });
-
           // Sprint 42: Handle AI image drop from chat
           const aiImageData = e.dataTransfer.getData("application/x-dg-ai-image");
           if (aiImageData && editor) {
@@ -1438,19 +1376,49 @@ export function MarkdownEditor({
             return;
           }
 
-          // Internal ProseMirror drag (node move): if view.dragging is still set,
-          // ProseMirror's native listener on view.dom didn't fire — the drop landed
-          // outside the contenteditable (on this scroll wrapper). Re-dispatch on
-          // the editor view so ProseMirror can process the move with the correct
-          // drop coordinates from the original event.
+          // Internal ProseMirror drag (node move): React's onDrop fires before PM's
+          // native listener on view.dom, so view.dragging is still set here. We can't
+          // reliably re-dispatch through PM's event pipeline (posAtCoords may return
+          // null on a re-entrant synthetic dispatch), so we replicate PM's handleDrop
+          // logic directly: find the insert position, delete the source if it's a move,
+          // then insert the slice at the mapped position.
           if (editor) {
-            const pmDragging = (editor.view as unknown as { dragging: unknown }).dragging;
+            type DraggingState = {
+              slice: Slice;
+              move: boolean;
+              node: NodeSelection | null;
+            };
+            const pmDragging = (editor.view as unknown as { dragging: DraggingState | null }).dragging;
             if (pmDragging) {
-              // dispatchEvent MUST come before preventDefault — calling preventDefault()
-              // on e.nativeEvent sets event.defaultPrevented=true, which makes
-              // runCustomHandler() return true and short-circuits editHandlers.drop.
-              editor.view.dispatchEvent(e.nativeEvent);
               e.preventDefault();
+              const { slice, move, node: draggingNode } = pmDragging;
+              const eventPos = editor.view.posAtCoords({ left: e.clientX, top: e.clientY });
+              if (eventPos) {
+                const { state } = editor.view;
+                const tr = state.tr;
+                // Find the best drop target on the original doc before any deletions
+                const insertPos = dropPoint(state.doc, eventPos.pos, slice) ?? eventPos.pos;
+                // Delete the original node when this is a move (not a copy)
+                if (move && draggingNode) {
+                  tr.delete(draggingNode.from, draggingNode.to);
+                } else if (move) {
+                  tr.deleteSelection();
+                }
+                // Map the insertion point through any preceding deletions
+                const pos = tr.mapping.map(insertPos);
+                const isNodeSlice =
+                  slice.openStart === 0 &&
+                  slice.openEnd === 0 &&
+                  slice.content.childCount === 1;
+                if (isNodeSlice && slice.content.firstChild) {
+                  tr.replaceRangeWith(pos, pos, slice.content.firstChild);
+                } else {
+                  tr.replaceRange(pos, pos, slice);
+                }
+                (editor.view as unknown as { dragging: null }).dragging = null;
+                editor.view.focus();
+                editor.view.dispatch(tr);
+              }
             }
           }
         }}

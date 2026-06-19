@@ -729,13 +729,17 @@ export const Accordion = Node.create({
             contentDOM.classList.toggle("block-accordion-closed", !isOpen);
           }
 
-          // Update title only if not being edited
+          // Reflect the *persisted* title when it isn't actively being edited.
+          // No `|| title.textContent` fallback: that masked failed writes, so a
+          // title could look saved on screen while attrs.headerText stayed empty
+          // (revealed only on reload/reconnect). With the focus-theft fix in
+          // block-focus-ext (selection no longer re-asserted during inline edits),
+          // attrs.headerText is now the source of truth.
           if (document.activeElement !== title) {
-            const nextHeaderText =
-              updatedNode.attrs.headerText ||
-              title.textContent ||
-              "";
-            title.textContent = nextHeaderText;
+            const nextHeaderText = (updatedNode.attrs.headerText as string) || "";
+            if (title.textContent !== nextHeaderText) {
+              title.textContent = nextHeaderText;
+            }
           }
           return true;
         },

@@ -5153,6 +5153,22 @@ mark {
   text-align: center;
 }
 
+/* Empty-slot click targets for adding events (day hour lanes + week columns). */
+.ProseMirror .calendar-view-block-hour-lane,
+.ProseMirror .calendar-view-block-week-day {
+  cursor: pointer;
+}
+
+.ProseMirror .calendar-view-block-hour-lane:hover,
+.ProseMirror .calendar-view-block-week-day:hover {
+  background: rgba(201, 168, 108, 0.1);
+}
+
+.dark .ProseMirror .calendar-view-block-hour-lane:hover,
+.dark .ProseMirror .calendar-view-block-week-day:hover {
+  background: rgba(201, 168, 108, 0.16);
+}
+
 .ProseMirror .calendar-view-block-agenda {
   display: grid;
   gap: 0.75rem;
@@ -5240,6 +5256,20 @@ mark {
 .dark .ProseMirror .calendar-view-block-hour-label,
 .dark .ProseMirror .calendar-view-block-hour-lane {
   border-bottom-color: rgba(229, 212, 176, 0.18);
+}
+
+/* Week view — was missed in the original dark pass, leaving the light
+   white-ish column fills (rgba(255,255,255,0.32)) and the near-white
+   sticky day-header (rgba(255,255,255,0.9)) behind warm-beige text.
+   Mirror the month-day / day-header parchment surfaces. */
+.dark .ProseMirror .calendar-view-block-week-day {
+  border-right-color: rgba(229, 212, 176, 0.08);
+  background: rgba(15, 25, 35, 0.4);
+}
+
+.dark .ProseMirror .calendar-view-block-week-head {
+  border-bottom-color: rgba(229, 212, 176, 0.12);
+  background: rgba(15, 25, 35, 0.6);
 }
 
 .ProseMirror .dg-collaboration-caret {

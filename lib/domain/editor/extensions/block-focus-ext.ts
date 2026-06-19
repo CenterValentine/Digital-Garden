@@ -89,6 +89,20 @@ export const BlockFocusExtension = Extension.create({
         return true;
       });
 
+      // Detect (before dispatch) whether the change came from an inline-editable
+      // element living inside the editor — e.g. an accordion title contentEditable
+      // (class block-accordion-title), as opposed to the sidebar Properties Panel.
+      // Re-asserting the block selection while such an element is focused blurs the
+      // caret mid-typing, so subsequent keystrokes are lost and the title never
+      // persists. The re-assertion below only matters for the sidebar panel, where
+      // the editor holds no focus to steal.
+      const active = typeof document !== "undefined" ? document.activeElement : null;
+      const inlineEditActive =
+        active instanceof HTMLElement &&
+        active.isContentEditable &&
+        active !== editor.view.dom &&
+        editor.view.dom.contains(active);
+
       if (found) {
         editor.view.dispatch(tr);
 
@@ -96,7 +110,7 @@ export const BlockFocusExtension = Extension.create({
         // if the editor's current selection is not a NodeSelection (e.g. when the user
         // is interacting with the Properties Panel in the sidebar). Re-assert the block
         // selection here so the panel stays pinned to the correct block.
-        const updatedNode = findNodeByBlockId(editor, blockId);
+        const updatedNode = !inlineEditActive ? findNodeByBlockId(editor, blockId) : null;
         if (updatedNode) {
           useBlockStore.getState().setSelectedBlock(
             blockId,
