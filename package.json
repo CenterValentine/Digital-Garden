@@ -2,7 +2,7 @@
   "name": "web",
   "version": "0.1.0",
   "private": true,
-  "packageManager": "pnpm@9.15.5",
+  "packageManager": "pnpm@10.25.0",
   "scripts": {
     "predev": "pnpm clean:traces",
     "dev": "tsx scripts/predev.ts && next dev --port 3015",
