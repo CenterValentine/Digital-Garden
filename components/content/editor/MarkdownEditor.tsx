@@ -450,7 +450,15 @@ export function MarkdownEditor({
           }
           return false;
         },
-        dragover: (_view, event) => {
+        dragover: (view, event) => {
+          // Diagnostic only — remove before shipping
+          // eslint-disable-next-line no-console
+          console.log("[dnd:dragover]", {
+            editable: view.editable,
+            dragging: !!(view as unknown as { dragging: unknown }).dragging,
+            types: Array.from(event.dataTransfer?.types ?? []),
+            defaultPrevented: event.defaultPrevented,
+          });
           if (event.dataTransfer?.types.includes("Files")) {
             event.preventDefault();
             event.dataTransfer.dropEffect = "copy";
@@ -724,6 +732,33 @@ export function MarkdownEditor({
       editor.setEditable(effectiveEditable);
     }
   }, [editor, effectiveEditable]);
+
+  // Diagnostic only — window-level drag listeners to detect where in the pipeline D&D fails.
+  // Remove before shipping.
+  useEffect(() => {
+    const onWindowDragover = (e: DragEvent) => {
+      // eslint-disable-next-line no-console
+      console.log("[window:dragover]", {
+        target: (e.target as HTMLElement)?.tagName,
+        insideEditor: !!editor?.view.dom.contains(e.target as Node),
+        defaultPrevented: e.defaultPrevented,
+      });
+    };
+    const onWindowDrop = (e: DragEvent) => {
+      // eslint-disable-next-line no-console
+      console.log("[window:drop]", {
+        target: (e.target as HTMLElement)?.tagName,
+        insideEditor: !!editor?.view.dom.contains(e.target as Node),
+        defaultPrevented: e.defaultPrevented,
+      });
+    };
+    window.addEventListener("dragover", onWindowDragover);
+    window.addEventListener("drop", onWindowDrop);
+    return () => {
+      window.removeEventListener("dragover", onWindowDragover);
+      window.removeEventListener("drop", onWindowDrop);
+    };
+  }, [editor]);
 
   // Expose the note's Y.Doc on editor.storage so embedded block node-views
   // (e.g. excalidrawBlock) can attach to sub-maps without acquiring a second
@@ -1288,21 +1323,25 @@ export function MarkdownEditor({
         ref={editorScrollRef}
         className="relative flex-1 overflow-y-auto"
         onDragOver={(e) => {
-          if (
-            e.dataTransfer.types.includes("Files") ||
-            e.dataTransfer.types.includes("application/x-dg-ai-image")
-          ) {
+          const isFile = e.dataTransfer.types.includes("Files");
+          const isAiImage = e.dataTransfer.types.includes("application/x-dg-ai-image");
+          const isInternalPMDrag = editor
+            ? !!(editor.view as unknown as { dragging: unknown }).dragging
+            : false;
+          if (isFile || isAiImage || isInternalPMDrag) {
             e.preventDefault();
-            e.dataTransfer.dropEffect = "copy";
+            e.dataTransfer.dropEffect = isInternalPMDrag ? "move" : "copy";
           }
         }}
         onDragEnter={(e) => {
-          if (
-            e.dataTransfer.types.includes("Files") ||
-            e.dataTransfer.types.includes("application/x-dg-ai-image")
-          ) {
+          const isFile = e.dataTransfer.types.includes("Files");
+          const isAiImage = e.dataTransfer.types.includes("application/x-dg-ai-image");
+          const isInternalPMDrag = editor
+            ? !!(editor.view as unknown as { dragging: unknown }).dragging
+            : false;
+          if (isFile || isAiImage || isInternalPMDrag) {
             e.preventDefault();
-            e.dataTransfer.dropEffect = "copy";
+            e.dataTransfer.dropEffect = isInternalPMDrag ? "move" : "copy";
           }
         }}
         onContextMenu={(e) => {
@@ -1326,6 +1365,18 @@ export function MarkdownEditor({
           );
         }}
         onDrop={(e) => {
+          // Diagnostic only — remove before shipping
+          // eslint-disable-next-line no-console
+          console.log("[react:onDrop]", {
+            target: (e.target as HTMLElement)?.tagName,
+            insideEditor: !!editor?.view.dom.contains(e.target as Node),
+            types: Array.from(e.dataTransfer.types),
+            files: e.dataTransfer.files.length,
+            viewDragging: editor
+              ? !!(editor.view as unknown as { dragging: unknown }).dragging
+              : false,
+          });
+
           // Sprint 42: Handle AI image drop from chat
           const aiImageData = e.dataTransfer.getData("application/x-dg-ai-image");
           if (aiImageData && editor) {
@@ -1383,6 +1434,20 @@ export function MarkdownEditor({
             e.stopPropagation();
             for (const file of imageFiles) {
               insertImageFromFile(file);
+            }
+            return;
+          }
+
+          // Internal ProseMirror drag (node move): if view.dragging is still set,
+          // ProseMirror's native listener on view.dom didn't fire — the drop landed
+          // outside the contenteditable (on this scroll wrapper). Re-dispatch on
+          // the editor view so ProseMirror can process the move with the correct
+          // drop coordinates from the original event.
+          if (editor) {
+            const pmDragging = (editor.view as unknown as { dragging: unknown }).dragging;
+            if (pmDragging) {
+              e.preventDefault();
+              editor.view.dispatchEvent(e.nativeEvent);
             }
           }
         }}
