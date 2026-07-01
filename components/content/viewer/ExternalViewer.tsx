@@ -66,8 +66,20 @@ export function ExternalViewer({
   return (
     <div className="flex h-full flex-col">
       {/* Header */}
-      <div className="border-b border-white/10 px-6 py-4">
-        <h1 className="text-2xl font-semibold text-white">{title}</h1>
+      <div className="flex items-center justify-between border-b border-border px-6 py-4">
+        <h1 className="text-2xl font-semibold text-foreground">{title}</h1>
+        <button
+          type="button"
+          onClick={() =>
+            window.dispatchEvent(
+              new CustomEvent("edit-external-link", { detail: { id: contentId } })
+            )
+          }
+          className="flex shrink-0 items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          title="Edit URL or name"
+        >
+          Edit
+        </button>
       </div>
 
       {/* Content */}

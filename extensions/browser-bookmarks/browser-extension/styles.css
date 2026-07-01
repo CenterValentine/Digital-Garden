@@ -309,6 +309,36 @@ body {
   cursor: default;
 }
 
+/* ── Quick Capture ── */
+.btn-quick-capture {
+  width: 100%;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 7px 12px;
+  border: 1.5px dashed rgba(100, 210, 230, 0.32);
+  border-radius: var(--radius-md);
+  background: rgba(100, 210, 230, 0.04);
+  color: rgba(100, 210, 230, 0.72);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  letter-spacing: 0.02em;
+  transition: background 0.14s, border-color 0.14s, color 0.14s;
+}
+
+.btn-quick-capture:hover {
+  background: rgba(100, 210, 230, 0.09);
+  border-color: rgba(100, 210, 230, 0.55);
+  color: rgba(100, 210, 230, 0.95);
+}
+
+.btn-quick-capture:active {
+  background: rgba(100, 210, 230, 0.15);
+}
+
 /* ── Footer ── */
 .footer-links {
   display: flex;

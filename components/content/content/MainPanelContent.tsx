@@ -2022,58 +2022,60 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
     const editorElement = (
       <div className="flex flex-col h-full">
         {/* Note title header with debug toggle */}
-        <div className="flex-none px-6 pt-6 pb-4 flex items-start justify-between shadow-[0_4px_8px_-2px_rgba(15,23,42,0.08),0_10px_24px_-6px_rgba(15,23,42,0.05)]">
-          {isTitleEditing ? (
-            <input
-              ref={titleInputRef}
-              type="text"
-              value={titleDraft}
-              onChange={(e) => setTitleDraft(e.target.value)}
-              onBlur={handleTitleCommit}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") { e.preventDefault(); handleTitleCommit(); }
-                if (e.key === "Escape") { e.preventDefault(); setIsTitleEditing(false); }
-              }}
-              className="flex-1 text-3xl font-semibold text-foreground bg-transparent border-b border-primary/40 focus:border-primary focus:outline-none mb-0 mr-4"
-            />
-          ) : (
-            <div className="mr-4 flex min-w-0 flex-1 items-start gap-3">
-              <h1
-                className={`min-w-0 text-3xl font-semibold text-foreground mb-0 transition-opacity ${
-                  isReadOnlyPageTemplate
-                    ? "cursor-default"
-                    : "cursor-text hover:opacity-80"
-                }`}
-                title={
-                  contentType === "page-template"
-                    ? isReadOnlyPageTemplate
-                      ? "System template (read-only)"
-                      : "Click to rename template"
-                    : "Click to rename"
-                }
-                onClick={isReadOnlyPageTemplate ? undefined : handleTitleEditStart}
-              >
-                {noteTitle}
-              </h1>
-              {contentType === "page-template" && templateWarningText ? (
-                <TooltipProvider delayDuration={150}>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-amber-300/80 bg-amber-50 px-2 py-1 text-xs font-medium text-amber-800">
-                        <AlertTriangle className="h-3.5 w-3.5" />
-                        Template
-                      </span>
-                    </TooltipTrigger>
-                    <TooltipContent side="bottom" className="max-w-xs text-xs">
-                      {templateWarningText}
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              ) : null}
-            </div>
-          )}
-          {process.env.NODE_ENV === "development" && !isMultiPane && <DebugViewToggle />}
-        </div>
+        {!isEmbedMode && (
+          <div className="flex-none px-6 pt-6 pb-4 flex items-start justify-between shadow-[0_4px_8px_-2px_rgba(15,23,42,0.08),0_10px_24px_-6px_rgba(15,23,42,0.05)]">
+            {isTitleEditing ? (
+              <input
+                ref={titleInputRef}
+                type="text"
+                value={titleDraft}
+                onChange={(e) => setTitleDraft(e.target.value)}
+                onBlur={handleTitleCommit}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") { e.preventDefault(); handleTitleCommit(); }
+                  if (e.key === "Escape") { e.preventDefault(); setIsTitleEditing(false); }
+                }}
+                className="flex-1 text-3xl font-semibold text-foreground bg-transparent border-b border-primary/40 focus:border-primary focus:outline-none mb-0 mr-4"
+              />
+            ) : (
+              <div className="mr-4 flex min-w-0 flex-1 items-start gap-3">
+                <h1
+                  className={`min-w-0 text-3xl font-semibold text-foreground mb-0 transition-opacity ${
+                    isReadOnlyPageTemplate
+                      ? "cursor-default"
+                      : "cursor-text hover:opacity-80"
+                  }`}
+                  title={
+                    contentType === "page-template"
+                      ? isReadOnlyPageTemplate
+                        ? "System template (read-only)"
+                        : "Click to rename template"
+                      : "Click to rename"
+                  }
+                  onClick={isReadOnlyPageTemplate ? undefined : handleTitleEditStart}
+                >
+                  {noteTitle}
+                </h1>
+                {contentType === "page-template" && templateWarningText ? (
+                  <TooltipProvider delayDuration={150}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-amber-300/80 bg-amber-50 px-2 py-1 text-xs font-medium text-amber-800">
+                          <AlertTriangle className="h-3.5 w-3.5" />
+                          Template
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom" className="max-w-xs text-xs">
+                        {templateWarningText}
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                ) : null}
+              </div>
+            )}
+            {process.env.NODE_ENV === "development" && !isMultiPane && <DebugViewToggle />}
+          </div>
+        )}
 
         {contentType === "page-template" && templateWarningText ? (
           <div className="mx-6 mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
@@ -2114,6 +2116,8 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
             collaborationEnabled={contentType === "note" ? collaborationEnabled : false}
             collaborationRuntime={collaborationRuntime}
             onCollaborationSyncChange={handleCollaborationSyncChange}
+            compact={isEmbedMode}
+            edgeToEdge={isEmbedMode}
           />
         </div>
       </div>

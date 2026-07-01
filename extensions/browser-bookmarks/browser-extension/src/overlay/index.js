@@ -10,6 +10,12 @@ const DG_OVERLAY_STALE_MS = 5 * 60 * 1000;
 // How long to wait for the background service worker before giving up
 const DG_RUNTIME_MSG_TIMEOUT_MS = 10000;
 
+// chrome.storage.local keys for persistent UI state
+const DG_STORAGE_WORKSPACE_KEY = "dgSelectedWorkspaceId";
+const DG_STORAGE_TREE_SORT_KEY = "dgTreeSortMode";
+const DG_STORAGE_TREE_EXPANDED_PREFIX = "dgTreeExpanded:";
+const DG_STORAGE_RECENTLY_VIEWED_KEY = "dgRecentlyViewed";
+
 function runtimeMessage(message) {
   return new Promise((resolve, reject) => {
     let settled = false;
@@ -169,6 +175,22 @@ function treeIconMarkup(node, isOpen) {
   }
 
   return svg('<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/>');
+}
+
+function treeNodeTitle(node) {
+  const candidates = [
+    node.title,
+    node.name,
+    node.displayName,
+    node.contentTitle,
+    node.label,
+    node.slug,
+  ];
+  const value = candidates.find(
+    (candidate) => typeof candidate === "string" && candidate.trim()
+  );
+  if (value) return value.trim();
+  return `Untitled ${node.contentType || "content"}`;
 }
 
 function initials(label) {
@@ -818,9 +840,9 @@ function overlayStyles() {
     .dg-tree-kind { width: 15px; height: 15px; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; color: rgba(255,255,255,0.62); }
     .dg-tree-svg { width: 15px; height: 15px; display: block; }
     .dg-tree-emoji { font-size: 13px; line-height: 1; }
-    .dg-tree-meta { display: flex; flex-direction: column; gap: 1px; min-width: 0; flex: 1; }
-    .dg-tree-title { color: rgba(255,255,255,0.88); font-size: 12px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .dg-tree-subtitle { color: rgba(255,255,255,0.4); font-size: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .dg-tree-meta { display: flex; flex-direction: column; gap: 1px; min-width: 0; width: 0; flex: 1 1 auto; }
+    .dg-tree-title { display: block; color: rgba(255,255,255,0.88); font-size: 12px; font-weight: 500; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .dg-tree-subtitle { display: block; color: rgba(255,255,255,0.4); font-size: 10px; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .dg-tree-actions { display: flex; align-items: center; gap: 3px; flex-shrink: 0; opacity: 0; transition: opacity 0.12s; }
     .dg-tree-row:hover .dg-tree-actions { opacity: 1; }
 
@@ -862,6 +884,9 @@ function overlayStyles() {
     .dg-panel-content {
       height: calc(100% - 53px); display: flex; flex-direction: column;
       gap: 12px; padding: 14px; overflow: auto;
+    }
+    .dg-floating-panel[data-content-kind="note"] .dg-panel-content {
+      gap: 0; padding: 0; overflow: hidden;
     }
     .dg-panel-content[data-loading="true"] { opacity: 0.62; pointer-events: none; }
     .dg-editor-stack { display: flex; flex-direction: column; gap: 12px; min-height: 0; flex: 1; }
@@ -1157,7 +1182,7 @@ function schedulePersist(state, contentId) {
 // That means in-tab navigation (browsing the same site) drops them. To keep a
 // note open while the user explores, we ALSO snapshot the currently-open panels
 // to tab-scoped session storage (via the background, keyed by sender.tab.id)
-// and restore them on every page load — independent of the URL.
+// and restore them when navigating within the same hostname.
 function scheduleTabPersist(state) {
   if (state.tabPersistTimer) clearTimeout(state.tabPersistTimer);
   state.tabPersistTimer = setTimeout(() => {
@@ -1169,6 +1194,7 @@ function scheduleTabPersist(state) {
         kind: panel.kind,
         title: panel.title || null,
         state: panel.state,
+        host: window.location.hostname,
         // Embedded panels anchor to a page element that won't exist after
         // navigation — restore them as floating.
         layoutMode: panel.layoutMode === "embedded" ? "floating" : panel.layoutMode,
@@ -1185,7 +1211,7 @@ function scheduleTabPersist(state) {
   }, 250);
 }
 
-// Re-open the panels that were open in this tab, regardless of the current URL.
+// Re-open the panels that were open in this tab on the same hostname.
 // Runs after restorePanelsFromState, so resource-bound panels win and we only
 // add the ones not already open (dedupe by contentId).
 async function restoreTabStickyPanels(state) {
@@ -1196,8 +1222,13 @@ async function restoreTabStickyPanels(state) {
     return;
   }
   if (!Array.isArray(descriptors)) return;
+  const currentHost = window.location.hostname;
   for (const descriptor of descriptors) {
     if (!descriptor?.contentId || state.openPanels.has(descriptor.contentId)) {
+      continue;
+    }
+    // Skip panels opened on a different hostname — they belong to another site.
+    if (descriptor.host && descriptor.host !== currentHost) {
       continue;
     }
     const item = { id: descriptor.contentId, title: descriptor.title || null };
@@ -1404,6 +1435,14 @@ async function loadContentTree(state, { workspaceId = null, force = false } = {}
   });
   state.loadedForWorkspaceId = workspaceId || null;
   state.fetchedAt = { ...state.fetchedAt, tree: Date.now() };
+
+  // Restore persisted folder expansion for this workspace
+  const storageKey = `${DG_STORAGE_TREE_EXPANDED_PREFIX}${workspaceId || "all"}`;
+  const stored = await chrome.storage.local.get(storageKey).catch(() => ({}));
+  state.expandedTreeIds = Array.isArray(stored[storageKey])
+    ? new Set(stored[storageKey])
+    : new Set();
+
   return state.contentTree;
 }
 
@@ -1498,7 +1537,7 @@ function renderFlashcardSection(state) {
       ` : ""}
       <button class="dg-flashcard-side-btn${hasSel ? " dg-flashcard-side-btn--secondary" : ""}" type="button"
         data-action="flashcard-type-manually" style="width:100%">
-        Type manually →
+        Add flashcard
       </button>
     `;
   } else if (fc.phase === "has-front") {
@@ -1836,11 +1875,137 @@ function renderConnectionsPopover(state) {
   `;
 }
 
+function relativeTime(isoString) {
+  const diff = Date.now() - new Date(isoString).getTime();
+  const secs = Math.floor(diff / 1000);
+  if (secs < 60) return "just now";
+  const mins = Math.floor(secs / 60);
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  if (days < 30) return `${days}d ago`;
+  const months = Math.floor(days / 30);
+  if (months < 12) return `${months}mo ago`;
+  return `${Math.floor(months / 12)}y ago`;
+}
+
+function trackRecentlyViewed(state, contentId) {
+  const now = new Date().toISOString();
+  const prev = (state.recentlyViewed || []).filter((e) => e.id !== contentId);
+  state.recentlyViewed = [{ id: contentId, viewedAt: now }, ...prev].slice(0, 50);
+  chrome.storage.local.set({ [DG_STORAGE_RECENTLY_VIEWED_KEY]: state.recentlyViewed });
+}
+
+function flattenTreeByDate(nodes, pathParts = [], parentFolderId = null) {
+  const results = [];
+  for (const node of nodes) {
+    if (node.contentType === "folder") {
+      flattenTreeByDate(node.children || [], [...pathParts, node.title], node.id).forEach((n) =>
+        results.push(n)
+      );
+    } else {
+      results.push({ ...node, _path: pathParts.join(" / "), _parentFolderId: parentFolderId });
+    }
+  }
+  return results;
+}
+
+function renderSortedList(state, visibleTree) {
+  const mode = state.treeSortMode; // "updated" | "viewed"
+  const allFlat = flattenTreeByDate(visibleTree);
+
+  // Sibling counts for /+N — computed from full list before filtering
+  const siblingCounts = {};
+  allFlat.forEach((n) => {
+    const key = n._parentFolderId || "__root__";
+    siblingCounts[key] = (siblingCounts[key] || 0) + 1;
+  });
+
+  // Apply optional folder filter
+  const folderFilter = state.recentFolderFilter;
+  let flat = folderFilter ? allFlat.filter((n) => n._parentFolderId === folderFilter) : allFlat;
+  let filterLabel = null;
+  if (folderFilter && flat.length > 0 && flat[0]._path) {
+    const parts = flat[0]._path.split(" / ");
+    filterLabel = parts[parts.length - 1] || flat[0]._path;
+  }
+
+  // Sort
+  if (mode === "updated") {
+    flat.sort((a, b) => {
+      if (!a.updatedAt && !b.updatedAt) return 0;
+      if (!a.updatedAt) return 1;
+      if (!b.updatedAt) return -1;
+      return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+    });
+  } else if (mode === "viewed") {
+    const viewedMap = new Map(
+      (state.recentlyViewed || []).map((e, i) => [e.id, { viewedAt: e.viewedAt, rank: i }])
+    );
+    flat.sort((a, b) => {
+      const va = viewedMap.get(a.id);
+      const vb = viewedMap.get(b.id);
+      if (va && vb) return va.rank - vb.rank;
+      if (va) return -1;
+      if (vb) return 1;
+      if (!a.updatedAt && !b.updatedAt) return 0;
+      if (!a.updatedAt) return 1;
+      if (!b.updatedAt) return -1;
+      return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+    });
+  }
+
+  if (flat.length === 0) {
+    return mode === "viewed"
+      ? `<div class="dg-status">No content viewed yet. Open notes from the tree to start tracking views.</div>`
+      : `<div class="dg-status">No items found.</div>`;
+  }
+
+  const filterHeader = folderFilter && filterLabel
+    ? `<div class="dg-status" style="display:flex;align-items:center;gap:8px;">
+        <button class="dg-mini-action" type="button" data-clear-folder-filter>← All</button>
+        <span style="font-size:11px;opacity:0.65;">📁 ${escapeHtml(filterLabel)}</span>
+      </div>`
+    : "";
+
+  return filterHeader + flat.map((node) => {
+    const sibCount = (siblingCounts[node._parentFolderId || "__root__"] || 1) - 1;
+    const viewed = mode === "viewed"
+      ? (state.recentlyViewed || []).find((e) => e.id === node.id)
+      : null;
+    const timeLabel = mode === "updated" && node.updatedAt
+      ? ` · ${escapeHtml(relativeTime(node.updatedAt))}`
+      : mode === "viewed" && viewed
+        ? ` · seen ${escapeHtml(relativeTime(viewed.viewedAt))}`
+        : "";
+    const siblingAffordances = !folderFilter && sibCount > 0 ? `
+      <button class="dg-mini-action" type="button" data-filter-by-folder="${escapeHtml(node._parentFolderId || "")}" title="Show ${sibCount} more from this folder">/+${sibCount}</button>
+      <button class="dg-mini-action" type="button" data-create-tree-item="note" data-parent-content="${escapeHtml(node._parentFolderId || "")}" title="Create a note in this folder">+N Sibling</button>
+    ` : "";
+    return `
+      <div class="dg-tree-row" style="--depth:0">
+        <button class="dg-tree-expand" type="button">•</button>
+        <span class="dg-tree-kind">${treeIconMarkup(node, false)}</span>
+        <div class="dg-tree-meta">
+          <div class="dg-tree-title" title="${escapeHtml(node.title)}">${escapeHtml(node.title)}</div>
+          <div class="dg-tree-subtitle">${node._path ? escapeHtml(node._path) : escapeHtml(node.contentType)}${timeLabel}</div>
+        </div>
+        <div class="dg-tree-actions">
+          ${siblingAffordances}
+          <button class="dg-mini-action" type="button" data-associate-content="${escapeHtml(node.id)}" data-content-kind="${escapeHtml(node.contentType)}">Open</button>
+        </div>
+      </div>
+    `;
+  }).join("");
+}
+
 function renderTreeRows(state, nodes, depth = 0) {
   return nodes
     .map((node) => {
       const isFolder = node.contentType === "folder";
       const expanded = state.expandedTreeIds.has(node.id);
+      const title = treeNodeTitle(node);
       const children =
         isFolder && expanded && node.children?.length
           ? renderTreeRows(state, node.children, depth + 1)
@@ -1854,7 +2019,7 @@ function renderTreeRows(state, nodes, depth = 0) {
             }>${isFolder ? (expanded ? "▾" : "▸") : "•"}</button>
             <span class="dg-tree-kind">${treeIconMarkup(node, expanded)}</span>
             <div class="dg-tree-meta">
-              <div class="dg-tree-title">${escapeHtml(node.title)}</div>
+              <div class="dg-tree-title" title="${escapeHtml(title)}">${escapeHtml(title)}</div>
               <div class="dg-tree-subtitle">${escapeHtml(node.contentType)}</div>
             </div>
             <div class="dg-tree-actions">
@@ -1888,6 +2053,8 @@ function renderTreePopover(state) {
   const container = state.popoverBodies.tree;
   if (!container) return;
   const visibleTree = state.contentTree;
+  const mode = state.treeSortMode; // "default" | "updated" | "viewed"
+
   if (!visibleTree || visibleTree.length === 0) {
     container.innerHTML = `
       <div class="dg-status">
@@ -1899,19 +2066,45 @@ function renderTreePopover(state) {
     `;
     return;
   }
+
+  const sortBtn = (id, label) => {
+    const isActive = mode === id;
+    const activeStyle = isActive
+      ? ' style="background:rgba(91,175,255,0.18);border-color:rgba(91,175,255,0.45);"'
+      : "";
+    return `<button class="dg-mini-action" type="button" data-tree-sort-mode="${id}"${activeStyle} title="${isActive ? "Return to folder tree" : `Sort by ${label.toLowerCase()}`}">${escapeHtml(label)}</button>`;
+  };
+
+  const statusText = mode === "updated"
+    ? "Sorted by last updated."
+    : mode === "viewed"
+      ? "Sorted by last viewed."
+      : "Create content at the root, or use the compact actions on folders to add nested items.";
+
+  const createBtns = mode === "default" ? `
+    <button class="dg-mini-action" type="button" data-create-tree-item="folder">+ Folder</button>
+    <button class="dg-mini-action" type="button" data-create-tree-item="note">+ Note</button>
+    <button class="dg-mini-action" type="button" data-create-tree-item="external">+ Link</button>
+  ` : "";
+
   container.innerHTML = `
     <div class="dg-status">
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">
-        <span>Create content at the root, or use the compact actions on folders to add nested items.</span>
-        <span style="display:flex;gap:6px;">
-          <button class="dg-mini-action" type="button" data-reload-tree title="Refresh file tree">↻</button>
-          <button class="dg-mini-action" type="button" data-create-tree-item="folder">+ Folder</button>
-          <button class="dg-mini-action" type="button" data-create-tree-item="note">+ Note</button>
-          <button class="dg-mini-action" type="button" data-create-tree-item="external">+ Link</button>
-        </span>
+      <div style="display:flex;flex-direction:column;gap:6px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">
+          <span>${statusText}</span>
+          <span style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+            <button class="dg-mini-action" type="button" data-reload-tree title="Refresh file tree">↻</button>
+            ${createBtns}
+          </span>
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+          ${sortBtn("default", "File Tree")}
+          ${sortBtn("updated", "Last Updated")}
+          ${sortBtn("viewed", "Last Viewed")}
+        </div>
       </div>
     </div>
-    ${renderTreeRows(state, visibleTree)}
+    ${mode === "default" ? renderTreeRows(state, visibleTree) : renderSortedList(state, visibleTree)}
   `;
 }
 
@@ -2323,6 +2516,7 @@ function createContentPanel(state, item, kind, persisted = null) {
 
   const container = document.createElement("section");
   container.className = "dg-floating-panel";
+  container.dataset.contentKind = kind;
   const title = item.title || (kind === "note" ? "Note" : kind === "embed" ? "Content" : "External link");
   const kindLabel = kind === "note" ? "Web note overlay" : kind === "embed" ? "Content overlay" : "External metadata overlay";
   container.innerHTML = `
@@ -2335,6 +2529,7 @@ function createContentPanel(state, item, kind, persisted = null) {
         <span class="dg-panel-ready" style="font-size:11px;color:rgba(255,255,255,0.46)"></span>
         <button class="dg-toolbar-button" type="button" data-panel-action="open-tree" title="Browse file tree">◂ Tree</button>
         <button class="dg-toolbar-button" type="button" data-panel-action="app" title="Open in app">↗</button>
+        <button class="dg-toolbar-button" type="button" data-panel-action="refresh" title="Refresh note">↺</button>
         <button class="dg-toolbar-button" type="button" data-panel-action="collapse" title="Collapse">—</button>
         <button class="dg-toolbar-button" type="button" data-panel-action="close" title="Close">×</button>
       </div>
@@ -2439,6 +2634,17 @@ function createContentPanel(state, item, kind, persisted = null) {
 
     if (action === "app") {
       openAppContent(state.config.appBaseUrl, panel.contentId, state.selectedWorkspaceId || null);
+      return;
+    }
+
+    if (action === "refresh") {
+      // Force a full iframe reload by clearing the cached content ID,
+      // then re-running openEmbedForPanel which will re-fetch the session
+      // token and reload the src from scratch.
+      if (state.iframePanel === panel) {
+        state.iframeContentId = null;
+      }
+      openEmbedForPanel(state, panel);
       return;
     }
 
@@ -2934,6 +3140,52 @@ function wireRootEvents(state) {
       })();
       return true;
     }
+
+    if (message?.type === "dg-associate-and-open") {
+      void (async () => {
+        try {
+          await associateAndOpen(
+            state,
+            message.payload?.contentId,
+            message.payload?.contentKind || "note"
+          );
+          sendResponse?.({ ok: true });
+        } catch (error) {
+          sendResponse?.({
+            ok: false,
+            error: error instanceof Error ? error.message : "Failed to open content",
+          });
+        }
+      })();
+      return true;
+    }
+
+    if (message?.type === "dg-refresh-embed") {
+      const panel = message.payload?.contentId
+        ? state.openPanels.get(message.payload.contentId)
+        : state.iframePanel;
+      if (panel) {
+        if (state.iframePanel === panel) state.iframeContentId = null;
+        openEmbedForPanel(state, panel);
+      }
+      sendResponse?.({ ok: true });
+      return true;
+    }
+
+    if (message?.type === "dg-quick-capture") {
+      try {
+        if (state.panelOpen) closeSnapPanel(state);
+        state.embedIframe?.blur();
+        startQuickCaptureMode();
+        sendResponse?.({ ok: true });
+      } catch (error) {
+        sendResponse?.({
+          ok: false,
+          error: error instanceof Error ? error.message : "Failed to start Quick Capture",
+        });
+      }
+      return true;
+    }
   });
 
   // ── Floating launcher button ───────────────────────────────────────────────
@@ -3028,6 +3280,7 @@ function wireRootEvents(state) {
   state.workspaceSelect.addEventListener("change", () => {
     const workspaceId = state.workspaceSelect.value || null;
     state.selectedWorkspaceId = workspaceId;
+    chrome.storage.local.set({ [DG_STORAGE_WORKSPACE_KEY]: workspaceId ?? "" });
     renderStatus(state.popoverBodies.tree, "Loading…");
     void loadContentTree(state, { workspaceId, force: true })
       .then(() => renderTreePopover(state))
@@ -3180,9 +3433,11 @@ function wireRootEvents(state) {
 
     const openButton = event.target.closest("[data-open-content]");
     if (openButton) {
+      const openContentId = openButton.getAttribute("data-open-content");
+      trackRecentlyViewed(state, openContentId);
       await openAssociatedContent(
         state,
-        openButton.getAttribute("data-open-content"),
+        openContentId,
         openButton.getAttribute("data-content-kind")
       );
       return;
@@ -3197,15 +3452,51 @@ function wireRootEvents(state) {
         state.expandedTreeIds.add(id);
       }
       renderTreePopover(state);
+      const wsKey = `${DG_STORAGE_TREE_EXPANDED_PREFIX}${state.selectedWorkspaceId || "all"}`;
+      chrome.storage.local.set({ [wsKey]: Array.from(state.expandedTreeIds) });
+      return;
+    }
+
+    const sortModeBtn = event.target.closest("[data-tree-sort-mode]");
+    if (sortModeBtn) {
+      const newMode = sortModeBtn.getAttribute("data-tree-sort-mode");
+      state.treeSortMode = newMode;
+      state.recentFolderFilter = null;
+      chrome.storage.local.set({ [DG_STORAGE_TREE_SORT_KEY]: state.treeSortMode });
+      if (state.treeSortMode === "updated") {
+        // Force fresh fetch to guarantee updatedAt is present on all nodes
+        renderStatus(state.popoverBodies.tree, "Loading…");
+        void loadContentTree(state, { workspaceId: state.selectedWorkspaceId || null, force: true })
+          .then(() => renderTreePopover(state))
+          .catch((e) => renderLoadError(state.popoverBodies.tree, e));
+      } else {
+        renderTreePopover(state);
+      }
+      return;
+    }
+
+    const filterFolderBtn = event.target.closest("[data-filter-by-folder]");
+    if (filterFolderBtn) {
+      state.recentFolderFilter = filterFolderBtn.getAttribute("data-filter-by-folder") || null;
+      renderTreePopover(state);
+      return;
+    }
+
+    const clearFilterBtn = event.target.closest("[data-clear-folder-filter]");
+    if (clearFilterBtn) {
+      state.recentFolderFilter = null;
+      renderTreePopover(state);
       return;
     }
 
     const associateButton = event.target.closest("[data-associate-content]");
     if (associateButton) {
       try {
+        const assocContentId = associateButton.getAttribute("data-associate-content");
+        trackRecentlyViewed(state, assocContentId);
         await associateAndOpen(
           state,
-          associateButton.getAttribute("data-associate-content"),
+          assocContentId,
           associateButton.getAttribute("data-content-kind")
         );
       } catch (error) {
@@ -3443,6 +3734,9 @@ async function initOverlay() {
     workspaces: [],
     selectedWorkspaceId: null,
     workspaceAutoSelected: false,
+    treeSortMode: "default",
+    recentFolderFilter: null,
+    recentlyViewed: [],
     isIdle: false,
     idleTimer: null,
     resourceContext: null,
@@ -3526,6 +3820,25 @@ async function initOverlay() {
   // Pre-load local flashcard history so it's ready when the panel opens
   loadLocalFlashcardHistory(hostname).then((h) => { state.localFlashcards = h; }).catch(() => { state.localFlashcards = []; });
 
+  // Restore persisted UI preferences before loading workspaces so that
+  // auto-select is correctly skipped when the user had a prior choice.
+  const storedUiPrefs = await chrome.storage.local.get([
+    DG_STORAGE_WORKSPACE_KEY,
+    DG_STORAGE_TREE_SORT_KEY,
+    DG_STORAGE_RECENTLY_VIEWED_KEY,
+  ]).catch(() => ({}));
+  if (storedUiPrefs[DG_STORAGE_WORKSPACE_KEY]) {
+    state.selectedWorkspaceId = storedUiPrefs[DG_STORAGE_WORKSPACE_KEY];
+  }
+  if (storedUiPrefs[DG_STORAGE_TREE_SORT_KEY]) {
+    // Normalize legacy "recent" value (renamed to "updated")
+    const stored = storedUiPrefs[DG_STORAGE_TREE_SORT_KEY];
+    state.treeSortMode = stored === "recent" ? "updated" : stored;
+  }
+  if (Array.isArray(storedUiPrefs[DG_STORAGE_RECENTLY_VIEWED_KEY])) {
+    state.recentlyViewed = storedUiPrefs[DG_STORAGE_RECENTLY_VIEWED_KEY];
+  }
+
   void loadWorkspaces(state).then(() => renderWorkspaceSelector(state));
 
   try {
@@ -3549,6 +3862,263 @@ async function initOverlay() {
 initOverlay().catch((error) => {
   console.warn("[DG Overlay] Failed to initialize overlay", error);
 });
+
+// ─── Quick Capture picker ─────────────────────────────────────────────────────
+
+function startQuickCaptureMode() {
+  if (document.getElementById("dg-quick-capture-root")) return;
+
+  const style = document.createElement("style");
+  style.id = "dg-qc-styles";
+  style.textContent = `
+    .dg-qc-highlight {
+      outline: 2px dashed rgba(100, 210, 230, 0.75) !important;
+      outline-offset: 2px !important;
+      background-color: rgba(100, 210, 230, 0.06) !important;
+    }
+    #dg-qc-banner {
+      position: fixed;
+      top: 12px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 2147483647;
+      background: rgba(10, 14, 20, 0.92);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      color: rgba(100, 210, 230, 0.95);
+      font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, sans-serif;
+      font-size: 12px;
+      font-weight: 500;
+      padding: 6px 16px;
+      border-radius: 20px;
+      border: 1px solid rgba(100, 210, 230, 0.25);
+      pointer-events: none;
+      white-space: nowrap;
+      letter-spacing: 0.02em;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.45);
+    }
+    #dg-qc-cancel-btn {
+      pointer-events: auto;
+      cursor: pointer;
+      border-bottom: 1px dotted rgba(100, 210, 230, 0.5);
+      padding-bottom: 1px;
+      transition: opacity 0.12s;
+    }
+    #dg-qc-cancel-btn:hover { opacity: 0.65; }
+    #dg-qc-tooltip {
+      position: fixed;
+      z-index: 2147483647;
+      background: rgba(10, 14, 20, 0.9);
+      color: #f4f6f8;
+      font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, sans-serif;
+      font-size: 11px;
+      font-weight: 500;
+      padding: 4px 9px;
+      border-radius: 5px;
+      border: 1px solid rgba(100, 210, 230, 0.22);
+      pointer-events: none;
+      white-space: nowrap;
+      letter-spacing: 0.01em;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.35);
+      opacity: 0;
+      transition: opacity 0.1s;
+    }
+    #dg-qc-tooltip.dg-qc-tip-visible { opacity: 1; }
+    #dg-qc-toast {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%) translateY(10px);
+      z-index: 2147483647;
+      background: rgba(10, 14, 20, 0.95);
+      color: #8fe0b3;
+      font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, sans-serif;
+      font-size: 13px;
+      font-weight: 600;
+      padding: 8px 20px;
+      border-radius: 20px;
+      border: 1px solid rgba(143, 224, 179, 0.3);
+      box-shadow: 0 4px 24px rgba(0,0,0,0.5);
+      opacity: 0;
+      transition: opacity 0.2s, transform 0.2s;
+      pointer-events: none;
+    }
+    #dg-qc-toast.dg-qc-toast-in { opacity: 1; transform: translateX(-50%) translateY(0); }
+  `;
+  document.head.appendChild(style);
+
+  const root = document.createElement("span");
+  root.id = "dg-quick-capture-root";
+  root.style.display = "none";
+  document.body.appendChild(root);
+
+  const banner = document.createElement("div");
+  banner.id = "dg-qc-banner";
+  banner.innerHTML = 'Click any block to copy &nbsp;&nbsp;<span id="dg-qc-cancel-btn">Click here to cancel or press ESC</span>';
+  document.body.appendChild(banner);
+  banner.querySelector("#dg-qc-cancel-btn").addEventListener("click", (e) => {
+    e.stopPropagation();
+    cleanup();
+  });
+
+  const tooltip = document.createElement("div");
+  tooltip.id = "dg-qc-tooltip";
+  document.body.appendChild(tooltip);
+
+  const toast = document.createElement("div");
+  toast.id = "dg-qc-toast";
+  document.body.appendChild(toast);
+
+  // Steal keyboard focus from any iframe (panel, embeds) so keydown fires on main window
+  const focusTrap = document.createElement("input");
+  Object.assign(focusTrap.style, {
+    position: "fixed", top: "-9999px", left: "-9999px",
+    width: "1px", height: "1px", opacity: "0", pointerEvents: "none",
+  });
+  document.body.appendChild(focusTrap);
+  requestAnimationFrame(() => focusTrap.focus({ preventScroll: true }));
+
+  const prevCursor = document.body.style.cursor;
+  document.body.style.cursor = "crosshair";
+  let currentTarget = null;
+
+  const PICKABLE = new Set([
+    "article", "section", "main", "aside", "header", "footer", "nav",
+    "div", "p", "blockquote", "pre", "figure", "figcaption",
+    "ul", "ol", "li", "table", "tbody", "thead", "tr",
+    "h1", "h2", "h3", "h4", "h5", "h6", "details", "summary",
+  ]);
+  const TAG_LABELS = {
+    article: "Article", section: "Section", main: "Main", aside: "Aside",
+    header: "Header", footer: "Footer", nav: "Nav", p: "Paragraph",
+    blockquote: "Blockquote", pre: "Code block", figure: "Figure",
+    ul: "List", ol: "Ordered list", li: "List item", table: "Table",
+    h1: "Heading 1", h2: "Heading 2", h3: "Heading 3",
+    h4: "Heading 4", h5: "Heading 5", h6: "Heading 6",
+    div: "Block",
+  };
+
+  function findTarget(el) {
+    let cur = el;
+    while (cur && cur !== document.body) {
+      const tag = cur.tagName?.toLowerCase();
+      if (PICKABLE.has(tag)) {
+        const rect = cur.getBoundingClientRect();
+        if (rect.width >= 20 && rect.height >= 10) return cur;
+      }
+      cur = cur.parentElement;
+    }
+    return null;
+  }
+
+  function sanitizeHtml(el) {
+    const clone = el.cloneNode(true);
+    for (const sel of ["script", "style", "noscript", "svg", "canvas", "video", "audio", "iframe", "object", "embed"]) {
+      clone.querySelectorAll(sel).forEach((n) => n.remove());
+    }
+    clone.querySelectorAll("*").forEach((n) => {
+      for (const attr of Array.from(n.attributes)) {
+        if (attr.name.startsWith("on") || attr.name === "style") n.removeAttribute(attr.name);
+      }
+    });
+    return clone.innerHTML;
+  }
+
+  async function writeToClipboard(html, text) {
+    try {
+      await navigator.clipboard.write([
+        new ClipboardItem({
+          "text/html": new Blob([html], { type: "text/html" }),
+          "text/plain": new Blob([text], { type: "text/plain" }),
+        }),
+      ]);
+    } catch {
+      const div = document.createElement("div");
+      div.contentEditable = "true";
+      div.innerHTML = html;
+      Object.assign(div.style, { position: "fixed", top: "-9999px", left: "-9999px", whiteSpace: "pre-wrap" });
+      document.body.appendChild(div);
+      try {
+        const sel = window.getSelection();
+        const range = document.createRange();
+        range.selectNodeContents(div);
+        sel?.removeAllRanges();
+        sel?.addRange(range);
+        document.execCommand("copy");
+      } finally {
+        document.body.removeChild(div);
+        window.getSelection()?.removeAllRanges();
+      }
+    }
+  }
+
+  function showToast(msg, isError = false) {
+    toast.textContent = msg;
+    toast.style.color = isError ? "#ff8a8a" : "#8fe0b3";
+    toast.style.borderColor = isError ? "rgba(255,138,138,0.3)" : "rgba(143,224,179,0.3)";
+    toast.classList.add("dg-qc-toast-in");
+    setTimeout(() => toast.classList.remove("dg-qc-toast-in"), 2200);
+  }
+
+  function cleanup() {
+    if (currentTarget) { currentTarget.classList.remove("dg-qc-highlight"); currentTarget = null; }
+    document.body.style.cursor = prevCursor;
+    document.removeEventListener("mouseover", onMouseOver, true);
+    document.removeEventListener("mousemove", onMouseMove, true);
+    document.removeEventListener("click", onClick, true);
+    window.removeEventListener("keydown", onKeyDown, true);
+    setTimeout(() => { style.remove(); banner.remove(); tooltip.remove(); toast.remove(); focusTrap.remove(); root.remove(); }, 350);
+  }
+
+  function onMouseOver(e) {
+    const target = findTarget(e.target);
+    if (target === currentTarget) return;
+    currentTarget?.classList.remove("dg-qc-highlight");
+    currentTarget = target;
+    if (currentTarget) {
+      currentTarget.classList.add("dg-qc-highlight");
+      const tag = currentTarget.tagName.toLowerCase();
+      tooltip.textContent = `${TAG_LABELS[tag] || tag} · click to copy`;
+      tooltip.classList.add("dg-qc-tip-visible");
+    } else {
+      tooltip.classList.remove("dg-qc-tip-visible");
+    }
+  }
+
+  function onMouseMove(e) {
+    tooltip.style.left = `${e.clientX + 14}px`;
+    tooltip.style.top = `${e.clientY + 14}px`;
+    const rect = tooltip.getBoundingClientRect();
+    if (rect.right > window.innerWidth - 8) tooltip.style.left = `${e.clientX - rect.width - 10}px`;
+    if (rect.bottom > window.innerHeight - 8) tooltip.style.top = `${e.clientY - rect.height - 10}px`;
+  }
+
+  function onClick(e) {
+    if (!currentTarget) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const html = sanitizeHtml(currentTarget);
+    const text = currentTarget.innerText || currentTarget.textContent || "";
+    currentTarget.classList.remove("dg-qc-highlight");
+    const captured = currentTarget;
+    captured.style.outline = "2px solid rgba(143,224,179,0.7)";
+    captured.style.outlineOffset = "2px";
+    setTimeout(() => { captured.style.outline = ""; captured.style.outlineOffset = ""; }, 550);
+    cleanup();
+    writeToClipboard(html, text)
+      .then(() => showToast("✓ Copied to clipboard"))
+      .catch(() => showToast("Failed to copy", true));
+  }
+
+  function onKeyDown(e) {
+    if (e.key === "Escape") { e.preventDefault(); e.stopImmediatePropagation(); cleanup(); }
+  }
+
+  document.addEventListener("mouseover", onMouseOver, true);
+  document.addEventListener("mousemove", onMouseMove, true);
+  document.addEventListener("click", onClick, true);
+  window.addEventListener("keydown", onKeyDown, true);
+}
 
 // ─── Read aloud (TTS) playback ─────────────────────────────────
 // The background service worker has no DOM and can't play audio, so it hands us

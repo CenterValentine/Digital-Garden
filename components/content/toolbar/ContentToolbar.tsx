@@ -25,6 +25,8 @@ import { PUBLISHING_EXTENSION_ID } from "@/extensions/publishing/manifest";
 import { PublishStatusPill } from "@/extensions/publishing/components/toolbar/PublishStatusPill";
 import { ReadAloudButton } from "@/components/content/tts/ReadAloudButton";
 import { SPEED_READER_EXTENSION_ID } from "@/extensions/speed-reader/manifest";
+import { SendToTabButton } from "@/extensions/browser-bookmarks/components/SendToTabButton";
+import { BROWSER_BOOKMARKS_EXTENSION_ID } from "@/extensions/browser-bookmarks/manifest";
 import {
   SPEED_READER_OPEN_EVENT,
   type SpeedReaderOpenEventDetail,
@@ -144,6 +146,8 @@ export function ContentToolbar({ contentId: contentIdProp }: ContentToolbarProps
 
   const showPublishPill = publishingEnabled && sourceContentId;
   const showSpeedRead = speedReaderEnabled && !!sourceContentId;
+  const browserBookmarksEnabled = useIsExtensionEnabled(BROWSER_BOOKMARKS_EXTENSION_ID);
+  const showSendToTab = browserBookmarksEnabled && !!sourceContentId;
 
   const openSpeedReader = useCallback(() => {
     if (!sourceContentId) return;
@@ -159,7 +163,8 @@ export function ContentToolbar({ contentId: contentIdProp }: ContentToolbarProps
     visibleSourceFlashcardCount === 0 &&
     !showPublishPill &&
     !canReadAloud &&
-    !showSpeedRead
+    !showSpeedRead &&
+    !showSendToTab
   ) {
     return null;
   }
@@ -211,6 +216,9 @@ export function ContentToolbar({ contentId: contentIdProp }: ContentToolbarProps
         >
           <Zap className="h-4 w-4" />
         </button>
+      )}
+      {showSendToTab && (
+        <SendToTabButton contentId={sourceContentId} contentKind="note" />
       )}
       {/* Tools with order >= 70: import, export */}
       {tools.filter((t) => t.definition.order >= 70).map((tool) => {

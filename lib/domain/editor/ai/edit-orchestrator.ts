@@ -22,6 +22,7 @@
  */
 
 import type { Editor } from "@tiptap/react";
+import type { JSONContent } from "@tiptap/core";
 import { TextSelection } from "@tiptap/pm/state";
 import { findTextInDoc } from "./text-search";
 import { markdownToTiptap } from "@/lib/domain/content/markdown";
@@ -35,6 +36,7 @@ export interface ApplyDiffPayload {
   after: string;
   documentTitle: string;
   action: string;
+  toolCallId?: string;
 }
 
 export interface ReplaceDocumentPayload {
@@ -43,6 +45,7 @@ export interface ReplaceDocumentPayload {
   markdown: string;
   documentTitle: string;
   action: string;
+  toolCallId?: string;
 }
 
 export interface InsertImagePayload {
@@ -52,6 +55,7 @@ export interface InsertImagePayload {
   alt: string;
   documentTitle: string;
   action: string;
+  toolCallId?: string;
 }
 
 export type EditPayload = ApplyDiffPayload | ReplaceDocumentPayload | InsertImagePayload;
@@ -60,6 +64,10 @@ export interface EditResult {
   success: boolean;
   action: string;
   error?: string;
+  /** Document state captured immediately before this edit was applied. Present only on success. */
+  snapshot?: JSONContent;
+  /** The tool call ID that triggered this edit, for associating the revert with the chat UI. */
+  toolCallId?: string;
 }
 
 // ─── Constants ───────────────────────────────────────────────
@@ -214,14 +222,25 @@ export class AiEditOrchestrator {
   // ─── Edit execution ────────────────────────────────────────
 
   private async executeEdit(payload: EditPayload): Promise<EditResult> {
+    // Capture document state before applying the edit so the UI can offer revert.
+    const snapshot = this.getEditor()?.getJSON();
+
+    let result: EditResult;
     if (payload.type === "apply_diff") {
-      return this.executeApplyDiff(payload);
+      result = await this.executeApplyDiff(payload);
     } else if (payload.type === "replace_document") {
-      return this.executeReplaceDocument(payload);
+      result = await this.executeReplaceDocument(payload);
     } else if (payload.type === "insert_image") {
-      return this.executeInsertImage(payload);
+      result = await this.executeInsertImage(payload);
+    } else {
+      return { success: false, action: "Unknown edit type", error: "Unknown payload type" };
     }
-    return { success: false, action: "Unknown edit type", error: "Unknown payload type" };
+
+    if (result.success && snapshot) {
+      result.snapshot = snapshot;
+      result.toolCallId = payload.toolCallId;
+    }
+    return result;
   }
 
   private async executeApplyDiff(payload: ApplyDiffPayload): Promise<EditResult> {

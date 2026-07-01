@@ -210,6 +210,10 @@ interface ChatMessageProps {
   onBranch?: (messageId: string) => void;
   /** Disable edit/regenerate/branch (e.g. while a turn is streaming). */
   actionsDisabled?: boolean;
+  /** Revert a specific edit by tool call ID — called when the user clicks "Undo" on an edit chip. */
+  onRevertEdit?: (toolCallId: string) => void;
+  /** Set of tool call IDs for which a pre-edit snapshot is available (drives undo button visibility). */
+  revertableToolIds?: ReadonlySet<string>;
 }
 
 export const ChatMessage = memo(function ChatMessage({
@@ -221,6 +225,8 @@ export const ChatMessage = memo(function ChatMessage({
   onRegenerate,
   onBranch,
   actionsDisabled = false,
+  onRevertEdit,
+  revertableToolIds,
 }: ChatMessageProps) {
   const isUser = message.role === "user";
   const isAssistant = message.role === "assistant";
@@ -628,9 +634,12 @@ export const ChatMessage = memo(function ChatMessage({
               <ToolCallBubble
                 key={i}
                 toolName={toolPart.toolName}
+                toolCallId={toolPart.toolCallId}
                 state={toolPart.state}
                 args={toolPart.input}
                 result={toolPart.output}
+                isRevertable={revertableToolIds?.has(toolPart.toolCallId) ?? false}
+                onRevertEdit={onRevertEdit}
               />
             );
           }
@@ -1412,19 +1421,26 @@ function parseDeckWithCardsProposal(result: unknown): DeckWithCardsProposalPaylo
  */
 function ToolCallBubble({
   toolName,
+  toolCallId,
   state,
   args: _args,
   result,
+  isRevertable = false,
+  onRevertEdit,
 }: {
   toolName: string;
+  toolCallId?: string;
   state: string;
   args: unknown;
   result?: unknown;
+  isRevertable?: boolean;
+  onRevertEdit?: (toolCallId: string) => void;
 }) {
   const isRunning = state === "input-streaming" || state === "input-available";
   const hasResult = state === "output-available";
   const [expanded, setExpanded] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [reverted, setReverted] = useState(false);
 
   // Canonical string form of the result for display + clipboard.
   const resultString = useMemo(() => {
@@ -1474,6 +1490,22 @@ function ToolCallBubble({
     () => toolActionLabel(toolName, isRunning),
     [toolName, isRunning],
   );
+
+  // True when this tool result is an edit payload (apply_diff, replace_document, insert_image).
+  const isEditPayload = useMemo(
+    () =>
+      hasResult &&
+      typeof result === "string" &&
+      result.startsWith("{") &&
+      result.includes('"__editPayload"'),
+    [hasResult, result],
+  );
+
+  const handleRevert = useCallback(() => {
+    if (!toolCallId) return;
+    onRevertEdit?.(toolCallId);
+    setReverted(true);
+  }, [toolCallId, onRevertEdit]);
 
   const handleCopy = useCallback(async () => {
     if (!resultString) return;
@@ -1549,6 +1581,32 @@ function ToolCallBubble({
           <pre className="max-h-60 overflow-auto px-3 pb-2 text-[11px] font-mono leading-relaxed text-gray-600 dark:text-gray-300 whitespace-pre-wrap break-words">
             {resultString}
           </pre>
+        </div>
+      )}
+      {isEditPayload && (
+        <div className="border-t border-black/[0.06] dark:border-white/[0.06] flex items-center gap-2 px-3 py-1.5">
+          {!reverted ? (
+            <button
+              type="button"
+              onClick={handleRevert}
+              disabled={!isRevertable}
+              className={cn(
+                "inline-flex items-center gap-1.5 rounded px-2 py-0.5 text-[11px] transition-colors",
+                isRevertable
+                  ? "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-black/[0.04] dark:hover:bg-white/[0.06] cursor-pointer"
+                  : "text-gray-400 dark:text-gray-600 cursor-default",
+              )}
+              title={isRevertable ? "Restore document to its state before this edit" : "Applying edit…"}
+            >
+              <RotateCcw className="h-3 w-3 shrink-0" />
+              Undo
+            </button>
+          ) : (
+            <span className="inline-flex items-center gap-1.5 text-[11px] text-emerald-600 dark:text-emerald-400">
+              <Check className="h-3 w-3 shrink-0" />
+              Reverted
+            </span>
+          )}
         </div>
       )}
     </div>

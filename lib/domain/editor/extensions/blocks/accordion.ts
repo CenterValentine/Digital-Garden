@@ -336,15 +336,25 @@ export const Accordion = Node.create({
     return ({ node: initialNode, getPos, editor }) => {
       let currentNode = initialNode;
 
-      // Auto-assign blockId if missing
+      // Auto-assign blockId if missing. Deferred via queueMicrotask to avoid
+      // calling editor.view.dispatch() while ProseMirror's updateState is still
+      // running (addNodeView is called from within docView.update). A synchronous
+      // dispatch here triggers a re-entrant updateState, which can cause PM to
+      // register the wrong NodeView instance — leaving currentNode.attrs.blockId
+      // as null and breaking all subsequent blockId-keyed event dispatches.
       if (!currentNode.attrs.blockId && typeof getPos === "function") {
-        const pos = getPos();
-        if (pos !== undefined) {
-          const newId = crypto.randomUUID();
+        const newId = crypto.randomUUID();
+        queueMicrotask(() => {
+          const pos = getPos();
+          if (pos === undefined) return;
+          const existingNode = editor.state.doc.nodeAt(pos);
+          // Skip if another path already assigned a blockId
+          if (!existingNode || existingNode.attrs.blockId) return;
           const { tr } = editor.state;
-          tr.setNodeMarkup(pos, undefined, { ...currentNode.attrs, blockId: newId });
+          // Spread CURRENT node.attrs so any headerText already typed is preserved
+          tr.setNodeMarkup(pos, undefined, { ...existingNode.attrs, blockId: newId });
           editor.view.dispatch(tr);
-        }
+        });
       }
 
       const dom = document.createElement("div");
@@ -484,6 +494,16 @@ export const Accordion = Node.create({
               detail: { blockId, key: "headerText", value: text },
             })
           );
+        } else if (typeof getPos === "function") {
+          // blockId not yet assigned (microtask pending) — dispatch directly so
+          // PM attrs.headerText stays in sync with user typing even before the
+          // blockId queueMicrotask fires.
+          const pos = getPos();
+          if (pos !== undefined) {
+            const { tr } = editor.state;
+            tr.setNodeMarkup(pos, undefined, { ...currentNode.attrs, headerText: text });
+            editor.view.dispatch(tr);
+          }
         }
       });
 
@@ -543,6 +563,14 @@ export const Accordion = Node.create({
           window.dispatchEvent(new CustomEvent("block-attrs-change", {
             detail: { blockId, key: "headerText", value: text },
           }));
+        } else if (typeof getPos === "function") {
+          // blockId still unassigned — direct positional dispatch as fallback
+          const pos = getPos();
+          if (pos !== undefined) {
+            const { tr } = editor.state;
+            tr.setNodeMarkup(pos, undefined, { ...currentNode.attrs, headerText: text });
+            editor.view.dispatch(tr);
+          }
         }
       });
       // Stop beforeinput/input from reaching ProseMirror's input handler

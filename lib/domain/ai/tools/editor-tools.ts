@@ -198,7 +198,7 @@ export function createEditorTools(ctx: ToolExecuteContext) {
     // editor.commands.setContent() with the converted TipTap JSON.
     replace_document: tool({
       description:
-        "Replace the entire document content with new markdown. Use for major rewrites or when apply_diff would require too many individual changes. Preserves the document title and metadata.",
+        "Replace the ENTIRE document content with new markdown. Use ONLY when the user explicitly asks to rewrite or replace the whole document. NEVER use this to add, append, insert, or make targeted changes — use apply_diff for all of those. Preserves the document title and metadata.",
       inputSchema: z.object({
         markdown: z
           .string()

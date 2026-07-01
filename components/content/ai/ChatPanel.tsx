@@ -36,6 +36,7 @@ import { useContentStore } from "@/state/content-store";
 import { detectMixedProvider } from "@/lib/design/system/ai-providers";
 import type { AIProviderId } from "@/lib/domain/ai/types";
 import type { UIMessage } from "ai";
+import type { JSONContent } from "@tiptap/core";
 
 interface ChatPanelProps {
   contentId?: string | null;
@@ -303,6 +304,24 @@ export function ChatPanel({
     contentIdRef.current = contentId;
   }, [contentId]);
 
+  // Revert snapshots — keyed by toolCallId, holds the document state before each edit.
+  // Ref for the map (stable read in the revert callback) + state for the Set of IDs
+  // (drives ChatMessage re-renders so the undo button appears as edits complete).
+  const revertSnapshotsRef = useRef<Map<string, { snapshot: JSONContent; action: string }>>(new Map());
+  const [revertableToolIds, setRevertableToolIds] = useState<ReadonlySet<string>>(new Set());
+
+  const revertEdit = useCallback((toolCallId: string) => {
+    const entry = revertSnapshotsRef.current.get(toolCallId);
+    if (!entry) return;
+    const editor = useEditorInstanceStore.getState().getEditor(contentIdRef.current);
+    if (!editor) {
+      toast.error("Editor not available — open the document and try again.");
+      return;
+    }
+    editor.commands.setContent(entry.snapshot);
+    toast.success("Reverted to before this edit");
+  }, []);
+
   // Create orchestrator on mount, destroy on unmount
   useEffect(() => {
     const orchestrator = new AiEditOrchestrator(
@@ -318,6 +337,13 @@ export function ChatPanel({
         onEditResult: (result) => {
           if (!result.success && result.error) {
             toast.error(result.error);
+          }
+          if (result.success && result.snapshot && result.toolCallId) {
+            revertSnapshotsRef.current.set(result.toolCallId, {
+              snapshot: result.snapshot,
+              action: result.action,
+            });
+            setRevertableToolIds(new Set(revertSnapshotsRef.current.keys()));
           }
         },
       }
@@ -361,7 +387,7 @@ export function ChatPanel({
             const payload = parseEditPayload(outputStr);
             if (payload) {
               processedToolIdsRef.current.add(toolPart.toolCallId);
-              orchestratorRef.current.enqueue(payload);
+              orchestratorRef.current.enqueue({ ...payload, toolCallId: toolPart.toolCallId });
             }
           }
         }
@@ -560,6 +586,8 @@ export function ChatPanel({
                   onRegenerate={(id) => void regenerateMessage(id)}
                   onBranch={(id) => void handleBranch(id)}
                   actionsDisabled={isActive}
+                  onRevertEdit={revertEdit}
+                  revertableToolIds={revertableToolIds}
                 />
               );
             })}

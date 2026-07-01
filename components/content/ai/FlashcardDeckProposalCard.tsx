@@ -204,7 +204,7 @@ export function FlashcardDeckProposalCard({
               resetValueOnBlankBlur={payload.proposedPath}
             />
           </div>
-          <div className="text-[11px] text-gray-400 dark:text-gray-500">
+          <div className="text-[11px] text-gray-500 dark:text-gray-400">
             <span className="font-mono">{effectivePath || "(empty path)"}</span>
             {" · Parent: "}
             <span>{parentLabel}</span>
@@ -229,7 +229,7 @@ export function FlashcardDeckProposalCard({
       </p>
 
       {payload.similarExistingPaths.length > 0 && (
-        <div className="text-[11px] text-gray-500 dark:text-gray-400">
+        <div className="text-[11px] text-gray-500 dark:text-gray-300">
           <div className="mb-1">
             Similar existing decks (tell the AI to use one instead):
           </div>
