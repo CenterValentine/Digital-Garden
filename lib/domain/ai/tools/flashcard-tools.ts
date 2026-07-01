@@ -404,11 +404,15 @@ export function createFlashcardTools(ctx: ToolExecuteContext) {
               front: z
                 .string()
                 .min(1)
-                .describe("Question / prompt side of the card (plain text)."),
+                .describe(
+                  "The term or prompt being tested — keep it concise, bare term only. No definitions, examples, or context on the front.",
+                ),
               back: z
                 .string()
                 .min(1)
-                .describe("Answer side of the card (plain text)."),
+                .describe(
+                  "The answer, definition, or translation. For language cards, always include pronunciation here: romanization for non-Latin scripts (kana→romaji, →pinyin with tones, Arabic→transliteration), or IPA/phonetic respelling for Latin-script languages with non-obvious pronunciation.",
+                ),
               frontLabel: z
                 .string()
                 .max(80)

@@ -187,6 +187,8 @@ export interface MarkdownEditorProps {
   }) => void;
   /** Compact mode for secondary/embedded editors (less padding, smaller prose) */
   compact?: boolean;
+  /** Edge-to-edge mode for the browser-extension iframe note surface */
+  edgeToEdge?: boolean;
   /** Placeholder text when editor is empty */
   placeholder?: string;
   /** Custom class name */
@@ -215,6 +217,7 @@ export function MarkdownEditor({
   collaborationRuntime = null,
   onCollaborationSyncChange,
   compact = false,
+  edgeToEdge = false,
   className = "",
 }: MarkdownEditorProps) {
   const openMenu = useContextMenuStore((s) => s.openMenu);
@@ -436,7 +439,9 @@ export function MarkdownEditor({
     editorProps: {
       attributes: {
         class: [
-          compact
+          edgeToEdge
+            ? "prose prose-sm max-w-none focus:outline-none min-h-[120px] px-2 pt-1 pb-1 dg-editor-edge-to-edge"
+            : compact
             ? "prose prose-sm max-w-none focus:outline-none min-h-[120px] px-4 pt-2 pb-2"
             : "prose prose-sm sm:prose lg:prose-lg xl:prose-xl max-w-none focus:outline-none min-h-[500px] px-6 pt-3 pb-4",
           effectiveEditable ? "block-editing-active" : "",

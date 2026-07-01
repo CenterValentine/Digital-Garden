@@ -12,9 +12,9 @@
  *
  * Attrs:
  * - caption    optional heading above the table
- * - items      JSON string: [{label, value, valueType?, highlight?}]
+ * - items      JSON string: [{label, value, valueType?, highlight?, pillColor?}]
+ *              pillColor per item: neutral | auto (djb2 hash) | blue | green | amber | purple | rose | teal | pastel
  * - variant    default | striped | bordered | compact | featured
- * - pillColor  neutral | blue | green | amber | purple | rose | teal | pastel | rainbow
  * - showBorder boolean — hides the block chrome border when false
  */
 
@@ -35,6 +35,7 @@ export interface StatsTableItem {
   value: string;
   valueType?: StatsValueType;
   highlight?: boolean;
+  pillColor?: string;
 }
 
 // ─── Value parsers ────────────────────────────────────────────────────────────
@@ -59,6 +60,31 @@ function parseRating(value: string): { filled: number; total: number } {
 function parseBool(value: string): boolean {
   return /^(true|yes|1|✓|y|on)$/i.test(value.trim());
 }
+
+// ─── Hash-based pill coloring ─────────────────────────────────────────────────
+
+const HASH_COLORS = ["blue", "green", "amber", "purple", "rose", "teal"] as const;
+type HashColor = typeof HASH_COLORS[number];
+
+/** djb2 hash: maps a pill label string to one of 6 semantic color names.
+ *  Same string always yields the same color across different stats blocks. */
+function hashPillText(text: string): HashColor {
+  let hash = 5381;
+  for (let i = 0; i < text.length; i++) {
+    hash = ((hash << 5) + hash + text.charCodeAt(i)) | 0;
+  }
+  return HASH_COLORS[Math.abs(hash) % HASH_COLORS.length];
+}
+
+/** Inline style tokens for hash-colored pills in the editor preview (no CSS class available). */
+const HASH_PILL_STYLES: Record<HashColor, { bg: string; fg: string; border: string }> = {
+  blue:   { bg: "rgba(59,130,246,0.15)",  fg: "#3b82f6", border: "rgba(59,130,246,0.3)" },
+  green:  { bg: "rgba(34,197,94,0.15)",   fg: "#16a34a", border: "rgba(34,197,94,0.3)" },
+  amber:  { bg: "rgba(245,158,11,0.15)",  fg: "#d97706", border: "rgba(245,158,11,0.3)" },
+  purple: { bg: "rgba(168,85,247,0.15)",  fg: "#9333ea", border: "rgba(168,85,247,0.3)" },
+  rose:   { bg: "rgba(244,63,94,0.15)",   fg: "#e11d48", border: "rgba(244,63,94,0.3)" },
+  teal:   { bg: "rgba(20,184,166,0.15)",  fg: "#0d9488", border: "rgba(20,184,166,0.3)" },
+};
 
 // ─── Schema ──────────────────────────────────────────────────────────────────
 
@@ -109,13 +135,27 @@ const { schema: statsTableSchema, defaults: statsTableDefaults } = createBlockSc
               { value: "true", label: "Highlighted" },
             ],
           },
+          {
+            key: "pillColor",
+            label: "Pill color",
+            type: "select",
+            tooltip: "Color for pills in this row. 'Auto' hashes each pill value to a consistent color across all stats blocks.",
+            showWhen: { key: "valueType", value: "pills" },
+            options: [
+              { value: "neutral", label: "Neutral (default)" },
+              { value: "auto", label: "Auto (by value)" },
+              { value: "blue", label: "Blue" },
+              { value: "green", label: "Green" },
+              { value: "amber", label: "Amber" },
+              { value: "purple", label: "Purple" },
+              { value: "rose", label: "Rose" },
+              { value: "teal", label: "Teal" },
+              { value: "pastel", label: "Pastel (rainbow)" },
+            ],
+          },
         ],
       }),
     variant: z.enum(["default", "striped", "bordered", "compact", "featured"]).default("default"),
-    pillColor: z
-      .enum(["neutral", "blue", "green", "amber", "purple", "rose", "teal", "pastel", "rainbow"])
-      .default("neutral")
-      .describe("Color theme applied to pill badges and ratings"),
     showBorder: z
       .boolean()
       .default(true)
@@ -147,7 +187,6 @@ function statsTableAttrs() {
     caption: dataAttr("caption", { default: "" }),
     items: dataAttr("items", { default: "[]" }),
     variant: dataAttr("variant", { default: "default" }),
-    pillColor: dataAttr("pill-color", { default: "neutral" }),
     showBorder: {
       default: true,
       parseHTML: (el: Element) => el.getAttribute("data-show-border") !== "false",
@@ -159,9 +198,20 @@ function statsTableAttrs() {
 
 // ─── Editor preview HTML (uses CSS vars for theme/dark-mode) ─────────────────
 
-function pillsHtml(value: string): string {
+function pillsHtml(value: string, pillColor = "neutral"): string {
+  const BASE = "display:inline-block;padding:1px 8px;margin:1px 3px 1px 0;border-radius:999px;font-size:11px;font-weight:500;white-space:nowrap;border:1px solid";
   return parsePills(value)
-    .map((p) => `<span style="display:inline-block;padding:1px 8px;margin:1px 3px 1px 0;border-radius:999px;font-size:11px;font-weight:500;background:var(--st-pill-bg);color:var(--st-pill-color);border:1px solid var(--st-pill-border);white-space:nowrap">${p}</span>`)
+    .map((p) => {
+      if (pillColor === "auto") {
+        const c = HASH_PILL_STYLES[hashPillText(p)];
+        return `<span style="${BASE} ${c.border};background:${c.bg};color:${c.fg}">${p}</span>`;
+      }
+      const named = HASH_PILL_STYLES[pillColor as HashColor];
+      if (named) {
+        return `<span style="${BASE} ${named.border};background:${named.bg};color:${named.fg}">${p}</span>`;
+      }
+      return `<span style="${BASE} var(--st-pill-border);background:var(--st-pill-bg);color:var(--st-pill-color)">${p}</span>`;
+    })
     .join("");
 }
 
@@ -183,7 +233,7 @@ function booleanHtml(value: string): string {
 function renderValueContent(item: StatsTableItem, isHighlight: boolean, variant: string): string {
   switch (item.valueType) {
     case "pills":
-      return `<span style="display:flex;flex-wrap:wrap;gap:2px;align-items:center">${pillsHtml(item.value)}</span>`;
+      return `<span style="display:flex;flex-wrap:wrap;gap:2px;align-items:center">${pillsHtml(item.value, item.pillColor ?? "neutral")}</span>`;
     case "rating":
       return ratingHtml(item.value);
     case "boolean":
@@ -270,18 +320,10 @@ export const StatsTable = Node.create({
       renderContent(node, contentDom) {
         contentDom.className = "block-stats-table-editor";
         const a = node.attrs as Record<string, string>;
-        if (a.pillColor && a.pillColor !== "neutral") {
-          contentDom.setAttribute("data-pill-color", a.pillColor);
-        }
         contentDom.innerHTML = editorHtml(parseItems(a.items), a.variant, a.caption);
       },
       updateContent(node, contentDom) {
         const a = node.attrs as Record<string, string>;
-        if (a.pillColor && a.pillColor !== "neutral") {
-          contentDom.setAttribute("data-pill-color", a.pillColor);
-        } else {
-          contentDom.removeAttribute("data-pill-color");
-        }
         contentDom.innerHTML = editorHtml(parseItems(a.items), a.variant, a.caption);
         return true;
       },
@@ -306,11 +348,6 @@ export const ServerStatsTable = Node.create({
     const items = parseItems(HTMLAttributes["data-items"] ?? "[]");
     const variant = (HTMLAttributes["data-variant"] ?? "default") as string;
     const caption = (HTMLAttributes["data-caption"] ?? "") as string;
-    const pillColor = (HTMLAttributes["data-pill-color"] ?? "neutral") as string;
-
-    const pillClass = pillColor !== "neutral"
-      ? `block-stats-table-pill block-stats-table-pill--${pillColor}`
-      : "block-stats-table-pill";
 
     const rows = items.map((item) => {
       const isPills = item.valueType === "pills";
@@ -322,12 +359,22 @@ export const ServerStatsTable = Node.create({
         isRating ? "block-stats-table-row--rating" : "",
       ].filter(Boolean).join(" ");
 
+      const rowPillColor = item.pillColor ?? "neutral";
+
       let valueChildren: unknown[];
       if (isPills) {
-        valueChildren = parsePills(item.value).map((p) => ["span", { class: pillClass }, p]);
+        if (rowPillColor === "auto") {
+          valueChildren = parsePills(item.value).map((p) => ["span", { class: `block-stats-table-pill block-stats-table-pill--${hashPillText(p)}` }, p]);
+        } else {
+          const pillClass = rowPillColor !== "neutral"
+            ? `block-stats-table-pill block-stats-table-pill--${rowPillColor}`
+            : "block-stats-table-pill";
+          valueChildren = parsePills(item.value).map((p) => ["span", { class: pillClass }, p]);
+        }
       } else if (isRating) {
         const { filled, total } = parseRating(item.value);
-        const dotClass = `block-stats-table-dot block-stats-table-dot--${pillColor !== "neutral" ? pillColor : "default"}`;
+        const dotColor = (rowPillColor !== "neutral" && rowPillColor !== "auto") ? rowPillColor : "default";
+        const dotClass = `block-stats-table-dot block-stats-table-dot--${dotColor}`;
         valueChildren = [
           ["span", { class: "block-stats-table-rating" },
             ...Array.from({ length: total }, (_, i) =>

@@ -609,6 +609,21 @@ async function getCurrentTabSyncState() {
   };
 }
 
+async function startQuickCaptureInActiveTab() {
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (!tab?.id) throw new Error("No active tab is available");
+  try {
+    await chrome.tabs.sendMessage(tab.id, { type: "dg-quick-capture" });
+    return { started: true, tabId: tab.id };
+  } catch (error) {
+    throw new Error(
+      error instanceof Error
+        ? `Quick Capture is not available on this page: ${error.message}`
+        : "Quick Capture is not available on this page"
+    );
+  }
+}
+
 async function showTreePanelInActiveTab() {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   if (!tab?.id) {
@@ -1483,10 +1498,56 @@ chrome.bookmarks.onRemoved.addListener((id, removeInfo) => {
   });
 });
 
+// ── MRU tab tracking ─────────────────────────────────────────────────────────
+// Ordered most-recent-first. Ephemeral (service-worker memory only) — resets
+// on MV3 restart, self-populates as the user browses. Only tabs the user
+// explicitly activates/focuses are tracked; background/preloaded tabs are not.
+const MRU_TABS_MAX = 10;
+const mruTabs = [];
+
+function isIneligibleMruUrl(url) {
+  if (!url) return true;
+  return (
+    url.startsWith("chrome://") ||
+    url.startsWith("chrome-extension://") ||
+    url.startsWith("about:") ||
+    url.startsWith("edge://") ||
+    url.startsWith("vivaldi://")
+  );
+}
+
+function updateMruTab(tabId, tab) {
+  if (!tab?.url || isIneligibleMruUrl(tab.url)) return;
+  const idx = mruTabs.findIndex((t) => t.tabId === tabId);
+  if (idx !== -1) mruTabs.splice(idx, 1);
+  mruTabs.unshift({
+    tabId,
+    title: tab.title || "",
+    favIconUrl: tab.favIconUrl || null,
+    url: tab.url,
+    lastViewedAt: new Date().toISOString(),
+  });
+  if (mruTabs.length > MRU_TABS_MAX) mruTabs.length = MRU_TABS_MAX;
+}
+
+function pruneMruTab(tabId) {
+  const idx = mruTabs.findIndex((t) => t.tabId === tabId);
+  if (idx !== -1) mruTabs.splice(idx, 1);
+}
+
 chrome.tabs.onActivated.addListener(({ tabId }) => {
   chrome.tabs.get(tabId, (tab) => {
     if (chrome.runtime.lastError || !tab?.url) return;
     void updateTabBadge(tabId, tab.url);
+    updateMruTab(tabId, tab);
+  });
+});
+
+chrome.windows.onFocusChanged.addListener((windowId) => {
+  if (windowId === chrome.windows.WINDOW_ID_NONE) return;
+  chrome.tabs.query({ active: true, windowId }, ([tab]) => {
+    if (chrome.runtime.lastError || !tab) return;
+    updateMruTab(tab.id, tab);
   });
 });
 
@@ -1500,6 +1561,7 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
 // that reuses the id starts clean.
 chrome.tabs.onRemoved.addListener((tabId) => {
   void chrome.storage.session.remove(`${TAB_PANELS_KEY_PREFIX}${tabId}`);
+  pruneMruTab(tabId);
 });
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -1585,6 +1647,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
     if (message.type === "show-tree-panel") {
       sendResponse({ ok: true, data: await showTreePanelInActiveTab() });
+      return;
+    }
+    if (message.type === "start-quick-capture") {
+      sendResponse({ ok: true, data: await startQuickCaptureInActiveTab() });
       return;
     }
     if (message.type === "open-content-in-active-tab") {
@@ -1732,6 +1798,55 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       return;
     }
     sendResponse({ ok: false, error: "Unknown message type" });
+    if (message.type === "get-recent-viewed-tabs") {
+      const config = await getConfig();
+      const appOrigin = config.appBaseUrl
+        ? (() => { try { return new URL(config.appBaseUrl).origin; } catch { return null; } })()
+        : null;
+      const tabs = mruTabs.filter((t) => {
+        if (!appOrigin) return true;
+        try { return new URL(t.url).origin !== appOrigin; } catch { return true; }
+      });
+      sendResponse({ ok: true, data: tabs });
+      return;
+    }
+
+    if (message.type === "send-note-to-tabs") {
+      const { contentId, contentKind = "note", tabIds = [] } = message.payload || {};
+      const results = await Promise.all(
+        tabIds.map(async (tabId) => {
+          const entry = mruTabs.find((t) => t.tabId === tabId);
+          try {
+            await new Promise((resolve, reject) => {
+              chrome.tabs.sendMessage(
+                tabId,
+                { type: "dg-associate-and-open", payload: { contentId, contentKind } },
+                (response) => {
+                  if (chrome.runtime.lastError) {
+                    reject(new Error(chrome.runtime.lastError.message));
+                  } else if (!response?.ok) {
+                    reject(new Error(response?.error || "Overlay unavailable"));
+                  } else {
+                    resolve(response);
+                  }
+                }
+              );
+            });
+            return { tabId, success: true, title: entry?.title || "" };
+          } catch (error) {
+            return {
+              tabId,
+              success: false,
+              title: entry?.title || "",
+              error: error instanceof Error ? error.message : "Failed",
+            };
+          }
+        })
+      );
+      sendResponse({ ok: true, data: results });
+      return;
+    }
+
   })().catch((error) => {
     sendResponse({ ok: false, error: error.message || "Unknown error" });
   });

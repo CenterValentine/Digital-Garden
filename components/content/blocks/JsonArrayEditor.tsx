@@ -27,6 +27,8 @@ export interface JsonArrayItemField {
   min?: number;
   max?: number;
   tooltip?: string;
+  /** Only render this field when another field in the same item equals a given value. */
+  showWhen?: { key: string; value: string };
 }
 
 // ─── Compact inline image field ───────────────────────────────────────────────
@@ -301,7 +303,9 @@ function ItemRow({
           gridTemplateColumns: `repeat(${gridCols}, minmax(0, 1fr))`,
         }}
       >
-        {schema.map((field) => (
+        {schema.filter((field) =>
+          !field.showWhen || String(item[field.showWhen.key] ?? "") === field.showWhen.value
+        ).map((field) => (
           <div
             key={field.key}
             style={field.type === "textarea" || field.type === "image" || field.type === "icon" ? { gridColumn: "1 / -1" } : undefined}

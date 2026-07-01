@@ -563,6 +563,46 @@ function buildSnippetSaveMenu(
   return items;
 }
 
+/**
+ * Trigger a browser download from a Blob.
+ */
+function triggerBlobDownload(blob: Blob, fileName: string) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = fileName;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+/**
+ * Download an image — either from the server (via contentId) or directly from its URL.
+ */
+async function downloadImage(src: string, contentId: string | null) {
+  try {
+    if (contentId) {
+      const res = await fetch(`/api/content/content/${contentId}/download?download=true`);
+      if (!res.ok) throw new Error("Download failed");
+      const blob = await res.blob();
+      const disposition = res.headers.get("content-disposition") ?? "";
+      const fileNameMatch = disposition.match(/filename="([^"]+)"/);
+      const fileName = fileNameMatch?.[1] ?? `image-${contentId}`;
+      triggerBlobDownload(blob, fileName);
+    } else {
+      const res = await fetch(src);
+      if (!res.ok) throw new Error("Download failed");
+      const blob = await res.blob();
+      const fileName = src.split("/").pop()?.split("?")[0] ?? "image";
+      triggerBlobDownload(blob, fileName);
+    }
+    toast.success("Image downloaded");
+  } catch {
+    toast.error("Failed to download image");
+  }
+}
+
 /** Resolve a wiki-link title to a content ID, then open in the given pane. */
 async function resolveWikiLinkAndOpen(targetTitle: string, paneId: WorkspacePaneId) {
   const { layoutMode, openContentInPane, setLayoutMode } = useContentStore.getState();
@@ -644,6 +684,24 @@ export const editorActionProvider: ContextMenuActionProvider = (ctx) => {
         ],
       });
     }
+  }
+
+  // --- Image actions (Download) ---
+  const imageWrapper = contextTarget?.closest?.(".image-resize-wrapper");
+  const imgEl = imageWrapper?.querySelector?.("img") ?? null;
+  const imageSrc = imgEl?.getAttribute("src") ?? null;
+  const imageContentId = imgEl?.getAttribute("data-content-id") ?? null;
+
+  if (imageSrc) {
+    sections.push({
+      actions: [
+        {
+          id: "download-image",
+          label: "Download Image",
+          onClick: () => { void downloadImage(imageSrc, imageContentId); },
+        },
+      ],
+    });
   }
 
   // Capture selection NOW, before any menu interaction

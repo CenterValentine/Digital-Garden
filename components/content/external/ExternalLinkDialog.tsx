@@ -34,6 +34,7 @@ export function ExternalLinkDialog({
   const [name, setName] = useState(initialName);
   const [url, setUrl] = useState(initialUrl);
   const [urlCopied, setUrlCopied] = useState(false);
+  const [urlError, setUrlError] = useState<string | null>(null);
 
   // Reset state when dialog opens/closes
   useEffect(() => {
@@ -44,6 +45,27 @@ export function ExternalLinkDialog({
       setUrlCopied(false);
     }
   }, [open, initialName, initialUrl]);
+
+  const validateUrl = (raw: string): string | null => {
+    const trimmed = raw.trim();
+    if (!trimmed || trimmed === "https://") return null;
+    let finalUrl = trimmed;
+    if (!finalUrl.match(/^https?:\/\//i)) finalUrl = `https://${finalUrl}`;
+    try {
+      const parsed = new URL(finalUrl);
+      if (parsed.protocol !== "https:") {
+        return "URL must use HTTPS. HTTP is disabled for security.";
+      }
+    } catch {
+      return "Invalid URL format.";
+    }
+    return null;
+  };
+
+  const handleUrlChange = (value: string) => {
+    setUrl(value);
+    if (urlError) setUrlError(validateUrl(value));
+  };
 
   const handleSubmit = () => {
     if (!name.trim()) {
@@ -60,6 +82,12 @@ export function ExternalLinkDialog({
     let finalUrl = url.trim();
     if (!finalUrl.match(/^https?:\/\//i)) {
       finalUrl = `https://${finalUrl}`;
+    }
+
+    const clientError = validateUrl(url.trim());
+    if (clientError) {
+      setUrlError(clientError);
+      return;
     }
 
     onConfirm({ name: name.trim(), url: finalUrl });
@@ -151,11 +179,13 @@ export function ExternalLinkDialog({
               <label className="block text-sm font-medium text-gray-900 mb-2">
                 URL
               </label>
+              <div className="space-y-1">
               <div className="flex gap-2">
                 <input
                   type="text"
                   value={url}
-                  onChange={(e) => setUrl(e.target.value)}
+                  onChange={(e) => handleUrlChange(e.target.value)}
+                  onBlur={() => setUrlError(validateUrl(url))}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" && !e.shiftKey) {
                       e.preventDefault();
@@ -163,7 +193,7 @@ export function ExternalLinkDialog({
                     }
                   }}
                   placeholder="https://example.com"
-                  className="flex-1 px-3 py-2 bg-white/80 border border-gray-900/20 rounded-lg text-sm text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary/50"
+                  className={`flex-1 px-3 py-2 bg-white/80 border rounded-lg text-sm text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary/50 ${urlError ? "border-red-400" : "border-gray-900/20"}`}
                 />
                 <button
                   onClick={handleCopyUrl}
@@ -176,6 +206,10 @@ export function ExternalLinkDialog({
                     <Copy className="h-4 w-4 text-gray-700" />
                   )}
                 </button>
+              </div>
+              {urlError && (
+                <p className="text-xs text-red-500">{urlError}</p>
+              )}
               </div>
             </div>
           </div>

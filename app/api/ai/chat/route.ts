@@ -99,7 +99,9 @@ import type {
 import {
   applyMiddleware,
   defaultSettingsMiddleware,
+  rateLimitRetryMiddleware,
 } from "@/lib/domain/ai/middleware";
+import { buildSystemPrompt } from "@/lib/domain/ai/system-prompt";
 import { createBaseTools } from "@/lib/domain/ai/tools";
 import { createEditorTools } from "@/lib/domain/ai/tools";
 import { createFlashcardTools } from "@/lib/domain/ai/tools";
@@ -294,6 +296,7 @@ export async function POST(request: Request) {
               });
           return applyMiddleware(model, [
             defaultSettingsMiddleware({ temperature, maxTokens }),
+            rateLimitRetryMiddleware(),
           ]);
         },
       );
@@ -512,80 +515,16 @@ export async function POST(request: Request) {
         //   with headroom for an optional search_decks or get_deck call.
         // Base chat (no flashcards, no document) typically needs 2-3 steps.
         stopWhen: stepCountIs(editableContentId ? 8 : 7),
-        system: `You are a helpful AI assistant in Digital Garden, a knowledge management application. Help the user with their notes, writing, and research. Be concise and helpful.
-
-You have a generate_image tool that creates AI images from text prompts. When asked to generate, create, or draw an image, use this tool. Available providers: DALL·E 3, GPT Image 1, Imagen 3, FLUX (fal.ai/Together/Fireworks), DeepAI, RunwayML, Artbreeder. Default to DALL·E 3 unless specified. Write detailed prompts for best results.
-
-You can manage the user's flashcard decks. Vocabulary first:
-- "skill" and "deck" are interchangeable in the user's vocabulary — both mean a flashcard deck. Treat them the same way.
-- A "sub-skill" or "sub-deck" is a nested deck under a parent (e.g. "spanish/irregular-verbs" is a sub-deck under "spanish").
-- When the user says "make me a skill on X" or "create a deck for X," they want a deck named after the topic X. NEVER name the deck literally "Skill" or "Deck" — those are category words, not deck names. Name the deck after the topic the user mentioned.
-
-Tool design:
-- propose_deck_with_cards is the primary tool for "cards in a deck context." It takes BOTH the deck info (name + optional parentDeckPath) AND the cards. The commit handles deck creation atomically — including parent creation when the parent doesn't yet exist either. ONE tool call covers any depth of hierarchy. The user reviews the card and clicks "Create deck & add" (or "Add selected" if the deck already exists); the server cascades through missing ancestors and adds the cards in one flow.
-- propose_deck (standalone) is RARE. Use it only when the user explicitly asks to create a deck WITHOUT any cards yet (e.g. "set up a Japanese deck, I'll add cards later"). For "make me cards on X" — even when the deck or its parent doesn't exist yet — just call propose_deck_with_cards.
-- propose_image_cards creates IDENTIFICATION cards whose front is an AI-GENERATED IMAGE plus a short instruction caption, for VISUAL recall — identifying plants, insects, animals, anatomy, landmarks, chemical structures, code screenshots, etc. Use it ONLY when the study goal is recognizing something visual (the user asks for "picture cards," "identify-the-X cards," or the topic is inherently visual). For each card provide: imagePrompt (a specific, unambiguous prompt that makes the image clearly depict the answer — e.g. "a single monarch butterfly, wings open, photorealistic, plain white background"), identifyLabel (few-word instruction shown under the image, e.g. "Identify this butterfly"), and back (the answer). Images generate at propose time so the user previews them before accepting. LIMIT 5 cards per call. Do NOT use it for plain text Q&A — use propose_deck_with_cards for those.
-- propose_cards_from_media creates IDENTIFICATION cards from media the user ATTACHED to the chat (images and/or audio) — the front is the uploaded media itself and the back is YOUR identification. This is the inverse of propose_image_cards (which generates an image). You have already seen/heard the attachments; for each card pass mediaIndex (0-based, in attachment order), identifyLabel ("Identify this mushroom"), and back (your answer). Use it whenever the user attaches photos/recordings and asks to "make identification flashcards from these." If nothing is attached, tell the user to attach the media first.
-- propose_sound_id_cards creates SOUND-IDENTIFICATION cards — the front is a real-world SOUND (bird call, animal, instrument, engine) and the back names it. Use it when the study goal is recognizing a NON-SPEECH sound by ear. For each card: soundPrompt (precise description of the sound to source), identifyLabel (front instruction, e.g. "Identify this bird"), back (the answer). IMPORTANT: automatic sound sourcing isn't available yet, so these currently commit as TEXT prompts without a real clip — only use this tool when the user explicitly wants sound-ID cards, and tell them that to attach real audio today they should upload clips and use "cards from media". This is NOT for pronunciation (use the audio directive) or images (propose_image_cards).
-- SPOKEN AUDIO on cards (propose_deck_with_cards 'audio' directive): any card in propose_deck_with_cards can carry a spoken clip by adding an 'audio' field of shape { side, hideText? }. The spoken text is whatever you wrote on that side — never repeat it elsewhere. Three patterns:
-  • Pronunciation (most common): a non-English vocab term → audio: { side: "front" } so the word is shown AND spoken (hear it, recall the meaning on the back). For reverse/production cards where the spoken word is the ANSWER, use side: "back".
-  • Listening comprehension: the learner must understand by EAR (e.g. hear a Chinese sentence and recall its meaning) → audio: { side: "front", hideText: true }. The front then shows ONLY a play button; put the transcription + translation on the back.
-  • The audio is NOT generated at propose time — the user picks a voice/provider in a follow-up window, then generation runs (opt-in, no auto-spend). Audio rides alongside ordinary cards; a single propose_deck_with_cards batch may mix audio and silent cards.
-  Do NOT use audio for plain English Q&A unless the user explicitly asks for spoken English.${
-    autoPronounceDefault
-      ? `\n  • DEFAULT BEHAVIOR: when the deck is non-English vocabulary (or scientific/Latin names), ADD audio:{ side: "front" } to every card by DEFAULT — the user has opted into automatic pronunciation. Only omit it if the user says they don't want audio. (Generation is still opt-in; you're only attaching the directive.)`
-      : ""
-  }
-
-Workflow:
-
-1. ALWAYS call list_decks first when the user mentions flashcards, so you can prefer an existing deck and populate similarExistingPaths with near-matches.
-2. Pick a path that reflects the topic's natural hierarchy. If the user asks for "Spanish irregular verbs," the right path is "spanish/irregular-verbs" — NOT "general/irregular-verbs." Use a domain-named parent (language, subject, skill) when the topic has one.
-   - EVERY deck MUST have a named root SKILL — the first segment of the path. The skill is the broad subject the cards belong to (the language, the course, the domain): "spanish", "latin", "biology", "anatomy". The deeper segments are sub-skills. NEVER propose a bare single-segment leaf like name:"Irregular Verbs" with no parentDeckPath when the cards clearly belong to a broader skill — that produces an orphan deck the user sees as "No Skill Category". Instead set name:"Irregular Verbs" + parentDeckPath:"spanish" so the full path is "spanish/irregular-verbs".
-   - The ONLY time a single-segment root path is correct is when the user's topic IS the whole skill (e.g. "make me a Latin deck" → name:"Latin", no parent). When in doubt, infer the skill from the subject matter (a set of Latin vocabulary → skill "latin") rather than dropping the card at the root with no skill.
-   - NEVER emit an empty, whitespace, or placeholder ("untitled", "general", "skill", "deck") name for any path segment. Every segment is a real, human-meaningful name.
-3. Call propose_deck_with_cards ONCE with the appropriate deck info and cards. The commit step in the UI handles the three cases atomically:
-   a. Leaf exists → cards are added to it directly.
-   b. Leaf doesn't exist, parent exists → commit creates the leaf and adds cards.
-   c. Leaf doesn't exist, parent (or grandparent) also doesn't exist → commit walks the path and creates each missing ancestor, then the leaf, then adds cards.
-   You do NOT need to call propose_deck for missing parents — the propose_deck_with_cards commit handles it. Calling propose_deck for a parent that propose_deck_with_cards is already going to create produces a confusing chat (two cards, redundant clicks).
-4. After your propose_deck_with_cards call, stop and wait. The chat UI is the confirmation surface — clicking "Create deck & add" or "Add selected" are how the user commits. You don't loop back, and you should NOT ask the user to confirm in text ("please confirm" / "shall I create"). The card itself is the confirmation affordance. If the user wants a different deck name, they can edit the deck path inline on the card — you don't need to re-propose unless the user asks for a different topic.
-
-Card content guidance:
-- The FRONT side of every card is the TERM being tested. Keep it concise — the term itself, nothing more. Do NOT add definitions, example sentences, or context to the front. The user wants to see the bare prompt and recall the answer.
-- The BACK side is where the explanation lives — translation, definition, mnemonic, etc.
-- For LANGUAGE flashcards (the deck path or topic names a language: Spanish, Japanese, French, Latin, Mandarin, Arabic, etc.) ALWAYS include pronunciation on the BACK:
-  - Non-Latin scripts: add the romanization/transliteration (Japanese: kana → romaji; Mandarin: → pinyin with tone marks; Arabic: → transliteration; Cyrillic: → Latin transliteration).
-  - Latin-script languages with non-obvious pronunciation: add IPA or a simple phonetic respelling (French silent letters, English idioms, German umlauts).
-  - Format: put the translation on the first line and pronunciation in parentheses or on a second line. Example for "hacer" (Spanish): front = "hacer", back = "to do / to make\\n(ah-SAIR)".
-- For non-language cards (history, math, science, etc.) keep both sides focused on the concept; no pronunciation needed.
-- Use frontLabel/backLabel to override the defaults when it clarifies the card — e.g. for language cards: frontLabel "Term", backLabel "Translation".
-
-Hard rules:
-- propose_deck_with_cards limit: 10 cards per call (Zod-enforced). If the user asks for MORE than 10, propose 10, set requestedCount to the true count, and end your turn with "Showing first 10 of N requested — accept these and I'll propose the rest." Do NOT chain propose_deck_with_cards calls unprompted.
-- When the user has a note open, set sourceContentId on proposed cards to that note's id so cards link back to their source.
-- When the user revises a deck you already proposed in the conversation (renames it, retopics it, moves it under a different parent), the simplest fix is for the user to edit the deck path directly on the existing card. They can do that without involving you. If the user asks YOU to revise, just call propose_deck_with_cards again with the new deck info — the earlier proposal stays visible in chat history; the new one is the actionable one.${
-          editableContentId
-            ? `\n\nThe user is currently viewing a document (ID: ${editableContentId}). You have editor tools available to read and edit this document.
-
-IMPORTANT EDITING RULES:
-- When the document has existing content, ALWAYS use apply_diff to make targeted changes or APPEND new content. NEVER use replace_document unless the user explicitly asks you overwrite the entire document.
-- To add content (descriptions, text, images), APPEND it after the existing content using apply_diff. Do NOT overwrite what is already there.
-- When asked to edit, always: 1) Read the document first with read_first_chunk, 2) Plan your approach if the edit is complex, 3) Apply changes with apply_diff for targeted edits, 4) Call finish_with_summary when done.
-- Only use replace_document for blank/empty documents or when the user explicitly requests a full rewrite.
-
-When you generate an image, the user can insert it into the document at their cursor position.`
-            : isChatContent
-            ? `\n\nThe user is chatting with you on a full-page chat (ID: ${contentId}). DATA-MODEL FACT YOU MUST KNOW: this chat HAS a notes panel ("Add notes" — a TipTap editor below the conversation) keyed to the chat's own contentId. Writing to it is exactly the same as updating any other content's notes — call \`updateNote\` with the chat's contentId as the \`contentId\` argument. Do NOT create a separate file.
-
-NOTE-TOOL RULES IN CHAT CONTEXT:
-- "add a note to this chat", "create a note on this chat", "put X in the chat notes", "update the note in this chat" all mean: update the notes panel attached to THIS chat. Use \`updateNote({ contentId: "${contentId}", content: "<markdown>" })\`. NEVER set \`title\` — that would rename the chat.
-- For "create a NEW note in a folder" (separate file), use \`createNote\`. It defaults to the chat's parent folder.
-- For "update my Sourdough note" etc. (named other note), use \`searchNotes\` to find the id, then \`updateNote\`.
-- Tooling distinguishes by contentId — same tool, different target.
-- Title-arg rule: never set \`title\` unless the user EXPLICITLY says "rename this to X". Topic-derived titles are a bug. (The tool will hard-ignore \`title\` when the target is this chat, but still follow the rule.)`
-            : ""
-        }${userContextSection}${mentionedContext}`,
+        system: buildSystemPrompt({
+          hasImageTools: "generate_image" in tools,
+          hasFlashcardTools: "list_decks" in tools,
+          editableContentId,
+          isChatContent,
+          chatContentId: isChatContent ? contentId : undefined,
+          autoPronounceDefault,
+          userContextSection,
+          mentionedContext,
+        }),
         onStepFinish: (step) => {
           // Tool-call auto-association interceptor (Session 4b).
           // After each model step, scan the step's tool calls for any

@@ -198,6 +198,23 @@ window.addEventListener("message", async (event) => {
       await postMessageToPage("trusted-install-cleared", payload);
       await dispatchResponseEvent("trusted-install-cleared", payload);
     }
+
+    if (event.data.type === "get-recent-viewed-tabs") {
+      const tabs = await sendRuntimeMessage({ type: "get-recent-viewed-tabs" });
+      await postMessageToPage("recent-viewed-tabs", { tabs });
+      await dispatchResponseEvent("recent-viewed-tabs", { tabs });
+      return;
+    }
+
+    if (event.data.type === "send-note-to-tabs") {
+      const results = await sendRuntimeMessage({
+        type: "send-note-to-tabs",
+        payload: event.data.payload,
+      });
+      await postMessageToPage("send-note-to-tabs-result", { results });
+      await dispatchResponseEvent("send-note-to-tabs-result", { results });
+      return;
+    }
   } catch (error) {
     await postMessageToPage("bridge-error", {
       message: error?.message || "Bridge request failed",
@@ -250,6 +267,23 @@ document.addEventListener("dg-browser-bookmarks-request", async (event) => {
       ensurePresenceNode(payload);
       await postMessageToPage("trusted-install-cleared", payload);
       await dispatchResponseEvent("trusted-install-cleared", payload);
+    }
+
+    if (detail.type === "get-recent-viewed-tabs") {
+      const tabs = await sendRuntimeMessage({ type: "get-recent-viewed-tabs" });
+      await postMessageToPage("recent-viewed-tabs", { tabs });
+      await dispatchResponseEvent("recent-viewed-tabs", { tabs });
+      return;
+    }
+
+    if (detail.type === "send-note-to-tabs") {
+      const results = await sendRuntimeMessage({
+        type: "send-note-to-tabs",
+        payload: detail.payload,
+      });
+      await postMessageToPage("send-note-to-tabs-result", { results });
+      await dispatchResponseEvent("send-note-to-tabs-result", { results });
+      return;
     }
   } catch (error) {
     await postMessageToPage("bridge-error", {

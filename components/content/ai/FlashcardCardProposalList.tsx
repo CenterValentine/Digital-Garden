@@ -778,7 +778,7 @@ export function FlashcardCardProposalList({
             the deck-status hint all update in sync with what the
             user types. "/" creates a sub-deck.
           */}
-          <div className="flex items-center gap-1.5 text-[11px] text-gray-500 dark:text-gray-400">
+          <div className="flex items-center gap-1.5 text-[11px] text-gray-500 dark:text-gray-300">
             <span className="shrink-0">Target deck:</span>
             <DeckPathField
               value={pathDraft}
@@ -790,7 +790,7 @@ export function FlashcardCardProposalList({
               resetValueOnBlankBlur={payload.deck.proposedPath}
             />
           </div>
-          <div className="text-[11px] text-gray-400 dark:text-gray-500">
+          <div className="text-[11px] text-gray-500 dark:text-gray-400">
             <span className="font-mono">{effectivePath || "(empty path)"}</span>
             {" — "}
             <span>{deckStatusLine}</span>
@@ -808,7 +808,7 @@ export function FlashcardCardProposalList({
             )}
           </div>
           {payload.sourceContentId && (
-            <div className="text-[11px] text-gray-500 dark:text-gray-400">
+            <div className="text-[11px] text-gray-500 dark:text-gray-300">
               Source: linked to the open note
             </div>
           )}
@@ -836,12 +836,12 @@ export function FlashcardCardProposalList({
             </div>
           </div>
           {payload.deck.rationale && (
-            <p className="text-gray-600 dark:text-gray-400">
+            <p className="text-gray-600 dark:text-gray-300">
               {payload.deck.rationale}
             </p>
           )}
           {payload.deck.similarExistingPaths.length > 0 && (
-            <div className="text-[11px] text-gray-500 dark:text-gray-400">
+            <div className="text-[11px] text-gray-500 dark:text-gray-300">
               <div className="mb-1">
                 Similar existing decks (tell the AI to use one instead):
               </div>
@@ -1062,14 +1062,14 @@ export function FlashcardCardProposalList({
                   aria-controls={`card-editor-${i}`}
                   title={row.expanded ? "Collapse" : `${frontPreview} → ${backPreview}`}
                 >
-                  <span className="mr-1 font-medium text-gray-500 dark:text-gray-400">
+                  <span className="mr-1 font-medium text-gray-500 dark:text-gray-300">
                     {i + 1}.
                   </span>
                   {frontPreview}
-                  <span className="mx-1 text-gray-400 dark:text-gray-500">
+                  <span className="mx-1 text-gray-400 dark:text-gray-400">
                     →
                   </span>
-                  <span className="text-gray-600 dark:text-gray-400">
+                  <span className="text-gray-600 dark:text-gray-300">
                     {backPreview}
                   </span>
                 </button>

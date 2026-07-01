@@ -147,6 +147,14 @@ body:has(.embed-layout-page) {
   overflow: hidden !important;
 }
 
+/* Hide default nav + remove padding for the platform marketing page (notetrellis.com) */
+body:has(.platform-home-page) .notes-route-hides-default-nav {
+  display: none !important;
+}
+body:has(.platform-home-page) main {
+  padding-top: 0 !important;
+}
+
 /* Position toaster below navbar on notes routes (top-right corner) */
 /* Sonner uses [data-sonner-toaster] as the main container */
 body:has(.notes-layout-page) [data-sonner-toaster][data-y-position="top"] {
@@ -390,7 +398,7 @@ nav a,
 nav a:visited,
 nav a:link {
   text-decoration: none !important;
-  color: inherit !important;
+  color: inherit;
 }
 
 nav a:hover {
@@ -464,6 +472,10 @@ nav[class*="fixed"] {
 }
 .ProseMirror.flashcard-editor-tight p {
   margin: 0;
+}
+
+.ProseMirror.dg-editor-edge-to-edge > :first-child {
+  margin-top: 0;
 }
 
 .dark .ProseMirror {
