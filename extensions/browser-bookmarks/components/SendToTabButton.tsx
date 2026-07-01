@@ -55,6 +55,8 @@ export function SendToTabButton({ contentId, contentKind = "note" }: Props) {
   const [popoverStyle, setPopoverStyle] = useState<React.CSSProperties>({});
   const popoverRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
+  // No fetchTimeoutRef — the 5s fallback lives in a useEffect below so the
+  // React Compiler can track the timeout lifetime through the dependency array.
 
   // Position popover below the button, escaping any overflow containers via portal
   const updatePosition = useCallback(() => {
@@ -91,9 +93,8 @@ export function SendToTabButton({ contentId, contentKind = "note" }: Props) {
       if (detail?.source !== EXTENSION_SOURCE) return;
 
       if (detail.type === "recent-viewed-tabs") {
-        if (fetchTimeoutRef.current) clearTimeout(fetchTimeoutRef.current);
         setTabs(detail.payload?.tabs ?? []);
-        setLoading(false);
+        setLoading(false); // flipping loading→false cancels the 5s timeout via its useEffect cleanup
         // Pre-select the most recent tab
         const first = detail.payload?.tabs?.[0];
         if (first) setSelected(new Set([first.tabId]));
@@ -128,8 +129,6 @@ export function SendToTabButton({ contentId, contentKind = "note" }: Props) {
       document.removeEventListener("dg-browser-bookmarks-response", handler as EventListener);
   }, []);
 
-  const fetchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
   const handleOpen = useCallback(() => {
     if (!isExtensionInstalled()) {
       toast.info("Browser extension not detected", {
@@ -144,16 +143,21 @@ export function SendToTabButton({ contentId, contentKind = "note" }: Props) {
       setTabs([]);
       setSelected(new Set());
       sendBridgeMessage("get-recent-viewed-tabs");
-      // If the extension service worker doesn't respond within 5s, show an actionable message
-      fetchTimeoutRef.current = setTimeout(() => {
-        setLoading(false);
-        setTabs([]);
-      }, 5000);
-    } else {
-      if (fetchTimeoutRef.current) clearTimeout(fetchTimeoutRef.current);
     }
     setOpen(nextOpen);
   }, [open, updatePosition]);
+
+  // 5-second fallback: if no bridge response arrives, surface an actionable empty state.
+  // Cleanup fires when `loading` flips false (tabs arrived) or when `open` closes —
+  // cancelling the timer without a ref write in a callback.
+  useEffect(() => {
+    if (!open || !loading) return;
+    const id = setTimeout(() => {
+      setLoading(false);
+      setTabs([]);
+    }, 5000);
+    return () => clearTimeout(id);
+  }, [open, loading]);
 
   const toggleTab = useCallback((tabId: number) => {
     setSelected((prev) => {
