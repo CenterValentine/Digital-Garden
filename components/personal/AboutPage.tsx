@@ -60,11 +60,14 @@ export function AboutPage() {
 
       <div className="prose-wrap">
         <p className="intro-p">
-          I&apos;m an execution engineer — someone who turns strategy into{" "}
-          <b>working systems</b>, and working systems into results. Over the past
-          decade I&apos;ve built and run operations in technology companies,
-          moving between the abstract and the concrete so often it no longer
-          feels like a distinction.
+          I&apos;m an execution engineer — someone who turns strategy,
+          constraints, and real-world signals into{" "}
+          <b>systems that work.</b>
+        </p>
+        <p className="intro-body">
+          My work lives between technology, operations, and human coordination:
+          support systems, revenue workflows, automation, knowledge architecture,
+          and the connective tissue that helps teams move with less friction.
         </p>
 
         <VineDivider marginTop={52} />
@@ -77,27 +80,30 @@ export function AboutPage() {
             </h2>
             <p>
               I&apos;m drawn to the space where{" "}
-              <b>system design meets human coordination</b> — where you have to
-              decide not just what to build but how the building itself should
-              work. Most of my career has been spent at that intersection:
-              creating the conditions for teams to move well, and staying close
-              enough to the execution to know when they aren&apos;t.
+              <b>system design meets human coordination</b> — where the question
+              is not just what to build, but how the work itself should move.
             </p>
             <p>
-              I&apos;ve run engineering operations, stood up product processes
-              from scratch, and carried responsibility for outcomes that required
-              both technical literacy and organizational will. The thread through
-              all of it is the same: <b>the map has to match the territory</b>,
-              or you&apos;re navigating by fiction.
+              At Doxy.me, that meant helping scale customer and revenue
+              operations through rapid growth: support systems, Intercom
+              automation, billing workflows, lifecycle messaging, usage-based
+              revenue, help-center architecture, and cross-functional process
+              design.
+            </p>
+            <p>
+              The thread through all of it is the same:{" "}
+              <b>the map has to match the territory</b>, or the system
+              eventually becomes fiction.
             </p>
           </div>
           <aside className="sec-note" aria-hidden="true">
             <span className="note-text">
-              map ≠ territory
+              every system is a theory
               <br />
-              is always the problem
+              until the work
+              <br />
+              runs through it
             </span>
-            <span className="note-arrow">↖ this one especially</span>
           </aside>
         </div>
 
@@ -110,23 +116,24 @@ export function AboutPage() {
               Actual <em>dirt.</em>
             </h2>
             <p>
-              I garden. Not metaphorically — though that too — but with soil and
-              seeds and an unreasonable amount of attention to water. The project
-              is a permaculture plot in the <b>desert Southwest</b>, where the
-              conditions are genuinely hostile: scarce water, intense heat,
-              alkaline soil, and a sun that has very strong opinions about things.
+              I garden in the desert Southwest, where alkaline soil, intense
+              heat, and scarce water make{" "}
+              <b>every assumption visible.</b>
             </p>
             <p>
-              Somewhere in the middle of trying to keep things alive, I stopped
-              seeing it as a hobby and started seeing it as a <b>discipline</b>.
-              The constraints aren&apos;t obstacles to gardening; they&apos;re
-              what makes it interesting. I carry that instinct into everything
-              else I do.
+              What started as a hobby has become a discipline in constraints:
+              shade, timing, amendment, irrigation, observation, and patience.
+            </p>
+            <p>
+              That instinct follows me back into my work. Good systems are{" "}
+              <b>grown as much as they are designed.</b>
             </p>
           </div>
           <aside className="sec-note" aria-hidden="true">
             <span className="note-text">
-              constraints are the design, not the problem
+              constraints are the design,
+              <br />
+              not the excuse
             </span>
           </aside>
         </div>
@@ -137,22 +144,30 @@ export function AboutPage() {
           <div className="sec-content">
             <span className="sec-kicker">Right now</span>
             <h2>
-              Growing the <em>garden.</em>
+              Building the <em>garden.</em>
             </h2>
             <p>
-              I&apos;m building davidvalentine.org as a <b>digital garden</b> — a
-              living, growing record of projects, thinking, and things I&apos;m
-              learning. It&apos;s organized the way a garden is: by what grows
-              near what, by root systems and branching, not by categories imposed
-              from above.
+              I&apos;m building davidvalentine.org as a{" "}
+              <b>digital garden</b>: a living record of projects, notes,
+              experiments, career artifacts, and things I&apos;m learning.
             </p>
             <p>
-              If you want to follow along, the <b>field notes</b> are the place to
-              start. If you want to talk, the door is open.
+              It is part portfolio, part workshop, part memory system —
+              organized less like a filing cabinet and more like a landscape:
+              roots, paths, branches, seasons, and the occasional useful weed.
+            </p>
+            <p>
+              For the professional trail, start with the{" "}
+              <b>résumé</b>. For the thinking behind it, browse the{" "}
+              <b>field notes</b>. To wander, enter the garden.
             </p>
           </div>
           <aside className="sec-note" aria-hidden="true">
-            <span className="note-text">gardens grow sideways, not up</span>
+            <span className="note-text">
+              gardens grow by relation,
+              <br />
+              not by hierarchy
+            </span>
           </aside>
         </div>
 
@@ -160,11 +175,8 @@ export function AboutPage() {
           <Link className="ab-cta pri" href="/resume">
             View résumé →
           </Link>
-          <Link className="ab-cta sec" href="/notes">
+          <Link className="ab-cta sec" href="/blog">
             Browse field notes
-          </Link>
-          <Link className="ab-cta sec" href="/">
-            See the garden
           </Link>
         </div>
       </div>
@@ -174,7 +186,7 @@ export function AboutPage() {
         <span className="sep">·</span>
         <Link href="/results">Results</Link>
         <span className="sep">·</span>
-        <Link href="/contact">Contact</Link>
+        <Link href="/blog">Field notes</Link>
       </footer>
     </div>
   );

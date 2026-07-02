@@ -66,6 +66,7 @@
 .personal-home .intro-p { font-family:var(--serif); font-size:19px; line-height:1.72; color:var(--text-soft); max-width:54ch; margin-top:60px; }
 .personal-home .intro-p b { color:var(--text); font-weight:600; }
 .personal-home .intro-p::first-letter { float:left; font-size:5.2em; line-height:.82; padding:6px 12px 0 0; color:var(--accent-warm); font-weight:600; font-style:normal; }
+.personal-home .intro-body { font-family:var(--serif); font-size:19px; line-height:1.72; color:var(--text-soft); max-width:54ch; margin-top:24px; }
 
 .personal-home .sec { margin-top:0; padding:52px 0; border-bottom:1px solid var(--rule); display:grid; grid-template-columns:1fr 200px; gap:0 44px; }
 .personal-home .sec:last-of-type { border-bottom:none; }
