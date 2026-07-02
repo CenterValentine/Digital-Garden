@@ -398,8 +398,12 @@ html[data-theme="dark"]{
   --glow-root:drop-shadow(0 0 4px rgba(227,164,74,.7));
 }
 *{box-sizing:border-box;margin:0;padding:0}
-html,body{height:100%}
-body{
+/* Scoped to .fn-page (blog route only) so these rules don't leak to /about, /results, etc.
+   html,body{height:100%} + body{overflow:hidden} in a global CSS file would pin every page
+   to viewport height and break scrolling on all other personal pages. */
+html:has(.fn-page),
+html:has(.fn-page) body { height:100% }
+html:has(.fn-page) body {
   background:var(--bg);
   background-image:
     radial-gradient(120% 90% at 50% 6%, rgba(255,255,255,.5), transparent 60%),
@@ -407,16 +411,16 @@ body{
   color:var(--text);font-family:var(--serif);-webkit-font-smoothing:antialiased;
   min-height:100vh;overflow:hidden;transition:background-color .5s ease,color .5s ease;
 }
-/* dark-mode gradient on its own layer so it CROSSFADES (opacity) instead of snapping — symmetric day↔night */
-body::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:-1;
+/* dark-mode gradient on its own layer so it CROSSFADES (opacity) instead of snapping */
+html:has(.fn-page) body::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:-1;
   background:
     radial-gradient(120% 80% at 50% 32%, rgba(138,215,160,.08), transparent 55%),
     radial-gradient(140% 120% at 50% 36%, #16201a 0%, #0c100e 58%, #080a09 100%);
   opacity:0;transition:opacity .5s ease}
-html[data-theme="dark"] body::before{opacity:1}
-body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:60;opacity:0;
+html[data-theme="dark"]:has(.fn-page) body::before{opacity:1}
+html:has(.fn-page) body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:60;opacity:0;
   background:repeating-linear-gradient(to bottom,rgba(0,0,0,0) 0 2px,rgba(0,0,0,.16) 2px 3px);transition:opacity .5s}
-html[data-theme="dark"] body::after{opacity:.5}
+html[data-theme="dark"]:has(.fn-page) body::after{opacity:.5}
 
 /* ---------- chrome bits (used à la carte per mockup) ---------- */
 .tag{font-family:var(--mono);font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--accent-warm);display:block;margin-bottom:4px}

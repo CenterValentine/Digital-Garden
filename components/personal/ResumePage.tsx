@@ -32,23 +32,25 @@ const DATA: CvEntry[] = [
     yr: "2023–25",
     title: "Revenue Operations — ",
     titleEm: "Doxy.me",
-    meta: "RevOps · Stripe · HubSpot · Tray.io",
+    meta: "RevOps · Stripe · HubSpot · Segment · Snowflake",
     blurbPre:
-      "Owned revenue-operations systems across billing, lifecycle messaging, usage-based revenue, and analytics. ",
-    blurbBold: "Lifted dunning recovery ~65% → 73%, supporting $1.37M recovered",
-    blurbPost: "; operationalized >$100k/month usage billing.",
-    tags: ["RevOps", "Stripe", "Usage billing", "Dunning"],
+      "Owned revenue-operations systems across billing, lifecycle messaging, usage-based revenue, analytics, and customer-data integrity. Helped mature RevOps governance across Stripe, HubSpot, Intercom, Segment, Tray.io, Snowflake, and Sigma — documenting sources, locking down access, and stabilizing trusted reporting. ",
+    blurbBold:
+      "Lifted dunning recovery ~65% → 73%, supporting $1.37M recovered; dropped operational cost $300k/yr.",
+    blurbPost: "",
+    tags: ["RevOps", "HubSpot", "Stripe", "Segment", "Data Integrity", "Dunning"],
   },
   {
     yr: "2020–23",
     title: "CS Operations — ",
     titleEm: "Doxy.me",
-    meta: "Customer Operations · Intercom · Scale",
+    meta: "Customer Operations · Intercom · CRM Hygiene",
     blurbPre:
-      "Scaled customer operations through hypergrowth to 1M+ providers — Intercom, automation, routing, and help-center systems. ",
-    blurbBold: "3M+ automated conversations; CSAT 74% → 85%",
-    blurbPost: " at massive volume.",
-    tags: ["CS Ops", "Intercom", "Automation", "CSAT"],
+      "Scaled customer operations through hypergrowth to 1M+ providers — Intercom, automation, routing, help-center systems, CRM hygiene, and lifecycle communications. ",
+    blurbBold:
+      "Supported 3M+ automated conversations and 6M+ outbound messages; CSAT 74% → 85%.",
+    blurbPost: " Operationalized >$100k/month usage billing.",
+    tags: ["CS Ops", "Intercom", "CRM Hygiene", "Workflow Automation"],
   },
   {
     yr: "pre-2020",
