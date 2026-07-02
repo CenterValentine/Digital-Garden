@@ -6900,3 +6900,108 @@ mark {
   .public-prose .block-newsletter-form { flex-direction: column; }
   .public-prose .block-newsletter-input { min-width: unset; }
 }
+
+/* ── Personal Home (davidvalentine.org) ───────────────────────────────
+   Token scope + day↔night crossfade for the m44 garden experience and the
+   (personal) page routes. Driven by html[data-theme] which both the IDE
+   theme script and PersonalHomeShell's __setTheme set. See
+   components/home/PersonalHomeShell.tsx and lib/personal/. */
+.personal-home {
+  --serif: var(--font-newsreader, "Newsreader", Georgia, serif);
+  --mono:  var(--font-jetbrains-mono, "JetBrains Mono", ui-monospace, monospace);
+  --hand:  var(--font-caveat, "Caveat", cursive);
+}
+
+.personal-home[data-theme="light"],
+html[data-theme="light"] .personal-home {
+  --ph-bg:           #f1eadd;
+  --ph-text:         #272320;
+  --ph-text-soft:    #6a6256;
+  --ph-rule:         #d4c9b4;
+  --ph-accent:       #24415f;
+  --ph-accent-warm:  #a9742a;
+  --ph-branch-shoot: #272320;
+  --ph-branch-root:  #a9742a;
+  --ph-node-fill:    #f1eadd;
+  --ph-label:        #272320;
+  --ph-label-halo:   #f1eadd;
+  --ph-glow-shoot:   none;
+  --ph-glow-root:    none;
+}
+
+.personal-home[data-theme="dark"],
+html[data-theme="dark"] .personal-home {
+  --ph-bg:           #0c100e;
+  --ph-text:         #efe7d4;
+  --ph-text-soft:    #a9a48f;
+  --ph-rule:         #232c24;
+  --ph-accent:       #8ad7a0;
+  --ph-accent-warm:  #e3a44a;
+  --ph-branch-shoot: #8ad7a0;
+  --ph-branch-root:  #e3a44a;
+  --ph-node-fill:    #0c100e;
+  --ph-label:        #efe7d4;
+  --ph-label-halo:   #0c100e;
+  --ph-glow-shoot:   drop-shadow(0 0 4px rgba(138,215,160,.75));
+  --ph-glow-root:    drop-shadow(0 0 4px rgba(227,164,74,.7));
+}
+
+/* bridge: garden carousel reads these generic names */
+.personal-home {
+  --branch-shoot: var(--ph-branch-shoot);
+  --branch-root:  var(--ph-branch-root);
+  --node-shoot:   var(--ph-accent);
+  --node-root:    var(--ph-accent-warm);
+  --node-fill:    var(--ph-node-fill);
+  --label:        var(--ph-label);
+  --label-halo:   var(--ph-label-halo);
+  --glow-shoot:   var(--ph-glow-shoot);
+  --glow-root:    var(--ph-glow-root);
+  --bg:           var(--ph-bg);
+  --text:         var(--ph-text);
+  --text-soft:    var(--ph-text-soft);
+  --rule:         var(--ph-rule);
+  --accent:       var(--ph-accent);
+  --accent-warm:  var(--ph-accent-warm);
+}
+
+/* ── symmetric day↔night gradient crossfade ───────────────────────────
+   Light gradient always on the surface; dark gradient fades in via ::before
+   so BOTH directions animate smoothly. */
+.personal-home {
+  background-color: var(--ph-bg);
+  background-image:
+    radial-gradient(120% 90% at 50% 6%, rgba(255,255,255,.5), transparent 60%),
+    radial-gradient(120% 120% at 50% 122%, rgba(120,96,52,.11), transparent 55%);
+  transition: background-color .5s ease, color .5s ease;
+}
+.personal-home::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: -1;
+  background:
+    radial-gradient(120% 80% at 50% 32%, rgba(138,215,160,.08), transparent 55%),
+    radial-gradient(140% 120% at 50% 36%, #16201a 0%, #0c100e 58%, #080a09 100%);
+  opacity: 0;
+  transition: opacity .5s ease;
+}
+html[data-theme="dark"] .personal-home::before { opacity: 1; }
+
+/* CRT scanlines — dark mode only */
+.personal-home::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 60;
+  opacity: 0;
+  background: repeating-linear-gradient(
+    to bottom,
+    rgba(0,0,0,0) 0 2px,
+    rgba(0,0,0,.16) 2px 3px
+  );
+  transition: opacity .5s;
+}
+html[data-theme="dark"] .personal-home::after { opacity: .5; }
